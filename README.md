@@ -76,7 +76,7 @@ This guide provides the essential steps to set up and run this project locally u
     ```
     This command will:
     *   Create the `./local.db` file if it doesn't exist.
-    *   Create all necessary tables based on the schema defined in `db/migrations-sqlite/0000_manual_initial_schema.sql`.
+    *   Create all necessary tables based on the schema defined in `db/migrations-sqlite/0000_clear_rocket_raccoon.sql`.
     *   Populate the database with initial seed data.
     *   You should see a confirmation message like `[Seed] Database seeding completed successfully.` in your terminal.
 

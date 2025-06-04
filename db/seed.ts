@@ -34,11 +34,11 @@ async function seed() {
       // Assuming error means table doesn't exist
       if (tableCheckError.message && tableCheckError.message.includes(`no such table`)) {
         console.log('[Seed] Tables not found. Attempting to create schema from manual DDL file...');
-        const ddlFilePath = path.join(__dirname, 'migrations-sqlite/0000_manual_initial_schema.sql');
+        const ddlFilePath = path.join(__dirname, 'migrations-sqlite/0000_clear_rocket_raccoon.sql');
         try {
           const ddlSql = fs.readFileSync(ddlFilePath, 'utf-8');
           sqliteConnection.exec(ddlSql);
-          console.log('[Seed] Successfully executed DDL from 0000_manual_initial_schema.sql');
+          console.log('[Seed] Successfully executed DDL from 0000_clear_rocket_raccoon.sql');
         } catch (ddlError) {
           console.error('[Seed] CRITICAL: Failed to read or execute DDL SQL file:', ddlFilePath, ddlError);
           if (sqliteConnection) sqliteConnection.close();
