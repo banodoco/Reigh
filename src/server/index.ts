@@ -104,8 +104,8 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   res.status(statusCode).json({ message });
 });
 
-app.listen(PORT, () => {
-  console.log(`API Server listening on port ${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`API Server listening on port ${PORT} on all interfaces (0.0.0.0)`);
 });
 
 // Export the app for potential testing or other uses (optional)
