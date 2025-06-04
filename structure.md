@@ -235,6 +235,13 @@ To change which tools appear for a specific environment, you need to modify the 
 • **`tasks.ts`**: TypeScript definitions for `Task` and `TaskStatus`.
 • (Other global or shared type definitions)
 
+### 3.7 Server Routes (`src/server/routes/`)
+• **`steerableMotion.ts`**: Express router handling video generation between images.
+    – `POST /steerable-motion/travel-between-images`: Creates a new "travel_orchestrator" task for generating video between a sequence of images.
+    – Accepts parameters matching Python CLI (image_urls, base_prompts, segment_frames, etc.).
+    – Creates orchestrator task in database with UUID for task IDs and timestamps for run IDs.
+    – Includes comprehensive logging and error handling.
+
 ---
 
 ## 4. High-Level Data Flow (Adjusted for Tools)

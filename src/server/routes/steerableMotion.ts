@@ -30,7 +30,9 @@ interface TravelRequestBody {
  * Accepts JSON payload defined by TravelRequestBody.
  */
 router.post('/travel-between-images', async (req: any, res: any) => {
+  console.log('[API /steerable-motion/travel-between-images] Received POST request.'); // Log entry
   const body = req.body as TravelRequestBody;
+  console.log('[API /steerable-motion/travel-between-images] Request body:', JSON.stringify(body, null, 2)); // Log body
 
   // Basic validation
   if (!body.project_id) {
@@ -54,12 +56,18 @@ router.post('/travel-between-images', async (req: any, res: any) => {
     const runId = new Date().toISOString().replace(/[-:.TZ]/g, ''); // compact timestamp
     const orchestratorTaskId = `sm_travel_orchestrator_${runId.substring(2, 10)}_${randomUUID().slice(0, 6)}`;
 
+    const numSegments = body.image_urls ? body.image_urls.length - 1 : 0;
+    if (numSegments <= 0) {
+      console.warn('[API /steerable-motion/travel-between-images] No segments to generate based on image_urls length.', body.image_urls);
+      return res.status(400).json({ message: 'Not enough images to create video segments (minimum 2 required).' });
+    }
+
     // Build orchestrator payload (subset of the huge Python equivalent)
     const orchestratorPayload = {
       orchestrator_task_id: orchestratorTaskId,
       run_id: runId,
       input_image_paths_resolved: body.image_urls,
-      num_new_segments_to_generate: body.image_urls.length - 1,
+      num_new_segments_to_generate: numSegments,
       base_prompts_expanded: body.base_prompts,
       negative_prompts_expanded: body.negative_prompts ?? [''],
       segment_frames_expanded: body.segment_frames,
@@ -75,8 +83,10 @@ router.post('/travel-between-images', async (req: any, res: any) => {
       debug_mode_enabled: body.debug ?? true,
       shot_id: body.shot_id ?? undefined
     };
+    console.log('[API /steerable-motion/travel-between-images] Constructed orchestratorPayload:', JSON.stringify(orchestratorPayload, null, 2)); // Log payload
 
     // Insert task into SQLite via Drizzle
+    console.log('[API /steerable-motion/travel-between-images] Attempting to insert task into DB...'); // Log DB attempt
     const inserted = await db.insert(tasksSchema).values({
       projectId: body.project_id,
       taskType: 'travel_orchestrator',
@@ -90,8 +100,10 @@ router.post('/travel-between-images', async (req: any, res: any) => {
     }).returning();
 
     if (inserted.length === 0) {
+      console.error('[API /steerable-motion/travel-between-images] Failed to create orchestrator task in DB - no rows returned.');
       return res.status(500).json({ message: 'Failed to create orchestrator task.' });
     }
+    console.log('[API /steerable-motion/travel-between-images] Task inserted successfully:', JSON.stringify(inserted[0], null, 2));
 
     return res.status(201).json(inserted[0]);
   } catch (err: any) {
