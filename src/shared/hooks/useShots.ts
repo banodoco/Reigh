@@ -108,6 +108,7 @@ export const useListShots = (projectId: string | null) => {
       return data;
     },
     enabled: !!projectId, 
+    refetchInterval: 5000,
   });
 };
 
@@ -159,7 +160,6 @@ const createGenerationForUploadedImage = async (
   }
   
   const newGeneration: Database['public']['Tables']['generations']['Row'] = await response.json();
-  console.log('[useShots] createGenerationForUploadedImage (API): Successfully created generation:', newGeneration);
   return newGeneration;
 };
 
@@ -188,7 +188,6 @@ export const useAddImageToShot = () => {
       }
       
       const newShotGenerationEntry = await response.json();
-      console.log('[useShots] useAddImageToShot (API): Successfully added image to shot:', newShotGenerationEntry);
       return newShotGenerationEntry;
     },
     onMutate: async (args) => {
@@ -501,9 +500,7 @@ export const useHandleExternalImageDrop = () => {
 
       // 2. Create a generation record for the uploaded image
       try {
-        console.log('[useShots] useHandleExternalImageDrop: Creating generation record for', imageUrl); // [VideoLoadSpeedIssue]
         newGeneration = await createGenerationForUploadedImage(imageUrl, imageFile.name, imageFile.type, imageFile.size, projectIdForOperation);
-        console.log('[useShots] useHandleExternalImageDrop: Generation record created, ID:', newGeneration.id); // [VideoLoadSpeedIssue]
       } catch (generationError) {
         toast.error(`Failed to create generation data: ${(generationError as Error).message}`);
         return null;

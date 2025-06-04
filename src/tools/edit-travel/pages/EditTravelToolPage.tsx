@@ -26,6 +26,7 @@ import { Slider } from "@/shared/components/ui/slider";
 import { saveReconstructedVideo, reconstructVideoClientSide, extractAudio } from "@/shared/lib/videoReconstructionUtils"; // <-- MODIFIED IMPORT
 import { useProject } from "@/shared/contexts/ProjectContext"; // Import useProject
 import { uploadImageToStorage } from '@/shared/lib/imageUploader'; // For input file
+import { useQueryClient } from "@tanstack/react-query"; // <-- ADDED IMPORT
 
 // Helper function for aspect ratio calculation
 const gcd = (a: number, b: number): number => {
@@ -92,6 +93,7 @@ const EditTravelToolPage = () => {
   const reconstructionCancelRef = useRef(false); // <-- ADDED REF
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   const { selectedProjectId } = useProject(); // Get selected project ID
+  const queryClient = useQueryClient(); // <-- ADDED INSTANCE
 
   const { data: shots, isLoading: isLoadingShots, error: shotsError } = useListShots(selectedProjectId);
   const addImageToShotMutation = useAddImageToShot();
@@ -603,6 +605,7 @@ const EditTravelToolPage = () => {
           setGeneratedImages([]);
           setShowPlaceholders(false);
         }
+        queryClient.invalidateQueries({ queryKey: ['shots', selectedProjectId] }); // <-- ADDED INVALIDATION
       } else {
          console.warn(`[EditTravelToolPage] ${generationMode} task creation via API no ID returned or error in response data.`);
          toast.info(`${generationMode.charAt(0).toUpperCase() + generationMode.slice(1)} task creation registered, but no confirmation ID from API.`);

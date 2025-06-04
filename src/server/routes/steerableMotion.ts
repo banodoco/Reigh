@@ -83,7 +83,7 @@ router.post('/travel-between-images', async (req: any, res: any) => {
         orchestrator_details: orchestratorPayload,
         task_id: orchestratorTaskId
       },
-      status: 'Pending',
+      status: 'Queued',
       createdAt: new Date(),
       updatedAt: new Date()
     }).returning();
