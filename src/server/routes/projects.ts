@@ -1,6 +1,6 @@
 import express, { Request, Response, NextFunction } from 'express';
 import { db } from '../../lib/db'; // Adjusted path from @/lib/db
-import { projects as projectsTable } from '../../../db/schema/schema';
+import { projects as projectsTable, ProjectUpdate } from '../../../db/schema/schema';
 import { eq, asc, desc, and } from 'drizzle-orm';
 
 const projectsRouter = express.Router();
@@ -105,6 +105,68 @@ projectsRouter.post('/', asyncHandler(async (req: Request, res: Response) => {
       return res.status(409).json({ message: `Project with name "${nameForError}" already exists.` });
     }
     res.status(500).json({ message: 'Failed to create project' });
+  }
+}));
+
+// PUT /api/projects/:id - Update an existing project
+projectsRouter.put('/:id', asyncHandler(async (req: Request, res: Response) => {
+  const projectId = req.params.id;
+  const { name, aspectRatio } = req.body;
+
+  if (!projectId) {
+    return res.status(400).json({ message: 'Project ID is required' });
+  }
+
+  const updates: ProjectUpdate = {}; // Use ProjectUpdate type from schema
+
+  if (name !== undefined) {
+    if (typeof name !== 'string' || !name.trim()) {
+      return res.status(400).json({ message: 'Project name must be a non-empty string if provided' });
+    }
+    updates.name = name.trim();
+  }
+
+  if (aspectRatio !== undefined) {
+    if (typeof aspectRatio !== 'string' || !aspectRatio.trim()) { // Basic validation, can be more specific
+      return res.status(400).json({ message: 'Aspect ratio must be a non-empty string if provided' });
+    }
+    updates.aspectRatio = aspectRatio;
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return res.status(400).json({ message: 'No update data provided' });
+  }
+
+  try {
+    const updatedProjects = await db.update(projectsTable)
+      .set(updates)
+      .where(and(eq(projectsTable.id, projectId), eq(projectsTable.userId, DUMMY_USER_ID))) // Ensure user owns project
+      .returning({
+        id: projectsTable.id,
+        name: projectsTable.name,
+        userId: projectsTable.userId,
+        aspectRatio: projectsTable.aspectRatio,
+      });
+
+    if (!updatedProjects || updatedProjects.length === 0) {
+      return res.status(404).json({ message: 'Project not found or user not authorized to update' });
+    }
+    
+    // API response should match client expectation (user_id)
+    const updatedProjectResponse = {
+      ...updatedProjects[0],
+      user_id: updatedProjects[0].userId, // Ensure consistency if client expects user_id
+    };
+    // delete updatedProjectResponse.userId; // If client only expects user_id
+
+    res.status(200).json(updatedProjectResponse);
+  } catch (error: any) {
+    console.error('[API Error Updating Project]', error);
+    // Handle potential unique constraint violation for name if your schema enforces it project-wide or user-wide
+    if (error.code === '23505') { 
+      return res.status(409).json({ message: `Project with name "${updates.name}" already exists.` });
+    }
+    res.status(500).json({ message: 'Failed to update project' });
   }
 }));
 

@@ -4,8 +4,9 @@ import { Button } from '@/shared/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { CreateProjectModal } from '@/shared/components/CreateProjectModal';
-import { PlusCircle } from 'lucide-react';
+import { PlusCircle, Settings } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
+import { ProjectSettingsModal } from '@/shared/components/ProjectSettingsModal';
 
 interface GlobalHeaderProps {
   contentOffsetRight?: number;
@@ -14,10 +15,13 @@ interface GlobalHeaderProps {
 export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight = 0 }) => {
   const { projects, selectedProjectId, setSelectedProjectId, isLoadingProjects } = useProject();
   const [isCreateProjectModalOpen, setIsCreateProjectModalOpen] = useState(false);
+  const [isProjectSettingsModalOpen, setIsProjectSettingsModalOpen] = useState(false);
 
   const handleProjectChange = (projectId: string) => {
     setSelectedProjectId(projectId);
   };
+
+  const selectedProject = projects.find(p => p.id === selectedProjectId);
 
   return (
     <>
@@ -54,6 +58,18 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                 </SelectContent>
               </Select>
             )}
+            {selectedProjectId && projects.length > 0 && ( 
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsProjectSettingsModalOpen(true)}
+                className="ml-2"
+                title="Project settings"
+                disabled={!selectedProject} 
+              >
+                <Settings className="h-5 w-5" />
+              </Button>
+            )}
             <Button 
               variant="ghost" 
               size="icon" 
@@ -61,7 +77,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
               className="ml-2"
               title="Create new project"
             >
-              <PlusCircle className="h-5 w-5" />
+              <PlusCircle className="h-5 w-5 text-blue-500" />
             </Button>
           </div>
           <div className="flex flex-1 items-center justify-end space-x-2">
@@ -78,6 +94,13 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
         isOpen={isCreateProjectModalOpen} 
         onOpenChange={setIsCreateProjectModalOpen} 
       />
+      {selectedProject && (
+        <ProjectSettingsModal
+          isOpen={isProjectSettingsModalOpen}
+          onOpenChange={setIsProjectSettingsModalOpen}
+          project={selectedProject}
+        />
+      )}
     </>
   );
 }; 

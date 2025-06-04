@@ -176,7 +176,7 @@ To change which tools appear for a specific environment, you need to modify the 
 ### 3.4 Shared Elements (`src/shared/`)
 
 #### `src/shared/components/`
-• **`GlobalHeader.tsx`**: Site-wide header with branding, project selector, and a '+' button for creating new projects. Includes navigation links (e.g., "Shots" link to `/shots`).
+• **`GlobalHeader.tsx`**: Site-wide header with branding, project selector, project settings button, and a '+' button for creating new projects. Includes navigation links (e.g., "Shots" link to `/shots`).
 • **`ShotsPane/`**:
     – `ShotsPane.tsx`: Sticky bottom drawer for "shots" (lightweight collections).
     – `ShotGroup.tsx`: Droppable area for images within a shot.
@@ -188,6 +188,7 @@ To change which tools appear for a specific environment, you need to modify the 
 • **`PromptEditorModal.tsx`**: Modal for bulk prompt creation/editing, AI-assisted generation and refinement.
 • **`LoraSelectorModal.tsx`**: Browse and select LoRA models.
 • **`CreateProjectModal.tsx`**: A dialog component that allows users to enter a name for a new project. It uses the `addNewProject` function from `ProjectContext` to create the project, which is then automatically selected.
+• **`ProjectSettingsModal.tsx`**: A dialog component that allows users to update the name and aspect ratio of an existing project. Uses `ProjectContext.updateProject`.
 • **`FileInput.tsx`**: Reusable component for file input (image/video) with drag-and-drop and preview.
 • **`ShotImageManager.tsx`**: Reusable component for displaying and managing a list of images within a shot. Handles drag-and-drop reordering and deletion of images via callbacks. Used by `VideoEditLayout.tsx` and `ShotsPage.tsx`.
 • **`TasksPane/`**:
@@ -215,7 +216,7 @@ To change which tools appear for a specific environment, you need to modify the 
 
 #### `src/shared/contexts/`
 • **`LastAffectedShotContext.tsx`**: Context to remember the last modified shot.
-• **`ProjectContext.tsx`**: Manages the selected project ID, fetches available projects, and provides project state to the application. It communicates with the backend API (`/api/projects`) to list and create projects. Persists selection to `localStorage`. The API handles the creation of a "Default Project" if none exist. Provides an `addNewProject` function (via API) and `isCreatingProject` state.
+• **`ProjectContext.tsx`**: Manages the selected project ID, fetches available projects, and provides project state to the application. It communicates with the backend API (`/api/projects`) to list, create, and update projects. Persists selection to `localStorage`. The API handles the creation of a "Default Project" if none exist. Provides `addNewProject` and `updateProject` functions (via API) and corresponding loading states (`isCreatingProject`, `isUpdatingProject`).
 
 #### `src/shared/lib/`
 • **`imageUploader.ts`**: Uploads files to Supabase storage.
@@ -262,7 +263,9 @@ To change which tools appear for a specific environment, you need to modify the 
         *   **User manages images within the shot (in `VideoEditLayout`):**
             *   **Reorder images:** `PUT /api/shots/:shotId/generations/order` (via `useUpdateShotImageOrder`) with payload `{ orderedGenerationIds: string[] }`. The API updates the `position` field in the `shot_generations` table for all affected items. Client UI updates optimistically and then refetches shot data.
             *   **Delete image from shot:** `DELETE /api/shots/:shotId/generations/:generationId` (via `useRemoveImageFromShot`). The API removes the corresponding entry from the `shot_generations` table. Client UI updates optimistically and then refetches shot data.
-    4.  User configures video segments. Generating a segment creates a task (currently direct to Supabase, future: via API `POST /api/tasks`) with `task_type: 'video_travel_segment'`, `project_id`, and params.
+    4.  User configures video segments. Generating video segments for a shot (either individually or batch) now calls `POST /api/steerable-motion/travel-between-images` or `POST /api/tasks` respectively.
+        *   `POST /api/steerable-motion/travel-between-images`: Creates a `travel_orchestrator` task in the database, mirroring the Python CLI behavior for generating a video from a sequence of images with specified parameters.
+        *   `POST /api/tasks` (with `task_type: 'video_travel_segment'`): Used for generating individual segments between two specific images if that flow is still used.
 4.  **If Edit Travel Tool:**
     1.  User uploads an input image/video on `EditTravelToolPage` (to Supabase Storage).
     2.  User manages one or more edit prompts.

@@ -4,14 +4,15 @@ import React, { createContext, useState, useContext, ReactNode, useEffect } from
 // import { projects as projectsTable, users as usersTable } from '../../../db/schema/schema'; // Corrected path
 // import { eq, and, asc, desc } from 'drizzle-orm'; // Import Drizzle operators
 import { toast } from 'sonner';
+import { Project } from '@/types/project'; // Added import
 
 // Define the project type - ensure this matches API response structure for projects
-interface Project {
-  id: string;
-  name: string;
-  user_id: string; // API might return userId, ensure mapping if necessary or align types
-  aspectRatio?: string; // Added aspectRatio to Project interface (optional for existing projects)
-}
+// interface Project {  // Removed local definition
+//   id: string;
+//   name: string;
+//   user_id: string; 
+//   aspectRatio?: string; 
+// }
 
 interface ProjectContextType {
   projects: Project[];
@@ -21,6 +22,8 @@ interface ProjectContextType {
   fetchProjects: (selectProjectIdAfterFetch?: string | null) => Promise<void>;
   addNewProject: (projectName: string, aspectRatio: string) => Promise<Project | null>;
   isCreatingProject: boolean;
+  updateProject: (projectId: string, updates: { name?: string; aspectRatio?: string }) => Promise<boolean>;
+  isUpdatingProject: boolean;
 }
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
@@ -33,6 +36,7 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
   const [selectedProjectId, setSelectedProjectIdState] = useState<string | null>(null);
   const [isLoadingProjects, setIsLoadingProjects] = useState(true);
   const [isCreatingProject, setIsCreatingProject] = useState(false);
+  const [isUpdatingProject, setIsUpdatingProject] = useState(false);
 
   const fetchProjects = async (selectProjectIdAfterFetch?: string | null) => {
     setIsLoadingProjects(true);
@@ -132,6 +136,42 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const updateProject = async (projectId: string, updates: { name?: string; aspectRatio?: string }): Promise<boolean> => {
+    if (!updates.name?.trim() && !updates.aspectRatio) {
+      toast.error("No changes to save.");
+      return false;
+    }
+    setIsUpdatingProject(true);
+    try {
+      const response = await fetch(`/api/projects/${projectId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: response.statusText }));
+        throw new Error(errorData.message || `HTTP error! status: ${response.status} - ${response.statusText}`);
+      }
+      const updatedProjectFromApi: Project = await response.json();
+
+      setProjects(prevProjects => 
+        prevProjects.map(p => p.id === projectId ? { ...p, ...updatedProjectFromApi } : p)
+                     .sort((a, b) => a.name.localeCompare(b.name))
+      );
+      // If the updated project is the currently selected one, ensure its details are fresh (though ID won't change)
+      // This is mostly handled by the projects array update triggering re-renders.
+      toast.success(`Project "${updatedProjectFromApi.name}" updated successfully.`);
+      return true;
+    } catch (err: any) {
+      console.error("[ProjectContext] Exception during project update via API:", err);
+      toast.error(`Failed to update project: ${err.message}`);
+      return false;
+    } finally {
+      setIsUpdatingProject(false);
+    }
+  };
+
   useEffect(() => {
     fetchProjects();
    
@@ -154,7 +194,9 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
       isLoadingProjects,
       fetchProjects,
       addNewProject, 
-      isCreatingProject 
+      isCreatingProject,
+      updateProject,
+      isUpdatingProject
     }}>
       {children}
     </ProjectContext.Provider>

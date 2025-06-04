@@ -98,7 +98,8 @@ This guide provides the essential steps to set up and run this project locally u
 
     The frontend server will connect to the local SQLite database via the backend API server. Check your frontend terminal output for a message similar to `[DB] Connecting to SQLite at ./local.db via Drizzle...` (this message might appear when the backend server starts, or when the frontend first tries to communicate with it).
 
-6.  **Running on Hosted Platforms (e.g., Runpod):**
+    <details>
+    <summary>Click to expand for details on running on Runpod</summary>
 
     When deploying or running the development environment on a hosted platform like Runpod, your frontend and backend will likely be accessible via different public URLs/ports. The Vite development server needs to be told where to proxy API requests.
 
@@ -117,6 +118,17 @@ This guide provides the essential steps to set up and run this project locally u
     The Vite dev server will then proxy any requests made from the frontend to `/api/...` to `http://213.173.108.33:13296/api/...`.
 
     For local development, you do not need to set `VITE_API_TARGET_URL`, as it will default to `http://localhost:3001` (the typical local backend address).
+
+    **Exposing Ports on Runpod:**
+
+    Runpod handles port exposure in specific ways. The port your application listens on inside the container (e.g., `3001` for the API, `2222` for the frontend) will be mapped to a different public-facing port by Runpod.
+
+    *   **HTTP Ports (Proxy):** When you define an HTTP port in your Pod or Template configuration (e.g., port `3001` for your API), Runpod makes it accessible via a proxy URL like `https://{POD_ID}-{INTERNAL_PORT}.proxy.runpod.net`. For example, if your Pod ID is `s7breobom8crgs` and your internal API port is `3001`, the public URL would be `https://s7breobom8crgs-3001.proxy.runpod.net`.
+    *   **TCP Ports (Public IP):** If your pod has a public IP, you can expose ports via TCP. You'd add the desired internal port (e.g., `3001`) to the TCP port list in your Pod/Template configuration. Runpod will then assign a public IP and a *different* external port that maps to your internal port. You'll find this mapping in the "Connect" menu of your Pod. For example, `your-public-ip:10027` might map to your internal port `3001`.
+
+    Refer to the official [Runpod documentation on exposing ports](https://docs.runpod.io/pods/configuration/expose-ports) for detailed instructions and diagrams on how to configure this in the Runpod interface (either through the Template or Pod configuration page). You'll need to ensure the ports your application servers listen on (e.g., `3001` for the backend, `2222` for the frontend) are correctly specified in the Runpod settings as either HTTP or TCP ports to make them accessible.
+
+    </details>
 
 ---
 

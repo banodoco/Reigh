@@ -4,6 +4,7 @@ import projectsRouter from './routes/projects';
 import shotsRouter from './routes/shots';
 import generationsRouter from './routes/generations';
 import tasksRouter from './routes/tasks';
+import steerableMotionRouter from './routes/steerableMotion';
 import dotenv from 'dotenv';
 import multer from 'multer';
 import path from 'path';
@@ -19,7 +20,7 @@ dotenv.config();
 const app = express();
 // Use process.env.PORT for flexibility, e.g., when deploying.
 // Default to 3001 for local development if PORT is not set.
-const PORT = process.env.PORT || 3001;
+const PORT: number = process.env.PORT ? parseInt(process.env.PORT, 10) : 3001;
 
 // Middleware
 app.use(cors()); // Basic CORS setup, configure as needed for production
@@ -78,6 +79,7 @@ app.use('/api/projects', projectsRouter);
 app.use('/api/shots', shotsRouter);
 app.use('/api/generations', generationsRouter);
 app.use('/api/tasks', tasksRouter);
+app.use('/api/steerable-motion', steerableMotionRouter);
 
 // Basic health check endpoint
 app.get('/status', (req: express.Request, res: express.Response): void => {

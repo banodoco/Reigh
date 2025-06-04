@@ -280,84 +280,71 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
 
   const handleGenerateAllVideos = async () => {
     if (!projectId) {
-      toast.error("No project selected. Please select a project first.");
+      toast.error('No project selected. Please select a project first.');
       return;
     }
-    if (videoPairConfigs.length === 0) {
-      toast.info("No video segments configured to generate.");
+
+    if (managedImages.length < 2) {
+      toast.warning('Add at least two images to generate a travel video.');
       return;
     }
 
     setIsCreatingTask(true);
     setCreatingTaskId('batch');
-    toast.info(`Creating ${videoPairConfigs.length} video tasks in batch via API...`);
+    toast.info('Queuing travel-between-images task via API...');
 
-    let successCount = 0;
-    let errorCount = 0;
+    const imageUrls = managedImages
+      .map((img) => img.imageUrl)
+      .filter((url): url is string => Boolean(url));
 
-    for (const pairConfig of videoPairConfigs) {
-      if (!pairConfig.imageA?.imageUrl || !pairConfig.imageB?.imageUrl) {
-        toast.error(`Skipping segment: Image A or Image B is missing for pair starting with ${pairConfig.imageA?.id?.substring(0,4) || 'N/A'}.`);
-        errorCount++;
-        continue;
+    const basePrompts =
+      videoControlMode === 'batch' ? [batchVideoPrompt] : videoPairConfigs.map((cfg) => cfg.prompt);
+
+    const segmentFrames =
+      videoControlMode === 'batch' ? [batchVideoFrames] : videoPairConfigs.map((cfg) => cfg.frames);
+
+    const frameOverlap =
+      videoControlMode === 'batch' ? [batchVideoContext] : videoPairConfigs.map((cfg) => cfg.context);
+
+    try {
+      const response = await fetch('/api/steerable-motion/travel-between-images', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          project_id: projectId,
+          shot_id: selectedShot.id,
+          image_urls: imageUrls,
+          base_prompts: basePrompts,
+          segment_frames: segmentFrames,
+          frame_overlap: frameOverlap,
+          resolution: '700x460',
+          model_name: 'vace_14B',
+          seed: 789,
+          debug: true,
+          use_causvid_lora: true,
+          fade_in_duration:
+            '{"low_point": 0.0, "high_point": 0.8, "curve_type": "ease_in_out", "duration_factor": 0.00}',
+          fade_out_duration:
+            '{"low_point": 0.0, "high_point": 0.8, "curve_type": "ease_in_out", "duration_factor": 0.00}',
+          after_first_post_generation_saturation: 0.6,
+          params_json_str: '{"steps": 4}',
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: response.statusText }));
+        throw new Error(errorData.message || `HTTP error ${response.status}`);
       }
-      
-      const taskApiParams = {
-        image_a_url: pairConfig.imageA.imageUrl,
-        image_b_url: pairConfig.imageB.imageUrl,
-        prompt: videoControlMode === 'batch' ? batchVideoPrompt : pairConfig.prompt,
-        frames: videoControlMode === 'batch' ? batchVideoFrames : pairConfig.frames,
-        context: videoControlMode === 'batch' ? batchVideoContext : pairConfig.context,
-        shot_id: selectedShot.id,
-      };
 
-      try {
-        const response = await fetch('/api/tasks', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            project_id: projectId,
-            task_type: 'video_travel_segment',
-            params: taskApiParams as Json,
-            status: 'Pending',
-          })
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ message: response.statusText }));
-          console.error(`[VideoEditLayout] API Error for batch task ${pairConfig.id}:`, errorData.message || response.statusText);
-          toast.error(`API Error for pair ${pairConfig.id.substring(0,4)}...: ${(errorData.message || response.statusText).substring(0,30)}...`);
-          errorCount++;
-          continue; 
-        }
-        
-        const newTask = await response.json();
-
-        if (newTask && newTask.id) {
-          successCount++;
-        } else {
-            errorCount++;
-            toast.info(`Task for pair ${pairConfig.id.substring(0,4)}... registered via API, no ID returned.`);
-        }
-      } catch (err: any) {
-        console.error(`[VideoEditLayout] Exception creating batch video task for pair ${pairConfig.id} via API:`, err);
-        toast.error(`API Exception for pair ${pairConfig.id.substring(0,4)}...: ${err.message.substring(0,30)}...`);
-        errorCount++;
-      }
+      const newTask = await response.json();
+      toast.success(`Travel task queued (ID: ${(newTask.id as string).substring(0, 8)}...).`);
+    } catch (err: any) {
+      console.error('[VideoEditLayout] Error creating travel task:', err);
+      toast.error(`Failed to create travel task: ${err.message || 'Unknown error'}`);
+    } finally {
+      setIsCreatingTask(false);
+      setCreatingTaskId(null);
     }
-
-    if (successCount > 0) {
-      toast.success(`${successCount} video tasks created successfully via API.`);
-    }
-    if (errorCount > 0) {
-      toast.warning(`${errorCount} video tasks failed or had API issues.`);
-    }
-    if (successCount === 0 && errorCount === 0 && videoPairConfigs.length > 0) {
-        toast.info("Batch generation attempted via API but no tasks were processed (check config).");
-    }
-
-    setIsCreatingTask(false);
-    setCreatingTaskId(null);
   };
 
   return (
@@ -366,6 +353,7 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
       <h2 className="text-3xl font-bold mb-1">Video Edit: {selectedShot.name}</h2>
       <p className="text-muted-foreground mb-6">Configure and generate video segments, or add new images to this shot.</p>
       
+      {/*
       <div className="mb-6 flex items-center space-x-2">
         <Label className="text-sm font-medium">Control Mode:</Label>
         <Button 
@@ -383,6 +371,7 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
           Individual
         </Button>
       </div>
+      */}
 
       {videoControlMode === 'individual' && videoPairConfigs.length > 0 && (
         <div className="space-y-8 mb-8">

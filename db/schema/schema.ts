@@ -21,6 +21,12 @@ export const projects = pgTable('projects', {
   createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).$defaultFn(() => new Date()).notNull(),
 });
 
+// Type for updating projects, allowing optional fields
+export type ProjectUpdate = {
+  name?: string;
+  aspectRatio?: string;
+};
+
 export const tasks = pgTable('tasks', {
   id: uuid('id').$defaultFn(() => randomUUID()).primaryKey(),
   taskType: text('task_type').notNull(),
