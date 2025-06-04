@@ -12,8 +12,8 @@ This guide provides the essential steps to set up and run this project locally u
 1.  **Clone the Repository:**
     ```sh
     # Replace <YOUR_GIT_URL> with the actual Git URL from GitHub
-    git clone <YOUR_GIT_URL>
-    cd <YOUR_PROJECT_NAME>
+    git clone https://github.com/peteromallet/reigh
+    cd reigh
     ```
 
 2.  **Install Dependencies:**
