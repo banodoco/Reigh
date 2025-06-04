@@ -59,6 +59,7 @@ router.post('/travel-between-images', async (req: any, res: any) => {
       orchestrator_task_id: orchestratorTaskId,
       run_id: runId,
       input_image_paths_resolved: body.image_urls,
+      num_new_segments_to_generate: body.image_urls.length - 1,
       base_prompts_expanded: body.base_prompts,
       negative_prompts_expanded: body.negative_prompts ?? [''],
       segment_frames_expanded: body.segment_frames,
