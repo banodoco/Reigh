@@ -16,6 +16,7 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable';
 import ShotImageManager from '@/shared/components/ShotImageManager';
+import { Trash2 } from 'lucide-react';
 
 // Interface for individual video pair configuration (copied from Index.tsx)
 export interface VideoPairConfig {
@@ -91,6 +92,7 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
   const removeImageFromShotMutation = useRemoveImageFromShot();
   const updateShotImageOrderMutation = useUpdateShotImageOrder();
   const [fileInputKey, setFileInputKey] = useState<number>(Date.now());
+  const [deletingVideoId, setDeletingVideoId] = useState<string | null>(null);
 
   const [managedImages, setManagedImages] = useState<GenerationRow[]>([]);
 
@@ -204,6 +206,33 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
       onError: (error) => {
         // Error toast is handled by the hook
         console.error("[VideoEditLayout] Failed to remove image:", error);
+      }
+    });
+  };
+
+  const handleDeleteVideoOutput = async (generationId: string) => {
+    if (!selectedProjectId || !selectedShot || !selectedShot.id) {
+      toast.error("Cannot delete video: Project or Shot ID is missing.");
+      return;
+    }
+    setDeletingVideoId(generationId);
+    removeImageFromShotMutation.mutate({
+      shot_id: selectedShot.id,
+      generation_id: generationId,
+      project_id: selectedProjectId
+    }, {
+      onSuccess: () => {
+        onShotImagesUpdate();
+        toast.success("Video output removed from shot.");
+        // Additional success toast is handled by the hook if needed, but this provides immediate feedback.
+      },
+      onError: (error) => {
+        // Error toast is handled by the hook
+        console.error("[VideoEditLayout] Failed to remove video output:", error);
+        toast.error(`Failed to remove video: ${error.message}`);
+      },
+      onSettled: () => {
+        setDeletingVideoId(null);
       }
     });
   };
@@ -359,7 +388,7 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
             '{"low_point": 0.0, "high_point": 0.8, "curve_type": "ease_in_out", "duration_factor": 0.00}',
           fade_out_duration:
             '{"low_point": 0.0, "high_point": 0.8, "curve_type": "ease_in_out", "duration_factor": 0.00}',
-          after_first_post_generation_saturation: 0.6,
+          after_first_post_generation_saturation: 0.75,
           params_json_str: '{"steps": 4}',
         }),
       });
@@ -397,7 +426,7 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {videoOutputs.map((video, index) => (
-                <div key={video.id || `video-${index}`} className="rounded-lg overflow-hidden shadow-md bg-muted/30 aspect-video flex items-center justify-center">
+                <div key={video.id || `video-${index}`} className="rounded-lg overflow-hidden shadow-md bg-muted/30 aspect-video flex items-center justify-center relative group">
                   { (video.location || video.imageUrl) ? (
                     <video 
                       src={getDisplayUrl(video.location || video.imageUrl)} 
@@ -409,6 +438,23 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
                   ) : (
                     <p className="text-xs text-muted-foreground p-2">Video URL not available.</p>
                   )}
+                  <Button
+                    variant="destructive"
+                    size="icon"
+                    className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                    onClick={() => handleDeleteVideoOutput(video.id)}
+                    disabled={deletingVideoId === video.id}
+                    aria-label="Delete video"
+                  >
+                    {deletingVideoId === video.id ? (
+                      <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
+                  </Button>
                 </div>
               ))}
             </div>
