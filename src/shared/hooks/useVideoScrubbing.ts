@@ -65,14 +65,18 @@ export const useVideoScrubbing = () => {
       const normalizedPosition = offsetX / width;
 
       let newRate;
-      if (normalizedPosition < 0.5) {
-          // Map 0.0-0.5 to -2x to 1x
-          const p = normalizedPosition * 2; // scale 0-0.5 to 0-1
-          newRate = -2 + p * 3; // p=0 -> -2. p=1 -> 1
+      if (normalizedPosition < 0.4) {
+          // Left 2/5ths: Map 0.0-0.4 to -3x to 0x
+          const p = normalizedPosition / 0.4;
+          newRate = -3 + p * 3;
+      } else if (normalizedPosition <= 0.6) {
+          // Middle 1/5th: Map 0.4-0.6 to 0x to 1x
+          const p = (normalizedPosition - 0.4) / 0.2;
+          newRate = p;
       } else {
-          // Map 0.5-1.0 to 1x to 3x
-          const p = (normalizedPosition - 0.5) * 2; // scale 0.5-1 to 0-1
-          newRate = 1 + p * 2; // p=0 -> 1. p=1 -> 3
+          // Right 2/5ths: Map 0.6-1.0 to 1x to 3x
+          const p = (normalizedPosition - 0.6) / 0.4;
+          newRate = 1 + p * 2;
       }
 
       playbackRateRef.current = newRate;
