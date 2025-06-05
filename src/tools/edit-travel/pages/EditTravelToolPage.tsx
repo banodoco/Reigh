@@ -10,7 +10,6 @@ import { PromptEntry } from "@/tools/image-generation/components/ImageGeneration
 import PromptEditorModal from "@/shared/components/PromptEditorModal";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { Json } from "@/integrations/supabase/types";
 import ShotsPane from "@/shared/components/ShotsPane/ShotsPane";
 import { useListShots, useAddImageToShot } from "@/shared/hooks/useShots";
 import { useLastAffectedShot } from "@/shared/hooks/useLastAffectedShot";
@@ -27,6 +26,15 @@ import { saveReconstructedVideo, reconstructVideoClientSide, extractAudio } from
 import { useProject } from "@/shared/contexts/ProjectContext"; // Import useProject
 import { uploadImageToStorage } from '@/shared/lib/imageUploader'; // For input file
 import { useQueryClient } from "@tanstack/react-query"; // <-- ADDED IMPORT
+
+// Local definition for Json type to remove dependency on supabase client types
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[];
 
 // Helper function for aspect ratio calculation
 const gcd = (a: number, b: number): number => {
@@ -284,7 +292,7 @@ const EditTravelToolPage = () => {
     try {
       const { data, error } = await supabase
         .from('generations' as any) // Ensure 'as any' for problematic tables
-        .select('id, image_url, prompt, seed, metadata, project_id') 
+        .select('id, image_url, prompt, seed, metadata, project_id, created_at') 
         .eq('project_id', selectedProjectId) 
         // Add a filter for toolType if you want to distinguish edit_travel generations
         // .eq('metadata->>toolType', 'edit_travel_kontext') // Or 'edit_travel_flux' or a general 'edit_travel'
@@ -308,6 +316,7 @@ const EditTravelToolPage = () => {
             prompt: record.prompt as string || metadata.prompt,
             seed: typeof record.seed === 'number' ? record.seed : (typeof metadata.seed === 'number' ? metadata.seed : undefined),
             metadata: { ...metadata, toolType: metadata.toolType || (generationMode === 'flux' ? 'edit_travel_flux' : 'edit_travel_kontext') },
+            createdAt: record.created_at,
           };
         });
         setGeneratedImages(dbImages);
@@ -499,11 +508,11 @@ const EditTravelToolPage = () => {
     }
     if (!inputFile) {
       toast.error("Please select an input image or video.");
-        return;
+      return;
     }
     if (prompts.filter(p => p.fullPrompt.trim() !== "").length === 0) {
       toast.error("Please enter at least one prompt.");
-        return;
+      return;
     }
     // FAL API key check for 'kontext' mode - uses falApiKey state which is now set from localStorage
     if (generationMode === 'kontext' && !falApiKey) { 
@@ -586,7 +595,7 @@ const EditTravelToolPage = () => {
         body: JSON.stringify({
           project_id: selectedProjectId,
           task_type: taskType, 
-          params: specificParams as Json,
+          params: specificParams,
           status: 'Pending',
         })
       });
@@ -905,7 +914,7 @@ const EditTravelToolPage = () => {
       )}
       
       <ImageGallery 
-        images={showPlaceholders && generatedImages.length === 0 ? Array(4).fill(null).map((_,idx) => ({id: `ph-${idx}`, url: "/placeholder.svg", prompt: "Placeholder"})) : generatedImages}
+        images={showPlaceholders && generatedImages.length === 0 ? Array(4).fill(null).map((_,idx) => ({id: `ph-${idx}`, url: "/placeholder.svg", prompt: "Placeholder"})) : [...generatedImages].reverse()}
         onDelete={handleDeleteEdit} 
         onAddToLastShot={handleAddImageToTargetShot}
         allShots={shots || []}
