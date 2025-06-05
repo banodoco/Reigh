@@ -8,7 +8,6 @@ import { Shot, GenerationRow } from "@/types/shots";
 import { useProject } from "@/shared/contexts/ProjectContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Json } from "@/integrations/supabase/types";
 import FileInput from "@/shared/components/FileInput";
 import { uploadImageToStorage } from "@/shared/lib/imageUploader";
 import { useAddImageToShot, useRemoveImageFromShot, useUpdateShotImageOrder } from "@/shared/hooks/useShots";
@@ -20,6 +19,15 @@ import { Trash2 } from 'lucide-react';
 import TaskDetailsModal from './TaskDetailsModal';
 import { Info } from 'lucide-react';
 import { getDisplayUrl } from '@/shared/lib/utils';
+
+// Local definition for Json type to remove dependency on supabase client types
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[];
 
 // Interface for individual video pair configuration (copied from Index.tsx)
 export interface VideoPairConfig {
@@ -421,10 +429,10 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="absolute top-2 left-2 opacity-80 group-hover:opacity-100 transition-opacity z-10"
+                      className="absolute top-2 left-2 opacity-80 group-hover:opacity-100 transition-opacity z-10 bg-black/20 backdrop-blur-sm"
                       aria-label="Show task details"
                     >
-                      <Info className="h-5 w-5" />
+                      <Info className="h-5 w-5 text-white" />
                     </Button>
                   </TaskDetailsModal>
                   { (video.location || video.imageUrl) ? (
@@ -439,15 +447,15 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
                     <p className="text-xs text-muted-foreground p-2">Video URL not available.</p>
                   )}
                   <Button
-                    variant="destructive"
+                    variant="ghost"
                     size="icon"
-                    className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                    className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10 text-destructive hover:bg-destructive/20"
                     onClick={() => handleDeleteVideoOutput(video.id)}
                     disabled={deletingVideoId === video.id}
                     aria-label="Delete video"
                   >
                     {deletingVideoId === video.id ? (
-                      <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <svg className="animate-spin h-4 w-4 text-destructive" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
