@@ -104,7 +104,7 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
   // Filter for video outputs from managedImages
   const videoOutputs = useMemo(() => {
     if (!orderedShotImages) return [];
-    return orderedShotImages.filter(isGenerationVideo);
+    return orderedShotImages.filter(isGenerationVideo).reverse();
   }, [orderedShotImages]);
 
   useEffect(() => {
@@ -426,19 +426,19 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {videoOutputs.map((video, index) => (
                 <div key={video.id || `video-${index}`} className="rounded-lg overflow-hidden shadow-md bg-muted/30 aspect-video flex items-center justify-center relative group">
-                  <div className="absolute top-2 left-2 flex items-center gap-2 z-10">
+                  <div className="absolute top-2 left-2 flex items-center gap-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
                     <TaskDetailsModal generationId={video.id}>
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="opacity-80 group-hover:opacity-100 transition-opacity bg-black/20 backdrop-blur-sm"
+                        className="bg-black/20 backdrop-blur-sm hover:bg-white/20"
                         aria-label="Show task details"
                       >
                         <Info className="h-5 w-5 text-white" />
                       </Button>
                     </TaskDetailsModal>
                     {video.createdAt && (
-                      <span className="text-xs text-white bg-black/50 px-1.5 py-0.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity">
+                      <span className="text-xs text-white bg-black/50 px-1.5 py-0.5 rounded-md">
                         {formatDistanceToNow(new Date(video.createdAt), { addSuffix: true })}
                       </span>
                     )}
@@ -457,7 +457,7 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10 text-destructive hover:bg-destructive/20"
+                    className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10 text-destructive bg-black/20 hover:bg-destructive/20 backdrop-blur-sm"
                     onClick={() => handleDeleteVideoOutput(video.id)}
                     disabled={deletingVideoId === video.id}
                     aria-label="Delete video"
