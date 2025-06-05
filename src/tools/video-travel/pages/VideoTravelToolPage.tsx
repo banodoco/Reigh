@@ -76,6 +76,7 @@ const VideoTravelToolPage: React.FC = () => {
   const [batchVideoPrompt, setBatchVideoPrompt] = useState("");
   const [batchVideoFrames, setBatchVideoFrames] = useState(65);
   const [batchVideoContext, setBatchVideoContext] = useState(16);
+  const [batchVideoSteps, setBatchVideoSteps] = useState(4);
 
   const handleOpenCreateShotModal = () => {
     if (!selectedProjectId) {
@@ -169,6 +170,8 @@ const VideoTravelToolPage: React.FC = () => {
           onBatchVideoPromptChange={setBatchVideoPrompt}
           onBatchVideoFramesChange={setBatchVideoFrames}
           onBatchVideoContextChange={setBatchVideoContext}
+          batchVideoSteps={batchVideoSteps}
+          onBatchVideoStepsChange={setBatchVideoSteps}
         />
       )}
 
