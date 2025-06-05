@@ -410,7 +410,7 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
           base_prompts: basePrompts,
           segment_frames: segmentFrames,
           frame_overlap: frameOverlap,
-          negative_prompts: steerableMotionSettings.negative_prompt ? [steerableMotionSettings.negative_prompt] : [],
+          negative_prompts: [steerableMotionSettings.negative_prompt],
           model_name: steerableMotionSettings.model_name,
           seed: steerableMotionSettings.seed,
           debug: steerableMotionSettings.debug,

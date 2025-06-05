@@ -84,6 +84,25 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
 
   const inputImages = orchestratorDetails?.input_image_paths_resolved ?? [];
 
+  const getSteps = () => {
+    if (orchestratorDetails?.steps) return orchestratorDetails.steps;
+    if (orchestratorDetails?.num_inference_steps) return orchestratorDetails.num_inference_steps;
+    if (task?.params) {
+        const params = task.params as any;
+        if (params.steps) return params.steps;
+        if (params.params_json_str) {
+            try {
+                const parsed = JSON.parse(params.params_json_str);
+                return parsed.steps;
+            } catch (e) {
+                return null;
+            }
+        }
+    }
+    return null;
+  }
+  const steps = getSteps();
+
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
@@ -147,6 +166,12 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
                       <div className="space-y-1">
                         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Seed</p>
                         <p className="text-sm font-medium">{orchestratorDetails.seed_base}</p>
+                      </div>
+                    )}
+                    {steps && (
+                       <div className="space-y-1">
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Steps</p>
+                        <p className="text-sm font-medium">{steps}</p>
                       </div>
                     )}
                     {orchestratorDetails.parsed_resolution_wh && (
