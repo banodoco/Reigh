@@ -459,13 +459,6 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
                 <div
                   key={video.id || `video-${index}`}
                   className="rounded-lg overflow-hidden shadow-md bg-muted/30 aspect-video flex items-center justify-center relative group"
-                  onMouseEnter={() => videoRefs.current[index]?.play()}
-                  onMouseLeave={() => {
-                    if (videoRefs.current[index]) {
-                      videoRefs.current[index].pause();
-                      videoRefs.current[index].currentTime = 0;
-                    }
-                  }}
                 >
                   <div className="absolute top-2 left-2 flex items-center gap-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
                     <TaskDetailsModal generationId={video.id}>
@@ -488,8 +481,9 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
                     <video
                       ref={(el) => (videoRefs.current[index] = el)}
                       src={getDisplayUrl(video.location || video.imageUrl)}
-                      poster={video.thumbUrl ? getDisplayUrl(video.thumbUrl) : undefined}
-                      preload="metadata"
+                      poster={video.thumbUrl ? getDisplayUrl(video.thumbUrl) : getDisplayUrl('/placeholder.svg')}
+                      preload="auto"
+                      onLoadedData={(e) => { e.currentTarget.removeAttribute('poster'); }}
                       loop
                       muted
                       playsInline
