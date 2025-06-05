@@ -131,12 +131,15 @@ export async function processCompletedStitchTask(task: Task): Promise<void> {
 
     console.log(`[VideoStitchGenDebug] Created shot_generation ${insertedShotGenerations[0].id} linking generation ${newGeneration.id} to shot ${shotId} (task ${task.id}).`);
 
-    // Mark the task as processed
+    // Mark the task as processed and update its params with the normalized paths
     await db.update(tasksSchema)
-      .set({ generationProcessedAt: new Date() })
+      .set({
+        generationProcessedAt: new Date(),
+        params: normalizedParams,
+      })
       .where(eq(tasksSchema.id, task.id));
     
-    console.log(`[VideoStitchGenDebug] Marked task ${task.id} as generation_processed.`);
+    console.log(`[VideoStitchGenDebug] Marked task ${task.id} as generation_processed and updated its params.`);
 
   } catch (error: any) {
     console.error(`[VideoStitchGenDebug] Error during generation/shot_generation creation for task ${task.id}:`, error);
