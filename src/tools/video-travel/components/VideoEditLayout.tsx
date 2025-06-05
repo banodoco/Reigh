@@ -45,6 +45,8 @@ interface VideoEditLayoutProps {
   onBatchVideoPromptChange: (value: string) => void;
   onBatchVideoFramesChange: (value: number) => void;
   onBatchVideoContextChange: (value: number) => void;
+  batchVideoSteps: number;
+  onBatchVideoStepsChange: (value: number) => void;
   // Add any other necessary props, e.g., for generating videos
 }
 
@@ -83,6 +85,8 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
   onBatchVideoPromptChange,
   onBatchVideoFramesChange,
   onBatchVideoContextChange,
+  batchVideoSteps,
+  onBatchVideoStepsChange,
 }) => {
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [creatingTaskId, setCreatingTaskId] = useState<string | null>(null);
@@ -389,7 +393,7 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
           fade_out_duration:
             '{"low_point": 0.0, "high_point": 0.8, "curve_type": "ease_in_out", "duration_factor": 0.00}',
           after_first_post_generation_saturation: 0.75,
-          params_json_str: '{"steps": 4}',
+          params_json_str: JSON.stringify({ steps: batchVideoSteps }),
         }),
       });
 
@@ -606,6 +610,17 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
                   onValueChange={(value) => onBatchVideoContextChange(value[0])}
                 />
               </div>
+            </div>
+            <div>
+              <Label htmlFor="batchVideoSteps" className="text-sm font-medium block mb-1">Steps for all: {batchVideoSteps}</Label>
+              <Slider
+                id="batchVideoSteps"
+                min={1}
+                max={20}
+                step={1}
+                value={[batchVideoSteps]}
+                onValueChange={(value) => onBatchVideoStepsChange(value[0])}
+              />
             </div>
           </div>
 
