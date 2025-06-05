@@ -97,25 +97,6 @@ async function seed() {
     await localDb.delete(schema.tasks).where(eq(schema.tasks.projectId, projectId));
     console.log(`[Seed] Existing data cleared for project ${projectId}.`);
 
-    // 3. Create Tasks
-    console.log('[Seed] Creating new tasks...');
-    const [task1] = await localDb.insert(schema.tasks).values({
-      taskType: 'RenderScene',
-      params: { sceneFile: 'scene_v01.blend', resolution: [1920, 1080] },
-      status: 'Pending',
-      projectId: projectId,
-    }).returning();
-    console.log(`[Seed] Created task: ${task1.id} - ${task1.taskType}`);
-
-    const [task2] = await localDb.insert(schema.tasks).values({
-      taskType: 'PostProcess',
-      params: { inputFile: 'render_output_001.exr', effects: ['glow', 'sharpen'] },
-      status: 'Pending',
-      dependantOn: [task1.id],
-      projectId: projectId,
-    }).returning();
-    console.log(`[Seed] Created task: ${task2.id} - ${task2.taskType}`);
-
     // 4. Create Shot
     console.log('[Seed] Creating new shot...');
     const [shot] = await localDb.insert(schema.shots).values({

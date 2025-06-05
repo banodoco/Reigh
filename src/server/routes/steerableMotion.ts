@@ -92,7 +92,7 @@ router.post('/travel-between-images', async (req: any, res: any) => {
       use_causvid_lora: body.use_causvid_lora ?? true,
       fade_in_params_json_str: body.fade_in_duration ?? '{"low_point":0.0,"high_point":0.8,"curve_type":"ease_in_out","duration_factor":0.0}',
       fade_out_params_json_str: body.fade_out_duration ?? '{"low_point":0.0,"high_point":0.8,"curve_type":"ease_in_out","duration_factor":0.0}',
-      after_first_post_generation_saturation: body.after_first_post_generation_saturation ?? 0.6,
+      after_first_post_generation_saturation: body.after_first_post_generation_saturation ?? 0.75,
       params_json_str_override: body.params_json_str ?? '{"steps":4}',
       debug_mode_enabled: body.debug ?? true,
       shot_id: body.shot_id ?? undefined,
