@@ -34,3 +34,21 @@ export const dataURLtoFile = (dataUrl: string, filename: string, fileType?: stri
     return null;
   }
 };
+
+/**
+ * Constructs a full URL for display, prepending the API base URL if the path is relative.
+ * Handles different types of paths (full URLs, blob URLs, relative paths).
+ * @param relativePath The path to a resource (e.g., /files/image.png or a full http URL).
+ * @returns A full, usable URL for display in img/video src tags.
+ */
+export const getDisplayUrl = (relativePath: string | undefined | null): string => {
+  const baseUrl = import.meta.env.VITE_API_TARGET_URL || '';
+  if (!relativePath) return '/placeholder.svg'; // Default placeholder
+  if (relativePath.startsWith('http') || relativePath.startsWith('blob:') || relativePath.startsWith('data:')) {
+    return relativePath;
+  }
+  // Ensure no double slashes if baseUrl ends with / and relativePath starts with /
+  const cleanBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+  const cleanRelative = relativePath.startsWith('/') ? relativePath.substring(1) : relativePath;
+  return `${cleanBase}/${cleanRelative}`;
+};

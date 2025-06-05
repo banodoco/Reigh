@@ -19,6 +19,7 @@ import ShotImageManager from '@/shared/components/ShotImageManager';
 import { Trash2 } from 'lucide-react';
 import TaskDetailsModal from './TaskDetailsModal';
 import { Info } from 'lucide-react';
+import { getDisplayUrl } from '@/shared/lib/utils';
 
 // Interface for individual video pair configuration (copied from Index.tsx)
 export interface VideoPairConfig {
@@ -53,17 +54,6 @@ interface VideoEditLayoutProps {
 }
 
 const baseUrl = import.meta.env.VITE_API_TARGET_URL || '';
-
-const getDisplayUrl = (relativePath: string | undefined | null): string => {
-  if (!relativePath) return '/placeholder.svg'; // Default placeholder
-  if (relativePath.startsWith('http') || relativePath.startsWith('blob:') || relativePath.startsWith('data:')) {
-    return relativePath;
-  }
-  // Ensure no double slashes if baseUrl ends with / and relativePath starts with /
-  const cleanBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
-  const cleanRelative = relativePath.startsWith('/') ? relativePath.substring(1) : relativePath;
-  return `${cleanBase}/${cleanRelative}`;
-};
 
 const isGenerationVideo = (gen: GenerationRow): boolean => {
   return gen.type === 'video_travel_output' ||

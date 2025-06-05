@@ -10,7 +10,7 @@ import {
 import { Button } from '@/shared/components/ui/button';
 import { toast } from 'sonner';
 import { Info } from 'lucide-react';
-// import { Json } from '@/integrations/supabase/types';
+import { getDisplayUrl } from '@/shared/lib/utils';
 
 // Local definition for Json type to remove dependency on supabase client types
 export type Json =
@@ -30,17 +30,6 @@ interface Task {
   id: string;
   params: Json;
 }
-
-const getDisplayUrl = (relativePath: string | undefined | null): string => {
-  const baseUrl = import.meta.env.VITE_API_TARGET_URL || '';
-  if (!relativePath) return '/placeholder.svg';
-  if (relativePath.startsWith('http') || relativePath.startsWith('blob:') || relativePath.startsWith('data:')) {
-    return relativePath;
-  }
-  const cleanBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
-  const cleanRelative = relativePath.startsWith('/') ? relativePath.substring(1) : relativePath;
-  return `${cleanBase}/${cleanRelative}`;
-};
 
 const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, children }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -116,12 +105,14 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
             </div>
           ) : task ? (
             <div className="overflow-y-auto pr-2 space-y-6" style={{ maxHeight: 'calc(80vh - 140px)' }}>
-              <div className="space-y-3">
-                <div className="flex items-center space-x-2">
-                  <div className="w-2 h-2 bg-primary rounded-full"></div>
-                  <h3 className="text-lg font-semibold text-foreground">Input Images</h3>
-                </div>
-                {inputImages.length > 0 ? (
+              {/* Input Images Section - Prominently displayed at top */}
+              {inputImages.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-primary rounded-full"></div>
+                    <h3 className="text-lg font-semibold text-foreground">Input Images</h3>
+                    <span className="text-sm text-muted-foreground">({inputImages.length} image{inputImages.length !== 1 ? 's' : ''})</span>
+                  </div>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3 p-4 bg-muted/30 rounded-lg border">
                     {inputImages.map((img: string, index: number) => (
                       <div key={index} className="relative group">
@@ -136,27 +127,9 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
                       </div>
                     ))}
                   </div>
-                ) : (
-                  <div className="p-6 bg-muted/30 rounded-lg border border-dashed text-center">
-                    <p className="text-sm text-muted-foreground">No input images found in task details.</p>
-                  </div>
-                )}
-              </div>
-              
-              <div className="space-y-3">
-                <div className="flex items-center space-x-2">
-                  <div className="w-2 h-2 bg-primary rounded-full"></div>
-                  <h3 className="text-lg font-semibold text-foreground">Task Parameters</h3>
                 </div>
-                <div className="bg-muted/30 rounded-lg border p-4">
-                  <div className="max-h-96 overflow-y-auto">
-                    <pre className="text-xs font-mono text-foreground whitespace-pre-wrap break-words leading-relaxed">
-                      {JSON.stringify(task.params, null, 2)}
-                    </pre>
-                  </div>
-                </div>
-              </div>
-              
+              )}
+
               {orchestratorDetails && (
                 <div className="space-y-3">
                   <div className="flex items-center space-x-2">
@@ -191,6 +164,20 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
                   </div>
                 </div>
               )}
+              
+              <div className="space-y-3">
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-primary rounded-full"></div>
+                  <h3 className="text-lg font-semibold text-foreground">Task Parameters</h3>
+                </div>
+                <div className="bg-muted/30 rounded-lg border p-4">
+                  <div className="max-h-96 overflow-y-auto">
+                    <pre className="text-xs font-mono text-foreground whitespace-pre-wrap break-words leading-relaxed">
+                      {JSON.stringify(task.params, null, 2)}
+                    </pre>
+                  </div>
+                </div>
+              </div>
             </div>
           ) : (
             <div className="flex justify-center items-center h-64">
