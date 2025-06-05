@@ -39,17 +39,6 @@ const PORT: number = process.env.PORT ? parseInt(process.env.PORT, 10) : 8085;
 app.use(cors()); // Basic CORS setup, configure as needed for production
 app.use(express.json()); // To parse JSON request bodies
 
-// --- NEW: Serve generated video outputs from /workspace ---
-const VIDEO_WORKSPACE_OUTPUT_DIR = '/workspace/Headless-Wan/outputs';
-// Optional: Check if the directory exists and log, but express.static will handle non-existence gracefully (404).
-if (fs.existsSync(VIDEO_WORKSPACE_OUTPUT_DIR)) {
-  console.log(`[Server Setup] Serving static video outputs from ${VIDEO_WORKSPACE_OUTPUT_DIR} via /media_outputs route.`);
-  app.use('/media_outputs', express.static(VIDEO_WORKSPACE_OUTPUT_DIR));
-} else {
-  console.warn(`[Server Setup] VIDEO_WORKSPACE_OUTPUT_DIR (${VIDEO_WORKSPACE_OUTPUT_DIR}) does not exist. Videos from this path will not be served until the directory is created and populated.`);
-}
-// --- END: Serve generated video outputs ---
-
 // --- START: Local Image Upload Logic ---
 const LOCAL_FILES_DIR_NAME = 'files'; // Changed from UPLOADS_DIR_NAME
 
@@ -91,9 +80,9 @@ app.post('/api/local-image-upload', upload.single('image'), (req: express.Reques
   }
   // Build relative URL for the uploaded file
   const relativeFileUrl = `/${LOCAL_FILES_DIR_NAME}/${req.file.filename}`;
-  // Construct full absolute URL using req.protocol and host
-  const fullUrl = `${req.protocol}://${req.get('host')}${relativeFileUrl}`;
-  res.json({ url: fullUrl });
+  // Construct full absolute URL using req.protocol and host - REMOVED, NOT NEEDED FOR CLIENT
+  // const fullUrl = `${req.protocol}://${req.get('host')}${relativeFileUrl}`; 
+  res.json({ url: relativeFileUrl }); // Return the relative URL
   return;
 });
 // --- END: Local File Upload Logic ---

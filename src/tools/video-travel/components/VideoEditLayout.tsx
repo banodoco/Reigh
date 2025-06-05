@@ -47,50 +47,23 @@ interface VideoEditLayoutProps {
   // Add any other necessary props, e.g., for generating videos
 }
 
-// Helper function to determine if a generation is a video
+const baseUrl = import.meta.env.VITE_API_TARGET_URL || '';
+
+const getDisplayUrl = (relativePath: string | undefined | null): string => {
+  if (!relativePath) return '/placeholder.svg'; // Default placeholder
+  if (relativePath.startsWith('http') || relativePath.startsWith('blob:') || relativePath.startsWith('data:')) {
+    return relativePath;
+  }
+  // Ensure no double slashes if baseUrl ends with / and relativePath starts with /
+  const cleanBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+  const cleanRelative = relativePath.startsWith('/') ? relativePath.substring(1) : relativePath;
+  return `${cleanBase}/${cleanRelative}`;
+};
+
 const isGenerationVideo = (gen: GenerationRow): boolean => {
   return gen.type === 'video_travel_output' ||
          (gen.location && gen.location.endsWith('.mp4')) ||
          (gen.imageUrl && gen.imageUrl.endsWith('.mp4'));
-};
-
-// Helper function to resolve asset URLs
-const getDisplayUrl = (pathOrUrl: string | undefined | null): string | undefined => {
-  if (!pathOrUrl) return undefined;
-
-  if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://')) {
-    return pathOrUrl;
-  }
-
-  const explicitAssetBaseUrl = import.meta.env.VITE_APP_ASSET_BASE_URL;
-  const apiTargetUrl = import.meta.env.VITE_API_TARGET_URL; // Read the API target URL
-
-  let effectiveBaseUrl: string | undefined;
-
-  if (explicitAssetBaseUrl) {
-    effectiveBaseUrl = explicitAssetBaseUrl;
-  } else if (apiTargetUrl) {
-    effectiveBaseUrl = apiTargetUrl;
-  } else {
-    effectiveBaseUrl = undefined;
-  }
-  
-  const workspaceVideoPrefix = '/workspace/Headless-Wan/outputs/';
-
-  if (effectiveBaseUrl && pathOrUrl.startsWith(workspaceVideoPrefix)) {
-    const cleanBaseUrl = effectiveBaseUrl.endsWith('/') ? effectiveBaseUrl.slice(0, -1) : effectiveBaseUrl;
-    const relativeVideoPath = pathOrUrl.substring(workspaceVideoPrefix.length);
-    return `${cleanBaseUrl}/media_outputs/${relativeVideoPath}`;
-  }
-
-  // Warning if no effective base URL is available for paths that need it
-  if (!effectiveBaseUrl && pathOrUrl.startsWith(workspaceVideoPrefix)) {
-    console.warn(
-      `[VideoEditLayout] Neither VITE_APP_ASSET_BASE_URL nor VITE_API_TARGET_URL is set, but a server path (${pathOrUrl}) starting with ${workspaceVideoPrefix} was encountered. Video may not load correctly. Please set VITE_APP_ASSET_BASE_URL (recommended for assets) or VITE_API_TARGET_URL in your .env to your API server's base address (e.g., http://localhost:3001).`
-    );
-  }
-  // Fallback for other non-HTTP paths or if logic above doesn't apply
-  return pathOrUrl; 
 };
 
 const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
@@ -120,26 +93,6 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
   const [fileInputKey, setFileInputKey] = useState<number>(Date.now());
 
   const [managedImages, setManagedImages] = useState<GenerationRow[]>([]);
-
-  useEffect(() => {
-    const explicitAssetBaseUrl = import.meta.env.VITE_APP_ASSET_BASE_URL;
-    const apiTargetUrl = import.meta.env.VITE_API_TARGET_URL;
-    const effectiveBaseUrlIsSet = explicitAssetBaseUrl || apiTargetUrl;
-
-    const workspaceVideoPrefix = '/workspace/Headless-Wan/outputs/';
-    const hasProblematicPathWithoutBaseUrl = (orderedShotImages || []).some(gen =>
-      isGenerationVideo(gen) &&
-      !effectiveBaseUrlIsSet && // Problem if no effective base URL is set
-      ( // AND path is a workspace video path not already a full URL
-        (gen.location && gen.location.startsWith(workspaceVideoPrefix) && !gen.location.startsWith('http')) ||
-        (gen.imageUrl && gen.imageUrl.startsWith(workspaceVideoPrefix) && !gen.imageUrl.startsWith('http'))
-      )
-    );
-
-    if (hasProblematicPathWithoutBaseUrl) {
-      toast.warning("Video URL issue: Neither VITE_APP_ASSET_BASE_URL nor VITE_API_TARGET_URL is set. Videos from server paths (e.g., /workspace/Headless-Wan/outputs/...) may not load. Please set VITE_APP_ASSET_BASE_URL (recommended for assets) or VITE_API_TARGET_URL in your .env to your API server's base (e.g. http://localhost:3001). Server will serve videos via /media_outputs/ route.", { duration: 12000 });
-    }
-  }, [orderedShotImages]);
 
   // Filter for video outputs from managedImages
   const videoOutputs = useMemo(() => {
@@ -365,9 +318,17 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
     setCreatingTaskId('batch');
     toast.info('Queuing travel-between-images task via API...');
 
-    const imageUrls = managedImages
-      .map((img) => img.imageUrl)
-      .filter((url): url is string => Boolean(url));
+    // Use getDisplayUrl to convert relative paths to absolute URLs
+    const absoluteImageUrls = managedImages
+      .map((img) => getDisplayUrl(img.imageUrl)) // Use getDisplayUrl here
+      .filter((url): url is string => Boolean(url) && url !== '/placeholder.svg'); // Ensure it's a valid, non-placeholder URL
+
+    if (absoluteImageUrls.length < 2) {
+      toast.error('Not enough valid image URLs to generate video. Ensure images are processed correctly.');
+      setIsCreatingTask(false);
+      setCreatingTaskId(null);
+      return;
+    }
 
     const basePrompts =
       videoControlMode === 'batch' ? [batchVideoPrompt] : videoPairConfigs.map((cfg) => cfg.prompt);
@@ -385,7 +346,7 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
         body: JSON.stringify({
           project_id: projectId,
           shot_id: selectedShot.id,
-          image_urls: imageUrls,
+          image_urls: absoluteImageUrls, // Pass the absolute URLs
           base_prompts: basePrompts,
           segment_frames: segmentFrames,
           frame_overlap: frameOverlap,
@@ -438,9 +399,9 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
               {videoOutputs.map((video, index) => (
                 <div key={video.id || `video-${index}`} className="rounded-lg overflow-hidden shadow-md bg-muted/30 aspect-video flex items-center justify-center">
                   { (video.location || video.imageUrl) ? (
-                    <video
-                      src={getDisplayUrl(video.location || video.imageUrl)}
-                      controls
+                    <video 
+                      src={getDisplayUrl(video.location || video.imageUrl)} 
+                      controls 
                       className="w-full h-full object-contain"
                     >
                       Your browser does not support the video tag.
@@ -484,7 +445,7 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
                   <Label className="text-xs font-medium text-muted-foreground self-start">Image A</Label>
                   <div className="w-full h-36 bg-muted/50 rounded border flex items-center justify-center p-1 overflow-hidden">
                     <img 
-                      src={pairConfig.imageA.thumbUrl || pairConfig.imageA.imageUrl || '/placeholder.svg'} 
+                      src={getDisplayUrl(pairConfig.imageA.thumbUrl || pairConfig.imageA.imageUrl)} 
                       alt={`Pair ${index + 1} - Image A`}
                       className="max-w-full max-h-full object-contain rounded-sm"
                     />
@@ -494,7 +455,7 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
                   <Label className="text-xs font-medium text-muted-foreground self-start">Image B</Label>
                   <div className="w-full h-36 bg-muted/50 rounded border flex items-center justify-center p-1 overflow-hidden">
                     <img 
-                      src={pairConfig.imageB.thumbUrl || pairConfig.imageB.imageUrl || '/placeholder.svg'} 
+                      src={getDisplayUrl(pairConfig.imageB.thumbUrl || pairConfig.imageB.imageUrl)} 
                       alt={`Pair ${index + 1} - Image B`}
                       className="max-w-full max-h-full object-contain rounded-sm"
                     />
@@ -542,7 +503,7 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
                 <Label className="text-xs font-medium text-muted-foreground self-center">Video Preview</Label>
                 <div className="w-full aspect-video bg-muted/50 rounded border flex items-center justify-center overflow-hidden">
                   {pairConfig.generatedVideoUrl ? (
-                    <video src={pairConfig.generatedVideoUrl} controls className="w-full h-full object-contain" />
+                    <video src={getDisplayUrl(pairConfig.generatedVideoUrl)} controls className="w-full h-full object-contain" />
                   ) : (
                     <p className="text-xs text-muted-foreground text-center p-2">Video output will appear here</p>
                   )}

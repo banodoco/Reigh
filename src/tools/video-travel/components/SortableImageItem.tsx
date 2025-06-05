@@ -24,6 +24,21 @@ interface SortableImageItemProps {
 
 const SKIP_CONFIRMATION_KEY = 'skipImageDeletionConfirmation';
 
+const baseUrl = import.meta.env.VITE_API_TARGET_URL || '';
+
+const getDisplayUrl = (relativePath: string | undefined): string => {
+  if (!relativePath) return '/placeholder.svg'; // Default placeholder if no path
+  // If it's already an absolute URL, a blob URL, or a root-relative path (like /placeholder.svg itself), use as is.
+  if (relativePath.startsWith('http') || relativePath.startsWith('blob:') || relativePath.startsWith('/')) {
+    return relativePath;
+  }
+  // For other relative paths (like 'files/image.png'), prepend the base URL.
+  const cleanBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+  // Ensure the relative path doesn't start with a slash if we are prepending base
+  const cleanRelative = relativePath.startsWith('/') ? relativePath.substring(1) : relativePath;
+  return `${cleanBase}/${cleanRelative}`;
+};
+
 export const SortableImageItem: React.FC<SortableImageItemProps> = ({ image, onDelete }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: image.id });
   const [isConfirmDeleteDialogOpen, setIsConfirmDeleteDialogOpen] = useState(false);
@@ -65,7 +80,7 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({ image, onD
       className="relative group bg-muted/50 rounded border p-1 flex flex-col items-center justify-center aspect-square overflow-hidden shadow-sm"
     >
       <img 
-        src={image.thumbUrl || image.imageUrl || '/placeholder.svg'} 
+        src={getDisplayUrl(image.thumbUrl || image.imageUrl)} 
         alt={`Image ${image.id}`} 
         className="max-w-full max-h-full object-contain rounded-sm"
       />

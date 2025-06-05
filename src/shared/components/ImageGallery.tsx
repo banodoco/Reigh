@@ -57,7 +57,7 @@ export interface DisplayableMetadata extends Record<string, any> {
 // Updated interface for images passed to the gallery
 export interface GeneratedImageWithMetadata {
   id: string;
-  url: string;
+  url: string; // This will now be a relative path for DB-sourced images
   prompt?: string;
   seed?: number;
   metadata?: DisplayableMetadata;
@@ -134,6 +134,19 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, isDeletin
 
   const tickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  const baseUrl = import.meta.env.VITE_API_TARGET_URL || '';
+
+  const getDisplayUrl = (relativePath: string | undefined): string => {
+    if (!relativePath) return ''; // Or a placeholder image URL
+    if (relativePath.startsWith('http') || relativePath.startsWith('blob:')) {
+      return relativePath;
+    }
+    // Ensure no double slashes if baseUrl ends with / and relativePath starts with /
+    const cleanBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+    const cleanRelative = relativePath.startsWith('/') ? relativePath.substring(1) : relativePath;
+    return `${cleanBase}/${cleanRelative}`;
+  };
+
   useEffect(() => {
     setSelectedShotIdLocal(lastShotId || (simplifiedShotOptions.length > 0 ? simplifiedShotOptions[0].id : ""));
   }, [lastShotId, simplifiedShotOptions]);
@@ -152,7 +165,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, isDeletin
   }, []);
 
   const handleOpenLightbox = (image: GeneratedImageWithMetadata) => {
-    setLightboxImageUrl(image.url);
+    setLightboxImageUrl(getDisplayUrl(image.url));
     setLightboxImageAlt(image.prompt || `Generated image with ID ${image.id}`);
     setLightboxImageId(image.id);
   };
@@ -163,13 +176,14 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, isDeletin
     setLightboxImageId(undefined);
   };
 
-  const handleDownloadImage = async (imageUrl: string, filename: string, imageId?: string, isVideo?: boolean, originalContentType?: string) => {
+  const handleDownloadImage = async (rawUrl: string, filename: string, imageId?: string, isVideo?: boolean, originalContentType?: string) => {
     const currentDownloadId = imageId || filename;
     setDownloadingImageId(currentDownloadId);
+    const accessibleImageUrl = getDisplayUrl(rawUrl); // Use display URL for download
 
     try {
       const xhr = new XMLHttpRequest();
-      xhr.open('GET', imageUrl, true);
+      xhr.open('GET', accessibleImageUrl, true); // Use accessibleImageUrl
       xhr.responseType = 'blob';
 
       xhr.onload = function() {
@@ -185,7 +199,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, isDeletin
           let fileExtension = blobContentType.split('/')[1];
           if (!fileExtension || fileExtension === 'octet-stream') {
             // Fallback to guessing from URL or defaulting
-            const urlParts = imageUrl.split('.');
+            const urlParts = accessibleImageUrl.split('.');
             fileExtension = urlParts.length > 1 ? urlParts.pop()! : (isVideo ? 'webm' : 'png');
           }
           const downloadFilename = filename.includes('.') ? filename : `${filename}.${fileExtension}`;
@@ -331,21 +345,21 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, isDeletin
         )}
 
         {filteredImages.length > 0 && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-4">
             {filteredImages.map((image, index) => {
-                const imageKey = image.id || `image-${image.url}-${index}`;
+                const displayUrl = getDisplayUrl(image.url);
+                const metadataForDisplay = image.metadata ? formatMetadataForDisplay(image.metadata) : "No metadata available.";
+                const isCurrentDeleting = isDeleting === image.id;
+                const imageKey = image.id || `image-${displayUrl}-${index}`;
                 const galleryRenderLogId = nanoid(5);
 
                 // Determine if it's a video by checking the URL extension if isVideo prop is not explicitly set
-                const urlIsVideo = image.url && (image.url.toLowerCase().endsWith('.webm') || image.url.toLowerCase().endsWith('.mp4') || image.url.toLowerCase().endsWith('.mov'));
+                const urlIsVideo = displayUrl && (displayUrl.toLowerCase().endsWith('.webm') || displayUrl.toLowerCase().endsWith('.mp4') || displayUrl.toLowerCase().endsWith('.mov'));
                 const isActuallyVideo = typeof image.isVideo === 'boolean' ? image.isVideo : urlIsVideo;
-
-   
 
                 // Placeholder check should ideally rely on more than just !image.id if placeholders are actual objects in the array
                 // For this implementation, we assume placeholders passed to `images` prop might not have `id`
-                const isPlaceholder = !image.id && image.url === "/placeholder.svg";
-                const isCurrentlyDeleting = isDeleting === image.id;
+                const isPlaceholder = !image.id && displayUrl === "/placeholder.svg";
                 const currentTargetShotName = selectedShotIdLocal ? simplifiedShotOptions.find(s => s.id === selectedShotIdLocal)?.name : undefined;
                 
                 let aspectRatioPadding = '100%'; 
@@ -376,16 +390,11 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, isDeletin
                     key={imageKey}
                     className="border rounded-lg overflow-hidden hover:shadow-md transition-shadow relative group bg-card"
                 >
-                    {/* This console.log is now covered by the one above that includes 'determined as video'
-                    ((): null => { 
-                        console.log(`[ImageGallery_RenderItem_${galleryRenderLogId}] Rendering decision: isVideo is ${image.isVideo}. Will render ${image.isVideo ? 'VIDEO' : 'IMAGE'} tag for URL: ${image.url}`); 
-                        return null; 
-                    })()*/}
                     <div className="relative w-full">
                     <div style={{ paddingBottom: aspectRatioPadding }} className="relative bg-gray-200">
                         {isActuallyVideo ? (
                             <video
-                                src={image.url}
+                                src={displayUrl}
                                 controls
                                 playsInline
                                 loop
@@ -396,7 +405,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, isDeletin
                             />
                         ) : (
                             <img
-                                src={image.url}
+                                src={displayUrl}
                                 alt={image.prompt || `Generated image ${index + 1}`}
                                 className="absolute inset-0 w-full h-full object-cover group-hover:opacity-80 transition-opacity duration-300"
                                 onDoubleClick={() => handleOpenLightbox(image)}
@@ -452,7 +461,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, isDeletin
                                                 toast({ title: "Select a Shot", description: "Please select a shot first to add this image.", variant: "destructive" });
                                                 return;
                                             }
-                                            const success = await onAddToLastShot(image.id!, image.url, image.url);
+                                            const success = await onAddToLastShot(image.id!, displayUrl, displayUrl);
                                             if (success) {
                                                 setShowTickForImageId(image.id!);
                                                 if (tickTimeoutRef.current) clearTimeout(tickTimeoutRef.current);
@@ -485,9 +494,9 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, isDeletin
                                 size="icon" 
                                 className="h-7 w-7 p-0 rounded-full"
                                 onClick={() => onDelete(image.id!)}
-                                disabled={isCurrentlyDeleting}
+                                disabled={isCurrentDeleting}
                                 >
-                                {isCurrentlyDeleting ? (
+                                {isCurrentDeleting ? (
                                     <div className="h-3 w-3 animate-spin rounded-full border-b-2 border-white"></div>
                                 ) : (
                                     <Trash2 className="h-3.5 w-3.5" />
@@ -515,7 +524,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, isDeletin
                                     className="w-full h-auto max-h-24 object-contain rounded-sm mb-2 border"
                                 />
                                 )}
-                                <pre className="font-sans whitespace-pre-wrap">{formatMetadataForDisplay(image.metadata)}</pre>
+                                <pre className="font-sans whitespace-pre-wrap">{metadataForDisplay}</pre>
                             </TooltipContent>
                             </Tooltip>
                         )}
@@ -526,12 +535,12 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, isDeletin
                                 variant="outline"
                                 size="icon" 
                                 className="h-7 w-7 p-0 rounded-full bg-black/50 hover:bg-black/70 text-white"
-                                onClick={() => image.metadata && onApplySettings(image.metadata)}
+                                onClick={() => onApplySettings(image.metadata!)}
                                 >
-                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-copy-plus"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/><path d="M15 12h6"/><path d="M18 9v6"/></svg>
+                                <Settings className="h-4 w-4 mr-1" /> Apply
                                 </Button>
                             </TooltipTrigger>
-                            <TooltipContent side="bottom"><p>Use these settings</p></TooltipContent>
+                            <TooltipContent>Apply these generation settings to the form</TooltipContent>
                             </Tooltip>
                         )}
                         </div>
@@ -545,7 +554,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, isDeletin
                                 size="icon"
                                 className="h-7 w-7 p-0 rounded-full bg-black/50 hover:bg-black/70 text-white"
                                 onClick={() => handleDownloadImage(
-                                    image.url, 
+                                    displayUrl, 
                                     `artful_pane_craft_${isActuallyVideo ? 'video' : 'image'}_${image.id || index}`,
                                     image.id || imageKey,
                                     isActuallyVideo,
@@ -572,12 +581,14 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, isDeletin
         )}
       </div>
       
-      <FullscreenImageModal 
-        imageUrl={lightboxImageUrl} 
-        imageAlt={lightboxImageAlt}
-        imageId={lightboxImageId}
-        onClose={handleCloseLightbox} 
-      />
+      {lightboxImageUrl && (
+        <FullscreenImageModal
+          imageUrl={lightboxImageUrl}
+          imageAlt={lightboxImageAlt}
+          onClose={handleCloseLightbox}
+          imageId={lightboxImageId}
+        />
+      )}
     </TooltipProvider>
   );
 };

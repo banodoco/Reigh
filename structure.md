@@ -87,10 +87,6 @@ src/app/Layout.tsx – Main application layout component. Renders `<GlobalHeader
 
 The application's behavior, specifically which tools are available on the `ToolSelectorPage.tsx`, can be controlled via the `VITE_APP_ENV` environment variable. This allows for different sets of tools to be displayed based on whether the app is running in a development (`dev`), local (`local`), or web/production (`web`) context.
 
-**Other Key Environment Variables:**
-*   `VITE_API_TARGET_URL`: (Primarily for Vite dev server) Specifies the target URL for API proxying (e.g., `http://localhost:3001`).
-*   `VITE_APP_ASSET_BASE_URL`: (Client-side) Specifies the base URL for constructing absolute URLs to assets (like videos) served by the backend. If not set, client-side logic will attempt to use `VITE_API_TARGET_URL` as a fallback for this purpose when dealing with assets served from the API server (e.g., videos from `/workspace/Headless-Wan/outputs/` which are exposed via the `/media_outputs/` route on the Express server).
-
 **How to Set `VITE_APP_ENV`:**
 
 1.  Ensure a `.env.local` file exists in the root of your project. If not, create one.
@@ -248,9 +244,6 @@ To change which tools appear for a specific environment, you need to modify the 
     – Accepts parameters matching Python CLI (image_urls, base_prompts, segment_frames, etc.).
     – Creates orchestrator task in database with UUID for task IDs and timestamps for run IDs.
     – Includes comprehensive logging and error handling.
-• **Static File Serving (in `src/server/index.ts`)**:
-    – `/files`: Serves files from the local `public/files` directory (primarily for local image uploads).
-    – `/media_outputs`: Serves files from the server's `/workspace/Headless-Wan/outputs/` directory (e.g., generated videos). Client-side code uses `VITE_APP_ASSET_BASE_URL` (or `VITE_API_TARGET_URL` as fallback) to construct full URLs to these assets.
 
 ---
 
