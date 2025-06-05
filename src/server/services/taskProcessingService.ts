@@ -49,12 +49,9 @@ function normalizeImagePathsInObject(obj: any): any {
   if (obj && typeof obj === 'object') {
     const normalized: any = {};
     for (const [key, value] of Object.entries(obj)) {
-      // Special handling for known image path fields
-      if (key.includes('image') || key.includes('path') || key === 'location' || key === 'outputLocation') {
-        normalized[key] = normalizeImagePathsInObject(value);
-      } else {
-        normalized[key] = normalizeImagePathsInObject(value);
-      }
+      // Recursively process all values to find and normalize image paths.
+      // The previous if/else block was redundant.
+      normalized[key] = normalizeImagePathsInObject(value);
     }
     return normalized;
   }
