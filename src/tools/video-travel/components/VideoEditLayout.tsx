@@ -488,6 +488,8 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
                     <video
                       ref={(el) => (videoRefs.current[index] = el)}
                       src={getDisplayUrl(video.location || video.imageUrl)}
+                      poster={video.thumbUrl ? getDisplayUrl(video.thumbUrl) : undefined}
+                      preload="metadata"
                       loop
                       muted
                       playsInline
