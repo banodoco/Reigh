@@ -20,7 +20,7 @@ export async function processCompletedStitchTask(task: Task): Promise<void> {
   console.log(`[VideoStitchGenDebug] Processing completed travel_stitch task ${task.id}.`);
   const params = task.params as any; // Assuming params is an object
   const shotId = params?.full_orchestrator_payload?.shot_id;
-  const outputLocation = params?.final_stitched_output_path;
+  const outputLocation = task.outputLocation;
   const projectId = task.projectId;
 
   if (!shotId || !outputLocation || !projectId) {

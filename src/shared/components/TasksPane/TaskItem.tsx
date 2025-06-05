@@ -53,7 +53,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
       {/* Add more task details as needed, e.g., from task.params */}
       {/* <pre className="text-xs text-zinc-500 whitespace-pre-wrap break-all">{JSON.stringify(task.params, null, 2)}</pre> */}
 
-      {(task.status === 'Pending' || task.status === 'In Progress') && (
+      {(task.status === 'Pending' || task.status === 'In Progress' || task.status === 'Queued') && (
         <Button 
           variant="destructive"
           size="sm" 
