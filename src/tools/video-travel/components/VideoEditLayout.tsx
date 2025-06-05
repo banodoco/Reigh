@@ -387,7 +387,7 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
           model_name: 'vace_14B',
           seed: 789,
           debug: true,
-          use_causvid_lora: true,
+          booster_loras: true,
           fade_in_duration:
             '{"low_point": 0.0, "high_point": 0.8, "curve_type": "ease_in_out", "duration_factor": 0.00}',
           fade_out_duration:

@@ -18,7 +18,7 @@ interface TravelRequestBody {
   model_name?: string;
   seed?: number;
   debug?: boolean;
-  use_causvid_lora?: boolean;
+  booster_loras?: boolean;
   fade_in_duration?: any; // JSON value (string or object)
   fade_out_duration?: any; // JSON value (string or object)
   after_first_post_generation_saturation?: number;
@@ -122,7 +122,7 @@ router.post('/travel-between-images', async (req: any, res: any) => {
       parsed_resolution_wh: projectResolution,
       model_name: body.model_name ?? 'vace_14B',
       seed_base: body.seed ?? 789,
-      use_causvid_lora: body.use_causvid_lora ?? true,
+      booster_loras: body.booster_loras ?? true,
       fade_in_params_json_str: body.fade_in_duration ?? '{"low_point":0.0,"high_point":0.8,"curve_type":"ease_in_out","duration_factor":0.0}',
       fade_out_params_json_str: body.fade_out_duration ?? '{"low_point":0.0,"high_point":0.8,"curve_type":"ease_in_out","duration_factor":0.0}',
       after_first_post_generation_saturation: body.after_first_post_generation_saturation ?? 0.75,
