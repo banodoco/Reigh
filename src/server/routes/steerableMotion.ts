@@ -22,6 +22,7 @@ interface TravelRequestBody {
   fade_out_duration?: any; // JSON value (string or object)
   after_first_post_generation_saturation?: number;
   params_json_str?: string;
+  main_output_dir_for_run?: string;
 }
 
 /**
@@ -62,16 +63,29 @@ router.post('/travel-between-images', async (req: any, res: any) => {
       return res.status(400).json({ message: 'Not enough images to create video segments (minimum 2 required).' });
     }
 
+    // Expand arrays if they have a single element and numSegments > 1
+    const expandArray = (arr: any[] | undefined, count: number) => {
+      if (arr && arr.length === 1 && count > 1) {
+        return Array(count).fill(arr[0]);
+      }
+      return arr;
+    };
+
+    const basePromptsExpanded = expandArray(body.base_prompts, numSegments) || [];
+    const negativePromptsExpanded = expandArray(body.negative_prompts, numSegments) || Array(numSegments).fill('');
+    const segmentFramesExpanded = expandArray(body.segment_frames, numSegments) || [];
+    const frameOverlapExpanded = expandArray(body.frame_overlap, numSegments) || [];
+
     // Build orchestrator payload (subset of the huge Python equivalent)
     const orchestratorPayload = {
       orchestrator_task_id: orchestratorTaskId,
       run_id: runId,
       input_image_paths_resolved: body.image_urls,
       num_new_segments_to_generate: numSegments,
-      base_prompts_expanded: body.base_prompts,
-      negative_prompts_expanded: body.negative_prompts ?? [''],
-      segment_frames_expanded: body.segment_frames,
-      frame_overlap_expanded: body.frame_overlap,
+      base_prompts_expanded: basePromptsExpanded,
+      negative_prompts_expanded: negativePromptsExpanded,
+      segment_frames_expanded: segmentFramesExpanded,
+      frame_overlap_expanded: frameOverlapExpanded,
       parsed_resolution_wh: body.resolution ?? '700x460',
       model_name: body.model_name ?? 'vace_14B',
       seed_base: body.seed ?? 789,
@@ -81,7 +95,8 @@ router.post('/travel-between-images', async (req: any, res: any) => {
       after_first_post_generation_saturation: body.after_first_post_generation_saturation ?? 0.6,
       params_json_str_override: body.params_json_str ?? '{"steps":4}',
       debug_mode_enabled: body.debug ?? true,
-      shot_id: body.shot_id ?? undefined
+      shot_id: body.shot_id ?? undefined,
+      main_output_dir_for_run: body.main_output_dir_for_run ?? './outputs/default_travel_output'
     };
     console.log('[API /steerable-motion/travel-between-images] Constructed orchestratorPayload:', JSON.stringify(orchestratorPayload, null, 2)); // Log payload
 
@@ -94,7 +109,7 @@ router.post('/travel-between-images', async (req: any, res: any) => {
         orchestrator_details: orchestratorPayload,
         task_id: orchestratorTaskId
       },
-      status: 'Queued',
+      status: 'Pending',
       createdAt: new Date(),
       updatedAt: new Date()
     }).returning();

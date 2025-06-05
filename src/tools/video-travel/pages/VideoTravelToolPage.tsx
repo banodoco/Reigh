@@ -74,8 +74,8 @@ const VideoTravelToolPage: React.FC = () => {
   const [videoPairConfigs, setVideoPairConfigs] = useState<any[]>([]); // Changed to any[] for now for setVideoPairConfigs type
   const [videoControlMode, setVideoControlMode] = useState<'individual' | 'batch'>('batch');
   const [batchVideoPrompt, setBatchVideoPrompt] = useState("");
-  const [batchVideoFrames, setBatchVideoFrames] = useState(50);
-  const [batchVideoContext, setBatchVideoContext] = useState(18);
+  const [batchVideoFrames, setBatchVideoFrames] = useState(65);
+  const [batchVideoContext, setBatchVideoContext] = useState(16);
 
   const handleOpenCreateShotModal = () => {
     if (!selectedProjectId) {

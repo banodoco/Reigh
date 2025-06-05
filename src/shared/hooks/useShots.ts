@@ -108,7 +108,7 @@ export const useListShots = (projectId: string | null) => {
       return data;
     },
     enabled: !!projectId, 
-    refetchInterval: 5000,
+    // refetchInterval: 5000, // Temporarily commented out for testing proxy issues
   });
 };
 

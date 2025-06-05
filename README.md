@@ -103,30 +103,36 @@ This guide provides the essential steps to set up and run this project locally u
 
     When deploying or running the development environment on a hosted platform like Runpod, your frontend and backend will likely be accessible via different public URLs/ports. The Vite development server needs to be told where to proxy API requests.
 
-    *   **Backend API (`npm run start:api`):** This server runs on an internal port (default `3001`). The platform (e.g., Runpod) will map a public IP and port to this internal port. For example, `http://<your-public-ip>:<public-backend-port>` might map to internal port `3001`.
+    *   **Backend API (`npm run start:api`):** This server runs on an internal port (default `8085`). **Note:** On some Runpod setups (or other containerized environments), port `8085` might already be in use (e.g., by a pre-configured Nginx server). If you encounter issues, you may need to change the port your backend API listens on. For this project, this can typically be done in `src/server/index.ts` (e.g., changing `8085` to `6969`). The platform (e.g., Runpod) will then map a public IP and port to this new internal port.
     *   **Frontend Dev Server (`npm run dev`):** This server runs on an internal port (default `2222`). The platform will also map a public IP and port to this. You'll access your app via `http://<your-public-ip>:<public-frontend-port>`.
 
-    To ensure the frontend can reach the backend API:
-    *   Identify the full public URL of your **backend API server**.
-    *   When starting the Vite frontend development server, set the `VITE_API_TARGET_URL` environment variable to this public backend URL.
+    To ensure the frontend (served by Vite) can reach the backend API when using Runpod:
 
-    Example:
-    If your Runpod backend API is accessible at `http://213.173.108.33:13296`, you would start your Vite dev server like this:
+    *   Identify the full public URL of your **Runpod backend API server**. This will be `http://<your-runpod-public-ip>:<public-port-mapped-to-your-backend-internal-port>`.
+    *   When starting the Vite frontend development server **inside the Runpod container**, set the `VITE_API_TARGET_URL` environment variable to this public backend URL.
+
+    Example (Backend API running on internal port `8085`, publicly accessible via `http://213.173.102.76:10368`):
     ```sh
-    VITE_API_TARGET_URL=http://213.173.108.33:13296 npm run dev
+    # Inside your Runpod container, if your API is on internal port 8085
+    # and Runpod maps public 213.173.102.76:10368 to internal 8085:
+    VITE_API_TARGET_URL=http://213.173.102.76:10368 npm run dev
     ```
-    The Vite dev server will then proxy any requests made from the frontend to `/api/...` to `http://213.173.108.33:13296/api/...`.
+    The Vite dev server (also in the container) will then proxy any requests made from the frontend (e.g., `/api/...`) to `http://213.173.102.76:10368/api/...`.
 
-    For local development, you do not need to set `VITE_API_TARGET_URL`, as it will default to `http://localhost:3001` (the typical local backend address).
+    *Alternative for intra-container communication:* If both Vite and your API are in the same container, you *should* also be able to use `http://localhost:<your-backend-internal-port>` (e.g., `VITE_API_TARGET_URL=http://localhost:8085 npm run dev`). This targets the API server directly within the container's network. However, ensure your API server is indeed listening on `localhost` (or `0.0.0.0`) on that port and that no other process (like Nginx) is intercepting traffic to that `localhost` port.
+
+    For **purely local development** (both frontend and backend on your local machine, not using Runpod), you typically do not need to set `VITE_API_TARGET_URL`, as the Vite configuration usually defaults to proxying to `http://localhost:8085/api` (or whatever port your local backend is configured to use if you've changed it from the default). Always verify your project's `vite.config.ts` for the precise local default proxy settings.
 
     **Exposing Ports on Runpod:**
 
-    Runpod handles port exposure in specific ways. The port your application listens on inside the container (e.g., `3001` for the API, `2222` for the frontend) will be mapped to a different public-facing port by Runpod.
+    Runpod handles port exposure in specific ways. The port your application listens on inside the container (e.g., `8085` for the API if you changed it from `8085`, or `2222` for the frontend) will be mapped to a different public-facing port by Runpod.
 
-    *   **HTTP Ports (Proxy):** When you define an HTTP port in your Pod or Template configuration (e.g., port `3001` for your API), Runpod makes it accessible via a proxy URL like `https://{POD_ID}-{INTERNAL_PORT}.proxy.runpod.net`. For example, if your Pod ID is `s7breobom8crgs` and your internal API port is `3001`, the public URL would be `https://s7breobom8crgs-3001.proxy.runpod.net`.
-    *   **TCP Ports (Public IP):** If your pod has a public IP, you can expose ports via TCP. You'd add the desired internal port (e.g., `3001`) to the TCP port list in your Pod/Template configuration. Runpod will then assign a public IP and a *different* external port that maps to your internal port. You'll find this mapping in the "Connect" menu of your Pod. For example, `your-public-ip:10027` might map to your internal port `3001`.
+    *   **HTTP Ports (Proxy):** When you define an HTTP port in your Pod or Template configuration (e.g., port `8085` for your API), Runpod makes it accessible via a proxy URL like `https://{POD_ID}-{INTERNAL_PORT}.proxy.runpod.net`. For example, if your Pod ID is `s7breobom8crgs` and your internal API port is `8085`, the public URL would be `https://s7breobom8crgs-8085.proxy.runpod.net`.
+    *   **TCP Ports (Public IP):** If your pod has a public IP, you can expose ports via TCP. You'd add the desired internal port (e.g., `8085`) to the TCP port list in your Pod/Template configuration. Runpod will then assign a public IP and a *different* external port that maps to your internal port. You'll find this mapping in the "Connect" menu of your Pod. For example, `your-public-ip:10368` might map to your internal port `8085`.
 
-    Refer to the official [Runpod documentation on exposing ports](https://docs.runpod.io/pods/configuration/expose-ports) for detailed instructions and diagrams on how to configure this in the Runpod interface (either through the Template or Pod configuration page). You'll need to ensure the ports your application servers listen on (e.g., `3001` for the backend, `2222` for the frontend) are correctly specified in the Runpod settings as either HTTP or TCP ports to make them accessible.
+    **Crucially, ensure that you have configured Runpod to expose the correct TCP port for your backend API (e.g., `8085` if you changed it from the default `8085`) and TCP port `2222` (for the frontend development server) in your Pod/Template settings.**
+
+    Refer to the official [Runpod documentation on exposing ports](https://docs.runpod.io/pods/configuration/expose-ports) for detailed instructions and diagrams on how to configure this in the Runpod interface (either through the Template or Pod configuration page). You'll need to ensure the ports your application servers listen on (e.g., `8085` for the backend, `2222` for the frontend) are correctly specified in the Runpod settings as either HTTP or TCP ports to make them accessible.
 
     </details>
 

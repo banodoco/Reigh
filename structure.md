@@ -208,7 +208,9 @@ To change which tools appear for a specific environment, you need to modify the 
     – `useHandleExternalImageDrop`: Orchestrates image upload, generation record creation (via `POST /api/generations`), and linking to a shot (potentially creating the shot first).
 • **`useTasks.ts`**: Provides hooks for task management.
     – `useListTasks`: `GET /api/tasks?projectId=&status=` (fetches tasks for a project, optionally filtered by status).
+    – `useCreateTask`: `POST /api/tasks` (creates a new task).
     – `useCancelTask`: `PATCH /api/tasks/:taskId/cancel` (updates a task's status to 'Cancelled').
+    – `useCancelAllPendingTasks`: `POST /api/tasks/cancel-pending` (updates status of all pending tasks for a project to 'Cancelled').
 • **`useLastAffectedShot.ts`**: Hook for `LastAffectedShotContext`.
 • **`use-mobile.tsx`**: Media query helper.
 • **`use-toast.ts`**: Wrapper for Sonner toasting library.
@@ -300,7 +302,7 @@ To change which tools appear for a specific environment, you need to modify the 
 |--------------|------------------------------------------------------|----------------------------------------------------------------------|
 | **Postgres** | `users`                                              | `id` (uuid, PK)                                                      |
 |              | `projects`                                           | `id` (uuid, PK), `name` (text), `userId` (uuid, FK to `users.id`), `createdAt` (timestamp) |
-|              | `tasks`                                              | `id` (uuid, PK), `taskType` (text), `params` (jsonb), `status` (enum: 'Pending', 'In Progress', 'Completed', 'Cancelled'), `dependantOn` (uuid[]), `outputLocation` (text), `createdAt` (timestamp), `updatedAt` (timestamp), `projectId` (uuid, FK to `projects.id`) |
+|              | `tasks`                                              | `id` (uuid, PK), `taskType` (text), `params` (jsonb), `status` (enum: 'Pending', 'In Progress', 'Complete', 'Failed', 'Queued', 'Cancelled'), `dependantOn` (uuid[]), `outputLocation` (text), `createdAt` (timestamp), `updatedAt` (timestamp), `projectId` (uuid, FK to `projects.id`) |
 |              | `generations`                                        | `id` (uuid, PK), `tasks` (uuid[]), `location` (text), `type` (text), `createdAt` (timestamp), `updatedAt` (timestamp), `projectId` (uuid, FK to `projects.id`) |
 |              | `shots`                                              | `id` (uuid, PK), `name` (text), `createdAt` (timestamp), `updatedAt` (timestamp), `projectId` (uuid, FK to `projects.id`) |
 |              | `shot_generations`                                   | `id` (uuid, PK), `shotId` (uuid, FK to `shots.id`), `generationId` (uuid, FK to `generations.id`), `position` (integer) |

@@ -169,15 +169,17 @@ shotsRouter.delete('/:shotId', asyncHandler(async (req: Request, res: Response) 
     // It's safer to delete related records explicitly in a transaction if not using PG with cascades.
     // For SQLite, manual deletion of related shot_generations is a good practice.
 
-    await db.transaction(async (tx) => {
+    db.transaction((tx) => {
       // 1. Delete links in shot_generations table
-      await tx.delete(shotGenerationsTable)
-        .where(eq(shotGenerationsTable.shotId, shotId));
+      tx.delete(shotGenerationsTable)
+        .where(eq(shotGenerationsTable.shotId, shotId))
+        .run();
       
       // 2. Delete the shot itself
-      const deletedShotArray = await tx.delete(shotsTable)
+      const deletedShotArray = tx.delete(shotsTable)
         .where(eq(shotsTable.id, shotId))
-        .returning({ id: shotsTable.id }); // Return id to confirm deletion
+        .returning({ id: shotsTable.id })
+        .all();
 
       if (!deletedShotArray || deletedShotArray.length === 0) {
         // This means the shot was not found, which might happen if it was already deleted.

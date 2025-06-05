@@ -35,12 +35,14 @@ const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
     <div className="p-3 mb-2 bg-zinc-800 rounded-md shadow">
       <div className="flex justify-between items-center mb-1">
         <span className="text-sm font-semibold text-zinc-200">{task.taskType}</span>
-        <span 
-          className={`px-2 py-0.5 text-xs rounded-full ${ 
-            task.status === 'Pending' ? 'bg-yellow-500 text-yellow-900' : 
-            task.status === 'In Progress' ? 'bg-blue-500 text-blue-100' : 
-            task.status === 'Completed' ? 'bg-green-500 text-green-100' : 
-            task.status === 'Cancelled' ? 'bg-red-500 text-red-100' : 'bg-gray-500 text-gray-100'
+        <span
+          className={`px-2 py-0.5 text-xs rounded-full ${
+            task.status === 'Pending' ? 'bg-yellow-500 text-yellow-900' :
+            task.status === 'In Progress' ? 'bg-blue-500 text-blue-100' :
+            task.status === 'Complete' ? 'bg-green-500 text-green-100' :
+            task.status === 'Failed' ? 'bg-red-500 text-red-100' :
+            task.status === 'Queued' ? 'bg-purple-500 text-purple-100' :
+            task.status === 'Cancelled' ? 'bg-orange-500 text-orange-100' : 'bg-gray-500 text-gray-100'
           }`}
         >
           {task.status}

@@ -37,38 +37,36 @@ export const useListTasks = (params: ListTasksParams) => {
   });
 };
 
-// Hook to cancel a task
-export const useCancelTask = () => {
-  const queryClient = useQueryClient();
-  const { selectedProjectId } = useProject();
+// Types for API responses and request bodies for cancel operations
+interface CancelTaskResponse extends Task { }
 
-  return useMutation<Task, Error, string>({ // Second type arg is Error, third is taskId (string)
-    mutationFn: async (taskId: string) => {
-      const response = await axios.patch(`/api/tasks/${taskId}/cancel`);
-      return response.data;
-    },
-    onSuccess: (data) => {
-      // Invalidate and refetch tasks list for the current project to reflect the change
-      queryClient.invalidateQueries({ queryKey: [TASKS_QUERY_KEY, selectedProjectId] });
-      
-      // Optionally, optimistically update the specific task in the cache
-      // queryClient.setQueryData([TASKS_QUERY_KEY, selectedProjectId], (oldData?: Task[]) =>
-      //   oldData ? oldData.map(task => task.id === data.id ? data : task) : []
-      // );
-    },
-    // onError: (error) => {
-    //   // Handle error, e.g., show a toast notification
-    //   console.error("Error cancelling task:", error);
-    // }
-  });
-};
-
-// Hook to cancel all pending tasks for a project
 interface CancelAllPendingTasksResponse {
   message: string;
   cancelledCount: number;
 }
 
+// Hook to cancel a task
+export const useCancelTask = () => {
+  const queryClient = useQueryClient();
+  const { selectedProjectId } = useProject();
+
+  return useMutation<Task, Error, string>({
+    mutationFn: async (taskId) => {
+      const response = await axios.patch(`/api/tasks/${taskId}/cancel`); // Endpoint might need to change if not generic for status update
+      return response.data;
+    },
+    onSuccess: (data) => {
+      // Invalidate and refetch tasks list for the current project
+      queryClient.invalidateQueries({ queryKey: [TASKS_QUERY_KEY, selectedProjectId] });
+      // Also invalidate specific status lists if they are cached separately
+      queryClient.invalidateQueries({ queryKey: [TASKS_QUERY_KEY, selectedProjectId, ['Pending']] });
+      queryClient.invalidateQueries({ queryKey: [TASKS_QUERY_KEY, selectedProjectId, ['Cancelled']] });
+    },
+  });
+};
+
+// Hook to cancel all PENDING tasks for a project
+// Note: The backend sets the status to "Failed" now.
 export const useCancelAllPendingTasks = () => {
   const queryClient = useQueryClient();
   const { selectedProjectId } = useProject(); // To invalidate queries for the current project
@@ -83,9 +81,7 @@ export const useCancelAllPendingTasks = () => {
     },
     onSuccess: (data) => {
       // Invalidate and refetch tasks list for the current project to reflect the changes
-      // We can invalidate all queries related to tasks for this project or be more specific
       queryClient.invalidateQueries({ queryKey: [TASKS_QUERY_KEY, selectedProjectId] });
-      // Potentially invalidate queries with specific statuses too if they are separate
       queryClient.invalidateQueries({ queryKey: [TASKS_QUERY_KEY, selectedProjectId, ['Pending']] });
       queryClient.invalidateQueries({ queryKey: [TASKS_QUERY_KEY, selectedProjectId, ['Cancelled']] });
     },

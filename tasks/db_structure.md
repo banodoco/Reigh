@@ -80,7 +80,7 @@ id          uuid    PRIMARY KEY,
 id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
 task_type       text    NOT NULL,
 params          jsonb   NOT NULL,
-status          text    CHECK (status IN ('Pending','In Progress','Completed')),
+status          text    CHECK (status IN ('Pending','In Progress','Complete','Failed','Queued','Cancelled')),
 dependant_on    uuid[]  DEFAULT '{}',
 output_location text,
 created_at      timestamptz DEFAULT now(),
@@ -263,14 +263,4 @@ Key results:
    ```
 
 3. Tooling confirmed
-   * `npm i drizzle-orm drizzle-kit better-sqlite3 pg dotenv` added (Task 3 ✅).
-   * Two config files:  
-     * `drizzle.config.ts` (Postgres)  
-     * `drizzle-sqlite.config.ts` (SQLite)
-   * Migrations produced to `db/migrations/` and `db/migrations-sqlite/` respectively.
-
-4. Conclusion
-   * Drizzle cleanly dual-targets our required types.  
-   * Client-side UUID generation for SQLite is acceptable for local-only mode.  
-   * Array column (`uuid[]`) round-trips as TEXT on SQLite; repository layer will need (de)serialisation helpers.  
-   * No blockers found – proceed to Task 4 (canonical schema) & Task 5 (scripts). 
+   * `npm i drizzle-orm drizzle-kit better-sqlite3 pg dotenv`

@@ -20,7 +20,7 @@ dotenv.config();
 const app = express();
 // Use process.env.PORT for flexibility, e.g., when deploying.
 // Default to 3001 for local development if PORT is not set.
-const PORT: number = process.env.PORT ? parseInt(process.env.PORT, 10) : 3001;
+const PORT: number = process.env.PORT ? parseInt(process.env.PORT, 10) : 8085;
 
 // Middleware
 app.use(cors()); // Basic CORS setup, configure as needed for production
