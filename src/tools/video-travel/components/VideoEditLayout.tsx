@@ -19,6 +19,7 @@ import { Trash2 } from 'lucide-react';
 import TaskDetailsModal from './TaskDetailsModal';
 import { Info } from 'lucide-react';
 import { getDisplayUrl } from '@/shared/lib/utils';
+import { formatDistanceToNow } from "date-fns";
 
 // Local definition for Json type to remove dependency on supabase client types
 export type Json =
@@ -425,16 +426,23 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {videoOutputs.map((video, index) => (
                 <div key={video.id || `video-${index}`} className="rounded-lg overflow-hidden shadow-md bg-muted/30 aspect-video flex items-center justify-center relative group">
-                  <TaskDetailsModal generationId={video.id}>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="absolute top-2 left-2 opacity-80 group-hover:opacity-100 transition-opacity z-10 bg-black/20 backdrop-blur-sm"
-                      aria-label="Show task details"
-                    >
-                      <Info className="h-5 w-5 text-white" />
-                    </Button>
-                  </TaskDetailsModal>
+                  <div className="absolute top-2 left-2 flex items-center gap-2 z-10">
+                    <TaskDetailsModal generationId={video.id}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="opacity-80 group-hover:opacity-100 transition-opacity bg-black/20 backdrop-blur-sm"
+                        aria-label="Show task details"
+                      >
+                        <Info className="h-5 w-5 text-white" />
+                      </Button>
+                    </TaskDetailsModal>
+                    {video.createdAt && (
+                      <span className="text-xs text-white bg-black/50 px-1.5 py-0.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity">
+                        {formatDistanceToNow(new Date(video.createdAt), { addSuffix: true })}
+                      </span>
+                    )}
+                  </div>
                   { (video.location || video.imageUrl) ? (
                     <video 
                       src={getDisplayUrl(video.location || video.imageUrl)} 

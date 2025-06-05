@@ -51,10 +51,12 @@ shotsRouter.get('/', asyncHandler(async (req: Request, res: Response) => {
         return {
           shotImageEntryId: sg.id,
           id: sg.generation.id,
-          imageUrl: sg.generation.location, // Corrected: use location field for imageUrl
-          thumbUrl: sg.generation.location, // Corrected: use location field for thumbUrl
-          metadata: sg.generation.params,   // Corrected: use params field for metadata
-          // position is implicitly handled by the orderBy in the query
+          imageUrl: sg.generation.location,
+          thumbUrl: sg.generation.location,
+          metadata: sg.generation.params,
+          createdAt: sg.generation.createdAt.toISOString(),
+          type: sg.generation.type,
+          location: sg.generation.location
         };
       }).filter((img): img is NonNullable<typeof img> => img !== null), // Type guard for filter
     }));

@@ -5,8 +5,9 @@ export interface GenerationRow {
   // Add other relevant properties from your generations table
   imageUrl?: string; // May specifically be for image previews
   thumbUrl?: string;
-  location?: string; // Canonical path to the media (image or video)
-  type?: string;     // Type of generation, e.g., 'image', 'video_travel_output'
+  location?: string | null;
+  type?: string | null;
+  createdAt?: string;
   metadata?: any; // Added metadata field, consider a more specific type if known
 }
 
