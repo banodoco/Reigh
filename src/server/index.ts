@@ -1,3 +1,15 @@
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[GLOBAL] Unhandled Rejection at:', promise, 'reason:', reason);
+  // Optionally, exit the process or add more detailed logging
+  // process.exit(1); // Be cautious with this in production
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('[GLOBAL] Uncaught Exception:', error);
+  // Optionally, exit the process
+  // process.exit(1); // Be cautious with this in production
+});
+
 import express from 'express';
 import cors from 'cors';
 import projectsRouter from './routes/projects';

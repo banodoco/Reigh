@@ -1,7 +1,8 @@
 import express, { Request, Response } from 'express';
 import { db } from '@/lib/db';
-import { tasks as tasksSchema } from '../../../db/schema/schema';
+import { tasks as tasksSchema, projects as projectsSchema } from '../../../db/schema/schema';
 import { randomUUID } from 'crypto';
+import { eq } from 'drizzle-orm';
 
 const router = express.Router() as any;
 
@@ -24,6 +25,14 @@ interface TravelRequestBody {
   params_json_str?: string;
   main_output_dir_for_run?: string;
 }
+
+// Define aspect ratio to resolution mapping
+const ASPECT_RATIO_TO_RESOLUTION: { [key: string]: string } = {
+  'Square': '700x700',
+  '16:9': '752x423',
+  // Add other common aspect ratios and their resolutions as needed
+};
+const DEFAULT_RESOLUTION = '700x460'; // Fallback resolution
 
 /**
  * POST /api/steerable-motion/travel-between-images
@@ -57,6 +66,27 @@ router.post('/travel-between-images', async (req: any, res: any) => {
     const runId = new Date().toISOString().replace(/[-:.TZ]/g, ''); // compact timestamp
     const orchestratorTaskId = `sm_travel_orchestrator_${runId.substring(2, 10)}_${randomUUID().slice(0, 6)}`;
 
+    // Fetch project to get aspect ratio
+    let projectResolution = DEFAULT_RESOLUTION;
+    if (body.project_id) {
+      const projectsResult = await db
+        .select({ aspectRatio: projectsSchema.aspectRatio })
+        .from(projectsSchema)
+        .where(eq(projectsSchema.id, body.project_id))
+        .limit(1);
+
+      if (projectsResult.length > 0 && projectsResult[0].aspectRatio) {
+        const projectAspectRatio = projectsResult[0].aspectRatio;
+        projectResolution = ASPECT_RATIO_TO_RESOLUTION[projectAspectRatio] || DEFAULT_RESOLUTION;
+        console.log(`[API /steerable-motion/travel-between-images] Project ${body.project_id} has aspect ratio: ${projectAspectRatio}, using resolution: ${projectResolution}`);
+      } else {
+        console.log(`[API /steerable-motion/travel-between-images] Project ${body.project_id} not found or has no aspect ratio. Using default resolution: ${DEFAULT_RESOLUTION}`);
+      }
+    } else {
+      console.log('[API /steerable-motion/travel-between-images] No project_id provided in body. Using default resolution for safety, though project_id is required by validation.');
+      // This case should ideally not be hit due to prior validation, but included for robustness.
+    }
+
     const numSegments = body.image_urls ? body.image_urls.length - 1 : 0;
     if (numSegments <= 0) {
       console.warn('[API /steerable-motion/travel-between-images] No segments to generate based on image_urls length.', body.image_urls);
@@ -86,7 +116,7 @@ router.post('/travel-between-images', async (req: any, res: any) => {
       negative_prompts_expanded: negativePromptsExpanded,
       segment_frames_expanded: segmentFramesExpanded,
       frame_overlap_expanded: frameOverlapExpanded,
-      parsed_resolution_wh: body.resolution ?? '700x460',
+      parsed_resolution_wh: projectResolution,
       model_name: body.model_name ?? 'vace_14B',
       seed_base: body.seed ?? 789,
       use_causvid_lora: body.use_causvid_lora ?? true,
