@@ -459,6 +459,13 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
                 <div
                   key={video.id || `video-${index}`}
                   className="rounded-lg overflow-hidden shadow-md bg-muted/30 aspect-video flex items-center justify-center relative group"
+                  onMouseEnter={() => videoRefs.current[index]?.play()}
+                  onMouseLeave={() => {
+                    if (videoRefs.current[index]) {
+                      videoRefs.current[index].pause();
+                      videoRefs.current[index].currentTime = 0;
+                    }
+                  }}
                 >
                   <div className="absolute top-2 left-2 flex items-center gap-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
                     <TaskDetailsModal generationId={video.id}>
