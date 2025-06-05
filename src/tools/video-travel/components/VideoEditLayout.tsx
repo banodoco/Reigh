@@ -383,16 +383,10 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
           base_prompts: basePrompts,
           segment_frames: segmentFrames,
           frame_overlap: frameOverlap,
-          resolution: '700x460',
           model_name: 'vace_14B',
           seed: 789,
           debug: true,
           booster_loras: true,
-          fade_in_duration:
-            '{"low_point": 0.0, "high_point": 0.8, "curve_type": "ease_in_out", "duration_factor": 0.00}',
-          fade_out_duration:
-            '{"low_point": 0.0, "high_point": 0.8, "curve_type": "ease_in_out", "duration_factor": 0.00}',
-          after_first_post_generation_saturation: 0.75,
           params_json_str: JSON.stringify({ steps: batchVideoSteps }),
         }),
       });
