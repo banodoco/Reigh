@@ -120,6 +120,9 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   const videoRefs = React.useRef<(HTMLVideoElement | null)[]>([]);
+  const animationFrameRef = React.useRef<number | null>(null);
+  const lastFrameTimeRef = React.useRef<number>(0);
+  const [playbackRates, setPlaybackRates] = useState<{ [key: number]: number }>({});
 
   const [managedImages, setManagedImages] = useState<GenerationRow[]>([]);
 
@@ -137,9 +140,84 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
     setManagedImages((orderedShotImages || []).filter(gen => !isGenerationVideo(gen)));
   }, [orderedShotImages]);
 
+  const stopScrubbing = () => {
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+    lastFrameTimeRef.current = 0;
+  };
+
+  useEffect(() => {
+    // Cleanup on unmount
+    return () => stopScrubbing();
+  }, []);
+
   if (!selectedShot) {
     return <p>Error: No shot selected. Please go back and select a shot.</p>;
   }
+
+  const scrub = (video: HTMLVideoElement, rate: number, timestamp: number) => {
+    if (!lastFrameTimeRef.current) {
+        lastFrameTimeRef.current = timestamp;
+    }
+    const delta = (timestamp - lastFrameTimeRef.current) / 1000; // time in seconds
+    lastFrameTimeRef.current = timestamp;
+
+    const newTime = video.currentTime + rate * delta;
+
+    if (newTime <= 0 && rate < 0) {
+        video.currentTime = 0;
+        return; 
+    }
+    if (newTime >= video.duration && rate > 0) {
+        video.currentTime = video.duration;
+        return;
+    }
+    
+    video.currentTime = newTime;
+
+    animationFrameRef.current = requestAnimationFrame((newTimestamp) => scrub(video, rate, newTimestamp));
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>, index: number) => {
+      const video = videoRefs.current[index];
+      if (!video) return;
+
+      stopScrubbing();
+      video.pause();
+
+      const { offsetX } = e.nativeEvent;
+      const width = e.currentTarget.offsetWidth;
+      const normalizedPosition = offsetX / width;
+
+      let newRate;
+      if (normalizedPosition < 0.5) {
+          const p = normalizedPosition * 2; // scale 0-0.5 to 0-1
+          newRate = -1 + p * 2; // maps 0 to -1, 0.5 to 0, 1 to 1
+      } else {
+          const p = (normalizedPosition - 0.5) * 2; // scale 0.5-1 to 0-1
+          newRate = 1 + p; // maps 0 to 1, 1 to 2
+      }
+
+      setPlaybackRates(prev => ({ ...prev, [index]: newRate }));
+      
+      animationFrameRef.current = requestAnimationFrame((timestamp) => scrub(video, newRate, timestamp));
+  };
+
+  const handleMouseLeave = (index: number) => {
+      stopScrubbing();
+      const video = videoRefs.current[index];
+      if (video) {
+          video.pause();
+          video.currentTime = 0;
+      }
+      setPlaybackRates(prev => {
+          const newRates = { ...prev };
+          delete newRates[index];
+          return newRates;
+      });
+  };
 
   const handleImageUploadToShot = async (files: File[]) => {
     if (!files || files.length === 0) return;
@@ -459,13 +537,8 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
                 <div
                   key={video.id || `video-${index}`}
                   className="rounded-lg overflow-hidden shadow-md bg-muted/30 aspect-video flex items-center justify-center relative group"
-                  onMouseEnter={() => videoRefs.current[index]?.play()}
-                  onMouseLeave={() => {
-                    if (videoRefs.current[index]) {
-                      videoRefs.current[index].pause();
-                      videoRefs.current[index].currentTime = 0;
-                    }
-                  }}
+                  onMouseMove={(e) => handleMouseMove(e, index)}
+                  onMouseLeave={() => handleMouseLeave(index)}
                 >
                   <div className="absolute top-2 left-2 flex items-center gap-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
                     <TaskDetailsModal generationId={video.id}>
@@ -500,6 +573,11 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
                     </video>
                   ) : (
                     <p className="text-xs text-muted-foreground p-2">Video URL not available.</p>
+                  )}
+                  {playbackRates[index] !== undefined && (
+                    <div className="absolute bottom-2 right-2 bg-black/50 text-white text-xs px-2 py-1 rounded-md font-mono pointer-events-none">
+                      {playbackRates[index].toFixed(1)}x
+                    </div>
                   )}
                   <Button
                     variant="ghost"
