@@ -78,6 +78,22 @@ const VideoTravelToolPage: React.FC = () => {
   const [batchVideoContext, setBatchVideoContext] = useState(16);
   const [batchVideoSteps, setBatchVideoSteps] = useState(4);
 
+  const [steerableMotionSettings, setSteerableMotionSettings] = useState({
+    negative_prompt: '',
+    model_name: 'vace_14B',
+    seed: 789,
+    debug: true,
+    booster_loras: true,
+    fade_in_duration: '{"low_point":0.0,"high_point":0.8,"curve_type":"ease_in_out","duration_factor":0.0}',
+    fade_out_duration: '{"low_point":0.0,"high_point":0.8,"curve_type":"ease_in_out","duration_factor":0.0}',
+    after_first_post_generation_saturation: 0.75,
+    after_first_post_generation_brightness: -0.3,
+  });
+
+  const handleSteerableMotionSettingsChange = (newSettings: Partial<typeof steerableMotionSettings>) => {
+    setSteerableMotionSettings(prev => ({ ...prev, ...newSettings }));
+  };
+
   const handleOpenCreateShotModal = () => {
     if (!selectedProjectId) {
       alert('Please select a project first to create a shot.'); // Or use toast
@@ -172,6 +188,8 @@ const VideoTravelToolPage: React.FC = () => {
           onBatchVideoContextChange={setBatchVideoContext}
           batchVideoSteps={batchVideoSteps}
           onBatchVideoStepsChange={setBatchVideoSteps}
+          steerableMotionSettings={steerableMotionSettings}
+          onSteerableMotionSettingsChange={handleSteerableMotionSettingsChange}
         />
       )}
 

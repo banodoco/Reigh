@@ -15,11 +15,14 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable';
 import ShotImageManager from '@/shared/components/ShotImageManager';
-import { Trash2 } from 'lucide-react';
+import { Trash2, ChevronsUpDown } from 'lucide-react';
 import TaskDetailsModal from './TaskDetailsModal';
 import { Info } from 'lucide-react';
 import { getDisplayUrl } from '@/shared/lib/utils';
 import { formatDistanceToNow } from "date-fns";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/components/ui/collapsible";
+import { Switch } from "@/shared/components/ui/switch";
+import { Input } from "@/shared/components/ui/input";
 
 // Local definition for Json type to remove dependency on supabase client types
 export type Json =
@@ -41,6 +44,18 @@ export interface VideoPairConfig {
   generatedVideoUrl?: string;
 }
 
+interface SteerableMotionSettings {
+  negative_prompt: string;
+  model_name: string;
+  seed: number;
+  debug: boolean;
+  booster_loras: boolean;
+  fade_in_duration: string;
+  fade_out_duration: string;
+  after_first_post_generation_saturation: number;
+  after_first_post_generation_brightness: number;
+}
+
 interface VideoEditLayoutProps {
   selectedShot: Shot;
   projectId: string | null;
@@ -59,6 +74,8 @@ interface VideoEditLayoutProps {
   onBatchVideoContextChange: (value: number) => void;
   batchVideoSteps: number;
   onBatchVideoStepsChange: (value: number) => void;
+  steerableMotionSettings: SteerableMotionSettings;
+  onSteerableMotionSettingsChange: (settings: Partial<SteerableMotionSettings>) => void;
   // Add any other necessary props, e.g., for generating videos
 }
 
@@ -88,6 +105,8 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
   onBatchVideoContextChange,
   batchVideoSteps,
   onBatchVideoStepsChange,
+  steerableMotionSettings,
+  onSteerableMotionSettingsChange,
 }) => {
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [creatingTaskId, setCreatingTaskId] = useState<string | null>(null);
@@ -98,6 +117,9 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
   const updateShotImageOrderMutation = useUpdateShotImageOrder();
   const [fileInputKey, setFileInputKey] = useState<number>(Date.now());
   const [deletingVideoId, setDeletingVideoId] = useState<string | null>(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
+  const videoRefs = React.useRef<(HTMLVideoElement | null)[]>([]);
 
   const [managedImages, setManagedImages] = useState<GenerationRow[]>([]);
 
@@ -106,6 +128,10 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
     if (!orderedShotImages) return [];
     return orderedShotImages.filter(isGenerationVideo).reverse();
   }, [orderedShotImages]);
+
+  useEffect(() => {
+    videoRefs.current = videoRefs.current.slice(0, videoOutputs.length);
+  }, [videoOutputs]);
 
   useEffect(() => {
     setManagedImages((orderedShotImages || []).filter(gen => !isGenerationVideo(gen)));
@@ -380,14 +406,19 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
         body: JSON.stringify({
           project_id: projectId,
           shot_id: selectedShot.id,
-          image_urls: absoluteImageUrls, // Pass the absolute URLs
+          image_urls: absoluteImageUrls,
           base_prompts: basePrompts,
           segment_frames: segmentFrames,
           frame_overlap: frameOverlap,
-          model_name: 'vace_14B',
-          seed: 789,
-          debug: true,
-          booster_loras: true,
+          negative_prompts: steerableMotionSettings.negative_prompt ? [steerableMotionSettings.negative_prompt] : [],
+          model_name: steerableMotionSettings.model_name,
+          seed: steerableMotionSettings.seed,
+          debug: steerableMotionSettings.debug,
+          booster_loras: steerableMotionSettings.booster_loras,
+          fade_in_duration: steerableMotionSettings.fade_in_duration,
+          fade_out_duration: steerableMotionSettings.fade_out_duration,
+          after_first_post_generation_saturation: steerableMotionSettings.after_first_post_generation_saturation,
+          after_first_post_generation_brightness: steerableMotionSettings.after_first_post_generation_brightness,
           params_json_str: JSON.stringify({ steps: batchVideoSteps }),
         }),
       });
@@ -425,7 +456,17 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {videoOutputs.map((video, index) => (
-                <div key={video.id || `video-${index}`} className="rounded-lg overflow-hidden shadow-md bg-muted/30 aspect-video flex items-center justify-center relative group">
+                <div
+                  key={video.id || `video-${index}`}
+                  className="rounded-lg overflow-hidden shadow-md bg-muted/30 aspect-video flex items-center justify-center relative group"
+                  onMouseEnter={() => videoRefs.current[index]?.play()}
+                  onMouseLeave={() => {
+                    if (videoRefs.current[index]) {
+                      videoRefs.current[index].pause();
+                      videoRefs.current[index].currentTime = 0;
+                    }
+                  }}
+                >
                   <div className="absolute top-2 left-2 flex items-center gap-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
                     <TaskDetailsModal generationId={video.id}>
                       <Button
@@ -444,9 +485,12 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
                     )}
                   </div>
                   { (video.location || video.imageUrl) ? (
-                    <video 
-                      src={getDisplayUrl(video.location || video.imageUrl)} 
-                      controls 
+                    <video
+                      ref={(el) => (videoRefs.current[index] = el)}
+                      src={getDisplayUrl(video.location || video.imageUrl)}
+                      loop
+                      muted
+                      playsInline
                       className="w-full h-full object-contain"
                     >
                       Your browser does not support the video tag.
@@ -634,6 +678,101 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
                 onValueChange={(value) => onBatchVideoStepsChange(value[0])}
               />
             </div>
+            
+            <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" className="w-full justify-center text-sm">
+                  <ChevronsUpDown className="h-4 w-4 mr-2" />
+                  {showAdvanced ? 'Hide' : 'Show'} Advanced Settings
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-4 pt-4">
+                <div>
+                  <Label htmlFor="negative_prompt">Global Negative Prompt</Label>
+                  <Textarea
+                    id="negative_prompt"
+                    value={steerableMotionSettings.negative_prompt}
+                    onChange={(e) => onSteerableMotionSettingsChange({ negative_prompt: e.target.value })}
+                    placeholder="e.g., blurry, low quality"
+                    rows={2}
+                  />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="model_name">Model Name</Label>
+                    <Input
+                      id="model_name"
+                      value={steerableMotionSettings.model_name}
+                      onChange={(e) => onSteerableMotionSettingsChange({ model_name: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="seed">Seed</Label>
+                    <Input
+                      id="seed"
+                      type="number"
+                      value={steerableMotionSettings.seed}
+                      onChange={(e) => onSteerableMotionSettingsChange({ seed: parseInt(e.target.value, 10) || 0 })}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                   <div>
+                    <Label htmlFor="saturation">Post-Gen Saturation: {steerableMotionSettings.after_first_post_generation_saturation}</Label>
+                    <Slider
+                      id="saturation"
+                      min={0} max={2} step={0.05}
+                      value={[steerableMotionSettings.after_first_post_generation_saturation]}
+                      onValueChange={(v) => onSteerableMotionSettingsChange({ after_first_post_generation_saturation: v[0] })}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="brightness">Post-Gen Brightness: {steerableMotionSettings.after_first_post_generation_brightness}</Label>
+                    <Slider
+                      id="brightness"
+                      min={-1} max={1} step={0.05}
+                      value={[steerableMotionSettings.after_first_post_generation_brightness]}
+                      onValueChange={(v) => onSteerableMotionSettingsChange({ after_first_post_generation_brightness: v[0] })}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="fade_in_duration">Fade-In Duration (JSON)</Label>
+                  <Textarea
+                    id="fade_in_duration"
+                    value={steerableMotionSettings.fade_in_duration}
+                    onChange={(e) => onSteerableMotionSettingsChange({ fade_in_duration: e.target.value })}
+                    rows={3}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="fade_out_duration">Fade-Out Duration (JSON)</Label>
+                  <Textarea
+                    id="fade_out_duration"
+                    value={steerableMotionSettings.fade_out_duration}
+                    onChange={(e) => onSteerableMotionSettingsChange({ fade_out_duration: e.target.value })}
+                    rows={3}
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="debug_mode">Debug Mode</Label>
+                  <Switch
+                    id="debug_mode"
+                    checked={steerableMotionSettings.debug}
+                    onCheckedChange={(checked) => onSteerableMotionSettingsChange({ debug: checked })}
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="booster_loras">Booster LoRAs</Label>
+                  <Switch
+                    id="booster_loras"
+                    checked={steerableMotionSettings.booster_loras}
+                    onCheckedChange={(checked) => onSteerableMotionSettingsChange({ booster_loras: checked })}
+                  />
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+
           </div>
 
           <Card className="mb-6">
