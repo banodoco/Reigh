@@ -17,6 +17,8 @@ import {
 } from '@dnd-kit/sortable';
 import ShotImageManager from '@/shared/components/ShotImageManager';
 import { Trash2 } from 'lucide-react';
+import TaskDetailsModal from './TaskDetailsModal';
+import { Info } from 'lucide-react';
 
 // Interface for individual video pair configuration (copied from Index.tsx)
 export interface VideoPairConfig {
@@ -425,6 +427,16 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {videoOutputs.map((video, index) => (
                 <div key={video.id || `video-${index}`} className="rounded-lg overflow-hidden shadow-md bg-muted/30 aspect-video flex items-center justify-center relative group">
+                  <TaskDetailsModal generationId={video.id}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute top-2 left-2 opacity-80 group-hover:opacity-100 transition-opacity z-10"
+                      aria-label="Show task details"
+                    >
+                      <Info className="h-5 w-5" />
+                    </Button>
+                  </TaskDetailsModal>
                   { (video.location || video.imageUrl) ? (
                     <video 
                       src={getDisplayUrl(video.location || video.imageUrl)} 

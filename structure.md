@@ -158,6 +158,7 @@ To change which tools appear for a specific environment, you need to modify the 
   – Allows creation of new shots (via API).
   – Hosts `VideoEditLayout` when a shot is selected for configuring video segments and managing images within that shot.
 • **`components/VideoEditLayout.tsx`**: Component for configuring and generating video segments from image pairs within a shot. Also allows uploading new images directly to the selected shot. Displays a section for "Output Videos" if any generated videos are associated with the shot. Uses `ShotImageManager` for image list management.
+• **`components/TaskDetailsModal.tsx`**: A dialog that displays the detailed parameters of a generation task. It's triggered from an info button on a generated video and fetches task details based on the generation ID.
 • **`components/VideoShotDisplay.tsx`**: Component to display a shot's images and name. Allows selection of the shot for editing. Includes UI for inline editing of the shot name and deleting the shot (both via API calls). Used by `ShotListDisplay`.
 • **`components/ShotListDisplay.tsx`**: Component that takes a list of shots and renders them using `VideoShotDisplay` components. Used by `VideoTravelToolPage.tsx` and `ShotsPage.tsx`.
 • **`components/SortableImageItem.tsx`**: A sub-component used by `ShotImageManager` to render each image in a sortable and deletable manner for the shot management UI.
