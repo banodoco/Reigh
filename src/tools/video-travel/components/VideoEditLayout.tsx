@@ -123,6 +123,7 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
   const animationFrameRef = React.useRef<number | null>(null);
   const lastFrameTimeRef = React.useRef<number>(0);
   const [playbackRates, setPlaybackRates] = useState<{ [key: number]: number }>({});
+  const [videoProgress, setVideoProgress] = useState<{ [key: number]: number }>({});
 
   const [managedImages, setManagedImages] = useState<GenerationRow[]>([]);
 
@@ -157,27 +158,27 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
     return <p>Error: No shot selected. Please go back and select a shot.</p>;
   }
 
-  const scrub = (video: HTMLVideoElement, rate: number, timestamp: number) => {
+  const scrub = (video: HTMLVideoElement, rate: number, timestamp: number, index: number) => {
     if (!lastFrameTimeRef.current) {
         lastFrameTimeRef.current = timestamp;
     }
     const delta = (timestamp - lastFrameTimeRef.current) / 1000; // time in seconds
     lastFrameTimeRef.current = timestamp;
 
-    const newTime = video.currentTime + rate * delta;
+    let newTime = video.currentTime + rate * delta;
 
-    if (newTime <= 0 && rate < 0) {
-        video.currentTime = 0;
-        return; 
+    // Looping logic
+    if (newTime < 0) {
+      newTime = video.duration + newTime;
     }
-    if (newTime >= video.duration && rate > 0) {
-        video.currentTime = video.duration;
-        return;
+    if (newTime > video.duration) {
+      newTime = newTime - video.duration;
     }
     
     video.currentTime = newTime;
+    setVideoProgress(prev => ({ ...prev, [index]: (newTime / video.duration) * 100 }));
 
-    animationFrameRef.current = requestAnimationFrame((newTimestamp) => scrub(video, rate, newTimestamp));
+    animationFrameRef.current = requestAnimationFrame((newTimestamp) => scrub(video, rate, newTimestamp, index));
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>, index: number) => {
@@ -193,16 +194,18 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
 
       let newRate;
       if (normalizedPosition < 0.5) {
+          // Map 0.0-0.5 to -2x to 1x
           const p = normalizedPosition * 2; // scale 0-0.5 to 0-1
-          newRate = -1 + p * 2; // maps 0 to -1, 0.5 to 0, 1 to 1
+          newRate = -2 + p * 3; // p=0 -> -2. p=1 -> 1
       } else {
+          // Map 0.5-1.0 to 1x to 3x
           const p = (normalizedPosition - 0.5) * 2; // scale 0.5-1 to 0-1
-          newRate = 1 + p; // maps 0 to 1, 1 to 2
+          newRate = 1 + p * 2; // p=0 -> 1. p=1 -> 3
       }
 
       setPlaybackRates(prev => ({ ...prev, [index]: newRate }));
       
-      animationFrameRef.current = requestAnimationFrame((timestamp) => scrub(video, newRate, timestamp));
+      animationFrameRef.current = requestAnimationFrame((timestamp) => scrub(video, newRate, timestamp, index));
   };
 
   const handleMouseLeave = (index: number) => {
@@ -217,6 +220,22 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
           delete newRates[index];
           return newRates;
       });
+      setVideoProgress(prev => {
+        const newProgress = { ...prev };
+        delete newProgress[index];
+        return newProgress;
+    });
+  };
+
+  const handleSeek = (e: React.MouseEvent<HTMLDivElement>, index: number) => {
+    const video = videoRefs.current[index];
+    if (!video) return;
+
+    const { offsetX } = e.nativeEvent;
+    const width = e.currentTarget.offsetWidth;
+    const newTime = (offsetX / width) * video.duration;
+    video.currentTime = newTime;
+    setVideoProgress(prev => ({ ...prev, [index]: (newTime / video.duration) * 100 }));
   };
 
   const handleImageUploadToShot = async (files: File[]) => {
@@ -575,10 +594,19 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
                     <p className="text-xs text-muted-foreground p-2">Video URL not available.</p>
                   )}
                   {playbackRates[index] !== undefined && (
-                    <div className="absolute bottom-2 right-2 bg-black/50 text-white text-xs px-2 py-1 rounded-md font-mono pointer-events-none">
+                    <div className="absolute bottom-2 right-2 bg-black/50 text-white text-xs px-2 py-1 rounded-md font-mono pointer-events-none z-20">
                       {playbackRates[index].toFixed(1)}x
                     </div>
                   )}
+                  <div 
+                    className="absolute bottom-0 left-0 w-full h-1.5 bg-white/20 cursor-pointer z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                    onClick={(e) => handleSeek(e, index)}
+                  >
+                    <div 
+                      className="h-full bg-white" 
+                      style={{ width: `${videoProgress[index] || 0}%` }}
+                    />
+                  </div>
                   <Button
                     variant="ghost"
                     size="icon"
