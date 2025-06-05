@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Button } from "@/shared/components/ui/button";
 import { Slider } from "@/shared/components/ui/slider";
 import { Textarea } from "@/shared/components/ui/textarea";
@@ -74,6 +74,16 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
   const [fileInputKey, setFileInputKey] = useState<number>(Date.now());
 
   const [managedImages, setManagedImages] = useState<GenerationRow[]>([]);
+
+  // Filter for video outputs from managedImages
+  const videoOutputs = useMemo(() => {
+    if (!managedImages) return [];
+    return managedImages.filter(gen => 
+      gen.type === 'video_travel_output' || 
+      (gen.location && gen.location.endsWith('.mp4')) || 
+      (gen.imageUrl && gen.imageUrl.endsWith('.mp4'))
+    );
+  }, [managedImages]);
 
   useEffect(() => {
     setManagedImages(orderedShotImages || []);
@@ -352,6 +362,36 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
       <Button onClick={onBack} className="mb-6">Back to Video Shots List</Button>
       <h2 className="text-3xl font-bold mb-1">Video Edit: {selectedShot.name}</h2>
       <p className="text-muted-foreground mb-6">Configure and generate video segments, or add new images to this shot.</p>
+
+      {videoOutputs.length > 0 && (
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle>Output Videos</CardTitle>
+            <p className="text-sm text-muted-foreground pt-1">
+              Generated videos for this shot.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {videoOutputs.map((video, index) => (
+                <div key={video.id || `video-${index}`} className="rounded-lg overflow-hidden shadow-md bg-muted/30 aspect-video flex items-center justify-center">
+                  { (video.location || video.imageUrl) ? (
+                    <video 
+                      src={video.location || video.imageUrl} 
+                      controls 
+                      className="w-full h-full object-contain"
+                    >
+                      Your browser does not support the video tag.
+                    </video>
+                  ) : (
+                    <p className="text-xs text-muted-foreground p-2">Video URL not available.</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
       
       {/*
       <div className="mb-6 flex items-center space-x-2">

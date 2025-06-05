@@ -3,8 +3,10 @@ export interface GenerationRow {
   shotImageEntryId: string; // Unique ID for the shot_images table entry
   id: string; // Assuming generation_id is a string, adjust if it's a number or other type
   // Add other relevant properties from your generations table
-  imageUrl?: string;
+  imageUrl?: string; // May specifically be for image previews
   thumbUrl?: string;
+  location?: string; // Canonical path to the media (image or video)
+  type?: string;     // Type of generation, e.g., 'image', 'video_travel_output'
   metadata?: any; // Added metadata field, consider a more specific type if known
 }
 

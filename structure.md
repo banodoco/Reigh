@@ -153,7 +153,7 @@ To change which tools appear for a specific environment, you need to modify the 
   – Lists shots for the selected project using `ShotListDisplay`.
   – Allows creation of new shots (via API).
   – Hosts `VideoEditLayout` when a shot is selected for configuring video segments and managing images within that shot.
-• **`components/VideoEditLayout.tsx`**: Component for configuring and generating video segments from image pairs within a shot. Also allows uploading new images directly to the selected shot. Uses `ShotImageManager` for image list management.
+• **`components/VideoEditLayout.tsx`**: Component for configuring and generating video segments from image pairs within a shot. Also allows uploading new images directly to the selected shot. Displays a section for "Output Videos" if any generated videos are associated with the shot. Uses `ShotImageManager` for image list management.
 • **`components/VideoShotDisplay.tsx`**: Component to display a shot's images and name. Allows selection of the shot for editing. Includes UI for inline editing of the shot name and deleting the shot (both via API calls). Used by `ShotListDisplay`.
 • **`components/ShotListDisplay.tsx`**: Component that takes a list of shots and renders them using `VideoShotDisplay` components. Used by `VideoTravelToolPage.tsx` and `ShotsPage.tsx`.
 • **`components/SortableImageItem.tsx`**: A sub-component used by `ShotImageManager` to render each image in a sortable and deletable manner for the shot management UI.
@@ -210,6 +210,7 @@ To change which tools appear for a specific environment, you need to modify the 
     – `useListTasks`: `GET /api/tasks?projectId=&status=` (fetches tasks for a project, optionally filtered by status).
     – `useCreateTask`: `POST /api/tasks` (creates a new task).
     – `useCancelTask`: `PATCH /api/tasks/:taskId/cancel` (updates a task's status to 'Cancelled').
+    – **`useUpdateTaskStatus` (Conceptual - API endpoint exists)**: `PATCH /api/tasks/:taskId/status` (updates a task's status to any valid status; if a 'travel_stitch' task is set to 'Complete', the backend will also create associated 'generation' and 'shot_generation' records).
     – `useCancelAllPendingTasks`: `POST /api/tasks/cancel-pending` (updates status of all pending tasks for a project to 'Cancelled').
 • **`useLastAffectedShot.ts`**: Hook for `LastAffectedShotContext`.
 • **`use-mobile.tsx`**: Media query helper.
@@ -232,7 +233,7 @@ To change which tools appear for a specific environment, you need to modify the 
 • **Fal-AI**: Imported from `@fal-ai/client` within relevant tools/pages.
 
 ### 3.6 Types (`src/types/`)
-• **`shots.ts`**: TypeScript definitions for Shot, GenerationRow etc.
+• **`shots.ts`**: TypeScript definitions for Shot, GenerationRow etc. `GenerationRow` includes `id`, `imageUrl`, `thumbUrl`, optional `location` (for canonical media path, e.g., video URL), and optional `type` (e.g., 'video_travel_output').
 • **`ai.ts`**: Types related to AI interaction services.
 • **`tasks.ts`**: TypeScript definitions for `Task` and `TaskStatus`.
 • (Other global or shared type definitions)

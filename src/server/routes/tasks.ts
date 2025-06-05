@@ -3,10 +3,12 @@ import { db } from '@/lib/db'; // Adjusted path assuming db is exported from her
 import { tasks as tasksSchema } from '../../../db/schema/schema'; // Adjusted path to schema
 import { taskStatusEnum } from '../../../db/schema/enums'; // CORRECTED: Import taskStatusEnum from enums.ts
 // import { NewTask } from '../../../db/schema/schema'; // Removed NewTask import
-import { sql, eq, and, inArray } from 'drizzle-orm'; // Added eq, and, inArray
+import { sql, eq, and, inArray, max } from 'drizzle-orm'; // Added eq, and, inArray, max
+import { generations as generationsSchema, shotGenerations as shotGenerationsSchema } from '../../../db/schema/schema'; // Added generations and shotGenerations schemas
+import { randomUUID } from 'crypto'; // Added for generating UUIDs
 // import { Static, Type } from '@sinclair/typebox'; // Removed optional TypeBox import
 
-const router: Router = express.Router();
+const router = express.Router() as any; // Changed Router to any to resolve overload errors
 
 interface TaskRequestBody {
   project_id: string;
@@ -151,6 +153,110 @@ router.patch('/:taskId/cancel', async (req: Request, res: Response) => {
         return res.status(400).json({ message: `Invalid status value. Ensure 'Cancelled' is a valid task status. Error: ${error.message}` });
     }
     return res.status(500).json({ message: 'Internal server error while cancelling task', error: error.message });
+  }
+});
+
+// New PATCH endpoint to update task status
+router.patch('/:taskId/status', async (req: Request, res: Response) => {
+  const taskId = req.params.taskId as string;
+  const { status: newStatus } = req.body;
+
+  if (!taskId) {
+    return res.status(400).json({ message: 'Missing required path parameter: taskId' });
+  }
+  if (!newStatus) {
+    return res.status(400).json({ message: 'Missing required body parameter: status' });
+  }
+
+  // Validate newStatus against taskStatusEnum.enumValues
+  if (!taskStatusEnum.enumValues.includes(newStatus as any)) {
+    return res.status(400).json({ message: `Invalid status value: ${newStatus}. Must be one of ${taskStatusEnum.enumValues.join(', ')}` });
+  }
+
+  try {
+    const updatedTasks = await db
+      .update(tasksSchema)
+      .set({
+        status: newStatus as typeof taskStatusEnum.enumValues[number],
+        updatedAt: new Date(),
+      })
+      .where(eq(tasksSchema.id, taskId))
+      .returning();
+
+    if (updatedTasks.length === 0) {
+      return res.status(404).json({ message: 'Task not found or not updated' });
+    }
+
+    const updatedTask = updatedTasks[0];
+
+    // If task is 'travel_stitch' and completed, create generation and shot_generation
+    if (updatedTask.taskType === 'travel_stitch' && updatedTask.status === 'Complete') {
+      console.log(`[API /api/tasks/${taskId}/status] 'travel_stitch' task completed. Creating generation records.`);
+      const params = updatedTask.params as any; // Assuming params is an object
+      const shotId = params?.full_orchestrator_payload?.shot_id;
+      const outputLocation = params?.final_stitched_output_path;
+      const projectId = updatedTask.projectId;
+
+      if (!shotId || !outputLocation || !projectId) {
+        console.error(`[API /api/tasks/${taskId}/status] Missing shot_id, outputLocation, or projectId for travel_stitch task. Cannot create generation.`, { shotId, outputLocation, projectId });
+        // Not returning an error to client here, as task update itself was successful.
+        // This is an internal post-processing step. Logging an error is important.
+      } else {
+        try {
+          // Create Generation
+          const newGenerationId = randomUUID();
+          const insertedGenerations = await db.insert(generationsSchema).values({
+            id: newGenerationId,
+            projectId: projectId,
+            tasks: [updatedTask.id], // Link to this travel_stitch task
+            location: outputLocation,
+            type: 'video_travel_output', // Specific type for these generated videos
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          }).returning();
+
+          if (insertedGenerations.length === 0) {
+            console.error(`[API /api/tasks/${taskId}/status] Failed to insert generation for task ${taskId}.`);
+          } else {
+            const newGeneration = insertedGenerations[0];
+            console.log(`[API /api/tasks/${taskId}/status] Created generation ${newGeneration.id} for task ${taskId}.`);
+
+            // Determine next position for shot_generation
+            const maxPositionResult = await db
+              .select({ value: max(shotGenerationsSchema.position) })
+              .from(shotGenerationsSchema)
+              .where(eq(shotGenerationsSchema.shotId, shotId));
+            
+            const nextPosition = (maxPositionResult[0]?.value ?? -1) + 1;
+
+            // Create ShotGeneration
+            const insertedShotGenerations = await db.insert(shotGenerationsSchema).values({
+              shotId: shotId,
+              generationId: newGeneration.id,
+              position: nextPosition,
+              // id will be auto-generated by DB if not provided and set up with default, or provide randomUUID()
+            }).returning();
+
+            if (insertedShotGenerations.length === 0) {
+               console.error(`[API /api/tasks/${taskId}/status] Failed to insert shot_generation for generation ${newGeneration.id}.`);
+            } else {
+               console.log(`[API /api/tasks/${taskId}/status] Created shot_generation ${insertedShotGenerations[0].id} linking generation ${newGeneration.id} to shot ${shotId}.`);
+            }
+          }
+        } catch (genError: any) {
+          console.error(`[API /api/tasks/${taskId}/status] Error creating generation/shot_generation for completed travel_stitch task ${taskId}:`, genError);
+          // Again, not returning error to client as task update succeeded.
+        }
+      }
+    }
+
+    return res.status(200).json(updatedTask);
+  } catch (error: any) {
+    console.error(`[API /api/tasks/${taskId}/status] Error updating task status:`, error);
+    if (error.message.includes('invalid input value for enum')) {
+        return res.status(400).json({ message: `Invalid status value. Error: ${error.message}` });
+    }
+    return res.status(500).json({ message: 'Internal server error while updating task status', error: error.message });
   }
 });
 
