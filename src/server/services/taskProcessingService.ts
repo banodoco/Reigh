@@ -8,6 +8,61 @@ import { randomUUID } from 'crypto';
 type Task = typeof tasksSchema.$inferSelect;
 
 /**
+ * Strips the server IP address and port from local image paths.
+ * Converts "http://213.173.102.76:10368/files/image.png" to "files/image.png"
+ * @param imagePath - The image path to normalize
+ * @returns The normalized path
+ */
+function normalizeImagePath(imagePath: string): string {
+  if (!imagePath) return imagePath;
+  
+  // Check if it's a local server URL (has IP address pattern)
+  const localServerPattern = /^https?:\/\/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d+/;
+  
+  if (localServerPattern.test(imagePath)) {
+    // Extract just the path part after the server address and remove leading slash
+    const url = new URL(imagePath);
+    return url.pathname.startsWith('/') ? url.pathname.substring(1) : url.pathname;
+  }
+  
+  return imagePath;
+}
+
+/**
+ * Recursively normalizes image paths in an object or array
+ * @param obj - The object/array to process
+ * @returns The object with normalized image paths
+ */
+function normalizeImagePathsInObject(obj: any): any {
+  if (typeof obj === 'string') {
+    // Check if this string looks like an image URL
+    if (obj.match(/\.(png|jpg|jpeg|gif|webp|svg)$/i) || obj.includes('/files/')) {
+      return normalizeImagePath(obj);
+    }
+    return obj;
+  }
+  
+  if (Array.isArray(obj)) {
+    return obj.map(item => normalizeImagePathsInObject(item));
+  }
+  
+  if (obj && typeof obj === 'object') {
+    const normalized: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      // Special handling for known image path fields
+      if (key.includes('image') || key.includes('path') || key === 'location' || key === 'outputLocation') {
+        normalized[key] = normalizeImagePathsInObject(value);
+      } else {
+        normalized[key] = normalizeImagePathsInObject(value);
+      }
+    }
+    return normalized;
+  }
+  
+  return obj;
+}
+
+/**
  * Processes a completed 'travel_stitch' task to create generation and shot_generation records.
  * @param task - The completed travel_stitch task object.
  */
@@ -18,10 +73,19 @@ export async function processCompletedStitchTask(task: Task): Promise<void> {
   }
 
   console.log(`[VideoStitchGenDebug] Processing completed travel_stitch task ${task.id}.`);
-  const params = task.params as any; // Assuming params is an object
+  
+  // Normalize image paths in task params
+  const normalizedParams = normalizeImagePathsInObject(task.params);
+  const params = normalizedParams as any;
+  
   const shotId = params?.full_orchestrator_payload?.shot_id;
-  const outputLocation = task.outputLocation;
+  let outputLocation = task.outputLocation;
   const projectId = task.projectId;
+
+  // Also normalize the output location
+  if (outputLocation) {
+    outputLocation = normalizeImagePath(outputLocation);
+  }
 
   if (!shotId || !outputLocation || !projectId) {
     console.error(`[VideoStitchGenDebug] Missing critical data for task ${task.id}. Cannot create generation.`, { shotId, outputLocation, projectId, taskParams: params });
@@ -36,7 +100,7 @@ export async function processCompletedStitchTask(task: Task): Promise<void> {
       id: newGenerationId,
       projectId: projectId,
       tasks: [task.id],
-      location: outputLocation,
+      location: outputLocation, // This is now normalized
       type: 'video_travel_output',
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -48,7 +112,7 @@ export async function processCompletedStitchTask(task: Task): Promise<void> {
     }
     
     const newGeneration = insertedGenerations[0];
-    console.log(`[VideoStitchGenDebug] Created generation ${newGeneration.id} for task ${task.id}.`);
+    console.log(`[VideoStitchGenDebug] Created generation ${newGeneration.id} for task ${task.id} with normalized location: ${outputLocation}.`);
 
     const maxPositionResult = await db
       .select({ value: sql<number>`max(${shotGenerationsSchema.position})` })
