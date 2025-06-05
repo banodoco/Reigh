@@ -8,10 +8,18 @@ import {
   DialogFooter,
 } from '@/shared/components/ui/dialog';
 import { Button } from '@/shared/components/ui/button';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Json } from '@/integrations/supabase/types';
 import { Info } from 'lucide-react';
+// import { Json } from '@/integrations/supabase/types';
+
+// Local definition for Json type to remove dependency on supabase client types
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
 
 interface TaskDetailsModalProps {
   generationId: string;
@@ -45,43 +53,30 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
 
       setIsLoading(true);
       try {
-        // First, get the generation to find the associated task ID.
-        const { data: generationData, error: generationError } = await supabase
-          .from('generations')
-          .select('tasks')
-          .eq('id', generationId)
-          .single();
-
-        if (generationError || !generationData) {
-          throw new Error(generationError?.message || 'Generation not found.');
+        // Step 1: Fetch the task ID from the generation
+        const taskIdResponse = await fetch(`/api/generations/${generationId}/task-id`);
+        if (!taskIdResponse.ok) {
+          const errorData = await taskIdResponse.json().catch(() => ({ message: `Generation not found or has no task.` }));
+          throw new Error(errorData.message);
         }
-        
-        const tasks = (generationData as any).tasks as string[];
-        if (!tasks || tasks.length === 0) {
-            // It's possible there are no tasks, so don't treat as an error
-            console.log(`[TaskDetailsModal] No tasks found for generation ID: ${generationId}`);
-            setTask(null); // Explicitly set task to null
+        const { taskId } = await taskIdResponse.json();
+
+        if (!taskId) {
+            console.log(`[TaskDetailsModal] No task ID found for generation ID: ${generationId}`);
+            setTask(null);
             return;
         }
 
-        const taskId = tasks[0]; 
-
-        // Then, fetch the task details using the task ID.
-        const { data: taskData, error: taskError } = await supabase
-          .from('tasks')
-          .select('id, params')
-          .eq('task_id', taskId)
-          .single();
-
-        if (taskError) {
-          throw new Error(taskError.message);
+        // Step 2: Fetch the task details using the task ID
+        const taskDetailsResponse = await fetch(`/api/tasks/by-task-id/${taskId}`);
+        if (!taskDetailsResponse.ok) {
+            const errorData = await taskDetailsResponse.json().catch(() => ({ message: `Task with ID ${taskId} not found.` }));
+            throw new Error(errorData.message);
         }
+        
+        const taskData = await taskDetailsResponse.json();
+        setTask(taskData);
 
-        if (taskData) {
-          setTask(taskData as unknown as Task);
-        } else {
-            throw new Error(`Task with ID ${taskId} not found.`)
-        }
       } catch (error: any) {
         console.error('[TaskDetailsModal] Error fetching task details:', error);
         toast.error(`Failed to fetch task details: ${error.message}`);

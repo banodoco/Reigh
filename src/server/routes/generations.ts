@@ -52,4 +52,33 @@ generationsRouter.post('/', asyncHandler(async (req: Request, res: Response) => 
   }
 }));
 
+// GET /api/generations/:id/task-id
+generationsRouter.get('/:id/task-id', asyncHandler(async (req: Request, res: Response) => {
+  const { id } = req.params;
+
+  if (!id) {
+    return res.status(400).json({ message: 'Generation ID is required' });
+  }
+
+  try {
+    const result = await db.select({ tasks: generationsTable.tasks }).from(generationsTable).where(eq(generationsTable.id, id)).limit(1);
+
+    if (result.length === 0) {
+      return res.status(404).json({ message: 'Generation not found' });
+    }
+
+    const tasks = result[0].tasks;
+    if (!tasks || tasks.length === 0) {
+      return res.status(404).json({ message: 'No task associated with this generation' });
+    }
+    
+    // Assuming the first task is the relevant one
+    res.status(200).json({ taskId: tasks[0] });
+
+  } catch (error: any) {
+    console.error(`[API Error getting task for generation ${id}]`, error);
+    res.status(500).json({ message: 'Failed to retrieve task ID' });
+  }
+}));
+
 export default generationsRouter; 

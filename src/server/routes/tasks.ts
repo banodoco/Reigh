@@ -247,4 +247,32 @@ router.post('/cancel-pending', async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/tasks/by-task-id/:taskId - Get a single task by its string task_id
+router.get('/by-task-id/:taskId', async (req: Request, res: Response) => {
+  const taskId = req.params.taskId as string;
+
+  if (!taskId) {
+    return res.status(400).json({ message: 'Missing required path parameter: taskId' });
+  }
+
+  try {
+    // The task_id is stored within the 'params' JSONB column.
+    // We need to use a JSON path expression to query it.
+    const tasks = await db
+      .select()
+      .from(tasksSchema)
+      .where(sql`params->>'task_id' = ${taskId}`)
+      .limit(1);
+
+    if (tasks.length === 0) {
+      return res.status(404).json({ message: 'Task not found' });
+    }
+
+    return res.status(200).json(tasks[0]);
+  } catch (error: any) {
+    console.error(`[API /api/tasks/by-task-id/${taskId}] Error fetching task:`, error);
+    return res.status(500).json({ message: 'Internal server error while fetching task', error: error.message });
+  }
+});
+
 export default router; 
