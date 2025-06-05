@@ -47,6 +47,52 @@ interface VideoEditLayoutProps {
   // Add any other necessary props, e.g., for generating videos
 }
 
+// Helper function to determine if a generation is a video
+const isGenerationVideo = (gen: GenerationRow): boolean => {
+  return gen.type === 'video_travel_output' ||
+         (gen.location && gen.location.endsWith('.mp4')) ||
+         (gen.imageUrl && gen.imageUrl.endsWith('.mp4'));
+};
+
+// Helper function to resolve asset URLs
+const getDisplayUrl = (pathOrUrl: string | undefined | null): string | undefined => {
+  if (!pathOrUrl) return undefined;
+
+  if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://')) {
+    return pathOrUrl;
+  }
+
+  const explicitAssetBaseUrl = import.meta.env.VITE_APP_ASSET_BASE_URL;
+  const apiTargetUrl = import.meta.env.VITE_API_TARGET_URL; // Read the API target URL
+
+  let effectiveBaseUrl: string | undefined;
+
+  if (explicitAssetBaseUrl) {
+    effectiveBaseUrl = explicitAssetBaseUrl;
+  } else if (apiTargetUrl) {
+    effectiveBaseUrl = apiTargetUrl;
+  } else {
+    effectiveBaseUrl = undefined;
+  }
+  
+  const workspaceVideoPrefix = '/workspace/Headless-Wan/outputs/';
+
+  if (effectiveBaseUrl && pathOrUrl.startsWith(workspaceVideoPrefix)) {
+    const cleanBaseUrl = effectiveBaseUrl.endsWith('/') ? effectiveBaseUrl.slice(0, -1) : effectiveBaseUrl;
+    const relativeVideoPath = pathOrUrl.substring(workspaceVideoPrefix.length);
+    return `${cleanBaseUrl}/media_outputs/${relativeVideoPath}`;
+  }
+
+  // Warning if no effective base URL is available for paths that need it
+  if (!effectiveBaseUrl && pathOrUrl.startsWith(workspaceVideoPrefix)) {
+    console.warn(
+      `[VideoEditLayout] Neither VITE_APP_ASSET_BASE_URL nor VITE_API_TARGET_URL is set, but a server path (${pathOrUrl}) starting with ${workspaceVideoPrefix} was encountered. Video may not load correctly. Please set VITE_APP_ASSET_BASE_URL (recommended for assets) or VITE_API_TARGET_URL in your .env to your API server's base address (e.g., http://localhost:3001).`
+    );
+  }
+  // Fallback for other non-HTTP paths or if logic above doesn't apply
+  return pathOrUrl; 
+};
+
 const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
   selectedShot,
   projectId,
@@ -75,18 +121,34 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
 
   const [managedImages, setManagedImages] = useState<GenerationRow[]>([]);
 
+  useEffect(() => {
+    const explicitAssetBaseUrl = import.meta.env.VITE_APP_ASSET_BASE_URL;
+    const apiTargetUrl = import.meta.env.VITE_API_TARGET_URL;
+    const effectiveBaseUrlIsSet = explicitAssetBaseUrl || apiTargetUrl;
+
+    const workspaceVideoPrefix = '/workspace/Headless-Wan/outputs/';
+    const hasProblematicPathWithoutBaseUrl = (orderedShotImages || []).some(gen =>
+      isGenerationVideo(gen) &&
+      !effectiveBaseUrlIsSet && // Problem if no effective base URL is set
+      ( // AND path is a workspace video path not already a full URL
+        (gen.location && gen.location.startsWith(workspaceVideoPrefix) && !gen.location.startsWith('http')) ||
+        (gen.imageUrl && gen.imageUrl.startsWith(workspaceVideoPrefix) && !gen.imageUrl.startsWith('http'))
+      )
+    );
+
+    if (hasProblematicPathWithoutBaseUrl) {
+      toast.warning("Video URL issue: Neither VITE_APP_ASSET_BASE_URL nor VITE_API_TARGET_URL is set. Videos from server paths (e.g., /workspace/Headless-Wan/outputs/...) may not load. Please set VITE_APP_ASSET_BASE_URL (recommended for assets) or VITE_API_TARGET_URL in your .env to your API server's base (e.g. http://localhost:3001). Server will serve videos via /media_outputs/ route.", { duration: 12000 });
+    }
+  }, [orderedShotImages]);
+
   // Filter for video outputs from managedImages
   const videoOutputs = useMemo(() => {
-    if (!managedImages) return [];
-    return managedImages.filter(gen => 
-      gen.type === 'video_travel_output' || 
-      (gen.location && gen.location.endsWith('.mp4')) || 
-      (gen.imageUrl && gen.imageUrl.endsWith('.mp4'))
-    );
-  }, [managedImages]);
+    if (!orderedShotImages) return [];
+    return orderedShotImages.filter(isGenerationVideo);
+  }, [orderedShotImages]);
 
   useEffect(() => {
-    setManagedImages(orderedShotImages || []);
+    setManagedImages((orderedShotImages || []).filter(gen => !isGenerationVideo(gen)));
   }, [orderedShotImages]);
 
   if (!selectedShot) {
@@ -376,9 +438,9 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
               {videoOutputs.map((video, index) => (
                 <div key={video.id || `video-${index}`} className="rounded-lg overflow-hidden shadow-md bg-muted/30 aspect-video flex items-center justify-center">
                   { (video.location || video.imageUrl) ? (
-                    <video 
-                      src={video.location || video.imageUrl} 
-                      controls 
+                    <video
+                      src={getDisplayUrl(video.location || video.imageUrl)}
+                      controls
                       className="w-full h-full object-contain"
                     >
                       Your browser does not support the video tag.

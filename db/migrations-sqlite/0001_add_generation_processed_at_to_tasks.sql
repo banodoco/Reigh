@@ -1,0 +1,1 @@
+ALTER TABLE `tasks` ADD COLUMN `generation_processed_at` DATETIME; 
