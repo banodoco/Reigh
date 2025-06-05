@@ -36,6 +36,13 @@
       "when": 1749123774502,
       "tag": "0004_mixed_tarantula",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1749125716875,
+      "tag": "0005_useful_nova",
+      "breakpoints": true
     }
   ]
 }

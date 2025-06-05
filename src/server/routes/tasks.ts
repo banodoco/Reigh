@@ -6,6 +6,7 @@ import { taskStatusEnum } from '../../../db/schema/enums'; // CORRECTED: Import 
 import { sql, eq, and, inArray, max } from 'drizzle-orm'; // Added eq, and, inArray, max
 import { generations as generationsSchema, shotGenerations as shotGenerationsSchema } from '../../../db/schema/schema'; // Added generations and shotGenerations schemas
 import { randomUUID } from 'crypto'; // Added for generating UUIDs
+import { processCompletedStitchTask } from '../services/taskProcessingService'; // Added import
 // import { Static, Type } from '@sinclair/typebox'; // Removed optional TypeBox import
 
 const router = express.Router() as any; // Changed Router to any to resolve overload errors
@@ -189,56 +190,13 @@ router.patch('/:taskId/status', async (req: Request, res: Response) => {
     const updatedTask = updatedTasks[0];
 
     if (updatedTask.taskType === 'travel_stitch' && updatedTask.status === 'Complete') {
-      console.log(`[VideoStitchGenDebug] Task ${taskId} is 'travel_stitch' and 'Complete'. Attempting to create generation records.`);
-      const params = updatedTask.params as any;
-      const shotId = params?.full_orchestrator_payload?.shot_id;
-      const outputLocation = params?.final_stitched_output_path;
-      const projectId = updatedTask.projectId;
-
-      if (!shotId || !outputLocation || !projectId) {
-        console.error(`[VideoStitchGenDebug] Missing critical data for task ${taskId}. Cannot create generation.`, { shotId, outputLocation, projectId, taskParams: params });
-      } else {
-        try {
-          const newGenerationId = randomUUID();
-          const insertedGenerations = await db.insert(generationsSchema).values({
-            id: newGenerationId,
-            projectId: projectId,
-            tasks: [updatedTask.id],
-            location: outputLocation,
-            type: 'video_travel_output',
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          }).returning();
-
-          if (insertedGenerations.length === 0) {
-            console.error(`[VideoStitchGenDebug] Failed to insert generation for task ${taskId}.`);
-          } else {
-            const newGeneration = insertedGenerations[0];
-            console.log(`[VideoStitchGenDebug] Created generation ${newGeneration.id} for task ${taskId}.`);
-
-            const maxPositionResult = await db
-              .select({ value: max(shotGenerationsSchema.position) })
-              .from(shotGenerationsSchema)
-              .where(eq(shotGenerationsSchema.shotId, shotId));
-            
-            const nextPosition = (maxPositionResult[0]?.value ?? -1) + 1;
-
-            const insertedShotGenerations = await db.insert(shotGenerationsSchema).values({
-              shotId: shotId,
-              generationId: newGeneration.id,
-              position: nextPosition,
-            }).returning();
-
-            if (insertedShotGenerations.length === 0) {
-               console.error(`[VideoStitchGenDebug] Failed to insert shot_generation for generation ${newGeneration.id} (task ${taskId}).`);
-            } else {
-               console.log(`[VideoStitchGenDebug] Created shot_generation ${insertedShotGenerations[0].id} linking generation ${newGeneration.id} to shot ${shotId} (task ${taskId}).`);
-            }
-          }
-        } catch (genError: any) {
-          console.error(`[VideoStitchGenDebug] Error during generation/shot_generation creation for task ${taskId}:`, genError);
-        }
-      }
+      // Call the refactored processing function
+      // No await needed here if we don't want the API response to wait for this background processing.
+      // However, if it was critical for the API response to confirm this post-processing, you might await.
+      // For now, let it run in the background.
+      processCompletedStitchTask(updatedTask).catch(err => {
+        console.error(`[VideoStitchGenDebug] Error from processCompletedStitchTask called via API for task ${updatedTask.id}:`, err);
+      });
     }
 
     return res.status(200).json(updatedTask);

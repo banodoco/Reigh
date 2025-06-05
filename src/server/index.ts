@@ -9,6 +9,7 @@ import dotenv from 'dotenv';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import { startTaskPoller } from './services/taskProcessingService';
 // import { fileURLToPath } from 'url'; // No longer needed if using process.cwd()
 
 // // Determine __dirname for ES modules
@@ -80,6 +81,9 @@ app.use('/api/shots', shotsRouter);
 app.use('/api/generations', generationsRouter);
 app.use('/api/tasks', tasksRouter);
 app.use('/api/steerable-motion', steerableMotionRouter);
+
+// Start the task poller
+startTaskPoller();
 
 // Basic health check endpoint
 app.get('/status', (req: express.Request, res: express.Response): void => {

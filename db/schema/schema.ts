@@ -37,6 +37,7 @@ export const tasks = pgTable('tasks', {
   createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).$defaultFn(() => new Date()).notNull(),
   updatedAt: timestamp('updated_at', { mode: 'date', withTimezone: true }).$onUpdate(() => new Date()),
   projectId: uuid('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+  generationProcessedAt: timestamp('generation_processed_at', { mode: 'date', withTimezone: true }),
 });
 
 export const generations = pgTable('generations', {
