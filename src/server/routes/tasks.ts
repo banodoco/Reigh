@@ -24,7 +24,7 @@ router.post('/', async (req: Request, res: Response) => {
     project_id,
     task_type,
     params,
-    status = 'Pending',
+    status = 'Queued',
     dependant_on, // snake_case from client
     output_location // snake_case from client
   } = req.body as TaskRequestBody; // Cast req.body here
