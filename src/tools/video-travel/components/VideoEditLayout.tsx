@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { Button } from "@/shared/components/ui/button";
 import { Slider } from "@/shared/components/ui/slider";
 import { Textarea } from "@/shared/components/ui/textarea";
@@ -23,6 +23,8 @@ import { formatDistanceToNow } from "date-fns";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/components/ui/collapsible";
 import { Switch } from "@/shared/components/ui/switch";
 import { Input } from "@/shared/components/ui/input";
+import VideoLightbox from "./VideoLightbox";
+import { useVideoScrubbing } from "@/shared/hooks/useVideoScrubbing";
 
 // Local definition for Json type to remove dependency on supabase client types
 export type Json =
@@ -118,10 +120,13 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
   const [fileInputKey, setFileInputKey] = useState<number>(Date.now());
   const [deletingVideoId, setDeletingVideoId] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   const videoRefs = React.useRef<(HTMLVideoElement | null)[]>([]);
-  const animationFrameRef = React.useRef<number | null>(null);
-  const lastFrameTimeRef = React.useRef<number>(0);
+  const animationFrameRef = useRef<number | null>(null);
+  const lastFrameTimeRef = useRef<number>(0);
+  const playbackRateRef = useRef<{ [key: number]: number }>({});
+
   const [playbackRates, setPlaybackRates] = useState<{ [key: number]: number }>({});
   const [videoProgress, setVideoProgress] = useState<{ [key: number]: number }>({});
 
@@ -158,7 +163,13 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
     return <p>Error: No shot selected. Please go back and select a shot.</p>;
   }
 
-  const scrub = (video: HTMLVideoElement, rate: number, timestamp: number, index: number) => {
+  const scrub = (video: HTMLVideoElement, index: number, timestamp: number) => {
+    // Ensure we have a rate, otherwise stop
+    const rate = playbackRateRef.current[index];
+    if (rate === undefined) {
+      return;
+    }
+    
     if (!lastFrameTimeRef.current) {
         lastFrameTimeRef.current = timestamp;
     }
@@ -170,23 +181,29 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
     // Looping logic
     if (newTime < 0) {
       newTime = video.duration + newTime;
-    }
-    if (newTime > video.duration) {
+    } else if (newTime > video.duration) {
       newTime = newTime - video.duration;
     }
     
     video.currentTime = newTime;
     setVideoProgress(prev => ({ ...prev, [index]: (newTime / video.duration) * 100 }));
 
-    animationFrameRef.current = requestAnimationFrame((newTimestamp) => scrub(video, rate, newTimestamp, index));
+    animationFrameRef.current = requestAnimationFrame((newTimestamp) => scrub(video, index, newTimestamp));
+  };
+
+  const startScrubbing = (video: HTMLVideoElement, index: number) => {
+    stopScrubbing(); // Ensure no other loops are running
+    video.pause();
+    lastFrameTimeRef.current = 0; // Reset timer for smooth start
+    animationFrameRef.current = requestAnimationFrame((timestamp) => {
+      lastFrameTimeRef.current = timestamp; // Initialize frame time
+      scrub(video, index, timestamp);
+    });
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>, index: number) => {
       const video = videoRefs.current[index];
       if (!video) return;
-
-      stopScrubbing();
-      video.pause();
 
       const { offsetX } = e.nativeEvent;
       const width = e.currentTarget.offsetWidth;
@@ -203,9 +220,15 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
           newRate = 1 + p * 2; // p=0 -> 1. p=1 -> 3
       }
 
+      playbackRateRef.current[index] = newRate;
       setPlaybackRates(prev => ({ ...prev, [index]: newRate }));
-      
-      animationFrameRef.current = requestAnimationFrame((timestamp) => scrub(video, newRate, timestamp, index));
+  };
+  
+  const handleMouseEnter = (index: number) => {
+    const video = videoRefs.current[index];
+    if (video) {
+      startScrubbing(video, index);
+    }
   };
 
   const handleMouseLeave = (index: number) => {
@@ -215,6 +238,7 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
           video.pause();
           video.currentTime = 0;
       }
+      delete playbackRateRef.current[index];
       setPlaybackRates(prev => {
           const newRates = { ...prev };
           delete newRates[index];
@@ -542,6 +566,13 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
       <h2 className="text-3xl font-bold mb-1">Video Edit: {selectedShot.name}</h2>
       <p className="text-muted-foreground mb-6">Configure and generate video segments, or add new images to this shot.</p>
 
+      {lightboxIndex !== null && videoOutputs[lightboxIndex] && (
+        <VideoLightbox
+          video={videoOutputs[lightboxIndex]}
+          onClose={() => setLightboxIndex(null)}
+        />
+      )}
+
       {videoOutputs.length > 0 && (
         <Card className="mb-8">
           <CardHeader>
@@ -552,80 +583,97 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {videoOutputs.map((video, index) => (
-                <div
-                  key={video.id || `video-${index}`}
-                  className="rounded-lg overflow-hidden shadow-md bg-muted/30 aspect-video flex items-center justify-center relative group"
-                  onMouseMove={(e) => handleMouseMove(e, index)}
-                  onMouseLeave={() => handleMouseLeave(index)}
-                >
-                  <div className="absolute top-2 left-2 flex items-center gap-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <TaskDetailsModal generationId={video.id}>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="bg-black/20 backdrop-blur-sm hover:bg-white/20"
-                        aria-label="Show task details"
-                      >
-                        <Info className="h-5 w-5 text-white" />
-                      </Button>
-                    </TaskDetailsModal>
-                    {video.createdAt && (
-                      <span className="text-xs text-white bg-black/50 px-1.5 py-0.5 rounded-md">
-                        {formatDistanceToNow(new Date(video.createdAt), { addSuffix: true })}
-                      </span>
-                    )}
-                  </div>
-                  { (video.location || video.imageUrl) ? (
-                    <video
-                      ref={(el) => (videoRefs.current[index] = el)}
-                      src={getDisplayUrl(video.location || video.imageUrl)}
-                      poster={video.thumbUrl ? getDisplayUrl(video.thumbUrl) : getDisplayUrl('/placeholder.svg')}
-                      preload="auto"
-                      onLoadedData={(e) => { e.currentTarget.removeAttribute('poster'); }}
-                      loop
-                      muted
-                      playsInline
-                      className="w-full h-full object-contain"
-                    >
-                      Your browser does not support the video tag.
-                    </video>
-                  ) : (
-                    <p className="text-xs text-muted-foreground p-2">Video URL not available.</p>
-                  )}
-                  {playbackRates[index] !== undefined && (
-                    <div className="absolute bottom-2 right-2 bg-black/50 text-white text-xs px-2 py-1 rounded-md font-mono pointer-events-none z-20">
-                      {playbackRates[index].toFixed(1)}x
+              {videoOutputs.map((video, index) => {
+                const {
+                  videoRef,
+                  playbackRate,
+                  progress,
+                  handleMouseEnter,
+                  handleMouseMove,
+                  handleMouseLeave,
+                  handleSeek,
+                } = useVideoScrubbing();
+
+                return (
+                  <div
+                    key={video.id || `video-${index}`}
+                    className="rounded-lg overflow-hidden shadow-md bg-muted/30 aspect-video flex items-center justify-center relative group"
+                    onMouseEnter={handleMouseEnter}
+                    onMouseMove={handleMouseMove}
+                    onMouseLeave={handleMouseLeave}
+                    onDoubleClick={() => setLightboxIndex(index)}
+                  >
+                    <div className="absolute top-2 left-2 flex items-center gap-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <TaskDetailsModal generationId={video.id}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="bg-black/20 backdrop-blur-sm hover:bg-white/20"
+                          aria-label="Show task details"
+                        >
+                          <Info className="h-5 w-5 text-white" />
+                        </Button>
+                      </TaskDetailsModal>
+                      {video.createdAt && (
+                        <span className="text-xs text-white bg-black/50 px-1.5 py-0.5 rounded-md">
+                          {formatDistanceToNow(new Date(video.createdAt), { addSuffix: true })}
+                        </span>
+                      )}
                     </div>
-                  )}
-                  <div 
-                    className="absolute bottom-0 left-0 w-full h-1.5 bg-white/20 cursor-pointer z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                    onClick={(e) => handleSeek(e, index)}
-                  >
-                    <div 
-                      className="h-full bg-white" 
-                      style={{ width: `${videoProgress[index] || 0}%` }}
-                    />
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10 text-destructive bg-black/20 hover:bg-destructive/20 backdrop-blur-sm"
-                    onClick={() => handleDeleteVideoOutput(video.id)}
-                    disabled={deletingVideoId === video.id}
-                    aria-label="Delete video"
-                  >
-                    {deletingVideoId === video.id ? (
-                      <svg className="animate-spin h-4 w-4 text-destructive" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
+                    { (video.location || video.imageUrl) ? (
+                      <video
+                        ref={videoRef}
+                        src={getDisplayUrl(video.location || video.imageUrl)}
+                        poster={video.thumbUrl ? getDisplayUrl(video.thumbUrl) : getDisplayUrl('/placeholder.svg')}
+                        preload="auto"
+                        onLoadedData={(e) => { e.currentTarget.removeAttribute('poster'); }}
+                        loop
+                        muted
+                        playsInline
+                        className="w-full h-full object-contain"
+                      >
+                        Your browser does not support the video tag.
+                      </video>
                     ) : (
-                      <Trash2 className="h-4 w-4" />
+                      <p className="text-xs text-muted-foreground p-2">Video URL not available.</p>
                     )}
-                  </Button>
-                </div>
-              ))}
+                    {playbackRate !== null && (
+                      <div className="absolute bottom-2 right-2 bg-black/50 text-white text-xs px-2 py-1 rounded-md font-mono pointer-events-none z-20">
+                        {playbackRate.toFixed(1)}x
+                      </div>
+                    )}
+                    <div 
+                      className="absolute bottom-0 left-0 w-full h-1.5 bg-white/20 cursor-pointer z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                      onClick={handleSeek}
+                    >
+                      <div 
+                        className="h-full bg-white" 
+                        style={{ width: `${progress}%` }}
+                      />
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10 text-destructive bg-black/20 hover:bg-destructive/20 backdrop-blur-sm"
+                      onClick={(e) => {
+                        e.stopPropagation(); // prevent lightbox from opening on delete
+                        handleDeleteVideoOutput(video.id);
+                      }}
+                      disabled={deletingVideoId === video.id}
+                      aria-label="Delete video"
+                    >
+                      {deletingVideoId === video.id ? (
+                        <svg className="animate-spin h-4 w-4 text-destructive" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                )
+              })}
             </div>
           </CardContent>
         </Card>
