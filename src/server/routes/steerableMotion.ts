@@ -28,11 +28,14 @@ interface TravelRequestBody {
 
 // Define aspect ratio to resolution mapping
 const ASPECT_RATIO_TO_RESOLUTION: { [key: string]: string } = {
-  'Square': '700x700',
-  '16:9': '752x423',
+  'Square': '670x670',
+  '16:9': '902x508',
+  '9:16': '508x902',
+  '4:3': '768x576',
+  '3:4': '576x768',
   // Add other common aspect ratios and their resolutions as needed
 };
-const DEFAULT_RESOLUTION = '700x460'; // Fallback resolution
+const DEFAULT_RESOLUTION = '840x552';
 
 /**
  * POST /api/steerable-motion/travel-between-images
