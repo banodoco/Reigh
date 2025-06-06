@@ -79,14 +79,19 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
   }, [isOpen, generationId]);
 
   const orchestratorDetails =
-    task?.params && typeof task.params === 'object' && 'orchestrator_details' in task.params
-      ? (task.params.orchestrator_details as any)
+    task?.params && typeof task.params === 'object' && !Array.isArray(task.params)
+      ? ((task.params.full_orchestrator_payload as any) ?? (task.params.orchestrator_details as any))
       : null;
 
   const inputImages = orchestratorDetails?.input_image_paths_resolved ?? [];
 
   // Helper to safely parse JSON strings from params
   const getParsedParams = () => {
+    if (orchestratorDetails?.params_json_str_override) {
+      try {
+        return JSON.parse(orchestratorDetails.params_json_str_override);
+      } catch (e) { /* ignore */ }
+    }
     if (task?.params) {
       const params = task.params as any;
       if (params.params_json_str) {
@@ -104,22 +109,27 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
   const parsedParams = getParsedParams();
 
   const getPrompt = () => {
-    if (orchestratorDetails?.base_prompts) {
-      return Array.isArray(orchestratorDetails.base_prompts)
-        ? orchestratorDetails.base_prompts.join('; ')
-        : orchestratorDetails.base_prompts;
+    const prompts = orchestratorDetails?.base_prompts ?? orchestratorDetails?.base_prompts_expanded;
+    if (prompts) {
+      return Array.isArray(prompts) ? prompts.join('; ') : prompts;
     }
     return parsedParams.prompt ?? 'N/A';
   };
 
   const getNegativePrompt = () => {
-    return orchestratorDetails?.negative_prompt ?? parsedParams.negative_prompt ?? 'N/A';
+    const negPrompts = orchestratorDetails?.negative_prompt ?? orchestratorDetails?.negative_prompts_expanded;
+    if (negPrompts) {
+      const joined = Array.isArray(negPrompts) ? negPrompts.join('; ') : negPrompts;
+      return joined || 'N/A';
+    }
+    return parsedParams.negative_prompt ?? 'N/A';
   };
 
   const getSteps = () => {
+    if (parsedParams.steps) return parsedParams.steps;
     if (orchestratorDetails?.steps) return orchestratorDetails.steps;
     if (orchestratorDetails?.num_inference_steps) return orchestratorDetails.num_inference_steps;
-    return parsedParams.steps ?? parsedParams.num_inference_steps ?? 'N/A';
+    return parsedParams.num_inference_steps ?? 'N/A';
   };
 
   const getResolution = () => {
