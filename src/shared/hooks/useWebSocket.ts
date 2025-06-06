@@ -29,6 +29,12 @@ export function useWebSocket() {
             queryClient.invalidateQueries({ queryKey: ['tasks'] }); // Invalidate general task list if any
             break;
           }
+          case 'TASKS_STATUS_UPDATE': {
+            const { projectId } = message.payload;
+            // console.log(`[WebSocket] Invalidating task queries for project ${projectId} due to status update.`);
+            queryClient.invalidateQueries({ queryKey: ['tasks', { projectId }] });
+            break;
+          }
           case 'GENERATIONS_UPDATED': {
             const { projectId, shotId } = message.payload;
             console.log(`[WebSocket] Invalidating generation/shot queries for project: ${projectId}, shot: ${shotId}`);

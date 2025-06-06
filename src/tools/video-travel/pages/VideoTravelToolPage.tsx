@@ -38,7 +38,7 @@ const VideoTravelToolPage: React.FC = () => {
     debug: true,
     apply_reward_lora: true,
     colour_match_videos: true,
-    apply_causvid: false,
+    apply_causvid: true,
     fade_in_duration: '{"low_point":0.0,"high_point":0.8,"curve_type":"ease_in_out","duration_factor":0.0}',
     fade_out_duration: '{"low_point":0.0,"high_point":0.8,"curve_type":"ease_in_out","duration_factor":0.0}',
     after_first_post_generation_saturation: 0.75,

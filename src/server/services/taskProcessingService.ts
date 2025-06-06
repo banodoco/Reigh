@@ -1,7 +1,7 @@
 import cron from 'node-cron';
 import { db } from '@/lib/db';
 import { tasks as tasksSchema, generations as generationsSchema, shotGenerations as shotGenerationsSchema } from '../../../db/schema/schema';
-import { eq, and, isNull, sql } from 'drizzle-orm';
+import { eq, and, isNull, sql, inArray, notInArray } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { broadcast } from './webSocketService';
 
@@ -164,6 +164,51 @@ export async function processCompletedStitchTask(task: Task): Promise<void> {
   }
 }
 
+/**
+ * Polls for active tasks and broadcasts updates.
+ */
+async function pollAndBroadcastTaskUpdates(): Promise<void> {
+  // console.log('[TaskStatusPoller] Checking for active task updates...');
+  try {
+    const activeTasks = await db
+      .select()
+      .from(tasksSchema)
+      .where(
+        notInArray(tasksSchema.status, ['Complete', 'Failed', 'Cancelled'])
+      );
+
+    if (activeTasks.length > 0) {
+      // console.log(`[TaskStatusPoller] Found ${activeTasks.length} active tasks.`);
+      
+      // Group tasks by project ID
+      const tasksByProject = activeTasks.reduce((acc, task) => {
+        if (task.projectId) {
+          if (!acc[task.projectId]) {
+            acc[task.projectId] = [];
+          }
+          acc[task.projectId].push(task);
+        }
+        return acc;
+      }, {} as Record<string, Task[]>);
+
+      // Broadcast updates for each project
+      for (const [projectId, tasks] of Object.entries(tasksByProject)) {
+        broadcast({
+          type: 'TASKS_STATUS_UPDATE',
+          payload: {
+            projectId,
+            tasks,
+          },
+        });
+      }
+    } else {
+      // console.log('[TaskStatusPoller] No active tasks found.');
+    }
+  } catch (error) {
+    console.error('[TaskStatusPoller] Error polling for task status updates:', error);
+  }
+}
+
 let pollerStarted = false;
 
 /**
@@ -179,7 +224,7 @@ export function startTaskPoller(): void {
   
   // Schedule a task to run every 10 seconds.
   cron.schedule('*/10 * * * * *', async () => {
-    console.log('[TaskPoller] Checking for completed travel_stitch tasks...');
+    // console.log('[TaskPoller] Checking for completed travel_stitch tasks...'); // Can be noisy
     try {
       const tasksToProcess = await db
         .select()
@@ -207,6 +252,10 @@ export function startTaskPoller(): void {
       console.error('[TaskPoller] Error querying for tasks to process:', error);
     }
   });
+
+  // Schedule the new status poller to run every 5 seconds
+  cron.schedule('*/5 * * * * *', pollAndBroadcastTaskUpdates);
+  console.log('[TaskStatusPoller] Started task status poller to run every 5 seconds.');
 
   pollerStarted = true;
 } 

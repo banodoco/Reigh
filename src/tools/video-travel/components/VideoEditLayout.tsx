@@ -548,8 +548,7 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
         if (imageUrl) {
           toast.info("Determining resolution from first image...");
           const { width, height } = await getDimensions(imageUrl);
-          resolution = findClosestResolution(width, height);
-          toast.success(`Using resolution ${resolution} from first image.`);
+          resolution = findClosestResolution(width, height);          
         } else {
           toast.warning("Could not get URL for the first image. Using project default resolution.");
         }
@@ -561,8 +560,7 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
 
     if (dimensionSource === 'custom') {
       if (customWidth && customHeight) {
-        resolution = `${customWidth}x${customHeight}`;
-        toast.success(`Using custom resolution ${resolution}.`);
+        resolution = `${customWidth}x${customHeight}`;        
       } else {
         toast.error('Custom dimensions are selected, but width or height is not set.');
         setIsCreatingTask(false);
@@ -606,7 +604,7 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
         debug: steerableMotionSettings.debug,
         apply_reward_lora: steerableMotionSettings.apply_reward_lora,
         colour_match_videos: steerableMotionSettings.colour_match_videos ?? true,
-        apply_causvid: steerableMotionSettings.apply_causvid ?? false,
+        apply_causvid: steerableMotionSettings.apply_causvid ?? true,
         fade_in_duration: steerableMotionSettings.fade_in_duration,
         fade_out_duration: steerableMotionSettings.fade_out_duration,
         after_first_post_generation_saturation: steerableMotionSettings.after_first_post_generation_saturation,
@@ -1029,7 +1027,7 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
                   <div className="flex items-center space-x-2">
                     <Switch
                       id="apply-causvid"
-                      checked={steerableMotionSettings.apply_causvid ?? false}
+                      checked={steerableMotionSettings.apply_causvid ?? true}
                       onCheckedChange={(v) => onSteerableMotionSettingsChange({ apply_causvid: v })}
                     />
                     <Label htmlFor="apply-causvid">Apply Causvid</Label>

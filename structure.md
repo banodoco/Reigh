@@ -200,7 +200,7 @@ To change which tools appear for a specific environment, you need to modify the 
 • **`HoverScrubVideo.tsx`**: Self-contained wrapper around the `useVideoScrubbing` hook that provides hover-to-play, variable-speed scrubbing, progress-bar seeking, and playback-rate overlay. Now reused by `VideoOutputItem` and `VideoLightbox` to avoid duplicate logic.
 • **`TasksPane/`**:
     – `TasksPane.tsx`: Slide-out panel from the right, activated on hover or can be locked open. Displays a list of tasks. Communicates lock state to parent layout for content adjustment.
-    – `TaskList.tsx`: Component within `TasksPane` that lists tasks, allows filtering by status, and refreshing the list. Uses `TaskItem`.
+    – `TaskList.tsx`: Component within `TasksPane` that lists tasks, allows filtering by status, and refreshing the list. Uses `TaskItem`. Receives real-time status updates via the WebSocket connection managed by `useWebSocket.ts`.
     – `TaskItem.tsx`: Displays individual task details and a button to cancel the task.
 
 #### `src/shared/hooks/`
@@ -219,7 +219,7 @@ To change which tools appear for a specific environment, you need to modify the 
     – `useCancelTask`: `PATCH /api/tasks/:taskId/cancel` (updates a task's status to 'Cancelled').
     – **`useUpdateTaskStatus` (Conceptual - API endpoint exists)**: `PATCH /api/tasks/:taskId/status` (updates a task's status to any valid status). For certain task types like 'travel_stitch', when a task is marked 'Complete', the backend `taskProcessingService.ts` poller detects this and handles the creation of associated 'generation' and 'shot_generation' records.
     – `useCancelAllPendingTasks`: `POST /api/tasks/cancel-pending` (updates status of all pending tasks for a project to 'Cancelled').
-    – **`useWebSocket.ts`**: Establishes and manages a WebSocket connection to the backend server. Listens for messages (e.g., `TASK_COMPLETED`, `GENERATIONS_UPDATED`) and invalidates relevant `react-query` caches to trigger UI updates in real-time.
+    – **`useWebSocket.ts`**: Establishes and manages a WebSocket connection to the backend server. Listens for messages (e.g., `TASK_COMPLETED`, `GENERATIONS_UPDATED`, `TASKS_STATUS_UPDATE`) and invalidates relevant `react-query` caches to trigger UI updates in real-time.
 • **`useLastAffectedShot.ts`**: Hook for `LastAffectedShotContext`.
 • **`use-mobile.tsx`**: Media query helper.
 • **`use-toast.ts`**: Wrapper for Sonner toasting library.
@@ -309,8 +309,59 @@ To change which tools appear for a specific environment, you need to modify the 
 
 ---
 
+## 7. Real-time Features
+
+### 7.1. Task Processing and Real-time Updates
+
+1.  **Task Creation**: A user action (e.g., clicking "Generate Video") triggers a call to `useCreateTask`, which sends a request to the backend API (`POST /api/tasks`) to create a new task with an initial status like 'Queued'.
+2.  **Backend Polling (`taskProcessingService.ts`)**:
+    -   **Stitch Task Poller**: A cron job runs every 10 seconds to find `travel_stitch` tasks with a status of 'Complete' that have not yet been processed. When found, it creates the corresponding `generation` and `shot_generation` records in the database. After successful creation, it broadcasts two WebSocket messages:
+        -   `TASK_COMPLETED`: Notifies the client that a specific task is done.
+        -   `GENERATIONS_UPDATED`: Notifies the client that new generation data is available for a specific shot.
+    -   **Active Task Status Poller**: A second cron job runs every 5 seconds to fetch all tasks that are currently in a non-terminal state (e.g., 'Queued', 'In Progress'). It then groups these tasks by `projectId` and broadcasts a `TASKS_STATUS_UPDATE` message for each project. This message contains the latest status of all active tasks for that project.
+3.  **Client-Side Updates (`useWebSocket.ts`)**:
+    -   The `useWebSocket.ts` hook maintains a persistent connection to the server.
+    -   It listens for incoming messages and acts accordingly:
+        -   On `TASK_COMPLETED` or `GENERATIONS_UPDATED`, it invalidates the relevant `react-query` caches (`tasks`, `shots`, `generations`).
+        -   On `TASKS_STATUS_UPDATE`, it invalidates the `tasks` query cache for the specific project.
+    -   This invalidation prompts `react-query` to automatically refetch the data.
+4.  **UI Refresh**: Components like `TaskList` and `VideoEditLayout`, which use hooks like `useListTasks` or `useListShots`, are subscribed to these queries. When the data is refetched, the components re-render with the latest information (e.g., a task's status changing from 'Queued' to 'In Progress' or a new video appearing in the output list).
+
+---
+
 ## 5. Persistence Layers
 
 | Layer        | Table / Bucket                                       | Key Columns & Details (from `/db/schema/schema.ts`)                    |
 |--------------|------------------------------------------------------|----------------------------------------------------------------------|
-| **Postgres** | `users`                                              | `
+| **Postgres** | `users`                                              | `id`, `email`, `created_at`                                          |
+|              | `shots`                                              | `id`, `project_id`, `name`, `created_at`, `updated_at`                 |
+|              | `shot_generations`                                   | `id`, `shot_id`, `generation_id`, `position`                           |
+|              | `tasks`                                              | `id`, `project_id`, `status`, `taskType`, `params`, `outputLocation`, `createdAt`, `updatedAt`, `generationProcessedAt` |
+| **Supabase** | `storage/generations`                                | Bucket for storing generated images and videos.                      |
+
+---
+
+## 6. API Endpoints (`src/server/routes/`)
+
+| Route                                     | Method | Description                                                                                                                                                                                                                                                                          |
+|-------------------------------------------|--------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `/api/projects`                           | GET    | Lists all projects. If none exist, creates a "Default Project".                                                                                                                                                                                                                      |
+| `/api/projects`                           | POST   | Creates a new project with a given name.                                                                                                                                                                                                                                             |
+| `/api/projects/:projectId`                | PUT    | Updates a project's `name` or `aspect_ratio`.                                                                                                                                                                                                                                        |
+| `/api/shots`                              | GET    | Gets all shots for a `projectId`. Returns shots with their associated `images` (from `generations` table) pre-sorted by position.                                                                                                                                                    |
+| `/api/shots`                              | POST   | Creates a new shot with a `shotName` and `projectId`.                                                                                                                                                                                                                                |
+| `/api/shots/:shotId`                      | DELETE | Deletes a shot and its associated `shot_generations` links.                                                                                                                                                                                                                          |
+| `/api/shots/:shotId`                      | PUT    | Updates the name of a shot.                                                                                                                                                                                                                                                          |
+| `/api/shots/shot_generations`             | POST   | Links an existing generation (`generation_id`) to a shot (`shot_id`).                                                                                                                                                                                                                |
+| `/api/shots/:shotId/generations/order`    | PUT    | Reorders the images within a shot based on an array of `orderedGenerationIds`.                                                                                                                                                                                                       |
+| `/api/shots/:shotId/generations/:genId`   | DELETE | Unlinks a generation from a shot.                                                                                                                                                                                                                                                    |
+| `/api/generations`                        | POST   | Creates a new generation record. Used when uploading an image not generated by an internal tool.                                                                                                                                                                                     |
+| `/api/generations/:generationId`          | DELETE | Deletes a generation record from the database and the corresponding file from Supabase storage.                                                                                                                                                                                      |
+| `/api/tasks`                              | GET    | Lists tasks for a `projectId`, optionally filtered by `status`.                                                                                                                                                                                                                      |
+| `/api/tasks`                              | POST   | Creates a new task. The backend uses this to queue long-running jobs.                                                                                                                                                                                                                |
+| `/api/tasks/:taskId`                      | GET    | Fetches the details for a single task, used by `TaskDetailsModal`.                                                                                                                                                                                                                   |
+| `/api/tasks/:taskId/cancel`               | PATCH  | Sets a task's status to 'Cancelled'.                                                                                                                                                                                                                                                 |
+| `/api/tasks/cancel-pending`               | POST   | Cancels all 'Pending' tasks for a given `projectId`.                                                                                                                                                                                                                                 |
+| `/api/steerable-motion/travel-between-images` | POST   | The main endpoint for the Video Travel tool. It receives image pairs, prompts, and motion settings, then creates a 'travel_stitch' task to generate a video. This process is handled by a background worker (`orchestrator/services/video_travel_service.py`). |
+
+---
