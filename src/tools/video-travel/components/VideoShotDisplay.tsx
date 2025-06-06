@@ -99,12 +99,12 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
   return (
     <div 
       key={shot.id} 
-      className="mb-6 p-4 border rounded-lg hover:shadow-lg transition-shadow duration-200 relative"
-      // onClick={() => onSelectShot(shot.id)} // Make the whole card clickable except controls
+      className="mb-6 p-4 border rounded-lg hover:shadow-lg transition-shadow duration-200 relative cursor-pointer"
+      onClick={() => onSelectShot(shot.id)}
     >
       <div className="flex justify-between items-start mb-3">
         {isEditingName ? (
-          <div className="flex items-center gap-2 flex-grow">
+          <div className="flex items-center gap-2 flex-grow" onClick={(e) => e.stopPropagation()}>
             <Input 
               value={editableName}
               onChange={(e) => setEditableName(e.target.value)}
@@ -128,13 +128,12 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
           </div>
         ) : (
           <h3 
-            className="text-xl font-medium cursor-pointer hover:text-primary flex-grow mr-2"
-            onClick={() => onSelectShot(shot.id)} // Make name clickable to select shot
+            className="text-xl font-medium hover:text-primary flex-grow mr-2"
           >
             {shot.name}
           </h3>
         )}
-        <div className="flex items-center space-x-1 flex-shrink-0">
+        <div className="flex items-center space-x-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
           {!isEditingName && (
              <Button variant="ghost" size="icon" onClick={handleNameEditToggle} className="h-8 w-8">
                 <Pencil className="h-4 w-4" />
@@ -146,12 +145,12 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
         </div>
       </div>
       
-      <div className="flex space-x-2 overflow-x-auto pb-2 cursor-pointer" onClick={() => onSelectShot(shot.id)}>
+      <div className="flex space-x-2 overflow-x-auto pb-2">
         {imagesToShow.length > 0 ? (
           imagesToShow.map((image, index) => (
             <div 
               key={image.shotImageEntryId || `img-${index}`} 
-              className="flex-shrink-0 w-32 h-32 rounded overflow-hidden border animate-fade-in-up"
+              className="flex-shrink-0 w-32 h-32 rounded overflow-hidden border animate-in fade-in-up"
               style={{ animationDelay: `${index * 0.1}s` }}
             >
               <img 
