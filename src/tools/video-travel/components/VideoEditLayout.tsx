@@ -528,8 +528,7 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
       const newTask = await response.json(); 
 
       if (newTask && newTask.id) {
-        console.log("[VideoEditLayout] Video task created via API:", newTask);
-        toast.success(`Video task created (ID: ${(newTask.id as string).substring(0,8)}...).`);
+        console.log("[VideoEditLayout] Video task created via API:", newTask);        
       } else {
         console.warn("[VideoEditLayout] Video task creation via API did not return ID or data.");
         toast.info("Video task creation registered, but no confirmation ID received from API.");
@@ -850,7 +849,10 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
             <h3 className="text-lg font-semibold">Batch Generation Settings</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="batchVideoPrompt" className="text-sm font-medium block mb-1.5">Global Prompt</Label>
+                <Label htmlFor="batchVideoPrompt" className="text-sm font-medium block mb-1.5">
+                  Prompt
+                  <span title="This prompt will be applied to every video. These are very sensitive and will impact things a lot." className="ml-1 text-muted-foreground cursor-help">ℹ️</span>
+                </Label>
                 <Textarea 
                   id="batchVideoPrompt"
                   value={batchVideoPrompt}
@@ -861,7 +863,10 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
                 />
               </div>
               <div>
-                <Label htmlFor="negative_prompt" className="text-sm font-medium block mb-1.5">Global Negative Prompt</Label>
+                <Label htmlFor="negative_prompt" className="text-sm font-medium block mb-1.5">
+                  Negative Prompt
+                  <span title="This will be applied to every video to tell it what to avoid." className="ml-1 text-muted-foreground cursor-help">ℹ️</span>
+                </Label>
                 <Textarea
                   id="negative_prompt"
                   value={steerableMotionSettings.negative_prompt}
@@ -874,7 +879,10 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="batchVideoFrames" className="text-sm font-medium block mb-1">Frames for all: {batchVideoFrames}</Label>
+                <Label htmlFor="batchVideoFrames" className="text-sm font-medium block mb-1">
+                  Frames per Image: {batchVideoFrames}
+                  <span title="Number of frames to have per image." className="ml-1 text-muted-foreground cursor-help">ℹ️</span>
+                </Label>
                 <Slider
                   id="batchVideoFrames"
                   min={10}
@@ -883,9 +891,19 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
                   value={[batchVideoFrames]}
                   onValueChange={(value) => onBatchVideoFramesChange(value[0])}
                 />
+                <Input
+                  id="batchVideoFramesInput"
+                  type="number"
+                  value={batchVideoFrames}
+                  onChange={(e) => onBatchVideoFramesChange(parseInt(e.target.value, 10) || 0)}
+                  className="mt-2"
+                />
               </div>
               <div>
-                <Label htmlFor="batchVideoContext" className="text-sm font-medium block mb-1">Context for all: {batchVideoContext}</Label>
+                <Label htmlFor="batchVideoContext" className="text-sm font-medium block mb-1">
+                  Number of Context Frames: {batchVideoContext}
+                  <span title="Number of frames in the previous video to provide us context to the next one." className="ml-1 text-muted-foreground cursor-help">ℹ️</span>
+                </Label>
                 <Slider
                   id="batchVideoContext"
                   min={0}
@@ -897,7 +915,10 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
               </div>
             </div>
             <div>
-              <Label htmlFor="batchVideoSteps" className="text-sm font-medium block mb-1">Steps for all: {batchVideoSteps}</Label>
+              <Label htmlFor="batchVideoSteps" className="text-sm font-medium block mb-1">
+                Generation Steps: {batchVideoSteps}
+                <span title="Amount of time to spend processing the generations; more steps generally means more quality." className="ml-1 text-muted-foreground cursor-help">ℹ️</span>
+              </Label>
               <Slider
                 id="batchVideoSteps"
                 min={1}
