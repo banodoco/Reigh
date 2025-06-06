@@ -129,6 +129,9 @@ const EditTravelToolPage = () => {
     { path: "kudzueye/boreal-flux-dev-v2", scale: "0.06" }
   ];
 
+  // Add this ref near other refs (for example, after kontextCurrentSubscriptionRef)
+  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   useEffect(() => {
     const localFalApiKey = localStorage.getItem('fal_api_key');
     setFalApiKey(localFalApiKey);
@@ -411,20 +414,24 @@ const EditTravelToolPage = () => {
   };
   
   const handleAutoSavePrompts = (updatedPrompts: PromptEntry[]) => {
-    setPrompts(updatedPrompts);
-    // Also persist to localStorage on auto-save from the modal
-    try {
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current);
+    }
+    autoSaveTimeoutRef.current = setTimeout(() => {
+      setPrompts(updatedPrompts);
+      // Also persist to localStorage on auto-save from the modal
+      try {
         const promptsString = JSON.stringify(updatedPrompts);
         if (promptsString.length < MAX_LOCAL_STORAGE_ITEM_LENGTH) {
-            localStorage.setItem(EDIT_TRAVEL_PROMPTS_KEY, promptsString);
+          localStorage.setItem(EDIT_TRAVEL_PROMPTS_KEY, promptsString);
         } else {
-            toast.info("Prompts are too large to be saved locally and may not persist fully.");
-            // Potentially save a truncated version or handle differently
+          toast.info("Prompts are too large to be saved locally and may not persist fully.");
         }
-    } catch (error) {
+      } catch (error) {
         console.error("Error auto-saving prompts to localStorage:", error);
         toast.error("Could not auto-save prompts locally.");
-    }
+      }
+    }, 300);
   };
 
   useEffect(() => {
@@ -446,6 +453,25 @@ const EditTravelToolPage = () => {
         toast.error("Could not save 'generation mode' setting locally.");
     }
   }, [generationMode]);
+
+  useEffect(() => {
+    if (prompts) { // Check if prompts is not undefined/null
+        try {
+            const promptsString = JSON.stringify(prompts);
+            if (promptsString.length < MAX_LOCAL_STORAGE_ITEM_LENGTH) {
+                localStorage.setItem(EDIT_TRAVEL_PROMPTS_KEY, promptsString);
+            } else {
+                // Attempt to remove if too large to prevent inconsistent states,
+                // though this might be aggressive if a previous smaller version was fine.
+                localStorage.removeItem(EDIT_TRAVEL_PROMPTS_KEY);
+                toast.info("Prompts are too large to be saved locally and won't persist. Consider reducing the number or length of prompts.");
+            }
+        } catch (error) {
+            console.error("Error saving prompts to localStorage:", error);
+            toast.error("Could not save prompts locally.");
+        }
+    }
+  }, [prompts]);
 
   useEffect(() => {
     if (fluxSoftEdgeStrength !== undefined) {
