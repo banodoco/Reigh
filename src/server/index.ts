@@ -22,6 +22,8 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { startTaskPoller } from './services/taskProcessingService';
+import { initializeWebSocketServer } from './services/webSocketService';
+import http from 'http';
 // import { fileURLToPath } from 'url'; // No longer needed if using process.cwd()
 
 // // Determine __dirname for ES modules
@@ -122,7 +124,11 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   res.status(statusCode).json({ message });
 });
 
-app.listen(PORT, '0.0.0.0', () => {
+const server = http.createServer(app);
+
+initializeWebSocketServer(server);
+
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`API Server listening on port ${PORT} on all interfaces (0.0.0.0)`);
 });
 

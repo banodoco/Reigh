@@ -219,6 +219,7 @@ To change which tools appear for a specific environment, you need to modify the 
     – `useCancelTask`: `PATCH /api/tasks/:taskId/cancel` (updates a task's status to 'Cancelled').
     – **`useUpdateTaskStatus` (Conceptual - API endpoint exists)**: `PATCH /api/tasks/:taskId/status` (updates a task's status to any valid status). For certain task types like 'travel_stitch', when a task is marked 'Complete', the backend `taskProcessingService.ts` poller detects this and handles the creation of associated 'generation' and 'shot_generation' records.
     – `useCancelAllPendingTasks`: `POST /api/tasks/cancel-pending` (updates status of all pending tasks for a project to 'Cancelled').
+    – **`useWebSocket.ts`**: Establishes and manages a WebSocket connection to the backend server. Listens for messages (e.g., `TASK_COMPLETED`, `GENERATIONS_UPDATED`) and invalidates relevant `react-query` caches to trigger UI updates in real-time.
 • **`useLastAffectedShot.ts`**: Hook for `LastAffectedShotContext`.
 • **`use-mobile.tsx`**: Media query helper.
 • **`use-toast.ts`**: Wrapper for Sonner toasting library.
@@ -301,6 +302,10 @@ To change which tools appear for a specific environment, you need to modify the 
         – External file drops handled by `useHandleExternalImageDrop`: Uploads to Supabase Storage, then uses API calls (`POST /api/generations`, `POST /api/shots/shot_generations`) to create `generations` and associate with `shots`.
 6.  **Shots Pane (`ShotsPane.tsx`)** (if active for the current tool):
     – Displays shot data via `GET /api/shots` (through `useListShots`), filtered by `selectedProjectId`.
+7.  **Real-time Task Updates (WebSockets)**:
+    – When the backend `taskProcessingService` completes processing a task (e.g., creating a video from a 'travel_stitch' task), it broadcasts a message via WebSockets.
+    – The client-side `useWebSocket` hook receives this message and invalidates the relevant queries (e.g., for tasks and generations).
+    – This triggers `react-query` to refetch the data, automatically updating components like `TaskList` or `VideoEditLayout` with the new information (e.g., completed task status, new video output).
 
 ---
 

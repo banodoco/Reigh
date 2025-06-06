@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { tasks as tasksSchema, generations as generationsSchema, shotGenerations as shotGenerationsSchema } from '../../../db/schema/schema';
 import { eq, and, isNull, sql } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
+import { broadcast } from './webSocketService';
 
 // Define the structure of a task object more explicitly if possible, for now using 'any'
 type Task = typeof tasksSchema.$inferSelect;
@@ -140,6 +141,22 @@ export async function processCompletedStitchTask(task: Task): Promise<void> {
       .where(eq(tasksSchema.id, task.id));
     
     console.log(`[VideoStitchGenDebug] Marked task ${task.id} as generation_processed and updated its params.`);
+
+    // After creating the generation and shot_generation, notify the client.
+    broadcast({ 
+      type: 'TASK_COMPLETED', 
+      payload: { 
+        taskId: task.id, 
+        projectId: task.projectId 
+      } 
+    });
+    broadcast({
+      type: 'GENERATIONS_UPDATED',
+      payload: {
+        projectId: task.projectId,
+        shotId: shotId,
+      }
+    });
 
   } catch (error: any) {
     console.error(`[VideoStitchGenDebug] Error during generation/shot_generation creation for task ${task.id}:`, error);

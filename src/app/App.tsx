@@ -10,11 +10,13 @@ import { LastAffectedShotProvider } from "@/shared/contexts/LastAffectedShotCont
 import { useLastAffectedShot } from "@/shared/hooks/useLastAffectedShot";
 import { AppRoutes } from "./routes";
 import { ProjectProvider, useProject } from "@/shared/contexts/ProjectContext";
+import { useWebSocket } from '@/shared/hooks/useWebSocket';
 
 const queryClient = new QueryClient();
 
 // New inner component that uses the context
 const AppInternalContent = () => {
+  useWebSocket(); // Initialize WebSocket connection and listeners
   const { setLastAffectedShotId } = useLastAffectedShot();
   const { selectedProjectId } = useProject();
   const { data: shotsFromHook, isLoading: isLoadingShots } = useListShots(selectedProjectId);

@@ -61,6 +61,15 @@ interface SteerableMotionSettings {
   after_first_post_generation_brightness: number;
 }
 
+interface ShotSettings {
+  videoControlMode: 'individual' | 'batch';
+  batchVideoPrompt: string;
+  batchVideoFrames: number;
+  batchVideoContext: number;
+  batchVideoSteps: number;
+  steerableMotionSettings: SteerableMotionSettings;
+}
+
 interface VideoEditLayoutProps {
   selectedShot: Shot;
   projectId: string | null;
@@ -128,6 +137,73 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
   const [currentPage, setCurrentPage] = useState(1);
   const videosPerPage = 9;
   const [localOrderedShotImages, setLocalOrderedShotImages] = useState(orderedShotImages || []);
+
+  useEffect(() => {
+    if (!selectedShot?.id) return;
+
+    const shotId = selectedShot.id;
+    let settingsToApply: ShotSettings | null = null;
+
+    const loadSettings = (key: string): ShotSettings | null => {
+      const settingsStr = localStorage.getItem(key);
+      if (settingsStr) {
+        try {
+          return JSON.parse(settingsStr) as ShotSettings;
+        } catch (e) {
+          console.error(`[VideoEditLayout] Failed to parse settings from localStorage for key ${key}`, e);
+          return null;
+        }
+      }
+      return null;
+    };
+
+    settingsToApply = loadSettings(`shot-settings-${shotId}`);
+
+    if (!settingsToApply) {
+      const lastEditedShotId = localStorage.getItem('last-edited-shot-id');
+      if (lastEditedShotId) {
+        settingsToApply = loadSettings(`shot-settings-${lastEditedShotId}`);
+      }
+    }
+
+    if (settingsToApply) {
+      if (settingsToApply.videoControlMode) onVideoControlModeChange(settingsToApply.videoControlMode);
+      if (typeof settingsToApply.batchVideoPrompt === 'string') onBatchVideoPromptChange(settingsToApply.batchVideoPrompt);
+      if (typeof settingsToApply.batchVideoFrames === 'number') onBatchVideoFramesChange(settingsToApply.batchVideoFrames);
+      if (typeof settingsToApply.batchVideoContext === 'number') onBatchVideoContextChange(settingsToApply.batchVideoContext);
+      if (typeof settingsToApply.batchVideoSteps === 'number') onBatchVideoStepsChange(settingsToApply.batchVideoSteps);
+      if (settingsToApply.steerableMotionSettings) onSteerableMotionSettingsChange(settingsToApply.steerableMotionSettings);
+    }
+  }, [selectedShot?.id, onVideoControlModeChange, onBatchVideoPromptChange, onBatchVideoFramesChange, onBatchVideoContextChange, onBatchVideoStepsChange, onSteerableMotionSettingsChange]);
+
+  const settingsToSave = useMemo(() => ({
+    videoControlMode,
+    batchVideoPrompt,
+    batchVideoFrames,
+    batchVideoContext,
+    batchVideoSteps,
+    steerableMotionSettings,
+  }), [
+    videoControlMode,
+    batchVideoPrompt,
+    batchVideoFrames,
+    batchVideoContext,
+    batchVideoSteps,
+    steerableMotionSettings,
+  ]);
+
+  useEffect(() => {
+    if (!selectedShot?.id) return;
+
+    const shotId = selectedShot.id;
+    try {
+      const settingsJson = JSON.stringify(settingsToSave);
+      localStorage.setItem(`shot-settings-${shotId}`, settingsJson);
+      localStorage.setItem('last-edited-shot-id', shotId);
+    } catch (e) {
+      console.error("[VideoEditLayout] Failed to save shot settings to localStorage", e);
+    }
+  }, [selectedShot?.id, settingsToSave]);
 
   useEffect(() => {
     if (orderedShotImages.length !== localOrderedShotImages.length) {
