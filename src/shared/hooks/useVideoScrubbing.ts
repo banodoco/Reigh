@@ -5,7 +5,6 @@ export const useVideoScrubbing = () => {
   const animationFrameRef = useRef<number | null>(null);
   const lastFrameTimeRef = useRef<number>(0);
   const playbackRateRef = useRef<number>(0);
-  const mouseMoveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const [playbackRate, setPlaybackRate] = useState<number | null>(null);
   const [progress, setProgress] = useState<number>(0);
@@ -86,10 +85,6 @@ export const useVideoScrubbing = () => {
   }, [scrub]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-      if (mouseMoveTimeoutRef.current) {
-        clearTimeout(mouseMoveTimeoutRef.current);
-      }
-
       // If scrubbing isn't active, start it.
       if (animationFrameRef.current === null) {
         startScrubbing();
@@ -113,13 +108,10 @@ export const useVideoScrubbing = () => {
       playbackRateRef.current = newRate;
       setPlaybackRate(newRate);
 
-      // Set a timer to automatically stop scrubbing if the mouse stops moving.
-      mouseMoveTimeoutRef.current = setTimeout(() => {
-        stopScrubbing();
-        setPlaybackRate(null); // Hide the rate indicator
-      }, 150);
+      // The timeout that stopped scrubbing on mouse inactivity has been removed.
+      // Scrubbing now continues at the current rate until the mouse leaves the element.
 
-  }, [startScrubbing, stopScrubbing]);
+  }, [startScrubbing]);
   
   const handleMouseEnter = useCallback(() => {
     const video = videoRef.current;
@@ -129,12 +121,7 @@ export const useVideoScrubbing = () => {
   }, []);
 
   const handleMouseLeave = useCallback(() => {
-      // Clear any pending timeout to stop scrubbing
-      if (mouseMoveTimeoutRef.current) {
-        clearTimeout(mouseMoveTimeoutRef.current);
-      }
-      
-      // Stop the animation frame loop directly, bypassing stopScrubbing's "play"
+      // Stop the animation frame loop directly.
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
         animationFrameRef.current = null;
@@ -177,9 +164,6 @@ export const useVideoScrubbing = () => {
     // Cleanup on unmount
     return () => {
         video?.removeEventListener('timeupdate', handleProgress);
-        if (mouseMoveTimeoutRef.current) {
-            clearTimeout(mouseMoveTimeoutRef.current);
-        }
         // Bypassing stopScrubbing() on unmount to avoid auto-playing a video that is no longer visible.
         if (animationFrameRef.current) {
           cancelAnimationFrame(animationFrameRef.current);
