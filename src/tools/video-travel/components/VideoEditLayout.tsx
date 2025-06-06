@@ -128,6 +128,12 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
   const [currentPage, setCurrentPage] = useState(1);
   const videosPerPage = 9;
 
+  // NEW: local state to preserve ordering across operations
+  const [localOrderedShotImages, setLocalOrderedShotImages] = useState<GenerationRow[]>(orderedShotImages || []);
+  useEffect(() => {
+    setLocalOrderedShotImages(orderedShotImages || []);
+  }, [orderedShotImages]);
+
   const handleImageUploadToShot = async (files: File[]) => {
     if (!files || files.length === 0) return;
     if (!selectedProjectId || !selectedShot?.id) {
@@ -185,10 +191,16 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
 
   const [managedImages, setManagedImages] = useState<GenerationRow[]>([]);
 
+  // Update managedImages to use localOrderedShotImages
+  useEffect(() => {
+    setManagedImages((localOrderedShotImages || []).filter(gen => !isGenerationVideo(gen)));
+  }, [localOrderedShotImages]);
+
+  // Update videoOutputs to use localOrderedShotImages
   const videoOutputs = useMemo(() => {
-    if (!orderedShotImages) return [];
-    return orderedShotImages.filter(isGenerationVideo).reverse();
-  }, [orderedShotImages]);
+    if (!localOrderedShotImages) return [];
+    return localOrderedShotImages.filter(isGenerationVideo).reverse();
+  }, [localOrderedShotImages]);
 
   // Pagination logic
   const pageCount = Math.ceil(videoOutputs.length / videosPerPage);
@@ -215,10 +227,6 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
     };
   }, [paginatedVideos]);
 
-  useEffect(() => {
-    setManagedImages((orderedShotImages || []).filter(gen => !isGenerationVideo(gen)));
-  }, [orderedShotImages]);
-
   if (!selectedShot) {
     return <p>Error: No shot selected. Please go back and select a shot.</p>;
   }
@@ -237,6 +245,8 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
         project_id: selectedProjectId,
       });
       toast.success("Video output removed from shot.");
+      // Optimistically update local ordering to remove the deleted video
+      setLocalOrderedShotImages(prev => prev.filter(item => item.id !== generationId));
     } catch (error: any) {
       // The hook will show its own toast on error.
       console.error(`Failed to delete video output: ${error.message}`);
@@ -264,10 +274,10 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
       return;
     }
     
-    // Build full ordering by merging the reordered non-video images with the unchanged video outputs
+    // Build full ordering by merging the reordered non-video images with the unchanged video outputs using localOrderedShotImages
     const newNonVideoIds = newOrder.map(img => img.id);
     let nonVideoIndex = 0;
-    const fullOrderedGenerationIds = orderedShotImages.map(item => {
+    const fullOrderedGenerationIds = localOrderedShotImages.map(item => {
       if (!isGenerationVideo(item)) {
         return newNonVideoIds[nonVideoIndex++];
       }
