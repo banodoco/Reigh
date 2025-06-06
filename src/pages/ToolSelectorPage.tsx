@@ -83,35 +83,9 @@ export default function ToolSelectorPage() {
       <div className="absolute right-0 bottom-1/4 w-8 h-64 wes-filmstrip opacity-20"></div>
       
       <div className="container mx-auto px-4 py-16 relative z-10">
-        {/* Enhanced Hero Section */}
-        <div className="wes-symmetry mb-24 animate-fade-in-down">
-          {/* Ornate header decoration */}
-          <div className="flex items-center justify-center mb-8">
-            <div className="flex items-center space-x-6">
-              <div className="wes-ornament relative">
-                <div className="w-10 h-10 bg-gradient-to-br from-wes-burgundy to-primary rounded-xl flex items-center justify-center shadow-wes-vintage wes-viewfinder">
-                  <Palette className="w-5 h-5 text-wes-cream drop-shadow-lg" />
-                </div>
-              </div>
-              
-              <div className="flex flex-col items-center space-y-2">
-                <div className="w-1.5 h-12 bg-gradient-to-b from-wes-vintage-gold via-wes-coral to-wes-mint rounded-full shadow-wes-ornate"></div>
-                <div className="w-3 h-3 bg-wes-vintage-gold rounded-full animate-vintage-pulse"></div>
-                <div className="w-1.5 h-12 bg-gradient-to-t from-wes-vintage-gold via-wes-coral to-wes-mint rounded-full shadow-wes-ornate"></div>
-              </div>
-              
-              <div className="wes-ornament relative">
-                <div className="w-8 h-8 bg-gradient-to-br from-wes-mint to-wes-sage rounded-lg flex items-center justify-center shadow-wes-vintage wes-aperture">
-                  <Sparkles className="w-4 h-4 text-primary drop-shadow-lg" />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
         {/* Enhanced Tools Grid */}
         {visibleTools.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-16 max-w-7xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-16 max-w-7xl mx-auto pt-12">
             {visibleTools.map((tool, index) => {
               const IconComponent = tool.icon;
               return (

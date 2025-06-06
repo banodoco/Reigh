@@ -127,9 +127,6 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                             </div>
                             <span className="font-crimson font-medium text-primary">{project.name}</span>
                           </div>
-                          {project.aspectRatio && (
-                            <span className="text-xs text-muted-foreground tracking-widest mt-1 bg-wes-yellow/20 px-2 py-1 rounded">{project.aspectRatio}</span>
-                          )}
                         </div>
                       </SelectItem>
                     ))}
@@ -178,7 +175,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
               <span className="relative flex items-center space-x-2">
                 <Sparkles className="w-4 h-4 text-primary group-hover:animate-rotate-slow transition-all duration-300" />
                 <span>Generations</span>
-                <div className="absolute -top-2 -right-2 w-3 h-3 bg-wes-yellow rounded-full animate-vintage-pulse wes-badge">
+                <div className="absolute -top-2 -right-2 w-3 h-3 bg-wes-yellow rounded-full animate-vintage-pulse group-hover:opacity-100 opacity-0 transition-opacity duration-300">
                   <div className="absolute inset-0 bg-wes-yellow rounded-full animate-ping opacity-30"></div>
                 </div>
               </span>
@@ -193,7 +190,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                 <span className="relative flex items-center space-x-2">
                   <Crown className="w-4 h-4 text-primary group-hover:animate-bounce-gentle transition-all duration-300" />
                   <span>Shots</span>
-                  <div className="absolute -top-2 -right-2 w-3 h-3 bg-wes-mint rounded-full animate-vintage-pulse wes-badge">
+                  <div className="absolute -top-2 -right-2 w-3 h-3 bg-wes-mint rounded-full animate-vintage-pulse group-hover:opacity-100 opacity-0 transition-opacity duration-300">
                     <div className="absolute inset-0 bg-wes-mint rounded-full animate-ping opacity-30"></div>
                   </div>
                 </span>

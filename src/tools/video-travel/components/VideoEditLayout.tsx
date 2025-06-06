@@ -19,6 +19,14 @@ import VideoLightbox from "./VideoLightbox.tsx";
 import { VideoOutputItem } from './VideoOutputItem';
 import { arrayMove } from '@dnd-kit/sortable';
 import { getDisplayUrl } from '@/shared/lib/utils';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/shared/components/ui/pagination";
 
 // Local definition for Json type to remove dependency on supabase client types
 export type Json =
@@ -115,6 +123,9 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [creatingTaskId, setCreatingTaskId] = useState<string | null>(null);
+  const [animatedVideoOutputs, setAnimatedVideoOutputs] = useState<GenerationRow[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const videosPerPage = 9;
 
   const handleImageUploadToShot = async (files: File[]) => {
     if (!files || files.length === 0) return;
@@ -177,6 +188,31 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
     if (!orderedShotImages) return [];
     return orderedShotImages.filter(isGenerationVideo).reverse();
   }, [orderedShotImages]);
+
+  // Pagination logic
+  const pageCount = Math.ceil(videoOutputs.length / videosPerPage);
+  const paginatedVideos = useMemo(() => {
+    const startIndex = (currentPage - 1) * videosPerPage;
+    const endIndex = startIndex + videosPerPage;
+    return videoOutputs.slice(startIndex, endIndex);
+  }, [videoOutputs, currentPage]);
+
+  useEffect(() => {
+    // This effect handles the sequential fade-in of video items.
+    // When the list of videos changes, it resets and re-runs the animation.
+    setAnimatedVideoOutputs([]);
+
+    const timeouts = paginatedVideos.map((video, index) => {
+        return setTimeout(() => {
+            setAnimatedVideoOutputs(prev => [...prev, video]);
+        }, index * 150); // Stagger by 150ms
+    });
+
+    // Cleanup timeouts on unmount or if videoOutputs changes again
+    return () => {
+        timeouts.forEach(clearTimeout);
+    };
+  }, [paginatedVideos]);
 
   useEffect(() => {
     setManagedImages((orderedShotImages || []).filter(gen => !isGenerationVideo(gen)));
@@ -402,16 +438,50 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {videoOutputs.map((video, index) => (
-                <VideoOutputItem
-                  key={video.id || `video-${index}`}
-                  video={video}
-                  onDoubleClick={() => setLightboxIndex(index)}
-                  onDelete={handleDeleteVideoOutput}
-                  isDeleting={deletingVideoId === video.id}
-                />
+              {animatedVideoOutputs.map((video) => (
+                <div key={video.id} className="animate-in fade-in duration-500">
+                  <VideoOutputItem
+                    video={video}
+                    onDoubleClick={() => {
+                      const originalIndex = videoOutputs.findIndex(v => v.id === video.id);
+                      setLightboxIndex(originalIndex);
+                    }}
+                    onDelete={handleDeleteVideoOutput}
+                    isDeleting={deletingVideoId === video.id}
+                  />
+                </div>
               ))}
             </div>
+            {pageCount > 1 && (
+              <Pagination className="mt-8">
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious 
+                      href="#" 
+                      onClick={(e) => { e.preventDefault(); setCurrentPage(p => Math.max(p - 1, 1)); }} 
+                      className={currentPage === 1 ? "pointer-events-none opacity-50" : undefined}
+                      size="default"
+                    />
+                  </PaginationItem>
+                  
+                  {/* Simplified page numbers for now */}
+                  <PaginationItem>
+                    <PaginationLink href="#" isActive size="default">
+                      Page {currentPage} of {pageCount}
+                    </PaginationLink>
+                  </PaginationItem>
+
+                  <PaginationItem>
+                    <PaginationNext 
+                      href="#" 
+                      onClick={(e) => { e.preventDefault(); setCurrentPage(p => Math.min(p + 1, pageCount)); }}
+                      className={currentPage === pageCount ? "pointer-events-none opacity-50" : undefined}
+                      size="default"
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            )}
           </CardContent>
         </Card>
       )}
