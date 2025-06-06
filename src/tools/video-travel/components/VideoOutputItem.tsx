@@ -2,8 +2,7 @@ import React from 'react';
 import { Button } from '@/shared/components/ui/button';
 import { Info, Trash2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { useVideoScrubbing } from '@/shared/hooks/useVideoScrubbing';
-import { getDisplayUrl } from '@/shared/lib/utils';
+import HoverScrubVideo from '@/shared/components/HoverScrubVideo';
 import TaskDetailsModal from './TaskDetailsModal';
 import { GenerationRow } from '@/types/shots';
 
@@ -20,16 +19,6 @@ export const VideoOutputItem: React.FC<VideoOutputItemProps> = ({
   onDelete,
   isDeleting,
 }) => {
-  const {
-    videoRef,
-    playbackRate,
-    progress,
-    handleMouseEnter,
-    handleMouseMove,
-    handleMouseLeave,
-    handleSeek,
-  } = useVideoScrubbing();
-
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation(); // prevent lightbox from opening on delete
     onDelete(video.id);
@@ -38,9 +27,6 @@ export const VideoOutputItem: React.FC<VideoOutputItemProps> = ({
   return (
     <div
       className="rounded-lg overflow-hidden shadow-md bg-muted/30 aspect-video flex items-center justify-center relative group"
-      onMouseEnter={handleMouseEnter}
-      onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseLeave}
       onDoubleClick={onDoubleClick}
     >
       <div className="absolute top-2 left-2 flex items-center gap-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -61,36 +47,14 @@ export const VideoOutputItem: React.FC<VideoOutputItemProps> = ({
         )}
       </div>
       {(video.location || video.imageUrl) ? (
-        <video
-          ref={videoRef}
-          src={getDisplayUrl(video.location || video.imageUrl)}
-          poster={video.thumbUrl ? getDisplayUrl(video.thumbUrl) : getDisplayUrl('/placeholder.svg')}
-          preload="auto"
-          onLoadedData={(e) => { e.currentTarget.removeAttribute('poster'); }}
-          loop
-          muted
-          playsInline
-          className="w-full h-full object-contain"
-        >
-          Your browser does not support the video tag.
-        </video>
+        <HoverScrubVideo
+          src={video.location || video.imageUrl}
+          poster={video.thumbUrl}
+          className="absolute inset-0"
+        />
       ) : (
         <p className="text-xs text-muted-foreground p-2">Video URL not available.</p>
       )}
-      {playbackRate !== null && (
-        <div className="absolute bottom-2 right-2 bg-black/50 text-white text-xs px-2 py-1 rounded-md font-mono pointer-events-none z-20">
-          {playbackRate.toFixed(1)}x
-        </div>
-      )}
-      <div
-        className="absolute bottom-0 left-0 w-full h-1.5 bg-white/20 cursor-pointer z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-        onClick={handleSeek}
-      >
-        <div
-          className="h-full bg-white"
-          style={{ width: `${progress}%` }}
-        />
-      </div>
       <Button
         variant="ghost"
         size="icon"
