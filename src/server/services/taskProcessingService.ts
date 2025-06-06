@@ -215,7 +215,7 @@ export async function pollAndBroadcastTaskUpdates(): Promise<void> {
       try {
         // Use a raw query to bypass Drizzle's automatic JSON parsing on the field.
         const rawTasks = await db.all(sql`
-          SELECT id, params, "dependantOn"
+          SELECT id, params, "dependant_on" as "dependantOn"
           FROM tasks
           WHERE status NOT IN ('Complete', 'Failed', 'Cancelled')
         `);
