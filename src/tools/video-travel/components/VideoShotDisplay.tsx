@@ -93,7 +93,8 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
     }
   };
 
-  const imagesToShow: GenerationRow[] = shot.images?.slice(0, 5) || [];
+  const imagesOnly = shot.images?.filter(image => image.type !== 'video_travel_output') || [];
+  const imagesToShow: GenerationRow[] = imagesOnly.slice(0, 5);
 
   return (
     <div 
@@ -159,9 +160,9 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
         ) : (
           <p className="text-sm text-muted-foreground italic">No images in this shot yet.</p>
         )}
-        {shot.images && shot.images.length > 5 && (
+        {imagesOnly.length > 5 && (
           <div className="flex-shrink-0 w-32 h-32 rounded border bg-muted flex items-center justify-center">
-            <p className="text-sm text-muted-foreground text-center">+{shot.images.length - 5} more</p>
+            <p className="text-sm text-muted-foreground text-center">+{imagesOnly.length - 5} more</p>
           </div>
         )}
       </div>
