@@ -187,19 +187,22 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
   }
 
   const handleDeleteVideoOutput = async (generationId: string) => {
-    if (!selectedProjectId) {
-      toast.error("No project selected.");
+    if (!selectedProjectId || !selectedShot?.id) {
+      toast.error("Cannot delete video: Project or Shot ID is missing.");
       return;
     }
     setDeletingVideoId(generationId);
     try {
-      // This needs to be a proper API call to delete a generation
-      // For now, let's assume it's just optimistic UI
-      console.log(`Deleting video generation ${generationId}`);
-      toast.success("Video output deleted.");
-      onShotImagesUpdate(); // Refetch shot data
+      console.log(`Deleting video generation ${generationId} from shot ${selectedShot.id}`);
+      await removeImageFromShotMutation.mutateAsync({
+        shot_id: selectedShot.id,
+        generation_id: generationId,
+        project_id: selectedProjectId,
+      });
+      toast.success("Video output removed from shot.");
     } catch (error: any) {
-      toast.error(`Failed to delete video: ${error.message}`);
+      // The hook will show its own toast on error.
+      console.error(`Failed to delete video output: ${error.message}`);
     } finally {
       setDeletingVideoId(null);
     }
