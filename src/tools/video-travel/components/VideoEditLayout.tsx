@@ -15,7 +15,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/co
 import { Switch } from "@/shared/components/ui/switch";
 import { Input } from "@/shared/components/ui/input";
 import { ChevronsUpDown } from 'lucide-react';
-import VideoLightbox from "./VideoLightbox";
+import VideoLightbox from "./VideoLightbox.tsx";
 import { VideoOutputItem } from './VideoOutputItem';
 import { arrayMove } from '@dnd-kit/sortable';
 import { getDisplayUrl } from '@/shared/lib/utils';

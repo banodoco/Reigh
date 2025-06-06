@@ -89,67 +89,22 @@ export default function ToolSelectorPage() {
           <div className="flex items-center justify-center mb-8">
             <div className="flex items-center space-x-6">
               <div className="wes-ornament relative">
-                <div className="w-20 h-20 bg-gradient-to-br from-wes-burgundy to-primary rounded-3xl flex items-center justify-center shadow-wes-vintage wes-viewfinder">
-                  <Palette className="w-10 h-10 text-wes-cream drop-shadow-lg" />
+                <div className="w-10 h-10 bg-gradient-to-br from-wes-burgundy to-primary rounded-xl flex items-center justify-center shadow-wes-vintage wes-viewfinder">
+                  <Palette className="w-5 h-5 text-wes-cream drop-shadow-lg" />
                 </div>
               </div>
               
               <div className="flex flex-col items-center space-y-2">
-                <div className="w-3 h-24 bg-gradient-to-b from-wes-vintage-gold via-wes-coral to-wes-mint rounded-full shadow-wes-ornate"></div>
-                <div className="w-6 h-6 bg-wes-vintage-gold rounded-full animate-vintage-pulse"></div>
-                <div className="w-3 h-24 bg-gradient-to-t from-wes-vintage-gold via-wes-coral to-wes-mint rounded-full shadow-wes-ornate"></div>
+                <div className="w-1.5 h-12 bg-gradient-to-b from-wes-vintage-gold via-wes-coral to-wes-mint rounded-full shadow-wes-ornate"></div>
+                <div className="w-3 h-3 bg-wes-vintage-gold rounded-full animate-vintage-pulse"></div>
+                <div className="w-1.5 h-12 bg-gradient-to-t from-wes-vintage-gold via-wes-coral to-wes-mint rounded-full shadow-wes-ornate"></div>
               </div>
               
               <div className="wes-ornament relative">
-                <div className="w-16 h-16 bg-gradient-to-br from-wes-mint to-wes-sage rounded-2xl flex items-center justify-center shadow-wes-vintage wes-aperture">
-                  <Sparkles className="w-8 h-8 text-primary drop-shadow-lg" />
+                <div className="w-8 h-8 bg-gradient-to-br from-wes-mint to-wes-sage rounded-lg flex items-center justify-center shadow-wes-vintage wes-aperture">
+                  <Sparkles className="w-4 h-4 text-primary drop-shadow-lg" />
                 </div>
               </div>
-            </div>
-          </div>
-          
-          {/* Main title with vintage glow */}
-          <h1 className="font-playfair text-7xl md:text-8xl font-bold text-primary mb-6 tracking-wide text-shadow-vintage-glow animate-vintage-glow">
-            Select Your
-            <span className="block bg-gradient-to-r from-wes-burgundy via-wes-dusty-blue to-wes-forest bg-clip-text text-transparent font-crimson">
-              Creative Instrument
-            </span>
-          </h1>
-          
-          {/* Ornate divider */}
-          <div className="wes-divider w-full max-w-lg mx-auto mb-8"></div>
-          
-          <div className="max-w-3xl mx-auto">
-            <p className="font-inter text-xl text-muted-foreground leading-relaxed tracking-wide mb-8 wes-typewriter">
-              Choose from our carefully curated collection of artistic instruments, 
-              each designed to bring your creative vision to life with precision and elegance.
-            </p>
-            
-            {/* Enhanced feature badges */}
-            <div className="flex items-center justify-center mt-12 space-x-12">
-              <div className="flex items-center space-x-3 animate-slide-in-left">
-                <div className="w-4 h-4 bg-wes-pink rounded-full animate-vintage-pulse wes-badge"></div>
-                <span className="font-inter text-sm tracking-ultra-wide uppercase text-muted-foreground text-shadow-vintage">Artistic</span>
-              </div>
-              <div className="w-px h-8 bg-gradient-to-b from-transparent via-border to-transparent"></div>
-              <div className="flex items-center space-x-3 animate-scale-in" style={{ animationDelay: '0.2s' }}>
-                <div className="w-4 h-4 bg-wes-mint rounded-full animate-vintage-pulse wes-badge" style={{ animationDelay: '1s' }}></div>
-                <span className="font-inter text-sm tracking-ultra-wide uppercase text-muted-foreground text-shadow-vintage">Elegant</span>
-              </div>
-              <div className="w-px h-8 bg-gradient-to-b from-transparent via-border to-transparent"></div>
-              <div className="flex items-center space-x-3 animate-slide-in-right" style={{ animationDelay: '0.4s' }}>
-                <div className="w-4 h-4 bg-wes-yellow rounded-full animate-vintage-pulse wes-badge" style={{ animationDelay: '2s' }}></div>
-                <span className="font-inter text-sm tracking-ultra-wide uppercase text-muted-foreground text-shadow-vintage">Precise</span>
-              </div>
-            </div>
-
-            {/* Ornamental flourish */}
-            <div className="flex items-center justify-center mt-12 space-x-4">
-              <Star className="w-3 h-3 text-wes-vintage-gold animate-rotate-slow" />
-              <div className="w-12 h-px bg-gradient-to-r from-transparent via-wes-vintage-gold to-transparent"></div>
-              <Gem className="w-4 h-4 text-wes-coral animate-bounce-gentle" />
-              <div className="w-12 h-px bg-gradient-to-r from-transparent via-wes-vintage-gold to-transparent"></div>
-              <Star className="w-3 h-3 text-wes-vintage-gold animate-rotate-slow" style={{ animationDelay: '1s' }} />
             </div>
           </div>
         </div>
