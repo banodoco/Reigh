@@ -57,6 +57,7 @@ export interface SteerableMotionSettings {
   debug: boolean;
   apply_reward_lora: boolean;
   colour_match_videos: boolean;
+  apply_causvid: boolean;
   fade_in_duration: string;
   fade_out_duration: string;
   after_first_post_generation_saturation: number;
@@ -605,6 +606,7 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
         debug: steerableMotionSettings.debug,
         apply_reward_lora: steerableMotionSettings.apply_reward_lora,
         colour_match_videos: steerableMotionSettings.colour_match_videos ?? true,
+        apply_causvid: steerableMotionSettings.apply_causvid ?? false,
         fade_in_duration: steerableMotionSettings.fade_in_duration,
         fade_out_duration: steerableMotionSettings.fade_out_duration,
         after_first_post_generation_saturation: steerableMotionSettings.after_first_post_generation_saturation,
@@ -1023,6 +1025,14 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
                       onCheckedChange={(v) => onSteerableMotionSettingsChange({ colour_match_videos: v })}
                     />
                     <Label htmlFor="colour-match">Color Match Videos</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="apply-causvid"
+                      checked={steerableMotionSettings.apply_causvid ?? false}
+                      onCheckedChange={(v) => onSteerableMotionSettingsChange({ apply_causvid: v })}
+                    />
+                    <Label htmlFor="apply-causvid">Apply Causvid</Label>
                   </div>
                 </div>
                 <div>

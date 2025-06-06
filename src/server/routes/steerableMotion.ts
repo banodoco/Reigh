@@ -20,6 +20,7 @@ interface TravelRequestBody {
   debug?: boolean;
   apply_reward_lora?: boolean;
   colour_match_videos?: boolean;
+  apply_causvid?: boolean;
   fade_in_duration?: any; // JSON value (string or object)
   fade_out_duration?: any; // JSON value (string or object)
   after_first_post_generation_saturation?: number;
@@ -126,6 +127,7 @@ router.post('/travel-between-images', async (req: any, res: any) => {
       seed_base: body.seed ?? 789,
       apply_reward_lora: body.apply_reward_lora ?? true,
       colour_match_videos: body.colour_match_videos ?? true,
+      apply_causvid: body.apply_causvid ?? false,
       fade_in_params_json_str: body.fade_in_duration ?? '{"low_point":0.0,"high_point":0.8,"curve_type":"ease_in_out","duration_factor":0.0}',
       fade_out_params_json_str: body.fade_out_duration ?? '{"low_point":0.0,"high_point":0.8,"curve_type":"ease_in_out","duration_factor":0.0}',
       after_first_post_generation_saturation: body.after_first_post_generation_saturation ?? 0.75,
