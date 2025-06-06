@@ -17,11 +17,14 @@ export const useVideoScrubbing = () => {
     }
     lastFrameTimeRef.current = 0;
     
-    // When scrubbing stops, we want native playback to resume
+    // When scrubbing stops, we no longer automatically resume playback.
+    // Doing so caused a conflict where moving the mouse again would pause,
+    // leading to a stuttering effect. Now, the video remains paused at the
+    // current frame, awaiting further mouse movement to scrub again.
     const video = videoRef.current;
-    if (video && video.paused) {
-        // We use a promise-based play to avoid console errors if interrupted.
-        video.play().catch(() => {/* ignore */});
+    if (video) {
+        // It's already paused by startScrubbing, we just need to make sure
+        // our animation loop is cancelled, which is done above.
     }
   }, []);
 
