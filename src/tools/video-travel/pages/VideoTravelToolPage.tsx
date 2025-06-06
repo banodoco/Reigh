@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import VideoEditLayout, { SteerableMotionSettings } from '../components/VideoEditLayout';
+import ShotEditor, { SteerableMotionSettings } from '../components/ShotEditor';
 import { useListShots, useCreateShot } from '@/shared/hooks/useShots';
 import { Shot } from '@/types/shots';
 import { Button } from '@/shared/components/ui/button';
@@ -162,7 +162,7 @@ const VideoTravelToolPage: React.FC = () => {
           />
         </>
       ) : (
-        <VideoEditLayout
+        <ShotEditor
           selectedShot={selectedShot}
           projectId={selectedProjectId}
           videoPairConfigs={videoPairConfigs}
@@ -190,6 +190,7 @@ const VideoTravelToolPage: React.FC = () => {
           onCustomHeightChange={setCustomHeight}
           steerableMotionSettings={steerableMotionSettings}
           onSteerableMotionSettingsChange={handleSteerableMotionSettingsChange}
+          onGenerateAllSegments={() => {}}
         />
       )}
 

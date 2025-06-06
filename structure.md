@@ -156,8 +156,8 @@ To change which tools appear for a specific environment, you need to modify the 
 • **`pages/VideoTravelToolPage.tsx`**: Main UI for the video travel/creation workflow.
   – Lists shots for the selected project using `ShotListDisplay`.
   – Allows creation of new shots (via API).
-  – Hosts `VideoEditLayout` when a shot is selected for configuring video segments and managing images within that shot.
-• **`components/VideoEditLayout.tsx`**: Component for configuring and generating video segments from image pairs within a shot. Also allows uploading new images directly to the selected shot. Displays a section for "Output Videos" if any generated videos are associated with the shot. Uses `ShotImageManager` for image list management.
+  – Hosts `ShotEditor` when a shot is selected for configuring video segments and managing images within that shot.
+• **`components/ShotEditor.tsx`**: Component for configuring and generating video segments from image pairs within a shot. Also allows uploading new images directly to the selected shot. Displays a section for "Output Videos" if any generated videos are associated with the shot. Uses `ShotImageManager` for image list management.
 • **`components/TaskDetailsModal.tsx`**: A dialog that displays the detailed parameters of a generation task. It's triggered from an info button on a generated video and fetches task details based on the generation ID.
 • **`components/VideoShotDisplay.tsx`**: Component to display a shot's images and name. Allows selection of the shot for editing. Includes UI for inline editing of the shot name and deleting the shot (both via API calls). Used by `ShotListDisplay`.
 • **`components/ShotListDisplay.tsx`**: Component that takes a list of shots and renders them using `VideoShotDisplay` components. Used by `VideoTravelToolPage.tsx` and `ShotsPage.tsx`.
@@ -196,7 +196,7 @@ To change which tools appear for a specific environment, you need to modify the 
 • **`CreateProjectModal.tsx`**: A dialog component that allows users to enter a name for a new project. It uses the `addNewProject` function from `ProjectContext` to create the project, which is then automatically selected.
 • **`ProjectSettingsModal.tsx`**: A dialog component that allows users to update the name and aspect ratio of an existing project. Uses `ProjectContext.updateProject`.
 • **`FileInput.tsx`**: Reusable component for file input (image/video) with drag-and-drop and preview.
-• **`ShotImageManager.tsx`**: Reusable component for displaying and managing a list of images within a shot. Handles drag-and-drop reordering and deletion of images via callbacks. Used by `VideoEditLayout.tsx` and `ShotsPage.tsx`.
+• **`ShotImageManager.tsx`**: Reusable component for displaying and managing a list of images within a shot. Handles drag-and-drop reordering and deletion of images via callbacks. Used by `ShotEditor` and `ShotsPage.tsx`.
 • **`HoverScrubVideo.tsx`**: Self-contained wrapper around the `useVideoScrubbing` hook that provides hover-to-play, variable-speed scrubbing, progress-bar seeking, and playback-rate overlay. Now reused by `VideoOutputItem` and `VideoLightbox` to avoid duplicate logic.
 • **`TasksPane/`**:
     – `TasksPane.tsx`: Slide-out panel from the right, activated on hover or can be locked open. Displays a list of tasks. Communicates lock state to parent layout for content adjustment.
@@ -250,7 +250,7 @@ To change which tools appear for a specific environment, you need to modify the 
 ### 3.7 Server Routes (`src/server/routes/`)
 • **`steerableMotion.ts`**: Express router handling video generation between images.
     – `POST /steerable-motion/travel-between-images`: Creates a new "travel_orchestrator" task for generating video between a sequence of images.
-    – Accepts parameters matching Python CLI (image_urls, base_prompts, segment_frames, etc.).
+    Accepts parameters matching Python CLI (image_urls, base_prompts, segment_frames, etc.).
     – Creates orchestrator task in database with UUID for task IDs and timestamps for run IDs.
     – Includes comprehensive logging and error handling.
 
@@ -274,12 +274,12 @@ To change which tools appear for a specific environment, you need to modify the 
         *   Name editing: `PUT /api/shots/:shotId` (via `useUpdateShotName`).
         *   Deletion: `DELETE /api/shots/:shotId` (via `useDeleteShot`).
     2.  User creates a new shot: `POST /api/shots` (via `useCreateShot`).
-    3.  User selects a "Shot", loading `VideoEditLayout`.
+    3.  User selects a "Shot", loading `ShotEditor`.
         *   User uploads a new image to the shot: 
             a.  Image uploaded to Supabase Storage (client-side).
             b.  `POST /api/generations` called to create a generation record.
             c.  `POST /api/shots/shot_generations` called to link generation to shot (via `useAddImageToShot`).
-        *   **User manages images within the shot (in `VideoEditLayout`):**
+        *   **User manages images within the shot (in `ShotEditor`):**
             *   **Reorder images:** `PUT /api/shots/:shotId/generations/order` (via `useUpdateShotImageOrder`) with payload `{ orderedGenerationIds: string[] }`. The API updates the `position` field in the `shot_generations` table for all affected items. Client UI updates optimistically and then refetches shot data.
             *   **Delete image from shot:** `DELETE /api/shots/:shotId/generations/:generationId` (via `useRemoveImageFromShot`). The API removes the corresponding entry from the `shot_generations` table. Client UI updates optimistically and then refetches shot data.
     4.  User configures video segments. Generating video segments for a shot (either individually or batch) now calls `POST /api/steerable-motion/travel-between-images` or `POST /api/tasks` respectively.
@@ -306,7 +306,7 @@ To change which tools appear for a specific environment, you need to modify the 
 7.  **Real-time Task Updates (WebSockets)**:
     – When the backend `taskProcessingService` completes processing a task (e.g., creating a video from a 'travel_stitch' task), it broadcasts a message via WebSockets.
     – The client-side `useWebSocket` hook receives this message and invalidates the relevant queries (e.g., for tasks and generations).
-    – This triggers `react-query` to refetch the data, automatically updating components like `TaskList` or `VideoEditLayout` with the new information (e.g., completed task status, new video output).
+    – This triggers `react-query` to refetch the data, automatically updating components like `TaskList` or `ShotEditor` with the new information (e.g., completed task status, new video output).
 
 ---
 
@@ -326,7 +326,7 @@ To change which tools appear for a specific environment, you need to modify the 
         -   On `TASK_COMPLETED` or `GENERATIONS_UPDATED`, it invalidates the relevant `react-query` caches (`tasks`, `shots`, `generations`).
         -   On `TASKS_STATUS_UPDATE`, it invalidates the `tasks` query cache for the specific project.
     -   This invalidation prompts `react-query` to automatically refetch the data.
-4.  **UI Refresh**: Components like `TaskList` and `VideoEditLayout`, which use hooks like `useListTasks` or `useListShots`, are subscribed to these queries. When the data is refetched, the components re-render with the latest information (e.g., a task's status changing from 'Queued' to 'In Progress' or a new video appearing in the output list).
+4.  **UI Refresh**: Components like `TaskList` and `ShotEditor`, which use hooks like `useListTasks` or `useListShots`, are subscribed to these queries. When the data is refetched, the components re-render with the latest information (e.g., a task's status changing from 'Queued' to 'In Progress' or a new video appearing in the output list).
 
 ---
 

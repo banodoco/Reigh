@@ -15,21 +15,12 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/co
 import { Switch } from "@/shared/components/ui/switch";
 import { Input } from "@/shared/components/ui/input";
 import { ChevronsUpDown, Info } from 'lucide-react';
-import VideoLightbox from "./VideoLightbox.tsx";
-import { VideoOutputItem } from './VideoOutputItem';
 import { arrayMove } from '@dnd-kit/sortable';
 import { getDisplayUrl } from '@/shared/lib/utils';
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/shared/components/ui/pagination";
-import { Skeleton } from '@/shared/components/ui/skeleton';
 import { RadioGroup, RadioGroupItem } from "@/shared/components/ui/radio-group";
 import { ASPECT_RATIO_TO_RESOLUTION } from '@/shared/lib/aspectRatios';
+import VideoOutputsGallery from "./VideoOutputsGallery";
+import BatchSettingsForm from "./BatchSettingsForm";
 
 // Add the missing type definition
 export interface SegmentGenerationParams {
@@ -84,7 +75,7 @@ interface ShotSettings {
   steerableMotionSettings: SteerableMotionSettings;
 }
 
-interface VideoEditLayoutProps {
+interface ShotEditorProps {
   selectedShot: Shot;
   projectId: string | null;
   videoPairConfigs: VideoPairConfig[];
@@ -154,7 +145,7 @@ const isGenerationVideo = (gen: GenerationRow): boolean => {
          (gen.imageUrl && gen.imageUrl.endsWith('.mp4'));
 };
 
-const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
+const ShotEditor: React.FC<ShotEditorProps> = ({
   selectedShot,
   projectId,
   videoPairConfigs,
@@ -190,12 +181,8 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
   const [fileInputKey, setFileInputKey] = useState<number>(Date.now());
   const [deletingVideoId, setDeletingVideoId] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [creatingTaskId, setCreatingTaskId] = useState<string | null>(null);
-  const [animatedVideoOutputs, setAnimatedVideoOutputs] = useState<GenerationRow[]>([]);
-  const [currentPage, setCurrentPage] = useState(1);
-  const videosPerPage = 9;
   const [localOrderedShotImages, setLocalOrderedShotImages] = useState(orderedShotImages || []);
 
   useEffect(() => {
@@ -210,7 +197,7 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
         try {
           return JSON.parse(settingsStr) as ShotSettings;
         } catch (e) {
-          console.error(`[VideoEditLayout] Failed to parse settings from localStorage for key ${key}`, e);
+          console.error(`[ShotEditor] Failed to parse settings from localStorage for key ${key}`, e);
           return null;
         }
       }
@@ -292,7 +279,7 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
         localStorage.setItem(`shot-settings-${shotId}`, settingsJson);
         localStorage.setItem('last-edited-shot-id', shotId);
       } catch (e) {
-        console.error("[VideoEditLayout] Failed to save shot settings to localStorage", e);
+        console.error("[ShotEditor] Failed to save shot settings to localStorage", e);
       }
     }, 400); // Save after 400ms of inactivity
 
@@ -355,7 +342,7 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
       setFileInputKey(Date.now());
 
     } catch (error: any) {
-      console.error("[VideoEditLayout] Error uploading images:", error);
+      console.error("[ShotEditor] Error uploading images:", error);
       toast.error(`Image upload failed: ${error.message}`);
     } finally {
       setIsUploadingImage(false);
@@ -370,32 +357,6 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
     return localOrderedShotImages.filter(isGenerationVideo).reverse();
   }, [localOrderedShotImages]);
 
-  // Pagination logic
-  const pageCount = Math.ceil(videoOutputs.length / videosPerPage);
-  const paginatedVideos = useMemo(() => {
-    const startIndex = (currentPage - 1) * videosPerPage;
-    const endIndex = startIndex + videosPerPage;
-    return videoOutputs.slice(startIndex, endIndex);
-  }, [videoOutputs, currentPage]);
-
-  useEffect(() => {
-    // This effect handles the sequential fade-in of video items.
-    // When the list of videos changes, it resets and re-runs the animation.
-    setAnimatedVideoOutputs([]);
-
-    const timeouts = paginatedVideos.map((video, index) => {
-        return setTimeout(() => {
-            setAnimatedVideoOutputs(prev => [...prev, video]);
-        }, index * 150); // Stagger by 150ms
-    });
-
-    // Cleanup timeouts on unmount or if videoOutputs changes again
-    return () => {
-        timeouts.forEach(clearTimeout);
-    };
-  }, [paginatedVideos]);
-
-  // Update managedImages effect to use localOrderedShotImages
   useEffect(() => {
     setManagedImages((localOrderedShotImages || []).filter(gen => !isGenerationVideo(gen)));
   }, [localOrderedShotImages]);
@@ -429,7 +390,7 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
           toast.success("Video output removed and ordering updated.");
         },
         onError: (error) => {
-          console.error("[VideoEditLayout] Failed to update ordering after deletion:", error);
+          console.error("[ShotEditor] Failed to update ordering after deletion:", error);
           toast.error("Failed to update ordering after deletion.");
         }
       });
@@ -446,7 +407,7 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
     const newIndex = managedImages.findIndex((img) => img.id === overId);
     
     if (oldIndex === -1 || newIndex === -1) {
-        console.error("[VideoEditLayout] Dragged item not found in managed images.");
+        console.error("[ShotEditor] Dragged item not found in managed images.");
         toast.error("Error reordering images. Item not found.");
         return;
     }
@@ -479,7 +440,7 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
         onShotImagesUpdate();
       },
       onError: (error) => {
-        console.error("[VideoEditLayout] Failed to reorder images:", error);
+        console.error("[ShotEditor] Failed to reorder images:", error);
         setManagedImages((localOrderedShotImages) || []); // Revert to local order on error
       }
     });
@@ -528,13 +489,13 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
       const newTask = await response.json(); 
 
       if (newTask && newTask.id) {
-        console.log("[VideoEditLayout] Video task created via API:", newTask);        
+        console.log("[ShotEditor] Video task created via API:", newTask);        
       } else {
-        console.warn("[VideoEditLayout] Video task creation via API did not return ID or data.");
+        console.warn("[ShotEditor] Video task creation via API did not return ID or data.");
         toast.info("Video task creation registered, but no confirmation ID received from API.");
       }
     } catch (err: any) {
-      console.error("[VideoEditLayout] Error creating video task via API:", err);
+      console.error("[ShotEditor] Error creating video task via API:", err);
       toast.error(`An unexpected error occurred: ${err.message || 'Unknown API error'}`);
     } finally {
       setIsCreatingTask(false);
@@ -647,7 +608,7 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
       const newTask = await response.json();
       toast.success(`Travel task queued (ID: ${(newTask.id as string).substring(0, 8)}...).`);
     } catch (err: any) {
-      console.error('[VideoEditLayout] Error creating travel task:', err);
+      console.error('[ShotEditor] Error creating travel task:', err);
       toast.error(`Failed to create travel task: ${err.message || 'Unknown error'}`);
     } finally {
       setIsCreatingTask(false);
@@ -661,94 +622,17 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
       <h2 className="text-3xl font-bold mb-1">Video Edit: {selectedShot.name}</h2>
       <p className="text-muted-foreground mb-6">Configure and generate video segments, or add new images to this shot.</p>
 
-      {lightboxIndex !== null && videoOutputs[lightboxIndex] && (
-        <VideoLightbox
-          video={videoOutputs[lightboxIndex]}
-          onClose={() => setLightboxIndex(null)}
-        />
-      )}
+      <VideoOutputsGallery
+        videoOutputs={videoOutputs}
+        onDelete={handleDeleteVideoOutput}
+        deletingVideoId={deletingVideoId}
+      />
 
-      {videoOutputs.length > 0 && (
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle>Output Videos</CardTitle>
-            <p className="text-sm text-muted-foreground pt-1">
-              Generated videos for this shot.
-            </p>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {paginatedVideos.map((video) => {
-                const isVisible = animatedVideoOutputs.some(v => v.id === video.id);
-                if (!isVisible) {
-                  return (
-                    <Skeleton
-                      key={video.id}
-                      className="w-full aspect-video rounded-lg bg-muted/40"
-                    />
-                  );
-                }
-                return (
-                  <div key={video.id} className="animate-in fade-in zoom-in-95 duration-500 ease-out">
-                    <VideoOutputItem
-                      video={video}
-                      onDoubleClick={() => {
-                        const originalIndex = videoOutputs.findIndex(v => v.id === video.id);
-                        setLightboxIndex(originalIndex);
-                      }}
-                      onDelete={handleDeleteVideoOutput}
-                      isDeleting={deletingVideoId === video.id}
-                    />
-                  </div>
-                );
-              })}
-            </div>
-            {pageCount > 1 && (
-              <Pagination className="mt-8">
-                <PaginationContent>
-                  <PaginationItem>
-                    <PaginationPrevious 
-                      href="#" 
-                      onClick={(e) => { e.preventDefault(); setCurrentPage(p => Math.max(p - 1, 1)); }} 
-                      className={currentPage === 1 ? "pointer-events-none opacity-50" : undefined}
-                      size="default"
-                    />
-                  </PaginationItem>
-                  
-                  {/* Simplified page numbers for now */}
-                  <PaginationItem>
-                    <PaginationLink href="#" isActive size="default">
-                      Page {currentPage} of {pageCount}
-                    </PaginationLink>
-                  </PaginationItem>
-
-                  <PaginationItem>
-                    <PaginationNext 
-                      href="#" 
-                      onClick={(e) => { e.preventDefault(); setCurrentPage(p => Math.min(p + 1, pageCount)); }}
-                      className={currentPage === pageCount ? "pointer-events-none opacity-50" : undefined}
-                      size="default"
-                    />
-                  </PaginationItem>
-                </PaginationContent>
-              </Pagination>
-            )}
-          </CardContent>
-        </Card>
-      )}
-      
       {/*
       <div className="mb-6 flex items-center space-x-2">
         <Label className="text-sm font-medium">Control Mode:</Label>
-        <Button 
-          variant={videoControlMode === 'batch' ? 'secondary' : 'outline'} 
-          size="sm"
-          onClick={() => onVideoControlModeChange('batch')}
-        >
-          Batch
-        </Button>
-        <Button 
-          variant={videoControlMode === 'individual' ? 'secondary' : 'outline'} 
+        Individual
+        <Button
           size="sm"
           onClick={() => onVideoControlModeChange('individual')}
         >
@@ -845,274 +729,26 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
 
       {videoControlMode === 'batch' && videoPairConfigs.length > 0 && (
         <div className="space-y-6 mb-8">
-          <div className="p-4 border rounded-lg bg-card shadow-md space-y-4">
-            <h3 className="text-lg font-semibold">Batch Generation Settings</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="relative">
-                <Label htmlFor="batchVideoPrompt" className="text-sm font-medium block mb-1.5">Prompt</Label>
-                <span 
-                  title="This prompt will be applied to every video. These are very sensitive and will impact things a lot." 
-                  className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors"
-                >
-                  <Info className="h-4 w-4" />
-                </span>
-                <Textarea 
-                  id="batchVideoPrompt"
-                  value={batchVideoPrompt}
-                  onChange={(e) => onBatchVideoPromptChange(e.target.value)}
-                  placeholder="Enter a global prompt for all video segments... (e.g., cinematic transition)"
-                  className="min-h-[70px] text-sm"
-                  rows={3}
-                />
-              </div>
-              <div className="relative">
-                <Label htmlFor="negative_prompt" className="text-sm font-medium block mb-1.5">Negative Prompt</Label>
-                <span 
-                  title="This will be applied to every video to tell it what to avoid." 
-                  className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors"
-                >
-                  <Info className="h-4 w-4" />
-                </span>
-                <Textarea
-                  id="negative_prompt"
-                  value={steerableMotionSettings.negative_prompt}
-                  onChange={(e) => onSteerableMotionSettingsChange({ negative_prompt: e.target.value })}
-                  placeholder="e.g., blurry, low quality"
-                  className="min-h-[70px] text-sm"
-                  rows={3}
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="relative">
-                <Label htmlFor="batchVideoFrames" className="text-sm font-medium block mb-1">Frames per Image: {batchVideoFrames}</Label>
-                <span 
-                  title="Number of frames to have per image." 
-                  className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors"
-                >
-                  <Info className="h-4 w-4" />
-                </span>
-                <Slider
-                  id="batchVideoFrames"
-                  min={10}
-                  max={81} 
-                  step={1}
-                  value={[batchVideoFrames]}
-                  onValueChange={(value) => onBatchVideoFramesChange(value[0])}
-                />
-                <Input
-                  id="batchVideoFramesInput"
-                  type="number"
-                  value={batchVideoFrames}
-                  onChange={(e) => onBatchVideoFramesChange(parseInt(e.target.value, 10) || 0)}
-                  className="mt-2"
-                />
-              </div>
-              <div className="relative">
-                <Label htmlFor="batchVideoContext" className="text-sm font-medium block mb-1">Number of Context Frames: {batchVideoContext}</Label>
-                <span 
-                  title="Number of frames in the previous video to provide us context to the next one." 
-                  className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors"
-                >
-                  <Info className="h-4 w-4" />
-                </span>
-                <Slider
-                  id="batchVideoContext"
-                  min={0}
-                  max={60}
-                  step={1}
-                  value={[batchVideoContext]}
-                  onValueChange={(value) => onBatchVideoContextChange(value[0])}
-                />
-              </div>
-            </div>
-            <div className="relative">
-              <Label htmlFor="batchVideoSteps" className="text-sm font-medium block mb-1">Generation Steps: {batchVideoSteps}</Label>
-              <span 
-                title="Amount of time to spend processing the generations; more steps generally means more quality." 
-                className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors"
-              >
-                <Info className="h-4 w-4" />
-              </span>
-              <Slider
-                id="batchVideoSteps"
-                min={1}
-                max={20}
-                step={1}
-                value={[batchVideoSteps]}
-                onValueChange={(value) => onBatchVideoStepsChange(value[0])}
-              />
-            </div>
-            <div>
-              <Label className="text-sm font-medium block mb-2">Dimension Source</Label>
-              <RadioGroup
-                value={dimensionSource || 'firstImage'}
-                onValueChange={(value) => {
-                  const newSource = value as 'project' | 'firstImage' | 'custom';
-                  onDimensionSourceChange(newSource);
-                  if (newSource === 'custom' && (!customWidth || !customHeight)) {
-                    const project = projects.find(p => p.id === selectedProjectId);
-                    if (project && project.aspectRatio) {
-                      const res = ASPECT_RATIO_TO_RESOLUTION[project.aspectRatio];
-                      if (res) {
-                        const [width, height] = res.split('x').map(Number);
-                        onCustomWidthChange(width);
-                        onCustomHeightChange(height);
-                      }
-                    }
-                  }
-                }}
-                className="flex space-x-4"
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="firstImage" id="r_firstImage" />
-                  <Label htmlFor="r_firstImage">Use First Image Dimensions</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="project" id="r_project" />
-                  <Label htmlFor="r_project">Use Project Dimensions</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="custom" id="r_custom" />
-                  <Label htmlFor="r_custom">Custom</Label>
-                </div>
-              </RadioGroup>
-            </div>
-            {dimensionSource === 'custom' && (
-              <div className="grid grid-cols-2 gap-4 p-4 border rounded-md bg-muted/20">
-                <div>
-                  <Label htmlFor="customWidth">Width</Label>
-                  <Input
-                    id="customWidth"
-                    type="number"
-                    value={customWidth || ''}
-                    onChange={(e) => onCustomWidthChange(parseInt(e.target.value, 10) || undefined)}
-                    placeholder="e.g., 1024"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="customHeight">Height</Label>
-                  <Input
-                    id="customHeight"
-                    type="number"
-                    value={customHeight || ''}
-                    onChange={(e) => onCustomHeightChange(parseInt(e.target.value, 10) || undefined)}
-                    placeholder="e.g., 576"
-                  />
-                </div>
-                {(customWidth || 0) > 2048 || (customHeight || 0) > 2048 ? (
-                  <p className="col-span-2 text-sm text-destructive">Warning: Very large dimensions may lead to slow generation or failures.</p>
-                ) : null}
-              </div>
-            )}
-            
-            <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
-              <CollapsibleTrigger asChild>
-                <Button variant="ghost" className="w-full justify-center text-sm">
-                  <ChevronsUpDown className="h-4 w-4 mr-2" />
-                  {showAdvanced ? 'Hide' : 'Show'} Advanced Settings
-                </Button>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="space-y-4 pt-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="model_name">Model Name</Label>
-                    <Input
-                      id="model_name"
-                      value={steerableMotionSettings.model_name}
-                      onChange={(e) => onSteerableMotionSettingsChange({ model_name: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="seed">Seed</Label>
-                    <Input
-                      id="seed"
-                      type="number"
-                      value={steerableMotionSettings.seed}
-                      onChange={(e) => onSteerableMotionSettingsChange({ seed: parseInt(e.target.value, 10) || 0 })}
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                   <div>
-                    <Label htmlFor="saturation">Post-Gen Saturation: {steerableMotionSettings.after_first_post_generation_saturation}</Label>
-                    <Slider
-                      id="saturation"
-                      min={0} max={2} step={0.05}
-                      value={[steerableMotionSettings.after_first_post_generation_saturation]}
-                      onValueChange={(v) => onSteerableMotionSettingsChange({ after_first_post_generation_saturation: v[0] })}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="brightness">Post-Gen Brightness: {steerableMotionSettings.after_first_post_generation_brightness}</Label>
-                    <Slider
-                      id="brightness"
-                      min={-1} max={1} step={0.05}
-                      value={[steerableMotionSettings.after_first_post_generation_brightness]}
-                      onValueChange={(v) => onSteerableMotionSettingsChange({ after_first_post_generation_brightness: v[0] })}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <Label htmlFor="fade_in_duration">Fade-In Duration (JSON)</Label>
-                  <Textarea
-                    id="fade_in_duration"
-                    value={steerableMotionSettings.fade_in_duration}
-                    onChange={(e) => onSteerableMotionSettingsChange({ fade_in_duration: e.target.value })}
-                    placeholder='e.g., {"low_point":0.0,"high_point":0.8,"curve_type":"ease_in_out","duration_factor":0.0}'
-                    className="font-mono text-xs"
-                    rows={3}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="fade_out_duration">Fade-Out Duration (JSON)</Label>
-                  <Textarea
-                    id="fade_out_duration"
-                    value={steerableMotionSettings.fade_out_duration}
-                    onChange={(e) => onSteerableMotionSettingsChange({ fade_out_duration: e.target.value })}
-                    placeholder='e.g., {"low_point":0.0,"high_point":0.8,"curve_type":"ease_in_out","duration_factor":0.0}'
-                    className="font-mono text-xs"
-                    rows={3}
-                  />
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 items-center">
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="debug"
-                      checked={steerableMotionSettings.debug ?? true}
-                      onCheckedChange={(v) => onSteerableMotionSettingsChange({ debug: v })}
-                    />
-                    <Label htmlFor="debug">Debug Mode</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="apply_reward_lora"
-                      checked={steerableMotionSettings.apply_reward_lora ?? true}
-                      onCheckedChange={(v) => onSteerableMotionSettingsChange({ apply_reward_lora: v })}
-                    />
-                    <Label htmlFor="apply_reward_lora">Apply Reward LoRA</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="colour-match"
-                      checked={steerableMotionSettings.colour_match_videos ?? true}
-                      onCheckedChange={(v) => onSteerableMotionSettingsChange({ colour_match_videos: v })}
-                    />
-                    <Label htmlFor="colour-match">Color Match Videos</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="apply-causvid"
-                      checked={steerableMotionSettings.apply_causvid ?? true}
-                      onCheckedChange={(v) => onSteerableMotionSettingsChange({ apply_causvid: v })}
-                    />
-                    <Label htmlFor="apply-causvid">Apply Causvid</Label>
-                  </div>
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
-          </div>
-
+          <BatchSettingsForm
+            batchVideoPrompt={batchVideoPrompt}
+            onBatchVideoPromptChange={onBatchVideoPromptChange}
+            batchVideoFrames={batchVideoFrames}
+            onBatchVideoFramesChange={onBatchVideoFramesChange}
+            batchVideoContext={batchVideoContext}
+            onBatchVideoContextChange={onBatchVideoContextChange}
+            batchVideoSteps={batchVideoSteps}
+            onBatchVideoStepsChange={onBatchVideoStepsChange}
+            dimensionSource={dimensionSource}
+            onDimensionSourceChange={onDimensionSourceChange}
+            customWidth={customWidth}
+            onCustomWidthChange={onCustomWidthChange}
+            customHeight={customHeight}
+            onCustomHeightChange={onCustomHeightChange}
+            steerableMotionSettings={steerableMotionSettings}
+            onSteerableMotionSettingsChange={onSteerableMotionSettingsChange}
+            projects={projects}
+            selectedProjectId={selectedProjectId}
+          />
           <Card className="mb-6">
             <CardHeader>
               <CardTitle>Manage Images in "{selectedShot.name}"</CardTitle>
@@ -1167,4 +803,4 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
   );
 };
 
-export default VideoEditLayout; 
+export default ShotEditor; 
