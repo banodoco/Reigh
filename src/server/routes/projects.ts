@@ -15,20 +15,23 @@ const asyncHandler = (fn: (req: Request, res: Response, next: NextFunction) => P
 
 // GET /api/projects
 projectsRouter.get('/', asyncHandler(async (req: Request, res: Response) => {
+  console.log('[API] GET /api/projects: Request received.');
   try {
+    console.log(`[API] GET /api/projects: Querying projects for user: ${DUMMY_USER_ID}`);
     let fetchedData = await db.select({
       id: projectsTable.id,
       name: projectsTable.name,
       userId: projectsTable.userId,
-      aspectRatio: projectsTable.aspectRatio, // Include aspectRatio in fetched data
-      // Optionally include createdAt, updatedAt if needed
+      aspectRatio: projectsTable.aspectRatio,
     })
       .from(projectsTable)
       .where(eq(projectsTable.userId, DUMMY_USER_ID))
       .orderBy(asc(projectsTable.name));
+    console.log(`[API] GET /api/projects: Found ${fetchedData.length} existing projects.`);
 
     // RFC: If no projects exist, create and return a default one
     if (fetchedData.length === 0) {
+      console.log('[API] GET /api/projects: No projects found. Creating a default project.');
       const defaultProjectName = 'Default Project';
       const newDefaultProject = await db.insert(projectsTable).values({
         name: defaultProjectName,
@@ -38,12 +41,23 @@ projectsRouter.get('/', asyncHandler(async (req: Request, res: Response) => {
         id: projectsTable.id,
         name: projectsTable.name,
         userId: projectsTable.userId,
-        aspectRatio: projectsTable.aspectRatio, // Return aspectRatio for default project
+        aspectRatio: projectsTable.aspectRatio,
       });
       fetchedData = newDefaultProject;
+      console.log('[API] GET /api/projects: Default project created successfully.');
     }
 
-    res.status(200).json(fetchedData);
+    // Map the fetched data to match the client's expectation of a 'user_id' field.
+    console.log('[API] GET /api/projects: Mapping data for response.');
+    const responseData = fetchedData.map(p => ({
+      id: p.id,
+      name: p.name,
+      user_id: p.userId,
+      aspectRatio: p.aspectRatio,
+    }));
+    console.log('[API] GET /api/projects: Sending successful response.');
+
+    res.status(200).json(responseData);
   } catch (error) {
     console.error('[API Error Fetching Projects]', error);
     res.status(500).json({ message: 'Failed to fetch projects' });
@@ -79,7 +93,7 @@ projectsRouter.post('/', asyncHandler(async (req: Request, res: Response) => {
       id: projectsTable.id,
       name: projectsTable.name,
       userId: projectsTable.userId,
-      aspectRatio: projectsTable.aspectRatio, // Return aspectRatio in response
+      aspectRatio: projectsTable.aspectRatio,
     });
 
     if (!newProjects || newProjects.length === 0) {
@@ -91,7 +105,7 @@ projectsRouter.post('/', asyncHandler(async (req: Request, res: Response) => {
     const createdProject = {
       id: newProjects[0].id,
       name: newProjects[0].name,
-      user_id: newProjects[0].userId, // Ensure key matches client expectation
+      user_id: newProjects[0].userId,
       aspectRatio: newProjects[0].aspectRatio,
     };
 
@@ -154,8 +168,10 @@ projectsRouter.put('/:id', asyncHandler(async (req: Request, res: Response) => {
     
     // API response should match client expectation (user_id)
     const updatedProjectResponse = {
-      ...updatedProjects[0],
-      user_id: updatedProjects[0].userId, // Ensure consistency if client expects user_id
+      id: updatedProjects[0].id,
+      name: updatedProjects[0].name,
+      user_id: updatedProjects[0].userId,
+      aspectRatio: updatedProjects[0].aspectRatio,
     };
     // delete updatedProjectResponse.userId; // If client only expects user_id
 

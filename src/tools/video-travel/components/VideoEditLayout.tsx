@@ -50,12 +50,13 @@ export interface VideoPairConfig {
   generatedVideoUrl?: string;
 }
 
-interface SteerableMotionSettings {
+export interface SteerableMotionSettings {
   negative_prompt: string;
   model_name: string;
   seed: number;
   debug: boolean;
-  booster_loras: boolean;
+  apply_reward_lora: boolean;
+  colour_match_videos: boolean;
   fade_in_duration: string;
   fade_out_duration: string;
   after_first_post_generation_saturation: number;
@@ -602,7 +603,8 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
         model_name: steerableMotionSettings.model_name,
         seed: steerableMotionSettings.seed,
         debug: steerableMotionSettings.debug,
-        booster_loras: steerableMotionSettings.booster_loras,
+        apply_reward_lora: steerableMotionSettings.apply_reward_lora,
+        colour_match_videos: steerableMotionSettings.colour_match_videos ?? true,
         fade_in_duration: steerableMotionSettings.fade_in_duration,
         fade_out_duration: steerableMotionSettings.fade_out_duration,
         after_first_post_generation_saturation: steerableMotionSettings.after_first_post_generation_saturation,
@@ -995,6 +997,32 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
                       value={[steerableMotionSettings.after_first_post_generation_brightness]}
                       onValueChange={(v) => onSteerableMotionSettingsChange({ after_first_post_generation_brightness: v[0] })}
                     />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 py-2">
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="debug"
+                      checked={steerableMotionSettings.debug ?? true}
+                      onCheckedChange={(v) => onSteerableMotionSettingsChange({ debug: v })}
+                    />
+                    <Label htmlFor="debug">Debug Mode</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="apply_reward_lora"
+                      checked={steerableMotionSettings.apply_reward_lora ?? true}
+                      onCheckedChange={(v) => onSteerableMotionSettingsChange({ apply_reward_lora: v })}
+                    />
+                    <Label htmlFor="apply_reward_lora">Apply Reward LoRA</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="colour-match"
+                      checked={steerableMotionSettings.colour_match_videos ?? true}
+                      onCheckedChange={(v) => onSteerableMotionSettingsChange({ colour_match_videos: v })}
+                    />
+                    <Label htmlFor="colour-match">Color Match Videos</Label>
                   </div>
                 </div>
                 <div>

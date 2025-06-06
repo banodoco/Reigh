@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import VideoEditLayout from '../components/VideoEditLayout';
+import VideoEditLayout, { SteerableMotionSettings } from '../components/VideoEditLayout';
 import { useListShots, useCreateShot } from '@/shared/hooks/useShots';
 import { Shot } from '@/types/shots';
 import { Button } from '@/shared/components/ui/button';
@@ -31,12 +31,13 @@ const VideoTravelToolPage: React.FC = () => {
   const [customWidth, setCustomWidth] = useState<number | undefined>();
   const [customHeight, setCustomHeight] = useState<number | undefined>();
   const [videoPairConfigs, setVideoPairConfigs] = useState<any[]>([]);
-  const [steerableMotionSettings, setSteerableMotionSettings] = useState({
+  const [steerableMotionSettings, setSteerableMotionSettings] = useState<SteerableMotionSettings>({
     negative_prompt: '',
     model_name: 'vace_14B',
     seed: 789,
     debug: true,
-    booster_loras: true,
+    apply_reward_lora: true,
+    colour_match_videos: true,
     fade_in_duration: '{"low_point":0.0,"high_point":0.8,"curve_type":"ease_in_out","duration_factor":0.0}',
     fade_out_duration: '{"low_point":0.0,"high_point":0.8,"curve_type":"ease_in_out","duration_factor":0.0}',
     after_first_post_generation_saturation: 0.75,
