@@ -187,6 +187,7 @@ To change which tools appear for a specific environment, you need to modify the 
     – `ShotGroup.tsx`: Droppable area for images within a shot.
     – `NewGroupDropZone.tsx`: Target to create a new shot by dropping an image.
 • **`ui/`**: Nearly 50+ re-exports/variants of shadcn components (Button, Card, Dialog, etc.).
+• **`loading.tsx`**: A set of Wes Anderson-inspired loading indicators with multiple variants (e.g., film reel, vintage camera, ornate badges) for use across the application.
 • **`DraggableImage.tsx`**: Wrapper for making gallery images draggable.
 • **`ImageGallery.tsx`**: Displays generated images; supports delete, upscale, "apply settings", drag-to-shot.
 • **`SettingsModal.tsx`**: Modal to enter and save API keys to `localStorage`.
@@ -306,13 +307,4 @@ To change which tools appear for a specific environment, you need to modify the 
 
 | Layer        | Table / Bucket                                       | Key Columns & Details (from `/db/schema/schema.ts`)                    |
 |--------------|------------------------------------------------------|----------------------------------------------------------------------|
-| **Postgres** | `users`                                              | `id` (uuid, PK)                                                      |
-|              | `projects`                                           | `id` (uuid, PK), `name` (text), `userId` (uuid, FK to `users.id`), `createdAt` (timestamp), `aspectRatio` (text, nullable) |
-|              | `tasks`                                              | `id` (uuid, PK), `taskType` (text), `params` (jsonb), `status` (enum: 'Pending', 'In Progress', 'Complete', 'Failed', 'Queued', 'Cancelled'), `dependantOn` (uuid[]), `outputLocation` (text), `createdAt` (timestamp), `updatedAt` (timestamp), `projectId` (uuid, FK to `projects.id`), `generationProcessedAt` (timestamp, nullable) |
-|              | `generations`                                        | `id` (uuid, PK), `tasks` (uuid[]), `location` (text), `type` (text), `createdAt` (timestamp), `updatedAt` (timestamp), `projectId` (uuid, FK to `projects.id`) |
-|              | `shots`                                              | `id` (uuid, PK), `name` (text), `createdAt` (timestamp), `updatedAt` (timestamp), `projectId` (uuid, FK to `projects.id`) |
-|              | `shot_generations`                                   | `id` (uuid, PK), `shotId` (uuid, FK to `shots.id`), `generationId` (uuid, FK to `generations.id`), `position` (integer) |
-| (Supabase)   | (Managed by Drizzle ORM, schema above applies)       |                                                                      |
-| **SQLite**   | `users`                                              | `id` (text, PK) - SQLite equivalent of uuid                            |
-|              | `projects`                                           | `id` (text, PK), `name` (text), `userId` (text, FK to `users.id`), `createdAt` (numeric/text timestamp), `aspectRatio` (text, nullable) |
-|              | `tasks`                                              | `id` (text, PK), `taskType` (text), `params` (text - jsonb equivalent), `status` (text enum - including 'Cancelled'), `dependantOn` (text - array equivalent), `outputLocation` (text), `createdAt` (numeric/text timestamp), `updatedAt` (numeric/text timestamp), `projectId` (text, FK to `projects.id`), `generationProcessedAt` (numeric/text timestamp, nullable) |
+| **Postgres** | `users`                                              | `

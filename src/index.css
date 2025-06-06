@@ -268,7 +268,8 @@
 
   .wes-button::after {
     content: '';
-    @apply absolute inset-0 rounded-inherit;
+    @apply absolute inset-0;
+    border-radius: inherit;
     background: 
       repeating-linear-gradient(
         90deg,
