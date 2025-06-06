@@ -234,7 +234,25 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
       if (settingsToApply.dimensionSource) onDimensionSourceChange(settingsToApply.dimensionSource);
       if (settingsToApply.customWidth) onCustomWidthChange(settingsToApply.customWidth);
       if (settingsToApply.customHeight) onCustomHeightChange(settingsToApply.customHeight);
-      if (settingsToApply.steerableMotionSettings) onSteerableMotionSettingsChange(settingsToApply.steerableMotionSettings);
+      if (settingsToApply.steerableMotionSettings) {
+        const defaultSteerableSettings = {
+          negative_prompt: '',
+          model_name: 'vace_14B',
+          seed: 789,
+          debug: true,
+          apply_reward_lora: true,
+          colour_match_videos: true,
+          apply_causvid: true,
+          fade_in_duration: '{"low_point":0.0,"high_point":0.8,"curve_type":"ease_in_out","duration_factor":0.0}',
+          fade_out_duration: '{"low_point":0.0,"high_point":0.8,"curve_type":"ease_in_out","duration_factor":0.0}',
+          after_first_post_generation_saturation: 0.75,
+          after_first_post_generation_brightness: -0.3,
+        };
+        onSteerableMotionSettingsChange({
+          ...defaultSteerableSettings,
+          ...settingsToApply.steerableMotionSettings
+        });
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedShot?.id]);
@@ -999,7 +1017,29 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
                     />
                   </div>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 py-2">
+                <div>
+                  <Label htmlFor="fade_in_duration">Fade-In Duration (JSON)</Label>
+                  <Textarea
+                    id="fade_in_duration"
+                    value={steerableMotionSettings.fade_in_duration}
+                    onChange={(e) => onSteerableMotionSettingsChange({ fade_in_duration: e.target.value })}
+                    placeholder='e.g., {"low_point":0.0,"high_point":0.8,"curve_type":"ease_in_out","duration_factor":0.0}'
+                    className="font-mono text-xs"
+                    rows={3}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="fade_out_duration">Fade-Out Duration (JSON)</Label>
+                  <Textarea
+                    id="fade_out_duration"
+                    value={steerableMotionSettings.fade_out_duration}
+                    onChange={(e) => onSteerableMotionSettingsChange({ fade_out_duration: e.target.value })}
+                    placeholder='e.g., {"low_point":0.0,"high_point":0.8,"curve_type":"ease_in_out","duration_factor":0.0}'
+                    className="font-mono text-xs"
+                    rows={3}
+                  />
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 items-center">
                   <div className="flex items-center space-x-2">
                     <Switch
                       id="debug"
@@ -1032,15 +1072,6 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
                     />
                     <Label htmlFor="apply-causvid">Apply Causvid</Label>
                   </div>
-                </div>
-                <div>
-                  <Label htmlFor="fade_in_duration">Fade-In Duration (JSON)</Label>
-                  <Textarea
-                    id="fade_in_duration"
-                    value={steerableMotionSettings.fade_in_duration}
-                    onChange={(e) => onSteerableMotionSettingsChange({ fade_in_duration: e.target.value })}
-                    rows={3}
-                  />
                 </div>
               </CollapsibleContent>
             </Collapsible>
