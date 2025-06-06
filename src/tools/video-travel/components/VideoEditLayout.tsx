@@ -192,17 +192,25 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
     steerableMotionSettings,
   ]);
 
+  // Debounced save of settings to localStorage to prevent rapid re-renders while typing
   useEffect(() => {
     if (!selectedShot?.id) return;
 
     const shotId = selectedShot.id;
-    try {
-      const settingsJson = JSON.stringify(settingsToSave);
-      localStorage.setItem(`shot-settings-${shotId}`, settingsJson);
-      localStorage.setItem('last-edited-shot-id', shotId);
-    } catch (e) {
-      console.error("[VideoEditLayout] Failed to save shot settings to localStorage", e);
-    }
+
+    const handler = setTimeout(() => {
+      try {
+        const settingsJson = JSON.stringify(settingsToSave);
+        localStorage.setItem(`shot-settings-${shotId}`, settingsJson);
+        localStorage.setItem('last-edited-shot-id', shotId);
+      } catch (e) {
+        console.error("[VideoEditLayout] Failed to save shot settings to localStorage", e);
+      }
+    }, 400); // Save after 400ms of inactivity
+
+    return () => {
+      clearTimeout(handler);
+    };
   }, [selectedShot?.id, settingsToSave]);
 
   useEffect(() => {

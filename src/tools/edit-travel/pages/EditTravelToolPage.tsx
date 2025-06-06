@@ -345,6 +345,48 @@ const EditTravelToolPage = () => {
   const handleFileChange = (files: File[]) => {
     const file = files && files.length > 0 ? files[0] : null;
     setInputFile(file);
+    if (file) {
+      if (file.type.startsWith('image/')) {
+        fileToDataURL(file)
+          .then(dataUrl => {
+            const itemToStore = { dataUrl, name: file.name, type: file.type };
+            const itemString = JSON.stringify(itemToStore);
+            if (itemString.length < MAX_LOCAL_STORAGE_ITEM_LENGTH) {
+              localStorage.setItem(EDIT_TRAVEL_INPUT_FILE_KEY, itemString);
+            } else {
+              localStorage.removeItem(EDIT_TRAVEL_INPUT_FILE_KEY);
+              toast.info(`Image is too large (~${(itemString.length / (1024*1024)).toFixed(1)}MB) to be saved locally and won't persist.`);
+            }
+          })
+          .catch(error => {
+            console.error("Error saving input image to localStorage:", error);
+            toast.error("Could not save input image locally.");
+            localStorage.removeItem(EDIT_TRAVEL_INPUT_FILE_KEY);
+          });
+      } else if (file.type.startsWith('video/')) {
+        fileToDataURL(file)
+          .then(dataUrl => {
+            const itemToStore = { dataUrl, name: file.name, type: file.type };
+            const itemString = JSON.stringify(itemToStore);
+            const itemLength = itemString.length;
+
+            if (itemLength < MAX_LOCAL_STORAGE_ITEM_LENGTH) {
+              localStorage.setItem(EDIT_TRAVEL_INPUT_FILE_KEY, itemString);
+              toast.info(`Video (~${(itemLength / (1024*1024)).toFixed(1)}MB) selected and saved locally. It should persist.`);
+            } else {
+              localStorage.removeItem(EDIT_TRAVEL_INPUT_FILE_KEY);
+              toast.info(`Video is too large (~${(itemLength / (1024*1024)).toFixed(1)}MB) to be saved locally and won't persist.`);
+            }
+          })
+          .catch(error => {
+            console.error("Error processing video for localStorage:", error);
+            toast.error("Could not process video for local saving.");
+            localStorage.removeItem(EDIT_TRAVEL_INPUT_FILE_KEY);
+          });
+      }
+    } else {
+      localStorage.removeItem(EDIT_TRAVEL_INPUT_FILE_KEY);
+    }
   };
 
   const handleFileRemove = () => { 
@@ -354,10 +396,35 @@ const EditTravelToolPage = () => {
 
   const handleSavePrompts = (updatedPrompts: PromptEntry[]) => {
     setPrompts(updatedPrompts);
+    // Persist to localStorage on explicit save from the modal
+    try {
+        const promptsString = JSON.stringify(updatedPrompts);
+        if (promptsString.length < MAX_LOCAL_STORAGE_ITEM_LENGTH) {
+            localStorage.setItem(EDIT_TRAVEL_PROMPTS_KEY, promptsString);
+        } else {
+            toast.info("Prompts are too large to be saved locally and won't persist.");
+        }
+    } catch (error) {
+        console.error("Error saving prompts to localStorage from modal save:", error);
+        toast.error("Could not save prompts locally.");
+    }
   };
   
   const handleAutoSavePrompts = (updatedPrompts: PromptEntry[]) => {
     setPrompts(updatedPrompts);
+    // Also persist to localStorage on auto-save from the modal
+    try {
+        const promptsString = JSON.stringify(updatedPrompts);
+        if (promptsString.length < MAX_LOCAL_STORAGE_ITEM_LENGTH) {
+            localStorage.setItem(EDIT_TRAVEL_PROMPTS_KEY, promptsString);
+        } else {
+            toast.info("Prompts are too large to be saved locally and may not persist fully.");
+            // Potentially save a truncated version or handle differently
+        }
+    } catch (error) {
+        console.error("Error auto-saving prompts to localStorage:", error);
+        toast.error("Could not auto-save prompts locally.");
+    }
   };
 
   useEffect(() => {
@@ -434,51 +501,6 @@ const EditTravelToolPage = () => {
     return undefined;
   }, [reconstructVideo]);
   
-  useEffect(() => {
-    if (inputFile) {
-      if (inputFile.type.startsWith('image/')) {
-        fileToDataURL(inputFile)
-          .then(dataUrl => {
-            const itemToStore = { dataUrl, name: inputFile.name, type: inputFile.type };
-            const itemString = JSON.stringify(itemToStore);
-            if (itemString.length < MAX_LOCAL_STORAGE_ITEM_LENGTH) {
-              localStorage.setItem(EDIT_TRAVEL_INPUT_FILE_KEY, itemString);
-            } else {
-              localStorage.removeItem(EDIT_TRAVEL_INPUT_FILE_KEY);
-              toast.info(`Image is too large (~${(itemString.length / (1024*1024)).toFixed(1)}MB) to be saved locally and won't persist.`);
-            }
-          })
-          .catch(error => {
-            console.error("Error saving input image to localStorage:", error);
-            toast.error("Could not save input image locally.");
-            localStorage.removeItem(EDIT_TRAVEL_INPUT_FILE_KEY);
-          });
-      } else if (inputFile.type.startsWith('video/')) {
-        fileToDataURL(inputFile)
-          .then(dataUrl => {
-            const itemToStore = { dataUrl, name: inputFile.name, type: inputFile.type };
-            const itemString = JSON.stringify(itemToStore);
-            const itemLength = itemString.length;
-
-            if (itemLength < MAX_LOCAL_STORAGE_ITEM_LENGTH) {
-              localStorage.setItem(EDIT_TRAVEL_INPUT_FILE_KEY, itemString);
-              toast.info(`Video (~${(itemLength / (1024*1024)).toFixed(1)}MB) selected and saved locally. It should persist.`);
-            } else {
-              localStorage.removeItem(EDIT_TRAVEL_INPUT_FILE_KEY);
-              toast.info(`Video is too large (~${(itemLength / (1024*1024)).toFixed(1)}MB) to be saved locally and won't persist.`);
-            }
-          })
-          .catch(error => {
-            console.error("Error processing video for localStorage:", error);
-            toast.error("Could not process video for local saving.");
-            localStorage.removeItem(EDIT_TRAVEL_INPUT_FILE_KEY);
-          });
-      }
-    } else {
-      localStorage.removeItem(EDIT_TRAVEL_INPUT_FILE_KEY);
-    }
-  }, [inputFile]);
-
   const handleGenerate = async () => {
     if (!selectedProjectId) {
       toast.error("No project selected. Please select a project first.");
