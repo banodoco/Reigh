@@ -17,12 +17,20 @@ const buttonVariants = cva(
           "bg-secondary text-secondary-foreground hover:bg-secondary/80",
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
+        // Wes Anderson-inspired variants
+        wes: "wes-button bg-gradient-to-r from-primary to-primary/90 text-primary-foreground hover:from-primary/90 hover:to-primary shadow-wes hover:shadow-wes-hover border-2 border-primary/20",
+        "wes-ghost": "wes-nav-item bg-transparent border-2 border-transparent hover:border-primary/20 hover:bg-accent/30",
+        "wes-outline": "border-2 border-primary/30 bg-white/80 hover:bg-accent/20 hover:border-primary/50 text-primary font-inter tracking-wide transition-all duration-300",
+        "wes-soft": "bg-gradient-to-br from-wes-pink to-wes-lavender border-2 border-primary/10 text-primary hover:from-wes-pink-dark hover:to-wes-lavender-dark shadow-wes hover:shadow-wes-hover",
       },
       size: {
         default: "h-10 px-4 py-2",
         sm: "h-9 rounded-md px-3",
         lg: "h-11 rounded-md px-8",
         icon: "h-10 w-10",
+        "wes-sm": "h-9 px-6 py-2 rounded-lg font-inter tracking-wide",
+        "wes-default": "h-11 px-8 py-3 rounded-xl font-inter tracking-wide",
+        "wes-lg": "h-14 px-12 py-4 rounded-2xl font-inter font-medium tracking-wider",
       },
     },
     defaultVariants: {
