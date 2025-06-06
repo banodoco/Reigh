@@ -174,7 +174,8 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
       if (typeof settingsToApply.batchVideoSteps === 'number') onBatchVideoStepsChange(settingsToApply.batchVideoSteps);
       if (settingsToApply.steerableMotionSettings) onSteerableMotionSettingsChange(settingsToApply.steerableMotionSettings);
     }
-  }, [selectedShot?.id, onVideoControlModeChange, onBatchVideoPromptChange, onBatchVideoFramesChange, onBatchVideoContextChange, onBatchVideoStepsChange, onSteerableMotionSettingsChange]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedShot?.id]);
 
   const settingsToSave = useMemo(() => ({
     videoControlMode,
@@ -201,11 +202,12 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
     const handler = setTimeout(() => {
       try {
         const settingsJson = JSON.stringify(settingsToSave);
-        localStorage.setItem(`videoEditSettings-${selectedShot.id}`, settingsJson);
-      } catch (error) {
-        console.error('Error saving settings', error);
+        localStorage.setItem(`shot-settings-${shotId}`, settingsJson);
+        localStorage.setItem('last-edited-shot-id', shotId);
+      } catch (e) {
+        console.error("[VideoEditLayout] Failed to save shot settings to localStorage", e);
       }
-    }, 400);
+    }, 400); // Save after 400ms of inactivity
 
     return () => {
       clearTimeout(handler);
