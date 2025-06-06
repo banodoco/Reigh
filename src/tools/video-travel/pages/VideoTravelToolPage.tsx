@@ -74,9 +74,9 @@ const VideoTravelToolPage: React.FC = () => {
   const [videoPairConfigs, setVideoPairConfigs] = useState<any[]>([]); // Changed to any[] for now for setVideoPairConfigs type
   const [videoControlMode, setVideoControlMode] = useState<'individual' | 'batch'>('batch');
   const [batchVideoPrompt, setBatchVideoPrompt] = useState("");
-  const [batchVideoFrames, setBatchVideoFrames] = useState(65);
+  const [batchVideoFrames, setBatchVideoFrames] = useState(81);
   const [batchVideoContext, setBatchVideoContext] = useState(16);
-  const [batchVideoSteps, setBatchVideoSteps] = useState(4);
+  const [batchVideoSteps, setBatchVideoSteps] = useState(9);
 
   const [steerableMotionSettings, setSteerableMotionSettings] = useState({
     negative_prompt: '',
@@ -87,7 +87,7 @@ const VideoTravelToolPage: React.FC = () => {
     fade_in_duration: '{"low_point":0.0,"high_point":0.8,"curve_type":"ease_in_out","duration_factor":0.0}',
     fade_out_duration: '{"low_point":0.0,"high_point":0.8,"curve_type":"ease_in_out","duration_factor":0.0}',
     after_first_post_generation_saturation: 0.75,
-    after_first_post_generation_brightness: -0.3,
+    after_first_post_generation_brightness: 0.0,
   });
 
   const handleSteerableMotionSettingsChange = (newSettings: Partial<typeof steerableMotionSettings>) => {
