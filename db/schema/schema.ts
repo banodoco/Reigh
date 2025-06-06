@@ -1,24 +1,28 @@
 // Temporarily empty schema for Drizzle Kit to initialize the migrations folder.
 
-import { pgTable, uuid, text, jsonb, timestamp, integer } from 'drizzle-orm/pg-core';
+import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
 import { relations, sql } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
-import { taskStatusEnum } from './enums';
 
-// --- Canonical Schema ---
+// --- ENUMS (simulated for SQLite) ---
+// Note: Drizzle ORM's `sqlite-core` does not have a native enum type like `pg-core`.
+// We'll use `text` and can enforce values at the application level.
+export const taskStatusEnum = ['Pending', 'In Progress', 'Complete', 'Failed', 'Cancelled'];
 
-export const users = pgTable('users', {
-  id: uuid('id').primaryKey(), // Assuming user_id comes from an auth provider like Supabase Auth
-  // Additional user columns (e.g., email, name) can be added here as needed.
-  // For now, it's minimal as per the doc.
+// --- Canonical Schema for SQLite ---
+
+export const users = sqliteTable('users', {
+  id: text('id').primaryKey(),
+  name: text('name'),
+  email: text('email'),
 });
 
-export const projects = pgTable('projects', {
-  id: uuid('id').$defaultFn(() => randomUUID()).primaryKey(),
+export const projects = sqliteTable('projects', {
+  id: text('id').$defaultFn(() => randomUUID()).primaryKey(),
   name: text('name').notNull(),
-  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   aspectRatio: text('aspect_ratio'),
-  createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).$defaultFn(() => new Date()).notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
 });
 
 // Type for updating projects, allowing optional fields
@@ -27,41 +31,41 @@ export type ProjectUpdate = {
   aspectRatio?: string;
 };
 
-export const tasks = pgTable('tasks', {
-  id: uuid('id').$defaultFn(() => randomUUID()).primaryKey(),
+export const tasks = sqliteTable('tasks', {
+  id: text('id').$defaultFn(() => randomUUID()).primaryKey(),
   taskType: text('task_type').notNull(),
-  params: jsonb('params').notNull(),
-  status: taskStatusEnum('status').default('Pending').notNull(),
-  dependantOn: uuid('dependant_on').array(),
+  params: text('params', { mode: 'json' }).notNull(),
+  status: text('status').default('Pending').notNull(),
+  dependantOn: text('dependant_on', { mode: 'json' }), // Storing array as JSON string
   outputLocation: text('output_location'),
-  createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).$defaultFn(() => new Date()).notNull(),
-  updatedAt: timestamp('updated_at', { mode: 'date', withTimezone: true }).$onUpdate(() => new Date()),
-  projectId: uuid('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
-  generationProcessedAt: timestamp('generation_processed_at', { mode: 'date', withTimezone: true }),
+  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }), // No $onUpdate in SQLite
+  projectId: text('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+  generationProcessedAt: integer('generation_processed_at', { mode: 'timestamp' }),
 });
 
-export const generations = pgTable('generations', {
-  id: uuid('id').$defaultFn(() => randomUUID()).primaryKey(),
-  tasks: uuid('tasks').array(),
+export const generations = sqliteTable('generations', {
+  id: text('id').$defaultFn(() => randomUUID()).primaryKey(),
+  tasks: text('tasks', { mode: 'json' }), // Storing array as JSON string
   location: text('location'),
-  type: text('type'), // "type" is a reserved keyword in SQL, Drizzle handles quoting
-  createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).$defaultFn(() => new Date()).notNull(),
-  updatedAt: timestamp('updated_at', { mode: 'date', withTimezone: true }).$onUpdate(() => new Date()),
-  projectId: uuid('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+  type: text('type'),
+  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }),
+  projectId: text('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
 });
 
-export const shots = pgTable('shots', {
-  id: uuid('id').$defaultFn(() => randomUUID()).primaryKey(),
+export const shots = sqliteTable('shots', {
+  id: text('id').$defaultFn(() => randomUUID()).primaryKey(),
   name: text('name').notNull(),
-  createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).$defaultFn(() => new Date()).notNull(),
-  updatedAt: timestamp('updated_at', { mode: 'date', withTimezone: true }).$onUpdate(() => new Date()),
-  projectId: uuid('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }),
+  projectId: text('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
 });
 
-export const shotGenerations = pgTable('shot_generations', {
-  id: uuid('id').$defaultFn(() => randomUUID()).primaryKey(),
-  shotId: uuid('shot_id').notNull().references(() => shots.id, { onDelete: 'cascade' }),
-  generationId: uuid('generation_id').notNull().references(() => generations.id, { onDelete: 'cascade' }),
+export const shotGenerations = sqliteTable('shot_generations', {
+  id: text('id').$defaultFn(() => randomUUID()).primaryKey(),
+  shotId: text('shot_id').notNull().references(() => shots.id, { onDelete: 'cascade' }),
+  generationId: text('generation_id').notNull().references(() => generations.id, { onDelete: 'cascade' }),
   position: integer('position').default(0).notNull(),
 });
 
