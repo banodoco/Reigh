@@ -27,6 +27,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/shared/components/ui/pagination";
+import { Skeleton } from '@/shared/components/ui/skeleton';
 
 // Local definition for Json type to remove dependency on supabase client types
 export type Json =
@@ -438,19 +439,30 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {animatedVideoOutputs.map((video) => (
-                <div key={video.id} className="animate-in fade-in duration-500">
-                  <VideoOutputItem
-                    video={video}
-                    onDoubleClick={() => {
-                      const originalIndex = videoOutputs.findIndex(v => v.id === video.id);
-                      setLightboxIndex(originalIndex);
-                    }}
-                    onDelete={handleDeleteVideoOutput}
-                    isDeleting={deletingVideoId === video.id}
-                  />
-                </div>
-              ))}
+              {paginatedVideos.map((video) => {
+                const isVisible = animatedVideoOutputs.some(v => v.id === video.id);
+                if (!isVisible) {
+                  return (
+                    <Skeleton
+                      key={video.id}
+                      className="w-full aspect-video rounded-lg bg-muted/40"
+                    />
+                  );
+                }
+                return (
+                  <div key={video.id} className="animate-in fade-in zoom-in-95 duration-500 ease-out">
+                    <VideoOutputItem
+                      video={video}
+                      onDoubleClick={() => {
+                        const originalIndex = videoOutputs.findIndex(v => v.id === video.id);
+                        setLightboxIndex(originalIndex);
+                      }}
+                      onDelete={handleDeleteVideoOutput}
+                      isDeleting={deletingVideoId === video.id}
+                    />
+                  </div>
+                );
+              })}
             </div>
             {pageCount > 1 && (
               <Pagination className="mt-8">

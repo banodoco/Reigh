@@ -197,6 +197,7 @@ To change which tools appear for a specific environment, you need to modify the 
 • **`ProjectSettingsModal.tsx`**: A dialog component that allows users to update the name and aspect ratio of an existing project. Uses `ProjectContext.updateProject`.
 • **`FileInput.tsx`**: Reusable component for file input (image/video) with drag-and-drop and preview.
 • **`ShotImageManager.tsx`**: Reusable component for displaying and managing a list of images within a shot. Handles drag-and-drop reordering and deletion of images via callbacks. Used by `VideoEditLayout.tsx` and `ShotsPage.tsx`.
+• **`HoverScrubVideo.tsx`**: Self-contained wrapper around the `useVideoScrubbing` hook that provides hover-to-play, variable-speed scrubbing, progress-bar seeking, and playback-rate overlay. Now reused by `VideoOutputItem` and `VideoLightbox` to avoid duplicate logic.
 • **`TasksPane/`**:
     – `TasksPane.tsx`: Slide-out panel from the right, activated on hover or can be locked open. Displays a list of tasks. Communicates lock state to parent layout for content adjustment.
     – `TaskList.tsx`: Component within `TasksPane` that lists tasks, allows filtering by status, and refreshing the list. Uses `TaskItem`.
