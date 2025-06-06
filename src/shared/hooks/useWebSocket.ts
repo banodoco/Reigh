@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
-const WS_URL = `ws://${window.location.hostname}:8085`;
+const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+const WS_URL = `${protocol}//${window.location.hostname}:8085`;
 
 export function useWebSocket() {
   const queryClient = useQueryClient();
@@ -55,7 +56,7 @@ export function useWebSocket() {
     };
 
     ws.current.onclose = () => {
-      console.log('[WebSocket] Disconnected from server');
+      console.log(`[WebSocket] Disconnected from ${WS_URL}`);
       ws.current = null;
     };
 
