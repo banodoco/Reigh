@@ -1,167 +1,78 @@
-import React, { useState, useEffect } from 'react';
-import { Shot, GenerationRow } from '../../../types/shots'; // Corrected import path
-import { useUpdateShotName, useDeleteShot } from '../../../shared/hooks/useShots'; // Import new hooks
-import { Input } from '@/shared/components/ui/input';
+import React from 'react';
+import { Shot, GenerationRow } from '../../../types/shots';
+import { useDeleteShot } from '../../../shared/hooks/useShots';
 import { Button } from '@/shared/components/ui/button';
-import { Pencil, Trash2, Check, X } from 'lucide-react'; // Icons
+import { Trash2, Play } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface VideoShotDisplayProps {
   shot: Shot;
   onSelectShot: (shotId: string) => void;
-  currentProjectId: string | null; // Needed for mutations
+  currentProjectId: string | null;
 }
 
 const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot, currentProjectId }) => {
-  const [isEditingName, setIsEditingName] = useState(false);
-  const [editableName, setEditableName] = useState(shot.name);
-
-  const updateShotNameMutation = useUpdateShotName();
   const deleteShotMutation = useDeleteShot();
 
-  useEffect(() => {
-    setEditableName(shot.name); // Reset editable name if shot prop changes
-  }, [shot.name]);
-
-  const handleNameEditToggle = () => {
-    if (isEditingName) {
-      // If was editing and toggling off without saving via button, consider it a cancel
-      setEditableName(shot.name); // Reset to original name
-    }
-    setIsEditingName(!isEditingName);
-  };
-
-  const handleSaveName = async () => {
-    if (!currentProjectId) {
-      toast.error('Cannot update shot: Project ID is missing.');
-      return;
-    }
-    if (editableName.trim() === '') {
-      toast.error('Shot name cannot be empty.');
-      setEditableName(shot.name); // Reset to original if submitted empty
-      setIsEditingName(false);
-      return;
-    }
-    if (editableName.trim() === shot.name) {
-      setIsEditingName(false); // No change, just exit edit mode
-      return;
-    }
-
-    try {
-      await updateShotNameMutation.mutateAsync(
-        { shotId: shot.id, newName: editableName.trim(), projectId: currentProjectId }, // Pass projectId
-        {
-          onSuccess: () => {
-            toast.success(`Shot "${editableName.trim()}" updated.`);
-            // Optimistic update already handles UI, or rely on query invalidation
-          },
-          onError: (error) => {
-            toast.error(`Failed to update shot: ${error.message}`);
-            setEditableName(shot.name); // Revert on error
-          },
-        }
-      );
-    } finally {
-      setIsEditingName(false);
-    }
-  };
-
-  const handleDeleteShot = async () => {
+  const handleDeleteShot = async (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent card click event
     if (!currentProjectId) {
       toast.error('Cannot delete shot: Project ID is missing.');
       return;
     }
-    // Simple confirm, can be replaced with a nicer modal
     if (window.confirm(`Are you sure you want to delete shot "${shot.name}"?`)) {
       try {
         await deleteShotMutation.mutateAsync(
-          { shotId: shot.id, projectId: currentProjectId }, // Pass projectId
+          { shotId: shot.id, projectId: currentProjectId },
           {
-            onSuccess: () => {
-              toast.success(`Shot "${shot.name}" deleted.`);
-              // Optimistic update or query invalidation handles UI removal
-            },
-            onError: (error) => {
-              toast.error(`Failed to delete shot: ${error.message}`);
-            },
+            onSuccess: () => toast.success(`Shot "${shot.name}" deleted.`),
+            onError: (error) => toast.error(`Failed to delete shot: ${error.message}`),
           }
         );
       } catch (error) {
-        // This catch is likely redundant if mutation's onError is used, but good for safety
         console.error("Error during deleteShotMutation call:", error);
       }
     }
   };
 
-  const imagesToShow: GenerationRow[] = shot.images?.slice(0, 5) || [];
+  const imagesToShow: GenerationRow[] = shot.images?.slice(0, 3) || [];
 
   return (
-    <div 
-      key={shot.id} 
-      className="mb-6 p-4 border rounded-lg hover:shadow-lg transition-shadow duration-200 relative"
-      // onClick={() => onSelectShot(shot.id)} // Make the whole card clickable except controls
-    >
-      <div className="flex justify-between items-start mb-3">
-        {isEditingName ? (
-          <div className="flex items-center gap-2 flex-grow">
-            <Input 
-              value={editableName}
-              onChange={(e) => setEditableName(e.target.value)}
-              onBlur={handleSaveName} // Save on blur
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleSaveName();
-                if (e.key === 'Escape') {
-                  setEditableName(shot.name);
-                  setIsEditingName(false);
-                }
-              }}
-              className="text-xl font-medium h-9"
-              autoFocus
-            />
-            <Button variant="ghost" size="icon" onClick={handleSaveName} className="h-9 w-9">
-              <Check className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" onClick={handleNameEditToggle} className="h-9 w-9">
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        ) : (
-          <h3 
-            className="text-xl font-medium cursor-pointer hover:text-primary flex-grow mr-2"
-            onClick={() => onSelectShot(shot.id)} // Make name clickable to select shot
+    <div className="space-y-4">
+      <h3 className="text-2xl font-playfair text-art-voyage-text">{shot.name}</h3>
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+        {imagesToShow.map((image, index) => (
+          <div 
+            key={image.shotImageEntryId || `img-${index}`} 
+            className="art-voyage-card cursor-pointer"
+            onClick={() => onSelectShot(shot.id)}
           >
-            {shot.name}
-          </h3>
-        )}
-        <div className="flex items-center space-x-1 flex-shrink-0">
-          {!isEditingName && (
-             <Button variant="ghost" size="icon" onClick={handleNameEditToggle} className="h-8 w-8">
-                <Pencil className="h-4 w-4" />
-            </Button>
-          )}
-          <Button variant="ghost" size="icon" onClick={handleDeleteShot} className="text-destructive hover:text-destructive-foreground hover:bg-destructive h-8 w-8">
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-      
-      <div className="flex space-x-2 overflow-x-auto pb-2 cursor-pointer" onClick={() => onSelectShot(shot.id)}>
-        {imagesToShow.length > 0 ? (
-          imagesToShow.map((image, index) => (
-            <div key={image.shotImageEntryId || `img-${index}`} className="flex-shrink-0 w-32 h-32 rounded overflow-hidden border">
+            <div className="relative card-content">
               <img 
                 src={image.thumbUrl || image.imageUrl || '/placeholder.svg'} 
                 alt={`Shot image ${index + 1} for ${shot.name}`}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover rounded-sm"
               />
+              <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                <Play className="w-8 h-8 text-white" />
+              </div>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={handleDeleteShot} 
+                className="art-voyage-icon-button"
+              >
+                <Trash2 />
+              </Button>
             </div>
-          ))
-        ) : (
-          <p className="text-sm text-muted-foreground italic">No images in this shot yet.</p>
-        )}
-        {shot.images && shot.images.length > 5 && (
-          <div className="flex-shrink-0 w-32 h-32 rounded border bg-muted flex items-center justify-center">
-            <p className="text-sm text-muted-foreground text-center">+{shot.images.length - 5} more</p>
+          </div>
+        ))}
+        {shot.images && shot.images.length > 3 && (
+          <div className="art-voyage-card flex items-center justify-center">
+             <div className="card-content text-center">
+                <p className="text-lg text-art-voyage-text">+{shot.images.length - 3}</p>
+                <p className="text-sm text-muted-foreground">more</p>
+             </div>
           </div>
         )}
       </div>

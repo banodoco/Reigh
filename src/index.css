@@ -93,6 +93,26 @@
     --sidebar-border: 345 25% 25%;
     --sidebar-ring: var(--wes-pink);
   }
+
+  .art-voyage-theme {
+    --background: 37 44% 95%; /* Corresponds to #F8F3E9 */
+    --foreground: 0 28% 24%; /* Corresponds to #4D2D2D */
+    --primary: 0 42% 39%; /* Corresponds to #8C3B3B */
+    --primary-foreground: 37 44% 95%;
+    --accent: 37 36% 51%; /* Corresponds to #B08D57 */
+    --accent-foreground: 0 28% 24%;
+    --border: 37 36% 63%; /* Corresponds to #D4C0A1 */
+    --card: 37 44% 97%;
+    --card-foreground: 0 28% 24%;
+  }
+
+  .art-voyage-theme body {
+    @apply bg-art-voyage-background text-art-voyage-text font-serif;
+  }
+  
+  .art-voyage-theme h1, .art-voyage-theme h2, .art-voyage-theme h3 {
+    @apply font-playfair;
+  }
 }
 
 @layer base {
@@ -739,6 +759,37 @@
     background: 
       radial-gradient(circle at 4px 4px, hsl(var(--primary) / 0.3) 2px, transparent 2px);
     background-size: 8px 8px;
+  }
+
+  .art-voyage-card {
+    @apply bg-art-voyage-background p-1.5 rounded-lg shadow-lg relative;
+    border: 1px solid hsl(var(--border));
+  }
+  .art-voyage-card::before {
+    content: '';
+    @apply absolute inset-1.5 rounded-md;
+    border: 2px solid hsl(var(--border));
+  }
+  .art-voyage-card .card-content {
+    @apply p-2;
+  }
+
+  .art-voyage-button {
+    @apply bg-art-voyage-primary text-white font-serif rounded-lg px-8 py-3 transition-all duration-300;
+    box-shadow: inset 0 -2px 4px rgba(0,0,0,0.2), 0 2px 4px rgba(0,0,0,0.1);
+  }
+  .art-voyage-button:hover {
+    @apply bg-red-900;
+    box-shadow: inset 0 -3px 6px rgba(0,0,0,0.25), 0 4px 8px rgba(0,0,0,0.15);
+  }
+
+  .art-voyage-icon-button {
+    @apply absolute top-2 right-2 bg-art-voyage-background rounded-bl-lg rounded-tr-sm p-1.5 z-10;
+    border-left: 1px solid hsl(var(--border));
+    border-bottom: 1px solid hsl(var(--border));
+  }
+  .art-voyage-icon-button svg {
+    @apply w-4 h-4 text-art-voyage-primary;
   }
 }
 
