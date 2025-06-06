@@ -14,7 +14,7 @@ import ShotImageManager from '@/shared/components/ShotImageManager';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/components/ui/collapsible";
 import { Switch } from "@/shared/components/ui/switch";
 import { Input } from "@/shared/components/ui/input";
-import { ChevronsUpDown } from 'lucide-react';
+import { ChevronsUpDown, Info } from 'lucide-react';
 import VideoLightbox from "./VideoLightbox.tsx";
 import { VideoOutputItem } from './VideoOutputItem';
 import { arrayMove } from '@dnd-kit/sortable';
@@ -848,11 +848,14 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
           <div className="p-4 border rounded-lg bg-card shadow-md space-y-4">
             <h3 className="text-lg font-semibold">Batch Generation Settings</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="batchVideoPrompt" className="text-sm font-medium block mb-1.5">
-                  Prompt
-                  <span title="This prompt will be applied to every video. These are very sensitive and will impact things a lot." className="ml-1 text-muted-foreground cursor-help">ℹ️</span>
-                </Label>
+              <div className="relative">
+                <Label htmlFor="batchVideoPrompt" className="text-sm font-medium block mb-1.5">Prompt</Label>
+                <span 
+                  title="This prompt will be applied to every video. These are very sensitive and will impact things a lot." 
+                  className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors"
+                >
+                  <Info className="h-4 w-4" />
+                </span>
                 <Textarea 
                   id="batchVideoPrompt"
                   value={batchVideoPrompt}
@@ -862,11 +865,14 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
                   rows={3}
                 />
               </div>
-              <div>
-                <Label htmlFor="negative_prompt" className="text-sm font-medium block mb-1.5">
-                  Negative Prompt
-                  <span title="This will be applied to every video to tell it what to avoid." className="ml-1 text-muted-foreground cursor-help">ℹ️</span>
-                </Label>
+              <div className="relative">
+                <Label htmlFor="negative_prompt" className="text-sm font-medium block mb-1.5">Negative Prompt</Label>
+                <span 
+                  title="This will be applied to every video to tell it what to avoid." 
+                  className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors"
+                >
+                  <Info className="h-4 w-4" />
+                </span>
                 <Textarea
                   id="negative_prompt"
                   value={steerableMotionSettings.negative_prompt}
@@ -878,11 +884,14 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="batchVideoFrames" className="text-sm font-medium block mb-1">
-                  Frames per Image: {batchVideoFrames}
-                  <span title="Number of frames to have per image." className="ml-1 text-muted-foreground cursor-help">ℹ️</span>
-                </Label>
+              <div className="relative">
+                <Label htmlFor="batchVideoFrames" className="text-sm font-medium block mb-1">Frames per Image: {batchVideoFrames}</Label>
+                <span 
+                  title="Number of frames to have per image." 
+                  className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors"
+                >
+                  <Info className="h-4 w-4" />
+                </span>
                 <Slider
                   id="batchVideoFrames"
                   min={10}
@@ -899,11 +908,14 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
                   className="mt-2"
                 />
               </div>
-              <div>
-                <Label htmlFor="batchVideoContext" className="text-sm font-medium block mb-1">
-                  Number of Context Frames: {batchVideoContext}
-                  <span title="Number of frames in the previous video to provide us context to the next one." className="ml-1 text-muted-foreground cursor-help">ℹ️</span>
-                </Label>
+              <div className="relative">
+                <Label htmlFor="batchVideoContext" className="text-sm font-medium block mb-1">Number of Context Frames: {batchVideoContext}</Label>
+                <span 
+                  title="Number of frames in the previous video to provide us context to the next one." 
+                  className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors"
+                >
+                  <Info className="h-4 w-4" />
+                </span>
                 <Slider
                   id="batchVideoContext"
                   min={0}
@@ -914,11 +926,14 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
                 />
               </div>
             </div>
-            <div>
-              <Label htmlFor="batchVideoSteps" className="text-sm font-medium block mb-1">
-                Generation Steps: {batchVideoSteps}
-                <span title="Amount of time to spend processing the generations; more steps generally means more quality." className="ml-1 text-muted-foreground cursor-help">ℹ️</span>
-              </Label>
+            <div className="relative">
+              <Label htmlFor="batchVideoSteps" className="text-sm font-medium block mb-1">Generation Steps: {batchVideoSteps}</Label>
+              <span 
+                title="Amount of time to spend processing the generations; more steps generally means more quality." 
+                className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors"
+              >
+                <Info className="h-4 w-4" />
+              </span>
               <Slider
                 id="batchVideoSteps"
                 min={1}
