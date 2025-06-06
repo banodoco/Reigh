@@ -233,6 +233,7 @@ To change which tools appear for a specific environment, you need to modify the 
 • **`imageUploader.ts`**: Uploads files to Supabase storage.
 • **`utils.ts`**: General utility functions.
 • **`imageCropper.ts`**: Crops uploaded images to supported aspect ratios.
+• **`aspectRatios.ts`**: Centralized mapping of aspect ratio strings (e.g., "16:9") to specific pixel resolutions (e.g., "902x508"). This file is the single source of truth for dimensions used in project creation, project settings, and server-side video generation, ensuring consistency across the application. It also includes helper functions for parsing ratios and finding the closest standard ratio to a given dimension.
 
 ### 3.5 Integrations (`src/integrations/`)
 • **`supabase/`**:

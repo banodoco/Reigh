@@ -29,6 +29,14 @@ import {
 } from "@/shared/components/ui/pagination";
 import { Skeleton } from '@/shared/components/ui/skeleton';
 import { RadioGroup, RadioGroupItem } from "@/shared/components/ui/radio-group";
+import { ASPECT_RATIO_TO_RESOLUTION } from '@/shared/lib/aspectRatios';
+
+// Add the missing type definition
+export interface SegmentGenerationParams {
+  prompts: string[];
+  frames: number[];
+  context: number[];
+}
 
 // Local definition for Json type to remove dependency on supabase client types
 export type Json =
@@ -102,19 +110,11 @@ interface VideoEditLayoutProps {
   onCustomWidthChange: (v: number | undefined) => void;
   customHeight?: number;
   onCustomHeightChange: (v: number | undefined) => void;
-  // Add any other necessary props, e.g., for generating videos
+  onGenerateAllSegments: (shot: Shot, segmentParams: SegmentGenerationParams, dimensionInfo: any) => void;
 }
 
 const baseUrl = import.meta.env.VITE_API_TARGET_URL || '';
 
-// Copied from src/server/routes/steerableMotion.ts
-const ASPECT_RATIO_TO_RESOLUTION: { [key: string]: string } = {
-  'Square': '670x670',
-  '16:9': '902x508',
-  '9:16': '508x902',
-  '4:3': '768x576',
-  '3:4': '576x768',
-};
 const DEFAULT_RESOLUTION = '840x552';
 
 const getDimensions = (url: string): Promise<{ width: number; height: number }> => {
@@ -180,6 +180,7 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
   onCustomWidthChange,
   customHeight,
   onCustomHeightChange,
+  onGenerateAllSegments,
 }) => {
   const { selectedProjectId, projects } = useProject();
   const [isUploadingImage, setIsUploadingImage] = useState(false);

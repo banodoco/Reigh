@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { tasks as tasksSchema, projects as projectsSchema } from '../../../db/schema/schema';
 import { randomUUID } from 'crypto';
 import { eq } from 'drizzle-orm';
+import { ASPECT_RATIO_TO_RESOLUTION } from '@/shared/lib/aspectRatios';
 
 const router = express.Router() as any;
 
@@ -29,16 +30,8 @@ interface TravelRequestBody {
   main_output_dir_for_run?: string;
 }
 
-// Define aspect ratio to resolution mapping
-const ASPECT_RATIO_TO_RESOLUTION: { [key: string]: string } = {
-  'Square': '670x670',
-  '16:9': '902x508',
-  '9:16': '508x902',
-  '4:3': '768x576',
-  '3:4': '576x768',
-  // Add other common aspect ratios and their resolutions as needed
-};
-const DEFAULT_RESOLUTION = '840x552';
+// Set a default aspect ratio key, which will be used to look up the resolution.
+const DEFAULT_ASPECT_RATIO = '1:1';
 
 /**
  * POST /api/steerable-motion/travel-between-images
@@ -73,7 +66,7 @@ router.post('/travel-between-images', async (req: any, res: any) => {
     const orchestratorTaskId = `sm_travel_orchestrator_${runId.substring(2, 10)}_${randomUUID().slice(0, 6)}`;
 
     // Fetch project to get aspect ratio
-    let projectResolution = DEFAULT_RESOLUTION;
+    let projectResolution: string | undefined;
     if (body.project_id) {
       const projectsResult = await db
         .select({ aspectRatio: projectsSchema.aspectRatio })
@@ -83,14 +76,20 @@ router.post('/travel-between-images', async (req: any, res: any) => {
 
       if (projectsResult.length > 0 && projectsResult[0].aspectRatio) {
         const projectAspectRatio = projectsResult[0].aspectRatio;
-        projectResolution = ASPECT_RATIO_TO_RESOLUTION[projectAspectRatio] || DEFAULT_RESOLUTION;
+        projectResolution = ASPECT_RATIO_TO_RESOLUTION[projectAspectRatio];
         console.log(`[API /steerable-motion/travel-between-images] Project ${body.project_id} has aspect ratio: ${projectAspectRatio}, using resolution: ${projectResolution}`);
+        
+        if (!projectResolution) {
+            console.warn(`[API /steerable-motion/travel-between-images] Project aspect ratio "${projectAspectRatio}" not found in resolution map. Falling back to default.`);
+            projectResolution = ASPECT_RATIO_TO_RESOLUTION[DEFAULT_ASPECT_RATIO];
+        }
       } else {
-        console.log(`[API /steerable-motion/travel-between-images] Project ${body.project_id} not found or has no aspect ratio. Using default resolution: ${DEFAULT_RESOLUTION}`);
+        console.log(`[API /steerable-motion/travel-between-images] Project ${body.project_id} not found or has no aspect ratio. Using default resolution.`);
+        projectResolution = ASPECT_RATIO_TO_RESOLUTION[DEFAULT_ASPECT_RATIO];
       }
     } else {
       console.log('[API /steerable-motion/travel-between-images] No project_id provided in body. Using default resolution for safety, though project_id is required by validation.');
-      // This case should ideally not be hit due to prior validation, but included for robustness.
+      projectResolution = ASPECT_RATIO_TO_RESOLUTION[DEFAULT_ASPECT_RATIO];
     }
 
     const numSegments = body.image_urls ? body.image_urls.length - 1 : 0;

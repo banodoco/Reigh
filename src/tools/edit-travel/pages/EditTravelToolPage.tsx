@@ -22,10 +22,11 @@ import { Checkbox } from "@/shared/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/shared/components/ui/radio-group";
 import { useFalImageGeneration, FalImageGenerationParams, initializeGlobalFalClient as initializeHookFalClient } from "@/shared/hooks/useFalImageGeneration";
 import { Slider } from "@/shared/components/ui/slider";
-import { saveReconstructedVideo, reconstructVideoClientSide, extractAudio } from "@/shared/lib/videoReconstructionUtils"; // <-- MODIFIED IMPORT
-import { useProject } from "@/shared/contexts/ProjectContext"; // Import useProject
-import { uploadImageToStorage } from '@/shared/lib/imageUploader'; // For input file
-import { useQueryClient } from "@tanstack/react-query"; // <-- ADDED IMPORT
+import { saveReconstructedVideo, reconstructVideoClientSide, extractAudio } from "@/shared/lib/videoReconstructionUtils";
+import { useProject } from "@/shared/contexts/ProjectContext";
+import { uploadImageToStorage } from '@/shared/lib/imageUploader';
+import { useQueryClient } from "@tanstack/react-query";
+import { findClosestAspectRatio } from "@/shared/lib/aspectRatios";
 
 // Local definition for Json type to remove dependency on supabase client types
 export type Json =
@@ -36,14 +37,6 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[];
 
-// Helper function for aspect ratio calculation
-const gcd = (a: number, b: number): number => {
-  if (b === 0) {
-    return a;
-  }
-  return gcd(b, a % b);
-};
-
 const EDIT_TRAVEL_INPUT_FILE_KEY = 'editTravelInputFile';
 const EDIT_TRAVEL_PROMPTS_KEY = 'editTravelPrompts';
 const EDIT_TRAVEL_IMAGES_PER_PROMPT_KEY = 'editTravelImagesPerPrompt';
@@ -53,21 +46,6 @@ const MAX_LOCAL_STORAGE_ITEM_LENGTH = 4 * 1024 * 1024; // Approx 4MB in characte
 const EDIT_TRAVEL_FLUX_SOFT_EDGE_STRENGTH_KEY = 'editTravelFluxSoftEdgeStrength';
 const EDIT_TRAVEL_FLUX_DEPTH_STRENGTH_KEY = 'editTravelFluxDepthStrength';
 const EDIT_TRAVEL_RECONSTRUCT_VIDEO_KEY = 'editTravelReconstructVideo';
-
-const VALID_ASPECT_RATIOS = ["21:9", "16:9", "4:3", "3:2", "1:1", "2:3", "3:4", "9:16", "9:21"];
-
-// Helper function to parse "W:H" string to a numerical ratio W/H
-const parseRatio = (ratioStr: string): number => {
-  const parts = ratioStr.split(':');
-  if (parts.length === 2) {
-    const w = parseInt(parts[0], 10);
-    const h = parseInt(parts[1], 10);
-    if (!isNaN(w) && !isNaN(h) && h !== 0) {
-      return w / h;
-    }
-  }
-  return NaN; // Return NaN for invalid formats or division by zero
-};
 
 const EditTravelToolPage = () => {
   const [prompts, setPrompts] = useState<PromptEntry[]>([]);
@@ -225,10 +203,10 @@ const EditTravelToolPage = () => {
         const imageLoadUrl = URL.createObjectURL(inputFile);
         img.onload = () => {
           if (img.naturalWidth > 0 && img.naturalHeight > 0) {
-            const commonDivisor = gcd(img.naturalWidth, img.naturalHeight);
-            const newAspectRatio = `${img.naturalWidth / commonDivisor}:${img.naturalHeight / commonDivisor}`;
-            setAspectRatio(newAspectRatio);
-            console.log(`[EditTravelToolPage_AspectRatio] Image aspect ratio set to: ${newAspectRatio}`);
+            const numericalRatio = img.naturalWidth / img.naturalHeight;
+            const closestAspectRatio = findClosestAspectRatio(numericalRatio);
+            setAspectRatio(closestAspectRatio);
+            console.log(`[EditTravelToolPage_AspectRatio] Input image ratio is ${numericalRatio.toFixed(2)}. Closest standard aspect ratio set to: ${closestAspectRatio}`);
           } else {
             console.warn("[EditTravelToolPage_AspectRatio] Image loaded but dimensions are zero, using previous or default aspect ratio.");
           }
@@ -245,10 +223,10 @@ const EditTravelToolPage = () => {
         const videoLoadUrl = URL.createObjectURL(inputFile);
         video.onloadedmetadata = () => {
           if (video.videoWidth > 0 && video.videoHeight > 0) {
-            const commonDivisor = gcd(video.videoWidth, video.videoHeight);
-            const newAspectRatio = `${video.videoWidth / commonDivisor}:${video.videoHeight / commonDivisor}`;
-            setAspectRatio(newAspectRatio);
-            console.log(`[EditTravelToolPage_AspectRatio] Video aspect ratio set to: ${newAspectRatio}`);
+            const numericalRatio = video.videoWidth / video.videoHeight;
+            const closestAspectRatio = findClosestAspectRatio(numericalRatio);
+            setAspectRatio(closestAspectRatio);
+            console.log(`[EditTravelToolPage_AspectRatio] Input video ratio is ${numericalRatio.toFixed(2)}. Closest standard aspect ratio set to: ${closestAspectRatio}`);
             setVideoDuration(video.duration);
             console.log(`[EditTravelToolPage_VideoInfo] Video duration set to: ${video.duration}s`);
           } else {
@@ -586,8 +564,6 @@ const EditTravelToolPage = () => {
       };
     }
     
-    toast.info(`Creating '${generationMode}' generation task via API...`);
-
     try {
       const response = await fetch('/api/tasks', {
         method: 'POST',
@@ -607,8 +583,7 @@ const EditTravelToolPage = () => {
 
       const newTask = await response.json();
 
-      if (newTask && newTask.id) {
-        console.log(`[EditTravelToolPage] ${generationMode} task created via API:`, newTask);
+      if (newTask && newTask.id) {        
         toast.success(`${generationMode.charAt(0).toUpperCase() + generationMode.slice(1)} task created (ID: ${(newTask.id as string).substring(0,8)}...).`);
         if (showPlaceholders && activePrompts.length * imagesPerPrompt > 0) {
           setGeneratedImages([]);

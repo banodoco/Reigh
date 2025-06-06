@@ -20,17 +20,12 @@ import {
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { toast } from 'sonner';
 import { Project } from '@/types/project';
+import { ASPECT_RATIO_TO_RESOLUTION } from '@/shared/lib/aspectRatios';
 
-// Re-using or ensure this is accessible, e.g., from a shared constants file
-const ASPECT_RATIOS = [
-  { value: "16:9", label: "16:9 (Landscape)" },
-  { value: "1:1", label: "1:1 (Square)" },
-  { value: "4:3", label: "4:3 (Traditional TV)" },
-  { value: "3:4", label: "3:4 (Portrait)" },
-  { value: "3:2", label: "3:2 (Photography)" },
-  { value: "2:3", label: "2:3 (Portrait Photo)" },
-  { value: "9:16", label: "9:16 (Vertical Video)" },
-];
+// Create the aspect ratio options from the centralized object
+const ASPECT_RATIOS = Object.keys(ASPECT_RATIO_TO_RESOLUTION)
+    .filter(key => key !== 'Square') // Exclude 'Square' if '1:1' is preferred
+    .map(key => ({ value: key, label: key }));
 
 interface ProjectSettingsModalProps {
   isOpen: boolean;

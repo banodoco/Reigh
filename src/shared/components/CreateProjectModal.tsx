@@ -20,21 +20,16 @@ import {
 } from "@/shared/components/ui/select";
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { toast } from 'sonner';
+import { ASPECT_RATIO_TO_RESOLUTION } from '@/shared/lib/aspectRatios';
 
 interface CreateProjectModalProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
 }
 
-const ASPECT_RATIOS = [
-  { value: "16:9", label: "16:9 (Landscape)" },
-  { value: "1:1", label: "1:1 (Square)" },
-  { value: "4:3", label: "4:3 (Traditional TV)" },
-  { value: "3:4", label: "3:4 (Portrait)" },
-  { value: "3:2", label: "3:2 (Photography)" },
-  { value: "2:3", label: "2:3 (Portrait Photo)" },
-  { value: "9:16", label: "9:16 (Vertical Video)" },
-];
+const ASPECT_RATIOS = Object.keys(ASPECT_RATIO_TO_RESOLUTION)
+    .filter(key => key !== 'Square')
+    .map(key => ({ value: key, label: key }));
 
 export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, onOpenChange }) => {
   const [projectName, setProjectName] = useState('');
