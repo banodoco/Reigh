@@ -198,10 +198,6 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
     return videoOutputs.slice(startIndex, endIndex);
   }, [videoOutputs, currentPage]);
 
-  const paginatedVideoIds = useMemo(() => {
-    return JSON.stringify(paginatedVideos.map(v => v.id));
-  }, [paginatedVideos]);
-
   useEffect(() => {
     // This effect handles the sequential fade-in of video items.
     // When the list of videos changes, it resets and re-runs the animation.
@@ -217,7 +213,7 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
     return () => {
         timeouts.forEach(clearTimeout);
     };
-  }, [paginatedVideoIds]);
+  }, [paginatedVideos]);
 
   useEffect(() => {
     setManagedImages((orderedShotImages || []).filter(gen => !isGenerationVideo(gen)));
@@ -261,27 +257,34 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
 
     const newOrder = arrayMove(managedImages, oldIndex, newIndex);
     setManagedImages(newOrder); // Optimistically update local UI
-
+    
     if (!selectedProjectId || !selectedShot || !selectedShot.id) {
       toast.error("Cannot reorder images: Project or Shot ID is missing.");
       setManagedImages(orderedShotImages || []); // Revert to prop order on error
       return;
     }
+    
+    // Build full ordering by merging the reordered non-video images with the unchanged video outputs
+    const newNonVideoIds = newOrder.map(img => img.id);
+    let nonVideoIndex = 0;
+    const fullOrderedGenerationIds = orderedShotImages.map(item => {
+      if (!isGenerationVideo(item)) {
+        return newNonVideoIds[nonVideoIndex++];
+      }
+      return item.id;
+    });
 
-    const orderedGenerationIds = newOrder.map(img => img.id);
     updateShotImageOrderMutation.mutate({
       shotId: selectedShot.id,
-      orderedGenerationIds,
+      orderedGenerationIds: fullOrderedGenerationIds,
       projectId: selectedProjectId
     }, {
       onSuccess: () => {
         onShotImagesUpdate();
-        // Success toast handled by hook
       },
       onError: (error) => {
         console.error("[VideoEditLayout] Failed to reorder images:", error);
         setManagedImages(orderedShotImages || []); // Revert to prop order on error
-        // Error toast handled by hook
       }
     });
   };
