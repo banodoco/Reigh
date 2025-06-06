@@ -20,6 +20,7 @@ import { Label } from '@/shared/components/ui/label';
 interface SortableImageItemProps {
   image: GenerationRow;
   onDelete: (generationId: string) => void;
+  onDoubleClick: () => void;
 }
 
 const SKIP_CONFIRMATION_KEY = 'skipImageDeletionConfirmation';
@@ -39,7 +40,7 @@ const getDisplayUrl = (relativePath: string | undefined): string => {
   return `${cleanBase}/${cleanRelative}`;
 };
 
-export const SortableImageItem: React.FC<SortableImageItemProps> = ({ image, onDelete }) => {
+export const SortableImageItem: React.FC<SortableImageItemProps> = ({ image, onDelete, onDoubleClick }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: image.id });
   const [isConfirmDeleteDialogOpen, setIsConfirmDeleteDialogOpen] = useState(false);
   const [skipConfirmationNextTimeVisual, setSkipConfirmationNextTimeVisual] = useState(false);
@@ -78,6 +79,7 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({ image, onD
       style={style} 
       {...attributes} 
       className="relative group bg-muted/50 rounded border p-1 flex flex-col items-center justify-center aspect-square overflow-hidden shadow-sm"
+      onDoubleClick={onDoubleClick}
     >
       <img 
         src={getDisplayUrl(image.thumbUrl || image.imageUrl)} 

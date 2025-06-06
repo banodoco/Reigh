@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   DndContext,
   closestCenter,
@@ -16,6 +16,7 @@ import {
 } from '@dnd-kit/sortable';
 import { GenerationRow } from '@/types/shots';
 import { SortableImageItem } from '@/tools/video-travel/components/SortableImageItem'; // Adjust path as needed
+import MediaLightbox from './MediaLightbox';
 
 export interface ShotImageManagerProps {
   images: GenerationRow[];
@@ -30,6 +31,8 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
   onImageDelete,
   onImageReorder,
 }) => {
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
@@ -41,6 +44,18 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
     const { active, over } = event;
     if (over && active.id !== over.id) {
       onImageReorder(active.id as string, over.id as string);
+    }
+  };
+
+  const handleNext = () => {
+    if (lightboxIndex !== null) {
+      setLightboxIndex((lightboxIndex + 1) % images.length);
+    }
+  };
+
+  const handlePrevious = () => {
+    if (lightboxIndex !== null) {
+      setLightboxIndex((lightboxIndex - 1 + images.length) % images.length);
     }
   };
 
@@ -56,15 +71,24 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
     >
       <SortableContext items={images.map(img => img.id)} strategy={rectSortingStrategy}>
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-3">
-          {images.map(image => (
+          {images.map((image, index) => (
             <SortableImageItem
               key={image.id}
               image={image}
               onDelete={() => onImageDelete(image.id)}
+              onDoubleClick={() => setLightboxIndex(index)}
             />
           ))}
         </div>
       </SortableContext>
+      {lightboxIndex !== null && (
+        <MediaLightbox
+          media={images[lightboxIndex]}
+          onClose={() => setLightboxIndex(null)}
+          onNext={handleNext}
+          onPrevious={handlePrevious}
+        />
+      )}
     </DndContext>
   );
 };

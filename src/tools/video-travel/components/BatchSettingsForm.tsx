@@ -8,6 +8,7 @@ import { Switch } from "@/shared/components/ui/switch";
 import { Input } from "@/shared/components/ui/input";
 import { ChevronsUpDown, Info } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from "@/shared/components/ui/radio-group";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/components/ui/tooltip";
 import { SteerableMotionSettings } from './ShotEditor';
 import { Project } from '@/types/project';
 import { ASPECT_RATIO_TO_RESOLUTION } from '@/shared/lib/aspectRatios';
@@ -60,8 +61,18 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
           <div className="p-4 border rounded-lg bg-card shadow-md space-y-4">
             <h3 className="text-lg font-semibold">Batch Generation Settings</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
+              <div className="relative">
                 <Label htmlFor="batchVideoPrompt" className="text-sm font-medium block mb-1.5">Prompt</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">
+                      <Info className="h-4 w-4" />
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>This prompt guides the style and transition for all video segments. <br /> Small changes can have a big impact.</p>
+                  </TooltipContent>
+                </Tooltip>
                 <Textarea 
                   id="batchVideoPrompt"
                   value={batchVideoPrompt}
@@ -70,28 +81,42 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                   className="min-h-[70px] text-sm"
                   rows={3}
                 />
-                <p className="text-xs text-muted-foreground mt-2 px-1">
-                  This prompt guides the style and content for all video segments. Small changes can have a big impact.
-                </p>
               </div>
-              <div>
+              <div className="relative">
                 <Label htmlFor="negative_prompt" className="text-sm font-medium block mb-1.5">Negative Prompt</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">
+                      <Info className="h-4 w-4" />
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Specify what you want to avoid in the generated videos, <br /> like 'blurry' or 'distorted'.</p>
+                  </TooltipContent>
+                </Tooltip>
                 <Textarea
                   id="negative_prompt"
                   value={steerableMotionSettings.negative_prompt}
                   onChange={(e) => onSteerableMotionSettingsChange({ negative_prompt: e.target.value })}
-                  placeholder="e.g., blurry, low quality, watermark"
+                  placeholder="e.g., blurry, low quality"
                   className="min-h-[70px] text-sm"
                   rows={3}
                 />
-                <p className="text-xs text-muted-foreground mt-2 px-1">
-                  Specify elements or qualities to exclude from all video segments.
-                </p>
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
+              <div className="relative">
                 <Label htmlFor="batchVideoFrames" className="text-sm font-medium block mb-1">Frames per Image: {batchVideoFrames}</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">
+                      <Info className="h-4 w-4" />
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Determines the duration of the video segment for each image. <br /> More frames result in a longer segment.</p>
+                  </TooltipContent>
+                </Tooltip>
                 <Slider
                   id="batchVideoFrames"
                   min={10}
@@ -107,12 +132,19 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                   onChange={(e) => onBatchVideoFramesChange(parseInt(e.target.value, 10) || 0)}
                   className="mt-2"
                 />
-                <p className="text-xs text-muted-foreground mt-2 px-1">
-                  Controls the duration of the "pause" on each image. Higher values create a slower pace.
-                </p>
               </div>
-              <div>
+              <div className="relative">
                 <Label htmlFor="batchVideoContext" className="text-sm font-medium block mb-1">Number of Context Frames: {batchVideoContext}</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">
+                      <Info className="h-4 w-4" />
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>How many frames from one segment to reference for the next. <br /> Helps create smoother transitions.</p>
+                  </TooltipContent>
+                </Tooltip>
                 <Slider
                   id="batchVideoContext"
                   min={0}
@@ -121,13 +153,20 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                   value={[batchVideoContext]}
                   onValueChange={(value) => onBatchVideoContextChange(value[0])}
                 />
-                <p className="text-xs text-muted-foreground mt-2 px-1">
-                  How many frames from a previous clip are used to influence the next, ensuring a smoother transition.
-                </p>
               </div>
             </div>
             <div className="relative">
               <Label htmlFor="batchVideoSteps" className="text-sm font-medium block mb-1">Generation Steps: {batchVideoSteps}</Label>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">
+                    <Info className="h-4 w-4" />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Number of processing steps for each frame. <br /> Higher values can improve quality but increase generation time.</p>
+                </TooltipContent>
+              </Tooltip>
               <Slider
                 id="batchVideoSteps"
                 min={1}
@@ -136,9 +175,6 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                 value={[batchVideoSteps]}
                 onValueChange={(value) => onBatchVideoStepsChange(value[0])}
               />
-               <p className="text-xs text-muted-foreground mt-2 px-1">
-                More steps can improve detail and quality, but will take longer to generate. A good starting point is 4-8.
-              </p>
             </div>
             <div>
               <Label className="text-sm font-medium block mb-2">Dimension Source</Label>

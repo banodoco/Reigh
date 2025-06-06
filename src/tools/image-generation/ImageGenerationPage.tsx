@@ -4,7 +4,6 @@ import ImageGallery, { GeneratedImageWithMetadata, DisplayableMetadata, Metadata
 import SettingsModal from "@/shared/components/SettingsModal";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { type Json } from "@supabase/supabase-js";
 import { Button } from "@/shared/components/ui/button";
 import ShotsPane from "@/shared/components/ShotsPane/ShotsPane";
 import { useListShots, useAddImageToShot } from "@/shared/hooks/useShots";
@@ -12,6 +11,15 @@ import { useLastAffectedShot } from "@/shared/hooks/useLastAffectedShot";
 import { useProject } from "@/shared/contexts/ProjectContext";
 import { uploadImageToStorage } from '@/shared/lib/imageUploader';
 import { nanoid } from 'nanoid';
+
+// Local definition for Json type to remove dependency on supabase client types
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[];
 
 // This interface defines the rich LoRA structure we expect from the form and want to save in metadata
 // interface StoredActiveLora { // This might be covered by MetadataLora or internal to the form/hook

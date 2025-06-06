@@ -624,15 +624,15 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
       <VideoOutputsGallery
         videoOutputs={videoOutputs}
-        onDelete={handleDeleteVideoOutput}
+                      onDelete={handleDeleteVideoOutput}
         deletingVideoId={deletingVideoId}
       />
-
+      
       {/*
       <div className="mb-6 flex items-center space-x-2">
         <Label className="text-sm font-medium">Control Mode:</Label>
         Individual
-        <Button
+        <Button 
           size="sm"
           onClick={() => onVideoControlModeChange('individual')}
         >
