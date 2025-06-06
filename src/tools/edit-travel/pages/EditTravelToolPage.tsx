@@ -129,9 +129,6 @@ const EditTravelToolPage = () => {
     { path: "kudzueye/boreal-flux-dev-v2", scale: "0.06" }
   ];
 
-  // Add this ref near other refs (for example, after kontextCurrentSubscriptionRef)
-  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
   useEffect(() => {
     const localFalApiKey = localStorage.getItem('fal_api_key');
     setFalApiKey(localFalApiKey);
@@ -414,24 +411,20 @@ const EditTravelToolPage = () => {
   };
   
   const handleAutoSavePrompts = (updatedPrompts: PromptEntry[]) => {
-    if (autoSaveTimeoutRef.current) {
-      clearTimeout(autoSaveTimeoutRef.current);
-    }
-    autoSaveTimeoutRef.current = setTimeout(() => {
-      setPrompts(updatedPrompts);
-      // Also persist to localStorage on auto-save from the modal
-      try {
+    setPrompts(updatedPrompts);
+    // Also persist to localStorage on auto-save from the modal
+    try {
         const promptsString = JSON.stringify(updatedPrompts);
         if (promptsString.length < MAX_LOCAL_STORAGE_ITEM_LENGTH) {
-          localStorage.setItem(EDIT_TRAVEL_PROMPTS_KEY, promptsString);
+            localStorage.setItem(EDIT_TRAVEL_PROMPTS_KEY, promptsString);
         } else {
-          toast.info("Prompts are too large to be saved locally and may not persist fully.");
+            toast.info("Prompts are too large to be saved locally and may not persist fully.");
+            // Potentially save a truncated version or handle differently
         }
-      } catch (error) {
+    } catch (error) {
         console.error("Error auto-saving prompts to localStorage:", error);
         toast.error("Could not auto-save prompts locally.");
-      }
-    }, 300);
+    }
   };
 
   useEffect(() => {
