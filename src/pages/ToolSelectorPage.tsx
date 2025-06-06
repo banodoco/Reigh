@@ -85,7 +85,7 @@ export default function ToolSelectorPage() {
       <div className="container mx-auto px-4 py-16 relative z-10">
         {/* Enhanced Tools Grid */}
         {visibleTools.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-16 max-w-7xl mx-auto pt-12">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-16 max-w-7xl mx-auto pt-6">
             {visibleTools.map((tool, index) => {
               const IconComponent = tool.icon;
               return (
@@ -214,13 +214,6 @@ export default function ToolSelectorPage() {
             <Star className="w-3 h-3 text-wes-vintage-gold animate-rotate-slow" style={{ animationDelay: '1s' }} />
             <div className="w-32 h-px bg-gradient-to-l from-transparent to-wes-vintage-gold/60"></div>
           </div>
-        </div>
-
-        {/* Vintage signature */}
-        <div className="mt-16 text-center">
-          <p className="font-crimson text-sm text-muted-foreground/60 tracking-widest uppercase text-shadow-vintage">
-            Artfully Crafted with Precision
-          </p>
         </div>
       </div>
     </div>
