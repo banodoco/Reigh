@@ -40,29 +40,14 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
   const [includeExistingContext, setIncludeExistingContext] = useState(initialValues?.includeExistingContext || false);
   const [addSummary, setAddSummary] = useState(initialValues?.addSummary || false);
 
-  // Sync local state with incoming initialValues ONLY when the content actually differs.
-  // This prevents rapid state resets on every keystroke that can cause flickering
-  // when the parent passes a new object reference on each onValuesChange call.
   useEffect(() => {
-    if (!initialValues) return;
-
-    if (initialValues.overallPromptText !== undefined && initialValues.overallPromptText !== overallPromptText) {
-      setOverallPromptText(initialValues.overallPromptText);
-    }
-    if (initialValues.specificPromptsText !== undefined && initialValues.specificPromptsText !== specificPromptsText) {
-      setSpecificPromptsText(initialValues.specificPromptsText);
-    }
-    if (initialValues.rulesToRememberText !== undefined && initialValues.rulesToRememberText !== rulesToRememberText) {
-      setRulesToRememberText(initialValues.rulesToRememberText);
-    }
-    if (initialValues.numberToGenerate !== undefined && initialValues.numberToGenerate !== numberToGenerate) {
-      setNumberToGenerate(initialValues.numberToGenerate);
-    }
-    if (initialValues.includeExistingContext !== undefined && initialValues.includeExistingContext !== includeExistingContext) {
-      setIncludeExistingContext(initialValues.includeExistingContext);
-    }
-    if (initialValues.addSummary !== undefined && initialValues.addSummary !== addSummary) {
-      setAddSummary(initialValues.addSummary);
+    if (initialValues) {
+      setOverallPromptText(initialValues.overallPromptText || '');
+      setSpecificPromptsText(initialValues.specificPromptsText || '');
+      setRulesToRememberText(initialValues.rulesToRememberText || '');
+      setNumberToGenerate(initialValues.numberToGenerate || 3);
+      setIncludeExistingContext(initialValues.includeExistingContext || false);
+      setAddSummary(initialValues.addSummary || false);
     }
   }, [initialValues]);
 
