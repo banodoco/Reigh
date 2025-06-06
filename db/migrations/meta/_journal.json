@@ -1,54 +1,12 @@
 {
   "version": "7",
-  "dialect": "postgresql",
+  "dialect": "sqlite",
   "entries": [
     {
       "idx": 0,
-      "version": "7",
-      "when": 1748948368889,
-      "tag": "0000_wealthy_mandarin",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1748959033607,
-      "tag": "0001_sparkling_star_brand",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1748959504883,
-      "tag": "0002_narrow_eddie_brock",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1748959563531,
-      "tag": "0003_curvy_bullseye",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1749123774502,
-      "tag": "0004_mixed_tarantula",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1749125716875,
-      "tag": "0005_useful_nova",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1749164518119,
-      "tag": "0006_sparkling_krista_starr",
+      "version": "6",
+      "when": 1749243500242,
+      "tag": "0000_spicy_sentinels",
       "breakpoints": true
     }
   ]

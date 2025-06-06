@@ -1,16 +1,14 @@
-import type { Config } from 'drizzle-kit';
-import * as dotenv from 'dotenv';
+import { defineConfig } from 'drizzle-kit';
 
-dotenv.config({ path: '.env.local' });
-
-export default {
+export default defineConfig({
+  dialect: 'sqlite',
   schema: './db/schema/schema.ts',
   out: './db/migrations',
-  dialect: 'postgresql',
   dbCredentials: {
-    url: process.env.SUPABASE_DATABASE_URL!,
+    url: 'local.db',
   },
-  breakpoints: true,
+  verbose: true,
+  strict: true,
   // Config for SQLite (can be managed via CLI flags or a separate config file)
   // To generate for SQLite, you might use a command like:
   // npx drizzle-kit generate:sqlite --config path/to/sqlite.config.ts
@@ -23,4 +21,4 @@ export default {
     url: './local.db',
   },
   */
-} satisfies Config; 
+}); 
