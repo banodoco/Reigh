@@ -78,30 +78,60 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
     fetchTaskDetails();
   }, [isOpen, generationId]);
 
-  const orchestratorDetails = task?.params && typeof task.params === 'object' && 'orchestrator_details' in task.params 
-    ? task.params.orchestrator_details as any 
-    : null;
+  const orchestratorDetails =
+    task?.params && typeof task.params === 'object' && 'orchestrator_details' in task.params
+      ? (task.params.orchestrator_details as any)
+      : null;
 
   const inputImages = orchestratorDetails?.input_image_paths_resolved ?? [];
+
+  // Helper to safely parse JSON strings from params
+  const getParsedParams = () => {
+    if (task?.params) {
+      const params = task.params as any;
+      if (params.params_json_str) {
+        try {
+          return JSON.parse(params.params_json_str);
+        } catch (e) {
+          return {};
+        }
+      }
+      return params;
+    }
+    return {};
+  };
+
+  const parsedParams = getParsedParams();
+
+  const getPrompt = () => {
+    if (orchestratorDetails?.base_prompts) {
+      return Array.isArray(orchestratorDetails.base_prompts)
+        ? orchestratorDetails.base_prompts.join('; ')
+        : orchestratorDetails.base_prompts;
+    }
+    return parsedParams.prompt ?? 'N/A';
+  };
+
+  const getNegativePrompt = () => {
+    return orchestratorDetails?.negative_prompt ?? parsedParams.negative_prompt ?? 'N/A';
+  };
 
   const getSteps = () => {
     if (orchestratorDetails?.steps) return orchestratorDetails.steps;
     if (orchestratorDetails?.num_inference_steps) return orchestratorDetails.num_inference_steps;
-    if (task?.params) {
-        const params = task.params as any;
-        if (params.steps) return params.steps;
-        if (params.params_json_str) {
-            try {
-                const parsed = JSON.parse(params.params_json_str);
-                return parsed.steps;
-            } catch (e) {
-                return null;
-            }
-        }
-    }
-    return null;
-  }
+    return parsedParams.steps ?? parsedParams.num_inference_steps ?? 'N/A';
+  };
+
+  const getResolution = () => {
+    if (orchestratorDetails?.parsed_resolution_wh) return orchestratorDetails.parsed_resolution_wh;
+    if (parsedParams.width && parsedParams.height) return `${parsedParams.width}x${parsedParams.height}`;
+    return 'N/A';
+  };
+
+  const prompt = getPrompt();
+  const negativePrompt = getNegativePrompt();
   const steps = getSteps();
+  const resolution = getResolution();
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -149,46 +179,30 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
                 </div>
               )}
 
-              {orchestratorDetails && (
-                <div className="space-y-3">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-primary rounded-full"></div>
-                    <h3 className="text-lg font-semibold text-foreground">Orchestrator Summary</h3>
+              <div className="space-y-3">
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-primary rounded-full"></div>
+                  <h3 className="text-lg font-semibold text-foreground">Generation Summary</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-muted/30 rounded-lg border">
+                  <div className="space-y-1 md:col-span-2">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Prompt</p>
+                    <p className="text-sm font-medium break-words whitespace-pre-wrap">{prompt}</p>
                   </div>
-                  <div className="grid grid-cols-2 gap-4 p-4 bg-muted/30 rounded-lg border">
-                    {orchestratorDetails.model_name && (
-                      <div className="space-y-1">
-                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Model</p>
-                        <p className="text-sm font-medium">{orchestratorDetails.model_name}</p>
-                      </div>
-                    )}
-                    {orchestratorDetails.seed_base && (
-                      <div className="space-y-1">
-                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Seed</p>
-                        <p className="text-sm font-medium">{orchestratorDetails.seed_base}</p>
-                      </div>
-                    )}
-                    {steps && (
-                       <div className="space-y-1">
-                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Steps</p>
-                        <p className="text-sm font-medium">{steps}</p>
-                      </div>
-                    )}
-                    {orchestratorDetails.parsed_resolution_wh && (
-                      <div className="space-y-1">
-                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Resolution</p>
-                        <p className="text-sm font-medium">{orchestratorDetails.parsed_resolution_wh}</p>
-                      </div>
-                    )}
-                    {orchestratorDetails.num_new_segments_to_generate && (
-                      <div className="space-y-1">
-                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Segments</p>
-                        <p className="text-sm font-medium">{orchestratorDetails.num_new_segments_to_generate}</p>
-                      </div>
-                    )}
+                  <div className="space-y-1 md:col-span-2">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Negative Prompt</p>
+                    <p className="text-sm font-medium break-words whitespace-pre-wrap">{negativePrompt}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Steps</p>
+                    <p className="text-sm font-medium">{steps}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Resolution</p>
+                    <p className="text-sm font-medium">{resolution}</p>
                   </div>
                 </div>
-              )}
+              </div>
               
               <div className="space-y-3">
                 <div className="flex items-center space-x-2">

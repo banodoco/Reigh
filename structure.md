@@ -157,7 +157,9 @@ To change which tools appear for a specific environment, you need to modify the 
   – Lists shots for the selected project using `ShotListDisplay`.
   – Allows creation of new shots (via API).
   – Hosts `ShotEditor` when a shot is selected for configuring video segments and managing images within that shot.
-• **`components/ShotEditor.tsx`**: Component for configuring and generating video segments from image pairs within a shot. Also allows uploading new images directly to the selected shot. Displays a section for "Output Videos" if any generated videos are associated with the shot. Uses `ShotImageManager` for image list management.
+• **`components/ShotEditor.tsx`**: The main editing view for a shot. It orchestrates the `VideoOutputsGallery`, `BatchSettingsForm`, and `ShotImageManager` components.
+• **`components/BatchSettingsForm.tsx`**: A dedicated form for managing all the settings related to batch video generation, including prompts, frames, and other advanced options.
+• **`components/VideoOutputsGallery.tsx`**: A component responsible for displaying the generated videos for a shot, including pagination and triggering the lightbox view.
 • **`components/TaskDetailsModal.tsx`**: A dialog that displays the detailed parameters of a generation task. It's triggered from an info button on a generated video and fetches task details based on the generation ID.
 • **`components/VideoShotDisplay.tsx`**: Component to display a shot's images and name. Allows selection of the shot for editing. Includes UI for inline editing of the shot name and deleting the shot (both via API calls). Used by `ShotListDisplay`.
 • **`components/ShotListDisplay.tsx`**: Component that takes a list of shots and renders them using `VideoShotDisplay` components. Used by `VideoTravelToolPage.tsx` and `ShotsPage.tsx`.
@@ -196,8 +198,9 @@ To change which tools appear for a specific environment, you need to modify the 
 • **`CreateProjectModal.tsx`**: A dialog component that allows users to enter a name for a new project. It uses the `addNewProject` function from `ProjectContext` to create the project, which is then automatically selected.
 • **`ProjectSettingsModal.tsx`**: A dialog component that allows users to update the name and aspect ratio of an existing project. Uses `ProjectContext.updateProject`.
 • **`FileInput.tsx`**: Reusable component for file input (image/video) with drag-and-drop and preview.
+• **`MediaLightbox.tsx`**: A reusable lightbox component for displaying images and videos. It supports keyboard and button navigation.
 • **`ShotImageManager.tsx`**: Reusable component for displaying and managing a list of images within a shot. Handles drag-and-drop reordering and deletion of images via callbacks. Used by `ShotEditor` and `ShotsPage.tsx`.
-• **`HoverScrubVideo.tsx`**: Self-contained wrapper around the `useVideoScrubbing` hook that provides hover-to-play, variable-speed scrubbing, progress-bar seeking, and playback-rate overlay. Now reused by `VideoOutputItem` and `VideoLightbox` to avoid duplicate logic.
+• **`HoverScrubVideo.tsx`**: Self-contained wrapper around the `useVideoScrubbing` hook that provides hover-to-play, variable-speed scrubbing, progress-bar seeking, and playback-rate overlay. Now reused by `VideoOutputItem` and `MediaLightbox` to avoid duplicate logic.
 • **`TasksPane/`**:
     – `TasksPane.tsx`: Slide-out panel from the right, activated on hover or can be locked open. Displays a list of tasks. Communicates lock state to parent layout for content adjustment.
     – `TaskList.tsx`: Component within `TasksPane` that lists tasks, allows filtering by status, and refreshing the list. Uses `TaskItem`. Receives real-time status updates via the WebSocket connection managed by `useWebSocket.ts`.
