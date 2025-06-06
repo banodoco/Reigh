@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500;600&family=Playfair+Display:wght@400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -21,6 +21,10 @@
     --wes-dusty-blue: 210 35% 82%;
     --wes-burgundy: 345 40% 30%;
     --wes-forest: 150 30% 25%;
+    --wes-coral: 10 70% 82%;
+    --wes-mustard: 45 80% 70%;
+    --wes-teal: 180 40% 75%;
+    --wes-vintage-gold: 40 60% 80%;
     
     --background: var(--wes-cream);
     --foreground: var(--wes-burgundy);
@@ -101,14 +105,49 @@
     background-image: 
       radial-gradient(circle at 20% 20%, hsl(var(--wes-pink)) 0%, transparent 50%),
       radial-gradient(circle at 80% 80%, hsl(var(--wes-yellow)) 0%, transparent 50%),
-      radial-gradient(circle at 40% 60%, hsl(var(--wes-mint)) 0%, transparent 50%);
-    background-attachment: fixed;
+      radial-gradient(circle at 40% 60%, hsl(var(--wes-mint)) 0%, transparent 50%),
+      /* Vintage film grain */
+      radial-gradient(circle at 1px 1px, rgba(255,255,255,0.15) 1px, transparent 0);
+    background-size: 100% 100%, 100% 100%, 100% 100%, 20px 20px;
+    background-attachment: fixed, fixed, fixed, scroll;
     letter-spacing: 0.015em;
+    position: relative;
+  }
+
+  /* Vintage film overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: 
+      linear-gradient(90deg, transparent 98%, rgba(255,255,255,0.03) 100%),
+      linear-gradient(0deg, transparent 98%, rgba(255,255,255,0.03) 100%);
+    background-size: 3px 3px;
+    pointer-events: none;
+    z-index: 1000;
+    opacity: 0.4;
+    animation: filmGrain 0.5s infinite;
+  }
+
+  /* Vintage scratches effect */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: 
+      linear-gradient(90deg, transparent 95%, rgba(0,0,0,0.02) 95%, rgba(0,0,0,0.02) 97%, transparent 97%),
+      linear-gradient(0deg, transparent 96%, rgba(0,0,0,0.015) 96%, rgba(0,0,0,0.015) 98%, transparent 98%);
+    background-size: 100px 1px, 1px 150px;
+    pointer-events: none;
+    z-index: 999;
+    opacity: 0.6;
+    animation: vintageScratches 8s infinite linear;
   }
 
   h1, h2, h3, h4, h5, h6 {
     @apply font-['Crimson_Text',serif] font-semibold;
     letter-spacing: 0.02em;
+    position: relative;
   }
 
   /* Wes Anderson signature elements */
@@ -118,8 +157,45 @@
   
   .wes-frame::before {
     content: '';
-    @apply absolute inset-0 border-2 border-primary/20 rounded-lg pointer-events-none;
-    box-shadow: inset 0 0 0 4px hsl(var(--background));
+    @apply absolute inset-0 pointer-events-none;
+    border: 3px solid hsl(var(--primary) / 0.15);
+    border-radius: inherit;
+    box-shadow: 
+      inset 0 0 0 2px hsl(var(--background)),
+      inset 0 0 0 6px hsl(var(--accent) / 0.1),
+      0 0 0 1px hsl(var(--primary) / 0.1);
+  }
+
+  .wes-ornate-frame {
+    @apply relative;
+  }
+
+  .wes-ornate-frame::before {
+    content: '';
+    @apply absolute inset-0 pointer-events-none;
+    border: 4px solid hsl(var(--primary) / 0.2);
+    border-radius: inherit;
+    border-image: linear-gradient(45deg, 
+      hsl(var(--wes-vintage-gold)), 
+      hsl(var(--wes-coral)), 
+      hsl(var(--wes-mint)), 
+      hsl(var(--wes-vintage-gold))
+    ) 1;
+    box-shadow: 
+      inset 0 0 0 2px hsl(var(--background)),
+      inset 0 0 0 8px hsl(var(--accent) / 0.08),
+      inset 0 0 0 12px hsl(var(--wes-yellow) / 0.05),
+      0 2px 20px hsl(var(--primary) / 0.15);
+  }
+
+  .wes-ornate-frame::after {
+    content: '';
+    @apply absolute inset-2 pointer-events-none;
+    background: 
+      radial-gradient(circle at 10px 10px, hsl(var(--wes-vintage-gold) / 0.1) 1px, transparent 1px),
+      radial-gradient(circle at 25px 25px, hsl(var(--wes-coral) / 0.1) 1px, transparent 1px);
+    background-size: 20px 20px, 50px 50px;
+    border-radius: inherit;
   }
 
   .wes-symmetry {
@@ -127,11 +203,45 @@
   }
 
   .wes-card {
-    @apply bg-white/90 backdrop-blur-sm border-2 border-primary/10 rounded-xl shadow-lg;
+    @apply bg-white/90 backdrop-blur-sm border-2 border-primary/10 rounded-xl shadow-lg relative;
     box-shadow: 
       0 10px 25px -5px hsl(var(--primary) / 0.1),
       0 4px 6px -2px hsl(var(--primary) / 0.05),
-      inset 0 1px 0 hsl(var(--accent) / 0.2);
+      inset 0 1px 0 hsl(var(--accent) / 0.2),
+      inset 0 0 0 1px hsl(var(--wes-vintage-gold) / 0.1);
+  }
+
+  .wes-card::before {
+    content: '';
+    @apply absolute inset-0 rounded-xl pointer-events-none;
+    background: 
+      linear-gradient(135deg, transparent 25%, hsl(var(--wes-pink) / 0.03) 25%, hsl(var(--wes-pink) / 0.03) 50%, transparent 50%),
+      linear-gradient(45deg, transparent 25%, hsl(var(--wes-yellow) / 0.02) 25%, hsl(var(--wes-yellow) / 0.02) 50%);
+    background-size: 30px 30px, 40px 40px;
+  }
+
+  .wes-vintage-card {
+    @apply wes-card;
+    background: 
+      linear-gradient(135deg, hsl(var(--wes-cream)) 0%, hsl(var(--wes-pink) / 0.3) 100%),
+      radial-gradient(circle at top right, hsl(var(--wes-yellow) / 0.2), transparent 50%),
+      radial-gradient(circle at bottom left, hsl(var(--wes-mint) / 0.2), transparent 50%);
+    border: 3px solid hsl(var(--wes-vintage-gold) / 0.4);
+    position: relative;
+  }
+
+  .wes-vintage-card::after {
+    content: '';
+    @apply absolute inset-0 rounded-xl;
+    background-image: 
+      repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 2px,
+        hsl(var(--primary) / 0.03) 2px,
+        hsl(var(--primary) / 0.03) 4px
+      );
+    pointer-events: none;
   }
 
   .wes-button {
@@ -142,7 +252,8 @@
     @apply border-2 border-primary/20;
     box-shadow: 
       0 4px 14px 0 hsl(var(--primary) / 0.15),
-      inset 0 1px 0 hsl(var(--primary-foreground) / 0.2);
+      inset 0 1px 0 hsl(var(--primary-foreground) / 0.2),
+      inset 0 0 0 1px hsl(var(--wes-vintage-gold) / 0.3);
   }
 
   .wes-button::before {
@@ -155,13 +266,27 @@
     @apply translate-x-[100%];
   }
 
+  .wes-button::after {
+    content: '';
+    @apply absolute inset-0 rounded-inherit;
+    background: 
+      repeating-linear-gradient(
+        90deg,
+        transparent,
+        transparent 1px,
+        hsl(var(--primary-foreground) / 0.05) 1px,
+        hsl(var(--primary-foreground) / 0.05) 2px
+      );
+    pointer-events: none;
+  }
+
   .wes-grid {
     @apply grid gap-8;
     /* Perfect symmetrical spacing */
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   }
 
-  /* Vintage paper texture overlay */
+  /* Enhanced vintage paper texture overlay */
   .wes-texture {
     position: relative;
   }
@@ -171,40 +296,281 @@
     position: absolute;
     inset: 0;
     background-image: 
-      radial-gradient(circle at 1px 1px, hsl(var(--primary)) 1px, transparent 0);
-    background-size: 20px 20px;
-    opacity: 0.02;
+      radial-gradient(circle at 1px 1px, hsl(var(--primary)) 1px, transparent 0),
+      linear-gradient(45deg, transparent 48%, hsl(var(--primary) / 0.01) 49%, hsl(var(--primary) / 0.01) 51%, transparent 52%);
+    background-size: 20px 20px, 8px 8px;
+    opacity: 0.015;
     pointer-events: none;
+    mix-blend-mode: multiply;
   }
 
-  /* Geometric patterns */
+  /* Enhanced geometric patterns */
   .wes-pattern {
     background-image: 
       linear-gradient(45deg, hsl(var(--accent)) 25%, transparent 25%),
       linear-gradient(-45deg, hsl(var(--accent)) 25%, transparent 25%),
       linear-gradient(45deg, transparent 75%, hsl(var(--accent)) 75%),
-      linear-gradient(-45deg, transparent 75%, hsl(var(--accent)) 75%);
-    background-size: 20px 20px;
-    background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
-    opacity: 0.05;
+      linear-gradient(-45deg, transparent 75%, hsl(var(--accent)) 75%),
+      radial-gradient(circle at 50% 50%, hsl(var(--wes-vintage-gold) / 0.1) 2px, transparent 2px);
+    background-size: 20px 20px, 20px 20px, 20px 20px, 20px 20px, 30px 30px;
+    background-position: 0 0, 0 10px, 10px -10px, -10px 0px, 15px 15px;
+    opacity: 0.03;
+  }
+
+  .wes-chevron-pattern {
+    background-image: 
+      linear-gradient(45deg, transparent 40%, hsl(var(--wes-coral) / 0.1) 40%, hsl(var(--wes-coral) / 0.1) 60%, transparent 60%),
+      linear-gradient(-45deg, transparent 40%, hsl(var(--wes-mint) / 0.1) 40%, hsl(var(--wes-mint) / 0.1) 60%, transparent 60%);
+    background-size: 16px 16px;
+    background-position: 0 0, 8px 8px;
+  }
+
+  .wes-diamond-pattern {
+    background-image: 
+      linear-gradient(45deg, hsl(var(--wes-yellow) / 0.08) 25%, transparent 25%), 
+      linear-gradient(-45deg, hsl(var(--wes-yellow) / 0.08) 25%, transparent 25%), 
+      linear-gradient(45deg, transparent 75%, hsl(var(--wes-yellow) / 0.08) 75%), 
+      linear-gradient(-45deg, transparent 75%, hsl(var(--wes-yellow) / 0.08) 75%);
+    background-size: 24px 24px;
+    background-position: 0 0, 0 12px, 12px -12px, -12px 0px;
+  }
+
+  /* Art Deco inspired patterns */
+  .wes-deco-pattern {
+    background-image: 
+      repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 8px,
+        hsl(var(--wes-vintage-gold) / 0.06) 8px,
+        hsl(var(--wes-vintage-gold) / 0.06) 16px,
+        transparent 16px,
+        transparent 24px,
+        hsl(var(--wes-coral) / 0.04) 24px,
+        hsl(var(--wes-coral) / 0.04) 32px
+      );
+  }
+
+  /* Film strip effect */
+  .wes-filmstrip {
+    position: relative;
+  }
+
+  .wes-filmstrip::before {
+    content: '';
+    position: absolute;
+    left: -20px;
+    top: 0;
+    bottom: 0;
+    width: 16px;
+    background: 
+      linear-gradient(to bottom, 
+        hsl(var(--primary)) 10px, 
+        transparent 10px, 
+        transparent 20px, 
+        hsl(var(--primary)) 20px
+      );
+    background-size: 100% 30px;
+    border-right: 2px solid hsl(var(--primary));
+    opacity: 0.3;
+  }
+
+  .wes-filmstrip::after {
+    content: '';
+    position: absolute;
+    right: -20px;
+    top: 0;
+    bottom: 0;
+    width: 16px;
+    background: 
+      linear-gradient(to bottom, 
+        hsl(var(--primary)) 10px, 
+        transparent 10px, 
+        transparent 20px, 
+        hsl(var(--primary)) 20px
+      );
+    background-size: 100% 30px;
+    border-left: 2px solid hsl(var(--primary));
+    opacity: 0.3;
+  }
+
+  /* Vintage viewfinder effect */
+  .wes-viewfinder {
+    position: relative;
+  }
+
+  .wes-viewfinder::before {
+    content: '';
+    position: absolute;
+    inset: 10px;
+    border: 2px solid hsl(var(--primary) / 0.3);
+    border-radius: 50%;
+    box-shadow: 
+      inset 0 0 0 4px hsl(var(--background)),
+      inset 0 0 0 6px hsl(var(--primary) / 0.1),
+      0 0 20px hsl(var(--primary) / 0.2);
+    pointer-events: none;
+  }
+
+  .wes-viewfinder::after {
+    content: '+';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 24px;
+    color: hsl(var(--primary) / 0.3);
+    pointer-events: none;
+    font-weight: 300;
+  }
+
+  /* Typewriter effect */
+  .wes-typewriter {
+    overflow: hidden;
+    border-right: 2px solid hsl(var(--primary));
+    white-space: nowrap;
+    animation: typewriter 3s steps(40, end), blink-caret 0.75s step-end infinite;
+  }
+
+  /* Vintage badge */
+  .wes-badge {
+    position: relative;
+    background: linear-gradient(45deg, hsl(var(--wes-vintage-gold)), hsl(var(--wes-mustard)));
+    border: 3px solid hsl(var(--primary));
+    border-radius: 50%;
+    box-shadow: 
+      0 0 0 4px hsl(var(--wes-vintage-gold) / 0.3),
+      0 0 0 8px hsl(var(--background)),
+      0 0 0 12px hsl(var(--primary) / 0.2),
+      0 8px 16px hsl(var(--primary) / 0.3);
+  }
+
+  .wes-badge::before {
+    content: '';
+    position: absolute;
+    inset: 6px;
+    border-radius: 50%;
+    background: 
+      radial-gradient(circle at 30% 30%, hsl(var(--wes-cream) / 0.5), transparent 50%),
+      conic-gradient(from 0deg, hsl(var(--wes-vintage-gold)), hsl(var(--wes-coral)), hsl(var(--wes-mint)), hsl(var(--wes-vintage-gold)));
+    opacity: 0.7;
+  }
+
+  /* Enhanced decorative corners */
+  .wes-corners {
+    position: relative;
+  }
+
+  .wes-corners::before,
+  .wes-corners::after {
+    content: '';
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border: 3px solid hsl(var(--wes-vintage-gold));
+  }
+
+  .wes-corners::before {
+    top: -3px;
+    left: -3px;
+    border-right: none;
+    border-bottom: none;
+  }
+
+  .wes-corners::after {
+    bottom: -3px;
+    right: -3px;
+    border-left: none;
+    border-top: none;
+  }
+
+  /* Vintage polaroid effect */
+  .wes-polaroid {
+    background: white;
+    padding: 12px 12px 40px 12px;
+    box-shadow: 
+      0 4px 8px hsl(var(--primary) / 0.1),
+      0 0 0 1px hsl(var(--primary) / 0.05),
+      inset 0 0 0 1px hsl(var(--primary) / 0.1);
+    transform: rotate(-2deg);
+    transition: transform 0.3s ease;
+  }
+
+  .wes-polaroid:hover {
+    transform: rotate(0deg) scale(1.05);
+  }
+
+  .wes-polaroid::after {
+    content: '';
+    position: absolute;
+    bottom: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60%;
+    height: 2px;
+    background: linear-gradient(to right, transparent, hsl(var(--primary) / 0.3), transparent);
   }
 }
 
 @layer components {
   .wes-header {
-    @apply wes-symmetry bg-white/80 backdrop-blur-md border-b-2 border-primary/10;
-    @apply shadow-sm relative;
+    @apply wes-symmetry bg-white/80 backdrop-blur-md border-b-2 border-primary/10 relative;
+    @apply shadow-sm;
+    background: 
+      linear-gradient(90deg, hsl(var(--wes-cream)) 0%, hsl(var(--wes-pink) / 0.3) 50%, hsl(var(--wes-cream)) 100%),
+      repeating-linear-gradient(
+        90deg,
+        transparent,
+        transparent 100px,
+        hsl(var(--wes-vintage-gold) / 0.05) 100px,
+        hsl(var(--wes-vintage-gold) / 0.05) 102px
+      );
+  }
+
+  .wes-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, 
+      hsl(var(--wes-vintage-gold)), 
+      hsl(var(--wes-coral)), 
+      hsl(var(--wes-mint)), 
+      hsl(var(--wes-yellow)), 
+      hsl(var(--wes-vintage-gold))
+    );
   }
 
   .wes-nav-item {
     @apply relative px-6 py-3 font-medium text-sm tracking-wider uppercase;
     @apply transition-all duration-300 ease-out;
     @apply hover:text-primary hover:bg-accent/30;
+    position: relative;
+  }
+
+  .wes-nav-item::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    background: radial-gradient(circle, hsl(var(--wes-vintage-gold) / 0.2), transparent);
+    transform: translate(-50%, -50%);
+    transition: all 0.4s ease;
+    border-radius: 50%;
+  }
+
+  .wes-nav-item:hover::before {
+    width: 100%;
+    height: 100%;
   }
 
   .wes-nav-item::after {
     content: '';
-    @apply absolute bottom-0 left-1/2 w-0 h-0.5 bg-primary;
+    @apply absolute bottom-0 left-1/2 w-0 h-0.5 bg-gradient-to-r from-wes-vintage-gold to-wes-coral;
     @apply transition-all duration-300 ease-out;
     transform: translateX(-50%);
   }
@@ -214,27 +580,233 @@
   }
 
   .wes-tool-card {
-    @apply wes-card wes-frame wes-texture p-8 hover:scale-[1.02];
+    @apply wes-vintage-card wes-ornate-frame wes-texture p-8 hover:scale-[1.02];
     @apply transition-all duration-500 ease-out cursor-pointer;
     @apply hover:shadow-2xl hover:border-primary/20;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .wes-tool-card::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: 
+      radial-gradient(circle at center, 
+        hsl(var(--wes-vintage-gold) / 0.1) 0%, 
+        transparent 50%
+      );
+    transform: scale(0);
+    transition: transform 0.6s ease;
+    border-radius: 50%;
+  }
+
+  .wes-tool-card:hover::before {
+    transform: scale(1);
   }
 
   .wes-tool-card:hover {
-    transform: translateY(-8px) scale(1.02);
+    transform: translateY(-12px) scale(1.03) rotate(0.5deg);
   }
 
   .wes-modal {
-    @apply wes-card wes-texture max-w-2xl mx-auto;
+    @apply wes-vintage-card wes-ornate-frame wes-texture max-w-2xl mx-auto;
     @apply animate-in fade-in-0 zoom-in-95 duration-300;
   }
 
   .wes-input {
-    @apply bg-white/90 border-2 border-primary/20 rounded-lg;
+    @apply bg-white/90 border-2 border-primary/20 rounded-lg relative;
     @apply focus:border-primary focus:ring-2 focus:ring-primary/20;
     @apply transition-all duration-200 ease-out;
+    box-shadow: 
+      inset 0 1px 3px hsl(var(--primary) / 0.1),
+      0 0 0 1px hsl(var(--wes-vintage-gold) / 0.2);
+  }
+
+  .wes-input:focus {
+    box-shadow: 
+      inset 0 1px 3px hsl(var(--primary) / 0.1),
+      0 0 0 1px hsl(var(--wes-vintage-gold) / 0.4),
+      0 0 10px hsl(var(--primary) / 0.2);
   }
 
   .wes-select {
     @apply wes-input appearance-none bg-white/90;
+    background-image: 
+      linear-gradient(45deg, transparent 50%, hsl(var(--primary)) 50%),
+      linear-gradient(135deg, hsl(var(--primary)) 50%, transparent 50%);
+    background-position: 
+      calc(100% - 15px) calc(1em + 2px),
+      calc(100% - 10px) calc(1em + 2px);
+    background-size: 5px 5px, 5px 5px;
+    background-repeat: no-repeat;
+  }
+
+  /* Enhanced decorative elements */
+  .wes-ornament {
+    position: relative;
+  }
+
+  .wes-ornament::before {
+    content: '❋';
+    position: absolute;
+    top: -15px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 20px;
+    color: hsl(var(--wes-vintage-gold));
+    text-shadow: 0 0 10px hsl(var(--wes-vintage-gold) / 0.5);
+  }
+
+  .wes-divider {
+    position: relative;
+    text-align: center;
+    margin: 2rem 0;
+  }
+
+  .wes-divider::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(
+      to right,
+      transparent,
+      hsl(var(--wes-vintage-gold) / 0.3) 20%,
+      hsl(var(--wes-coral) / 0.3) 50%,
+      hsl(var(--wes-mint) / 0.3) 80%,
+      transparent
+    );
+  }
+
+  .wes-divider::after {
+    content: '◆';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: hsl(var(--background));
+    padding: 0 1rem;
+    color: hsl(var(--wes-vintage-gold));
+    font-size: 12px;
+  }
+
+  /* Vintage camera aperture effect */
+  .wes-aperture {
+    position: relative;
+    border-radius: 50%;
+    overflow: hidden;
+  }
+
+  .wes-aperture::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: 
+      conic-gradient(from 0deg at 50% 50%,
+        transparent 0deg,
+        hsl(var(--primary) / 0.1) 45deg,
+        transparent 90deg,
+        hsl(var(--primary) / 0.1) 135deg,
+        transparent 180deg,
+        hsl(var(--primary) / 0.1) 225deg,
+        transparent 270deg,
+        hsl(var(--primary) / 0.1) 315deg,
+        transparent 360deg
+      );
+    animation: rotate 20s linear infinite;
+  }
+
+  /* Vintage stamp effect */
+  .wes-stamp {
+    position: relative;
+    border: 3px dashed hsl(var(--primary) / 0.4);
+    background: hsl(var(--wes-cream));
+    transform: rotate(-5deg);
+  }
+
+  .wes-stamp::before {
+    content: '';
+    position: absolute;
+    inset: -8px;
+    border: 2px solid hsl(var(--primary) / 0.2);
+    background: 
+      radial-gradient(circle at 4px 4px, hsl(var(--primary) / 0.3) 2px, transparent 2px);
+    background-size: 8px 8px;
+  }
+}
+
+/* Enhanced keyframe animations */
+@keyframes filmGrain {
+  0% { opacity: 0.3; }
+  50% { opacity: 0.5; }
+  100% { opacity: 0.3; }
+}
+
+@keyframes vintageScratches {
+  0% { transform: translateX(0) translateY(0); }
+  25% { transform: translateX(1px) translateY(-1px); }
+  50% { transform: translateX(-1px) translateY(1px); }
+  75% { transform: translateX(1px) translateY(1px); }
+  100% { transform: translateX(0) translateY(0); }
+}
+
+@keyframes typewriter {
+  from { width: 0; }
+  to { width: 100%; }
+}
+
+@keyframes blink-caret {
+  from, to { border-color: transparent; }
+  50% { border-color: hsl(var(--primary)); }
+}
+
+@keyframes rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes vintageGlow {
+  0%, 100% { 
+    text-shadow: 
+      0 0 5px hsl(var(--wes-vintage-gold) / 0.5),
+      0 0 10px hsl(var(--wes-vintage-gold) / 0.3);
+  }
+  50% { 
+    text-shadow: 
+      0 0 10px hsl(var(--wes-vintage-gold) / 0.8),
+      0 0 20px hsl(var(--wes-vintage-gold) / 0.5),
+      0 0 30px hsl(var(--wes-vintage-gold) / 0.3);
+  }
+}
+
+@keyframes parallaxFloat {
+  0%, 100% { 
+    transform: translateY(0px) translateX(0px) rotate(0deg); 
+  }
+  25% { 
+    transform: translateY(-10px) translateX(5px) rotate(1deg); 
+  }
+  50% { 
+    transform: translateY(-5px) translateX(-3px) rotate(-0.5deg); 
+  }
+  75% { 
+    transform: translateY(-15px) translateX(8px) rotate(1.5deg); 
+  }
+}
+
+@keyframes vintagePulse {
+  0%, 100% { 
+    opacity: 0.6;
+    transform: scale(1);
+  }
+  50% { 
+    opacity: 0.9;
+    transform: scale(1.05);
   }
 }
