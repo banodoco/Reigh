@@ -21,6 +21,26 @@ const VideoTravelToolPage: React.FC = () => {
   const queryClient = useQueryClient();
   // const { lastAffectedShotId, setLastAffectedShotId } = useLastAffectedShot(); // Keep for later if needed
 
+  // Add state for video generation settings
+  const [videoControlMode, setVideoControlMode] = useState<'individual' | 'batch'>('batch');
+  const [batchVideoPrompt, setBatchVideoPrompt] = useState('');
+  const [batchVideoFrames, setBatchVideoFrames] = useState(30);
+  const [batchVideoContext, setBatchVideoContext] = useState(10);
+  const [batchVideoSteps, setBatchVideoSteps] = useState(4);
+  const [dimensionSource, setDimensionSource] = useState<'project' | 'firstImage'>('firstImage');
+  const [videoPairConfigs, setVideoPairConfigs] = useState<any[]>([]);
+  const [steerableMotionSettings, setSteerableMotionSettings] = useState({
+    negative_prompt: '',
+    model_name: 'vace_14B',
+    seed: 789,
+    debug: true,
+    booster_loras: true,
+    fade_in_duration: '{"low_point":0.0,"high_point":0.8,"curve_type":"ease_in_out","duration_factor":0.0}',
+    fade_out_duration: '{"low_point":0.0,"high_point":0.8,"curve_type":"ease_in_out","duration_factor":0.0}',
+    after_first_post_generation_saturation: 0.75,
+    after_first_post_generation_brightness: -0.3,
+  });
+
   useEffect(() => {
     if (!selectedProjectId) {
       if (selectedShot) {
@@ -48,122 +68,92 @@ const VideoTravelToolPage: React.FC = () => {
   }, [shots, selectedShot, selectedProjectId, isLoading]);
 
   useEffect(() => {
-    if (selectedShot && selectedShot.images) {
-      if (selectedShot.images.length >= 2) {
-        const newPairs = [];
-        for (let i = 0; i < selectedShot.images.length - 1; i++) {
-          newPairs.push({
-            id: `pair-${selectedShot.images[i].id}-${selectedShot.images[i+1].id}`,
-            imageA: selectedShot.images[i],
-            imageB: selectedShot.images[i+1],
-            prompt: '', 
-            frames: 50,  
-            context: 18, 
+    if (selectedShot?.images && selectedShot.images.length >= 2) {
+      const nonVideoImages = selectedShot.images.filter(img => !img.type?.includes('video'));
+      if (nonVideoImages.length >= 2) {
+        const pairs = [];
+        for (let i = 0; i < nonVideoImages.length - 1; i++) {
+          pairs.push({
+            id: `${nonVideoImages[i].id}_${nonVideoImages[i + 1].id}`,
+            imageA: nonVideoImages[i],
+            imageB: nonVideoImages[i + 1],
+            prompt: '',
+            frames: 30,
+            context: 10,
           });
         }
-        setVideoPairConfigs(newPairs);
-      } else {
-        setVideoPairConfigs([]);
+        setVideoPairConfigs(pairs);
       }
-    } else if (!selectedShot) {
-      setVideoPairConfigs([]);
     }
-  }, [selectedShot]);
+  }, [selectedShot?.images]);
 
-  // Mocking or preparing props for VideoEditLayout - these might need to be dynamic based on selectedShot
-  const [videoPairConfigs, setVideoPairConfigs] = useState<any[]>([]); // Changed to any[] for now for setVideoPairConfigs type
-  const [videoControlMode, setVideoControlMode] = useState<'individual' | 'batch'>('batch');
-  const [batchVideoPrompt, setBatchVideoPrompt] = useState("");
-  const [batchVideoFrames, setBatchVideoFrames] = useState(81);
-  const [batchVideoContext, setBatchVideoContext] = useState(16);
-  const [batchVideoSteps, setBatchVideoSteps] = useState(9);
-
-  const [steerableMotionSettings, setSteerableMotionSettings] = useState({
-    negative_prompt: '',
-    model_name: 'vace_14B',
-    seed: 789,
-    debug: true,
-    booster_loras: true,
-    fade_in_duration: '{"low_point":0.0,"high_point":0.8,"curve_type":"ease_in_out","duration_factor":0.0}',
-    fade_out_duration: '{"low_point":0.0,"high_point":0.8,"curve_type":"ease_in_out","duration_factor":0.0}',
-    after_first_post_generation_saturation: 0.75,
-    after_first_post_generation_brightness: 0.0,
-  });
-
-  const handleSteerableMotionSettingsChange = (newSettings: Partial<typeof steerableMotionSettings>) => {
-    setSteerableMotionSettings(prev => ({ ...prev, ...newSettings }));
-  };
-
-  const handleOpenCreateShotModal = () => {
-    if (!selectedProjectId) {
-      alert('Please select a project first to create a shot.'); // Or use toast
-      return;
-    }
-    setIsCreateShotModalOpen(true);
-  };
-
-  const handleModalSubmitCreateShot = async (shotName: string) => {
-    if (!selectedProjectId) { // Should be redundant due to check in handleOpenCreateShotModal
-      console.error("Project ID missing at modal submission, this shouldn't happen.");
-      return;
-    }
-    try {
-      await createShotMutation.mutateAsync({
-        shotName: shotName, // Already trimmed by modal
-        projectId: selectedProjectId,
-      });
-      // Toast notification for success is handled within useCreateShot
-      setIsCreateShotModalOpen(false); // Close modal on success
-    } catch (e) {
-      // Toast notification for error is handled within useCreateShot
-      console.error("Failed to create shot from modal", e);
-      // Optionally keep modal open on error, or display error in modal
-    }
-  };
-
-  const handleSelectShotForEditingUI = (shot: Shot) => {
+  const handleShotSelect = (shot: Shot) => {
     setSelectedShot(shot);
   };
 
   const handleBackToShotList = () => {
     setSelectedShot(null);
+    setVideoPairConfigs([]);
   };
 
-  // Callback for VideoEditLayout to trigger data refresh
-  const handleShotImagesUpdate = () => {
-    if (selectedProjectId) {
-      // Invalidate and refetch the shots list for the current project
-      // This will cause useListShots to get fresh data,
-      // which in turn will update selectedShot via the useEffect, then videoPairConfigs.
-      queryClient.invalidateQueries({ queryKey: ['shots', selectedProjectId] });
-      // Optionally, could call refetchShots() directly if preferred and it correctly updates the list
-      // refetchShots(); 
-    } else {
-      console.warn("[VideoTravelToolPage] Attempted to update shot images without a selected project ID.");
+  const handleModalSubmitCreateShot = async (name: string) => {
+    if (!selectedProjectId) {
+      console.error("[VideoTravelToolPage] Cannot create shot: No project selected");
+      return;
+    }
+
+    try {
+      const newShot = await createShotMutation.mutateAsync({
+        shotName: name,
+        projectId: selectedProjectId,
+      });
+      
+      // Refetch shots to update the list
+      await refetchShots();
+      
+      // Select the newly created shot
+      setSelectedShot(newShot);
+      
+      // Close the modal
+      setIsCreateShotModalOpen(false);
+    } catch (error) {
+      console.error("[VideoTravelToolPage] Error creating shot:", error);
     }
   };
 
-  if (isLoading) return <div className="container mx-auto p-4">Loading shots...</div>;
-  if (error) return <div className="container mx-auto p-4">Error loading shots: {error.message}</div>;
-  if (!selectedProjectId) return <div className="container mx-auto p-4">Please select a project from the global header to manage video travel shots.</div>;
+  const handleShotImagesUpdate = () => {
+    if (selectedProjectId && selectedShot?.id) {
+      // Invalidate and refetch the shots query to get updated data
+      queryClient.invalidateQueries({ queryKey: ['shots', selectedProjectId] });
+    }
+  };
+
+  const handleSteerableMotionSettingsChange = (settings: Partial<typeof steerableMotionSettings>) => {
+    setSteerableMotionSettings(prev => ({
+      ...prev,
+      ...settings
+    }));
+  };
+
+  if (!selectedProjectId) {
+    return <div className="p-4">Please select a project first.</div>;
+  }
+
+  if (error) {
+    return <div className="p-4">Error loading shots: {error.message}</div>;
+  }
 
   return (
     <div className="container mx-auto p-4">
-      <h1 className="text-3xl font-bold mb-6">Video Travel Tool</h1>
-      
       {!selectedShot ? (
         <>
-          <div className="flex justify-between items-center mb-4">
-            <p className="text-muted-foreground">
-              Select a shot to create video sequences or create a new one.
-            </p>
-            <Button onClick={handleOpenCreateShotModal} disabled={createShotMutation.isPending || !selectedProjectId}>
-              Create New Shot
-            </Button>
+          <div className="flex justify-between items-center mb-6">
+            <h1 className="text-3xl font-bold">Video Travel Tool</h1>
+            <Button onClick={() => setIsCreateShotModalOpen(true)}>Create New Shot</Button>
           </div>
-          <ShotListDisplay 
-            shots={shots}
-            onSelectShot={handleSelectShotForEditingUI}
+          <ShotListDisplay
+            shots={shots || []}
+            onSelectShot={handleShotSelect}
             currentProjectId={selectedProjectId}
           />
         </>
@@ -188,6 +178,8 @@ const VideoTravelToolPage: React.FC = () => {
           onBatchVideoContextChange={setBatchVideoContext}
           batchVideoSteps={batchVideoSteps}
           onBatchVideoStepsChange={setBatchVideoSteps}
+          dimensionSource={dimensionSource}
+          onDimensionSourceChange={setDimensionSource}
           steerableMotionSettings={steerableMotionSettings}
           onSteerableMotionSettingsChange={handleSteerableMotionSettingsChange}
         />

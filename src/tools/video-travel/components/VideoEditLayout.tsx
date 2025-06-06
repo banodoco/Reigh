@@ -800,33 +800,29 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
         <div className="space-y-6 mb-8">
           <div className="p-4 border rounded-lg bg-card shadow-md space-y-4">
             <h3 className="text-lg font-semibold">Batch Generation Settings</h3>
-            <div>
-              <Label className="text-sm font-medium block mb-2">Dimension Source</Label>
-              <RadioGroup
-                value={dimensionSource || 'firstImage'}
-                onValueChange={(value) => onDimensionSourceChange(value as 'project' | 'firstImage')}
-                className="flex space-x-4"
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="firstImage" id="r_firstImage" />
-                  <Label htmlFor="r_firstImage">Use First Image Dimensions</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="project" id="r_project" />
-                  <Label htmlFor="r_project">Use Project Dimensions</Label>
-                </div>
-              </RadioGroup>
-            </div>
-            <div>
-              <Label htmlFor="batchVideoPrompt" className="text-sm font-medium block mb-1.5">Global Prompt</Label>
-              <Textarea 
-                id="batchVideoPrompt"
-                value={batchVideoPrompt}
-                onChange={(e) => onBatchVideoPromptChange(e.target.value)}
-                placeholder="Enter a global prompt for all video segments... (e.g., cinematic transition)"
-                className="min-h-[70px] text-sm"
-                rows={3}
-              />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="batchVideoPrompt" className="text-sm font-medium block mb-1.5">Global Prompt</Label>
+                <Textarea 
+                  id="batchVideoPrompt"
+                  value={batchVideoPrompt}
+                  onChange={(e) => onBatchVideoPromptChange(e.target.value)}
+                  placeholder="Enter a global prompt for all video segments... (e.g., cinematic transition)"
+                  className="min-h-[70px] text-sm"
+                  rows={3}
+                />
+              </div>
+              <div>
+                <Label htmlFor="negative_prompt" className="text-sm font-medium block mb-1.5">Global Negative Prompt</Label>
+                <Textarea
+                  id="negative_prompt"
+                  value={steerableMotionSettings.negative_prompt}
+                  onChange={(e) => onSteerableMotionSettingsChange({ negative_prompt: e.target.value })}
+                  placeholder="e.g., blurry, low quality"
+                  className="min-h-[70px] text-sm"
+                  rows={3}
+                />
+              </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -863,6 +859,23 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
                 onValueChange={(value) => onBatchVideoStepsChange(value[0])}
               />
             </div>
+            <div>
+              <Label className="text-sm font-medium block mb-2">Dimension Source</Label>
+              <RadioGroup
+                value={dimensionSource || 'firstImage'}
+                onValueChange={(value) => onDimensionSourceChange(value as 'project' | 'firstImage')}
+                className="flex space-x-4"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="firstImage" id="r_firstImage" />
+                  <Label htmlFor="r_firstImage">Use First Image Dimensions</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="project" id="r_project" />
+                  <Label htmlFor="r_project">Use Project Dimensions</Label>
+                </div>
+              </RadioGroup>
+            </div>
             
             <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
               <CollapsibleTrigger asChild>
@@ -872,16 +885,6 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
                 </Button>
               </CollapsibleTrigger>
               <CollapsibleContent className="space-y-4 pt-4">
-                <div>
-                  <Label htmlFor="negative_prompt">Global Negative Prompt</Label>
-                  <Textarea
-                    id="negative_prompt"
-                    value={steerableMotionSettings.negative_prompt}
-                    onChange={(e) => onSteerableMotionSettingsChange({ negative_prompt: e.target.value })}
-                    placeholder="e.g., blurry, low quality"
-                    rows={2}
-                  />
-                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="model_name">Model Name</Label>
@@ -930,34 +933,8 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
                     rows={3}
                   />
                 </div>
-                <div>
-                  <Label htmlFor="fade_out_duration">Fade-Out Duration (JSON)</Label>
-                  <Textarea
-                    id="fade_out_duration"
-                    value={steerableMotionSettings.fade_out_duration}
-                    onChange={(e) => onSteerableMotionSettingsChange({ fade_out_duration: e.target.value })}
-                    rows={3}
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="debug_mode">Debug Mode</Label>
-                  <Switch
-                    id="debug_mode"
-                    checked={steerableMotionSettings.debug}
-                    onCheckedChange={(checked) => onSteerableMotionSettingsChange({ debug: checked })}
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="booster_loras">Booster LoRAs</Label>
-                  <Switch
-                    id="booster_loras"
-                    checked={steerableMotionSettings.booster_loras}
-                    onCheckedChange={(checked) => onSteerableMotionSettingsChange({ booster_loras: checked })}
-                  />
-                </div>
               </CollapsibleContent>
             </Collapsible>
-
           </div>
 
           <Card className="mb-6">
