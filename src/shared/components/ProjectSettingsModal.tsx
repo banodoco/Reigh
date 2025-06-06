@@ -25,7 +25,10 @@ import { ASPECT_RATIO_TO_RESOLUTION } from '@/shared/lib/aspectRatios';
 // Create the aspect ratio options from the centralized object
 const ASPECT_RATIOS = Object.keys(ASPECT_RATIO_TO_RESOLUTION)
     .filter(key => key !== 'Square') // Exclude 'Square' if '1:1' is preferred
-    .map(key => ({ value: key, label: key }));
+    .map(key => ({
+        value: key,
+        label: `${key} (${ASPECT_RATIO_TO_RESOLUTION[key]})`
+    }));
 
 interface ProjectSettingsModalProps {
   isOpen: boolean;

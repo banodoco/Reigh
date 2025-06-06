@@ -29,7 +29,10 @@ interface CreateProjectModalProps {
 
 const ASPECT_RATIOS = Object.keys(ASPECT_RATIO_TO_RESOLUTION)
     .filter(key => key !== 'Square')
-    .map(key => ({ value: key, label: key }));
+    .map(key => ({
+        value: key,
+        label: `${key} (${ASPECT_RATIO_TO_RESOLUTION[key]})`
+    }));
 
 export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, onOpenChange }) => {
   const [projectName, setProjectName] = useState('');
