@@ -51,6 +51,7 @@ export const VideoOutputItem: React.FC<VideoOutputItemProps> = ({
           src={video.location || video.imageUrl}
           poster={video.thumbUrl}
           className="absolute inset-0"
+          enableScrubbing={false}
         />
       ) : (
         <p className="text-xs text-muted-foreground p-2">Video URL not available.</p>

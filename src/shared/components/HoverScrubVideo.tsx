@@ -35,6 +35,11 @@ interface HoverScrubVideoProps extends React.HTMLAttributes<HTMLDivElement> {
    * Mute the video (defaults to true).
    */
   muted?: boolean;
+  /**
+   * Enable interactive scrubbing behaviour (default true). If false, we only
+   * auto-play/pause on hover.
+   */
+  enableScrubbing?: boolean;
 }
 
 /**
@@ -51,6 +56,7 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
   showPlaybackRate = true,
   loop = true,
   muted = true,
+  enableScrubbing = true,
   ...rest
 }) => {
   const {
@@ -67,7 +73,7 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
     <div
       className={cn('relative group', className)}
       onMouseEnter={handleMouseEnter}
-      onMouseMove={handleMouseMove}
+      onMouseMove={enableScrubbing ? handleMouseMove : undefined}
       onMouseLeave={handleMouseLeave}
       {...rest}
     >
@@ -88,7 +94,7 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
         Your browser does not support the video tag.
       </video>
 
-      {showPlaybackRate && playbackRate !== null && (
+      {enableScrubbing && showPlaybackRate && playbackRate !== null && (
         <div className="absolute bottom-2 right-2 bg-black/50 text-white text-xs px-2 py-1 rounded-md font-mono pointer-events-none z-20">
           {playbackRate.toFixed(1)}x
         </div>
@@ -97,7 +103,7 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
       {showProgress && (
         <div
           className="absolute bottom-0 left-0 w-full h-1.5 bg-white/20 cursor-pointer z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-          onClick={handleSeek}
+          onClick={enableScrubbing ? handleSeek : undefined}
         >
           <div
             className="h-full bg-white"
