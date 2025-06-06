@@ -127,11 +127,12 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
   const [animatedVideoOutputs, setAnimatedVideoOutputs] = useState<GenerationRow[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const videosPerPage = 9;
+  const [localOrderedShotImages, setLocalOrderedShotImages] = useState(orderedShotImages || []);
 
-  // NEW: local state to preserve ordering across operations
-  const [localOrderedShotImages, setLocalOrderedShotImages] = useState<GenerationRow[]>(orderedShotImages || []);
   useEffect(() => {
-    setLocalOrderedShotImages(orderedShotImages || []);
+    if (orderedShotImages.length !== localOrderedShotImages.length) {
+      setLocalOrderedShotImages(orderedShotImages);
+    }
   }, [orderedShotImages]);
 
   const handleImageUploadToShot = async (files: File[]) => {
@@ -191,11 +192,6 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
 
   const [managedImages, setManagedImages] = useState<GenerationRow[]>([]);
 
-  // Update managedImages to use localOrderedShotImages
-  useEffect(() => {
-    setManagedImages((localOrderedShotImages || []).filter(gen => !isGenerationVideo(gen)));
-  }, [localOrderedShotImages]);
-
   // Update videoOutputs to use localOrderedShotImages
   const videoOutputs = useMemo(() => {
     if (!localOrderedShotImages) return [];
@@ -227,6 +223,11 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
     };
   }, [paginatedVideos]);
 
+  // Update managedImages effect to use localOrderedShotImages
+  useEffect(() => {
+    setManagedImages((localOrderedShotImages || []).filter(gen => !isGenerationVideo(gen)));
+  }, [localOrderedShotImages]);
+
   if (!selectedShot) {
     return <p>Error: No shot selected. Please go back and select a shot.</p>;
   }
@@ -244,9 +245,22 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
         generation_id: generationId,
         project_id: selectedProjectId,
       });
-      toast.success("Video output removed from shot.");
-      // Optimistically update local ordering to remove the deleted video
-      setLocalOrderedShotImages(prev => prev.filter(item => item.id !== generationId));
+      // Optimistically update the local ordering by removing the deleted item
+      const updatedOrdering = localOrderedShotImages.filter(item => item.id !== generationId);
+      setLocalOrderedShotImages(updatedOrdering);
+      updateShotImageOrderMutation.mutate({
+        shotId: selectedShot.id,
+        orderedGenerationIds: updatedOrdering.map(item => item.id),
+        projectId: selectedProjectId
+      }, {
+        onSuccess: () => {
+          toast.success("Video output removed and ordering updated.");
+        },
+        onError: (error) => {
+          console.error("[VideoEditLayout] Failed to update ordering after deletion:", error);
+          toast.error("Failed to update ordering after deletion.");
+        }
+      });
     } catch (error: any) {
       // The hook will show its own toast on error.
       console.error(`Failed to delete video output: ${error.message}`);
@@ -267,21 +281,21 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
 
     const newOrder = arrayMove(managedImages, oldIndex, newIndex);
     setManagedImages(newOrder); // Optimistically update local UI
-    
+
     if (!selectedProjectId || !selectedShot || !selectedShot.id) {
       toast.error("Cannot reorder images: Project or Shot ID is missing.");
-      setManagedImages(orderedShotImages || []); // Revert to prop order on error
+      setManagedImages((localOrderedShotImages) || []); // Revert to local order on error
       return;
     }
     
-    // Build full ordering by merging the reordered non-video images with the unchanged video outputs using localOrderedShotImages
+    // Build full ordering by merging the reordered non-video images with the unchanged video outputs
     const newNonVideoIds = newOrder.map(img => img.id);
     let nonVideoIndex = 0;
     const fullOrderedGenerationIds = localOrderedShotImages.map(item => {
-      if (!isGenerationVideo(item)) {
-        return newNonVideoIds[nonVideoIndex++];
-      }
-      return item.id;
+       if (!isGenerationVideo(item)) {
+         return newNonVideoIds[nonVideoIndex++];
+       }
+       return item.id;
     });
 
     updateShotImageOrderMutation.mutate({
@@ -294,7 +308,7 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
       },
       onError: (error) => {
         console.error("[VideoEditLayout] Failed to reorder images:", error);
-        setManagedImages(orderedShotImages || []); // Revert to prop order on error
+        setManagedImages((localOrderedShotImages) || []); // Revert to local order on error
       }
     });
   };
