@@ -7,7 +7,6 @@ import { useProject } from "@/shared/contexts/ProjectContext";
 import CreateShotModal from '../components/CreateShotModal';
 import ShotListDisplay from '../components/ShotListDisplay';
 import { useQueryClient } from '@tanstack/react-query';
-import { PageLoading } from '@/shared/components/ui/loading';
 // import { useLastAffectedShot } from '@/shared/hooks/useLastAffectedShot';
 
 // Placeholder data or logic to fetch actual data for VideoEditLayout
@@ -144,19 +143,22 @@ const VideoTravelToolPage: React.FC = () => {
     }
   };
 
-  if (isLoading) return <PageLoading text="Loading Art Voyages..." />;
+  if (isLoading) return <div className="container mx-auto p-4">Loading shots...</div>;
   if (error) return <div className="container mx-auto p-4">Error loading shots: {error.message}</div>;
   if (!selectedProjectId) return <div className="container mx-auto p-4">Please select a project from the global header to manage video travel shots.</div>;
 
   return (
-    <div className="art-voyage-theme container mx-auto p-4">
-      <h1 className="text-4xl font-bold mb-6 text-center text-art-voyage-text">Art Voyage Tool</h1>
+    <div className="container mx-auto p-4">
+      <h1 className="text-3xl font-bold mb-6">Video Travel Tool</h1>
       
       {!selectedShot ? (
         <>
-          <div className="flex justify-center items-center mb-8">
-            <Button onClick={handleOpenCreateShotModal} disabled={createShotMutation.isPending || !selectedProjectId} className="art-voyage-button">
-              Create New Piece
+          <div className="flex justify-between items-center mb-4">
+            <p className="text-muted-foreground">
+              Select a shot to create video sequences or create a new one.
+            </p>
+            <Button onClick={handleOpenCreateShotModal} disabled={createShotMutation.isPending || !selectedProjectId}>
+              Create New Shot
             </Button>
           </div>
           <ShotListDisplay 

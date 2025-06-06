@@ -87,14 +87,6 @@ export default {
 					mustard: 'hsl(var(--wes-mustard))',
 					teal: 'hsl(var(--wes-teal))',
 					'vintage-gold': 'hsl(var(--wes-vintage-gold))',
-				},
-				// Art Voyage theme palette
-				'art-voyage': {
-					background: '#F8F3E9',
-					text: '#4D2D2D',
-					primary: '#8C3B3B',
-					accent: '#B08D57',
-					'accent-light': '#D4C0A1',
 				}
 			},
 			borderRadius: {
