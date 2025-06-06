@@ -448,25 +448,6 @@ const EditTravelToolPage = () => {
   }, [generationMode]);
 
   useEffect(() => {
-    if (prompts) { // Check if prompts is not undefined/null
-        try {
-            const promptsString = JSON.stringify(prompts);
-            if (promptsString.length < MAX_LOCAL_STORAGE_ITEM_LENGTH) {
-                localStorage.setItem(EDIT_TRAVEL_PROMPTS_KEY, promptsString);
-            } else {
-                // Attempt to remove if too large to prevent inconsistent states,
-                // though this might be aggressive if a previous smaller version was fine.
-                localStorage.removeItem(EDIT_TRAVEL_PROMPTS_KEY);
-                toast.info("Prompts are too large to be saved locally and won't persist. Consider reducing the number or length of prompts.");
-            }
-        } catch (error) {
-            console.error("Error saving prompts to localStorage:", error);
-            toast.error("Could not save prompts locally.");
-        }
-    }
-  }, [prompts]);
-
-  useEffect(() => {
     if (fluxSoftEdgeStrength !== undefined) {
         try {
             localStorage.setItem(EDIT_TRAVEL_FLUX_SOFT_EDGE_STRENGTH_KEY, fluxSoftEdgeStrength.toString());
