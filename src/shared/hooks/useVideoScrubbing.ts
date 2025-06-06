@@ -97,22 +97,18 @@ export const useVideoScrubbing = () => {
 
       const { offsetX } = e.nativeEvent;
       const width = e.currentTarget.offsetWidth;
-      const normalizedPosition = offsetX / width;
+      const normalizedPosition = offsetX / width; // Value from 0.0 to 1.0
 
+      const MAX_SPEED = 3.0;
       let newRate;
-      if (normalizedPosition < 0.4) {
-          // Left 2/5ths: Map 0.0-0.4 to -3x to 0x
-          const p = normalizedPosition / 0.4;
-          newRate = -3 + p * 3;
-      } else if (normalizedPosition <= 0.6) {
-          // Middle 1/5th: Map 0.4-0.6 to 0x to 1x
-          const p = (normalizedPosition - 0.4) / 0.2;
-          newRate = p;
-      } else {
-          // Right 2/5ths: Map 0.6-1.0 to 1x to 3x
-          const p = (normalizedPosition - 0.6) / 0.4;
-          newRate = 1 + p * 2;
-      }
+
+      // The new logic is simpler:
+      // - Cursor at 0% width -> -3x speed (max reverse)
+      // - Cursor at 50% width -> 0x speed (paused)
+      // - Cursor at 100% width -> +3x speed (max forward)
+      // The rate is linearly interpolated between these points.
+      
+      newRate = (normalizedPosition - 0.5) * 2 * MAX_SPEED;
 
       playbackRateRef.current = newRate;
       setPlaybackRate(newRate);
