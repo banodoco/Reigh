@@ -69,8 +69,8 @@ export const VideoOutputItem: React.FC<VideoOutputItemProps> = ({
           onLoadedData={(e) => { e.currentTarget.removeAttribute('poster'); }}
           loop
           muted
+          autoPlay
           playsInline
-          crossOrigin="anonymous"
           className="w-full h-full object-contain"
         >
           Your browser does not support the video tag.

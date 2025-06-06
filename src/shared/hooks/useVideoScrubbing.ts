@@ -48,10 +48,11 @@ export const useVideoScrubbing = () => {
   }, []);
 
   const startScrubbing = useCallback(() => {
-    stopScrubbing(); // Ensure no other loops are running
-    if (videoRef.current) {
-        videoRef.current.pause();
-    }
+    // Ensure no other scrubbing loops are running before starting a new one
+    stopScrubbing();
+    // NOTE: We intentionally no longer pause the video here to avoid the visual "freeze" effect
+    // that occurred when simply hovering over the video element. The video will keep playing
+    // underneath while we adjust currentTime when the mouse actually moves (scrubbing).
     lastFrameTimeRef.current = 0; // Reset timer for smooth start
     animationFrameRef.current = requestAnimationFrame((timestamp) => {
       lastFrameTimeRef.current = timestamp; // Initialize frame time
@@ -59,7 +60,19 @@ export const useVideoScrubbing = () => {
     });
   }, [scrub, stopScrubbing]);
 
+  // We no longer start scrubbing immediately on hover because that caused the video
+  // to appear frozen when the pointer entered the element without any movement.
+  // Instead, scrubbing starts the first time the mouse actually *moves*.
+  const handleMouseEnter = useCallback(() => {
+    /* Intentionally left blank – actual scrubbing starts on first movement */
+  }, []);
+
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+      // Ensure the scrubbing loop is running
+      if (animationFrameRef.current === null) {
+        startScrubbing();
+      }
+
       const { offsetX } = e.nativeEvent;
       const width = e.currentTarget.offsetWidth;
       const normalizedPosition = offsetX / width;
@@ -81,22 +94,22 @@ export const useVideoScrubbing = () => {
 
       playbackRateRef.current = newRate;
       setPlaybackRate(newRate);
-  }, []);
-  
-  const handleMouseEnter = useCallback(() => {
-    startScrubbing();
   }, [startScrubbing]);
-
+  
   const handleMouseLeave = useCallback(() => {
-      stopScrubbing();
-      const video = videoRef.current;
-      if (video) {
-          video.pause();
-          video.currentTime = 0;
-      }
-      playbackRateRef.current = 0;
-      setPlaybackRate(null);
-      setProgress(0);
+    stopScrubbing();
+    const video = videoRef.current;
+    if (video) {
+        // Reset playback position but immediately resume playing so the preview keeps looping
+        // when the user moves the cursor away.
+        video.currentTime = 0;
+        // `play()` can fail if the browser policies disallow it, but since the video is muted
+        // (see VideoOutputItem & VideoLightbox components) autoplay should be allowed.
+        video.play().catch(() => {/* ignored */});
+    }
+    playbackRateRef.current = 0;
+    setPlaybackRate(null);
+    setProgress(0);
   }, [stopScrubbing]);
 
   const handleSeek = useCallback((e: React.MouseEvent<HTMLDivElement>) => {

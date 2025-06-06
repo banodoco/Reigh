@@ -44,6 +44,7 @@ const VideoLightbox: React.FC<VideoLightboxProps> = ({ video, onClose }) => {
             onLoadedData={(e) => { e.currentTarget.removeAttribute('poster'); }}
             loop
             muted
+            autoPlay
             playsInline
             className="w-full h-full object-contain"
           >
