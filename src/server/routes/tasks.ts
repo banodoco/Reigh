@@ -81,7 +81,7 @@ router.get('/', async (req: Request, res: Response) => {
   const projectId = req.query.projectId as string;
   let typedStatusFilter: (typeof taskStatusEnum.enumValues[number])[] | undefined;
 
-  console.log('[API /api/tasks] Received GET request. Query params:', req.query);
+  // console.log('[API /api/tasks] Received GET request. Query params:', req.query);
 
   const statusQueryParam = req.query.status || req.query['status[]']; // Check both possible param names
 

@@ -1,7 +1,8 @@
 import express, { Request, Response, NextFunction } from 'express';
-import { db } from '../../lib/db'; // Adjusted path from @/lib/db
+import { db } from '@/lib/db'; // Adjusted path from @/lib/db
 import { projects as projectsTable, ProjectUpdate } from '../../../db/schema/schema';
 import { eq, asc, desc, and } from 'drizzle-orm';
+import { Project } from '@/types/project';
 
 const projectsRouter = express.Router();
 const DUMMY_USER_ID = '00000000-0000-0000-0000-000000000000'; // As per RFC
@@ -15,9 +16,13 @@ const asyncHandler = (fn: (req: Request, res: Response, next: NextFunction) => P
 
 // GET /api/projects
 projectsRouter.get('/', asyncHandler(async (req: Request, res: Response) => {
-  console.log('[API] GET /api/projects: Request received.');
+  // console.log('[API] GET /api/projects: Request received.');
+
+  // Hardcoded for now, will be replaced with actual user session data
+  const DUMMY_USER_ID = '3e3e3e3e-3e3e-3e3e-3e3e-3e3e3e3e3e3e'; 
+  // console.log(`[API] GET /api/projects: Querying projects for user: ${DUMMY_USER_ID}`);
+
   try {
-    console.log(`[API] GET /api/projects: Querying projects for user: ${DUMMY_USER_ID}`);
     let fetchedData = await db.select({
       id: projectsTable.id,
       name: projectsTable.name,
@@ -27,39 +32,37 @@ projectsRouter.get('/', asyncHandler(async (req: Request, res: Response) => {
       .from(projectsTable)
       .where(eq(projectsTable.userId, DUMMY_USER_ID))
       .orderBy(asc(projectsTable.name));
-    console.log(`[API] GET /api/projects: Found ${fetchedData.length} existing projects.`);
 
-    // RFC: If no projects exist, create and return a default one
+    // console.log(`[API] GET /api/projects: Found ${fetchedData.length} existing projects.`);
+
     if (fetchedData.length === 0) {
-      console.log('[API] GET /api/projects: No projects found. Creating a default project.');
-      const defaultProjectName = 'Default Project';
-      const newDefaultProject = await db.insert(projectsTable).values({
-        name: defaultProjectName,
+      // console.log('[API] GET /api/projects: No projects found. Creating a default project.');
+      const defaultProject = {
+        name: 'Default Project',
         userId: DUMMY_USER_ID,
-        aspectRatio: '16:9', // Default aspect ratio for the default project
-      }).returning({
-        id: projectsTable.id,
-        name: projectsTable.name,
-        userId: projectsTable.userId,
-        aspectRatio: projectsTable.aspectRatio,
-      });
-      fetchedData = newDefaultProject;
-      console.log('[API] GET /api/projects: Default project created successfully.');
+        aspectRatio: '16:9', // or some other sensible default
+      };
+      
+      const newProject = await db
+        .insert(projectsTable)
+        .values(defaultProject)
+        .returning();
+      
+      fetchedData = newProject;
+      // console.log('[API] GET /api/projects: Default project created successfully.');
     }
 
-    // Map the fetched data to match the client's expectation of a 'user_id' field.
-    console.log('[API] GET /api/projects: Mapping data for response.');
-    const responseData = fetchedData.map(p => ({
+    // console.log('[API] GET /api/projects: Mapping data for response.');
+    const projects: Project[] = fetchedData.map(p => ({
       id: p.id,
       name: p.name,
-      user_id: p.userId,
       aspectRatio: p.aspectRatio,
     }));
-    console.log('[API] GET /api/projects: Sending successful response.');
 
-    res.status(200).json(responseData);
+    // console.log('[API] GET /api/projects: Sending successful response.');
+    res.status(200).json(projects);
   } catch (error) {
-    console.error('[API Error Fetching Projects]', error);
+    console.error('[API] Error fetching or creating projects:', error);
     res.status(500).json({ message: 'Failed to fetch projects' });
   }
 }));

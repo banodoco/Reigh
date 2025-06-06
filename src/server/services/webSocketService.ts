@@ -27,14 +27,14 @@ export function initializeWebSocketServer(server: Server): void {
   console.log('[WebSocket] Server initialized');
 }
 
-export function broadcast(message: object): void {
+export const broadcast = (message: object) => {
   if (!wss) {
     console.error('[WebSocket] WebSocket server not initialized. Cannot broadcast message.');
     return;
   }
 
   const messageString = JSON.stringify(message);
-  console.log(`[WebSocket] Broadcasting message to all clients: ${messageString}`);
+  // console.log(`[WebSocket] Broadcasting message to all clients: ${messageString}`);
   
   wss.clients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {
