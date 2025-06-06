@@ -36,7 +36,7 @@ export const tasks = sqliteTable('tasks', {
   taskType: text('task_type').notNull(),
   params: text('params', { mode: 'json' }).notNull(),
   status: text('status').default('Pending').notNull(),
-  dependantOn: text('dependant_on', { mode: 'json' }), // Storing array as JSON string
+  dependantOn: text('dependant_on'),
   outputLocation: text('output_location'),
   createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }), // No $onUpdate in SQLite
