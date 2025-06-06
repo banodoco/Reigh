@@ -206,6 +206,53 @@ export async function pollAndBroadcastTaskUpdates(): Promise<void> {
     }
   } catch (error) {
     console.error('[TaskStatusPoller] Error polling for task status updates:', error);
+
+    // --- Start Enhanced Error Logging ---
+    if (error instanceof SyntaxError && error.message.includes('JSON')) {
+      console.error('[TaskStatusPoller] A JSON parsing error occurred. This likely means a task has a malformed `params` or `dependantOn` field, possibly written by an external script.');
+      console.error('[TaskStatusPoller] Fetching raw task data to identify the problematic row...');
+      
+      try {
+        // Use a raw query to bypass Drizzle's automatic JSON parsing on the field.
+        const rawTasks = await db.all(sql`
+          SELECT id, params, "dependantOn"
+          FROM tasks
+          WHERE status NOT IN ('Complete', 'Failed', 'Cancelled')
+        `);
+
+        console.error(`[TaskStatusPoller] Found ${rawTasks.length} active tasks. Inspecting for bad JSON...`);
+
+        for (const task of rawTasks as any[]) {
+          // Check `params` field
+          try {
+            JSON.parse(task.params);
+          } catch (e: any) {
+            console.error(`[TaskStatusPoller] >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>`);
+            console.error(`[TaskStatusPoller] CORRUPTED JSON DETECTED IN TASK ID: ${task.id}`);
+            console.error(`[TaskStatusPoller] Offending Column: params`);
+            console.error(`[TaskStatusPoller] Raw Content:`, task.params);
+            console.error(`[TaskStatusPoller] Parse Error:`, e.message);
+            console.error(`[TaskStatusPoller] <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<`);
+          }
+          // Check `dependantOn` field
+          if (task.dependantOn) { // It can be null
+            try {
+              JSON.parse(task.dependantOn);
+            } catch (e: any) {
+              console.error(`[TaskStatusPoller] >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>`);
+              console.error(`[TaskStatusPoller] CORRUPTED JSON DETECTED IN TASK ID: ${task.id}`);
+              console.error(`[TaskStatusPoller] Offending Column: dependantOn`);
+              console.error(`[TaskStatusPoller] Raw Content:`, task.dependantOn);
+              console.error(`[TaskStatusPoller] Parse Error:`, e.message);
+              console.error(`[TaskStatusPoller] <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<`);
+            }
+          }
+        }
+      } catch (rawFetchError) {
+        console.error('[TaskStatusPoller] Could not even fetch raw task data. This is a deeper issue.', rawFetchError);
+      }
+    }
+    // --- End Enhanced Error Logging ---
   }
 }
 

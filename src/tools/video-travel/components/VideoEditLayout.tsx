@@ -563,8 +563,7 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
       try {
         const firstImage = managedImages[0];
         const imageUrl = getDisplayUrl(firstImage.imageUrl);
-        if (imageUrl) {
-          toast.info("Determining resolution from first image...");
+        if (imageUrl) {          
           const { width, height } = await getDimensions(imageUrl);
           resolution = findClosestResolution(width, height);          
         } else {
