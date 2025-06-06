@@ -201,12 +201,11 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
     const handler = setTimeout(() => {
       try {
         const settingsJson = JSON.stringify(settingsToSave);
-        localStorage.setItem(`shot-settings-${shotId}`, settingsJson);
-        localStorage.setItem('last-edited-shot-id', shotId);
-      } catch (e) {
-        console.error("[VideoEditLayout] Failed to save shot settings to localStorage", e);
+        localStorage.setItem(`videoEditSettings-${selectedShot.id}`, settingsJson);
+      } catch (error) {
+        console.error('Error saving settings', error);
       }
-    }, 400); // Save after 400ms of inactivity
+    }, 400);
 
     return () => {
       clearTimeout(handler);
