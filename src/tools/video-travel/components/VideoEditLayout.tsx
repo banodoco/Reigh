@@ -28,6 +28,7 @@ import {
   PaginationPrevious,
 } from "@/shared/components/ui/pagination";
 import { Skeleton } from '@/shared/components/ui/skeleton';
+import { RadioGroup, RadioGroupItem } from "@/shared/components/ui/radio-group";
 
 // Local definition for Json type to remove dependency on supabase client types
 export type Json =
@@ -67,6 +68,7 @@ interface ShotSettings {
   batchVideoFrames: number;
   batchVideoContext: number;
   batchVideoSteps: number;
+  dimensionSource: 'project' | 'firstImage';
   steerableMotionSettings: SteerableMotionSettings;
 }
 
@@ -88,12 +90,55 @@ interface VideoEditLayoutProps {
   onBatchVideoContextChange: (value: number) => void;
   batchVideoSteps: number;
   onBatchVideoStepsChange: (value: number) => void;
+  dimensionSource: 'project' | 'firstImage';
+  onDimensionSourceChange: (source: 'project' | 'firstImage') => void;
   steerableMotionSettings: SteerableMotionSettings;
   onSteerableMotionSettingsChange: (settings: Partial<SteerableMotionSettings>) => void;
   // Add any other necessary props, e.g., for generating videos
 }
 
 const baseUrl = import.meta.env.VITE_API_TARGET_URL || '';
+
+// Copied from src/server/routes/steerableMotion.ts
+const ASPECT_RATIO_TO_RESOLUTION: { [key: string]: string } = {
+  'Square': '670x670',
+  '16:9': '902x508',
+  '9:16': '508x902',
+  '4:3': '768x576',
+  '3:4': '576x768',
+};
+const DEFAULT_RESOLUTION = '840x552';
+
+const getDimensions = (url: string): Promise<{ width: number; height: number }> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+    img.onerror = (err) => reject(err);
+    img.src = url;
+  });
+};
+
+const findClosestResolution = (width: number, height: number): string => {
+  const imageAspectRatio = width / height;
+  let closestRatioKey = 'Square';
+  let minDiff = Math.abs(imageAspectRatio - 1);
+
+  for (const key in ASPECT_RATIO_TO_RESOLUTION) {
+    let ratio: number;
+    if (key === 'Square') {
+      ratio = 1;
+    } else {
+      const parts = key.split(':').map(Number);
+      ratio = parts[0] / parts[1];
+    }
+    const diff = Math.abs(imageAspectRatio - ratio);
+    if (diff < minDiff) {
+      minDiff = diff;
+      closestRatioKey = key;
+    }
+  }
+  return ASPECT_RATIO_TO_RESOLUTION[closestRatioKey] || DEFAULT_RESOLUTION;
+};
 
 const isGenerationVideo = (gen: GenerationRow): boolean => {
   return gen.type === 'video_travel_output' ||
@@ -119,6 +164,8 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
   onBatchVideoContextChange,
   batchVideoSteps,
   onBatchVideoStepsChange,
+  dimensionSource,
+  onDimensionSourceChange,
   steerableMotionSettings,
   onSteerableMotionSettingsChange,
 }) => {
@@ -172,6 +219,7 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
       if (typeof settingsToApply.batchVideoFrames === 'number') onBatchVideoFramesChange(settingsToApply.batchVideoFrames);
       if (typeof settingsToApply.batchVideoContext === 'number') onBatchVideoContextChange(settingsToApply.batchVideoContext);
       if (typeof settingsToApply.batchVideoSteps === 'number') onBatchVideoStepsChange(settingsToApply.batchVideoSteps);
+      if (settingsToApply.dimensionSource) onDimensionSourceChange(settingsToApply.dimensionSource);
       if (settingsToApply.steerableMotionSettings) onSteerableMotionSettingsChange(settingsToApply.steerableMotionSettings);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -183,6 +231,7 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
     batchVideoFrames,
     batchVideoContext,
     batchVideoSteps,
+    dimensionSource,
     steerableMotionSettings,
   }), [
     videoControlMode,
@@ -190,6 +239,7 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
     batchVideoFrames,
     batchVideoContext,
     batchVideoSteps,
+    dimensionSource,
     steerableMotionSettings,
   ]);
 
@@ -471,6 +521,26 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
     setCreatingTaskId('batch');
     toast.info('Queuing travel-between-images task via API...');
 
+    let resolution: string | undefined = undefined;
+
+    if ((dimensionSource || 'firstImage') === 'firstImage' && managedImages.length > 0) {
+      try {
+        const firstImage = managedImages[0];
+        const imageUrl = getDisplayUrl(firstImage.imageUrl);
+        if (imageUrl) {
+          toast.info("Determining resolution from first image...");
+          const { width, height } = await getDimensions(imageUrl);
+          resolution = findClosestResolution(width, height);
+          toast.success(`Using resolution ${resolution} from first image.`);
+        } else {
+          toast.warning("Could not get URL for the first image. Using project default resolution.");
+        }
+      } catch (error) {
+        console.error("Error getting first image dimensions:", error);
+        toast.warning("Could not determine first image dimensions. Using project default resolution.");
+      }
+    }
+
     // Use getDisplayUrl to convert relative paths to absolute URLs
     const absoluteImageUrls = managedImages
       .map((img) => getDisplayUrl(img.imageUrl)) // Use getDisplayUrl here
@@ -493,27 +563,33 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
       videoControlMode === 'batch' ? [batchVideoContext] : videoPairConfigs.map((cfg) => cfg.context);
 
     try {
+      const requestBody: any = {
+        project_id: projectId,
+        shot_id: selectedShot.id,
+        image_urls: absoluteImageUrls,
+        base_prompts: basePrompts,
+        segment_frames: segmentFrames,
+        frame_overlap: frameOverlap,
+        negative_prompts: [steerableMotionSettings.negative_prompt],
+        model_name: steerableMotionSettings.model_name,
+        seed: steerableMotionSettings.seed,
+        debug: steerableMotionSettings.debug,
+        booster_loras: steerableMotionSettings.booster_loras,
+        fade_in_duration: steerableMotionSettings.fade_in_duration,
+        fade_out_duration: steerableMotionSettings.fade_out_duration,
+        after_first_post_generation_saturation: steerableMotionSettings.after_first_post_generation_saturation,
+        after_first_post_generation_brightness: steerableMotionSettings.after_first_post_generation_brightness,
+        params_json_str: JSON.stringify({ steps: batchVideoSteps }),
+      };
+
+      if (resolution) {
+        requestBody.resolution = resolution;
+      }
+      
       const response = await fetch('/api/steerable-motion/travel-between-images', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          project_id: projectId,
-          shot_id: selectedShot.id,
-          image_urls: absoluteImageUrls,
-          base_prompts: basePrompts,
-          segment_frames: segmentFrames,
-          frame_overlap: frameOverlap,
-          negative_prompts: [steerableMotionSettings.negative_prompt],
-          model_name: steerableMotionSettings.model_name,
-          seed: steerableMotionSettings.seed,
-          debug: steerableMotionSettings.debug,
-          booster_loras: steerableMotionSettings.booster_loras,
-          fade_in_duration: steerableMotionSettings.fade_in_duration,
-          fade_out_duration: steerableMotionSettings.fade_out_duration,
-          after_first_post_generation_saturation: steerableMotionSettings.after_first_post_generation_saturation,
-          after_first_post_generation_brightness: steerableMotionSettings.after_first_post_generation_brightness,
-          params_json_str: JSON.stringify({ steps: batchVideoSteps }),
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
@@ -724,6 +800,23 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
         <div className="space-y-6 mb-8">
           <div className="p-4 border rounded-lg bg-card shadow-md space-y-4">
             <h3 className="text-lg font-semibold">Batch Generation Settings</h3>
+            <div>
+              <Label className="text-sm font-medium block mb-2">Dimension Source</Label>
+              <RadioGroup
+                value={dimensionSource || 'firstImage'}
+                onValueChange={(value) => onDimensionSourceChange(value as 'project' | 'firstImage')}
+                className="flex space-x-4"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="firstImage" id="r_firstImage" />
+                  <Label htmlFor="r_firstImage">Use First Image Dimensions</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="project" id="r_project" />
+                  <Label htmlFor="r_project">Use Project Dimensions</Label>
+                </div>
+              </RadioGroup>
+            </div>
             <div>
               <Label htmlFor="batchVideoPrompt" className="text-sm font-medium block mb-1.5">Global Prompt</Label>
               <Textarea 
