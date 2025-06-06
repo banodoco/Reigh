@@ -27,7 +27,9 @@ const VideoTravelToolPage: React.FC = () => {
   const [batchVideoFrames, setBatchVideoFrames] = useState(30);
   const [batchVideoContext, setBatchVideoContext] = useState(10);
   const [batchVideoSteps, setBatchVideoSteps] = useState(4);
-  const [dimensionSource, setDimensionSource] = useState<'project' | 'firstImage'>('firstImage');
+  const [dimensionSource, setDimensionSource] = useState<'project' | 'firstImage' | 'custom'>('firstImage');
+  const [customWidth, setCustomWidth] = useState<number | undefined>();
+  const [customHeight, setCustomHeight] = useState<number | undefined>();
   const [videoPairConfigs, setVideoPairConfigs] = useState<any[]>([]);
   const [steerableMotionSettings, setSteerableMotionSettings] = useState({
     negative_prompt: '',
@@ -180,6 +182,10 @@ const VideoTravelToolPage: React.FC = () => {
           onBatchVideoStepsChange={setBatchVideoSteps}
           dimensionSource={dimensionSource}
           onDimensionSourceChange={setDimensionSource}
+          customWidth={customWidth}
+          onCustomWidthChange={setCustomWidth}
+          customHeight={customHeight}
+          onCustomHeightChange={setCustomHeight}
           steerableMotionSettings={steerableMotionSettings}
           onSteerableMotionSettingsChange={handleSteerableMotionSettingsChange}
         />

@@ -68,7 +68,9 @@ interface ShotSettings {
   batchVideoFrames: number;
   batchVideoContext: number;
   batchVideoSteps: number;
-  dimensionSource: 'project' | 'firstImage';
+  dimensionSource: 'project' | 'firstImage' | 'custom';
+  customWidth?: number;
+  customHeight?: number;
   steerableMotionSettings: SteerableMotionSettings;
 }
 
@@ -90,10 +92,14 @@ interface VideoEditLayoutProps {
   onBatchVideoContextChange: (value: number) => void;
   batchVideoSteps: number;
   onBatchVideoStepsChange: (value: number) => void;
-  dimensionSource: 'project' | 'firstImage';
-  onDimensionSourceChange: (source: 'project' | 'firstImage') => void;
+  dimensionSource: 'project' | 'firstImage' | 'custom';
+  onDimensionSourceChange: (source: 'project' | 'firstImage' | 'custom') => void;
   steerableMotionSettings: SteerableMotionSettings;
   onSteerableMotionSettingsChange: (settings: Partial<SteerableMotionSettings>) => void;
+  customWidth?: number;
+  onCustomWidthChange: (v: number | undefined) => void;
+  customHeight?: number;
+  onCustomHeightChange: (v: number | undefined) => void;
   // Add any other necessary props, e.g., for generating videos
 }
 
@@ -168,8 +174,12 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
   onDimensionSourceChange,
   steerableMotionSettings,
   onSteerableMotionSettingsChange,
+  customWidth,
+  onCustomWidthChange,
+  customHeight,
+  onCustomHeightChange,
 }) => {
-  const { selectedProjectId } = useProject();
+  const { selectedProjectId, projects } = useProject();
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const addImageToShotMutation = useAddImageToShot();
   const removeImageFromShotMutation = useRemoveImageFromShot();
@@ -220,6 +230,8 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
       if (typeof settingsToApply.batchVideoContext === 'number') onBatchVideoContextChange(settingsToApply.batchVideoContext);
       if (typeof settingsToApply.batchVideoSteps === 'number') onBatchVideoStepsChange(settingsToApply.batchVideoSteps);
       if (settingsToApply.dimensionSource) onDimensionSourceChange(settingsToApply.dimensionSource);
+      if (settingsToApply.customWidth) onCustomWidthChange(settingsToApply.customWidth);
+      if (settingsToApply.customHeight) onCustomHeightChange(settingsToApply.customHeight);
       if (settingsToApply.steerableMotionSettings) onSteerableMotionSettingsChange(settingsToApply.steerableMotionSettings);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -232,6 +244,8 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
     batchVideoContext,
     batchVideoSteps,
     dimensionSource,
+    customWidth,
+    customHeight,
     steerableMotionSettings,
   }), [
     videoControlMode,
@@ -240,6 +254,8 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
     batchVideoContext,
     batchVideoSteps,
     dimensionSource,
+    customWidth,
+    customHeight,
     steerableMotionSettings,
   ]);
 
@@ -541,6 +557,18 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
       }
     }
 
+    if (dimensionSource === 'custom') {
+      if (customWidth && customHeight) {
+        resolution = `${customWidth}x${customHeight}`;
+        toast.success(`Using custom resolution ${resolution}.`);
+      } else {
+        toast.error('Custom dimensions are selected, but width or height is not set.');
+        setIsCreatingTask(false);
+        setCreatingTaskId(null);
+        return;
+      }
+    }
+
     // Use getDisplayUrl to convert relative paths to absolute URLs
     const absoluteImageUrls = managedImages
       .map((img) => getDisplayUrl(img.imageUrl)) // Use getDisplayUrl here
@@ -830,7 +858,7 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
                 <Slider
                   id="batchVideoFrames"
                   min={10}
-                  max={120} 
+                  max={81} 
                   step={1}
                   value={[batchVideoFrames]}
                   onValueChange={(value) => onBatchVideoFramesChange(value[0])}
@@ -863,7 +891,21 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
               <Label className="text-sm font-medium block mb-2">Dimension Source</Label>
               <RadioGroup
                 value={dimensionSource || 'firstImage'}
-                onValueChange={(value) => onDimensionSourceChange(value as 'project' | 'firstImage')}
+                onValueChange={(value) => {
+                  const newSource = value as 'project' | 'firstImage' | 'custom';
+                  onDimensionSourceChange(newSource);
+                  if (newSource === 'custom' && (!customWidth || !customHeight)) {
+                    const project = projects.find(p => p.id === selectedProjectId);
+                    if (project && project.aspectRatio) {
+                      const res = ASPECT_RATIO_TO_RESOLUTION[project.aspectRatio];
+                      if (res) {
+                        const [width, height] = res.split('x').map(Number);
+                        onCustomWidthChange(width);
+                        onCustomHeightChange(height);
+                      }
+                    }
+                  }
+                }}
                 className="flex space-x-4"
               >
                 <div className="flex items-center space-x-2">
@@ -874,8 +916,39 @@ const VideoEditLayout: React.FC<VideoEditLayoutProps> = ({
                   <RadioGroupItem value="project" id="r_project" />
                   <Label htmlFor="r_project">Use Project Dimensions</Label>
                 </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="custom" id="r_custom" />
+                  <Label htmlFor="r_custom">Custom</Label>
+                </div>
               </RadioGroup>
             </div>
+            {dimensionSource === 'custom' && (
+              <div className="grid grid-cols-2 gap-4 p-4 border rounded-md bg-muted/20">
+                <div>
+                  <Label htmlFor="customWidth">Width</Label>
+                  <Input
+                    id="customWidth"
+                    type="number"
+                    value={customWidth || ''}
+                    onChange={(e) => onCustomWidthChange(parseInt(e.target.value, 10) || undefined)}
+                    placeholder="e.g., 1024"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="customHeight">Height</Label>
+                  <Input
+                    id="customHeight"
+                    type="number"
+                    value={customHeight || ''}
+                    onChange={(e) => onCustomHeightChange(parseInt(e.target.value, 10) || undefined)}
+                    placeholder="e.g., 576"
+                  />
+                </div>
+                {(customWidth || 0) > 2048 || (customHeight || 0) > 2048 ? (
+                  <p className="col-span-2 text-sm text-destructive">Warning: Very large dimensions may lead to slow generation or failures.</p>
+                ) : null}
+              </div>
+            )}
             
             <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
               <CollapsibleTrigger asChild>
