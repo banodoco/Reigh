@@ -149,7 +149,11 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
       <div className="flex space-x-2 overflow-x-auto pb-2 cursor-pointer" onClick={() => onSelectShot(shot.id)}>
         {imagesToShow.length > 0 ? (
           imagesToShow.map((image, index) => (
-            <div key={image.shotImageEntryId || `img-${index}`} className="flex-shrink-0 w-32 h-32 rounded overflow-hidden border">
+            <div 
+              key={image.shotImageEntryId || `img-${index}`} 
+              className="flex-shrink-0 w-32 h-32 rounded overflow-hidden border animate-fade-in-up"
+              style={{ animationDelay: `${index * 0.1}s` }}
+            >
               <img 
                 src={image.thumbUrl || image.imageUrl || '/placeholder.svg'} 
                 alt={`Shot image ${index + 1} for ${shot.name}`}
