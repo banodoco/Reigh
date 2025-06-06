@@ -2,7 +2,9 @@ import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
 const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-const WS_URL = `${protocol}//${window.location.hostname}:8085`;
+// Connect to the same host and port as the web page, but on the /ws path
+// The dev server (Vite) will proxy this to the real backend.
+const WS_URL = `${protocol}//${window.location.host}/ws`;
 
 export function useWebSocket() {
   const queryClient = useQueryClient();

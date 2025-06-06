@@ -9,10 +9,12 @@ export default defineConfig(({ mode }: { mode: string }) => {
   // For local development, target the local API server (port 3001 by default)
   // For other environments (like Runpod), you might use an environment variable
   // e.g., VITE_API_TARGET_URL=http://213.173.108.33:13296
-  const apiTarget = process.env.VITE_API_TARGET_URL || 'http://localhost:3001';
+  const apiTarget = process.env.VITE_API_TARGET_URL || 'http://localhost:8085';
+  const wsTarget = apiTarget.replace(/^http/, 'ws');
   
   console.log(`[Vite Config] Mode: ${mode}`);
   console.log(`[Vite Config] API Proxy Target: ${apiTarget}/api`);
+  console.log(`[Vite Config] WebSocket Proxy Target: ${wsTarget}`);
 
   return {
     server: {
@@ -23,7 +25,11 @@ export default defineConfig(({ mode }: { mode: string }) => {
           target: apiTarget,
           changeOrigin: true,
           secure: false,
-        }
+        },
+        '/ws': {
+          target: wsTarget,
+          ws: true,
+        },
       },
       headers: {
         "Cross-Origin-Opener-Policy": "same-origin",
