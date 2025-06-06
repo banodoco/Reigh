@@ -85,7 +85,7 @@ export default function ToolSelectorPage() {
       <div className="container mx-auto px-4 py-16 relative z-10">
         {/* Enhanced Tools Grid */}
         {visibleTools.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-16 max-w-7xl mx-auto pt-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-16 max-w-7xl mx-auto">
             {visibleTools.map((tool, index) => {
               const IconComponent = tool.icon;
               return (
