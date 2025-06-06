@@ -167,7 +167,7 @@ export async function processCompletedStitchTask(task: Task): Promise<void> {
 /**
  * Polls for active tasks and broadcasts updates.
  */
-async function pollAndBroadcastTaskUpdates(): Promise<void> {
+export async function pollAndBroadcastTaskUpdates(): Promise<void> {
   // console.log('[TaskStatusPoller] Checking for active task updates...');
   try {
     const activeTasks = await db
@@ -210,6 +210,20 @@ async function pollAndBroadcastTaskUpdates(): Promise<void> {
 }
 
 let pollerStarted = false;
+let statusPollerStarted = false;
+
+/**
+ * Starts a cron job to poll for task status updates.
+ */
+export function startTaskStatusPoller(): void {
+  if (statusPollerStarted) {
+    console.log('[TaskStatusPoller] Status poller already started.');
+    return;
+  }
+  console.log('[TaskStatusPoller] Started task status poller to run every 5 seconds.');
+  cron.schedule('*/5 * * * * *', pollAndBroadcastTaskUpdates);
+  statusPollerStarted = true;
+}
 
 /**
  * Starts a cron job to poll for completed travel_stitch tasks.

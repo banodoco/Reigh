@@ -21,9 +21,10 @@ import dotenv from 'dotenv';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
-import { startTaskPoller } from './services/taskProcessingService';
+import { startTaskPoller, startTaskStatusPoller } from './services/taskProcessingService';
 import { initializeWebSocketServer } from './services/webSocketService';
 import http from 'http';
+import { seedDatabase } from '../lib/seed';
 // import { fileURLToPath } from 'url'; // No longer needed if using process.cwd()
 
 // // Determine __dirname for ES modules
@@ -96,19 +97,25 @@ app.use('/api/generations', generationsRouter);
 app.use('/api/tasks', tasksRouter);
 app.use('/api/steerable-motion', steerableMotionRouter);
 
-// Start the task poller
-startTaskPoller();
+const startServer = async () => {
+  try {
+    // Seed the database with necessary initial data
+    await seedDatabase();
 
-// Basic health check endpoint
-app.get('/status', (req: express.Request, res: express.Response): void => {
-  res.status(200).json({ status: 'ok' });
-  return;
-});
+    // The existing server initialization logic
+    const server = app.listen(PORT, '0.0.0.0', () => {
+      console.log(`API Server listening on port ${PORT} on all interfaces (0.0.0.0)`);
+      initializeWebSocketServer(server);
+      startTaskPoller(); // Start the background task poller
+      startTaskStatusPoller(); // Start the task status poller
+    });
+  } catch (error) {
+    console.error("Failed to start server:", error);
+    process.exit(1);
+  }
+};
 
-app.get('/', (req: express.Request, res: express.Response): void => {
-  res.send('API Server is running!');
-  return;
-});
+startServer();
 
 // Global error handling middleware - MUST be defined after all other app.use() and routes
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -122,14 +129,6 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   const message = err.message || 'An unexpected error occurred on the server.';
   
   res.status(statusCode).json({ message });
-});
-
-const server = http.createServer(app);
-
-initializeWebSocketServer(server);
-
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`API Server listening on port ${PORT} on all interfaces (0.0.0.0)`);
 });
 
 // Export the app for potential testing or other uses (optional)
