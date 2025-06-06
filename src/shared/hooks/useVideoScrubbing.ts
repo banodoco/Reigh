@@ -5,6 +5,7 @@ export const useVideoScrubbing = () => {
   const animationFrameRef = useRef<number | null>(null);
   const lastFrameTimeRef = useRef<number>(0);
   const playbackRateRef = useRef<number>(0);
+  const mouseMoveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const [playbackRate, setPlaybackRate] = useState<number | null>(null);
   const [progress, setProgress] = useState<number>(0);
@@ -15,16 +16,24 @@ export const useVideoScrubbing = () => {
       animationFrameRef.current = null;
     }
     lastFrameTimeRef.current = 0;
+    
+    // When scrubbing stops, we want native playback to resume
+    const video = videoRef.current;
+    if (video && video.paused) {
+        // We use a promise-based play to avoid console errors if interrupted.
+        video.play().catch(() => {/* ignore */});
+    }
   }, []);
 
   const scrub = useCallback((timestamp: number) => {
     const video = videoRef.current;
-    if (!video) return;
+    // If the video element is gone, stop the loop.
+    if (!video) {
+        stopScrubbing();
+        return;
+    };
 
     const rate = playbackRateRef.current;
-    if (rate === undefined) {
-      return;
-    }
     
     if (!lastFrameTimeRef.current) {
         lastFrameTimeRef.current = timestamp;
@@ -41,34 +50,44 @@ export const useVideoScrubbing = () => {
       newTime = newTime - video.duration;
     }
     
-    video.currentTime = newTime;
-    setProgress((newTime / video.duration) * 100);
+    if (isFinite(newTime)) {
+        video.currentTime = newTime;
+    }
+    
+    // Also update progress bar during scrub
+    if(video.duration > 0 && isFinite(video.duration)){
+        setProgress((video.currentTime / video.duration) * 100);
+    } else {
+        setProgress(0);
+    }
 
+    // Continue the loop
     animationFrameRef.current = requestAnimationFrame(scrub);
-  }, []);
+  }, [stopScrubbing]);
 
   const startScrubbing = useCallback(() => {
-    // Ensure no other scrubbing loops are running before starting a new one
-    stopScrubbing();
-    // NOTE: We intentionally no longer pause the video here to avoid the visual "freeze" effect
-    // that occurred when simply hovering over the video element. The video will keep playing
-    // underneath while we adjust currentTime when the mouse actually moves (scrubbing).
+    // Ensure no other loops are running before starting a new one
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+    }
+    
+    const video = videoRef.current;
+    if (video) {
+        video.pause(); // We take control of playback
+    }
     lastFrameTimeRef.current = 0; // Reset timer for smooth start
     animationFrameRef.current = requestAnimationFrame((timestamp) => {
       lastFrameTimeRef.current = timestamp; // Initialize frame time
       scrub(timestamp);
     });
-  }, [scrub, stopScrubbing]);
-
-  // We no longer start scrubbing immediately on hover because that caused the video
-  // to appear frozen when the pointer entered the element without any movement.
-  // Instead, scrubbing starts the first time the mouse actually *moves*.
-  const handleMouseEnter = useCallback(() => {
-    /* Intentionally left blank – actual scrubbing starts on first movement */
-  }, []);
+  }, [scrub]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-      // Ensure the scrubbing loop is running
+      if (mouseMoveTimeoutRef.current) {
+        clearTimeout(mouseMoveTimeoutRef.current);
+      }
+
+      // If scrubbing isn't active, start it.
       if (animationFrameRef.current === null) {
         startScrubbing();
       }
@@ -94,27 +113,48 @@ export const useVideoScrubbing = () => {
 
       playbackRateRef.current = newRate;
       setPlaybackRate(newRate);
-  }, [startScrubbing]);
+
+      // Set a timer to automatically stop scrubbing if the mouse stops moving.
+      mouseMoveTimeoutRef.current = setTimeout(() => {
+        stopScrubbing();
+        setPlaybackRate(null); // Hide the rate indicator
+      }, 150);
+
+  }, [startScrubbing, stopScrubbing]);
   
-  const handleMouseLeave = useCallback(() => {
-    stopScrubbing();
+  const handleMouseEnter = useCallback(() => {
     const video = videoRef.current;
-    if (video) {
-        // Reset playback position but immediately resume playing so the preview keeps looping
-        // when the user moves the cursor away.
-        video.currentTime = 0;
-        // `play()` can fail if the browser policies disallow it, but since the video is muted
-        // (see VideoOutputItem & VideoLightbox components) autoplay should be allowed.
-        video.play().catch(() => {/* ignored */});
+    if (video && video.paused) {
+      video.play().catch(() => {/* ignore */});
     }
-    playbackRateRef.current = 0;
-    setPlaybackRate(null);
-    setProgress(0);
-  }, [stopScrubbing]);
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+      // Clear any pending timeout to stop scrubbing
+      if (mouseMoveTimeoutRef.current) {
+        clearTimeout(mouseMoveTimeoutRef.current);
+      }
+      
+      // Stop the animation frame loop directly, bypassing stopScrubbing's "play"
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+      lastFrameTimeRef.current = 0;
+
+      const video = videoRef.current;
+      if (video) {
+          video.pause();
+          video.currentTime = 0;
+      }
+      playbackRateRef.current = 0;
+      setPlaybackRate(null);
+      setProgress(0);
+  }, []);
 
   const handleSeek = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     const video = videoRef.current;
-    if (!video) return;
+    if (!video || !isFinite(video.duration)) return;
 
     const { offsetX } = e.nativeEvent;
     const width = e.currentTarget.offsetWidth;
@@ -124,9 +164,30 @@ export const useVideoScrubbing = () => {
   }, []);
 
   useEffect(() => {
+    const video = videoRef.current;
+    
+    // This listener updates the progress bar during normal playback.
+    const handleProgress = () => {
+        if (video && video.duration > 0 && animationFrameRef.current === null) {
+            setProgress((video.currentTime / video.duration) * 100);
+        }
+    };
+
+    video?.addEventListener('timeupdate', handleProgress);
+
     // Cleanup on unmount
-    return () => stopScrubbing();
-  }, [stopScrubbing]);
+    return () => {
+        video?.removeEventListener('timeupdate', handleProgress);
+        if (mouseMoveTimeoutRef.current) {
+            clearTimeout(mouseMoveTimeoutRef.current);
+        }
+        // Bypassing stopScrubbing() on unmount to avoid auto-playing a video that is no longer visible.
+        if (animationFrameRef.current) {
+          cancelAnimationFrame(animationFrameRef.current);
+          animationFrameRef.current = null;
+        }
+    };
+  }, []);
 
   return {
     videoRef,
