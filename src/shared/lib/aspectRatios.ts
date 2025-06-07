@@ -38,26 +38,24 @@ export const parseRatio = (ratioStr: string): number => {
  * @returns The closest matching aspect ratio string (e.g., "16:9").
  */
 export function findClosestAspectRatio(targetRatio: number): string {
-  // Exclude 'Square' from the list of keys to iterate over to avoid duplicate checks with '1:1'
-  const predefinedRatios = Object.keys(ASPECT_RATIO_TO_RESOLUTION).filter(k => k !== 'Square');
-  
-  if (predefinedRatios.length === 0) {
+  const ratioKeys = Object.keys(ASPECT_RATIO_TO_RESOLUTION);
+  if (ratioKeys.length === 0) {
     return '1:1'; // Fallback
   }
 
-  let closestRatio = predefinedRatios[0];
-  let minDiff = Math.abs(targetRatio - parseRatio(closestRatio));
+  let closestRatioKey: string = ratioKeys[0];
+  let minDiff = Infinity;
 
-  for (const ratioStr of predefinedRatios) {
+  for (const ratioStr of ratioKeys) {
     const predefinedRatioValue = parseRatio(ratioStr);
     if (isNaN(predefinedRatioValue)) continue;
 
     const diff = Math.abs(targetRatio - predefinedRatioValue);
     if (diff < minDiff) {
       minDiff = diff;
-      closestRatio = ratioStr;
+      closestRatioKey = ratioStr;
     }
   }
 
-  return closestRatio;
+  return closestRatioKey;
 } 

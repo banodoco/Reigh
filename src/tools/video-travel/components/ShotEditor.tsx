@@ -18,7 +18,7 @@ import { ChevronsUpDown, Info } from 'lucide-react';
 import { arrayMove } from '@dnd-kit/sortable';
 import { getDisplayUrl } from '@/shared/lib/utils';
 import { RadioGroup, RadioGroupItem } from "@/shared/components/ui/radio-group";
-import { ASPECT_RATIO_TO_RESOLUTION } from '@/shared/lib/aspectRatios';
+import { ASPECT_RATIO_TO_RESOLUTION, findClosestAspectRatio } from '@/shared/lib/aspectRatios';
 import VideoOutputsGallery from "./VideoOutputsGallery";
 import BatchSettingsForm from "./BatchSettingsForm";
 
@@ -115,28 +115,6 @@ const getDimensions = (url: string): Promise<{ width: number; height: number }> 
     img.onerror = (err) => reject(err);
     img.src = url;
   });
-};
-
-const findClosestResolution = (width: number, height: number): string => {
-  const imageAspectRatio = width / height;
-  let closestRatioKey = 'Square';
-  let minDiff = Math.abs(imageAspectRatio - 1);
-
-  for (const key in ASPECT_RATIO_TO_RESOLUTION) {
-    let ratio: number;
-    if (key === 'Square') {
-      ratio = 1;
-    } else {
-      const parts = key.split(':').map(Number);
-      ratio = parts[0] / parts[1];
-    }
-    const diff = Math.abs(imageAspectRatio - ratio);
-    if (diff < minDiff) {
-      minDiff = diff;
-      closestRatioKey = key;
-    }
-  }
-  return ASPECT_RATIO_TO_RESOLUTION[closestRatioKey] || DEFAULT_RESOLUTION;
 };
 
 const isGenerationVideo = (gen: GenerationRow): boolean => {
@@ -526,7 +504,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         const imageUrl = getDisplayUrl(firstImage.imageUrl);
         if (imageUrl) {          
           const { width, height } = await getDimensions(imageUrl);
-          resolution = findClosestResolution(width, height);          
+          const imageAspectRatio = width / height;
+          const closestRatioKey = findClosestAspectRatio(imageAspectRatio);
+          resolution = ASPECT_RATIO_TO_RESOLUTION[closestRatioKey] || DEFAULT_RESOLUTION;
         } else {
           toast.warning("Could not get URL for the first image. Using project default resolution.");
         }
