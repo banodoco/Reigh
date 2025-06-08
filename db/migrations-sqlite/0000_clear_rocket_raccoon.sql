@@ -46,9 +46,12 @@ CREATE TABLE `tasks` (
 	`created_at` integer NOT NULL,
 	`updated_at` integer,
 	`project_id` text NOT NULL,
+	`generation_processed_at` integer,
 	FOREIGN KEY (`project_id`) REFERENCES `projects`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
 CREATE TABLE `users` (
-	`id` text PRIMARY KEY NOT NULL
+	`id` text PRIMARY KEY NOT NULL,
+	`name` text,
+	`email` text
 );

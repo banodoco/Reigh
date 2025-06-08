@@ -97,6 +97,20 @@ async function seed() {
     await localDb.delete(schema.tasks).where(eq(schema.tasks.projectId, projectId));
     console.log(`[Seed] Existing data cleared for project ${projectId}.`);
 
+    // Create some tasks for the generation
+    console.log('[Seed] Creating new tasks...');
+    const [task1] = await localDb.insert(schema.tasks).values({
+      taskType: 'render',
+      params: { scene: 'scene1.blend', frames: '1-100' },
+      projectId: projectId,
+    }).returning();
+    const [task2] = await localDb.insert(schema.tasks).values({
+      taskType: 'encode',
+      params: { input: 'frames_*.png', output: 'shot.mp4' },
+      projectId: projectId,
+    }).returning();
+    console.log(`[Seed] Created tasks: ${task1.id}, ${task2.id}`);
+
     // 4. Create Shot
     console.log('[Seed] Creating new shot...');
     const [shot] = await localDb.insert(schema.shots).values({
