@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useProject } from "@/shared/contexts/ProjectContext";
 import { useListGenerations } from '@/tools/image-generation/hooks/useGenerations';
 import { useSlidingPane } from '@/shared/hooks/useSlidingPane';
@@ -24,13 +24,21 @@ const GenerationsPane: React.FC<GenerationsPaneProps> = ({ onLockStateChange, pa
   const [page, setPage] = useState(1);
   const { data, isLoading, error } = useListGenerations(selectedProjectId, page, GENERATIONS_PER_PAGE);
   const { data: shotsData } = useListShots(selectedProjectId);
-  const { lastAffectedShotId } = useLastAffectedShot();
+  const { lastAffectedShotId, setLastAffectedShotId } = useLastAffectedShot();
   const addImageToShotMutation = useAddImageToShot();
 
   const { isLocked, toggleLock, hotZoneProps, paneProps, transformClass } = useSlidingPane({
     side: 'bottom',
     onLockStateChange: onLockStateChange,
   });
+
+  useEffect(() => {
+    // If there is no "last affected shot" but there are shots available,
+    // default to the first shot in the list (which is the most recent).
+    if (!lastAffectedShotId && shotsData && shotsData.length > 0) {
+      setLastAffectedShotId(shotsData[0].id);
+    }
+  }, [lastAffectedShotId, shotsData, setLastAffectedShotId]);
 
   const handleNextPage = () => {
     if (data && page < data.totalPages) {
