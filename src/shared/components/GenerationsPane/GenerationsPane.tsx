@@ -8,7 +8,8 @@ import { LockIcon, UnlockIcon, ArrowUpIcon, ChevronLeft, ChevronRight } from 'lu
 import { Link } from 'react-router-dom';
 import ImageGallery from '@/shared/components/ImageGallery';
 import { useLastAffectedShot } from '@/shared/hooks/useLastAffectedShot';
-import { useListShots } from '@/shared/hooks/useShots';
+import { useListShots, useAddImageToShot } from '@/shared/hooks/useShots';
+import { toast } from 'sonner';
 
 interface GenerationsPaneProps {
   onLockStateChange?: (isLocked: boolean) => void;
@@ -24,6 +25,7 @@ const GenerationsPane: React.FC<GenerationsPaneProps> = ({ onLockStateChange, pa
   const { data, isLoading, error } = useListGenerations(selectedProjectId, page, GENERATIONS_PER_PAGE);
   const { data: shotsData } = useListShots(selectedProjectId);
   const { lastAffectedShotId } = useLastAffectedShot();
+  const addImageToShotMutation = useAddImageToShot();
 
   const { isLocked, toggleLock, hotZoneProps, paneProps, transformClass } = useSlidingPane({
     side: 'bottom',
@@ -42,6 +44,33 @@ const GenerationsPane: React.FC<GenerationsPaneProps> = ({ onLockStateChange, pa
 
   const handleDeleteGeneration = (id: string) => {
     console.log(`TODO: Implement delete for generation ${id}`);
+  };
+
+  const handleAddToShot = (generationId: string, imageUrl?: string) => {
+    if (!lastAffectedShotId) {
+      toast.error("No shot selected", {
+        description: "Please select a shot in the gallery or create one first.",
+      });
+      return Promise.resolve(false);
+    }
+    return new Promise<boolean>((resolve) => {
+      addImageToShotMutation.mutate({
+        shot_id: lastAffectedShotId,
+        generation_id: generationId,
+        project_id: selectedProjectId!,
+      }, {
+        onSuccess: () => {
+          toast.success("Image added to shot");
+          resolve(true);
+        },
+        onError: (error) => {
+          toast.error("Failed to add image to shot", {
+            description: error.message,
+          });
+          resolve(false);
+        }
+      });
+    });
   };
 
   const constructImageUrl = (url: string | undefined | null) => {
@@ -110,7 +139,7 @@ const GenerationsPane: React.FC<GenerationsPaneProps> = ({ onLockStateChange, pa
                     onDelete={handleDeleteGeneration}
                     allShots={shotsData || []}
                     lastShotId={lastAffectedShotId || undefined}
-                    onAddToLastShot={async () => { console.log('Add to last shot'); return false; }}
+                    onAddToLastShot={handleAddToShot}
                 />
             )}
             {data && data.items.length === 0 && !isLoading && (

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { useListGenerations } from '@/tools/image-generation/hooks/useGenerations';
 import ImageGallery from '@/shared/components/ImageGallery';
-import { useListShots } from '@/shared/hooks/useShots';
+import { useListShots, useAddImageToShot } from '@/shared/hooks/useShots';
 import { useLastAffectedShot } from '@/shared/hooks/useLastAffectedShot';
 import { Button } from '@/shared/components/ui/button';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
@@ -18,6 +18,7 @@ const GenerationsPage: React.FC = () => {
   const { data: shotsData } = useListShots(selectedProjectId);
   const { lastAffectedShotId } = useLastAffectedShot();
   const queryClient = useQueryClient();
+  const addImageToShotMutation = useAddImageToShot();
 
   const handleDeleteGeneration = (id: string) => {
     // Placeholder for delete mutation
@@ -35,6 +36,33 @@ const GenerationsPage: React.FC = () => {
     //     toast.error(`Failed to delete generation: ${err.message}`);
     //   }
     // });
+  };
+
+  const handleAddToShot = (generationId: string, imageUrl?: string) => {
+    if (!lastAffectedShotId) {
+      toast.error("No shot selected", {
+        description: "Please select a shot in the gallery or create one first.",
+      });
+      return Promise.resolve(false);
+    }
+    return new Promise<boolean>((resolve) => {
+      addImageToShotMutation.mutate({
+        shot_id: lastAffectedShotId,
+        generation_id: generationId,
+        project_id: selectedProjectId!,
+      }, {
+        onSuccess: () => {
+          toast.success("Image added to shot");
+          resolve(true);
+        },
+        onError: (error) => {
+          toast.error("Failed to add image to shot", {
+            description: error.message,
+          });
+          resolve(false);
+        }
+      });
+    });
   };
 
   const constructImageUrl = (url: string | undefined | null) => {
@@ -92,7 +120,7 @@ const GenerationsPage: React.FC = () => {
             onDelete={handleDeleteGeneration}
             allShots={shotsData || []}
             lastShotId={lastAffectedShotId || undefined}
-            onAddToLastShot={async () => { return false; }} // Not applicable on this page
+            onAddToLastShot={handleAddToShot}
           />
         </div>
       ) : (
