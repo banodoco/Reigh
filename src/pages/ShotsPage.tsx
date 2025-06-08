@@ -1,20 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { useListShots, useRemoveImageFromShot, useUpdateShotImageOrder } from '@/shared/hooks/useShots';
 import { Shot, GenerationRow } from '@/types/shots';
-import ShotListDisplay from '@/tools/video-travel/components/ShotListDisplay'; // Reusing this component
+import ShotListDisplay from '@/tools/video-travel/components/ShotListDisplay';
 import ShotImageManager from '@/shared/components/ShotImageManager';
 import { Button } from '@/shared/components/ui/button';
 import { useQueryClient } from '@tanstack/react-query';
-import { arrayMove } from '@dnd-kit/sortable';
 import { toast } from 'sonner';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 
 const ShotsPage: React.FC = () => {
   const { selectedProjectId } = useProject();
-  const { data: shots, isLoading: isLoadingShots, error: shotsError, refetch: refetchShots } = useListShots(selectedProjectId);
-  const [selectedShot, setSelectedShot] = useState<Shot | null>(null);
-  const [managedImages, setManagedImages] = useState<GenerationRow[]>([]);
+  const { data: shots, isLoading: isLoadingShots, error: shotsError } = useListShots(selectedProjectId);
+  const { currentShotId, setCurrentShotId } = useCurrentShot();
 
   const queryClient = useQueryClient();
   const removeImageFromShotMutation = useRemoveImageFromShot();
@@ -22,109 +21,97 @@ const ShotsPage: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    // If project changes, or selected shot is no longer in the fetched list, deselect it
-    if (selectedShot && selectedProjectId) {
-      const currentShotExists = shots?.find(s => s.id === selectedShot.id && s.project_id === selectedProjectId);
-      if (!currentShotExists) {
-        setSelectedShot(null);
-        setManagedImages([]);
-      }
-    } else if (!selectedProjectId) {
-      setSelectedShot(null);
-      setManagedImages([]);
-    }
-  }, [selectedProjectId, shots, selectedShot]);
+  // DERIVE selectedShot from the single source of truth (the `shots` query)
+  const selectedShot = useMemo(() => {
+    if (!currentShotId || !shots) return null;
+    return shots.find(s => s.id === currentShotId) || null;
+  }, [currentShotId, shots]);
 
+  // Local state for the images being managed, which can be updated optimistically.
+  const [managedImages, setManagedImages] = useState<GenerationRow[]>([]);
+
+  // This effect syncs the managedImages with the derived selectedShot.
   useEffect(() => {
-    // Update managedImages when selectedShot changes
-    if (selectedShot && selectedShot.images) {
+    if (selectedShot?.images) {
       setManagedImages(selectedShot.images);
     } else {
       setManagedImages([]);
     }
   }, [selectedShot]);
 
+  // This effect handles selecting a shot based on navigation state.
   useEffect(() => {
-    if (location.state?.selectedShotId && shots && shots.length > 0) {
-      const shotToSelect = shots.find(s => s.id === location.state.selectedShotId);
+    const shotIdFromLocation = location.state?.selectedShotId;
+    if (shotIdFromLocation && shots && shots.length > 0) {
+      const shotToSelect = shots.find(s => s.id === shotIdFromLocation);
       if (shotToSelect) {
-        setSelectedShot(shotToSelect);
-        // Clear the state from location to prevent re-triggering on unrelated re-renders
+        setCurrentShotId(shotIdFromLocation);
         navigate(location.pathname, { replace: true, state: {} });
       }
     }
-  }, [location.state, shots, navigate, location.pathname]);
+  }, [location.state, shots, navigate, location.pathname, setCurrentShotId]);
 
   const handleSelectShot = (shot: Shot) => {
-    // Fetch the full shot details if necessary, or use the one from the list
-    // For now, assume `shot` from `useListShots` contains `images` array
-    setSelectedShot(shot);
+    setCurrentShotId(shot.id);
   };
 
   const handleBackToList = () => {
-    setSelectedShot(null);
+    setCurrentShotId(null);
   };
 
   const refreshSelectedShotImages = async () => {
-    if (selectedShot && selectedProjectId) {
-      // Invalidate and refetch the specific shot or the whole list
-      // For simplicity, refetching the whole list for the project will update the selected shot
+    if (currentShotId && selectedProjectId) {
       await queryClient.invalidateQueries({ queryKey: ['shots', selectedProjectId] });
-      // After refetch, the useEffect for [shots, selectedShot, selectedProjectId] should update selectedShot if it changed
-      // And then the useEffect for [selectedShot] will update managedImages
     }
   };
 
-  const handleDeleteImage = (generationId: string) => {
+  const handleDeleteImage = (shotImageEntryId: string) => {
     if (!selectedShot || !selectedProjectId) {
       toast.error('Cannot delete image: Shot or Project ID is missing.');
       return;
     }
 
+    const originalImages = selectedShot.images || [];
+    const updatedImages = originalImages.filter(img => img.shotImageEntryId !== shotImageEntryId);
+    setManagedImages(updatedImages); // Optimistic update
+
     removeImageFromShotMutation.mutate({
       shot_id: selectedShot.id,
-      generation_id: generationId,
+      shotImageEntryId: shotImageEntryId,
       project_id: selectedProjectId,
     }, {
       onSuccess: () => {
-        const updatedImages = managedImages.filter(img => img.id !== generationId);
-        setManagedImages(updatedImages);
-        refreshSelectedShotImages();
+        // The query invalidation will trigger a refetch and update the view.
+        // No need for refreshSelectedShotImages();
       },
       onError: (error) => {
         toast.error(`Failed to remove image: ${error.message}`);
+        setManagedImages(originalImages); // Revert optimistic update
       },
     });
   };
 
-  const handleReorderImage = (activeId: string, overId: string) => {
+  const handleReorderImage = (orderedShotGenerationIds: string[]) => {
     if (!selectedShot || !selectedProjectId) {
       toast.error('Cannot reorder images: Shot or Project ID is missing.');
       return;
     }
 
-    const oldIndex = managedImages.findIndex(img => img.id === activeId);
-    const newIndex = managedImages.findIndex(img => img.id === overId);
-    if (oldIndex === -1 || newIndex === -1) return;
+    const originalImages = selectedShot.images || [];
+    const imageMap = new Map(originalImages.map(img => [img.shotImageEntryId, img]));
+    const reorderedImages = orderedShotGenerationIds
+      .map(id => imageMap.get(id))
+      .filter((img): img is GenerationRow => !!img);
+    setManagedImages(reorderedImages); // Optimistic update
 
-    const newOrder = arrayMove(managedImages, oldIndex, newIndex);
-    setManagedImages(newOrder); // Optimistic update
-
-    const orderedGenerationIds = newOrder.map(img => img.id);
     updateShotImageOrderMutation.mutate({
       shotId: selectedShot.id,
-      orderedGenerationIds,
+      orderedShotGenerationIds,
       projectId: selectedProjectId,
     }, {
-      onSuccess: () => {        
-        // setSelectedShot(prev => prev ? { ...prev, images: newOrder } : null); // also update selectedShot
-        refreshSelectedShotImages(); // Refresh from source after optimistic update
-      },
       onError: (error) => {
         toast.error(`Failed to update image order: ${error.message}`);
-        // Revert optimistic update
-        setManagedImages(selectedShot.images || []); // Revert to original order from selectedShot
+        setManagedImages(originalImages); // Revert optimistic update
       },
     });
   };
@@ -157,7 +144,7 @@ const ShotsPage: React.FC = () => {
           <Button onClick={handleBackToList} className="mb-4">Back to All Shots</Button>
           <h2 className="text-2xl font-bold mb-4">Images in: {selectedShot.name}</h2>
           <ShotImageManager
-            images={managedImages} // Use the local managedImages state for optimistic updates
+            images={managedImages}
             onImageDelete={handleDeleteImage}
             onImageReorder={handleReorderImage}
             columns={8}

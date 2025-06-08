@@ -78,7 +78,7 @@ const ShotsPane: React.FC = () => {
           <NewGroupDropZone />
           {isLoading && <p className="text-white">Loading shots...</p>}
           {error && <p className="text-red-500">Error loading shots: {error.message}</p>}
-          {shots && shots.map(shot => <ShotGroup key={shot.id} shot={shot} />)}
+          {shots && shots.map(shot => <ShotGroup key={`${shot.id}-${shot.images?.length || 0}`} shot={shot} />)}
         </div>
       </div>
     </div>

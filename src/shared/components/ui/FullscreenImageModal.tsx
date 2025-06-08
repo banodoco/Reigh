@@ -8,6 +8,7 @@ import {
   TooltipTrigger
 } from "./tooltip"; // Updated
 import { useToast } from "@/shared/hooks/use-toast"; // Updated
+import { usePanes } from "@/shared/contexts/PanesContext"; // Added
 
 
 interface FullscreenImageModalProps {
@@ -20,6 +21,16 @@ interface FullscreenImageModalProps {
 const FullscreenImageModal: React.FC<FullscreenImageModalProps> = ({ imageUrl, imageAlt, imageId, onClose }) => {
   const [isDownloading, setIsDownloading] = useState(false); // State for download button loading
   const { toast } = useToast(); // Initialize useToast
+  
+  // Get pane state for positioning adjustments
+  const { 
+    isTasksPaneLocked, 
+    tasksPaneWidth, 
+    isShotsPaneLocked, 
+    shotsPaneWidth, 
+    isGenerationsPaneLocked, 
+    generationsPaneHeight 
+  } = usePanes();
 
   if (!imageUrl) return null;
 
@@ -71,10 +82,20 @@ const FullscreenImageModal: React.FC<FullscreenImageModalProps> = ({ imageUrl, i
     }
   };
 
+  // Calculate positioning adjustments for locked panes
+  const modalStyle = {
+    left: isShotsPaneLocked ? `${shotsPaneWidth}px` : '0px',
+    right: isTasksPaneLocked ? `${tasksPaneWidth}px` : '0px',
+    bottom: isGenerationsPaneLocked ? `${generationsPaneHeight}px` : '0px',
+    top: '0px',
+    transition: 'left 300ms ease-in-out, right 300ms ease-in-out, bottom 300ms ease-in-out',
+  };
+
   return (
     <TooltipProvider>
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 transition-opacity duration-300 ease-in-out"
+        className="fixed z-50 flex items-center justify-center bg-black bg-opacity-75 transition-opacity duration-300 ease-in-out"
+        style={modalStyle}
         onClick={onClose} // Close on backdrop click
       >
         <div

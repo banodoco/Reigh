@@ -6,7 +6,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/shared/components/ui/dialog";
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
@@ -14,30 +13,32 @@ import { Label } from "@/shared/components/ui/label";
 import { toast } from "sonner";
 
 interface SettingsModalProps {
+  isOpen: boolean;
+  onOpenChange: (isOpen: boolean) => void;
   currentFalApiKey: string;
   onSaveApiKeys: (falApiKey: string, openaiApiKey: string, replicateApiKey: string) => void;
 }
 
 const SettingsModal: React.FC<SettingsModalProps> = ({
+  isOpen,
+  onOpenChange,
   currentFalApiKey,
   onSaveApiKeys,
 }) => {
   const [falApiKey, setFalApiKey] = useState<string>(currentFalApiKey);
   const [openaiApiKey, setOpenaiApiKey] = useState<string>("");
   const [replicateApiKey, setReplicateApiKey] = useState<string>("");
-  const [isOpen, setIsOpen] = useState(false);
   const [isFalKeyMasked, setIsFalKeyMasked] = useState(false);
   const [isOpenAIKeyMasked, setIsOpenAIKeyMasked] = useState(false);
   const [isReplicateKeyMasked, setIsReplicateKeyMasked] = useState(false);
 
   // Load API keys from localStorage if they exist
   useEffect(() => {
-    // For Fal.ai API key
+    setFalApiKey(currentFalApiKey);
     if (currentFalApiKey && currentFalApiKey !== '0b6f1876-0aab-4b56-b821-b384b64768fa:121392c885a381f93de56d701e3d532f') {
       setIsFalKeyMasked(true);
     }
     
-    // For OpenAI API key
     const storedOpenaiKey = localStorage.getItem('openai_api_key') || "";
     if (storedOpenaiKey) {
       setOpenaiApiKey(storedOpenaiKey);
@@ -49,7 +50,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       setReplicateApiKey(storedReplicateKey);
       setIsReplicateKeyMasked(true);
     }
-  }, [currentFalApiKey]);
+  }, [currentFalApiKey, isOpen]);
 
   const handleSave = () => {
     // Save the API keys and close the modal
@@ -67,7 +68,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       : replicateApiKey;
 
     onSaveApiKeys(newFalKey, newOpenAIKey, newReplicateKey);
-    setIsOpen(false);
+    onOpenChange(false);
     toast.success("Settings saved successfully");
   };
 
@@ -87,18 +88,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="absolute top-4 right-4 rounded-full"
-          title="Settings"
-        >
-          <Settings className="h-5 w-5" />
-          <span className="sr-only">Settings</span>
-        </Button>
-      </DialogTrigger>
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>API Settings</DialogTitle>

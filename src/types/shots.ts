@@ -9,6 +9,7 @@ export interface GenerationRow {
   type?: string | null;
   createdAt?: string;
   metadata?: any; // Added metadata field, consider a more specific type if known
+  isOptimistic?: boolean;
 }
 
 export interface Shot {

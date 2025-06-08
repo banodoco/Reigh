@@ -21,6 +21,7 @@ import {
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { toast } from 'sonner';
 import { ASPECT_RATIO_TO_RESOLUTION } from '@/shared/lib/aspectRatios';
+import { getRandomDummyName } from '../lib/dummyNames';
 
 interface CreateProjectModalProps {
   isOpen: boolean;
@@ -40,15 +41,16 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, 
   const { addNewProject, isCreatingProject } = useProject();
 
   const handleCreateProject = async () => {
-    if (!projectName.trim()) {
-      toast.error("Project name cannot be empty.");
-      return;
+    let finalProjectName = projectName.trim();
+    if (!finalProjectName) {
+      finalProjectName = getRandomDummyName();
     }
+
     if (!aspectRatio) {
       toast.error("Please select an aspect ratio.");
       return;
     }
-    const newProject = await addNewProject(projectName.trim(), aspectRatio);
+    const newProject = await addNewProject(finalProjectName, aspectRatio);
     if (newProject) {
       toast.success(`Project "${newProject.name}" created successfully!`);
       setProjectName('');
@@ -105,7 +107,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, 
           <Button 
             type="submit" 
             onClick={handleCreateProject} 
-            disabled={isCreatingProject || !projectName.trim() || !aspectRatio}
+            disabled={isCreatingProject || !aspectRatio}
           >
             {isCreatingProject ? "Creating..." : "Create Project"}
           </Button>

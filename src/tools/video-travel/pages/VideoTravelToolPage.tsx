@@ -7,6 +7,7 @@ import { useProject } from "@/shared/contexts/ProjectContext";
 import CreateShotModal from '../components/CreateShotModal';
 import ShotListDisplay from '../components/ShotListDisplay';
 import { useQueryClient } from '@tanstack/react-query';
+import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 // import { useLastAffectedShot } from '@/shared/hooks/useLastAffectedShot';
 
 // Placeholder data or logic to fetch actual data for VideoEditLayout
@@ -16,6 +17,7 @@ const VideoTravelToolPage: React.FC = () => {
   const { selectedProjectId } = useProject();
   const { data: shots, isLoading, error, refetch: refetchShots } = useListShots(selectedProjectId);
   const [selectedShot, setSelectedShot] = useState<Shot | null>(null);
+  const { setCurrentShotId } = useCurrentShot();
   const createShotMutation = useCreateShot();
   const [isCreateShotModalOpen, setIsCreateShotModalOpen] = useState(false);
   const queryClient = useQueryClient();
@@ -49,7 +51,8 @@ const VideoTravelToolPage: React.FC = () => {
     if (!selectedProjectId) {
       if (selectedShot) {
         setSelectedShot(null);
-        setVideoPairConfigs([]); 
+        setVideoPairConfigs([]);
+        setCurrentShotId(null);
       }
       return;
     }
@@ -63,13 +66,15 @@ const VideoTravelToolPage: React.FC = () => {
         } else {
           setSelectedShot(null);
           setVideoPairConfigs([]);
+          setCurrentShotId(null);
         }
       }
     } else if (!isLoading && selectedShot) {
       setSelectedShot(null);
       setVideoPairConfigs([]);
+      setCurrentShotId(null);
     }
-  }, [shots, selectedShot, selectedProjectId, isLoading]);
+  }, [shots, selectedShot, selectedProjectId, isLoading, setCurrentShotId]);
 
   useEffect(() => {
     if (selectedShot?.images && selectedShot.images.length >= 2) {
@@ -93,11 +98,13 @@ const VideoTravelToolPage: React.FC = () => {
 
   const handleShotSelect = (shot: Shot) => {
     setSelectedShot(shot);
+    setCurrentShotId(shot.id);
   };
 
   const handleBackToShotList = () => {
     setSelectedShot(null);
     setVideoPairConfigs([]);
+    setCurrentShotId(null);
   };
 
   const handleModalSubmitCreateShot = async (name: string) => {
@@ -117,6 +124,7 @@ const VideoTravelToolPage: React.FC = () => {
       
       // Select the newly created shot
       setSelectedShot(newShot);
+      setCurrentShotId(newShot.id);
       
       // Close the modal
       setIsCreateShotModalOpen(false);

@@ -22,6 +22,7 @@ import { Checkbox } from "@/shared/components/ui/checkbox";
 import { Label } from "@/shared/components/ui/label";
 import { nanoid } from "nanoid";
 import { formatDistanceToNow } from "date-fns";
+import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 
 // Define the structure for individual LoRA details within metadata
 export interface MetadataLora {
@@ -122,10 +123,11 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, isDeletin
   const [downloadingImageId, setDownloadingImageId] = useState<string | null>(null);
   const { toast } = useToast();
   const { setLastAffectedShotId } = useLastAffectedShot();
+  const { currentShotId } = useCurrentShot();
   const simplifiedShotOptions = React.useMemo(() => allShots.map(s => ({ id: s.id, name: s.name })), [allShots]);
 
   const [selectedShotIdLocal, setSelectedShotIdLocal] = useState<string>(() => 
-    lastShotId || (simplifiedShotOptions.length > 0 ? simplifiedShotOptions[0].id : "")
+    currentShotId || lastShotId || (simplifiedShotOptions.length > 0 ? simplifiedShotOptions[0].id : "")
   );
   const [showTickForImageId, setShowTickForImageId] = useState<string | null>(null);
 
@@ -150,8 +152,12 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, isDeletin
   };
 
   useEffect(() => {
-    setSelectedShotIdLocal(lastShotId || (simplifiedShotOptions.length > 0 ? simplifiedShotOptions[0].id : ""));
-  }, [lastShotId, simplifiedShotOptions]);
+    const newSelectedShotId = currentShotId || lastShotId || (simplifiedShotOptions.length > 0 ? simplifiedShotOptions[0].id : "");
+    setSelectedShotIdLocal(newSelectedShotId);
+    if (newSelectedShotId) {
+      setLastAffectedShotId(newSelectedShotId);
+    }
+  }, [currentShotId, lastShotId, simplifiedShotOptions, setLastAffectedShotId]);
 
   useEffect(() => {
     // When the component mounts or initialFilterState prop changes, update the filter state
@@ -237,8 +243,6 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, isDeletin
 
   const filteredImages = React.useMemo(() => {
     const galleryLogId = nanoid(5);
-    console.log(`[ImageGallery_${galleryLogId}] Received images for filtering:`, JSON.parse(JSON.stringify(images)));
-    console.log(`[ImageGallery_${galleryLogId}] filterByToolType: ${filterByToolType}, currentToolType: ${currentToolType}, mediaTypeFilter: ${mediaTypeFilter}`);
 
     let currentFiltered = images;
 
@@ -287,8 +291,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, isDeletin
         return true; // Should not be reached if filter is 'image' or 'video'
       });
     }
-    
-    console.log(`[ImageGallery_${galleryLogId}] Filtered images (filter ON):`, JSON.parse(JSON.stringify(currentFiltered)));
+        
     return currentFiltered;
   }, [images, filterByToolType, currentToolType, mediaTypeFilter]);
 
@@ -435,6 +438,8 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, isDeletin
                                         <SelectTrigger
                                             className="h-7 px-2 py-1 rounded-md bg-black/50 hover:bg-black/70 text-white text-xs min-w-[70px] max-w-[120px] truncate focus:ring-0 focus:ring-offset-0"
                                             aria-label="Select target shot"
+                                            onMouseEnter={(e) => e.stopPropagation()}
+                                            onMouseLeave={(e) => e.stopPropagation()}
                                         >
                                             <SelectValue placeholder="Shot..." />
                                         </SelectTrigger>
@@ -443,7 +448,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, isDeletin
                                         <p>Target Shot: {currentTargetShotName || "Select a shot"}</p>
                                     </TooltipContent>
                                 </Tooltip>
-                                <SelectContent>
+                                <SelectContent className="z-[9999]" style={{ zIndex: 10000 }}>
                                     {simplifiedShotOptions.map(shot => (
                                         <SelectItem key={shot.id} value={shot.id} className="text-xs">
                                             {shot.name}

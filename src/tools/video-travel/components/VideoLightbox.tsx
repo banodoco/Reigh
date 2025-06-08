@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom';
 import { X } from 'lucide-react';
 import { GenerationRow } from '@/types/shots';
 import HoverScrubVideo from '@/shared/components/HoverScrubVideo';
+import { usePanes } from '@/shared/contexts/PanesContext';
 
 interface VideoLightboxProps {
   video: GenerationRow;
@@ -10,9 +11,29 @@ interface VideoLightboxProps {
 }
 
 const VideoLightbox: React.FC<VideoLightboxProps> = ({ video, onClose }) => {
+  // Get pane state for positioning adjustments
+  const { 
+    isTasksPaneLocked, 
+    tasksPaneWidth, 
+    isShotsPaneLocked, 
+    shotsPaneWidth, 
+    isGenerationsPaneLocked, 
+    generationsPaneHeight 
+  } = usePanes();
+
+  // Calculate positioning adjustments for locked panes
+  const modalStyle = {
+    left: isShotsPaneLocked ? `${shotsPaneWidth}px` : '0px',
+    right: isTasksPaneLocked ? `${tasksPaneWidth}px` : '0px',
+    bottom: isGenerationsPaneLocked ? `${generationsPaneHeight}px` : '0px',
+    top: '0px',
+    transition: 'left 300ms ease-in-out, right 300ms ease-in-out, bottom 300ms ease-in-out',
+  };
+
   return ReactDOM.createPortal(
     <div 
-      className="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
+      className="fixed bg-black/80 flex items-center justify-center z-50"
+      style={modalStyle}
       onClick={onClose}
     >
       <div 

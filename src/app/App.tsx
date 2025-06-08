@@ -12,6 +12,8 @@ import { AppRoutes } from "./routes";
 import { ProjectProvider, useProject } from "@/shared/contexts/ProjectContext";
 import { useWebSocket } from '@/shared/hooks/useWebSocket';
 import { PanesProvider } from '@/shared/contexts/PanesContext';
+import { CurrentShotProvider } from '@/shared/contexts/CurrentShotContext';
+import { getRandomDummyName } from '@/shared/lib/dummyNames';
 
 const queryClient = new QueryClient();
 
@@ -109,8 +111,7 @@ const AppInternalContent = () => {
         setLastAffectedShotId(shotId);
 
       } else if (over.id === NEW_GROUP_DROPPABLE_ID && droppableZone.type === 'new-group-zone') {
-        const currentShotCount = shotsFromHook ? shotsFromHook.length : 0;
-        const newShotName = `Shot ${currentShotCount + 1}`;
+        const newShotName = getRandomDummyName();
         
         const newShot = await createShotMutation.mutateAsync({ shotName: newShotName, projectId: selectedProjectId });
         if (newShot && newShot.id) {
@@ -147,11 +148,13 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ProjectProvider>
-        <LastAffectedShotProvider>
-          <PanesProvider>
-            <AppInternalContent />
-          </PanesProvider>
-        </LastAffectedShotProvider>
+        <PanesProvider>
+          <LastAffectedShotProvider>
+            <CurrentShotProvider>
+              <AppInternalContent />
+            </CurrentShotProvider>
+          </LastAffectedShotProvider>
+        </PanesProvider>
       </ProjectProvider>
     </QueryClientProvider>
   );

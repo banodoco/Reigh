@@ -235,8 +235,8 @@ export const useAddImageToShot = () => {
 // Type for the arguments of useRemoveImageFromShot mutation
 interface RemoveImageFromShotArgs {
   shot_id: string;
-  generation_id: string;
-  project_id: string | null; // For invalidating correct query and optimistic updates
+  shotImageEntryId: string; // Changed from generation_id
+  project_id: string | null;
 }
 
 // Remove an image from a shot VIA API
@@ -246,10 +246,10 @@ export const useRemoveImageFromShot = () => {
     void, 
     Error,
     RemoveImageFromShotArgs,
-    { previousShots?: Shot[], project_id?: string | null, shot_id?: string, generation_id?: string }
+    { previousShots?: Shot[], project_id?: string | null }
   >({
-    mutationFn: async ({ shot_id, generation_id, project_id }) => { 
-      const response = await fetch(`/api/shots/${shot_id}/generations/${generation_id}`, {
+    mutationFn: async ({ shot_id, shotImageEntryId }: RemoveImageFromShotArgs) => {
+      const response = await fetch(`/api/shots/${shot_id}/generations/${shotImageEntryId}`, {
         method: 'DELETE',
       });
 
@@ -258,7 +258,7 @@ export const useRemoveImageFromShot = () => {
         throw new Error(errorData.message || `Failed to remove image from shot: ${response.statusText}`);
       }
     },
-    onMutate: async ({ shot_id, generation_id, project_id }) => {
+    onMutate: async ({ shot_id, shotImageEntryId, project_id }) => {
       if (!project_id) return { previousShots: [], project_id: null };
       await queryClient.cancelQueries({ queryKey: ['shots', project_id] });
       const previousShots = queryClient.getQueryData<Shot[]>(['shots', project_id]);
@@ -268,22 +268,23 @@ export const useRemoveImageFromShot = () => {
           if (shot.id === shot_id) {
             return {
               ...shot,
-              images: shot.images ? shot.images.filter(img => img.id !== generation_id) : [],
+              images: shot.images.filter(image => image.shotImageEntryId !== shotImageEntryId),
             };
           }
           return shot;
         })
       );
-      return { previousShots, project_id, shot_id, generation_id }; 
+      
+      return { previousShots, project_id };
     },
     onError: (err, args, context) => {
       console.error('Optimistic update failed for removeImageFromShot:', err);
-      if (context?.previousShots && context.project_id) { 
+      if (context?.previousShots && context.project_id) {
         queryClient.setQueryData<Shot[]>(['shots', context.project_id], context.previousShots);
       }
       toast.error(`Failed to remove image: ${err.message}`);
     },
-    onSettled: (data, error, { project_id, shot_id, generation_id }) => { 
+    onSettled: (data, error, { project_id }) => {
       if (project_id) {
         queryClient.invalidateQueries({ queryKey: ['shots', project_id] });
       }
@@ -401,62 +402,63 @@ export const useUpdateShotName = () => {
   });
 };
 
-// Args for updating image order
+// Type for the arguments of useUpdateShotImageOrder mutation
 interface UpdateShotImageOrderArgs {
   shotId: string;
-  orderedGenerationIds: string[];
+  orderedShotGenerationIds: string[]; // Changed from orderedGenerationIds
   projectId: string | null;
 }
 
-// Hook to update the order of images in a shot VIA API
+// Update the order of images in a shot VIA API
 export const useUpdateShotImageOrder = () => {
   const queryClient = useQueryClient();
   return useMutation<
-    void, 
+    void,
     Error,
     UpdateShotImageOrderArgs,
-    { previousShots?: Shot[], projectId?: string | null }
+    { previousShots?: Shot[], projectId: string | null }
   >({
-    mutationFn: async ({ shotId, orderedGenerationIds, projectId }) => {
+    mutationFn: async ({ shotId, orderedShotGenerationIds }: UpdateShotImageOrderArgs) => {
       const response = await fetch(`/api/shots/${shotId}/generations/order`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderedGenerationIds }),
+        body: JSON.stringify({ orderedShotGenerationIds }), // Changed payload key
       });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: response.statusText }));
-        throw new Error(errorData.message || `Failed to update image order: ${response.statusText}`);
+        throw new Error(errorData.message || 'Failed to update image order');
       }
     },
-    onMutate: async ({ shotId, orderedGenerationIds, projectId }) => {
+    onMutate: async ({ shotId, orderedShotGenerationIds, projectId }) => {
       if (!projectId) return { previousShots: [], projectId: null };
       await queryClient.cancelQueries({ queryKey: ['shots', projectId] });
       const previousShots = queryClient.getQueryData<Shot[]>(['shots', projectId]);
-
-      queryClient.setQueryData<Shot[]>(['shots', projectId], (oldShots = []) =>
-        oldShots.map(shot => {
+      
+      queryClient.setQueryData<Shot[]>(['shots', projectId], (oldShots = []) => {
+        return oldShots.map(shot => {
           if (shot.id === shotId) {
-            if (!shot.images) return shot; 
-            const imageMap = new Map(shot.images.map(img => [img.id, img]));
-            const reorderedImages = orderedGenerationIds
+            const imageMap = new Map(shot.images.map(img => [img.shotImageEntryId, img]));
+            const reorderedImages = orderedShotGenerationIds
               .map(id => imageMap.get(id))
-              .filter(img => img !== undefined) as GenerationRow[];
+              .filter((img): img is GenerationRow => !!img);
+            
             return { ...shot, images: reorderedImages };
           }
           return shot;
-        })
-      );
+        });
+      });
+
       return { previousShots, projectId };
     },
     onError: (err, args, context) => {
       console.error('Optimistic update failed for updateShotImageOrder:', err);
       if (context?.previousShots && context.projectId) {
-        queryClient.setQueryData<Shot[]>(['shots', context.projectId], context.previousShots);
+        queryClient.setQueryData(['shots', context.projectId], context.previousShots);
       }
       toast.error(`Failed to reorder images: ${err.message}`);
     },
-    onSettled: (data, error, { projectId, shotId }) => {
+    onSettled: (data, error, { projectId }) => {
       if (projectId) {
         queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
       }

@@ -21,18 +21,16 @@ import { cn } from '@/shared/lib/utils';
 
 export interface ShotImageManagerProps {
   images: GenerationRow[];
-  onImageDelete: (generationId: string) => void;
-  onImageReorder: (activeId: string, overId: string) => void; // Simplified for now, parent will handle array move
-  columns?: 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12; // Add a columns prop
-  // We might need projectId and shotId if delete/reorder logic is complex and internal,
-  // but passing callbacks for actions is generally cleaner.
+  onImageDelete: (shotImageEntryId: string) => void;
+  onImageReorder: (orderedShotGenerationIds: string[]) => void;
+  columns?: 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
 }
 
 const ShotImageManager: React.FC<ShotImageManagerProps> = ({
   images,
   onImageDelete,
   onImageReorder,
-  columns = 4, // Default to 4 columns
+  columns = 4,
 }) => {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
@@ -46,7 +44,10 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (over && active.id !== over.id) {
-      onImageReorder(active.id as string, over.id as string);
+      const oldIndex = images.findIndex((img) => img.shotImageEntryId === active.id);
+      const newIndex = images.findIndex((img) => img.shotImageEntryId === over.id);
+      const newOrder = arrayMove(images, oldIndex, newIndex);
+      onImageReorder(newOrder.map((img) => img.shotImageEntryId));
     }
   };
 
@@ -86,13 +87,13 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
       collisionDetection={closestCenter}
       onDragEnd={handleDragEnd}
     >
-      <SortableContext items={images.map(img => img.id)} strategy={rectSortingStrategy}>
+      <SortableContext items={images.map(img => img.shotImageEntryId)} strategy={rectSortingStrategy}>
         <div className={cn("grid gap-3", gridColsClass[columns])}>
           {images.map((image, index) => (
             <SortableImageItem
-              key={image.id}
+              key={image.shotImageEntryId}
               image={image}
-              onDelete={() => onImageDelete(image.id)}
+              onDelete={() => onImageDelete(image.shotImageEntryId)}
               onDoubleClick={() => setLightboxIndex(index)}
             />
           ))}

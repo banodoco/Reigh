@@ -4,6 +4,7 @@ import { X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { GenerationRow } from '@/types/shots';
 import HoverScrubVideo from '@/shared/components/HoverScrubVideo';
 import { getDisplayUrl } from '../lib/utils';
+import { usePanes } from '@/shared/contexts/PanesContext';
 
 interface MediaLightboxProps {
   media: GenerationRow;
@@ -18,6 +19,15 @@ const isVideo = (media: GenerationRow): boolean => {
 };
 
 const MediaLightbox: React.FC<MediaLightboxProps> = ({ media, onClose, onNext, onPrevious }) => {
+  const { 
+    isTasksPaneLocked, 
+    tasksPaneWidth, 
+    isShotsPaneLocked, 
+    shotsPaneWidth, 
+    isGenerationsPaneLocked, 
+    generationsPaneHeight 
+  } = usePanes();
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -28,9 +38,18 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({ media, onClose, onNext, o
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose, onNext, onPrevious]);
 
+  const modalStyle = {
+    left: isShotsPaneLocked ? `${shotsPaneWidth}px` : '0px',
+    right: isTasksPaneLocked ? `${tasksPaneWidth}px` : '0px',
+    bottom: isGenerationsPaneLocked ? `${generationsPaneHeight}px` : '0px',
+    top: '0px',
+    transition: 'left 300ms ease-in-out, right 300ms ease-in-out, bottom 300ms ease-in-out',
+  };
+
   return ReactDOM.createPortal(
     <div 
-      className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 animate-in fade-in"
+      className="fixed bg-black/80 flex items-center justify-center z-50 animate-in fade-in"
+      style={modalStyle}
       onClick={onClose}
     >
       <button 

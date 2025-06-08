@@ -256,32 +256,33 @@ shotsRouter.post('/shot_generations', asyncHandler(async (req: Request, res: Res
   }
 }));
 
-// DELETE /api/shots/:shotId/generations/:generationId - Unlink a generation from a shot
-shotsRouter.delete('/:shotId/generations/:generationId', asyncHandler(async (req: Request, res: Response) => {
-  const { shotId, generationId } = req.params;
+// DELETE /api/shots/:shotId/generations/:shotGenerationId - Unlink a generation from a shot
+shotsRouter.delete('/:shotId/generations/:shotGenerationId', asyncHandler(async (req: Request, res: Response) => {
+  const { shotId, shotGenerationId } = req.params;
 
   if (!shotId || typeof shotId !== 'string') {
     return res.status(400).json({ message: 'Shot ID is required' });
   }
-  if (!generationId || typeof generationId !== 'string') {
-    return res.status(400).json({ message: 'Generation ID is required' });
+  if (!shotGenerationId || typeof shotGenerationId !== 'string') {
+    return res.status(400).json({ message: 'Shot-Generation link ID is required' });
   }
 
   try {
+    // We can use the shotId from the URL to ensure the link belongs to the correct shot, which is good practice.
     const deletedLinkArray = await db.delete(shotGenerationsTable)
       .where(and(
-        eq(shotGenerationsTable.shotId, shotId),
-        eq(shotGenerationsTable.generationId, generationId)
+        eq(shotGenerationsTable.id, shotGenerationId),
+        eq(shotGenerationsTable.shotId, shotId) 
       ))
       .returning({ id: shotGenerationsTable.id });
 
     if (!deletedLinkArray || deletedLinkArray.length === 0) {
-      return res.status(404).json({ message: 'Link between shot and generation not found' });
+      return res.status(404).json({ message: 'Link between shot and generation not found, or it does not belong to the specified shot.' });
     }
 
     res.status(204).send(); // Successfully unlinked
   } catch (error: any) {
-    console.error(`[API Error Unlinking Generation ${generationId} from Shot ${shotId}]`, error);
+    console.error(`[API Error Unlinking Shot-Generation ${shotGenerationId} from Shot ${shotId}]`, error);
     res.status(500).json({ message: 'Failed to unlink generation from shot' });
   }
 }));
@@ -289,53 +290,43 @@ shotsRouter.delete('/:shotId/generations/:generationId', asyncHandler(async (req
 // PUT /api/shots/:shotId/generations/order - Update the order of generations in a shot
 shotsRouter.put('/:shotId/generations/order', asyncHandler(async (req: Request, res: Response) => {
   const { shotId } = req.params;
-  const { orderedGenerationIds } = req.body as { orderedGenerationIds: string[] };
+  const { orderedShotGenerationIds } = req.body as { orderedShotGenerationIds: string[] };
 
   if (!shotId || typeof shotId !== 'string') {
     return res.status(400).json({ message: 'Shot ID is required' });
   }
-  if (!Array.isArray(orderedGenerationIds) || !orderedGenerationIds.every(id => typeof id === 'string')) {
-    return res.status(400).json({ message: 'orderedGenerationIds must be an array of strings' });
+  if (!Array.isArray(orderedShotGenerationIds) || !orderedShotGenerationIds.every(id => typeof id === 'string')) {
+    return res.status(400).json({ message: 'orderedShotGenerationIds must be an array of strings' });
   }
 
   try {
-    // First, verify the shot exists to provide a better error message if not.
-    const shotExists = await db.query.shots.findFirst({
-      where: eq(shotsTable.id, shotId),
-      columns: { id: true }
-    });
-
-    if (!shotExists) {
-      return res.status(404).json({ message: 'Shot not found' });
-    }
-
-    // Sequentially update each link's position. While this is not a single DB transaction, SQLite
-    // executions are still atomic per-statement and this approach avoids Better-SQLite3's
-    // limitation that a transaction callback cannot be asynchronous.
-    for (let index = 0; index < orderedGenerationIds.length; index++) {
-      const generationId = orderedGenerationIds[index];
+    // For SQLite, we perform sequential updates. While not a single transaction,
+    // each statement is atomic. The previous implementation noted that async callbacks
+    // in db.transaction are problematic with better-sqlite3.
+    for (let index = 0; index < orderedShotGenerationIds.length; index++) {
+      const shotGenerationId = orderedShotGenerationIds[index];
+      
       const result = await db.update(shotGenerationsTable)
         .set({ position: index })
-        .where(and(eq(shotGenerationsTable.shotId, shotId), eq(shotGenerationsTable.generationId, generationId)));
-
-      // In Drizzle (better-sqlite3) the result contains a `rowsAffected` field; fall back to length checks
-      // for broader driver compatibility.
-      // @ts-ignore – type shapes differ per driver
-      const affected = (result?.rowsAffected ?? result?.changes ?? 0);
-      if (affected === 0) {
-        throw new Error(`Link for generation ${generationId} not found in shot ${shotId}`);
+        .where(and(
+          eq(shotGenerationsTable.id, shotGenerationId),
+          eq(shotGenerationsTable.shotId, shotId)
+        ));
+      
+      // @ts-ignore
+      const rowsAffected = result.rowsAffected ?? result.changes ?? result.rowCount ?? 0;
+      if (rowsAffected === 0) {
+        throw new Error(`Shot-Generation link with ID ${shotGenerationId} not found in shot ${shotId}. Order update failed.`);
       }
     }
 
     res.status(200).json({ message: 'Image order updated successfully' });
   } catch (error: any) {
     console.error(`[API Error Updating Generation Order for Shot ${shotId}]`, error);
-    // Check for foreign key constraint errors if a generationId doesn't exist
-    // This depends on the DB and Drizzle error structure, e.g., error.code or message inspection
-    if (error.message && error.message.includes('violates foreign key constraint')) {
-        return res.status(400).json({ message: 'Invalid generation ID provided in the order. One or more generations do not exist.' });
+    if (error.message.includes('not found in shot')) {
+      return res.status(404).json({ message: error.message });
     }
-    res.status(500).json({ message: 'Failed to update image order' });
+    res.status(500).json({ message: 'Failed to update image order due to an internal error.' });
   }
 }));
 

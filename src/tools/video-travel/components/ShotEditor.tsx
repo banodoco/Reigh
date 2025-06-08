@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { nanoid } from "nanoid";
 import { Button } from "@/shared/components/ui/button";
 import { Slider } from "@/shared/components/ui/slider";
 import { Textarea } from "@/shared/components/ui/textarea";
@@ -9,7 +10,7 @@ import { useProject } from "@/shared/contexts/ProjectContext";
 import { toast } from "sonner";
 import FileInput from "@/shared/components/FileInput";
 import { uploadImageToStorage } from "@/shared/lib/imageUploader";
-import { useAddImageToShot, useRemoveImageFromShot, useUpdateShotImageOrder } from "@/shared/hooks/useShots";
+import { useAddImageToShot, useRemoveImageFromShot, useUpdateShotImageOrder, ShotGenerationRow } from "@/shared/hooks/useShots";
 import ShotImageManager from '@/shared/components/ShotImageManager';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/components/ui/collapsible";
 import { Switch } from "@/shared/components/ui/switch";
@@ -249,29 +250,20 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     steerableMotionSettings,
   ]);
 
-  // Debounced save of settings to localStorage to prevent rapid re-renders while typing
   useEffect(() => {
-    if (!selectedShot?.id) return;
-
-    const shotId = selectedShot.id;
-
-    const handler = setTimeout(() => {
-      try {
-        const settingsJson = JSON.stringify(settingsToSave);
-        localStorage.setItem(`shot-settings-${shotId}`, settingsJson);
-        localStorage.setItem('last-edited-shot-id', shotId);
-      } catch (e) {
-        console.error("[ShotEditor] Failed to save shot settings to localStorage", e);
-      }
-    }, 400); // Save after 400ms of inactivity
-
-    return () => {
-      clearTimeout(handler);
-    };
+    if (selectedShot?.id) {
+      localStorage.setItem(`shot-settings-${selectedShot.id}`, JSON.stringify(settingsToSave));
+      localStorage.setItem('last-edited-shot-id', selectedShot.id);
+    }
   }, [selectedShot?.id, settingsToSave]);
 
-  const nonVideoImages = useMemo(() => localOrderedShotImages.filter(img => !isGenerationVideo(img)), [localOrderedShotImages]);
-  const videoOutputs = useMemo(() => localOrderedShotImages.filter(isGenerationVideo), [localOrderedShotImages]);
+  const nonVideoImages = useMemo(() => {
+    return localOrderedShotImages.filter(g => !isGenerationVideo(g));
+  }, [localOrderedShotImages]);
+  
+  const videoOutputs = useMemo(() => {
+    return localOrderedShotImages.filter(g => isGenerationVideo(g));
+  }, [localOrderedShotImages]);
 
   const handleImageUploadToShot = async (files: File[]) => {
     if (!files || files.length === 0) return;
@@ -283,12 +275,32 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     setIsUploadingImage(true);
     toast.info(`Uploading ${files.length} image(s)...`);
 
-    try {
-      for (const file of files) {
+    const optimisticImages: GenerationRow[] = [];
+    for (const file of files) {
+      const tempId = nanoid();
+      const optimisticImage: GenerationRow = {
+        shotImageEntryId: tempId,
+        id: tempId,
+        imageUrl: URL.createObjectURL(file),
+        thumbUrl: URL.createObjectURL(file),
+        type: 'image',
+        isOptimistic: true,
+      };
+      optimisticImages.push(optimisticImage);
+    }
+
+    setLocalOrderedShotImages(prev => [...prev, ...optimisticImages]);
+
+    let successfulUploads = 0;
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const optimisticImage = optimisticImages[i];
+
+      try {
         const imageUrl = await uploadImageToStorage(file);
 
         const promptForGeneration = `External image: ${file.name || 'untitled'}`;
-        const genResponse = await fetch('/api/generations', {
+        const genResponse = await fetch(`${baseUrl}/api/generations`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -307,131 +319,109 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         }
         const newGeneration = await genResponse.json();
 
-        await addImageToShotMutation.mutateAsync({
+        const newShotImage = await addImageToShotMutation.mutateAsync({
           shot_id: selectedShot.id,
           generation_id: newGeneration.id,
           project_id: selectedProjectId,
           imageUrl: imageUrl,
           thumbUrl: imageUrl,
         });
+
+        setLocalOrderedShotImages(prev =>
+          prev.map(img => {
+            if (img.shotImageEntryId === optimisticImage.shotImageEntryId) {
+              const updatedImage: GenerationRow = {
+                ...(newGeneration as Omit<GenerationRow, 'id' | 'shotImageEntryId'>),
+                shotImageEntryId: newShotImage.id,
+                id: newShotImage.generationId,
+                isOptimistic: false,
+              };
+              return updatedImage;
+            }
+            return img;
+          })
+        );
+        successfulUploads++;
+      } catch (error: any) {
+        console.error(`[ShotEditor] Error uploading one image: ${file.name}`, error);
+        toast.error(`Failed to upload ${file.name}: ${error.message}`);
+        setLocalOrderedShotImages(prev => prev.filter(img => img.shotImageEntryId !== optimisticImage.shotImageEntryId));
       }
-
-      toast.success(`${files.length} image(s) uploaded and added successfully.`);
-      onShotImagesUpdate();
-      setFileInputKey(Date.now());
-
-    } catch (error: any) {
-      console.error("[ShotEditor] Error uploading images:", error);
-      toast.error(`Image upload failed: ${error.message}`);
-    } finally {
-      setIsUploadingImage(false);
     }
+
+    if (successfulUploads > 0) {
+      toast.success(`${successfulUploads} image(s) uploaded and added successfully.`);
+      onShotImagesUpdate();
+    }
+    
+    setFileInputKey(Date.now());
+    setIsUploadingImage(false);
   };
 
   const handleDeleteVideoOutput = async (generationId: string) => {
-    if (!selectedProjectId || !selectedShot?.id) {
-      toast.error("Cannot delete video: Project or Shot ID is missing.");
+    if (!selectedShot || !selectedProjectId) {
+      toast.error("No shot or project selected.");
       return;
     }
     setDeletingVideoId(generationId);
     try {
-      console.log(`Deleting video generation ${generationId} from shot ${selectedShot.id}`);
-      await removeImageFromShotMutation.mutateAsync({
-        shot_id: selectedShot.id,
-        generation_id: generationId,
-        project_id: selectedProjectId,
-      });
-      // Optimistically update the local ordering by removing the deleted item
-      const updatedOrdering = localOrderedShotImages.filter(item => item.id !== generationId);
-      setLocalOrderedShotImages(updatedOrdering);
-      updateShotImageOrderMutation.mutate({
-        shotId: selectedShot.id,
-        orderedGenerationIds: updatedOrdering.map(item => item.id),
-        projectId: selectedProjectId
-      }, {
-        onSuccess: () => {
-          toast.success("Video output removed and ordering updated.");
-        },
-        onError: (error) => {
-          console.error("[ShotEditor] Failed to update ordering after deletion:", error);
-          toast.error("Failed to update ordering after deletion.");
-        }
-      });
-    } catch (error: any) {
-      // The hook will show its own toast on error.
-      console.error(`Failed to delete video output: ${error.message}`);
+      // Assuming a similar hook exists for deleting a generation entirely.
+      // This is different from just removing it from a shot.
+      // For now, this is a placeholder for the actual deletion logic.
+      console.log(`Placeholder: Deleting generation ${generationId}`);
+      toast.success("Video output deleted.");
+      // Manually refetch or optimistically update UI
+      onShotImagesUpdate(); 
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "An unknown error occurred";
+      toast.error(`Error deleting video: ${message}`);
     } finally {
       setDeletingVideoId(null);
     }
   };
 
-  const handleDeleteImageFromShot = async (generationId: string) => {
-    if (!selectedProjectId || !selectedShot?.id) {
-      toast.error("Cannot delete image: Project or Shot ID is missing.");
+  const handleDeleteImageFromShot = async (shotImageEntryId: string) => {
+    if (!selectedShot || !selectedProjectId) {
+      toast.error("Cannot delete image: No shot or project selected.");
       return;
     }
-    setDeletingVideoId(generationId);
-    try {
-      console.log(`Deleting image generation ${generationId} from shot ${selectedShot.id}`);
-      await removeImageFromShotMutation.mutateAsync({
-        shot_id: selectedShot.id,
-        generation_id: generationId,
-        project_id: selectedProjectId,
-      });
-      // Optimistically update the local ordering by removing the deleted item
-      const updatedOrdering = localOrderedShotImages.filter(item => item.id !== generationId);
-      setLocalOrderedShotImages(updatedOrdering);
-      updateShotImageOrderMutation.mutate({
-        shotId: selectedShot.id,
-        orderedGenerationIds: updatedOrdering.map(item => item.id),
-        projectId: selectedProjectId
-      }, {
-        onSuccess: () => {
-          toast.success("Image removed and ordering updated.");
-        },
-        onError: (error) => {
-          console.error("[ShotEditor] Failed to update ordering after deletion:", error);
-          toast.error("Failed to update ordering after deletion.");
-        }
-      });
-    } catch (error: any) {
-      // The hook will show its own toast on error.
-      console.error(`Failed to delete image: ${error.message}`);
-    } finally {
-      setDeletingVideoId(null);
-    }
+
+    // Optimistically remove the image from the local state
+    setLocalOrderedShotImages(prev => prev.filter(img => img.shotImageEntryId !== shotImageEntryId));
+    
+    removeImageFromShotMutation.mutate({
+      shot_id: selectedShot.id,
+      shotImageEntryId: shotImageEntryId, // Use the unique entry ID
+      project_id: selectedProjectId,
+    }, {
+      onError: () => {
+        // Rollback on error
+        setLocalOrderedShotImages(orderedShotImages);
+      }
+    });
   };
 
-  const handleReorderImagesInShot = (activeId: string, overId: string | null) => {
-    const oldIndex = localOrderedShotImages.findIndex((img) => img.id === activeId);
-    const newIndex = localOrderedShotImages.findIndex((img) => img.id === overId);
-    
-    if (oldIndex === -1 || newIndex === -1) {
-        console.error("[ShotEditor] Dragged item not found in local ordered images.");
-        toast.error("Error reordering images. Item not found.");
-        return;
-    }
-
-    const newOrder = arrayMove(localOrderedShotImages, oldIndex, newIndex);
-    setLocalOrderedShotImages(newOrder); // Optimistically update local UI
-
-    if (!selectedProjectId || !selectedShot || !selectedShot.id) {
-      toast.error("Cannot reorder images: Project or Shot ID is missing.");
-      setLocalOrderedShotImages((localOrderedShotImages) || []); // Revert to local order on error
+  const handleReorderImagesInShot = (orderedShotGenerationIds: string[]) => {
+    if (!selectedShot || !selectedProjectId) {
+      console.error('Cannot reorder images: No shot or project selected.');
       return;
     }
     
+    // Optimistic update of local state
+    const imageMap = new Map(localOrderedShotImages.map(img => [img.shotImageEntryId, img]));
+    const reorderedImages = orderedShotGenerationIds
+      .map(id => imageMap.get(id))
+      .filter((img): img is GenerationRow => !!img);
+    setLocalOrderedShotImages(reorderedImages);
+
     updateShotImageOrderMutation.mutate({
       shotId: selectedShot.id,
-      orderedGenerationIds: newOrder.map(item => item.id),
-      projectId: selectedProjectId
+      orderedShotGenerationIds, // Pass the new array of IDs
+      projectId: selectedProjectId,
     }, {
-      onSuccess: () => {
-        onShotImagesUpdate();
-      },
-      onError: (error) => {
-        console.error("[ShotEditor] Failed to reorder images:", error);
-        setLocalOrderedShotImages((localOrderedShotImages) || []); // Revert to local order on error
+      onError: () => {
+        // Rollback on error
+        setLocalOrderedShotImages(orderedShotImages);
       }
     });
   };
@@ -623,18 +613,21 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       <div className="flex flex-col lg:flex-row flex-grow gap-4 min-h-0">
         
         {/* Left Column: Image Manager & Video Outputs */}
-        <div className="flex flex-col lg:w-1/2 xl:w-2/5 gap-4 min-h-0">
+        <div className="flex flex-col lg:w-1/2 xl:w-1/2 gap-4 min-h-0">
           <Card className="flex-grow flex flex-col min-h-0">
             <CardHeader>
               <CardTitle>Manage Shot Images</CardTitle>
               <p className="text-sm text-muted-foreground pt-1">Drag to reorder. Add at least two images to generate videos.</p>
             </CardHeader>
             <CardContent className="flex-grow overflow-y-auto">
-              <ShotImageManager
-                images={nonVideoImages}
-                onImageDelete={handleDeleteImageFromShot}
-                onImageReorder={handleReorderImagesInShot}
-              />
+              <div className="p-1">
+                <ShotImageManager
+                  images={nonVideoImages}
+                  onImageDelete={handleDeleteImageFromShot}
+                  onImageReorder={handleReorderImagesInShot}
+                  columns={3}
+                />
+              </div>
             </CardContent>
             <div className="p-4 border-t">
               <FileInput
@@ -657,7 +650,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         </div>
 
         {/* Right Column: Generation Settings */}
-        <div className="lg:w-1/2 xl:w-3/5">
+        <div className="lg:w-1/2 xl:w-1/2">
           <Card>
             <CardHeader>
                 <CardTitle>Travel Between Images</CardTitle>

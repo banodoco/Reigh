@@ -19,7 +19,7 @@ import { Label } from '@/shared/components/ui/label';
 
 interface SortableImageItemProps {
   image: GenerationRow;
-  onDelete: (generationId: string) => void;
+  onDelete: (shotImageEntryId: string) => void;
   onDoubleClick: () => void;
 }
 
@@ -41,7 +41,7 @@ const getDisplayUrl = (relativePath: string | undefined): string => {
 };
 
 export const SortableImageItem: React.FC<SortableImageItemProps> = ({ image, onDelete, onDoubleClick }) => {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: image.id });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: image.shotImageEntryId });
   const [isConfirmDeleteDialogOpen, setIsConfirmDeleteDialogOpen] = useState(false);
   const [skipConfirmationNextTimeVisual, setSkipConfirmationNextTimeVisual] = useState(false);
   const currentDialogSkipChoiceRef = useRef(false);
@@ -57,7 +57,7 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({ image, onD
     e.stopPropagation();
     const shouldSkipConfirmation = sessionStorage.getItem(SKIP_CONFIRMATION_KEY) === 'true';
     if (shouldSkipConfirmation) {
-      onDelete(image.id);
+      onDelete(image.shotImageEntryId);
     } else {
       setSkipConfirmationNextTimeVisual(false);
       currentDialogSkipChoiceRef.current = false;
@@ -66,7 +66,7 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({ image, onD
   };
 
   const handleConfirmDelete = () => {
-    onDelete(image.id);
+    onDelete(image.shotImageEntryId);
     if (currentDialogSkipChoiceRef.current) {
       sessionStorage.setItem(SKIP_CONFIRMATION_KEY, 'true');
     }

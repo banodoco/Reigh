@@ -28,8 +28,25 @@ interface ProjectContextType {
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 
-// Dummy User ID - replace with actual user management later
-const DUMMY_USER_ID = '00000000-0000-0000-0000-000000000000'; // A valid UUID
+// Dummy User ID is managed server-side and no longer needed here.
+
+const determineProjectIdToSelect = (
+  projects: Project[],
+  preferredId: string | null | undefined,
+  storedId: string | null
+): string | null => {
+  if (!projects.length) return null;
+
+  const projectIds = new Set(projects.map(p => p.id));
+
+  if (preferredId && projectIds.has(preferredId)) {
+    return preferredId;
+  }
+  if (storedId && projectIds.has(storedId)) {
+    return storedId;
+  }
+  return projects[0].id;
+};
 
 export const ProjectProvider = ({ children }: { children: ReactNode }) => {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -41,50 +58,30 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
   const fetchProjects = async (selectProjectIdAfterFetch?: string | null) => {
     setIsLoadingProjects(true);
     try {
-      const response = await fetch('/api/projects'); // API call
+      const response = await fetch('/api/projects');
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: response.statusText }));
         throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
       }
-      const fetchedDataFromApi: any[] = await response.json();
+      const fetchedProjects: Project[] = await response.json();
 
-      // Map API response (userId) to client Project type (user_id)
-      const mappedProjects: Project[] = fetchedDataFromApi.map(p => ({
-        id: p.id,
-        name: p.name,
-        user_id: p.userId, // Assuming API returns userId
-        aspectRatio: p.aspectRatio, // Map aspectRatio from API response
-      }));
+      setProjects(fetchedProjects);
 
-      // API handles default project creation, so client expects projects array (possibly with default)
-      setProjects(mappedProjects);
-
-      if (mappedProjects.length > 0) {
-        if (selectProjectIdAfterFetch && mappedProjects.find(p => p.id === selectProjectIdAfterFetch)) {
-          setSelectedProjectIdState(selectProjectIdAfterFetch);
-          localStorage.setItem('selectedProjectId', selectProjectIdAfterFetch);
-        } else {
-          const storedProjectId = localStorage.getItem('selectedProjectId');
-          if (storedProjectId && mappedProjects.find(p => p.id === storedProjectId)) {
-            setSelectedProjectIdState(storedProjectId);
-          } else {
-            // If no specific project to select, and there are projects, select the first one.
-            setSelectedProjectIdState(mappedProjects[0].id);
-            localStorage.setItem('selectedProjectId', mappedProjects[0].id);
-          }
+      if (fetchedProjects.length > 0) {
+        const storedProjectId = localStorage.getItem('selectedProjectId');
+        const projectIdToSelect = determineProjectIdToSelect(fetchedProjects, selectProjectIdAfterFetch, storedProjectId);
+        setSelectedProjectIdState(projectIdToSelect);
+        if (projectIdToSelect) {
+            localStorage.setItem('selectedProjectId', projectIdToSelect);
         }
       } else {
-        // This case should ideally not be hit if API guarantees a default project.
-        // If it is, means API returned empty array, which is unexpected if default project logic is robust on server.
         console.warn("API returned no projects, and no default project was provided by the API.");
         setSelectedProjectIdState(null);
-        // Potentially show a specific message or handle this state if it's possible.
       }
-
     } catch (error: any) {
       console.error('[ProjectContext] Error fetching projects via API:', error);
       toast.error(`Failed to load projects: ${error.message}`);
-      setProjects([]); // Clear projects on error
+      setProjects([]);
       setSelectedProjectIdState(null);
     }
     setIsLoadingProjects(false);
@@ -96,8 +93,8 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
       return null;
     }
     if (!aspectRatio) {
-        toast.error("Aspect ratio cannot be empty.");
-        return null;
+      toast.error("Aspect ratio cannot be empty.");
+      return null;
     }
     setIsCreatingProject(true);
     try {
@@ -108,19 +105,10 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
       });
 
       if (!response.ok) {
-        // Try to parse error json, otherwise use statusText
         const errorData = await response.json().catch(() => ({ message: response.statusText }));
         throw new Error(errorData.message || `HTTP error! status: ${response.status} - ${response.statusText}`);
       }
-      const newProjectFromApi: any = await response.json(); // API returns the created project
-
-      // Map API response (user_id from RFC for POST response) to client Project type
-      const newProject: Project = {
-        id: newProjectFromApi.id,
-        name: newProjectFromApi.name,
-        user_id: newProjectFromApi.user_id, // POST API returns user_id as per RFC
-        aspectRatio: newProjectFromApi.aspectRatio, // Add aspectRatio from API response
-      };
+      const newProject: Project = await response.json();
 
       setProjects(prevProjects => [...prevProjects, newProject].sort((a, b) => a.name.localeCompare(b.name)));
       setSelectedProjectIdState(newProject.id);

@@ -1,11 +1,12 @@
 import express, { Request, Response, NextFunction } from 'express';
 import { db } from '@/lib/db'; // Adjusted path from @/lib/db
-import { projects as projectsTable, ProjectUpdate } from '../../../db/schema/schema';
+import { projects as projectsTable, users as usersTable, ProjectUpdate } from '../../../db/schema/schema';
 import { eq, asc, desc, and } from 'drizzle-orm';
 import { Project } from '@/types/project';
 
 const projectsRouter = express.Router();
-const DUMMY_USER_ID = '00000000-0000-0000-0000-000000000000'; // As per RFC
+// This should be replaced with actual user session data in a real app
+const DUMMY_USER_ID = '3e3e3e3e-3e3e-3e3e-3e3e-3e3e3e3e3e3e';
 
 // Define an asyncHandler to wrap async route handlers
 const asyncHandler = (fn: (req: Request, res: Response, next: NextFunction) => Promise<any>) => {
@@ -16,10 +17,7 @@ const asyncHandler = (fn: (req: Request, res: Response, next: NextFunction) => P
 
 // GET /api/projects
 projectsRouter.get('/', asyncHandler(async (req: Request, res: Response) => {
-  // console.log('[API] GET /api/projects: Request received.');
-
-  // Hardcoded for now, will be replaced with actual user session data
-  const DUMMY_USER_ID = '3e3e3e3e-3e3e-3e3e-3e3e-3e3e3e3e3e3e'; 
+  // Hardcoded user ID is now defined at the module level.
   // console.log(`[API] GET /api/projects: Querying projects for user: ${DUMMY_USER_ID}`);
 
   try {
@@ -56,6 +54,7 @@ projectsRouter.get('/', asyncHandler(async (req: Request, res: Response) => {
     const projects: Project[] = fetchedData.map(p => ({
       id: p.id,
       name: p.name,
+      user_id: p.userId,
       aspectRatio: p.aspectRatio,
     }));
 
@@ -86,6 +85,13 @@ projectsRouter.post('/', asyncHandler(async (req: Request, res: Response) => {
       // or set a default if not provided, though the frontend should always send it.
       // If it becomes strictly required, this check can be enforced.
       // return res.status(400).json({ message: 'Aspect ratio is required and must be a non-empty string' });
+    }
+
+    // Ensure the dummy user exists before creating a project
+    const existingUser = await db.select().from(usersTable).where(eq(usersTable.id, DUMMY_USER_ID));
+    if (existingUser.length === 0) {
+      console.log(`[API] User ${DUMMY_USER_ID} not found, creating it.`);
+      await db.insert(usersTable).values({ id: DUMMY_USER_ID, name: 'Default User' });
     }
 
     const newProjects = await db.insert(projectsTable).values({

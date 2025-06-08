@@ -10,6 +10,7 @@ import {
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
+import { getRandomDummyName } from '@/shared/lib/dummyNames';
 
 interface CreateShotModalProps {
   isOpen: boolean;
@@ -22,12 +23,11 @@ const CreateShotModal: React.FC<CreateShotModalProps> = ({ isOpen, onClose, onSu
   const [shotName, setShotName] = useState('');
 
   const handleSubmit = async () => {
-    if (!shotName.trim()) {
-      // Basic validation, or rely on parent/hook to toast
-      alert('Shot name cannot be empty.'); 
-      return;
+    let finalShotName = shotName.trim();
+    if (!finalShotName) {
+      finalShotName = getRandomDummyName();
     }
-    await onSubmit(shotName.trim());
+    await onSubmit(finalShotName);
     setShotName(''); // Reset input after submission
     // onClose(); // Parent can decide to close based on submission success/failure if needed
   };
@@ -59,7 +59,7 @@ const CreateShotModal: React.FC<CreateShotModalProps> = ({ isOpen, onClose, onSu
           <Button variant="outline" onClick={onClose} disabled={isLoading}>
             Cancel
           </Button>
-          <Button type="submit" onClick={handleSubmit} disabled={isLoading || !shotName.trim()}>
+          <Button type="submit" onClick={handleSubmit} disabled={isLoading}>
             {isLoading ? 'Creating...' : 'Save Shot'}
           </Button>
         </DialogFooter>
