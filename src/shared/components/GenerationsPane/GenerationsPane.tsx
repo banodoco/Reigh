@@ -10,16 +10,12 @@ import ImageGallery from '@/shared/components/ImageGallery';
 import { useLastAffectedShot } from '@/shared/hooks/useLastAffectedShot';
 import { useListShots, useAddImageToShot } from '@/shared/hooks/useShots';
 import { toast } from 'sonner';
-
-interface GenerationsPaneProps {
-  onLockStateChange?: (isLocked: boolean) => void;
-  paneHeight?: number;
-}
+import { usePanes } from '@/shared/contexts/PanesContext';
 
 const DEFAULT_PANE_HEIGHT = 350;
 const GENERATIONS_PER_PAGE = 24;
 
-const GenerationsPane: React.FC<GenerationsPaneProps> = ({ onLockStateChange, paneHeight = DEFAULT_PANE_HEIGHT }) => {
+const GenerationsPane: React.FC = () => {
   const { selectedProjectId } = useProject();
   const [page, setPage] = useState(1);
   const { data, isLoading, error } = useListGenerations(selectedProjectId, page, GENERATIONS_PER_PAGE);
@@ -27,9 +23,15 @@ const GenerationsPane: React.FC<GenerationsPaneProps> = ({ onLockStateChange, pa
   const { lastAffectedShotId, setLastAffectedShotId } = useLastAffectedShot();
   const addImageToShotMutation = useAddImageToShot();
 
+  const {
+    isGenerationsPaneLocked,
+    setIsGenerationsPaneLocked,
+    generationsPaneHeight,
+  } = usePanes();
+
   const { isLocked, toggleLock, hotZoneProps, paneProps, transformClass } = useSlidingPane({
     side: 'bottom',
-    onLockStateChange: onLockStateChange,
+    onLockStateChange: setIsGenerationsPaneLocked,
   });
 
   useEffect(() => {
@@ -94,16 +96,15 @@ const GenerationsPane: React.FC<GenerationsPaneProps> = ({ onLockStateChange, pa
       {!isLocked && (
         <div
           {...hotZoneProps}
-          className="fixed bottom-0 left-0 w-full h-[24px] bg-transparent z-40 pointer-events-auto"
-          style={{ opacity: 0 }}
+          className="fixed bottom-0 left-0 w-full h-[24px] bg-transparent z-[101]"
         />
       )}
 
       <div
         {...paneProps}
-        style={{ height: `${paneHeight}px` }}
+        style={{ height: `${generationsPaneHeight}px` }}
         className={cn(
-          `fixed bottom-0 left-0 w-full bg-zinc-900/95 border-t border-zinc-700 shadow-xl z-50 transform transition-transform duration-300 ease-in-out flex flex-col`,
+          `fixed bottom-0 left-0 w-full bg-zinc-900/95 border-t border-zinc-700 shadow-xl z-[100] transform transition-transform duration-300 ease-in-out flex flex-col`,
           transformClass
         )}
       >
@@ -122,7 +123,11 @@ const GenerationsPane: React.FC<GenerationsPaneProps> = ({ onLockStateChange, pa
                 </Button>
 
                 {/* Actions */}
-                <Button asChild variant="ghost" size="sm" className="text-zinc-400 hover:text-zinc-100">
+                <Button asChild variant="ghost" size="sm" className="text-zinc-400 hover:text-zinc-100" onClick={() => {
+                    if (isLocked) {
+                        toggleLock();
+                    }
+                }}>
                     <Link to="/generations">
                         View All
                         <ArrowUpIcon className="h-4 w-4 ml-1" />

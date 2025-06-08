@@ -4,50 +4,63 @@ import { cn } from '@/shared/lib/utils'; // For conditional classnames
 import { Button } from '@/shared/components/ui/button'; // For the lock button
 import { LockIcon, UnlockIcon } from 'lucide-react'; // Example icons
 import { useSlidingPane } from '@/shared/hooks/useSlidingPane';
+import { usePanes } from '@/shared/contexts/PanesContext';
 
-interface TasksPaneProps {
-  onLockStateChange?: (isLockedAndOpen: boolean, currentWidth: number) => void;
-  paneWidth?: number;
-}
+const TasksPane: React.FC = () => {
+  const {
+    isGenerationsPaneLocked,
+    generationsPaneHeight,
+    setIsTasksPaneLocked,
+    tasksPaneWidth,
+  } = usePanes();
 
-const DEFAULT_PANE_WIDTH = 350;
-
-const TasksPane: React.FC<TasksPaneProps> = ({ onLockStateChange, paneWidth = DEFAULT_PANE_WIDTH }) => {
   const { isLocked, isOpen, toggleLock, hotZoneProps, paneProps, transformClass } = useSlidingPane({
     side: 'right',
-    onLockStateChange: (isLocked) => onLockStateChange?.(isLocked, paneWidth),
+    onLockStateChange: setIsTasksPaneLocked,
   });
 
+  const bottomOffset = isGenerationsPaneLocked ? generationsPaneHeight : 0;
+
   return (
-    <>
+    <div
+      className="pointer-events-none"
+      style={{
+        position: 'fixed',
+        right: 0,
+        top: 0,
+        bottom: `${bottomOffset}px`,
+        width: `${tasksPaneWidth}px`,
+        zIndex: 60, // On top of header (z-50)
+        transition: 'bottom 300ms ease-in-out',
+      }}
+    >
       {!isLocked && (
         <div
           {...hotZoneProps}
-          className="fixed top-0 right-0 h-full w-[24px] bg-transparent z-40 pointer-events-auto"
-          style={{ opacity: 0 }} // Invisible but interactable
+          className="absolute top-0 right-0 h-full w-[24px] bg-transparent pointer-events-auto"
         />
       )}
 
       {/* Tasks Pane */}
       <div
         {...paneProps}
-        style={{ width: `${paneWidth}px` }}
         className={cn(
-          'fixed top-0 right-0 h-full bg-zinc-900/95 border-l border-zinc-600 shadow-xl z-50 transform transition-transform duration-300 ease-in-out flex flex-col',
+          'pointer-events-auto absolute top-0 right-0 h-full w-full bg-zinc-900/95 border-l border-zinc-600 shadow-xl transform transition-transform duration-300 ease-in-out flex flex-col',
           transformClass
         )}
       >
-        <div className="p-2 border-b border-zinc-800">
-          <Button variant="ghost" size="sm" onClick={toggleLock} className="text-zinc-400 hover:text-zinc-100">
-            {isLocked ? <LockIcon className="h-4 w-4 mr-1" /> : <UnlockIcon className="h-4 w-4 mr-1" />}
-            {isLocked ? 'Unlock' : 'Lock'}
-          </Button>
+        <div className="p-2 border-b border-zinc-800 flex items-center justify-between flex-shrink-0">
+            <h2 className="text-lg font-semibold text-zinc-200 ml-2">Tasks</h2>
+            <Button variant="ghost" size="sm" onClick={toggleLock} className="text-zinc-400 hover:text-zinc-100">
+                {isLocked ? <LockIcon className="h-4 w-4 mr-1" /> : <UnlockIcon className="h-4 w-4 mr-1" />}
+                {isLocked ? 'Unlock' : 'Lock'}
+            </Button>
         </div>
         <div className="flex-grow overflow-y-auto">
           <TaskList />
         </div>
       </div>
-    </>
+    </div>
   );
 };
 

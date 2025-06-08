@@ -235,6 +235,7 @@ To change which tools appear for a specific environment, you need to modify the 
 #### `src/shared/contexts/`
 • **`LastAffectedShotContext.tsx`**: Context to remember the last modified shot.
 • **`ProjectContext.tsx`**: Manages the selected project ID, fetches available projects, and provides project state to the application. It communicates with the backend API (`/api/projects`) to list, create, and update projects. Persists selection to `localStorage`. The API handles the creation of a "Default Project" if none exist. Provides `addNewProject` and `updateProject` functions (via API) and corresponding loading states (`isCreatingProject`, `isUpdatingProject`).
+• **`PanesContext.tsx`**: Manages the shared state for the application's sliding panes (`ShotsPane`, `TasksPane`, `GenerationsPane`). It centralizes the logic for their dimensions and lock states, providing a single source of truth to avoid prop-drilling and ensure consistent layout behavior.
 
 #### `src/shared/lib/`
 • **`imageUploader.ts`**: Uploads files to Supabase storage.
@@ -309,11 +310,12 @@ To change which tools appear for a specific environment, you need to modify the 
             c.  `POST /api/shots/shot_generations` called to link generation to shot (via `useAddImageToShot`).
         – External file drops handled by `useHandleExternalImageDrop`: Uploads to Supabase Storage, then uses API calls (`POST /api/generations`, `POST /api/shots/shot_generations`) to create `generations` and associate with `shots`.
 6.  **Side Panes (`ShotsPane.tsx`, `TasksPane.tsx`, `GenerationsPane.tsx`)**:
-    – Both panes are now managed by the `useSlidingPane` hook for consistent behavior.
-    – They are rendered globally in `Layout.tsx` and appear on all pages.
-    – They are hover-activated and can be locked open.
-    – When locked, they offset the main content and `GlobalHeader` to prevent overlap.
-    – The `GenerationsPane` slides up from the bottom and provides a paginated view of all generated media for the project.
+    – All three panes are rendered in `Layout.tsx` and their state (dimensions, lock status) is managed globally by `PanesContext`.
+    – They are hover-activated via the `useSlidingPane` hook and can be locked open.
+    – The side panes (`Shots`, `Tasks`) have a `z-index` that places them on top of the `GlobalHeader`. Their container uses `pointer-events-none` to allow click-through when closed, while the visible pane content re-enables pointer events.
+    – The `GenerationsPane` has the highest `z-index` to ensure it appears on top of the side panes.
+    – When panes are locked, `Layout.tsx` uses the context to apply appropriate margins to the main content area, preventing overlap.
+    – The `ShotsPane` and `TasksPane` dynamically adjust their `bottom` position based on whether the `GenerationsPane` is locked, ensuring they don't get cut off.
 7.  **Real-time Task Updates (WebSockets)**:
     – When the backend `taskProcessingService` completes processing a task (e.g., creating a video from a 'travel_stitch' task), it broadcasts a message via WebSockets.
     – The client-side `useWebSocket` hook receives this message and invalidates the relevant queries (e.g., for tasks and generations).

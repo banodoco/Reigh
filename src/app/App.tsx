@@ -1,3 +1,4 @@
+import React, { useContext } from 'react';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { TooltipProvider } from "@/shared/components/ui/tooltip";
 import { Toaster as Sonner } from "@/shared/components/ui/sonner";
@@ -6,18 +7,21 @@ import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { useHandleExternalImageDrop, useCreateShot, useAddImageToShot, useListShots } from "@/shared/hooks/useShots";
 import { NEW_GROUP_DROPPABLE_ID } from '@/shared/components/ShotsPane/NewGroupDropZone';
 import { useToast } from "@/shared/hooks/use-toast";
-import { LastAffectedShotProvider } from "@/shared/contexts/LastAffectedShotContext";
-import { useLastAffectedShot } from "@/shared/hooks/useLastAffectedShot";
+import { LastAffectedShotProvider, LastAffectedShotContext } from '@/shared/contexts/LastAffectedShotContext';
 import { AppRoutes } from "./routes";
 import { ProjectProvider, useProject } from "@/shared/contexts/ProjectContext";
 import { useWebSocket } from '@/shared/hooks/useWebSocket';
+import { PanesProvider } from '@/shared/contexts/PanesContext';
 
 const queryClient = new QueryClient();
 
 // New inner component that uses the context
 const AppInternalContent = () => {
   useWebSocket(); // Initialize WebSocket connection and listeners
-  const { setLastAffectedShotId } = useLastAffectedShot();
+  const context = useContext(LastAffectedShotContext);
+  if (!context) throw new Error("useLastAffectedShot must be used within a LastAffectedShotProvider");
+  const { setLastAffectedShotId } = context;
+
   const { selectedProjectId } = useProject();
   const { data: shotsFromHook, isLoading: isLoadingShots } = useListShots(selectedProjectId);
 
@@ -142,11 +146,13 @@ const AppInternalContent = () => {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <LastAffectedShotProvider>
-        <ProjectProvider>
-          <AppInternalContent />
-        </ProjectProvider>
-      </LastAffectedShotProvider>
+      <ProjectProvider>
+        <LastAffectedShotProvider>
+          <PanesProvider>
+            <AppInternalContent />
+          </PanesProvider>
+        </LastAffectedShotProvider>
+      </ProjectProvider>
     </QueryClientProvider>
   );
 }
