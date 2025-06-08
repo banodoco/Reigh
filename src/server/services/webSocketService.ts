@@ -9,8 +9,7 @@ export function initializeWebSocketServer(server: Server): void {
   wss.on('connection', (ws: WebSocket) => {
     console.log('[WebSocket] Client connected');
 
-    ws.on('message', (message: string) => {
-      console.log(`[WebSocket] Received message: ${message}`);
+    ws.on('message', (message: string) => {      
       // Echo message back to client
       ws.send(`Echo: ${message}`);
     });

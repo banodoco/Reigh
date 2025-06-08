@@ -47,6 +47,7 @@ export const tasks = sqliteTable('tasks', {
 export const generations = sqliteTable('generations', {
   id: text('id').$defaultFn(() => randomUUID()).primaryKey(),
   tasks: text('tasks', { mode: 'json' }), // Storing array as JSON string
+  params: text('params', { mode: 'json' }),
   location: text('location'),
   type: text('type'),
   createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),

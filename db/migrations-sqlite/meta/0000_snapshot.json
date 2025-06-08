@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "5412b969-4fe9-4daa-ad47-1fc12a4d320a",
+  "id": "b2447a1d-46d1-4bdf-8a8b-e3684a62b830",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "generations": {
@@ -16,6 +16,13 @@
         },
         "tasks": {
           "name": "tasks",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "params": {
+          "name": "params",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -327,6 +334,13 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "generation_processed_at": {
+          "name": "generation_processed_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         }
       },
       "indexes": {},
@@ -357,6 +371,20 @@
           "type": "text",
           "primaryKey": true,
           "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         }
       },

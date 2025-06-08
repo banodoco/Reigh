@@ -10,9 +10,10 @@ import { ProjectSettingsModal } from '@/shared/components/ProjectSettingsModal';
 
 interface GlobalHeaderProps {
   contentOffsetRight?: number;
+  contentOffsetLeft?: number;
 }
 
-export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight = 0 }) => {
+export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight = 0, contentOffsetLeft = 0 }) => {
   const { projects, selectedProjectId, setSelectedProjectId, isLoadingProjects } = useProject();
   const [isCreateProjectModalOpen, setIsCreateProjectModalOpen] = useState(false);
   const [isProjectSettingsModalOpen, setIsProjectSettingsModalOpen] = useState(false);
@@ -44,6 +45,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
           className="container flex h-24 max-w-screen-2xl items-center justify-between transition-all duration-300 ease-in-out relative z-10"
           style={{
             paddingRight: `${contentOffsetRight}px`,
+            paddingLeft: `${contentOffsetLeft}px`,
           }}
         >
           {/* Enhanced Left side - Brand */}

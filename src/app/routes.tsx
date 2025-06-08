@@ -7,6 +7,7 @@ import NotFoundPage from '@/pages/NotFoundPage'; // Assuming NotFoundPage will b
 import { LastAffectedShotProvider } from '@/shared/contexts/LastAffectedShotContext';
 import EditTravelToolPage from '@/tools/edit-travel/pages/EditTravelToolPage';
 import ShotsPage from "@/pages/ShotsPage";
+import GenerationsPage from "@/pages/GenerationsPage"; // Import the new GenerationsPage
 import Layout from './Layout'; // Import the new Layout component
 
 const router = createBrowserRouter([
@@ -33,6 +34,10 @@ const router = createBrowserRouter([
       {
         path: '/shots',
         element: <ShotsPage />,
+      },
+      {
+        path: '/generations',
+        element: <GenerationsPage />,
       },
       // Any other top-level page routes can become children here
     ]

@@ -158,10 +158,14 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const updateShotImageOrderMutation = useUpdateShotImageOrder();
   const [fileInputKey, setFileInputKey] = useState<number>(Date.now());
   const [deletingVideoId, setDeletingVideoId] = useState<string | null>(null);
-  const [showAdvanced, setShowAdvanced] = useState(false);
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [creatingTaskId, setCreatingTaskId] = useState<string | null>(null);
+
+  // Use local state for optimistic updates on image list
   const [localOrderedShotImages, setLocalOrderedShotImages] = useState(orderedShotImages || []);
+  useEffect(() => {
+    setLocalOrderedShotImages(orderedShotImages || []);
+  }, [orderedShotImages]);
 
   useEffect(() => {
     if (!selectedShot?.id) return;
@@ -266,11 +270,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     };
   }, [selectedShot?.id, settingsToSave]);
 
-  useEffect(() => {
-    if (orderedShotImages.length !== localOrderedShotImages.length) {
-      setLocalOrderedShotImages(orderedShotImages);
-    }
-  }, [orderedShotImages]);
+  const nonVideoImages = useMemo(() => localOrderedShotImages.filter(img => !isGenerationVideo(img)), [localOrderedShotImages]);
+  const videoOutputs = useMemo(() => localOrderedShotImages.filter(isGenerationVideo), [localOrderedShotImages]);
 
   const handleImageUploadToShot = async (files: File[]) => {
     if (!files || files.length === 0) return;
@@ -327,22 +328,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     }
   };
 
-  const [managedImages, setManagedImages] = useState<GenerationRow[]>([]);
-
-  // Update videoOutputs to use localOrderedShotImages
-  const videoOutputs = useMemo(() => {
-    if (!localOrderedShotImages) return [];
-    return localOrderedShotImages.filter(isGenerationVideo).reverse();
-  }, [localOrderedShotImages]);
-
-  useEffect(() => {
-    setManagedImages((localOrderedShotImages || []).filter(gen => !isGenerationVideo(gen)));
-  }, [localOrderedShotImages]);
-
-  if (!selectedShot) {
-    return <p>Error: No shot selected. Please go back and select a shot.</p>;
-  }
-
   const handleDeleteVideoOutput = async (generationId: string) => {
     if (!selectedProjectId || !selectedShot?.id) {
       toast.error("Cannot delete video: Project or Shot ID is missing.");
@@ -380,38 +365,65 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     }
   };
 
+  const handleDeleteImageFromShot = async (generationId: string) => {
+    if (!selectedProjectId || !selectedShot?.id) {
+      toast.error("Cannot delete image: Project or Shot ID is missing.");
+      return;
+    }
+    setDeletingVideoId(generationId);
+    try {
+      console.log(`Deleting image generation ${generationId} from shot ${selectedShot.id}`);
+      await removeImageFromShotMutation.mutateAsync({
+        shot_id: selectedShot.id,
+        generation_id: generationId,
+        project_id: selectedProjectId,
+      });
+      // Optimistically update the local ordering by removing the deleted item
+      const updatedOrdering = localOrderedShotImages.filter(item => item.id !== generationId);
+      setLocalOrderedShotImages(updatedOrdering);
+      updateShotImageOrderMutation.mutate({
+        shotId: selectedShot.id,
+        orderedGenerationIds: updatedOrdering.map(item => item.id),
+        projectId: selectedProjectId
+      }, {
+        onSuccess: () => {
+          toast.success("Image removed and ordering updated.");
+        },
+        onError: (error) => {
+          console.error("[ShotEditor] Failed to update ordering after deletion:", error);
+          toast.error("Failed to update ordering after deletion.");
+        }
+      });
+    } catch (error: any) {
+      // The hook will show its own toast on error.
+      console.error(`Failed to delete image: ${error.message}`);
+    } finally {
+      setDeletingVideoId(null);
+    }
+  };
+
   const handleReorderImagesInShot = (activeId: string, overId: string | null) => {
-    const oldIndex = managedImages.findIndex((img) => img.id === activeId);
-    const newIndex = managedImages.findIndex((img) => img.id === overId);
+    const oldIndex = localOrderedShotImages.findIndex((img) => img.id === activeId);
+    const newIndex = localOrderedShotImages.findIndex((img) => img.id === overId);
     
     if (oldIndex === -1 || newIndex === -1) {
-        console.error("[ShotEditor] Dragged item not found in managed images.");
+        console.error("[ShotEditor] Dragged item not found in local ordered images.");
         toast.error("Error reordering images. Item not found.");
         return;
     }
 
-    const newOrder = arrayMove(managedImages, oldIndex, newIndex);
-    setManagedImages(newOrder); // Optimistically update local UI
+    const newOrder = arrayMove(localOrderedShotImages, oldIndex, newIndex);
+    setLocalOrderedShotImages(newOrder); // Optimistically update local UI
 
     if (!selectedProjectId || !selectedShot || !selectedShot.id) {
       toast.error("Cannot reorder images: Project or Shot ID is missing.");
-      setManagedImages((localOrderedShotImages) || []); // Revert to local order on error
+      setLocalOrderedShotImages((localOrderedShotImages) || []); // Revert to local order on error
       return;
     }
     
-    // Build full ordering by merging the reordered non-video images with the unchanged video outputs
-    const newNonVideoIds = newOrder.map(img => img.id);
-    let nonVideoIndex = 0;
-    const fullOrderedGenerationIds = localOrderedShotImages.map(item => {
-       if (!isGenerationVideo(item)) {
-         return newNonVideoIds[nonVideoIndex++];
-       }
-       return item.id;
-    });
-
     updateShotImageOrderMutation.mutate({
       shotId: selectedShot.id,
-      orderedGenerationIds: fullOrderedGenerationIds,
+      orderedGenerationIds: newOrder.map(item => item.id),
       projectId: selectedProjectId
     }, {
       onSuccess: () => {
@@ -419,7 +431,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       },
       onError: (error) => {
         console.error("[ShotEditor] Failed to reorder images:", error);
-        setManagedImages((localOrderedShotImages) || []); // Revert to local order on error
+        setLocalOrderedShotImages((localOrderedShotImages) || []); // Revert to local order on error
       }
     });
   };
@@ -487,7 +499,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       return;
     }
 
-    if (managedImages.length < 2) {
+    if (localOrderedShotImages.length < 2) {
       toast.warning('Add at least two images to generate a travel video.');
       return;
     }
@@ -498,9 +510,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
     let resolution: string | undefined = undefined;
 
-    if ((dimensionSource || 'firstImage') === 'firstImage' && managedImages.length > 0) {
+    if ((dimensionSource || 'firstImage') === 'firstImage' && localOrderedShotImages.length > 0) {
       try {
-        const firstImage = managedImages[0];
+        const firstImage = localOrderedShotImages[0];
         const imageUrl = getDisplayUrl(firstImage.imageUrl);
         if (imageUrl) {          
           const { width, height } = await getDimensions(imageUrl);
@@ -528,7 +540,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     }
 
     // Use getDisplayUrl to convert relative paths to absolute URLs
-    const absoluteImageUrls = managedImages
+    const absoluteImageUrls = localOrderedShotImages
       .map((img) => getDisplayUrl(img.imageUrl)) // Use getDisplayUrl here
       .filter((url): url is string => Boolean(url) && url !== '/placeholder.svg'); // Ensure it's a valid, non-placeholder URL
 
@@ -597,188 +609,96 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   };
 
   return (
-    <div className="container mx-auto p-4">
-      <Button onClick={onBack} className="mb-6">Back to Video Shots List</Button>
-      <h2 className="text-3xl font-bold mb-1">Video Edit: {selectedShot.name}</h2>
-      <p className="text-muted-foreground mb-6">Configure and generate video segments, or add new images to this shot.</p>
-
-      <VideoOutputsGallery
-        videoOutputs={videoOutputs}
-                      onDelete={handleDeleteVideoOutput}
-        deletingVideoId={deletingVideoId}
-      />
-      
-      {/*
-      <div className="mb-6 flex items-center space-x-2">
-        <Label className="text-sm font-medium">Control Mode:</Label>
-        Individual
-        <Button 
-          size="sm"
-          onClick={() => onVideoControlModeChange('individual')}
-        >
-          Individual
-        </Button>
+    <div className="flex flex-col h-full space-y-4">
+      {/* Header */}
+      <div className="flex-shrink-0 flex justify-between items-center">
+        <Button onClick={onBack}>&larr; Back to Shot List</Button>
+        <h2 className="text-2xl font-bold text-center truncate px-4">
+          Editing Shot: <span className="text-primary">{selectedShot.name}</span>
+        </h2>
+        <div className="w-[150px]" /> {/* Spacer to balance the back button */}
       </div>
-      */}
 
-      {videoControlMode === 'individual' && videoPairConfigs.length > 0 && (
-        <div className="space-y-8 mb-8">
-          {videoPairConfigs.map((pairConfig, index) => (
-            <div key={pairConfig.id} className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4 p-4 border rounded-lg items-start bg-card shadow-md">
-              <div className="flex flex-col space-y-2 md:flex-row md:space-x-3 md:space-y-0">
-                <div className="flex-1 flex flex-col space-y-1">
-                  <Label className="text-xs font-medium text-muted-foreground self-start">Image A</Label>
-                  <div className="w-full h-36 bg-muted/50 rounded border flex items-center justify-center p-1 overflow-hidden">
-                    <img 
-                      src={getDisplayUrl(pairConfig.imageA.thumbUrl || pairConfig.imageA.imageUrl)} 
-                      alt={`Pair ${index + 1} - Image A`}
-                      className="max-w-full max-h-full object-contain rounded-sm"
-                    />
-                  </div>
-                </div>
-                <div className="flex-1 flex flex-col space-y-1">
-                  <Label className="text-xs font-medium text-muted-foreground self-start">Image B</Label>
-                  <div className="w-full h-36 bg-muted/50 rounded border flex items-center justify-center p-1 overflow-hidden">
-                    <img 
-                      src={getDisplayUrl(pairConfig.imageB.thumbUrl || pairConfig.imageB.imageUrl)} 
-                      alt={`Pair ${index + 1} - Image B`}
-                      className="max-w-full max-h-full object-contain rounded-sm"
-                    />
-                  </div>
-                </div>
-              </div>
-              <div className="space-y-4 pt-1 md:pt-0">
-                <div>
-                  <Label htmlFor={`prompt-${pairConfig.id}`} className="text-sm font-medium block mb-1.5">Prompt</Label>
-                  <Textarea 
-                    id={`prompt-${pairConfig.id}`}
-                    value={pairConfig.prompt}
-                    onChange={(e) => onPairConfigChange(pairConfig.id, 'prompt', e.target.value)}
-                    placeholder={`Video prompt for A to B...`}
-                    className="min-h-[70px] text-sm"
-                    rows={3}
-                  />
-                </div>
-                <div className="space-y-3">
-                  <div>
-                    <Label htmlFor={`frames-${pairConfig.id}`} className="text-sm font-medium block mb-1">Frames: {pairConfig.frames}</Label>
-                    <Slider
-                      id={`frames-${pairConfig.id}`}
-                      min={10}
-                      max={120} 
-                      step={1}
-                      value={[pairConfig.frames]}
-                      onValueChange={(val) => onPairConfigChange(pairConfig.id, 'frames', val[0])}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor={`context-${pairConfig.id}`} className="text-sm font-medium block mb-1">Context: {pairConfig.context}</Label>
-                    <Slider
-                      id={`context-${pairConfig.id}`}
-                      min={0}
-                      max={60}
-                      step={1}
-                      value={[pairConfig.context]}
-                      onValueChange={(val) => onPairConfigChange(pairConfig.id, 'context', val[0])}
-                    />
-                  </div>
-                </div>
-              </div>
-              <div className="flex flex-col space-y-2 items-center pt-2 md:pt-0">
-                <Label className="text-xs font-medium text-muted-foreground self-center">Video Preview</Label>
-                <div className="w-full aspect-video bg-muted/50 rounded border flex items-center justify-center overflow-hidden">
-                  {pairConfig.generatedVideoUrl ? (
-                    <video src={getDisplayUrl(pairConfig.generatedVideoUrl)} controls className="w-full h-full object-contain" />
-                  ) : (
-                    <p className="text-xs text-muted-foreground text-center p-2">Video output will appear here</p>
-                  )}
-                </div>
-                <Button 
-                  size="sm" 
-                  className="w-full mt-1" 
-                  onClick={() => handleGenerateVideo(pairConfig)} 
-                  disabled={isCreatingTask && creatingTaskId === pairConfig.id}
-                >
-                  {(isCreatingTask && creatingTaskId === pairConfig.id) ? 'Creating Task...' : 'Generate Video'}
-                </Button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {videoControlMode === 'batch' && videoPairConfigs.length > 0 && (
-        <div className="space-y-6 mb-8">
-          <BatchSettingsForm
-            batchVideoPrompt={batchVideoPrompt}
-            onBatchVideoPromptChange={onBatchVideoPromptChange}
-            batchVideoFrames={batchVideoFrames}
-            onBatchVideoFramesChange={onBatchVideoFramesChange}
-            batchVideoContext={batchVideoContext}
-            onBatchVideoContextChange={onBatchVideoContextChange}
-            batchVideoSteps={batchVideoSteps}
-            onBatchVideoStepsChange={onBatchVideoStepsChange}
-            dimensionSource={dimensionSource}
-            onDimensionSourceChange={onDimensionSourceChange}
-            customWidth={customWidth}
-            onCustomWidthChange={onCustomWidthChange}
-            customHeight={customHeight}
-            onCustomHeightChange={onCustomHeightChange}
-            steerableMotionSettings={steerableMotionSettings}
-            onSteerableMotionSettingsChange={onSteerableMotionSettingsChange}
-            projects={projects}
-            selectedProjectId={selectedProjectId}
-          />
-          <Card className="mb-6">
+      {/* Main Content Area */}
+      <div className="flex flex-col lg:flex-row flex-grow gap-4 min-h-0">
+        
+        {/* Left Column: Image Manager & Video Outputs */}
+        <div className="flex flex-col lg:w-1/2 xl:w-2/5 gap-4 min-h-0">
+          <Card className="flex-grow flex flex-col min-h-0">
             <CardHeader>
-              <CardTitle>Manage Images in "{selectedShot.name}"</CardTitle>
-              <p className="text-sm text-muted-foreground pt-1">
-                Drag to reorder images. Reordering will affect video segment pairs. 
-                {managedImages.length < 2 ? "Add at least two images to create video segments." : ""}
-              </p>
+              <CardTitle>Manage Shot Images</CardTitle>
+              <p className="text-sm text-muted-foreground pt-1">Drag to reorder. Add at least two images to generate videos.</p>
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex-grow overflow-y-auto">
               <ShotImageManager
-                images={managedImages}
-                onImageDelete={handleDeleteVideoOutput}
+                images={nonVideoImages}
+                onImageDelete={handleDeleteImageFromShot}
                 onImageReorder={handleReorderImagesInShot}
               />
-              {managedImages.length === 0 && (
-                 <p className="text-sm text-muted-foreground mt-4">No images in this shot yet. Upload images using the form below.</p>
-              )}
+            </CardContent>
+            <div className="p-4 border-t">
+              <FileInput
+                key={fileInputKey}
+                onFileChange={handleImageUploadToShot}
+                acceptTypes={['image']}
+                label="Add more images"
+                disabled={isUploadingImage}
+                multiple
+              />
+            </div>
+          </Card>
+          <div className="flex-shrink-0">
+             <VideoOutputsGallery 
+                videoOutputs={videoOutputs} 
+                onDelete={handleDeleteVideoOutput}
+                deletingVideoId={deletingVideoId}
+              />
+          </div>
+        </div>
+
+        {/* Right Column: Generation Settings */}
+        <div className="lg:w-1/2 xl:w-3/5">
+          <Card>
+            <CardHeader>
+                <CardTitle>Travel Between Images</CardTitle>
+                <p className="text-sm text-muted-foreground pt-1">Configure and generate video segments between the images in this shot.</p>
+            </CardHeader>
+            <CardContent>
+                <BatchSettingsForm
+                    batchVideoPrompt={batchVideoPrompt}
+                    onBatchVideoPromptChange={onBatchVideoPromptChange}
+                    batchVideoFrames={batchVideoFrames}
+                    onBatchVideoFramesChange={onBatchVideoFramesChange}
+                    batchVideoContext={batchVideoContext}
+                    onBatchVideoContextChange={onBatchVideoContextChange}
+                    batchVideoSteps={batchVideoSteps}
+                    onBatchVideoStepsChange={onBatchVideoStepsChange}
+                    dimensionSource={dimensionSource}
+                    onDimensionSourceChange={onDimensionSourceChange}
+                    customWidth={customWidth}
+                    onCustomWidthChange={onCustomWidthChange}
+                    customHeight={customHeight}
+                    onCustomHeightChange={onCustomHeightChange}
+                    steerableMotionSettings={steerableMotionSettings}
+                    onSteerableMotionSettingsChange={onSteerableMotionSettingsChange}
+                    projects={projects}
+                    selectedProjectId={selectedProjectId}
+                />
+                <div className="mt-6">
+                    <Button 
+                        size="lg" 
+                        className="w-full" 
+                        onClick={handleGenerateAllVideos} 
+                        disabled={isCreatingTask || nonVideoImages.length < 2}
+                    >
+                        {isCreatingTask ? 'Creating Tasks...' : 'Generate All Videos (Batch)'}
+                    </Button>
+                    {nonVideoImages.length < 2 && <p className="text-xs text-center text-muted-foreground mt-2">You need at least two images to generate videos.</p>}
+                </div>
             </CardContent>
           </Card>
-          
-          <Button size="lg" className="w-full" onClick={handleGenerateAllVideos} disabled={isCreatingTask && creatingTaskId === 'batch'}>
-            {(isCreatingTask && creatingTaskId === 'batch') ? 'Creating Tasks...' : 'Generate All Videos (Batch)'}
-          </Button>
         </div>
-      )}
-
-      {videoPairConfigs.length === 0 && videoControlMode !== 'batch' && (
-        <p className="mb-8">No image pairs to configure for individual mode. This shot might have less than two images. Add images below.</p>
-      )}
-       {videoPairConfigs.length === 0 && videoControlMode === 'batch' && (
-        <p className="mb-8">No image pairs to configure for batch mode. This shot might have less than two images. Add more images below.</p>
-      )}
-
-      <Card className="mt-8">
-        <CardHeader>
-          <CardTitle>Add New Image(s) to "{selectedShot.name}"</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <FileInput
-            key={fileInputKey}
-            onFileChange={handleImageUploadToShot}
-            acceptTypes={['image']}
-            label="Upload Image(s)"
-            disabled={isUploadingImage}
-            multiple
-          />
-          {isUploadingImage && <p className="text-sm text-primary mt-2">Uploading and processing image(s)...</p>}
-        </CardContent>
-      </Card>
-
+      </div>
     </div>
   );
 };

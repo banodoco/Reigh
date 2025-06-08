@@ -99,7 +99,7 @@ shotsRouter.post('/', asyncHandler(async (req: Request, res: Response) => {
     const responseShot = {
       id: newShot.id,
       name: newShot.name,
-      created_at: newShot.createdAt.toISOString(),
+      created_at: newShot.createdAt,
       project_id: newShot.projectId,
       images: [], // New shot has no images initially
     };

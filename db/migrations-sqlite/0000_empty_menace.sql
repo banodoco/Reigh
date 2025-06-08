@@ -1,6 +1,7 @@
 CREATE TABLE `generations` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tasks` text,
+	`params` text,
 	`location` text,
 	`type` text,
 	`created_at` integer NOT NULL,

@@ -3,6 +3,7 @@ import { useDroppable } from '@dnd-kit/core';
 import { Shot, GenerationRow } from '@/types/shots';
 import { useUpdateShotName, useHandleExternalImageDrop } from '@/shared/hooks/useShots';
 import { useToast } from '@/shared/hooks/use-toast';
+import { useNavigate } from 'react-router-dom';
 
 interface ShotGroupProps {
   shot: Shot;
@@ -25,6 +26,7 @@ const ShotGroup: React.FC<ShotGroupProps> = ({ shot }) => {
   const updateShotNameMutation = useUpdateShotName();
   const handleExternalImageDropMutation = useHandleExternalImageDrop();
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (shot.name !== currentName && !isEditing) {
@@ -51,7 +53,7 @@ const ShotGroup: React.FC<ShotGroupProps> = ({ shot }) => {
     setIsEditing(false);
     const trimmedName = currentName.trim();
     if (trimmedName && trimmedName !== shot.name) {
-      updateShotNameMutation.mutate({ shotId: shot.id, newName: trimmedName });
+      updateShotNameMutation.mutate({ shotId: shot.id, newName: trimmedName, projectId: shot.project_id });
     } else if (!trimmedName && shot.name) {
       setCurrentName(shot.name || 'Unnamed Shot'); 
     } else if (!trimmedName && !shot.name) {
@@ -140,7 +142,8 @@ const ShotGroup: React.FC<ShotGroupProps> = ({ shot }) => {
       }
 
       try {
-        await handleExternalImageDropMutation.mutateAsync({ shotId: shot.id, imageFile: file });
+        if (!shot.project_id) throw new Error("This shot has no associated project.");
+        await handleExternalImageDropMutation.handleDrop(file, shot.id, shot.project_id, 0);
         processedCount++;
         console.log(`[ShotGroup:${shot.id}] handleDrop: Successfully initiated processing for ${file.name}.`);
       } catch (error) {
@@ -161,15 +164,24 @@ const ShotGroup: React.FC<ShotGroupProps> = ({ shot }) => {
     }
   };
 
+  const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Prevent navigation when interacting with editable elements
+    if (isEditing || (e.target as HTMLElement).closest('input, button, a')) {
+      return;
+    }
+    navigate('/shots', { state: { selectedShotId: shot.id } });
+  };
+
   return (
     <div 
       ref={setNodeRef} 
       style={droppableStyle} 
-      className="shot-group p-3 border border-zinc-700 rounded-lg min-w-[200px] max-w-[300px] bg-zinc-800/90 shadow-lg flex flex-col space-y-2 transition-all duration-150 ease-in-out relative"
+      className="shot-group p-3 border border-zinc-700 rounded-lg min-w-[200px] max-w-[300px] bg-zinc-800/90 shadow-lg flex flex-col space-y-2 transition-all duration-150 ease-in-out relative cursor-pointer"
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
+      onClick={handleClick}
     >
       {isFileOver && (
         <div 

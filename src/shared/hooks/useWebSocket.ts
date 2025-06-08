@@ -22,8 +22,7 @@ export function useWebSocket() {
     ws.current.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data);
-        console.log('[WebSocket] Received message:', message);
-
+        
         switch (message.type) {
           case 'TASK_COMPLETED': {
             const { projectId } = message.payload;

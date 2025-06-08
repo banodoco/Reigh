@@ -4,14 +4,20 @@ import ImageGallery, { GeneratedImageWithMetadata, DisplayableMetadata, Metadata
 import SettingsModal from "@/shared/components/SettingsModal";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { Json } from "@/integrations/supabase/types";
 import { Button } from "@/shared/components/ui/button";
-import ShotsPane from "@/shared/components/ShotsPane/ShotsPane";
 import { useListShots, useAddImageToShot } from "@/shared/hooks/useShots";
 import { useLastAffectedShot } from "@/shared/hooks/useLastAffectedShot";
 import { useProject } from "@/shared/contexts/ProjectContext";
 import { uploadImageToStorage } from '@/shared/lib/imageUploader';
 import { nanoid } from 'nanoid';
+
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
 
 // This interface defines the rich LoRA structure we expect from the form and want to save in metadata
 // interface StoredActiveLora { // This might be covered by MetadataLora or internal to the form/hook
@@ -382,7 +388,6 @@ const ImageGenerationToolPage = () => {
     }
   };
 
-  const MemoizedShotsPane = React.memo(ShotsPane);
   const validShots = shots || [];
 
   // Update the condition for showing the form, and disable generate button if task is being created
@@ -447,7 +452,6 @@ const ImageGenerationToolPage = () => {
             currentToolType="image-generation"
             initialFilterState={true} // Added this prop, assuming it exists or should be added to ImageGallery
           />
-          <MemoizedShotsPane />
         </>
       )}
     </div>

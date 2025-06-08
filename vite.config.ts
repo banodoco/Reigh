@@ -9,7 +9,7 @@ export default defineConfig(({ mode }: { mode: string }) => {
   // For local development, target the local API server (port 3001 by default)
   // For other environments (like Runpod), you might use an environment variable
   // e.g., VITE_API_TARGET_URL=http://213.173.108.33:13296
-  const apiTarget = process.env.VITE_API_TARGET_URL || 'http://localhost:8085';
+  const apiTarget = process.env.VITE_API_TARGET_URL || 'http://127.0.0.1:8085';
   const wsTarget = apiTarget.replace(/^http/, 'ws');
   
   console.log(`[Vite Config] Mode: ${mode}`);

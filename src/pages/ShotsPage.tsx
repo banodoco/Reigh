@@ -8,6 +8,7 @@ import { Button } from '@/shared/components/ui/button';
 import { useQueryClient } from '@tanstack/react-query';
 import { arrayMove } from '@dnd-kit/sortable';
 import { toast } from 'sonner';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 const ShotsPage: React.FC = () => {
   const { selectedProjectId } = useProject();
@@ -18,6 +19,8 @@ const ShotsPage: React.FC = () => {
   const queryClient = useQueryClient();
   const removeImageFromShotMutation = useRemoveImageFromShot();
   const updateShotImageOrderMutation = useUpdateShotImageOrder();
+  const location = useLocation();
+  const navigate = useNavigate();
 
   useEffect(() => {
     // If project changes, or selected shot is no longer in the fetched list, deselect it
@@ -41,6 +44,17 @@ const ShotsPage: React.FC = () => {
       setManagedImages([]);
     }
   }, [selectedShot]);
+
+  useEffect(() => {
+    if (location.state?.selectedShotId && shots && shots.length > 0) {
+      const shotToSelect = shots.find(s => s.id === location.state.selectedShotId);
+      if (shotToSelect) {
+        setSelectedShot(shotToSelect);
+        // Clear the state from location to prevent re-triggering on unrelated re-renders
+        navigate(location.pathname, { replace: true, state: {} });
+      }
+    }
+  }, [location.state, shots, navigate, location.pathname]);
 
   const handleSelectShot = (shot: Shot) => {
     // Fetch the full shot details if necessary, or use the one from the list
@@ -146,6 +160,7 @@ const ShotsPage: React.FC = () => {
             images={managedImages} // Use the local managedImages state for optimistic updates
             onImageDelete={handleDeleteImage}
             onImageReorder={handleReorderImage}
+            columns={8}
           />
         </>
       )}

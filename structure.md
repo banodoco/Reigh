@@ -60,7 +60,7 @@ This project uses Drizzle ORM to manage database schema, migrations, and data ac
     - For SQLite: `npm run db:generate:sqlite` uses `drizzle-sqlite.config.ts`.
 3.  **Migration Application**:
     - PostgreSQL migrations are applied to Supabase (e.g., via Supabase CLI or a CI step).
-    - SQLite migrations (`npm run db:migrate:sqlite`) are applied to the local `./local.db` file.
+    - **Local SQLite migrations are now run automatically by the `npm run start:api` script.** This ensures the local database is always up-to-date when the server starts. Manual migration via `npm run db:migrate:sqlite` is no longer part of the standard startup flow.
 4.  **Runtime DAL**: 
     - The **API server** imports the `db` object from `/src/lib/db/index.ts` to get a Drizzle client (SQLite or PostgreSQL based on server environment).
     - The **client-side application** imports the `db` object from `/src/lib/db/index.ts` to get a Supabase JS client for direct Supabase interactions (e.g., storage, auth) or uses API calls for database operations.
@@ -79,8 +79,8 @@ src/app/App.tsx    – Global providers (QueryClient, LastAffectedShot, Project,
                  `GlobalHeader` is no longer directly rendered here but as part of `Layout.tsx` via `AppRoutes`.
 src/app/routes.tsx – Centralized application routing using `createBrowserRouter` and `RouterProvider`.
                  Defines a root layout route (`<Layout />`) that includes `<GlobalHeader />` and an `<Outlet />` for child page components.
-src/app/Layout.tsx – Main application layout component. Renders `<GlobalHeader />`, an `<Outlet />` for page content, and `<TasksPane />`. 
-                 Adjusts main content margin when `TasksPane` is locked open.
+src/app/Layout.tsx – Main application layout component. Renders `<GlobalHeader />`, an `<Outlet />`, `<TasksPane />`, `<ShotsPane />`, and `<GenerationsPane />`. 
+                 Adjusts main content and header margins when side panes are locked open.
 ```
 
 ### 3.1.1 Environment Configuration (`VITE_APP_ENV`)
@@ -137,6 +137,7 @@ To change which tools appear for a specific environment, you need to modify the 
 • **`src/pages/ToolSelectorPage.tsx`** – Main entry point of the application. Displays a grid of available tools (Image Generation, Video Travel, etc.).
 • **`src/pages/NotFoundPage.tsx`** – Fallback page for 404 errors.
 • **`src/pages/ShotsPage.tsx`** – Displays a list of all shots for the selected project (using `ShotListDisplay`). Allows selecting a shot to view and manage its images (using `ShotImageManager`).
+• **`src/pages/GenerationsPage.tsx`** – Displays a paginated gallery of all generated media for the selected project.
 
 ### 3.3 Tool Modules (`src/tools/`)
 
@@ -149,7 +150,7 @@ To change which tools appear for a specific environment, you need to modify the 
   – Handles upscaling, deletion, and optimistic UI updates for generations.
 • **`components/ImageGenerationForm.tsx`**: Multi-step form for prompts, LoRAs, controls, starting image. Persists state to `localStorage`.
 • **`components/BulkEditControls.tsx`, `components/PromptGenerationControls.tsx`**: Helper toolbars.
-• `hooks/useGenerations.ts`: Placeholder hooks for generation listing, deletion, upscaling.
+• `hooks/useGenerations.ts`: Provides `useListGenerations` for fetching paginated generation data from the API (`GET /api/generations`), and placeholders for deletion and upscaling.
 
 #### 3.3.2 Video Travel Tool (`src/tools/video-travel/`)
 
@@ -183,11 +184,13 @@ To change which tools appear for a specific environment, you need to modify the 
 ### 3.4 Shared Elements (`src/shared/`)
 
 #### `src/shared/components/`
-• **`GlobalHeader.tsx`**: Site-wide header with branding, project selector, project settings button, and a '+' button for creating new projects. Includes navigation links (e.g., "Shots" link to `/shots`).
+• **`GlobalHeader.tsx`**: Site-wide header with branding, project selector, project settings button, and a '+' button for creating new projects. Includes navigation links (e.g., "Shots" link to `/shots`). Its content is offset when side panes are locked open.
 • **`ShotsPane/`**:
-    – `ShotsPane.tsx`: Sticky bottom drawer for "shots" (lightweight collections).
-    – `ShotGroup.tsx`: Droppable area for images within a shot.
-    – `NewGroupDropZone.tsx`: Target to create a new shot by dropping an image.
+    – `ShotsPane.tsx`: Lockable, auto-hiding slide-out panel from the left for managing "shots" (collections of images).
+    – `ShotGroup.tsx`: Droppable area for images within a shot, supports dropping external files.
+    – `NewGroupDropZone.tsx`: Target to create a new shot by dropping an external image file.
+• **`GenerationsPane/`**:
+    – `GenerationsPane.tsx`: Lockable, auto-hiding slide-up panel from the bottom for browsing all generated media for the current project, with pagination.
 • **`ui/`**: Nearly 50+ re-exports/variants of shadcn components (Button, Card, Dialog, etc.).
 • **`loading.tsx`**: A set of Wes Anderson-inspired loading indicators with multiple variants (e.g., film reel, vintage camera, ornate badges) for use across the application.
 • **`DraggableImage.tsx`**: Wrapper for making gallery images draggable.
@@ -202,7 +205,7 @@ To change which tools appear for a specific environment, you need to modify the 
 • **`ShotImageManager.tsx`**: Reusable component for displaying and managing a list of images within a shot. Handles drag-and-drop reordering and deletion of images via callbacks. Used by `ShotEditor` and `ShotsPage.tsx`.
 • **`HoverScrubVideo.tsx`**: Self-contained wrapper around the `useVideoScrubbing` hook that provides hover-to-play, variable-speed scrubbing, progress-bar seeking, and playback-rate overlay. Now reused by `VideoOutputItem` and `MediaLightbox` to avoid duplicate logic.
 • **`TasksPane/`**:
-    – `TasksPane.tsx`: Slide-out panel from the right, activated on hover or can be locked open. Displays a list of tasks. Communicates lock state to parent layout for content adjustment.
+    – `TasksPane.tsx`: Lockable, auto-hiding slide-out panel from the right for displaying tasks. Communicates lock state to parent layout for content adjustment.
     – `TaskList.tsx`: Component within `TasksPane` that lists tasks, allows filtering by status, and refreshing the list. Uses `TaskItem`. Receives real-time status updates via the WebSocket connection managed by `useWebSocket.ts`.
     – `TaskItem.tsx`: Displays individual task details and a button to cancel the task.
 
@@ -223,6 +226,7 @@ To change which tools appear for a specific environment, you need to modify the 
     – **`useUpdateTaskStatus` (Conceptual - API endpoint exists)**: `PATCH /api/tasks/:taskId/status` (updates a task's status to any valid status). For certain task types like 'travel_stitch', when a task is marked 'Complete', the backend `taskProcessingService.ts` poller detects this and handles the creation of associated 'generation' and 'shot_generation' records.
     – `useCancelAllPendingTasks`: `POST /api/tasks/cancel-pending` (updates status of all pending tasks for a project to 'Cancelled').
     – **`useWebSocket.ts`**: Establishes and manages a WebSocket connection to the backend server. Listens for messages (e.g., `TASK_COMPLETED`, `GENERATIONS_UPDATED`, `TASKS_STATUS_UPDATE`) and invalidates relevant `react-query` caches to trigger UI updates in real-time.
+• **`useSlidingPane.ts`**: Manages the state and interactions for a side panel that can be hovered to open and optionally locked in an open state. Used by `TasksPane` (right), `ShotsPane` (left), and `GenerationsPane` (bottom).
 • **`useLastAffectedShot.ts`**: Hook for `LastAffectedShotContext`.
 • **`use-mobile.tsx`**: Media query helper.
 • **`use-toast.ts`**: Wrapper for Sonner toasting library.
@@ -304,8 +308,12 @@ To change which tools appear for a specific environment, you need to modify the 
             b.  `POST /api/generations` called to create a generation record.
             c.  `POST /api/shots/shot_generations` called to link generation to shot (via `useAddImageToShot`).
         – External file drops handled by `useHandleExternalImageDrop`: Uploads to Supabase Storage, then uses API calls (`POST /api/generations`, `POST /api/shots/shot_generations`) to create `generations` and associate with `shots`.
-6.  **Shots Pane (`ShotsPane.tsx`)** (if active for the current tool):
-    – Displays shot data via `GET /api/shots` (through `useListShots`), filtered by `selectedProjectId`.
+6.  **Side Panes (`ShotsPane.tsx`, `TasksPane.tsx`, `GenerationsPane.tsx`)**:
+    – Both panes are now managed by the `useSlidingPane` hook for consistent behavior.
+    – They are rendered globally in `Layout.tsx` and appear on all pages.
+    – They are hover-activated and can be locked open.
+    – When locked, they offset the main content and `GlobalHeader` to prevent overlap.
+    – The `GenerationsPane` slides up from the bottom and provides a paginated view of all generated media for the project.
 7.  **Real-time Task Updates (WebSockets)**:
     – When the backend `taskProcessingService` completes processing a task (e.g., creating a video from a 'travel_stitch' task), it broadcasts a message via WebSockets.
     – The client-side `useWebSocket` hook receives this message and invalidates the relevant queries (e.g., for tasks and generations).
@@ -341,6 +349,7 @@ To change which tools appear for a specific environment, you need to modify the 
 |              | `shots`                                              | `id`, `project_id`, `name`, `created_at`, `updated_at`                 |
 |              | `shot_generations`                                   | `id`, `shot_id`, `generation_id`, `position`                           |
 |              | `tasks`                                              | `id`, `project_id`, `status`, `taskType`, `params`, `outputLocation`, `createdAt`, `updatedAt`, `generationProcessedAt` |
+|              | `generations`                                        | `id`, `projectId`, `location`, `type`, `params` (JSON), `tasks` (JSON), `createdAt`, `updatedAt` |
 | **Supabase** | `storage/generations`                                | Bucket for storing generated images and videos.                      |
 
 ---
@@ -359,6 +368,7 @@ To change which tools appear for a specific environment, you need to modify the 
 | `/api/shots/shot_generations`             | POST   | Links an existing generation (`generation_id`) to a shot (`shot_id`).                                                                                                                                                                                                                |
 | `/api/shots/:shotId/generations/order`    | PUT    | Reorders the images within a shot based on an array of `orderedGenerationIds`.                                                                                                                                                                                                       |
 | `/api/shots/:shotId/generations/:genId`   | DELETE | Unlinks a generation from a shot.                                                                                                                                                                                                                                                    |
+| `/api/generations`                        | GET    | Gets all generations for a `projectId` with pagination (`?page=&limit=`).                                                                                                                                                                                                            |
 | `/api/generations`                        | POST   | Creates a new generation record. Used when uploading an image not generated by an internal tool.                                                                                                                                                                                     |
 | `/api/generations/:generationId`          | DELETE | Deletes a generation record from the database and the corresponding file from Supabase storage.                                                                                                                                                                                      |
 | `/api/tasks`                              | GET    | Lists tasks for a `projectId`, optionally filtered by `status`.                                                                                                                                                                                                                      |

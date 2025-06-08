@@ -1,80 +1,68 @@
-import React, { useState, useEffect, useRef } from 'react';
-import ShotGroup from './ShotGroup'; // Adjust path as needed
-import NewGroupDropZone from './NewGroupDropZone'; // Adjust path as needed
+import React from 'react';
+import ShotGroup from './ShotGroup';
+import NewGroupDropZone from './NewGroupDropZone';
+import { useListShots } from '@/shared/hooks/useShots';
+import { useProject } from "@/shared/contexts/ProjectContext";
+import { useSlidingPane } from '@/shared/hooks/useSlidingPane';
+import { cn } from '@/shared/lib/utils';
+import { Button } from '@/shared/components/ui/button';
+import { LockIcon, UnlockIcon, ArrowRightIcon } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
-// Import hooks and types
-import { useListShots } from '@/shared/hooks/useShots'; // Adjust path
-import { Shot } from '@/types/shots'; // Adjust path
-import { useProject } from "@/shared/contexts/ProjectContext"; // Import useProject
+interface ShotsPaneProps {
+  onLockStateChange?: (isLocked: boolean) => void;
+  paneWidth?: number;
+}
 
-const ShotsPane: React.FC = () => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [isHoveringPane, setIsHoveringPane] = useState(false);
-  const hotZoneRef = useRef<HTMLDivElement>(null);
-  const paneRef = useRef<HTMLDivElement>(null);
-  const leaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+const DEFAULT_PANE_WIDTH = 300;
 
-  const { selectedProjectId } = useProject(); // Get selectedProjectId
-  const { data: shots, isLoading, error } = useListShots(selectedProjectId); // Pass projectId
+const ShotsPane: React.FC<ShotsPaneProps> = ({ onLockStateChange, paneWidth = DEFAULT_PANE_WIDTH }) => {
+  const { selectedProjectId } = useProject();
+  const { data: shots, isLoading, error } = useListShots(selectedProjectId);
 
-  const handleHotZoneEnter = () => {
-    if (leaveTimeoutRef.current) {
-      clearTimeout(leaveTimeoutRef.current);
-      leaveTimeoutRef.current = null;
-    }
-    setIsOpen(true);
-  };
-
-  const handlePaneLeave = () => {
-    leaveTimeoutRef.current = setTimeout(() => {
-      setIsOpen(false);
-    }, 300); // 300ms delay before closing
-  };
-
-  const handlePaneEnter = () => {
-    if (leaveTimeoutRef.current) {
-      clearTimeout(leaveTimeoutRef.current);
-      leaveTimeoutRef.current = null;
-    }
-  };
-
-  useEffect(() => {
-    // Cleanup timeout on unmount
-    return () => {
-      if (leaveTimeoutRef.current) {
-        clearTimeout(leaveTimeoutRef.current);
-      }
-    };
-  }, []);
+  const { isLocked, toggleLock, hotZoneProps, paneProps, transformClass } = useSlidingPane({
+    side: 'left',
+    onLockStateChange: onLockStateChange,
+  });
 
   return (
     <>
-      {/* Hot Zone: Invisible div at the bottom to trigger the pane */}
-      <div
-        ref={hotZoneRef}
-        onMouseEnter={handleHotZoneEnter}
-        className="fixed bottom-0 left-0 w-full h-[24px] bg-transparent z-40 pointer-events-auto"
-        style={{ opacity: 0 }} // Make it invisible but interactable
-      />
+      {!isLocked && (
+        <div
+          {...hotZoneProps}
+          className="fixed left-0 top-0 h-full w-[24px] bg-transparent z-40 pointer-events-auto"
+          style={{ opacity: 0 }}
+        />
+      )}
 
-      {/* Shots Pane */}
       <div
-        ref={paneRef}
-        onMouseEnter={handlePaneEnter} // Clear close timeout if mouse re-enters pane
-        onMouseLeave={handlePaneLeave} // Set timeout to close if mouse leaves pane
-        className={`fixed bottom-0 inset-x-0 h-[220px] bg-zinc-900/95 border-t border-zinc-700 shadow-xl z-50 transform transition-transform duration-300 ease-in-out ${
-          isOpen ? 'translate-y-0' : 'translate-y-full'
-        }`}
+        {...paneProps}
+        style={{ width: `${paneWidth}px` }}
+        className={cn(
+          `fixed top-0 left-0 h-full bg-zinc-900/95 border-r border-zinc-700 shadow-xl z-50 transform transition-transform duration-300 ease-in-out flex flex-col`,
+          transformClass
+        )}
       >
-        <div className="flex gap-4 px-4 py-3 h-full overflow-x-auto scrollbar-hide">
+        <div className="p-2 border-b border-zinc-800 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-zinc-200 ml-2">Shots</h2>
+            <div className="flex items-center">
+              <Button asChild variant="ghost" size="sm" className="text-zinc-400 hover:text-zinc-100">
+                <Link to="/shots">
+                  See All
+                  <ArrowRightIcon className="h-4 w-4 ml-1" />
+                </Link>
+              </Button>
+              <Button variant="ghost" size="sm" onClick={toggleLock} className="text-zinc-400 hover:text-zinc-100">
+                  {isLocked ? <LockIcon className="h-4 w-4 mr-1" /> : <UnlockIcon className="h-4 w-4 mr-1" />}
+                  {isLocked ? 'Unlock' : 'Lock'}
+              </Button>
+            </div>
+        </div>
+        <div className="flex flex-col gap-4 px-3 py-4 h-full overflow-y-auto scrollbar-hide">
           <NewGroupDropZone />
-          
           {isLoading && <p className="text-white">Loading shots...</p>}
           {error && <p className="text-red-500">Error loading shots: {error.message}</p>}
-          {shots && shots.map(shot => {
-            return <ShotGroup key={shot.id} shot={shot} />;
-          })}
-          
+          {shots && shots.map(shot => <ShotGroup key={shot.id} shot={shot} />)}
         </div>
       </div>
     </>

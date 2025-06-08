@@ -1,7 +1,17 @@
 import express, { Request, Response, NextFunction } from 'express';
 import { db } from '../../lib/db'; // Drizzle instance
-import { generations as generationsTable } from '../../../db/schema/schema';
-import { eq, asc, desc, and } from 'drizzle-orm';
+import { generations as generationsTable, projects } from '../../../db/schema/schema';
+import { eq, asc, desc, and, count } from 'drizzle-orm';
+import { authenticate } from '../middleware/auth';
+
+// Augment the Express Request type to include the 'userId' property
+declare global {
+  namespace Express {
+    interface Request {
+      userId?: string; // or your preferred type
+    }
+  }
+}
 
 const generationsRouter = express.Router();
 
@@ -21,35 +31,82 @@ generationsRouter.post('/', asyncHandler(async (req: Request, res: Response) => 
   if (!imageUrl || typeof imageUrl !== 'string') {
     return res.status(400).json({ message: 'Image URL is required' });
   }
-  // Add other validations as necessary, e.g., for prompt
 
   try {
     const newGenerationArray = await db.insert(generationsTable).values({
-      location: imageUrl, // Using 'location' field for imageUrl as per schema
-      // prompt: prompt || `External image: ${fileName || 'untitled'}`,
-      prompt: prompt, // The client will construct the prompt string
+      location: imageUrl,
       params: {
+        prompt: prompt,
         source: 'external_upload',
         original_filename: fileName,
         file_type: fileType,
         file_size: fileSize,
       },
-      // seed: 0, // Schema does not have seed, tasks array, or type for generations table currently
       projectId: projectId,
     }).returning();
 
     if (!newGenerationArray || newGenerationArray.length === 0) {
-      console.error('[API Error Creating Generation]', 'Insert operation did not return the new generation.');
       return res.status(500).json({ message: 'Failed to create generation after insert' });
     }
 
     const newGeneration = newGenerationArray[0];
-    res.status(201).json(newGeneration); // Return the full generation object as created in DB
+    res.status(201).json(newGeneration);
 
   } catch (error: any) {
     console.error('[API Error Creating Generation]', error);
     res.status(500).json({ message: 'Failed to create generation' });
   }
+}));
+
+// GET /api/generations?projectId=:projectId&page=:page&limit=:limit
+generationsRouter.get('/', authenticate, asyncHandler(async (req, res) => {
+    const { projectId, page = '1', limit = '24' } = req.query;
+    const pageNum = parseInt(page as string, 10);
+    const limitNum = parseInt(limit as string, 10);
+
+    if (!projectId || typeof projectId !== 'string') {
+        return res.status(400).json({ message: 'Project ID is required' });
+    }
+
+    try {
+        const userId = req.userId;
+
+        if (!userId) {
+            return res.status(401).json({ message: 'Unauthorized' });
+        }
+
+        const project = await db.query.projects.findFirst({
+            where: and(eq(projects.id, projectId as string), eq(projects.userId, userId))
+        });
+
+        if (!project) {
+            return res.status(404).json({ message: 'Project not found or you do not have access' });
+        }
+
+        const offset = (pageNum - 1) * limitNum;
+
+        const results = await db.query.generations.findMany({
+            where: eq(generationsTable.projectId, projectId as string),
+            orderBy: [desc(generationsTable.createdAt)],
+            limit: limitNum,
+            offset: offset,
+        });
+
+        const totalCountResult = await db.select({ value: count() }).from(generationsTable).where(eq(generationsTable.projectId, projectId as string));
+        const total = totalCountResult[0].value;
+
+        res.json({
+            items: results,
+            page: pageNum,
+            limit: limitNum,
+            total,
+            totalPages: Math.ceil(total / limitNum),
+        });
+
+    } catch (error) {
+        console.error('Failed to fetch generations:', error);
+        res.status(500).json({ message: 'Failed to fetch generations' });
+    }
 }));
 
 // GET /api/generations/:id/task-id
@@ -67,12 +124,11 @@ generationsRouter.get('/:id/task-id', asyncHandler(async (req: Request, res: Res
       return res.status(404).json({ message: 'Generation not found' });
     }
 
-    const tasks = result[0].tasks;
+    const tasks = result[0].tasks as string[] | null;
     if (!tasks || tasks.length === 0) {
       return res.status(404).json({ message: 'No task associated with this generation' });
     }
     
-    // Assuming the first task is the relevant one
     res.status(200).json({ taskId: tasks[0] });
 
   } catch (error: any) {
