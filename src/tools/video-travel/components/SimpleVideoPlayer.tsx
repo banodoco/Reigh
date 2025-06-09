@@ -25,13 +25,23 @@ const SimpleVideoPlayer: React.FC<SimpleVideoPlayerProps> = ({
 
     const handlePlay = () => setIsPlaying(true);
     const handlePause = () => setIsPlaying(false);
+    
+    // Auto-play when component mounts
+    const handleLoadedData = () => {
+      video.play().catch(error => {
+        console.log('Auto-play was prevented:', error);
+        // Auto-play was prevented, user will need to click play
+      });
+    };
 
     video.addEventListener('play', handlePlay);
     video.addEventListener('pause', handlePause);
+    video.addEventListener('loadeddata', handleLoadedData);
 
     return () => {
       video.removeEventListener('play', handlePlay);
       video.removeEventListener('pause', handlePause);
+      video.removeEventListener('loadeddata', handleLoadedData);
     };
   }, []);
 
@@ -56,7 +66,9 @@ const SimpleVideoPlayer: React.FC<SimpleVideoPlayerProps> = ({
     if (!video) return;
 
     if (video.paused) {
-      video.play();
+      video.play().catch(error => {
+        console.log('Play was prevented:', error);
+      });
     } else {
       video.pause();
     }
@@ -72,6 +84,8 @@ const SimpleVideoPlayer: React.FC<SimpleVideoPlayerProps> = ({
         loop
         muted
         playsInline
+        autoPlay
+        preload="auto"
         className="w-full h-full object-contain"
         onClick={togglePlayPause}
       >
