@@ -17,6 +17,7 @@ import shotsRouter from './routes/shots';
 import generationsRouter from './routes/generations';
 import tasksRouter from './routes/tasks';
 import steerableMotionRouter from './routes/steerableMotion';
+import resourcesRouter from './routes/resources';
 import dotenv from 'dotenv';
 import multer from 'multer';
 import path from 'path';
@@ -96,6 +97,7 @@ app.use('/api/shots', shotsRouter);
 app.use('/api/generations', generationsRouter);
 app.use('/api/tasks', tasksRouter);
 app.use('/api/steerable-motion', steerableMotionRouter);
+app.use('/api/resources', resourcesRouter);
 
 const startServer = async () => {
   try {
@@ -118,7 +120,7 @@ const startServer = async () => {
 startServer();
 
 // Global error handling middleware - MUST be defined after all other app.use() and routes
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+ 
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error('[Global Error Handler]', err);
   

@@ -12,6 +12,7 @@ import { Textarea } from '@/shared/components/ui/textarea';
 import { Label } from '@/shared/components/ui/label';
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/components/ui/tabs";
+import { usePaneAwareModalStyle } from '@/shared/hooks/usePaneAwareModalStyle';
 
 // Debounce utility function
 function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
@@ -66,6 +67,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
   const actualCanUseAI = !!apiKey;
   const [activeTab, setActiveTab] = useState<EditorMode>('generate');
   const [activePromptIdForFullView, setActivePromptIdForFullView] = useState<string | null>(null);
+  const modalStyle = usePaneAwareModalStyle();
   
   // Scroll state and ref
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -396,7 +398,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleFinalSaveAndClose()}>
-      <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0">
+      <DialogContent style={modalStyle} className="max-w-4xl flex flex-col p-0">
         <DialogHeader className="p-6 pb-0 flex-shrink-0">
           <DialogTitle>Prompt Editor</DialogTitle>
           <DialogDescription>

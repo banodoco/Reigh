@@ -93,7 +93,6 @@ export default function ToolSelectorPage() {
                   to={tool.path}
                   key={tool.name}
                   className="group block animate-fade-in-up wes-corners"
-                  style={{ animationDelay: `${index * 0.3}s` }}
                 >
                   <div className="wes-tool-card relative overflow-hidden h-full wes-polaroid">
                     {/* Badge */}

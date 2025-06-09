@@ -59,7 +59,7 @@ generationsRouter.post('/', asyncHandler(async (req: Request, res: Response) => 
 }));
 
 // GET /api/generations?projectId=:projectId&page=:page&limit=:limit
-generationsRouter.get('/', authenticate, asyncHandler(async (req, res) => {
+generationsRouter.get('/', asyncHandler(async (req, res) => {
     const { projectId, page = '1', limit = '24' } = req.query;
     const pageNum = parseInt(page as string, 10);
     const limitNum = parseInt(limit as string, 10);
@@ -69,20 +69,6 @@ generationsRouter.get('/', authenticate, asyncHandler(async (req, res) => {
     }
 
     try {
-        const userId = req.userId;
-
-        if (!userId) {
-            return res.status(401).json({ message: 'Unauthorized' });
-        }
-
-        const project = await db.query.projects.findFirst({
-            where: and(eq(projects.id, projectId as string), eq(projects.userId, userId))
-        });
-
-        if (!project) {
-            return res.status(404).json({ message: 'Project not found or you do not have access' });
-        }
-
         const offset = (pageNum - 1) * limitNum;
 
         const results = await db.query.generations.findMany({
@@ -106,6 +92,26 @@ generationsRouter.get('/', authenticate, asyncHandler(async (req, res) => {
     } catch (error) {
         console.error('Failed to fetch generations:', error);
         res.status(500).json({ message: 'Failed to fetch generations' });
+    }
+}));
+
+// DELETE /api/generations/:id
+generationsRouter.delete('/:id', asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+
+    if (!id) {
+        return res.status(400).json({ message: 'Generation ID is required.' });
+    }
+
+    try {
+        const deleted = await db.delete(generationsTable).where(eq(generationsTable.id, id)).returning();
+        if (deleted.length === 0) {
+            return res.status(404).json({ message: 'Generation not found.' });
+        }
+        res.status(200).json({ message: 'Generation deleted successfully.' });
+    } catch (error) {
+        console.error(`Failed to delete generation with id ${id}:`, error);
+        res.status(500).json({ message: 'Failed to delete generation.' });
     }
 }));
 

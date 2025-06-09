@@ -10,6 +10,8 @@ import { useLastAffectedShot } from "@/shared/hooks/useLastAffectedShot";
 import { useProject } from "@/shared/contexts/ProjectContext";
 import { uploadImageToStorage } from '@/shared/lib/imageUploader';
 import { nanoid } from 'nanoid';
+import { useListAllGenerations, useDeleteGeneration } from "@/shared/hooks/useGenerations";
+import { Settings } from "lucide-react";
 
 export type Json =
   | string
@@ -63,6 +65,8 @@ const ImageGenerationToolPage = () => {
   const { data: shots, isLoading: isLoadingShots, error: shotsError } = useListShots(selectedProjectId);
   const addImageToShotMutation = useAddImageToShot();
   const { lastAffectedShotId, setLastAffectedShotId } = useLastAffectedShot();
+  const { data: generatedImagesData, isLoading: isLoadingGenerations } = useListAllGenerations(selectedProjectId);
+  const deleteGenerationMutation = useDeleteGeneration();
 
   // Add state for task creation loading
   const [isCreatingTask, setIsCreatingTask] = useState(false);
@@ -76,53 +80,22 @@ const ImageGenerationToolPage = () => {
     setOpenaiApiKey(storedOpenaiKey);
     const storedReplicateKey = localStorage.getItem('replicate_api_key') || "";
     setReplicateApiKey(storedReplicateKey);
-    fetchGeneratedImages();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedProjectId]);
   
-  const fetchGeneratedImages = async () => {
-    if (!selectedProjectId) {
-      // console.log("No project selected, skipping fetch of generated images."); // [VideoLoadSpeedIssue]
-      setGeneratedImages(placeholderImages); // Show placeholders if no project or clear
+  useEffect(() => {
+    if (generatedImagesData) {
+      setGeneratedImages(generatedImagesData);
+      setShowPlaceholders(generatedImagesData.length === 0);
+    } else {
+      setGeneratedImages(placeholderImages);
       setShowPlaceholders(true);
-      return; 
     }
-    try {
-      // console.log(`[ImageGenerationToolPage] Fetching images for project: ${selectedProjectId}`); // [VideoLoadSpeedIssue]
-      const { data, error } = await supabase
-        .from('generations' as any) // Cast to any to bypass strict table check
-        .select('id, image_url, prompt, seed, metadata, project_id') 
-        .eq('project_id', selectedProjectId) 
-        .order('created_at', { ascending: false });
-        
-      if (error) { console.error('Error fetching images:', error); toast.error("Failed to load previously generated images."); return; }
-      
-      if (data && data.length > 0) {
-        // Cast data to any[] to bypass strict type checking during map
-        const dbImages: GeneratedImageWithMetadata[] = (data as any[]).map(record_any => {
-          const record = record_any as any;
-          const metadata = (record.metadata || {}) as DisplayableMetadata;
-          return {
-            id: record.id as string, // Ensure id is string
-            url: record.image_url as string,
-            prompt: record.prompt as string || metadata.prompt,
-            seed: typeof record.seed === 'number' ? record.seed : (typeof metadata.seed === 'number' ? metadata.seed : undefined),
-            metadata: metadata, 
-          };
-        });
-        setGeneratedImages(dbImages);
-        setShowPlaceholders(false);
-      } else {
-        setGeneratedImages(placeholderImages); // Or an empty array if preferred when no images found
-        setShowPlaceholders(true);
-      }
-    } catch (error) { 
-        console.error('Error fetching images:', error); // [VideoLoadSpeedIssue]
-        toast.error("An error occurred while fetching images."); 
-        setGeneratedImages(placeholderImages);
-        setShowPlaceholders(true);
-    }
-  };
+  }, [generatedImagesData]);
+
+  useEffect(() => {
+    setShowPlaceholders(!isLoadingGenerations && (!generatedImagesData || generatedImagesData.length === 0));
+  }, [generatedImagesData, isLoadingGenerations]);
 
   const handleSaveApiKeys = (newFalApiKey: string, newOpenaiApiKey: string, newReplicateApiKey: string) => {
     localStorage.setItem('fal_api_key', newFalApiKey);
@@ -137,14 +110,7 @@ const ImageGenerationToolPage = () => {
   };
   
   const handleDeleteImage = async (id: string) => {
-    setIsDeleting(id);
-    try {
-      const { error } = await supabase.from('generations' as any).delete().eq('id', id);
-      if (error) { toast.error("Failed to delete image: " + error.message); return; }
-      setGeneratedImages(prevImages => prevImages.filter(image => image.id !== id));
-      toast.success("Image deleted successfully");
-    } catch (error) { console.error('Error deleting image:', error); toast.error("Failed to delete image");
-    } finally { setIsDeleting(null); }
+    deleteGenerationMutation.mutate(id);
   };
 
   const handleUpscaleImage = async (imageId: string, imageUrl: string, currentMetadata?: DisplayableMetadata) => {
@@ -258,69 +224,36 @@ const ImageGenerationToolPage = () => {
         userImageUrl = formData.appliedStartingImageUrl;
     }
 
-    const taskParamsForApi = {
-        prompts: formData.prompts.map((p: PromptEntry) => ({ id: p.id, fullPrompt: p.fullPrompt, shortPrompt: p.shortPrompt })),
-        images_per_prompt: formData.imagesPerPrompt,
-        image_size: formData.determinedApiImageSize,
-        loras: formData.loras, 
-        controlnets: formData.softEdgeStrength && userImageUrl ? [ 
-          {
-            path: "https://huggingface.co/XLabs-AI/flux-controlnet-hed-v3/resolve/main/flux-hed-controlnet-v3.safetensors",
-            conditioning_scale: formData.softEdgeStrength, 
-            control_image_url: userImageUrl,
-          }
-        ] : undefined, // Use undefined if empty for cleaner JSON
-        control_loras: formData.depthStrength && userImageUrl ? [
-          {
-            path: "https://huggingface.co/black-forest-labs/FLUX.1-Depth-dev-lora/resolve/main/flux1-depth-dev-lora.safetensors",
-            preprocess: "depth", 
-            control_image_url: userImageUrl, 
-            scale: formData.depthStrength?.toString(), 
-          }
-        ] : undefined, // Use undefined if empty
-        starting_image_url: userImageUrl,
-        original_starting_image_filename: formData.startingImage ? formData.startingImage.name : (formData.appliedStartingImageUrl ? 'applied_image' : null),
-        full_selected_loras_for_metadata: formData.fullSelectedLoras,
-        depth_strength: formData.depthStrength,
-        soft_edge_strength: formData.softEdgeStrength,
-        // Fal specific parameters like fal_model_id, num_inference_steps can be added here from formData
-        // e.g. fal_model_id: formData.falModelId (if it exists on the form)
-    };
+    const { onGenerationComplete, onGenerationStart, ...restOfFormData } = formData;
 
-    // Remove undefined keys from taskParamsForApi to keep payload clean
-    Object.keys(taskParamsForApi).forEach(key => (taskParamsForApi as any)[key] === undefined && delete (taskParamsForApi as any)[key]);
-
-    const apiPayload = {
+    const taskPayload = {
       project_id: selectedProjectId,
-      task_type: 'image_generation',
-      params: taskParamsForApi as Json, // Cast the inner params object to Json
+      task_type: 'image_generation_fal',
+      params: {
+        ...restOfFormData,
+        user_image_url: userImageUrl,
+        // Ensure LoRAs are serializable and match expected structure
+        loras: formData.loras.map((lora: any) => ({
+            path: lora.path,
+            strength: lora.scale // Assuming the form still provides 'scale'
+        })),
+      },
       status: 'Pending',
     };
 
     try {
-      const response = await fetch('/api/tasks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(apiPayload)
-      });
+      const { data: newTask, error } = await supabase.from('tasks').insert(taskPayload).select().single();
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: response.statusText }));
-        throw new Error(errorData.message || `HTTP error ${response.status}`);
+      if (error) throw error;
+
+      if (newTask) {
+        toast.success(`Image generation task created (ID: ${newTask.id.substring(0,8)}...). Check the Tasks pane for progress.`);
+        // No longer need to call onGenerationStart or onGenerationComplete
+        // The backend and WebSocket will handle state updates.
       }
-
-      const newTask = await response.json();
-
-      if (newTask && newTask.id) {
-        console.log('[ImageGenerationToolPage] Task created successfully via API:', newTask);
-        toast.success(`Image generation task created (ID: ${(newTask.id as string).substring(0,8)}...). It will be processed in the background.`);
-      } else {
-        console.warn("[ImageGenerationToolPage] Task creation via API didn't return data or ID.");
-        toast.info("Task creation registered via API but no confirmation ID received. Check logs.");
-      }
-    } catch (error: any) {
-      console.error("[ImageGenerationToolPage] Exception creating task via API:", error);
-      toast.error(`An unexpected error occurred while creating the task via API: ${error.message || 'Unknown API error'}`);
+    } catch (err: any) {
+      console.error('Error creating image generation task:', err);
+      toast.error(`Failed to create task: ${err.message || 'Unknown API error'}`);
     } finally {
       setIsCreatingTask(false);
     }
@@ -343,11 +276,9 @@ const ImageGenerationToolPage = () => {
   // ... old handleGenerate logic was here ...
 
   const handleApplySettingsFromGallery = (settings: DisplayableMetadata) => {
-    if (imageGenerationFormRef.current?.applySettings) {
+    if (imageGenerationFormRef.current) {
       imageGenerationFormRef.current.applySettings(settings);
-      toast.success("Settings applied to form!");
-    } else {
-      toast.error("Could not apply settings to the form.");
+      toast.info("Settings applied to the form.");
     }
   };
 
@@ -393,14 +324,20 @@ const ImageGenerationToolPage = () => {
   // Update the condition for showing the form, and disable generate button if task is being created
   const canGenerate = hasValidFalApiKey && !isCreatingTask; // And selectedProjectId is implicitly checked in handleNewGenerate
 
+  const isGenerating = isCreatingTask; // Simplified generating state
+
+  const imagesToShow = showPlaceholders 
+    ? placeholderImages 
+    : [...(generatedImagesData || [])];
+
   return (
     <div className="flex flex-col h-screen">
-      <header className="flex justify-between items-center p-4 border-b sticky top-0 bg-background/90 backdrop-blur-md z-10">
-        <h1 className="text-xl font-semibold">Image Generation Tool</h1>
-        <SettingsModal 
-            currentFalApiKey={falApiKey}
-            onSaveApiKeys={handleSaveApiKeys}
-         />
+      <header className="flex justify-between items-center mb-6 sticky top-0 bg-background/90 backdrop-blur-md py-4 z-10">
+        <h1 className="text-3xl font-bold">Image Generation</h1>
+        <Button variant="ghost" onClick={() => setShowSettingsModal(true)}>
+          <Settings className="h-5 w-5" />
+          <span className="sr-only">Settings</span>
+        </Button>
       </header>
 
       {!hasValidFalApiKey && (
@@ -423,7 +360,7 @@ const ImageGenerationToolPage = () => {
             <ImageGenerationForm 
               ref={imageGenerationFormRef} 
               onGenerate={handleNewGenerate} // Use the new handler
-              isGenerating={isCreatingTask} // isCreatingTask from handleNewGenerate
+              isGenerating={isGenerating} // isCreatingTask from handleNewGenerate
               hasApiKey={!!falApiKey} // Still relevant for UI
               apiKey={falApiKey} // Potentially for display or direct use by form
               openaiApiKey={openaiApiKey}
@@ -441,19 +378,28 @@ const ImageGenerationToolPage = () => {
             </div>
           )}
 
-          <ImageGallery 
-            images={showPlaceholders ? placeholderImages : generatedImages} 
-            onDelete={handleDeleteImage}
-            isDeleting={isDeleting}
-            onApplySettings={handleApplySettingsFromGallery}
-            onAddToLastShot={handleAddImageToTargetShot}
-            lastShotId={lastAffectedShotId}
-            allShots={validShots}
-            currentToolType="image-generation"
-            initialFilterState={true} // Added this prop, assuming it exists or should be added to ImageGallery
-          />
+          <div className="mt-8">
+            <ImageGallery 
+              images={imagesToShow}
+              onDelete={handleDeleteImage} 
+              isDeleting={deleteGenerationMutation.isPending ? deleteGenerationMutation.variables as string : null}
+              onApplySettings={handleApplySettingsFromGallery}
+              onAddToLastShot={handleAddImageToTargetShot}
+              allShots={shots || []}
+              lastShotId={lastAffectedShotId}
+              currentToolType="image-generation"
+            />
+          </div>
         </>
       )}
+
+      {/* Settings Modal */}
+      <SettingsModal 
+          isOpen={showSettingsModal}
+          onOpenChange={setShowSettingsModal}
+          currentFalApiKey={falApiKey}
+          onSaveApiKeys={handleSaveApiKeys}
+        />
     </div>
   );
 };

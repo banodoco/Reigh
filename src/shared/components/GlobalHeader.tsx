@@ -62,8 +62,8 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
         <div 
           className="container flex h-24 max-w-screen-2xl items-center justify-between transition-all duration-300 ease-in-out relative z-10"
           style={{
-            paddingRight: `${contentOffsetRight}px`,
-            paddingLeft: `${contentOffsetLeft}px`,
+            paddingRight: contentOffsetRight ? `${contentOffsetRight}px` : undefined,
+            paddingLeft: contentOffsetLeft ? `${contentOffsetLeft}px` : undefined,
           }}
         >
           <div className="flex items-center space-x-8">

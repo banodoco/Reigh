@@ -16,11 +16,14 @@ import {
 } from '@/shared/components/ui/alert-dialog';
 import { Checkbox } from '@/shared/components/ui/checkbox';
 import { Label } from '@/shared/components/ui/label';
+import { cn } from '@/shared/lib/utils';
 
 interface SortableImageItemProps {
   image: GenerationRow;
   onDelete: (shotImageEntryId: string) => void;
   onDoubleClick: () => void;
+  onClick: (event: React.MouseEvent) => void;
+  isSelected: boolean;
 }
 
 const SKIP_CONFIRMATION_KEY = 'skipImageDeletionConfirmation';
@@ -40,8 +43,16 @@ const getDisplayUrl = (relativePath: string | undefined): string => {
   return `${cleanBase}/${cleanRelative}`;
 };
 
-export const SortableImageItem: React.FC<SortableImageItemProps> = ({ image, onDelete, onDoubleClick }) => {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: image.shotImageEntryId });
+export const SortableImageItem: React.FC<SortableImageItemProps> = ({
+  image,
+  onDelete,
+  onDoubleClick,
+  onClick,
+  isSelected,
+}) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: image.shotImageEntryId,
+  });
   const [isConfirmDeleteDialogOpen, setIsConfirmDeleteDialogOpen] = useState(false);
   const [skipConfirmationNextTimeVisual, setSkipConfirmationNextTimeVisual] = useState(false);
   const currentDialogSkipChoiceRef = useRef(false);
@@ -74,25 +85,24 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({ image, onD
   };
 
   return (
-    <div 
-      ref={setNodeRef} 
-      style={style} 
-      {...attributes} 
-      className="relative group bg-muted/50 rounded border p-1 flex flex-col items-center justify-center aspect-square overflow-hidden shadow-sm"
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      className={cn(
+        'relative group bg-muted/50 rounded border p-1 flex flex-col items-center justify-center aspect-square overflow-hidden shadow-sm cursor-grab active:cursor-grabbing',
+        { 'ring-2 ring-offset-2 ring-blue-500 border-blue-500': isSelected },
+      )}
       onDoubleClick={onDoubleClick}
+      onClick={onClick}
     >
-      <img 
-        src={getDisplayUrl(image.thumbUrl || image.imageUrl)} 
-        alt={`Image ${image.id}`} 
+      <img
+        src={getDisplayUrl(image.thumbUrl || image.imageUrl)}
+        alt={`Image ${image.id}`}
         className="max-w-full max-h-full object-contain rounded-sm"
       />
-      <div 
-        {...listeners} 
-        className="absolute inset-0 bg-black/30 group-hover:bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-grab active:cursor-grabbing"
-      >
-        {/* Optional: Add a drag handle icon here if desired */}
-      </div>
-      <Button 
+      <Button
         variant="destructive"
         size="icon"
         className="absolute top-1 right-1 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity z-10"

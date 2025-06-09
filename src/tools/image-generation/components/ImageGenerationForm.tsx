@@ -734,12 +734,13 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
         </div>
       </form>
 
-      <LoraSelectorModal 
-        isOpen={isLoraModalOpen} 
-        onClose={() => setIsLoraModalOpen(false)} 
-        loras={availableLoras} 
-        onAddLora={handleAddLora} 
-        selectedLoraIds={selectedLoras.map(sl => sl.id)}
+      <LoraSelectorModal
+        isOpen={isLoraModalOpen}
+        onClose={() => setIsLoraModalOpen(false)}
+        loras={availableLoras}
+        onAddLora={handleAddLora}
+        selectedLoraIds={selectedLoras.map(l => l["Model ID"])}
+        lora_type="Flux.dev"
       />
         
       <PromptEditorModal

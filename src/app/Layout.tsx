@@ -21,7 +21,6 @@ const Layout: React.FC = () => {
     marginRight: isTasksPaneLocked ? `${tasksPaneWidth}px` : '0px',
     marginLeft: isShotsPaneLocked ? `${shotsPaneWidth}px` : '0px',
     paddingBottom: isGenerationsPaneLocked ? `${generationsPaneHeight}px` : '0px',
-    transition: 'margin 300ms ease-in-out, padding 300ms ease-in-out',
   };
 
   return (

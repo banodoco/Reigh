@@ -70,10 +70,19 @@ export const shotGenerations = sqliteTable('shot_generations', {
   position: integer('position').default(0).notNull(),
 });
 
+export const resources = sqliteTable('resources', {
+  id: text('id').$defaultFn(() => randomUUID()).primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  type: text('type').notNull(), // 'lora'
+  metadata: text('metadata', { mode: 'json' }).notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
+});
+
 // --- Relations ---
 
 export const usersRelations = relations(users, ({ many }) => ({
   projects: many(projects),
+  resources: many(resources),
 }));
 
 export const projectsRelations = relations(projects, ({ one, many }) => ({
@@ -117,6 +126,13 @@ export const shotGenerationsRelations = relations(shotGenerations, ({ one }) => 
   generation: one(generations, {
     fields: [shotGenerations.generationId],
     references: [generations.id],
+  }),
+}));
+
+export const resourcesRelations = relations(resources, ({ one }) => ({
+  user: one(users, {
+    fields: [resources.userId],
+    references: [users.id],
   }),
 }));
 

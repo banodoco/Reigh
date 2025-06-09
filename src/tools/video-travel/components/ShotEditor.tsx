@@ -15,13 +15,17 @@ import ShotImageManager from '@/shared/components/ShotImageManager';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/components/ui/collapsible";
 import { Switch } from "@/shared/components/ui/switch";
 import { Input } from "@/shared/components/ui/input";
-import { ChevronsUpDown, Info } from 'lucide-react';
+import { ChevronsUpDown, Info, X } from 'lucide-react';
 import { arrayMove } from '@dnd-kit/sortable';
 import { getDisplayUrl } from '@/shared/lib/utils';
 import { RadioGroup, RadioGroupItem } from "@/shared/components/ui/radio-group";
 import { ASPECT_RATIO_TO_RESOLUTION, findClosestAspectRatio } from '@/shared/lib/aspectRatios';
 import VideoOutputsGallery from "./VideoOutputsGallery";
 import BatchSettingsForm from "./BatchSettingsForm";
+import { ActiveLora } from '../pages/VideoTravelToolPage';
+import { LoraModel, LoraSelectorModal } from '@/shared/components/LoraSelectorModal';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
+import { SliderWithValue } from '@/shared/components/ui/slider-with-value';
 
 // Add the missing type definition
 export interface SegmentGenerationParams {
@@ -76,9 +80,9 @@ interface ShotSettings {
   steerableMotionSettings: SteerableMotionSettings;
 }
 
-interface ShotEditorProps {
+export interface ShotEditorProps {
   selectedShot: Shot;
-  projectId: string | null;
+  projectId: string;
   videoPairConfigs: VideoPairConfig[];
   videoControlMode: 'individual' | 'batch';
   batchVideoPrompt: string;
@@ -88,21 +92,28 @@ interface ShotEditorProps {
   onShotImagesUpdate: () => void;
   onBack: () => void;
   onVideoControlModeChange: (mode: 'individual' | 'batch') => void;
-  onPairConfigChange: (pairId: string, field: keyof Omit<VideoPairConfig, 'imageA' | 'imageB' | 'id' | 'generatedVideoUrl'>, value: string | number) => void;
-  onBatchVideoPromptChange: (value: string) => void;
-  onBatchVideoFramesChange: (value: number) => void;
-  onBatchVideoContextChange: (value: number) => void;
+  onPairConfigChange: (pairId: string, field: 'prompt' | 'frames' | 'context', value: string | number) => void;
+  onBatchVideoPromptChange: (prompt: string) => void;
+  onBatchVideoFramesChange: (frames: number) => void;
+  onBatchVideoContextChange: (context: number) => void;
   batchVideoSteps: number;
-  onBatchVideoStepsChange: (value: number) => void;
+  onBatchVideoStepsChange: (steps: number) => void;
   dimensionSource: 'project' | 'firstImage' | 'custom';
   onDimensionSourceChange: (source: 'project' | 'firstImage' | 'custom') => void;
+  customWidth?: number;
+  onCustomWidthChange: (width?: number) => void;
+  customHeight?: number;
+  onCustomHeightChange: (height?: number) => void;
   steerableMotionSettings: SteerableMotionSettings;
   onSteerableMotionSettingsChange: (settings: Partial<SteerableMotionSettings>) => void;
-  customWidth?: number;
-  onCustomWidthChange: (v: number | undefined) => void;
-  customHeight?: number;
-  onCustomHeightChange: (v: number | undefined) => void;
-  onGenerateAllSegments: (shot: Shot, segmentParams: SegmentGenerationParams, dimensionInfo: any) => void;
+  onGenerateAllSegments: () => void;
+  selectedLoras: ActiveLora[];
+  onAddLora: (lora: LoraModel) => void;
+  onRemoveLora: (loraId: string) => void;
+  onLoraStrengthChange: (loraId: string, strength: number) => void;
+  availableLoras: LoraModel[];
+  isLoraModalOpen: boolean;
+  setIsLoraModalOpen: (isOpen: boolean) => void;
 }
 
 const baseUrl = import.meta.env.VITE_API_TARGET_URL || '';
@@ -151,6 +162,13 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   customHeight,
   onCustomHeightChange,
   onGenerateAllSegments,
+  selectedLoras,
+  onAddLora,
+  onRemoveLora,
+  onLoraStrengthChange,
+  availableLoras,
+  isLoraModalOpen,
+  setIsLoraModalOpen,
 }) => {
   const { selectedProjectId, projects } = useProject();
   const [isUploadingImage, setIsUploadingImage] = useState(false);
@@ -598,6 +616,12 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     }
   };
 
+  const handleGenerateAll = () => {
+    // Logic to prepare and generate all video segments
+    console.log('Generate all segments clicked');
+    // This would gather all configs and prompts and then trigger generation
+  };
+
   return (
     <div className="flex flex-col h-full space-y-4">
       {/* Header */}
@@ -617,7 +641,12 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           <Card className="flex-grow flex flex-col min-h-0">
             <CardHeader>
               <CardTitle>Manage Shot Images</CardTitle>
-              <p className="text-sm text-muted-foreground pt-1">Drag to reorder. Add at least two images to generate videos.</p>
+              <div className="flex justify-between items-center mb-2">
+                <h3 className="text-lg font-semibold tracking-tight">Images</h3>
+              </div>
+              <p className="text-sm text-muted-foreground pt-1">
+                Drag to reorder. Cmd+click to select and move multiple images.
+              </p>
             </CardHeader>
             <CardContent className="flex-grow overflow-y-auto">
               <div className="p-1">
@@ -677,7 +706,59 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                     projects={projects}
                     selectedProjectId={selectedProjectId}
                 />
-                <div className="mt-6">
+                
+                <div className="space-y-4 py-6 border-t mt-6">
+                   
+                    <Button type="button" variant="outline" className="w-full" onClick={() => setIsLoraModalOpen(true)}>
+                     Add or Manage LoRAs
+                    </Button>
+                    {availableLoras.length === 0 && !isLoraModalOpen && <p className="text-xs text-muted-foreground mt-1">Loading LoRA models for selection...</p>}
+                    {selectedLoras.length > 0 && (
+                      <TooltipProvider delayDuration={300}>
+                        <div className="mt-4 space-y-4">
+                          <h3 className="text-md font-semibold">Active LoRAs:</h3>
+                          {selectedLoras.map((lora) => (
+                            <div key={lora.id} className="p-3 border rounded-md shadow-sm bg-slate-50/50 dark:bg-slate-800/30">
+                              <div className="flex items-start gap-3">
+                                {lora.previewImageUrl && (
+                                  <img 
+                                    src={lora.previewImageUrl} 
+                                    alt={`Preview for ${lora.name}`} 
+                                    className="h-16 w-16 object-cover rounded-md border flex-shrink-0"
+                                  />
+                                )}
+                                <div className="flex-grow min-w-0">
+                                  <div className="flex justify-between items-start mb-1">
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Label htmlFor={`lora-strength-${lora.id}`} className="text-sm font-medium truncate pr-2 cursor-help">
+                                          {lora.name}
+                                        </Label>
+                                      </TooltipTrigger>
+                                      <TooltipContent side="top">
+                                        <p>{lora.name}</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                    <Button variant="ghost" size="icon" onClick={() => onRemoveLora(lora.id)} className="text-destructive hover:bg-destructive/10 h-7 w-7 flex-shrink-0">
+                                      <X className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                  <SliderWithValue 
+                                    label={`Strength`}
+                                    value={lora.strength}
+                                    onChange={(newStrength) => onLoraStrengthChange(lora.id, newStrength)}
+                                    min={0} max={100} step={1}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </TooltipProvider>
+                    )}
+                </div>
+                
+                <div className="mt-0 pt-6 border-t">
                     <Button 
                         size="lg" 
                         className="w-full" 
@@ -692,6 +773,14 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           </Card>
         </div>
       </div>
+      <LoraSelectorModal
+        isOpen={isLoraModalOpen}
+        onClose={() => setIsLoraModalOpen(false)}
+        loras={availableLoras}
+        onAddLora={onAddLora}
+        selectedLoraIds={selectedLoras.map(l => l.id)}
+        lora_type="Wan 2.1 14b"
+      />
     </div>
   );
 };

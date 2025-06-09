@@ -1,13 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useContext } from 'react';
 import { useProject } from "@/shared/contexts/ProjectContext";
-import { useListGenerations } from '@/tools/image-generation/hooks/useGenerations';
+import { useListAllGenerations, useDeleteGeneration } from '@/shared/hooks/useGenerations';
 import { useSlidingPane } from '@/shared/hooks/useSlidingPane';
 import { cn } from '@/shared/lib/utils';
 import { Button } from '@/shared/components/ui/button';
 import { LockIcon, UnlockIcon, ArrowUpIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import ImageGallery from '@/shared/components/ImageGallery';
-import { useLastAffectedShot } from '@/shared/hooks/useLastAffectedShot';
+import { LastAffectedShotContext } from '@/shared/contexts/LastAffectedShotContext';
 import { useListShots, useAddImageToShot } from '@/shared/hooks/useShots';
 import { toast } from 'sonner';
 import { usePanes } from '@/shared/contexts/PanesContext';
@@ -18,10 +18,24 @@ const GENERATIONS_PER_PAGE = 24;
 const GenerationsPane: React.FC = () => {
   const { selectedProjectId } = useProject();
   const [page, setPage] = useState(1);
-  const { data, isLoading, error } = useListGenerations(selectedProjectId, page, GENERATIONS_PER_PAGE);
+  const { data: allGenerations, isLoading, error } = useListAllGenerations(selectedProjectId);
   const { data: shotsData } = useListShots(selectedProjectId);
-  const { lastAffectedShotId, setLastAffectedShotId } = useLastAffectedShot();
+  const lastAffectedShotContext = useContext(LastAffectedShotContext);
+  const { lastAffectedShotId = null, setLastAffectedShotId = () => {} } = lastAffectedShotContext || {};
   const addImageToShotMutation = useAddImageToShot();
+  const deleteGenerationMutation = useDeleteGeneration();
+
+  // Client-side pagination
+  const paginatedData = useMemo(() => {
+    if (!allGenerations) return { items: [], totalPages: 0, currentPage: page };
+    
+    const startIndex = (page - 1) * GENERATIONS_PER_PAGE;
+    const endIndex = startIndex + GENERATIONS_PER_PAGE;
+    const items = allGenerations.slice(startIndex, endIndex);
+    const totalPages = Math.ceil(allGenerations.length / GENERATIONS_PER_PAGE);
+    
+    return { items, totalPages, currentPage: page };
+  }, [allGenerations, page]);
 
   const {
     isGenerationsPaneLocked,
@@ -42,8 +56,13 @@ const GenerationsPane: React.FC = () => {
     }
   }, [lastAffectedShotId, shotsData, setLastAffectedShotId]);
 
+  // Reset to page 1 when project changes
+  useEffect(() => {
+    setPage(1);
+  }, [selectedProjectId]);
+
   const handleNextPage = () => {
-    if (data && page < data.totalPages) {
+    if (page < paginatedData.totalPages) {
       setPage(page + 1);
     }
   };
@@ -53,7 +72,7 @@ const GenerationsPane: React.FC = () => {
   };
 
   const handleDeleteGeneration = (id: string) => {
-    console.log(`TODO: Implement delete for generation ${id}`);
+    deleteGenerationMutation.mutate(id);
   };
 
   const handleAddToShot = (generationId: string, imageUrl?: string) => {
@@ -83,14 +102,6 @@ const GenerationsPane: React.FC = () => {
     });
   };
 
-  const constructImageUrl = (url: string | undefined | null) => {
-    if (!url) return '';
-    if (url.startsWith('http')) return url;
-    // Use environment variable for the base URL, default to empty string if not set
-    const baseUrl = import.meta.env.VITE_API_TARGET_URL || '';
-    return `${baseUrl}${url}`;
-  };
-
   return (
     <>
       {!isLocked && (
@@ -113,12 +124,12 @@ const GenerationsPane: React.FC = () => {
             <div className="flex items-center space-x-2">
                 {/* Pagination */}
                 <span className="text-sm text-zinc-400">
-                    Page {data?.page || 1} of {data?.totalPages || 1}
+                    Page {paginatedData.currentPage} of {paginatedData.totalPages || 1}
                 </span>
                 <Button variant="outline" size="sm" onClick={handlePrevPage} disabled={page === 1 || isLoading}>
                     <ChevronLeft className="h-4 w-4" />
                 </Button>
-                <Button variant="outline" size="sm" onClick={handleNextPage} disabled={!data || page >= data.totalPages || isLoading}>
+                <Button variant="outline" size="sm" onClick={handleNextPage} disabled={page >= paginatedData.totalPages || isLoading}>
                     <ChevronRight className="h-4 w-4" />
                 </Button>
 
@@ -142,20 +153,17 @@ const GenerationsPane: React.FC = () => {
         <div className="flex-grow p-3 overflow-y-auto">
             {isLoading && <p className="text-white text-center">Loading generations...</p>}
             {error && <p className="text-red-500 text-center">Error: {error.message}</p>}
-            {data && data.items.length > 0 && (
+            {paginatedData.items.length > 0 && (
                 <ImageGallery
-                    images={data.items.map(gen => ({ 
-                        ...gen, 
-                        url: constructImageUrl(gen.location), 
-                        isVideo: gen.type?.includes('video') 
-                    }))}
+                    images={paginatedData.items}
                     onDelete={handleDeleteGeneration}
+                    isDeleting={deleteGenerationMutation.isPending ? deleteGenerationMutation.variables as string : null}
                     allShots={shotsData || []}
                     lastShotId={lastAffectedShotId || undefined}
                     onAddToLastShot={handleAddToShot}
                 />
             )}
-            {data && data.items.length === 0 && !isLoading && (
+            {paginatedData.items.length === 0 && !isLoading && (
                 <div className="flex items-center justify-center h-full text-zinc-500">
                     No generations found for this project.
                 </div>

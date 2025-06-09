@@ -8,10 +8,18 @@ import CreateShotModal from '../components/CreateShotModal';
 import ShotListDisplay from '../components/ShotListDisplay';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
+import { LoraModel } from '@/shared/components/LoraSelectorModal';
 // import { useLastAffectedShot } from '@/shared/hooks/useLastAffectedShot';
 
 // Placeholder data or logic to fetch actual data for VideoEditLayout
 // This will need to be fleshed out based on VideoEditLayout's requirements
+export interface ActiveLora {
+  id: string;
+  name: string;
+  path: string;
+  strength: number;
+  previewImageUrl?: string;
+}
 
 const VideoTravelToolPage: React.FC = () => {
   const { selectedProjectId } = useProject();
@@ -22,6 +30,9 @@ const VideoTravelToolPage: React.FC = () => {
   const [isCreateShotModalOpen, setIsCreateShotModalOpen] = useState(false);
   const queryClient = useQueryClient();
   // const { lastAffectedShotId, setLastAffectedShotId } = useLastAffectedShot(); // Keep for later if needed
+  const [isLoraModalOpen, setIsLoraModalOpen] = useState(false);
+  const [availableLoras, setAvailableLoras] = useState<LoraModel[]>([]);
+  const [selectedLoras, setSelectedLoras] = useState<ActiveLora[]>([]);
 
   // Add state for video generation settings
   const [videoControlMode, setVideoControlMode] = useState<'individual' | 'batch'>('batch');
@@ -46,6 +57,16 @@ const VideoTravelToolPage: React.FC = () => {
     after_first_post_generation_saturation: 0.75,
     after_first_post_generation_brightness: -0.3,
   });
+
+  useEffect(() => {
+    fetch('/data/loras.json')
+      .then(response => response.json())
+      .then(data => {
+        const allLoras = Object.values(data).flat();
+        setAvailableLoras(allLoras as LoraModel[]);
+      })
+      .catch(error => console.error("Error fetching LoRA data:", error));
+  }, []);
 
   useEffect(() => {
     if (!selectedProjectId) {
@@ -147,6 +168,38 @@ const VideoTravelToolPage: React.FC = () => {
     }));
   };
 
+  const handleAddLora = (loraToAdd: LoraModel) => {
+    if (selectedLoras.find(sl => sl.id === loraToAdd["Model ID"])) {
+      console.log(`LoRA already added.`);
+      return;
+    }
+    if (loraToAdd["Model Files"] && loraToAdd["Model Files"].length > 0) {
+      setSelectedLoras(prevLoras => [
+        ...prevLoras,
+        {
+          id: loraToAdd["Model ID"],
+          name: loraToAdd.Name !== "N/A" ? loraToAdd.Name : loraToAdd["Model ID"],
+          path: loraToAdd["Model Files"][0].url,
+          strength: 40,
+          previewImageUrl: loraToAdd.Images && loraToAdd.Images.length > 0 ? loraToAdd.Images[0].url : undefined,
+        },
+      ]);
+      console.log(`LoRA added.`);
+    } else {
+      console.error("Selected LoRA has no model file specified.");
+    }
+  };
+
+  const handleRemoveLora = (loraIdToRemove: string) => {
+    setSelectedLoras(prevLoras => prevLoras.filter(lora => lora.id !== loraIdToRemove));
+  };
+
+  const handleLoraStrengthChange = (loraId: string, newStrength: number) => {
+    setSelectedLoras(prevLoras =>
+      prevLoras.map(lora => (lora.id === loraId ? { ...lora, strength: newStrength } : lora))
+    );
+  };
+
   if (!selectedProjectId) {
     return <div className="p-4">Please select a project first.</div>;
   }
@@ -199,6 +252,13 @@ const VideoTravelToolPage: React.FC = () => {
           steerableMotionSettings={steerableMotionSettings}
           onSteerableMotionSettingsChange={handleSteerableMotionSettingsChange}
           onGenerateAllSegments={() => {}}
+          selectedLoras={selectedLoras}
+          onAddLora={handleAddLora}
+          onRemoveLora={handleRemoveLora}
+          onLoraStrengthChange={handleLoraStrengthChange}
+          availableLoras={availableLoras}
+          isLoraModalOpen={isLoraModalOpen}
+          setIsLoraModalOpen={setIsLoraModalOpen}
         />
       )}
 
