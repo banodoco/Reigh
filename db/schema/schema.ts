@@ -2,7 +2,7 @@
 
 import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
 import { relations, sql } from 'drizzle-orm';
-import { randomUUID } from 'node:crypto';
+import { v4 as randomUUID } from 'uuid';
 
 // --- ENUMS (simulated for SQLite) ---
 // Note: Drizzle ORM's `sqlite-core` does not have a native enum type like `pg-core`.
