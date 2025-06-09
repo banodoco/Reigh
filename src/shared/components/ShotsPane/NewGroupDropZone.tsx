@@ -7,7 +7,11 @@ import { useListShots } from '@/shared/hooks/useShots';
 
 const NEW_GROUP_DROPPABLE_ID = 'new-shot-group-dropzone';
 
-const NewGroupDropZone: React.FC = () => {
+interface NewGroupDropZoneProps {
+  onZoneClick: () => void;
+}
+
+const NewGroupDropZone: React.FC<NewGroupDropZoneProps> = ({ onZoneClick }) => {
   const { selectedProjectId } = useProject();
   const { data: shots } = useListShots(selectedProjectId);
   const handleExternalImageDropMutation = useHandleExternalImageDrop();
@@ -60,12 +64,11 @@ const NewGroupDropZone: React.FC = () => {
     const validImageTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
     const shotCount = shots?.length ?? 0;
     
-    // Process only the first valid file to create the new shot
-    const file = files.find(f => validImageTypes.includes(f.type));
+    const validFiles = files.filter(f => validImageTypes.includes(f.type));
     
-    if (!file) {
+    if (validFiles.length === 0) {
       toast({
-        title: "Invalid File Type",
+        title: "No Valid Files Found",
         description: `Only JPEG, PNG, WEBP, or GIF files can be used to create a new shot.`,
         variant: "destructive",
       });
@@ -75,19 +78,19 @@ const NewGroupDropZone: React.FC = () => {
     try {
       if (!selectedProjectId) throw new Error("A project must be selected.");
       
-      await handleExternalImageDropMutation.handleDrop( 
-        file,
-        null, // Passing null to indicate a new shot should be created
-        selectedProjectId,
-        shotCount
-      );
+      await handleExternalImageDropMutation.mutateAsync({
+        imageFiles: validFiles,
+        targetShotId: null, // Passing null to indicate a new shot should be created
+        currentProjectQueryKey: selectedProjectId,
+        currentShotCount: shotCount
+      });
 
       toast({
         title: "New Shot Created",
-        description: `Successfully created a new shot with '${file.name}'.`,
+        description: `Successfully created a new shot with ${validFiles.length} image(s).`,
       });
     } catch (error) {
-      console.error(`Error creating new shot with file ${file.name}:`, error);
+      console.error(`Error creating new shot with ${validFiles.length} file(s):`, error);
       toast({
         title: "Error Creating Shot",
         description: `Could not create a new shot: ${(error as Error).message}`,
@@ -111,9 +114,10 @@ const NewGroupDropZone: React.FC = () => {
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
+      onClick={onZoneClick}
     >
       <p className="text-gray-400 text-center">
-        {isDropTarget ? 'Release to create a new shot' : 'Drop an image here to create a new shot'}
+        {isDropTarget ? 'Release to create a new shot' : 'Drop image(s) here to create a new shot'}
       </p>
     </div>
   );

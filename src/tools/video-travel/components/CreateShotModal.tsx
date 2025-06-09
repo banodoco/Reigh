@@ -10,35 +10,49 @@ import {
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
-import { getRandomDummyName } from '@/shared/lib/dummyNames';
+import FileInput from '@/shared/components/FileInput';
 
 interface CreateShotModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (shotName: string) => Promise<void>; // onSubmit now only takes shotName
-  isLoading?: boolean; // To disable button during submission
+  onSubmit: (shotName: string, files: File[]) => Promise<void>;
+  isLoading?: boolean;
+  defaultShotName?: string;
 }
 
-const CreateShotModal: React.FC<CreateShotModalProps> = ({ isOpen, onClose, onSubmit, isLoading }) => {
+const CreateShotModal: React.FC<CreateShotModalProps> = ({ 
+  isOpen, 
+  onClose, 
+  onSubmit, 
+  isLoading, 
+  defaultShotName 
+}) => {
   const [shotName, setShotName] = useState('');
+  const [files, setFiles] = useState<File[]>([]);
 
   const handleSubmit = async () => {
     let finalShotName = shotName.trim();
     if (!finalShotName) {
-      finalShotName = getRandomDummyName();
+      finalShotName = defaultShotName || 'Untitled Shot';
     }
-    await onSubmit(finalShotName);
-    setShotName(''); // Reset input after submission
-    // onClose(); // Parent can decide to close based on submission success/failure if needed
+    await onSubmit(finalShotName, files);
+    setShotName('');
+    setFiles([]);
+  };
+
+  const handleClose = () => {
+    setShotName('');
+    setFiles([]);
+    onClose();
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Create New Shot</DialogTitle>
           <DialogDescription>
-            Enter a name for your new shot. Click save when you're done.
+            Enter a name for your new shot. You can also add starting images.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
@@ -51,12 +65,18 @@ const CreateShotModal: React.FC<CreateShotModalProps> = ({ isOpen, onClose, onSu
               value={shotName} 
               onChange={(e) => setShotName(e.target.value)} 
               className="col-span-3" 
-              placeholder="My Awesome Shot"
+              placeholder={defaultShotName || "e.g., My Awesome Shot"}
             />
           </div>
+          <FileInput 
+            onFileChange={setFiles}
+            multiple
+            acceptTypes={['image']}
+            label="Starting Images (Optional)"
+          />
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={isLoading}>
+          <Button variant="outline" onClick={handleClose} disabled={isLoading}>
             Cancel
           </Button>
           <Button type="submit" onClick={handleSubmit} disabled={isLoading}>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import ShotEditor, { SteerableMotionSettings } from '../components/ShotEditor';
-import { useListShots, useCreateShot } from '@/shared/hooks/useShots';
+import { useListShots, useCreateShot, useHandleExternalImageDrop } from '@/shared/hooks/useShots';
 import { Shot } from '@/types/shots';
 import { Button } from '@/shared/components/ui/button';
 import { useProject } from "@/shared/contexts/ProjectContext";
@@ -25,8 +25,9 @@ const VideoTravelToolPage: React.FC = () => {
   const { selectedProjectId } = useProject();
   const { data: shots, isLoading, error, refetch: refetchShots } = useListShots(selectedProjectId);
   const [selectedShot, setSelectedShot] = useState<Shot | null>(null);
-  const { setCurrentShotId } = useCurrentShot();
+  const { currentShotId, setCurrentShotId } = useCurrentShot();
   const createShotMutation = useCreateShot();
+  const handleExternalImageDropMutation = useHandleExternalImageDrop();
   const [isCreateShotModalOpen, setIsCreateShotModalOpen] = useState(false);
   const queryClient = useQueryClient();
   // const { lastAffectedShotId, setLastAffectedShotId } = useLastAffectedShot(); // Keep for later if needed
@@ -117,6 +118,18 @@ const VideoTravelToolPage: React.FC = () => {
     }
   }, [selectedShot?.images]);
 
+  // Auto-select shot if currentShotId is set and shot is available
+  useEffect(() => {
+    if (currentShotId && shots) {
+      if (selectedShot?.id !== currentShotId) {
+        const shotToSelect = shots.find(shot => shot.id === currentShotId);
+        if (shotToSelect) {
+          setSelectedShot(shotToSelect);
+        }
+      }
+    }
+  }, [currentShotId, shots, selectedShot]);
+
   const handleShotSelect = (shot: Shot) => {
     setSelectedShot(shot);
     setCurrentShotId(shot.id);
@@ -128,20 +141,46 @@ const VideoTravelToolPage: React.FC = () => {
     setCurrentShotId(null);
   };
 
-  const handleModalSubmitCreateShot = async (name: string) => {
+  const handleModalSubmitCreateShot = async (name: string, files: File[]) => {
     if (!selectedProjectId) {
       console.error("[VideoTravelToolPage] Cannot create shot: No project selected");
       return;
     }
 
     try {
-      const newShot = await createShotMutation.mutateAsync({
-        shotName: name,
-        projectId: selectedProjectId,
-      });
+      let newShot: Shot;
       
-      // Refetch shots to update the list
-      await refetchShots();
+      if (files.length > 0) {
+        // Use the multi-purpose hook if there are files
+        const result = await handleExternalImageDropMutation.mutateAsync({
+          imageFiles: files, 
+          targetShotId: null, 
+          currentProjectQueryKey: selectedProjectId, 
+          currentShotCount: shots?.length ?? 0
+        });
+        
+        if (result?.shotId) {
+          // Find the created shot from the shots list after refetching
+          const { data: updatedShots } = await refetchShots();
+          const createdShot = updatedShots?.find(s => s.id === result.shotId);
+          if (createdShot) {
+            newShot = createdShot;
+          } else {
+            throw new Error("Created shot not found after refetch");
+          }
+        } else {
+          throw new Error("Failed to create shot with files");
+        }
+      } else {
+        // Otherwise, just create an empty shot
+        newShot = await createShotMutation.mutateAsync({
+          shotName: name,
+          projectId: selectedProjectId,
+        });
+        
+        // Refetch shots to update the list
+        await refetchShots();
+      }
       
       // Select the newly created shot
       setSelectedShot(newShot);
@@ -266,7 +305,8 @@ const VideoTravelToolPage: React.FC = () => {
         isOpen={isCreateShotModalOpen}
         onClose={() => setIsCreateShotModalOpen(false)}
         onSubmit={handleModalSubmitCreateShot}
-        isLoading={createShotMutation.isPending}
+        isLoading={createShotMutation.isPending || handleExternalImageDropMutation.isPending}
+        defaultShotName={`Shot ${(shots?.length ?? 0) + 1}`}
       />
     </div>
   );

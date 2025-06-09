@@ -11,6 +11,7 @@ import { LastAffectedShotContext } from '@/shared/contexts/LastAffectedShotConte
 import { useListShots, useAddImageToShot } from '@/shared/hooks/useShots';
 import { toast } from 'sonner';
 import { usePanes } from '@/shared/contexts/PanesContext';
+import PaneControlTab from '../PaneControlTab';
 
 const DEFAULT_PANE_HEIGHT = 350;
 const GENERATIONS_PER_PAGE = 24;
@@ -38,12 +39,11 @@ const GenerationsPane: React.FC = () => {
   }, [allGenerations, page]);
 
   const {
-    isGenerationsPaneLocked,
     setIsGenerationsPaneLocked,
     generationsPaneHeight,
   } = usePanes();
 
-  const { isLocked, toggleLock, hotZoneProps, paneProps, transformClass } = useSlidingPane({
+  const { isLocked, isOpen, toggleLock, openPane, paneProps, transformClass } = useSlidingPane({
     side: 'bottom',
     onLockStateChange: setIsGenerationsPaneLocked,
   });
@@ -104,13 +104,14 @@ const GenerationsPane: React.FC = () => {
 
   return (
     <>
-      {!isLocked && (
-        <div
-          {...hotZoneProps}
-          className="fixed bottom-0 left-0 w-full h-[24px] bg-transparent z-[101]"
-        />
-      )}
-
+      <PaneControlTab
+        side="bottom"
+        isLocked={isLocked}
+        isOpen={isOpen}
+        toggleLock={toggleLock}
+        openPane={openPane}
+        paneDimension={generationsPaneHeight}
+      />
       <div
         {...paneProps}
         style={{ height: `${generationsPaneHeight}px` }}
@@ -134,19 +135,11 @@ const GenerationsPane: React.FC = () => {
                 </Button>
 
                 {/* Actions */}
-                <Button asChild variant="ghost" size="sm" className="text-zinc-400 hover:text-zinc-100" onClick={() => {
-                    if (isLocked) {
-                        toggleLock();
-                    }
-                }}>
+                <Button asChild variant="ghost" size="sm" className="text-zinc-400 hover:text-zinc-100">
                     <Link to="/generations">
                         View All
                         <ArrowUpIcon className="h-4 w-4 ml-1" />
                     </Link>
-                </Button>
-                <Button variant="ghost" size="sm" onClick={toggleLock} className="text-zinc-400 hover:text-zinc-100">
-                    {isLocked ? <UnlockIcon className="h-4 w-4 mr-1" /> : <LockIcon className="h-4 w-4 mr-1" />}
-                    {isLocked ? 'Unlock' : 'Lock'}
                 </Button>
             </div>
         </div>

@@ -4,6 +4,7 @@ import { Shot, GenerationRow } from '@/types/shots';
 import { useUpdateShotName, useHandleExternalImageDrop } from '@/shared/hooks/useShots';
 import { useToast } from '@/shared/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
+import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 
 interface ShotGroupProps {
   shot: Shot;
@@ -27,6 +28,7 @@ const ShotGroup: React.FC<ShotGroupProps> = ({ shot }) => {
   const handleExternalImageDropMutation = useHandleExternalImageDrop();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { setCurrentShotId } = useCurrentShot();
 
   useEffect(() => {
     if (shot.name !== currentName && !isEditing) {
@@ -127,40 +129,45 @@ const ShotGroup: React.FC<ShotGroupProps> = ({ shot }) => {
     }
 
     const validImageTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-    let processedCount = 0;
-
-    for (const file of files) {
-      console.log(`[ShotGroup:${shot.id}] handleDrop: Processing file - ${file.name}, Type: ${file.type}, Size: ${file.size}`);
-      if (!validImageTypes.includes(file.type)) {
-        console.warn(`[ShotGroup:${shot.id}] handleDrop: Invalid file type for ${file.name}: ${file.type}. Skipping.`);
-        toast({
-          title: "Invalid File Type",
-          description: `Skipped '${file.name}'. Only JPEG, PNG, WEBP, GIF are allowed. `,
-          variant: "destructive",
-        });
-        continue;
+    const validFiles = files.filter(file => {
+      if (validImageTypes.includes(file.type)) {
+        return true;
       }
+      console.warn(`[ShotGroup:${shot.id}] handleDrop: Invalid file type for ${file.name}: ${file.type}. Skipping.`);
+      toast({
+        title: "Invalid File Type",
+        description: `Skipped '${file.name}'. Only JPEG, PNG, WEBP, GIF are allowed. `,
+        variant: "destructive",
+      });
+      return false;
+    });
 
-      try {
-        if (!shot.project_id) throw new Error("This shot has no associated project.");
-        await handleExternalImageDropMutation.handleDrop(file, shot.id, shot.project_id, 0);
-        processedCount++;
-        console.log(`[ShotGroup:${shot.id}] handleDrop: Successfully initiated processing for ${file.name}.`);
-      } catch (error) {
-        console.error(`[ShotGroup:${shot.id}] handleDrop: Error processing file ${file.name}:`, error);
-        toast({
-          title: "Upload Error",
-          description: `Could not add '${file.name}': ${(error as Error).message}`,
-          variant: "destructive",
-        });
-      }
+    if (validFiles.length === 0) {
+      return;
     }
 
-    if (processedCount > 0) {
-        toast({
-            title: "Images Added",
-            description: `${processedCount} image(s) successfully added to shot '${currentName}'.`,
-        });
+    try {
+      if (!shot.project_id) throw new Error("This shot has no associated project.");
+      
+      await handleExternalImageDropMutation.mutateAsync({
+        imageFiles: validFiles, 
+        targetShotId: shot.id, 
+        currentProjectQueryKey: shot.project_id, 
+        currentShotCount: 0 /* Not needed when adding to existing shot */
+      });
+
+      toast({
+          title: "Images Added",
+          description: `${validFiles.length} image(s) successfully added to shot '${currentName}'.`,
+      });
+
+    } catch (error) {
+      console.error(`[ShotGroup:${shot.id}] handleDrop: Error processing files:`, error);
+      toast({
+        title: "Upload Error",
+        description: `Could not add images: ${(error as Error).message}`,
+        variant: "destructive",
+      });
     }
   };
 
@@ -169,7 +176,8 @@ const ShotGroup: React.FC<ShotGroupProps> = ({ shot }) => {
     if (isEditing || (e.target as HTMLElement).closest('input, button, a')) {
       return;
     }
-    navigate('/shots', { state: { selectedShotId: shot.id } });
+    setCurrentShotId(shot.id);
+    navigate('/tools/video-travel');
   };
 
   return (

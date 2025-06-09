@@ -23,15 +23,13 @@ export const useSlidingPane = ({ onLockStateChange, side, isInitiallyLocked = fa
     onLockStateChange?.(isLocked);
   }, [isLocked, onLockStateChange]);
 
-  const handleHotZoneEnter = () => {
+  const openPane = () => {
     if (leaveTimeoutRef.current) {
-      clearTimeout(leaveTimeoutRef.current);
-      leaveTimeoutRef.current = null;
+        clearTimeout(leaveTimeoutRef.current);
+        leaveTimeoutRef.current = null;
     }
-    if (!isLocked) {
-      setOpen(true);
-    }
-  };
+    setOpen(true);
+  }
 
   const handlePaneLeave = () => {
     if (isLocked) return;
@@ -46,11 +44,10 @@ export const useSlidingPane = ({ onLockStateChange, side, isInitiallyLocked = fa
       clearTimeout(leaveTimeoutRef.current);
       leaveTimeoutRef.current = null;
     }
-    setOpen(true);
   };
 
-  const toggleLock = () => {
-    const newLockState = !isLocked;
+  const toggleLock = (force?: boolean) => {
+    const newLockState = force !== undefined ? force : !isLocked;
     setIsLocked(newLockState);
     if (newLockState) {
       setOpen(true); // Ensure pane is open when locked
@@ -80,10 +77,6 @@ export const useSlidingPane = ({ onLockStateChange, side, isInitiallyLocked = fa
     }
   };
 
-  const hotZoneProps = {
-    onMouseEnter: handleHotZoneEnter,
-  };
-
   const paneProps = {
     onMouseEnter: handlePaneEnter,
     onMouseLeave: handlePaneLeave,
@@ -93,7 +86,7 @@ export const useSlidingPane = ({ onLockStateChange, side, isInitiallyLocked = fa
     isLocked,
     isOpen,
     toggleLock,
-    hotZoneProps,
+    openPane,
     paneProps,
     transformClass: getTransformClass(),
   };

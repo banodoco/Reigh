@@ -6,7 +6,6 @@ import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, us
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { useHandleExternalImageDrop, useCreateShot, useAddImageToShot, useListShots } from "@/shared/hooks/useShots";
 import { NEW_GROUP_DROPPABLE_ID } from '@/shared/components/ShotsPane/NewGroupDropZone';
-import { useToast } from "@/shared/hooks/use-toast";
 import { LastAffectedShotProvider, LastAffectedShotContext } from '@/shared/contexts/LastAffectedShotContext';
 import { AppRoutes } from "./routes";
 import { ProjectProvider, useProject } from "@/shared/contexts/ProjectContext";
@@ -38,11 +37,9 @@ const AppInternalContent = () => {
     })
   );
 
-  const { toast } = useToast();
-  
   const createShotMutation = useCreateShot();
   const addImageToShotMutation = useAddImageToShot();
-  const { handleDrop: handleExternalImageDrop } = useHandleExternalImageDrop();
+  const handleExternalImageDropMutation = useHandleExternalImageDrop();
 
   const handleDragEnd = async (event: DragEndEvent) => {
     console.log('handleDragEnd triggered.', {
@@ -52,7 +49,6 @@ const AppInternalContent = () => {
     const { active, over } = event;
 
     if (!selectedProjectId) {
-      toast({ title: "Action failed", description: "No project selected. Please select a project first.", variant: "destructive" });
       return;
     }
 
@@ -79,9 +75,15 @@ const AppInternalContent = () => {
         const targetShotId = droppableZone.type === 'shot-group' ? droppableZone.shotId : null;
         const currentShotsCount = shotsFromHook?.length || 0;
         
-        const result = await handleExternalImageDrop(externalFile, targetShotId, selectedProjectId, currentShotsCount);
+        const result = await handleExternalImageDropMutation.mutateAsync({
+            imageFiles: [externalFile], 
+            targetShotId, 
+            currentProjectQueryKey: selectedProjectId, 
+            currentShotCount: currentShotsCount
+        });
+
         if (result && result.shotId) {
-          setLastAffectedShotId(result.shotId);
+            setLastAffectedShotId(result.shotId);
         }
         return;
       }
@@ -130,7 +132,6 @@ const AppInternalContent = () => {
     } catch (error) {
       console.error('Error handling drop:', error);
       const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
-      toast({ title: "Failed to process drop.", description: errorMessage, variant: "destructive" });
     }
   };
 

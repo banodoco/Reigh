@@ -117,7 +117,6 @@ const TaskList: React.FC = () => {
     <div className="p-4 h-full flex flex-col text-zinc-200">
       <div className="mb-4">
         <div className="flex justify-between items-center mb-2">
-          <h3 className="text-lg font-semibold">Tasks</h3>
           {/* Display this button only if there are pending tasks based on the current view or a more specific check */}
           {actualPendingTasksInView.length > 0 && (
              <Button 

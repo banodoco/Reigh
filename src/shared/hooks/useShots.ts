@@ -475,74 +475,100 @@ export const useHandleExternalImageDrop = () => {
   // For now, I'll assume it's passed as an argument or a higher-level component handles it.
   // Let's modify it to accept projectId.
 
-  const handleDrop = async (
-    imageFile: File, 
-    targetShotId: string | null, 
-    currentProjectQueryKey: string | null, // This is a placeholder for actual projectId
-    currentShotCount: number
-  ): Promise<{ shotId: string; generationId: string } | null> => {
+  const mutation = useMutation({
+    mutationFn: async (variables: {
+        imageFiles: File[], 
+        targetShotId: string | null, 
+        currentProjectQueryKey: string | null,
+        currentShotCount: number
+    }) => {
+    const { imageFiles, targetShotId, currentProjectQueryKey, currentShotCount } = variables;
     
     if (!currentProjectQueryKey) { // Should be actual projectId
-        toast.error("Cannot add image: current project is not identified.");
+        toast.error("Cannot add image(s): current project is not identified.");
         return null;
     }
     const projectIdForOperation = currentProjectQueryKey; // Use the passed projectId
 
-    let newShotId = targetShotId;
-    let newGeneration: Database['public']['Tables']['generations']['Row'] | null = null;
+    let shotId = targetShotId;
+    const generationIds: string[] = [];
 
     try {
-      // 1. Upload the image to Supabase Storage
-      const imageUrl = await uploadImageToStorage(imageFile);
-      if (!imageUrl) {
-        toast.error("Failed to upload image to storage.");
-        return null;
-      }
-      toast.success("Image uploaded to storage!");
-
-      // 2. Create a generation record for the uploaded image
-      try {
-        newGeneration = await createGenerationForUploadedImage(imageUrl, imageFile.name, imageFile.type, imageFile.size, projectIdForOperation);
-      } catch (generationError) {
-        toast.error(`Failed to create generation data: ${(generationError as Error).message}`);
-        return null;
-      }
-
-      if (!newGeneration || !newGeneration.id) {
-        toast.error("Failed to create generation record or ID is missing.");
-        return null;
-      }
-
-      // 3. Create a new shot if targetShotId is null (e.g., dropped on NewGroupDropZone)
-      if (!newShotId) {
+      // 1. Create a new shot if targetShotId is null
+      if (!shotId) {
         const newShotName = `Shot ${currentShotCount + 1}`;
         const createdShot = await createShotMutation.mutateAsync({ shotName: newShotName, projectId: projectIdForOperation });
         if (createdShot && createdShot.id) {
-          newShotId = createdShot.id;
+          shotId = createdShot.id;
           toast.success(`New shot "${newShotName}" created!`);
         } else {
           toast.error("Failed to create new shot.");
           return null;
         }
       }
+      
+      if (!shotId) {
+        toast.error("Cannot add images to an unknown shot.");
+        return null;
+      }
 
-      // 4. Add the generation to the shot (either new or existing)
-      await addImageToShotMutation.mutateAsync({
-        shot_id: newShotId,
-        generation_id: newGeneration.id as string, // generation.id is string from DB schema
-        project_id: projectIdForOperation, // Pass projectId here
-        imageUrl: newGeneration.image_url || undefined,
-        thumbUrl: newGeneration.image_url || undefined, // Assuming same for now
-        // position can be set if needed
-      });
-      toast.success(`Image added to shot "${newShotId.substring(0,6)}..."!`);
-      return { shotId: newShotId, generationId: newGeneration.id as string };
+      // 2. Process each file
+      for (const imageFile of imageFiles) {
+        let newGeneration: Database['public']['Tables']['generations']['Row'] | null = null;
+        try {
+          // 2a. Upload the image to Supabase Storage
+          const imageUrl = await uploadImageToStorage(imageFile);
+          if (!imageUrl) {
+            toast.error(`Failed to upload image ${imageFile.name} to storage.`);
+            continue; // Skip to next file
+          }
+          toast.success(`Image ${imageFile.name} uploaded to storage!`);
+
+          // 2b. Create a generation record for the uploaded image
+          try {
+            newGeneration = await createGenerationForUploadedImage(imageUrl, imageFile.name, imageFile.type, imageFile.size, projectIdForOperation);
+          } catch (generationError) {
+            toast.error(`Failed to create generation data for ${imageFile.name}: ${(generationError as Error).message}`);
+            continue; // Skip to next file
+          }
+
+          if (!newGeneration || !newGeneration.id) {
+            toast.error(`Failed to create generation record for ${imageFile.name} or ID is missing.`);
+            continue; // Skip to next file
+          }
+
+          // 2c. Add the generation to the shot (either new or existing)
+          await addImageToShotMutation.mutateAsync({
+            shot_id: shotId,
+            generation_id: newGeneration.id as string,
+            project_id: projectIdForOperation,
+            imageUrl: newGeneration.image_url || undefined,
+            thumbUrl: newGeneration.image_url || undefined,
+          });
+          generationIds.push(newGeneration.id as string);
+          toast.success(`Image ${imageFile.name} added to shot!`);
+
+        } catch (fileError) {
+            console.error(`[useShots] Error processing file ${imageFile.name}:`, fileError);
+            toast.error(`Failed to process file ${imageFile.name}: ${(fileError as Error).message}`);
+        }
+      }
+
+      if (generationIds.length > 0) {
+        return { shotId, generationIds };
+      } else {
+        // If no files were successfully processed, but a new shot was created, it will be empty.
+        // This might be desired, or we might want to delete it. For now, leave it.
+        return null; 
+      }
 
     } catch (error) {
       console.error('[useShots] Error handling external image drop:', error); // [VideoLoadSpeedIssue]
-      toast.error(`Failed to process dropped image: ${(error as Error).message}`);
+      toast.error(`Failed to process dropped image(s): ${(error as Error).message}`);
       return null;
     }
-  };
-  return { handleDrop }; 
+    }
+  });
+
+  return mutation;
 }; 
