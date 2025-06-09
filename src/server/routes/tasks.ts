@@ -1,7 +1,6 @@
 import express, { Request, Response, Router } from 'express';
 import { db } from '@/lib/db'; // Adjusted path assuming db is exported from here
-import { tasks as tasksSchema } from '../../../db/schema/schema'; // Adjusted path to schema
-import { taskStatusEnum } from '../../../db/schema/enums';
+import { tasks as tasksSchema, taskStatusEnum } from '../../../db/schema/schema'; // Adjusted path to schema
 import { sql, eq, and, inArray, max } from 'drizzle-orm';
 import { generations as generationsSchema, shotGenerations as shotGenerationsSchema } from '../../../db/schema/schema';
 import { randomUUID } from 'crypto';
@@ -77,7 +76,7 @@ router.post('/', async (req: Request, res: Response) => {
 // GET /api/tasks - List tasks for a project, with optional status filtering
 router.get('/', async (req: Request, res: Response) => {
   const projectId = req.query.projectId as string;
-  let typedStatusFilter: (typeof taskStatusEnum.enumValues[number])[] | undefined;
+  let typedStatusFilter: (typeof taskStatusEnum[number])[] | undefined;
 
   const statusQueryParam = req.query.status || req.query['status[]'];
 
@@ -87,8 +86,8 @@ router.get('/', async (req: Request, res: Response) => {
         : [statusQueryParam];
     
     const validStatuses = rawStatuses.filter(
-        (s: any): s is typeof taskStatusEnum.enumValues[number] => 
-            typeof s === 'string' && taskStatusEnum.enumValues.includes(s as any)
+        (s: any): s is typeof taskStatusEnum[number] => 
+            typeof s === 'string' && (taskStatusEnum as readonly string[]).includes(s as any)
     );
 
     if (validStatuses.length > 0) {
@@ -132,7 +131,7 @@ router.patch('/:taskId/cancel', async (req: Request, res: Response) => {
     const updatedTasks = await db
       .update(tasksSchema)
       .set({ 
-        status: 'Cancelled' as typeof taskStatusEnum.enumValues[number], 
+        status: 'Cancelled' as typeof taskStatusEnum[number], 
         updatedAt: new Date() 
       })
       .where(eq(tasksSchema.id, taskId))
@@ -165,15 +164,15 @@ router.patch('/:taskId/status', async (req: Request, res: Response) => {
     return res.status(400).json({ message: 'Missing required body parameter: status' });
   }
 
-  if (!taskStatusEnum.enumValues.includes(newStatus as any)) {
-    return res.status(400).json({ message: `Invalid status value: ${newStatus}. Must be one of ${taskStatusEnum.enumValues.join(', ')}` });
+  if (!(taskStatusEnum as readonly string[]).includes(newStatus as any)) {
+    return res.status(400).json({ message: `Invalid status value: ${newStatus}. Must be one of ${taskStatusEnum.join(', ')}` });
   }
 
   try {
     const updatedTasks = await db
       .update(tasksSchema)
       .set({
-        status: newStatus as typeof taskStatusEnum.enumValues[number],
+        status: newStatus as typeof taskStatusEnum[number],
         updatedAt: new Date(),
       })
       .where(eq(tasksSchema.id, taskId))
@@ -217,12 +216,12 @@ router.post('/cancel-pending', async (req: Request, res: Response) => {
     const result = await db
       .update(tasksSchema)
       .set({ 
-        status: 'Cancelled' as typeof taskStatusEnum.enumValues[number], 
+        status: 'Cancelled' as typeof taskStatusEnum[number], 
         updatedAt: new Date() 
       })
       .where(and(
         eq(tasksSchema.projectId, projectId),
-        eq(tasksSchema.status, 'Pending' as typeof taskStatusEnum.enumValues[number])
+        eq(tasksSchema.status, 'Pending' as typeof taskStatusEnum[number])
       ))
       .returning({ id: tasksSchema.id }); // Only return IDs or a count for efficiency
 

@@ -7,7 +7,7 @@ import { randomUUID } from 'node:crypto';
 // --- ENUMS (simulated for SQLite) ---
 // Note: Drizzle ORM's `sqlite-core` does not have a native enum type like `pg-core`.
 // We'll use `text` and can enforce values at the application level.
-export const taskStatusEnum = ['Pending', 'In Progress', 'Complete', 'Failed', 'Cancelled'];
+export const taskStatusEnum = ['Pending', 'Queued', 'In Progress', 'Complete', 'Failed', 'Cancelled'] as const;
 
 // --- Canonical Schema for SQLite ---
 
@@ -35,7 +35,7 @@ export const tasks = sqliteTable('tasks', {
   id: text('id').$defaultFn(() => randomUUID()).primaryKey(),
   taskType: text('task_type').notNull(),
   params: text('params', { mode: 'json' }).notNull(),
-  status: text('status').default('Pending').notNull(),
+  status: text('status', { enum: taskStatusEnum }).default('Pending').notNull(),
   dependantOn: text('dependant_on'),
   outputLocation: text('output_location'),
   createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),

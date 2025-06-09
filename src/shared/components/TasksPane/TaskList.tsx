@@ -3,7 +3,7 @@ import { useListTasks, useCancelAllPendingTasks } from '@/shared/hooks/useTasks'
 import { useProject } from '@/shared/contexts/ProjectContext';
 import TaskItem from './TaskItem';
 import { TaskStatus, Task } from '@/types/tasks';
-import { taskStatusEnum } from '../../../../db/schema/enums'; // Corrected relative path
+import { taskStatusEnum } from '../../../../db/schema/schema'; // Corrected relative path
 import { Button } from '@/shared/components/ui/button';
 import { Checkbox } from "@/shared/components/ui/checkbox";
 import { 
@@ -18,7 +18,7 @@ import { ScrollArea } from "@/shared/components/ui/scroll-area"
 import { useToast } from '@/shared/hooks/use-toast'; // For user feedback
 
 // Use all statuses from the enum directly
-const ALL_POSSIBLE_STATUSES = [...taskStatusEnum.enumValues] as TaskStatus[];
+const ALL_POSSIBLE_STATUSES = [...taskStatusEnum] as TaskStatus[];
 
 const TaskList: React.FC = () => {
   const { selectedProjectId } = useProject();
@@ -111,7 +111,7 @@ const TaskList: React.FC = () => {
     });
   };
 
-  const availableStatuses: (TaskStatus | 'All')[] = ['All', ...taskStatusEnum.enumValues];
+  const availableStatuses: (TaskStatus | 'All')[] = ['All', ...taskStatusEnum];
 
   return (
     <div className="p-4 h-full flex flex-col text-zinc-200">
