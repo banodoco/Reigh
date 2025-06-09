@@ -24,6 +24,12 @@ export function useWebSocket() {
         const message = JSON.parse(event.data);
         
         switch (message.type) {
+          case 'TASK_CREATED': {
+            const { projectId } = message.payload;
+            console.log(`[WebSocket] Task created for project ${projectId}, invalidating task queries.`);
+            queryClient.invalidateQueries({ queryKey: ['tasks', { projectId }] });
+            break;
+          }
           case 'TASK_COMPLETED': {
             const { projectId } = message.payload;
             console.log(`[WebSocket] Invalidating task queries for project: ${projectId}`);

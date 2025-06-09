@@ -254,9 +254,6 @@ export function startTaskPoller(): void {
       if (tasksToProcess.length > 0) {
         console.log(`[TaskPoller] Found ${tasksToProcess.length} completed travel_stitch tasks to process.`);
         for (const task of tasksToProcess) {
-          // Using await here to process tasks one by one within a polling cycle.
-          // If one fails, subsequent ones in this batch will still be attempted in the NEXT cycle if not marked.
-          // For true parallel processing of many tasks, a more robust queue/worker system would be needed.
           await processCompletedStitchTask(task);
         }
       } else {
@@ -266,10 +263,6 @@ export function startTaskPoller(): void {
       console.error('[TaskPoller] Error querying for tasks to process:', error);
     }
   });
-
-  // Schedule the new status poller to run every 5 seconds
-  cron.schedule('*/5 * * * * *', pollAndBroadcastTaskUpdates);
-  console.log('[TaskStatusPoller] Started task status poller to run every 5 seconds.');
 
   pollerStarted = true;
 } 

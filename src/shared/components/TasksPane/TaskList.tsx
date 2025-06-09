@@ -17,8 +17,8 @@ import {
 import { ScrollArea } from "@/shared/components/ui/scroll-area"
 import { useToast } from '@/shared/hooks/use-toast'; // For user feedback
 
-// Define selectable statuses by excluding 'Pending'
-const ALL_POSSIBLE_STATUSES = taskStatusEnum.filter(status => status !== 'Pending') as TaskStatus[];
+// Use all statuses from the enum directly
+const ALL_POSSIBLE_STATUSES = [...taskStatusEnum.enumValues] as TaskStatus[];
 
 const TaskList: React.FC = () => {
   const { selectedProjectId } = useProject();
@@ -111,7 +111,7 @@ const TaskList: React.FC = () => {
     });
   };
 
-  const availableStatuses: (TaskStatus | 'All')[] = ['All', ...taskStatusEnum];
+  const availableStatuses: (TaskStatus | 'All')[] = ['All', ...taskStatusEnum.enumValues];
 
   return (
     <div className="p-4 h-full flex flex-col text-zinc-200">

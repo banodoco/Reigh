@@ -4,6 +4,7 @@ import { tasks as tasksSchema, projects as projectsSchema } from '../../../db/sc
 import { randomUUID } from 'crypto';
 import { eq } from 'drizzle-orm';
 import { ASPECT_RATIO_TO_RESOLUTION } from '@/shared/lib/aspectRatios';
+import { broadcast } from '../services/webSocketService';
 
 const router = express.Router() as any;
 
@@ -157,6 +158,15 @@ router.post('/travel-between-images', async (req: any, res: any) => {
       return res.status(500).json({ message: 'Failed to create orchestrator task.' });
     }
     console.log('[API /steerable-motion/travel-between-images] Task inserted successfully:', JSON.stringify(inserted[0], null, 2));
+
+    // After successful insertion, broadcast an update to all clients for that project
+    broadcast({
+      type: 'TASK_CREATED',
+      payload: {
+        projectId: body.project_id,
+        task: inserted[0],
+      },
+    });
 
     return res.status(201).json(inserted[0]);
   } catch (err: any) {

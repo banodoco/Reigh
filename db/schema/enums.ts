@@ -1,7 +1,7 @@
 import { pgEnum } from 'drizzle-orm/pg-core';
 
 // Enum for task status
-export const taskStatusEnum = ['Pending', 'In Progress', 'Complete', 'Failed', 'Cancelled'];
+export const taskStatusEnum = pgEnum('task_status', ['Pending', 'Queued', 'In Progress', 'Complete', 'Failed', 'Cancelled']);
 
 // Enum for resource type
 export const resourceTypeEnum = ['lora'];
