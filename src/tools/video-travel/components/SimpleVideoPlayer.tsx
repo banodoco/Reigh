@@ -1,0 +1,98 @@
+import React, { useRef, useState, useEffect } from 'react';
+import { Button } from '@/shared/components/ui/button';
+import { getDisplayUrl } from '@/shared/lib/utils';
+
+interface SimpleVideoPlayerProps {
+  src: string;
+  poster?: string;
+  className?: string;
+}
+
+const SimpleVideoPlayer: React.FC<SimpleVideoPlayerProps> = ({
+  src,
+  poster,
+  className = '',
+}) => {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [playbackRate, setPlaybackRate] = useState(1);
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  const speedOptions = [-2, -1, 1, 2];
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const handlePlay = () => setIsPlaying(true);
+    const handlePause = () => setIsPlaying(false);
+
+    video.addEventListener('play', handlePlay);
+    video.addEventListener('pause', handlePause);
+
+    return () => {
+      video.removeEventListener('play', handlePlay);
+      video.removeEventListener('pause', handlePause);
+    };
+  }, []);
+
+  const handleSpeedChange = (speed: number) => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    if (speed < 0) {
+      // For negative speeds, we need to implement reverse playback
+      // This is a simplified approach - HTML5 video doesn't natively support reverse
+      // You might want to implement a more sophisticated reverse playback
+      video.playbackRate = Math.abs(speed);
+      setPlaybackRate(speed);
+    } else {
+      video.playbackRate = speed;
+      setPlaybackRate(speed);
+    }
+  };
+
+  const togglePlayPause = () => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    if (video.paused) {
+      video.play();
+    } else {
+      video.pause();
+    }
+  };
+
+  return (
+    <div className={`flex flex-col items-center space-y-4 ${className}`}>
+      <video
+        ref={videoRef}
+        src={getDisplayUrl(src)}
+        poster={poster ? getDisplayUrl(poster) : undefined}
+        controls
+        loop
+        muted
+        playsInline
+        className="w-full h-full object-contain"
+        onClick={togglePlayPause}
+      >
+        Your browser does not support the video tag.
+      </video>
+      
+      <div className="flex items-center space-x-2">
+        {speedOptions.map((speed) => (
+          <Button
+            key={speed}
+            variant={playbackRate === speed ? "default" : "outline"}
+            size="sm"
+            onClick={() => handleSpeedChange(speed)}
+            className="min-w-[60px]"
+          >
+            {speed > 0 ? `${speed}x` : `${speed}x`}
+          </Button>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+export default SimpleVideoPlayer; 

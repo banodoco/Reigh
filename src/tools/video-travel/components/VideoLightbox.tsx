@@ -2,7 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import { X } from 'lucide-react';
 import { GenerationRow } from '@/types/shots';
-import HoverScrubVideo from '@/shared/components/HoverScrubVideo';
+import SimpleVideoPlayer from './SimpleVideoPlayer';
 import { usePanes } from '@/shared/contexts/PanesContext';
 
 interface VideoLightboxProps {
@@ -32,15 +32,15 @@ const VideoLightbox: React.FC<VideoLightboxProps> = ({ video, onClose }) => {
 
   return ReactDOM.createPortal(
     <div 
-      className="fixed bg-black/80 flex items-center justify-center z-50"
+      className="fixed bg-black/80 flex items-center justify-center z-50 p-8"
       style={modalStyle}
       onClick={onClose}
     >
       <div 
-        className="relative w-full max-w-4xl h-auto aspect-video"
+        className="relative w-full max-w-4xl h-auto"
         onClick={(e) => e.stopPropagation()} // Prevent closing when clicking on the video
       >
-        <HoverScrubVideo
+        <SimpleVideoPlayer
           src={video.location || video.imageUrl}
           poster={video.thumbUrl}
           className="w-full h-full"

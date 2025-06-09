@@ -83,9 +83,11 @@
 
 ##### Video Travel (`src/tools/video-travel/`)
 - **pages/VideoTravelToolPage.tsx**: Main UI. Lists project shots (ShotListDisplay). Creates new shots (API). Hosts ShotEditor. Manages LoRA state and filtering for "Wan 2.1 14b" models.
-- **components/ShotEditor.tsx**: Main shot editing. Orchestrates VideoOutputsGallery, BatchSettingsForm, ShotImageManager. Includes LoRA selector UI with strength controls.
+- **components/ShotEditor.tsx**: Main shot editing. VideoOutputsGallery now positioned above main content area for better visibility. Orchestrates BatchSettingsForm, ShotImageManager. Includes LoRA selector UI with strength controls.
 - **components/BatchSettingsForm.tsx**: Form for batch video gen settings (prompts, frames, etc.).
-- **components/VideoOutputsGallery.tsx**: Displays generated videos for a shot (pagination, lightbox).
+- **components/VideoOutputsGallery.tsx**: Displays generated videos for a shot (pagination, lightbox). Updated to show 3 videos per row consistently across screen sizes.
+- **components/SimpleVideoPlayer.tsx**: Clean video player with speed controls (-2x, -1x, 1x, 2x). Replaces complex HoverScrubVideo functionality in lightbox for simplified playback experience.
+- **components/VideoLightbox.tsx**: Modal video player using SimpleVideoPlayer for clean viewing experience.
 - **components/TaskDetailsModal.tsx**: Dialog for detailed task parameters (fetches by generation ID).
 - **components/VideoShotDisplay.tsx**: Displays shot's images & name. Allows selection. Inline name edit, delete (API). Used by ShotListDisplay.
 - **components/ShotListDisplay.tsx**: Renders list of shots using VideoShotDisplay.

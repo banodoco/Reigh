@@ -633,10 +633,19 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         <div className="w-[150px]" /> {/* Spacer to balance the back button */}
       </div>
 
+      {/* Output Videos Section - Now at the top */}
+      <div className="flex-shrink-0">
+        <VideoOutputsGallery 
+          videoOutputs={videoOutputs} 
+          onDelete={handleDeleteVideoOutput}
+          deletingVideoId={deletingVideoId}
+        />
+      </div>
+
       {/* Main Content Area */}
       <div className="flex flex-col lg:flex-row flex-grow gap-4 min-h-0">
         
-        {/* Left Column: Image Manager & Video Outputs */}
+        {/* Left Column: Image Manager */}
         <div className="flex flex-col lg:w-1/2 xl:w-1/2 gap-4 min-h-0">
           <Card className="flex-grow flex flex-col min-h-0">
             <CardHeader>
@@ -669,13 +678,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
               />
             </div>
           </Card>
-          <div className="flex-shrink-0">
-             <VideoOutputsGallery 
-                videoOutputs={videoOutputs} 
-                onDelete={handleDeleteVideoOutput}
-                deletingVideoId={deletingVideoId}
-              />
-          </div>
         </div>
 
         {/* Right Column: Generation Settings */}
