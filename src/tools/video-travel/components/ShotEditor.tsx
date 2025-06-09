@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import FileInput from "@/shared/components/FileInput";
 import { uploadImageToStorage } from "@/shared/lib/imageUploader";
 import { useAddImageToShot, useRemoveImageFromShot, useUpdateShotImageOrder, ShotGenerationRow } from "@/shared/hooks/useShots";
+import { useDeleteGeneration } from "@/shared/hooks/useGenerations";
 import ShotImageManager from '@/shared/components/ShotImageManager';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/components/ui/collapsible";
 import { Switch } from "@/shared/components/ui/switch";
@@ -175,6 +176,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const addImageToShotMutation = useAddImageToShot();
   const removeImageFromShotMutation = useRemoveImageFromShot();
   const updateShotImageOrderMutation = useUpdateShotImageOrder();
+  const deleteGenerationMutation = useDeleteGeneration();
   const [fileInputKey, setFileInputKey] = useState<number>(Date.now());
   const [deletingVideoId, setDeletingVideoId] = useState<string | null>(null);
   const [isCreatingTask, setIsCreatingTask] = useState(false);
@@ -382,17 +384,19 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       return;
     }
     setDeletingVideoId(generationId);
+    
     try {
-      // Assuming a similar hook exists for deleting a generation entirely.
-      // This is different from just removing it from a shot.
-      // For now, this is a placeholder for the actual deletion logic.
-      console.log(`Placeholder: Deleting generation ${generationId}`);
-      toast.success("Video output deleted.");
-      // Manually refetch or optimistically update UI
+      // Optimistically remove the video from local state
+      setLocalOrderedShotImages(prev => prev.filter(img => img.id !== generationId));
+      
+      // Delete the generation (this will show success/error toasts automatically)
+      await deleteGenerationMutation.mutateAsync(generationId);
+      
+      // Refresh the shot data
       onShotImagesUpdate(); 
     } catch (error) {
-      const message = error instanceof Error ? error.message : "An unknown error occurred";
-      toast.error(`Error deleting video: ${message}`);
+      // Rollback the optimistic update on error
+      setLocalOrderedShotImages(orderedShotImages);
     } finally {
       setDeletingVideoId(null);
     }
