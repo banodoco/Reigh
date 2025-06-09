@@ -142,7 +142,7 @@ router.patch('/:taskId/cancel', async (req: Request, res: Response) => {
     }
 
     // Don't await, let it run in the background
-    cascadeTaskStatus(taskId, 'Cancelled');
+    cascadeTaskStatus(taskId, 'Cancelled', 'Task cancelled by user via API');
 
     return res.status(200).json(updatedTasks[0]);
   } catch (error: any) {
@@ -158,7 +158,7 @@ router.patch('/:taskId/cancel', async (req: Request, res: Response) => {
 // New PATCH endpoint to update task status
 router.patch('/:taskId/status', async (req: Request, res: Response) => {
   const taskId = req.params.taskId as string;
-  const { status: newStatus } = req.body;
+  const { status: newStatus, reason } = req.body;
 
   if (!taskId) {
     return res.status(400).json({ message: 'Missing required path parameter: taskId' });
@@ -189,7 +189,7 @@ router.patch('/:taskId/status', async (req: Request, res: Response) => {
 
     if (updatedTask.status === 'Failed') {
       // Don't await, let it run in the background
-      cascadeTaskStatus(updatedTask.id, 'Failed');
+      cascadeTaskStatus(updatedTask.id, 'Failed', reason || `Task status updated to Failed via API without a specific reason.`);
     }
 
     if (updatedTask.taskType === 'travel_stitch' && updatedTask.status === 'Complete') {

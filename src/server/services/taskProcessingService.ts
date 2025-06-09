@@ -168,19 +168,21 @@ export async function processCompletedStitchTask(task: Task): Promise<void> {
  * Recursively cancels or fails tasks that depend on a given task.
  * @param taskId The ID of the task that was cancelled or failed.
  * @param status The new status to set ('Cancelled' or 'Failed').
+ * @param reason The reason for the status change.
  * @param processedIds A set of already processed task IDs to avoid infinite loops.
  */
 export async function cascadeTaskStatus(
   taskId: string,
   status: 'Cancelled' | 'Failed',
-  processedIds: Set<string> = new Set()
+  reason: string = 'No reason provided',
+  processedIds: Set<string> = new Set(),
 ): Promise<void> {
   if (processedIds.has(taskId)) {
     return; // Avoid cycles
   }
   processedIds.add(taskId);
 
-  console.log(`[TaskCascader] Cascading status '${status}' for dependents of task ${taskId}`);
+  console.log(`[TaskCascader] Cascading status '${status}' for dependents of task ${taskId}. Reason: ${reason}`);
 
   try {
     // Find tasks that depend on the current task.
@@ -221,7 +223,8 @@ export async function cascadeTaskStatus(
 
     // Recursively cascade the status change for each dependent task.
     for (const dependentTask of dependentTasks) {
-      await cascadeTaskStatus(dependentTask.id, status, processedIds);
+      const cascadeReason = `Cascaded from upstream task ${taskId} which was set to ${status}.`;
+      await cascadeTaskStatus(dependentTask.id, status, cascadeReason, processedIds);
     }
   } catch (error) {
     console.error(`[TaskCascader] Error cascading status for dependents of task ${taskId}:`, error);
