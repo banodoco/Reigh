@@ -120,15 +120,32 @@ const VideoTravelToolPage: React.FC = () => {
 
   // Auto-select shot if currentShotId is set and shot is available
   useEffect(() => {
-    if (currentShotId && shots) {
-      if (selectedShot?.id !== currentShotId) {
-        const shotToSelect = shots.find(shot => shot.id === currentShotId);
-        if (shotToSelect) {
-          setSelectedShot(shotToSelect);
-        }
+    // Case 1: No current shot ID - clear selection
+    if (!currentShotId) {
+      if (selectedShot) {
+        setSelectedShot(null);
+        setVideoPairConfigs([]);
+      }
+      return;
+    }
+
+    // Case 2: Wait for shots to load
+    if (!shots) {
+      return;
+    }
+
+    // Case 3: Only update if we need to select a different shot
+    if (selectedShot?.id !== currentShotId) {
+      const shotToSelect = shots.find(shot => shot.id === currentShotId);
+      if (shotToSelect) {
+        setSelectedShot(shotToSelect);
+      } else {
+        // Shot not found, clear selection
+        setSelectedShot(null);
+        setVideoPairConfigs([]);
       }
     }
-  }, [currentShotId, shots, selectedShot]);
+  }, [currentShotId, shots]); // Removed selectedShot from deps to avoid loops
 
   const handleShotSelect = (shot: Shot) => {
     setSelectedShot(shot);

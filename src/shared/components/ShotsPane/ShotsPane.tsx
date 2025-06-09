@@ -7,7 +7,7 @@ import { useSlidingPane } from '@/shared/hooks/useSlidingPane';
 import { cn } from '@/shared/lib/utils';
 import { Button } from '@/shared/components/ui/button';
 import { LockIcon, UnlockIcon, ArrowRightIcon } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { usePanes } from '@/shared/contexts/PanesContext';
 import CreateShotModal from '@/tools/video-travel/components/CreateShotModal';
 import { useCreateShot, useHandleExternalImageDrop } from '@/shared/hooks/useShots';
@@ -101,11 +101,18 @@ const ShotsPane: React.FC = () => {
           <div className="p-2 border-b border-zinc-800 flex items-center justify-between flex-shrink-0">
             <h2 className="text-lg font-semibold text-zinc-200 ml-2">Shots</h2>
             <div className="flex items-center">
-              <Button asChild variant="ghost" size="sm" className="text-zinc-400 hover:text-zinc-100">
-                <Link to="/shots">
-                  See All
-                  <ArrowRightIcon className="h-4 w-4 ml-1" />
-                </Link>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="text-zinc-400 hover:text-zinc-100"
+                onClick={() => {
+                  toggleLock(false);
+                  setCurrentShotId(null);
+                  navigate('/tools/video-travel');
+                }}
+              >
+                See All
+                <ArrowRightIcon className="h-4 w-4 ml-1" />
               </Button>
             </div>
           </div>

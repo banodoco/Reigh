@@ -5,7 +5,7 @@ import { useSlidingPane } from '@/shared/hooks/useSlidingPane';
 import { cn } from '@/shared/lib/utils';
 import { Button } from '@/shared/components/ui/button';
 import { LockIcon, UnlockIcon, ArrowUpIcon, ChevronLeft, ChevronRight } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import ImageGallery from '@/shared/components/ImageGallery';
 import { LastAffectedShotContext } from '@/shared/contexts/LastAffectedShotContext';
 import { useListShots, useAddImageToShot } from '@/shared/hooks/useShots';
@@ -18,6 +18,7 @@ const GENERATIONS_PER_PAGE = 24;
 
 const GenerationsPane: React.FC = () => {
   const { selectedProjectId } = useProject();
+  const navigate = useNavigate();
   const [page, setPage] = useState(1);
   const { data: allGenerations, isLoading, error } = useListAllGenerations(selectedProjectId);
   const { data: shotsData } = useListShots(selectedProjectId);
@@ -137,11 +138,17 @@ const GenerationsPane: React.FC = () => {
                 </Button>
 
                 {/* Actions */}
-                <Button asChild variant="ghost" size="sm" className="text-zinc-400 hover:text-zinc-100">
-                    <Link to="/generations">
-                        View All
-                        <ArrowUpIcon className="h-4 w-4 ml-1" />
-                    </Link>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="text-zinc-400 hover:text-zinc-100"
+                  onClick={() => {
+                    toggleLock(false); // Unlock the pane
+                    navigate('/generations'); // Navigate to generations page
+                  }}
+                >
+                  View All
+                  <ArrowUpIcon className="h-4 w-4 ml-1" />
                 </Button>
             </div>
         </div>
