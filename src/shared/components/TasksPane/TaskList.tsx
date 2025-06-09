@@ -139,7 +139,7 @@ const TaskList: React.FC = () => {
                   <span className="ml-2">▼</span>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-[200px] bg-zinc-700 text-zinc-200 border-zinc-600">
+              <DropdownMenuContent className="w-[200px] bg-zinc-700 text-zinc-200 border-zinc-600 z-[70]">
                 <DropdownMenuLabel>Filter by status</DropdownMenuLabel>
                 <DropdownMenuItem
                   onSelect={(e) => e.preventDefault()} // Prevent menu closing on item click
