@@ -51,6 +51,8 @@ export const useSlidingPane = ({ onLockStateChange, side, isInitiallyLocked = fa
     setIsLocked(newLockState);
     if (newLockState) {
       setOpen(true); // Ensure pane is open when locked
+    } else {
+      setIsOpen(false); // Directly close pane when unlocked (bypass setOpen guard)
     }
   };
   
@@ -89,5 +91,7 @@ export const useSlidingPane = ({ onLockStateChange, side, isInitiallyLocked = fa
     openPane,
     paneProps,
     transformClass: getTransformClass(),
+    handlePaneEnter,
+    handlePaneLeave,
   };
 }; 

@@ -43,7 +43,7 @@ const GenerationsPane: React.FC = () => {
     generationsPaneHeight,
   } = usePanes();
 
-  const { isLocked, isOpen, toggleLock, openPane, paneProps, transformClass } = useSlidingPane({
+  const { isLocked, isOpen, toggleLock, openPane, paneProps, transformClass, handlePaneEnter, handlePaneLeave } = useSlidingPane({
     side: 'bottom',
     onLockStateChange: setIsGenerationsPaneLocked,
   });
@@ -111,6 +111,8 @@ const GenerationsPane: React.FC = () => {
         toggleLock={toggleLock}
         openPane={openPane}
         paneDimension={generationsPaneHeight}
+        handlePaneEnter={handlePaneEnter}
+        handlePaneLeave={handlePaneLeave}
       />
       <div
         {...paneProps}

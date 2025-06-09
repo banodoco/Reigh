@@ -30,7 +30,7 @@ const ShotsPane: React.FC = () => {
     shotsPaneWidth,
   } = usePanes();
 
-  const { isLocked, isOpen, toggleLock, openPane, paneProps, transformClass } = useSlidingPane({
+  const { isLocked, isOpen, toggleLock, openPane, paneProps, transformClass, handlePaneEnter, handlePaneLeave } = useSlidingPane({
     side: 'left',
     onLockStateChange: setIsShotsPaneLocked,
   });
@@ -76,6 +76,8 @@ const ShotsPane: React.FC = () => {
         openPane={openPane}
         paneDimension={shotsPaneWidth}
         bottomOffset={isGenerationsPaneLocked ? generationsPaneHeight : 0}
+        handlePaneEnter={handlePaneEnter}
+        handlePaneLeave={handlePaneLeave}
       />
       <div
         className="pointer-events-none"

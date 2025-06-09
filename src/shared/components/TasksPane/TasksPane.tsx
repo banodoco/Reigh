@@ -15,7 +15,7 @@ const TasksPane: React.FC = () => {
     tasksPaneWidth,
   } = usePanes();
 
-  const { isLocked, isOpen, toggleLock, openPane, paneProps, transformClass } = useSlidingPane({
+  const { isLocked, isOpen, toggleLock, openPane, paneProps, transformClass, handlePaneEnter, handlePaneLeave } = useSlidingPane({
     side: 'right',
     onLockStateChange: setIsTasksPaneLocked,
   });
@@ -32,6 +32,8 @@ const TasksPane: React.FC = () => {
         openPane={openPane}
         paneDimension={tasksPaneWidth}
         bottomOffset={isGenerationsPaneLocked ? generationsPaneHeight : 0}
+        handlePaneEnter={handlePaneEnter}
+        handlePaneLeave={handlePaneLeave}
       />
       <div
         className="pointer-events-none"

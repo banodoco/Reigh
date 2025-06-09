@@ -11,31 +11,65 @@ interface PaneControlTabProps {
   openPane: () => void;
   paneDimension: number;
   bottomOffset?: number;
+  handlePaneEnter: () => void;
+  handlePaneLeave: () => void;
 }
 
-const PaneControlTab: React.FC<PaneControlTabProps> = ({ side, isLocked, isOpen, toggleLock, openPane, paneDimension, bottomOffset = 0 }) => {
-  if (isOpen && !isLocked) { // Pane is in "peek" state (hovered but not locked)
-    return null;
-  }
-
+const PaneControlTab: React.FC<PaneControlTabProps> = ({ side, isLocked, isOpen, toggleLock, openPane, paneDimension, bottomOffset = 0, handlePaneEnter, handlePaneLeave }) => {
   const getDynamicStyle = (): React.CSSProperties => {
     const style: React.CSSProperties = {};
     if (side === 'left' || side === 'right') {
         style.top = `calc(50% - ${bottomOffset / 2}px)`;
-        if(isLocked) {
+        if(isLocked || (isOpen && !isLocked)) {
             style.transform = side === 'left' ? 'translate(-50%, -50%)' : 'translate(50%, -50%)';
             if(side === 'left') style.left = `${paneDimension}px`;
             else style.right = `${paneDimension}px`;
         } else {
             style.transform = 'translateY(-50%)';
         }
-    } else if (side === 'bottom' && isLocked) {
+    } else if (side === 'bottom' && (isLocked || (isOpen && !isLocked))) {
         style.bottom = `${paneDimension}px`;
         style.left = '50%';
         style.transform = 'translate(-50%, 50%)';
     }
     return style;
   };
+
+  // Show lock button at edge when pane is open but not locked
+  if (isOpen && !isLocked) {
+    let positionClass = '';
+    switch (side) {
+        case 'left':
+        case 'right':
+            positionClass = 'flex-col';
+            break;
+        case 'bottom':
+            positionClass = 'flex-row';
+            break;
+    }
+
+    return (
+      <div
+        style={getDynamicStyle()}
+        className={cn(
+          'fixed z-[101] flex items-center p-1 bg-zinc-800/90 backdrop-blur-sm border border-zinc-700 rounded-md transition-all duration-200',
+          positionClass
+        )}
+        onMouseEnter={handlePaneEnter}
+        onMouseLeave={handlePaneLeave}
+      >
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => toggleLock(true)}
+          className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
+          aria-label="Lock pane"
+        >
+          <LockIcon className="h-4 w-4" />
+        </Button>
+      </div>
+    );
+  }
 
   if (isLocked) {
     let positionClass = '';
