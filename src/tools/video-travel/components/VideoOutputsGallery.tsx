@@ -17,9 +17,16 @@ interface VideoOutputsGalleryProps {
   videoOutputs: GenerationRow[];
   onDelete: (generationId: string) => void;
   deletingVideoId: string | null;
+  onApplySettings?: (settings: {
+    prompt?: string;
+    negativePrompt?: string;
+    steps?: number;
+    width?: number;
+    height?: number;
+  }) => void;
 }
 
-const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({ videoOutputs, onDelete, deletingVideoId }) => {
+const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({ videoOutputs, onDelete, deletingVideoId, onApplySettings }) => {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [animatedVideoOutputs, setAnimatedVideoOutputs] = useState<GenerationRow[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -107,6 +114,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({ videoOutputs,
                     }}
                     onDelete={onDelete}
                     isDeleting={deletingVideoId === video.id}
+                    onApplySettings={onApplySettings}
                   />
                 </div>
               );

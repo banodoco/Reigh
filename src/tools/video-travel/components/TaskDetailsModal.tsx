@@ -24,6 +24,13 @@ export type Json =
 interface TaskDetailsModalProps {
   generationId: string;
   children: React.ReactNode;
+  onApplySettings?: (settings: {
+    prompt?: string;
+    negativePrompt?: string;
+    steps?: number;
+    width?: number;
+    height?: number;
+  }) => void;
 }
 
 interface Task {
@@ -31,7 +38,7 @@ interface Task {
   params: Json;
 }
 
-const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, children }) => {
+const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, children, onApplySettings }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [task, setTask] = useState<Task | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -143,6 +150,51 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
   const steps = getSteps();
   const resolution = getResolution();
 
+  const handleApplySettings = () => {
+    if (!onApplySettings || !task) return;
+
+    const settings: any = {};
+    
+    // Extract prompt if available and not "N/A"
+    if (prompt && prompt !== 'N/A') {
+      settings.prompt = prompt;
+    }
+    
+    // Extract negative prompt if available and not "N/A"
+    if (negativePrompt && negativePrompt !== 'N/A') {
+      settings.negativePrompt = negativePrompt;
+    }
+    
+    // Extract steps if available and not "N/A"
+    if (steps && steps !== 'N/A') {
+      const stepsNum = typeof steps === 'number' ? steps : parseInt(steps.toString(), 10);
+      if (!isNaN(stepsNum)) {
+        settings.steps = stepsNum;
+      }
+    }
+    
+    // Extract resolution if available and not "N/A"
+    if (resolution && resolution !== 'N/A') {
+      if (typeof resolution === 'string' && resolution.includes('x')) {
+        const [width, height] = resolution.split('x').map(n => parseInt(n, 10));
+        if (!isNaN(width) && !isNaN(height)) {
+          settings.width = width;
+          settings.height = height;
+        }
+      } else if (Array.isArray(resolution) && resolution.length === 2) {
+        const [width, height] = resolution;
+        if (typeof width === 'number' && typeof height === 'number') {
+          settings.width = width;
+          settings.height = height;
+        }
+      }
+    }
+
+    onApplySettings(settings);
+    setIsOpen(false);
+    toast.success('Settings applied successfully!');
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
@@ -243,9 +295,20 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
         </div>
         
         <DialogFooter className="flex-shrink-0 pt-4 border-t">
-          <Button variant="outline" onClick={() => setIsOpen(false)} className="w-full sm:w-auto">
-            Close
-          </Button>
+          <div className="flex justify-between w-full">
+            {onApplySettings && task && (
+              <Button 
+                variant="default" 
+                onClick={handleApplySettings}
+                className="text-sm"
+              >
+                Use These Settings
+              </Button>
+            )}
+            <Button variant="outline" onClick={() => setIsOpen(false)} className="w-full sm:w-auto">
+              Close
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -11,6 +11,13 @@ interface VideoOutputItemProps {
   onDoubleClick: () => void;
   onDelete: (generationId: string) => void;
   isDeleting: boolean;
+  onApplySettings?: (settings: {
+    prompt?: string;
+    negativePrompt?: string;
+    steps?: number;
+    width?: number;
+    height?: number;
+  }) => void;
 }
 
 export const VideoOutputItem: React.FC<VideoOutputItemProps> = ({
@@ -18,6 +25,7 @@ export const VideoOutputItem: React.FC<VideoOutputItemProps> = ({
   onDoubleClick,
   onDelete,
   isDeleting,
+  onApplySettings,
 }) => {
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation(); // prevent lightbox from opening on delete
@@ -30,7 +38,7 @@ export const VideoOutputItem: React.FC<VideoOutputItemProps> = ({
       onDoubleClick={onDoubleClick}
     >
       <div className="absolute top-2 left-2 flex items-center gap-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
-        <TaskDetailsModal generationId={video.id}>
+        <TaskDetailsModal generationId={video.id} onApplySettings={onApplySettings}>
           <Button
             variant="ghost"
             size="icon"

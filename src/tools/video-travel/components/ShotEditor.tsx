@@ -627,6 +627,32 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     // This would gather all configs and prompts and then trigger generation
   };
 
+  const handleApplySettingsFromTask = (settings: {
+    prompt?: string;
+    negativePrompt?: string;
+    steps?: number;
+    width?: number;
+    height?: number;
+  }) => {
+    if (settings.prompt) {
+      onBatchVideoPromptChange(settings.prompt);
+    }
+    
+    if (settings.negativePrompt) {
+      onSteerableMotionSettingsChange({ negative_prompt: settings.negativePrompt });
+    }
+    
+    if (settings.steps) {
+      onBatchVideoStepsChange(settings.steps);
+    }
+    
+    if (settings.width && settings.height) {
+      onDimensionSourceChange('custom');
+      onCustomWidthChange(settings.width);
+      onCustomHeightChange(settings.height);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full space-y-4">
       {/* Header */}
@@ -644,6 +670,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           videoOutputs={videoOutputs} 
           onDelete={handleDeleteVideoOutput}
           deletingVideoId={deletingVideoId}
+          onApplySettings={handleApplySettingsFromTask}
         />
       </div>
 
