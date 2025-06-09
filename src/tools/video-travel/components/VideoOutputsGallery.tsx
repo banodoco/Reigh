@@ -25,13 +25,28 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({ videoOutputs,
   const [currentPage, setCurrentPage] = useState(1);
   const videosPerPage = 9;
 
+  // Sort videos by creation date (newest first)
+  const sortedVideoOutputs = useMemo(() => {
+    return [...videoOutputs].sort((a, b) => {
+      // If both have createdAt, sort by date (newest first)
+      if (a.createdAt && b.createdAt) {
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      }
+      // If only one has createdAt, prioritize the one with date
+      if (a.createdAt && !b.createdAt) return -1;
+      if (!a.createdAt && b.createdAt) return 1;
+      // If neither has createdAt, maintain original order
+      return 0;
+    });
+  }, [videoOutputs]);
+
   // Pagination logic
-  const pageCount = Math.ceil(videoOutputs.length / videosPerPage);
+  const pageCount = Math.ceil(sortedVideoOutputs.length / videosPerPage);
   const paginatedVideos = useMemo(() => {
     const startIndex = (currentPage - 1) * videosPerPage;
     const endIndex = startIndex + videosPerPage;
-    return videoOutputs.slice(startIndex, endIndex);
-  }, [videoOutputs, currentPage]);
+    return sortedVideoOutputs.slice(startIndex, endIndex);
+  }, [sortedVideoOutputs, currentPage]);
 
   useEffect(() => {
     // This effect handles the sequential fade-in of video items.
@@ -50,15 +65,15 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({ videoOutputs,
     };
   }, [paginatedVideos]);
 
-  if (videoOutputs.length === 0) {
+  if (sortedVideoOutputs.length === 0) {
     return null;
   }
 
   return (
     <>
-      {lightboxIndex !== null && videoOutputs[lightboxIndex] && (
+      {lightboxIndex !== null && sortedVideoOutputs[lightboxIndex] && (
         <VideoLightbox
-          video={videoOutputs[lightboxIndex]}
+          video={sortedVideoOutputs[lightboxIndex]}
           onClose={() => setLightboxIndex(null)}
         />
       )}
@@ -87,7 +102,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({ videoOutputs,
                   <VideoOutputItem
                     video={video}
                     onDoubleClick={() => {
-                      const originalIndex = videoOutputs.findIndex(v => v.id === video.id);
+                      const originalIndex = sortedVideoOutputs.findIndex(v => v.id === video.id);
                       setLightboxIndex(originalIndex);
                     }}
                     onDelete={onDelete}

@@ -17,7 +17,7 @@ const SimpleVideoPlayer: React.FC<SimpleVideoPlayerProps> = ({
   const [playbackRate, setPlaybackRate] = useState(1);
   const [isPlaying, setIsPlaying] = useState(false);
 
-  const speedOptions = [-2, -1, 1, 2];
+  const speedOptions = [0.5, 1, 1.5, 2];
 
   useEffect(() => {
     const video = videoRef.current;
@@ -49,29 +49,8 @@ const SimpleVideoPlayer: React.FC<SimpleVideoPlayerProps> = ({
     const video = videoRef.current;
     if (!video) return;
 
-    if (speed < 0) {
-      // For negative speeds, we need to implement reverse playback
-      // This is a simplified approach - HTML5 video doesn't natively support reverse
-      // You might want to implement a more sophisticated reverse playback
-      video.playbackRate = Math.abs(speed);
-      setPlaybackRate(speed);
-    } else {
-      video.playbackRate = speed;
-      setPlaybackRate(speed);
-    }
-  };
-
-  const togglePlayPause = () => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    if (video.paused) {
-      video.play().catch(error => {
-        console.log('Play was prevented:', error);
-      });
-    } else {
-      video.pause();
-    }
+    video.playbackRate = speed;
+    setPlaybackRate(speed);
   };
 
   return (
@@ -87,7 +66,6 @@ const SimpleVideoPlayer: React.FC<SimpleVideoPlayerProps> = ({
         autoPlay
         preload="auto"
         className="w-full h-full object-contain"
-        onClick={togglePlayPause}
       >
         Your browser does not support the video tag.
       </video>
@@ -101,7 +79,7 @@ const SimpleVideoPlayer: React.FC<SimpleVideoPlayerProps> = ({
             onClick={() => handleSpeedChange(speed)}
             className="min-w-[60px]"
           >
-            {speed > 0 ? `${speed}x` : `${speed}x`}
+            {speed}x
           </Button>
         ))}
       </div>

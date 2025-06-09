@@ -507,7 +507,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       return;
     }
 
-    if (localOrderedShotImages.length < 2) {
+    if (nonVideoImages.length < 2) {
       toast.warning('Add at least two images to generate a travel video.');
       return;
     }
@@ -518,9 +518,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
     let resolution: string | undefined = undefined;
 
-    if ((dimensionSource || 'firstImage') === 'firstImage' && localOrderedShotImages.length > 0) {
+    if ((dimensionSource || 'firstImage') === 'firstImage' && nonVideoImages.length > 0) {
       try {
-        const firstImage = localOrderedShotImages[0];
+        const firstImage = nonVideoImages[0];
         const imageUrl = getDisplayUrl(firstImage.imageUrl);
         if (imageUrl) {          
           const { width, height } = await getDimensions(imageUrl);
@@ -548,7 +548,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     }
 
     // Use getDisplayUrl to convert relative paths to absolute URLs
-    const absoluteImageUrls = localOrderedShotImages
+    // IMPORTANT: Use nonVideoImages to exclude generated video outputs
+    const absoluteImageUrls = nonVideoImages
       .map((img) => getDisplayUrl(img.imageUrl)) // Use getDisplayUrl here
       .filter((url): url is string => Boolean(url) && url !== '/placeholder.svg'); // Ensure it's a valid, non-placeholder URL
 
