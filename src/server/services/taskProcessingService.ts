@@ -1,7 +1,7 @@
 import cron from 'node-cron';
 import { db } from '@/lib/db';
-import { tasks as tasksSchema, generations as generationsSchema, shotGenerations as shotGenerationsSchema } from '../../../db/schema/schema';
-import { eq, and, isNull, sql, inArray, notInArray } from 'drizzle-orm';
+import { tasks as tasksSchema, generations as generationsSchema, shotGenerations as shotGenerationsSchema, taskStatusEnum } from '../../../db/schema/schema';
+import { eq, and, isNull, sql, inArray, notInArray, like } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { broadcast } from './webSocketService';
 
@@ -161,6 +161,70 @@ export async function processCompletedStitchTask(task: Task): Promise<void> {
   } catch (error: any) {
     console.error(`[VideoStitchGenDebug] Error during generation/shot_generation creation for task ${task.id}:`, error);
     // Don't mark as processed if an error occurred
+  }
+}
+
+/**
+ * Recursively cancels or fails tasks that depend on a given task.
+ * @param taskId The ID of the task that was cancelled or failed.
+ * @param status The new status to set ('Cancelled' or 'Failed').
+ * @param processedIds A set of already processed task IDs to avoid infinite loops.
+ */
+export async function cascadeTaskStatus(
+  taskId: string,
+  status: 'Cancelled' | 'Failed',
+  processedIds: Set<string> = new Set()
+): Promise<void> {
+  if (processedIds.has(taskId)) {
+    return; // Avoid cycles
+  }
+  processedIds.add(taskId);
+
+  console.log(`[TaskCascader] Cascading status '${status}' for dependents of task ${taskId}`);
+
+  try {
+    // Find tasks that depend on the current task.
+    // Drizzle stores array as string, so we use LIKE. This is not ideal but works for now.
+    const dependentTasks = await db
+      .select({ id: tasksSchema.id })
+      .from(tasksSchema)
+      .where(like(tasksSchema.dependantOn, `%"${taskId}"%`));
+
+    if (dependentTasks.length === 0) {
+      console.log(`[TaskCascader] No dependent tasks found for ${taskId}.`);
+      return;
+    }
+
+    const dependentTaskIds = dependentTasks.map((t) => t.id);
+    console.log(`[TaskCascader] Found dependent tasks for ${taskId}:`, dependentTaskIds);
+
+    // Update the status of all dependent tasks.
+    await db
+      .update(tasksSchema)
+      .set({ status, updatedAt: new Date() })
+      .where(inArray(tasksSchema.id, dependentTaskIds));
+
+    console.log(`[TaskCascader] Updated status to '${status}' for tasks:`, dependentTaskIds);
+    
+    // Notify clients about the update
+    broadcast({
+      type: 'TASKS_STATUS_UPDATE',
+      payload: {
+        // We don't have projectId here easily without another query,
+        // so we might need a broader client-side refetch trigger or fetch it.
+        // For now, client will refetch on TASK_COMPLETED style messages.
+        // A generic TASKS_CHANGED message could be better.
+        // Let's assume for now the client will get updates via the poller.
+      },
+    });
+
+
+    // Recursively cascade the status change for each dependent task.
+    for (const dependentTask of dependentTasks) {
+      await cascadeTaskStatus(dependentTask.id, status, processedIds);
+    }
+  } catch (error) {
+    console.error(`[TaskCascader] Error cascading status for dependents of task ${taskId}:`, error);
   }
 }
 

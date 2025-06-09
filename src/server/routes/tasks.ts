@@ -4,7 +4,7 @@ import { tasks as tasksSchema, taskStatusEnum } from '../../../db/schema/schema'
 import { sql, eq, and, inArray, max } from 'drizzle-orm';
 import { generations as generationsSchema, shotGenerations as shotGenerationsSchema } from '../../../db/schema/schema';
 import { randomUUID } from 'crypto';
-import { processCompletedStitchTask } from '../services/taskProcessingService';
+import { processCompletedStitchTask, cascadeTaskStatus } from '../services/taskProcessingService';
 
 const router = express.Router() as any; // Changed Router to any to resolve overload errors
 
@@ -141,6 +141,9 @@ router.patch('/:taskId/cancel', async (req: Request, res: Response) => {
       return res.status(404).json({ message: 'Task not found or not updated' });
     }
 
+    // Don't await, let it run in the background
+    cascadeTaskStatus(taskId, 'Cancelled');
+
     return res.status(200).json(updatedTasks[0]);
   } catch (error: any) {
     console.error(`[API /api/tasks/${taskId}/cancel] Error cancelling task:`, error);
@@ -183,6 +186,11 @@ router.patch('/:taskId/status', async (req: Request, res: Response) => {
     }
 
     const updatedTask = updatedTasks[0];
+
+    if (updatedTask.status === 'Failed') {
+      // Don't await, let it run in the background
+      cascadeTaskStatus(updatedTask.id, 'Failed');
+    }
 
     if (updatedTask.taskType === 'travel_stitch' && updatedTask.status === 'Complete') {
       // Call the refactored processing function
