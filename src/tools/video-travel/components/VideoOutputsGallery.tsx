@@ -21,6 +21,8 @@ interface VideoOutputsGalleryProps {
     prompt?: string;
     negativePrompt?: string;
     steps?: number;
+    frames?: number;
+    context?: number;
     width?: number;
     height?: number;
   }) => void;

@@ -88,7 +88,7 @@
 - **components/VideoOutputsGallery.tsx**: Displays generated videos for a shot (pagination, lightbox). Updated to show 3 videos per row consistently across screen sizes.
 - **components/SimpleVideoPlayer.tsx**: Clean video player with speed controls (-2x, -1x, 1x, 2x). Replaces complex HoverScrubVideo functionality in lightbox for simplified playback experience.
 - **components/VideoLightbox.tsx**: Modal video player using SimpleVideoPlayer for clean viewing experience.
-- **components/TaskDetailsModal.tsx**: Dialog for detailed task parameters (fetches by generation ID).
+- **components/TaskDetailsModal.tsx**: Dialog for detailed task parameters (fetches by generation ID). Features "Use These Settings" button that extracts and applies generation parameters (prompt, negative prompt, steps, frames, context, resolution) to BatchSettingsForm. Automatically deduplicates repeated prompts and handles expanded parameter arrays.
 - **components/VideoShotDisplay.tsx**: Displays shot's images & name. Allows selection. Inline name edit, delete (API). Used by ShotListDisplay.
 - **components/ShotListDisplay.tsx**: Renders list of shots using VideoShotDisplay.
 - **components/SortableImageItem.tsx**: Renders sortable/deletable image item for ShotImageManager.

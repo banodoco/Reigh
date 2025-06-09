@@ -631,6 +631,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     prompt?: string;
     negativePrompt?: string;
     steps?: number;
+    frames?: number;
+    context?: number;
     width?: number;
     height?: number;
   }) => {
@@ -644,6 +646,14 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     
     if (settings.steps) {
       onBatchVideoStepsChange(settings.steps);
+    }
+    
+    if (settings.frames) {
+      onBatchVideoFramesChange(settings.frames);
+    }
+    
+    if (settings.context) {
+      onBatchVideoContextChange(settings.context);
     }
     
     if (settings.width && settings.height) {

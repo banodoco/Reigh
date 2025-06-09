@@ -28,6 +28,8 @@ interface TaskDetailsModalProps {
     prompt?: string;
     negativePrompt?: string;
     steps?: number;
+    frames?: number;
+    context?: number;
     width?: number;
     height?: number;
   }) => void;
@@ -118,7 +120,12 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
   const getPrompt = () => {
     const prompts = orchestratorDetails?.base_prompts ?? orchestratorDetails?.base_prompts_expanded;
     if (prompts) {
-      return Array.isArray(prompts) ? prompts.join('; ') : prompts;
+      if (Array.isArray(prompts)) {
+        // Deduplicate prompts to avoid repetition
+        const uniquePrompts = [...new Set(prompts.filter(p => p && p.trim()))];
+        return uniquePrompts.join('; ');
+      }
+      return prompts;
     }
     return parsedParams.prompt ?? 'N/A';
   };
@@ -126,7 +133,13 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
   const getNegativePrompt = () => {
     const negPrompts = orchestratorDetails?.negative_prompt ?? orchestratorDetails?.negative_prompts_expanded;
     if (negPrompts) {
-      const joined = Array.isArray(negPrompts) ? negPrompts.join('; ') : negPrompts;
+      if (Array.isArray(negPrompts)) {
+        // Deduplicate negative prompts to avoid repetition
+        const uniqueNegPrompts = [...new Set(negPrompts.filter(p => p && p.trim()))];
+        const joined = uniqueNegPrompts.join('; ');
+        return joined || 'N/A';
+      }
+      const joined = negPrompts;
       return joined || 'N/A';
     }
     return parsedParams.negative_prompt ?? 'N/A';
@@ -170,6 +183,24 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
       const stepsNum = typeof steps === 'number' ? steps : parseInt(steps.toString(), 10);
       if (!isNaN(stepsNum)) {
         settings.steps = stepsNum;
+      }
+    }
+    
+    // Extract frames from segment_frames_expanded
+    const segmentFrames = orchestratorDetails?.segment_frames_expanded;
+    if (segmentFrames && Array.isArray(segmentFrames) && segmentFrames.length > 0) {
+      const firstFrameValue = segmentFrames[0];
+      if (typeof firstFrameValue === 'number' && firstFrameValue > 0) {
+        settings.frames = firstFrameValue;
+      }
+    }
+    
+    // Extract context from frame_overlap_expanded
+    const frameOverlap = orchestratorDetails?.frame_overlap_expanded;
+    if (frameOverlap && Array.isArray(frameOverlap) && frameOverlap.length > 0) {
+      const firstOverlapValue = frameOverlap[0];
+      if (typeof firstOverlapValue === 'number' && firstOverlapValue >= 0) {
+        settings.context = firstOverlapValue;
       }
     }
     
