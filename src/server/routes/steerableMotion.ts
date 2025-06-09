@@ -67,8 +67,13 @@ router.post('/travel-between-images', async (req: any, res: any) => {
     const orchestratorTaskId = `sm_travel_orchestrator_${runId.substring(2, 10)}_${randomUUID().slice(0, 6)}`;
 
     // Fetch project to get aspect ratio
-    let projectResolution: string | undefined;
-    if (body.project_id) {
+    let finalResolution: string | undefined;
+    
+    // Use provided resolution if available, otherwise fall back to project aspect ratio
+    if (body.resolution && body.resolution.trim()) {
+      finalResolution = body.resolution.trim();
+      console.log(`[API /steerable-motion/travel-between-images] Using provided resolution: ${finalResolution}`);
+    } else if (body.project_id) {
       const projectsResult = await db
         .select({ aspectRatio: projectsSchema.aspectRatio })
         .from(projectsSchema)
@@ -77,20 +82,20 @@ router.post('/travel-between-images', async (req: any, res: any) => {
 
       if (projectsResult.length > 0 && projectsResult[0].aspectRatio) {
         const projectAspectRatio = projectsResult[0].aspectRatio;
-        projectResolution = ASPECT_RATIO_TO_RESOLUTION[projectAspectRatio];
-        console.log(`[API /steerable-motion/travel-between-images] Project ${body.project_id} has aspect ratio: ${projectAspectRatio}, using resolution: ${projectResolution}`);
+        finalResolution = ASPECT_RATIO_TO_RESOLUTION[projectAspectRatio];
+        console.log(`[API /steerable-motion/travel-between-images] Project ${body.project_id} has aspect ratio: ${projectAspectRatio}, using resolution: ${finalResolution}`);
         
-        if (!projectResolution) {
+        if (!finalResolution) {
             console.warn(`[API /steerable-motion/travel-between-images] Project aspect ratio "${projectAspectRatio}" not found in resolution map. Falling back to default.`);
-            projectResolution = ASPECT_RATIO_TO_RESOLUTION[DEFAULT_ASPECT_RATIO];
+            finalResolution = ASPECT_RATIO_TO_RESOLUTION[DEFAULT_ASPECT_RATIO];
         }
       } else {
         console.log(`[API /steerable-motion/travel-between-images] Project ${body.project_id} not found or has no aspect ratio. Using default resolution.`);
-        projectResolution = ASPECT_RATIO_TO_RESOLUTION[DEFAULT_ASPECT_RATIO];
+        finalResolution = ASPECT_RATIO_TO_RESOLUTION[DEFAULT_ASPECT_RATIO];
       }
     } else {
       console.log('[API /steerable-motion/travel-between-images] No project_id provided in body. Using default resolution for safety, though project_id is required by validation.');
-      projectResolution = ASPECT_RATIO_TO_RESOLUTION[DEFAULT_ASPECT_RATIO];
+      finalResolution = ASPECT_RATIO_TO_RESOLUTION[DEFAULT_ASPECT_RATIO];
     }
 
     const numSegments = body.image_urls ? body.image_urls.length - 1 : 0;
@@ -122,7 +127,7 @@ router.post('/travel-between-images', async (req: any, res: any) => {
       negative_prompts_expanded: negativePromptsExpanded,
       segment_frames_expanded: segmentFramesExpanded,
       frame_overlap_expanded: frameOverlapExpanded,
-      parsed_resolution_wh: projectResolution,
+      parsed_resolution_wh: finalResolution,
       model_name: body.model_name ?? 'vace_14B',
       seed_base: body.seed ?? 789,
       apply_reward_lora: body.apply_reward_lora ?? true,
