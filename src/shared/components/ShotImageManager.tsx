@@ -22,12 +22,20 @@ import { SortableImageItem } from '@/tools/video-travel/components/SortableImage
 import MediaLightbox from './MediaLightbox';
 import { cn } from '@/shared/lib/utils';
 import { MultiImagePreview, SingleImagePreview } from './ImageDragPreview';
+import { PairConfig } from '@/tools/video-travel/components/ShotEditor';
+import { Input } from './ui/input';
+import { Textarea } from './ui/textarea';
+import { Label } from './ui/label';
+import { Slider } from './ui/slider';
 
 export interface ShotImageManagerProps {
   images: GenerationRow[];
   onImageDelete: (shotImageEntryId: string) => void;
   onImageReorder: (orderedShotGenerationIds: string[]) => void;
   columns?: 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
+  generationMode: 'batch' | 'by-pair';
+  pairConfigs: PairConfig[];
+  onPairConfigChange: (id: string, field: 'prompt' | 'frames' | 'negativePrompt' | 'context', value: string | number) => void;
 }
 
 const ShotImageManager: React.FC<ShotImageManagerProps> = ({
@@ -35,6 +43,9 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
   onImageDelete,
   onImageReorder,
   columns = 4,
+  generationMode,
+  pairConfigs,
+  onPairConfigChange,
 }) => {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -148,6 +159,108 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
 
   if (!images || images.length === 0) {
     return <p className="text-sm text-muted-foreground">No images to display.</p>;
+  }
+
+  if (generationMode === 'by-pair') {
+    const imagePairs = images.slice(0, -1).map((image, index) => {
+      const nextImage = images[index + 1];
+      const pairId = `${image.id}-${nextImage.id}`;
+      const config = pairConfigs.find(p => p.id === pairId) || { 
+        prompt: '', 
+        frames: 30, 
+        negativePrompt: '', 
+        context: 16 
+      };
+
+      return {
+        id: pairId,
+        imageA: image,
+        imageB: nextImage,
+        config: config,
+        isFirstPair: index === 0,
+      };
+    });
+
+    return (
+      <div className="space-y-4">
+        {imagePairs.map(pair => (
+          <div key={pair.id} className="p-4 border rounded-lg bg-card shadow-md">
+            <div className="flex space-x-4">
+              <div className="flex-1">
+                <SortableImageItem
+                  image={pair.imageA}
+                  isSelected={false}
+                  onClick={() => {}}
+                  onDelete={() => onImageDelete(pair.imageA.shotImageEntryId)}
+                  onDoubleClick={() => {}}
+                />
+              </div>
+              <div className="flex-1">
+                <SortableImageItem
+                  image={pair.imageB}
+                  isSelected={false}
+                  onClick={() => {}}
+                  onDelete={() => onImageDelete(pair.imageB.shotImageEntryId)}
+                  onDoubleClick={() => {}}
+                />
+              </div>
+            </div>
+            <div className="mt-4 space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor={`prompt-${pair.id}`}>Prompt Per Pair:</Label>
+                  <Textarea
+                    id={`prompt-${pair.id}`}
+                    value={pair.config.prompt}
+                    onChange={e => onPairConfigChange(pair.id, 'prompt', e.target.value)}
+                    placeholder="e.g., cinematic transition"
+                    className="min-h-[70px] text-sm"
+                    rows={3}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor={`negative-prompt-${pair.id}`}>Negative Prompt Per Pair:</Label>
+                  <Textarea
+                    id={`negative-prompt-${pair.id}`}
+                    value={pair.config.negativePrompt}
+                    onChange={e => onPairConfigChange(pair.id, 'negativePrompt', e.target.value)}
+                    placeholder="e.g., blurry, low quality"
+                    className="min-h-[70px] text-sm"
+                    rows={3}
+                  />
+                </div>
+              </div>
+              <div className={pair.isFirstPair ? "grid grid-cols-1 gap-4" : "grid grid-cols-1 md:grid-cols-2 gap-4"}>
+                <div>
+                  <Label htmlFor={`frames-${pair.id}`}>Frames per pair: {pair.config.frames}</Label>
+                  <Slider
+                    id={`frames-${pair.id}`}
+                    min={10}
+                    max={82}
+                    step={1}
+                    value={[pair.config.frames]}
+                    onValueChange={([value]) => onPairConfigChange(pair.id, 'frames', value)}
+                  />
+                </div>
+                {!pair.isFirstPair && (
+                  <div>
+                    <Label htmlFor={`context-${pair.id}`}>Context Frames Per Pair: {pair.config.context}</Label>
+                    <Slider
+                      id={`context-${pair.id}`}
+                      min={0}
+                      max={60}
+                      step={1}
+                      value={[pair.config.context]}
+                      onValueChange={([value]) => onPairConfigChange(pair.id, 'context', value)}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
   }
 
   const gridColsClass = {

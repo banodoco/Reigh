@@ -11,65 +11,66 @@ import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { Label } from "@/shared/components/ui/label";
 import { toast } from "sonner";
+import { useApiKeys } from "@/shared/hooks/useApiKeys";
 
 interface SettingsModalProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  currentFalApiKey: string;
-  onSaveApiKeys: (falApiKey: string, openaiApiKey: string, replicateApiKey: string) => void;
 }
 
 const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
   onOpenChange,
-  currentFalApiKey,
-  onSaveApiKeys,
 }) => {
-  const [falApiKey, setFalApiKey] = useState<string>(currentFalApiKey);
+  const { apiKeys, isLoading, saveApiKeys, isUpdating } = useApiKeys();
+  
+  const [falApiKey, setFalApiKey] = useState<string>("");
   const [openaiApiKey, setOpenaiApiKey] = useState<string>("");
   const [replicateApiKey, setReplicateApiKey] = useState<string>("");
   const [isFalKeyMasked, setIsFalKeyMasked] = useState(false);
   const [isOpenAIKeyMasked, setIsOpenAIKeyMasked] = useState(false);
   const [isReplicateKeyMasked, setIsReplicateKeyMasked] = useState(false);
 
-  // Load API keys from localStorage if they exist
+  // Load API keys from the database when they change
   useEffect(() => {
-    setFalApiKey(currentFalApiKey);
-    if (currentFalApiKey && currentFalApiKey !== '0b6f1876-0aab-4b56-b821-b384b64768fa:121392c885a381f93de56d701e3d532f') {
-      setIsFalKeyMasked(true);
+    if (apiKeys && isOpen) {
+      const falKey = apiKeys.fal_api_key || '';
+      const openaiKey = apiKeys.openai_api_key || '';
+      const replicateKey = apiKeys.replicate_api_key || '';
+      
+      setFalApiKey(falKey);
+      setOpenaiApiKey(openaiKey);
+      setReplicateApiKey(replicateKey);
+      
+      // Set masking state for existing keys
+      setIsFalKeyMasked(!!falKey);
+      setIsOpenAIKeyMasked(!!openaiKey);
+      setIsReplicateKeyMasked(!!replicateKey);
     }
-    
-    const storedOpenaiKey = localStorage.getItem('openai_api_key') || "";
-    if (storedOpenaiKey) {
-      setOpenaiApiKey(storedOpenaiKey);
-      setIsOpenAIKeyMasked(true);
-    }
-
-    const storedReplicateKey = localStorage.getItem('replicate_api_key') || "";
-    if (storedReplicateKey) {
-      setReplicateApiKey(storedReplicateKey);
-      setIsReplicateKeyMasked(true);
-    }
-  }, [currentFalApiKey, isOpen]);
+  }, [apiKeys, isOpen]);
 
   const handleSave = () => {
-    // Save the API keys and close the modal
+    // Save the API keys to the database
     // If masked, don't override with masked value
     const newFalKey = isFalKeyMasked && falApiKey === "••••••••••••••••••••••" 
-      ? currentFalApiKey 
+      ? apiKeys.fal_api_key || ""
       : falApiKey;
       
     const newOpenAIKey = isOpenAIKeyMasked && openaiApiKey === "••••••••••••••••••••••" 
-      ? localStorage.getItem('openai_api_key') || "" 
+      ? apiKeys.openai_api_key || ""
       : openaiApiKey;
     
     const newReplicateKey = isReplicateKeyMasked && replicateApiKey === "••••••••••••••••••••••"
-      ? localStorage.getItem('replicate_api_key') || ""
+      ? apiKeys.replicate_api_key || ""
       : replicateApiKey;
 
-    onSaveApiKeys(newFalKey, newOpenAIKey, newReplicateKey);
+    saveApiKeys({
+      fal_api_key: newFalKey,
+      openai_api_key: newOpenAIKey,
+      replicate_api_key: newReplicateKey,
+    });
+    
     onOpenChange(false);
-    toast.success("Settings saved successfully");
   };
 
   const handleFalKeyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -106,6 +107,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
               onChange={handleFalKeyChange}
               placeholder="Enter your Fal.ai API key"
               className="w-full"
+              disabled={isLoading}
             />
             <p className="text-xs text-gray-500">
               Used for image generation with Fal.ai services.
@@ -120,6 +122,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
               onChange={handleOpenAIKeyChange}
               placeholder="Enter your OpenAI API key"
               className="w-full"
+              disabled={isLoading}
             />
             <p className="text-xs text-gray-500">
               Will be used for future AI features.
@@ -134,6 +137,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
               onChange={handleReplicateKeyChange}
               placeholder="Enter your Replicate API key"
               className="w-full"
+              disabled={isLoading}
             />
             <p className="text-xs text-gray-500">
               Used for upscaling images with Replicate.
@@ -141,7 +145,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           </div>
         </div>
         <div className="flex justify-end">
-          <Button onClick={handleSave}>Save Settings</Button>
+          <Button 
+            onClick={handleSave} 
+            disabled={isLoading || isUpdating}
+          >
+            {isUpdating ? "Saving..." : "Save Settings"}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

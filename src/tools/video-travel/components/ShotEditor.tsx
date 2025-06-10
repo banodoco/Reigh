@@ -10,7 +10,7 @@ import { useProject } from "@/shared/contexts/ProjectContext";
 import { toast } from "sonner";
 import FileInput from "@/shared/components/FileInput";
 import { uploadImageToStorage } from "@/shared/lib/imageUploader";
-import { useAddImageToShot, useRemoveImageFromShot, useUpdateShotImageOrder, ShotGenerationRow } from "@/shared/hooks/useShots";
+import { useAddImageToShot, useRemoveImageFromShot, useUpdateShotImageOrder, useHandleExternalImageDrop } from "@/shared/hooks/useShots";
 import { useDeleteGeneration } from "@/shared/hooks/useGenerations";
 import ShotImageManager from '@/shared/components/ShotImageManager';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/components/ui/collapsible";
@@ -27,12 +27,16 @@ import { ActiveLora } from '../pages/VideoTravelToolPage';
 import { LoraModel, LoraSelectorModal } from '@/shared/components/LoraSelectorModal';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
 import { SliderWithValue } from '@/shared/components/ui/slider-with-value';
+import { useApiKeys } from '@/shared/hooks/useApiKeys';
+import SettingsModal from '@/shared/components/SettingsModal';
+import { ToggleGroup, ToggleGroupItem } from "@/shared/components/ui/toggle-group";
 
 // Add the missing type definition
 export interface SegmentGenerationParams {
   prompts: string[];
   frames: number[];
   context: number[];
+  generatedVideoUrl?: string;
 }
 
 // Local definition for Json type to remove dependency on supabase client types
@@ -53,6 +57,14 @@ export interface VideoPairConfig {
   frames: number;
   context: number;
   generatedVideoUrl?: string;
+}
+
+export interface PairConfig {
+  id: string;
+  prompt: string;
+  frames: number;
+  negativePrompt: string;
+  context: number;
 }
 
 export interface SteerableMotionSettings {
@@ -79,6 +91,9 @@ interface ShotSettings {
   customWidth?: number;
   customHeight?: number;
   steerableMotionSettings: SteerableMotionSettings;
+  enhancePrompt: boolean;
+  generationMode?: 'batch' | 'by-pair';
+  pairConfigs?: PairConfig[];
 }
 
 export interface ShotEditorProps {
@@ -115,6 +130,8 @@ export interface ShotEditorProps {
   availableLoras: LoraModel[];
   isLoraModalOpen: boolean;
   setIsLoraModalOpen: (isOpen: boolean) => void;
+  enhancePrompt: boolean;
+  onEnhancePromptChange: (enhance: boolean) => void;
 }
 
 const baseUrl = import.meta.env.VITE_API_TARGET_URL || '';
@@ -170,8 +187,11 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   availableLoras,
   isLoraModalOpen,
   setIsLoraModalOpen,
+  enhancePrompt,
+  onEnhancePromptChange,
 }) => {
   const { selectedProjectId, projects } = useProject();
+  const { getApiKey } = useApiKeys();
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const addImageToShotMutation = useAddImageToShot();
   const removeImageFromShotMutation = useRemoveImageFromShot();
@@ -181,6 +201,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const [deletingVideoId, setDeletingVideoId] = useState<string | null>(null);
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [creatingTaskId, setCreatingTaskId] = useState<string | null>(null);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [generationMode, setGenerationMode] = useState<'batch' | 'by-pair'>('batch');
+  const [pairConfigs, setPairConfigs] = useState<PairConfig[]>([]);
 
   // Use local state for optimistic updates on image list
   const [localOrderedShotImages, setLocalOrderedShotImages] = useState(orderedShotImages || []);
@@ -225,6 +248,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       if (settingsToApply.dimensionSource) onDimensionSourceChange(settingsToApply.dimensionSource);
       if (settingsToApply.customWidth) onCustomWidthChange(settingsToApply.customWidth);
       if (settingsToApply.customHeight) onCustomHeightChange(settingsToApply.customHeight);
+      if (settingsToApply.generationMode) setGenerationMode(settingsToApply.generationMode);
+      if (settingsToApply.pairConfigs) setPairConfigs(settingsToApply.pairConfigs);
       if (settingsToApply.steerableMotionSettings) {
         const defaultSteerableSettings = {
           negative_prompt: '',
@@ -258,6 +283,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     customWidth,
     customHeight,
     steerableMotionSettings,
+    enhancePrompt,
+    generationMode,
+    pairConfigs,
   }), [
     videoControlMode,
     batchVideoPrompt,
@@ -268,6 +296,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     customWidth,
     customHeight,
     steerableMotionSettings,
+    enhancePrompt,
+    generationMode,
+    pairConfigs,
   ]);
 
   useEffect(() => {
@@ -284,6 +315,26 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const videoOutputs = useMemo(() => {
     return localOrderedShotImages.filter(g => isGenerationVideo(g));
   }, [localOrderedShotImages]);
+
+  useEffect(() => {
+    setPairConfigs(previousPairConfigs => {
+      const newPairConfigs = nonVideoImages.slice(0, -1).map((image, index) => {
+        const nextImage = nonVideoImages[index + 1];
+        const pairId = `${image.id}-${nextImage.id}`;
+        
+        const existingConfig = previousPairConfigs.find(p => p.id === pairId);
+        
+        return existingConfig || {
+          id: pairId,
+          prompt: '',
+          frames: batchVideoFrames,
+          negativePrompt: '',
+          context: 16,
+        };
+      });
+      return newPairConfigs;
+    });
+  }, [nonVideoImages, batchVideoFrames, batchVideoContext]);
 
   const handleImageUploadToShot = async (files: File[]) => {
     if (!files || files.length === 0) return;
@@ -565,13 +616,16 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     }
 
     const basePrompts =
-      videoControlMode === 'batch' ? [batchVideoPrompt] : videoPairConfigs.map((cfg) => cfg.prompt);
+      generationMode === 'batch' ? [batchVideoPrompt] : pairConfigs.map((cfg) => cfg.prompt);
 
     const segmentFrames =
-      videoControlMode === 'batch' ? [batchVideoFrames] : videoPairConfigs.map((cfg) => cfg.frames);
+      generationMode === 'batch' ? [batchVideoFrames] : pairConfigs.map((cfg) => cfg.frames);
 
-    const frameOverlap =
-      videoControlMode === 'batch' ? [batchVideoContext] : videoPairConfigs.map((cfg) => cfg.context);
+    const frameOverlap = 
+      generationMode === 'batch' ? [batchVideoContext] : pairConfigs.map((cfg) => cfg.context);
+
+    const negativePrompts = 
+      generationMode === 'batch' ? [steerableMotionSettings.negative_prompt] : pairConfigs.map((cfg) => cfg.negativePrompt);
 
     try {
       const requestBody: any = {
@@ -581,7 +635,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         base_prompts: basePrompts,
         segment_frames: segmentFrames,
         frame_overlap: frameOverlap,
-        negative_prompts: [steerableMotionSettings.negative_prompt],
+        negative_prompts: negativePrompts,
         model_name: steerableMotionSettings.model_name,
         seed: steerableMotionSettings.seed,
         debug: steerableMotionSettings.debug,
@@ -593,6 +647,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         after_first_post_generation_saturation: steerableMotionSettings.after_first_post_generation_saturation,
         after_first_post_generation_brightness: steerableMotionSettings.after_first_post_generation_brightness,
         params_json_str: JSON.stringify({ steps: batchVideoSteps }),
+        enhance_prompt: enhancePrompt,
+        openai_api_key: enhancePrompt ? openaiApiKey : '',
       };
 
       if (resolution) {
@@ -629,38 +685,177 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
   const handleApplySettingsFromTask = (settings: {
     prompt?: string;
+    prompts?: string[];
     negativePrompt?: string;
+    negativePrompts?: string[];
     steps?: number;
-    frames?: number;
+    frame?: number;
+    frames?: number[];
     context?: number;
+    contexts?: number[];
     width?: number;
     height?: number;
+    replaceImages?: boolean;
+    inputImages?: string[];
   }) => {
-    if (settings.prompt) {
-      onBatchVideoPromptChange(settings.prompt);
-    }
+    // Check if there are multiple unique prompts or frame counts
+    const uniquePrompts = settings.prompts ? [...new Set(settings.prompts)] : [];
+    const uniqueFrames = settings.frames ? [...new Set(settings.frames)] : [];
     
-    if (settings.negativePrompt) {
+    const isByPair = uniquePrompts.length > 1 || uniqueFrames.length > 1;
+
+    if (isByPair) {
+      setGenerationMode('by-pair');
+      
+      // Create pair configs from the settings
+      const imagePairsCount = Math.max(0, nonVideoImages.length - 1);
+      const newPairConfigs: PairConfig[] = [];
+      
+      for (let i = 0; i < imagePairsCount; i++) {
+        const pairId = i < nonVideoImages.length - 1 ? 
+          `${nonVideoImages[i].id}-${nonVideoImages[i + 1].id}` : 
+          `pair-${i}`;
+        
+        newPairConfigs.push({
+          id: pairId,
+          prompt: settings.prompts?.[i] || settings.prompt || '',
+          frames: settings.frames?.[i] || settings.frame || batchVideoFrames,
+          negativePrompt: settings.negativePrompts?.[i] || settings.negativePrompt || '',
+          context: settings.contexts?.[i] || settings.context || 16,
+        });
+      }
+      setPairConfigs(newPairConfigs);
+    } else {
+      setGenerationMode('batch');
+      
+      // Apply single values to batch settings
+      if (settings.prompt) {
+        onBatchVideoPromptChange(settings.prompt);
+      }
+      if (settings.frame !== undefined) {
+        onBatchVideoFramesChange(settings.frame);
+      }
+      if (settings.context !== undefined) {
+        onBatchVideoContextChange(settings.context);
+      }
+    }
+
+    // Apply other settings
+    if (settings.negativePrompt && !isByPair) {
       onSteerableMotionSettingsChange({ negative_prompt: settings.negativePrompt });
     }
-    
     if (settings.steps) {
       onBatchVideoStepsChange(settings.steps);
     }
-    
-    if (settings.frames) {
-      onBatchVideoFramesChange(settings.frames);
-    }
-    
-    if (settings.context) {
-      onBatchVideoContextChange(settings.context);
-    }
-    
     if (settings.width && settings.height) {
       onDimensionSourceChange('custom');
       onCustomWidthChange(settings.width);
       onCustomHeightChange(settings.height);
     }
+
+    // Handle image replacement
+    if (settings.replaceImages && settings.inputImages && settings.inputImages.length > 0) {
+      handleReplaceImagesFromTask(settings.inputImages);
+    }
+
+    toast.success('Settings applied successfully!');
+  };
+
+  const handleReplaceImagesFromTask = async (inputImages: string[]) => {
+    if (!selectedShot?.id || !selectedProjectId) {
+      toast.error("Cannot replace images: Shot or Project ID is missing.");
+      return;
+    }
+
+    try {
+      toast.info(`Replacing images with ${inputImages.length} images from previous generation...`);
+      
+      // First, remove all current non-video images
+      const imagesToRemove = nonVideoImages.map(img => img.shotImageEntryId);
+      
+      // Optimistically update to remove old images
+      setLocalOrderedShotImages(prev => prev.filter(img => isGenerationVideo(img)));
+      
+      // Remove existing images from the shot
+      for (const shotImageEntryId of imagesToRemove) {
+        await removeImageFromShotMutation.mutateAsync({
+          shot_id: selectedShot.id,
+          shotImageEntryId: shotImageEntryId,
+          project_id: selectedProjectId,
+        });
+      }
+
+      // Add the new images from the task
+      const newGenerationRows: GenerationRow[] = [];
+      for (let i = 0; i < inputImages.length; i++) {
+        const imageUrl = inputImages[i];
+        
+        // Create a generation record for the input image
+        const promptForGeneration = `Input image from task ${i + 1}`;
+        const genResponse = await fetch(`${baseUrl}/api/generations`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            imageUrl: imageUrl,
+            fileName: `task-input-${i + 1}.jpg`,
+            fileType: 'image/jpeg',
+            projectId: selectedProjectId,
+            prompt: promptForGeneration,
+          }),
+        });
+
+        if (!genResponse.ok) {
+          throw new Error(`Failed to create generation record for image ${i + 1}`);
+        }
+        const newGeneration = await genResponse.json();
+
+        // Add the generation to the shot
+        const newShotImage = await addImageToShotMutation.mutateAsync({
+          shot_id: selectedShot.id,
+          generation_id: newGeneration.id,
+          project_id: selectedProjectId,
+          imageUrl: imageUrl,
+          thumbUrl: imageUrl,
+        });
+
+        const newGenerationRow: GenerationRow = {
+          ...(newGeneration as Omit<GenerationRow, 'id' | 'shotImageEntryId'>),
+          shotImageEntryId: newShotImage.id,
+          id: newShotImage.generationId,
+          isOptimistic: false,
+        };
+        newGenerationRows.push(newGenerationRow);
+      }
+
+      // Update local state with new images
+      setLocalOrderedShotImages(prev => {
+        const videoImages = prev.filter(img => isGenerationVideo(img));
+        return [...newGenerationRows, ...videoImages];
+      });
+
+      // Refresh the shot data
+      onShotImagesUpdate();
+      
+      toast.success(`Successfully replaced images with ${inputImages.length} images from the previous generation!`);
+    } catch (error: any) {
+      console.error('Error replacing images:', error);
+      toast.error(`Failed to replace images: ${error.message}`);
+      // Revert optimistic update on error
+      setLocalOrderedShotImages(orderedShotImages);
+    }
+  };
+
+  // Check if generation should be disabled due to missing OpenAI API key for enhance prompt
+  const openaiApiKey = getApiKey('openai_api_key');
+  const isGenerationDisabledDueToApiKey = enhancePrompt && (!openaiApiKey || openaiApiKey.trim() === '');
+  const isGenerationDisabled = isCreatingTask || nonVideoImages.length < 2 || isGenerationDisabledDueToApiKey;
+
+  const handleUpdatePairConfig = (id: string, field: 'prompt' | 'frames' | 'negativePrompt' | 'context', value: string | number) => {
+    setPairConfigs(prev =>
+      prev.map(pair =>
+        pair.id === id ? { ...pair, [field]: value } : pair
+      )
+    );
   };
 
   return (
@@ -706,6 +901,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                   onImageDelete={handleDeleteImageFromShot}
                   onImageReorder={handleReorderImagesInShot}
                   columns={3}
+                  generationMode={generationMode}
+                  pairConfigs={pairConfigs}
+                  onPairConfigChange={handleUpdatePairConfig}
                 />
               </div>
             </CardContent>
@@ -749,6 +947,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                     onSteerableMotionSettingsChange={onSteerableMotionSettingsChange}
                     projects={projects}
                     selectedProjectId={selectedProjectId}
+                    enhancePrompt={enhancePrompt}
+                    onEnhancePromptChange={onEnhancePromptChange}
+                    generationMode={generationMode}
+                    onGenerationModeChange={setGenerationMode}
                 />
                 
                 <div className="space-y-4 py-6 border-t mt-6">
@@ -807,11 +1009,22 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                         size="lg" 
                         className="w-full" 
                         onClick={handleGenerateAllVideos} 
-                        disabled={isCreatingTask || nonVideoImages.length < 2}
+                        disabled={isGenerationDisabled}
                     >
-                        {isCreatingTask ? 'Creating Tasks...' : 'Generate All Videos (Batch)'}
+                        {isCreatingTask ? 'Creating Tasks...' : 'Generate All Videos'}
                     </Button>
                     {nonVideoImages.length < 2 && <p className="text-xs text-center text-muted-foreground mt-2">You need at least two images to generate videos.</p>}
+                    {isGenerationDisabledDueToApiKey && (
+                      <p className="text-xs text-center text-muted-foreground mt-2">
+                        If Enhance Prompt is enabled, you must add an{' '}
+                        <button 
+                          onClick={() => setIsSettingsModalOpen(true)}
+                          className="underline text-blue-600 hover:text-blue-800 cursor-pointer"
+                        >
+                          OpenAI API key
+                        </button>
+                      </p>
+                    )}
                 </div>
             </CardContent>
           </Card>
@@ -824,6 +1037,11 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         onAddLora={onAddLora}
         selectedLoraIds={selectedLoras.map(l => l.id)}
         lora_type="Wan 2.1 14b"
+      />
+      
+      <SettingsModal
+        isOpen={isSettingsModalOpen}
+        onOpenChange={setIsSettingsModalOpen}
       />
     </div>
   );

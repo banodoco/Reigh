@@ -9,9 +9,11 @@ import { Input } from "@/shared/components/ui/input";
 import { ChevronsUpDown, Info } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from "@/shared/components/ui/radio-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/components/ui/tooltip";
+import { Checkbox } from "@/shared/components/ui/checkbox";
 import { SteerableMotionSettings } from './ShotEditor';
 import { Project } from '@/types/project';
 import { ASPECT_RATIO_TO_RESOLUTION } from '@/shared/lib/aspectRatios';
+import { ToggleGroup, ToggleGroupItem } from '@/shared/components/ui/toggle-group';
 
 interface BatchSettingsFormProps {
   batchVideoPrompt: string;
@@ -32,6 +34,10 @@ interface BatchSettingsFormProps {
   onSteerableMotionSettingsChange: (settings: Partial<SteerableMotionSettings>) => void;
   projects: Project[];
   selectedProjectId: string | null;
+  enhancePrompt: boolean;
+  onEnhancePromptChange: (enhance: boolean) => void;
+  generationMode: 'batch' | 'by-pair';
+  onGenerationModeChange: (mode: 'batch' | 'by-pair') => void;
 }
 
 const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
@@ -53,108 +59,167 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
   onSteerableMotionSettingsChange,
   projects,
   selectedProjectId,
+  enhancePrompt,
+  onEnhancePromptChange,
+  generationMode,
+  onGenerationModeChange,
 }) => {
     const [showAdvanced, setShowAdvanced] = React.useState(false);
 
     return (
         <div className="space-y-6 mb-8">
           <div className="p-4 border rounded-lg bg-card shadow-md space-y-4">
-            <h3 className="text-lg font-semibold">Batch Generation Settings</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="relative">
-                <Label htmlFor="batchVideoPrompt" className="text-sm font-medium block mb-1.5">Prompt</Label>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">
-                      <Info className="h-4 w-4" />
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>This prompt guides the style and transition for all video segments. <br /> Small changes can have a big impact.</p>
-                  </TooltipContent>
-                </Tooltip>
-                <Textarea 
-                  id="batchVideoPrompt"
-                  value={batchVideoPrompt}
-                  onChange={(e) => onBatchVideoPromptChange(e.target.value)}
-                  placeholder="Enter a global prompt for all video segments... (e.g., cinematic transition)"
-                  className="min-h-[70px] text-sm"
-                  rows={3}
-                />
-              </div>
-              <div className="relative">
-                <Label htmlFor="negative_prompt" className="text-sm font-medium block mb-1.5">Negative Prompt</Label>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">
-                      <Info className="h-4 w-4" />
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Specify what you want to avoid in the generated videos, <br /> like 'blurry' or 'distorted'.</p>
-                  </TooltipContent>
-                </Tooltip>
-                <Textarea
-                  id="negative_prompt"
-                  value={steerableMotionSettings.negative_prompt}
-                  onChange={(e) => onSteerableMotionSettingsChange({ negative_prompt: e.target.value })}
-                  placeholder="e.g., blurry, low quality"
-                  className="min-h-[70px] text-sm"
-                  rows={3}
-                />
-              </div>
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-semibold">Generation Settings</h3>
+              <ToggleGroup type="single" value={generationMode} onValueChange={(value: 'batch' | 'by-pair') => value && onGenerationModeChange(value)} className="my-2">
+                <ToggleGroupItem value="batch" aria-label="Toggle batch">
+                  Batch
+                </ToggleGroupItem>
+                <ToggleGroupItem value="by-pair" aria-label="Toggle by-pair">
+                  By Pair
+                </ToggleGroupItem>
+              </ToggleGroup>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="relative">
-                <Label htmlFor="batchVideoFrames" className="text-sm font-medium block mb-1">Frames per Image: {batchVideoFrames}</Label>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">
-                      <Info className="h-4 w-4" />
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Determines the duration of the video segment for each image. <br /> More frames result in a longer segment.</p>
-                  </TooltipContent>
-                </Tooltip>
-                <Slider
-                  id="batchVideoFrames"
-                  min={10}
-                  max={81} 
-                  step={1}
-                  value={[batchVideoFrames]}
-                  onValueChange={(value) => onBatchVideoFramesChange(value[0])}
-                />
-                <Input
-                  id="batchVideoFramesInput"
-                  type="number"
-                  value={batchVideoFrames}
-                  onChange={(e) => onBatchVideoFramesChange(parseInt(e.target.value, 10) || 0)}
-                  className="mt-2"
-                />
+
+            {generationMode === 'batch' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="relative">
+                    <Label htmlFor="batchVideoPrompt" className="text-sm font-medium block mb-1.5">Prompt:</Label>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">
+                          <Info className="h-4 w-4" />
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>This prompt guides the style and transition for all video segments. <br /> Small changes can have a big impact.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                    <Textarea 
+                      id="batchVideoPrompt"
+                      value={batchVideoPrompt}
+                      onChange={(e) => onBatchVideoPromptChange(e.target.value)}
+                      placeholder="Enter a global prompt for all video segments... (e.g., cinematic transition)"
+                      className="min-h-[70px] text-sm"
+                      rows={3}
+                    />
+                    <div className="flex items-center space-x-2 mt-2">
+                      <Label htmlFor="enhancePrompt" className="text-sm font-medium">
+                        Enhance Prompts
+                      </Label>
+                      <Switch 
+                        id="enhancePrompt"
+                        checked={enhancePrompt}
+                        onCheckedChange={(checked) => onEnhancePromptChange(checked as boolean)}
+                      />
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="text-muted-foreground cursor-help hover:text-foreground transition-colors">
+                            <Info className="h-4 w-4" />
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Use AI to enhance and improve your prompt for better results. <br /> Requires OpenAI API key to be set in Settings.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </div>
+                  <div className="relative">
+                    <Label htmlFor="negative_prompt" className="text-sm font-medium block mb-1.5">Negative Prompt:</Label>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">
+                          <Info className="h-4 w-4" />
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Specify what you want to avoid in the generated videos, <br /> like 'blurry' or 'distorted'.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                    <Textarea
+                      id="negative_prompt"
+                      value={steerableMotionSettings.negative_prompt}
+                      onChange={(e) => onSteerableMotionSettingsChange({ negative_prompt: e.target.value })}
+                      placeholder="e.g., blurry, low quality"
+                      className="min-h-[70px] text-sm"
+                      rows={3}
+                    />
+                  </div>
               </div>
-              <div className="relative">
-                <Label htmlFor="batchVideoContext" className="text-sm font-medium block mb-1">Number of Context Frames: {batchVideoContext}</Label>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">
-                      <Info className="h-4 w-4" />
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>How many frames from one segment to reference for the next. <br /> Helps create smoother transitions.</p>
-                  </TooltipContent>
-                </Tooltip>
-                <Slider
-                  id="batchVideoContext"
-                  min={0}
-                  max={60}
-                  step={1}
-                  value={[batchVideoContext]}
-                  onValueChange={(value) => onBatchVideoContextChange(value[0])}
-                />
+            )}
+            
+            {generationMode === 'batch' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="relative">
+                    <Label htmlFor="batchVideoFrames" className="text-sm font-medium block mb-1">Frames per pair: {batchVideoFrames}</Label>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">
+                          <Info className="h-4 w-4" />
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Determines the duration of the video segment for each image. <br /> More frames result in a longer segment.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                    <Slider
+                      id="batchVideoFrames"
+                      min={10}
+                      max={81} 
+                      step={1}
+                      value={[batchVideoFrames]}
+                      onValueChange={(value) => onBatchVideoFramesChange(value[0])}
+                    />
+                  </div>
+                  <div className="relative">
+                    <Label htmlFor="batchVideoContext" className="text-sm font-medium block mb-1">Number of Context Frames: {batchVideoContext}</Label>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">
+                          <Info className="h-4 w-4" />
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>How many frames from one segment to reference for the next. <br /> Helps create smoother transitions.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                    <Slider
+                      id="batchVideoContext"
+                      min={0}
+                      max={60}
+                      step={1}
+                      value={[batchVideoContext]}
+                      onValueChange={(value) => onBatchVideoContextChange(value[0])}
+                    />
+                  </div>
               </div>
-            </div>
+            )}
+
+            {generationMode === 'by-pair' && (
+              <div className="grid grid-cols-1 gap-4">
+                <div className="flex items-center space-x-2 mt-2">
+                      <Label htmlFor="enhancePromptByPair" className="text-sm font-medium">
+                        Enhance Prompts
+                      </Label>
+                      <Switch 
+                        id="enhancePromptByPair"
+                        checked={enhancePrompt}
+                        onCheckedChange={(checked) => onEnhancePromptChange(checked as boolean)}
+                      />
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="text-muted-foreground cursor-help hover:text-foreground transition-colors">
+                            <Info className="h-4 w-4" />
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Use AI to enhance and improve your prompt for better results. <br /> Requires OpenAI API key to be set in Settings.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+              </div>
+            )}
+
             <div className="relative">
               <Label htmlFor="batchVideoSteps" className="text-sm font-medium block mb-1">Generation Steps: {batchVideoSteps}</Label>
               <Tooltip>

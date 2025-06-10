@@ -44,6 +44,7 @@ const VideoTravelToolPage: React.FC = () => {
   const [dimensionSource, setDimensionSource] = useState<'project' | 'firstImage' | 'custom'>('firstImage');
   const [customWidth, setCustomWidth] = useState<number | undefined>();
   const [customHeight, setCustomHeight] = useState<number | undefined>();
+  const [enhancePrompt, setEnhancePrompt] = useState<boolean>(false);
   const [videoPairConfigs, setVideoPairConfigs] = useState<any[]>([]);
   const [steerableMotionSettings, setSteerableMotionSettings] = useState<SteerableMotionSettings>({
     negative_prompt: '',
@@ -315,6 +316,8 @@ const VideoTravelToolPage: React.FC = () => {
           availableLoras={availableLoras}
           isLoraModalOpen={isLoraModalOpen}
           setIsLoraModalOpen={setIsLoraModalOpen}
+          enhancePrompt={enhancePrompt}
+          onEnhancePromptChange={setEnhancePrompt}
         />
       )}
 

@@ -1,6 +1,6 @@
 // Temporarily empty schema for Drizzle Kit to initialize the migrations folder.
 
-import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, index } from 'drizzle-orm/sqlite-core';
 import { relations, sql } from 'drizzle-orm';
 import { v4 as randomUUID } from 'uuid';
 
@@ -15,6 +15,7 @@ export const users = sqliteTable('users', {
   id: text('id').primaryKey(),
   name: text('name'),
   email: text('email'),
+  apiKeys: text('api_keys', { mode: 'json' }), // Store API keys as JSON object
 });
 
 export const projects = sqliteTable('projects', {
@@ -42,7 +43,12 @@ export const tasks = sqliteTable('tasks', {
   updatedAt: integer('updated_at', { mode: 'timestamp' }), // No $onUpdate in SQLite
   projectId: text('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
   generationProcessedAt: integer('generation_processed_at', { mode: 'timestamp' }),
-});
+}, (table) => ({
+  // Indexes for better query performance
+  statusCreatedIdx: index('idx_status_created').on(table.status, table.createdAt),
+  dependantOnIdx: index('idx_dependant_on').on(table.dependantOn),
+  projectStatusIdx: index('idx_project_status').on(table.projectId, table.status),
+}));
 
 export const generations = sqliteTable('generations', {
   id: text('id').$defaultFn(() => randomUUID()).primaryKey(),

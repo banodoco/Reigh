@@ -12,6 +12,7 @@ import { uploadImageToStorage } from '@/shared/lib/imageUploader';
 import { nanoid } from 'nanoid';
 import { useListAllGenerations, useDeleteGeneration } from "@/shared/hooks/useGenerations";
 import { Settings } from "lucide-react";
+import { useApiKeys } from '@/shared/hooks/useApiKeys';
 
 export type Json =
   | string
@@ -48,13 +49,13 @@ const ImageGenerationToolPage = () => {
   // const [isGenerating, setIsGenerating] = useState(false); // From hook
   // const [currentPromptIndex, setCurrentPromptIndex] = useState<number | null>(null); // Part of hook's progress
   // const [currentImageCount, setCurrentImageCount] = useState<number>(0); // Part of hook's progress
-  const [falApiKey, setFalApiKey] = useState<string>('');
-  const [openaiApiKey, setOpenaiApiKey] = useState<string>('');
-  const [replicateApiKey, setReplicateApiKey] = useState<string>('');
   const [showPlaceholders, setShowPlaceholders] = useState(true);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [isUpscalingImageId, setIsUpscalingImageId] = useState<string | null>(null);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [isCreatingTask, setIsCreatingTask] = useState(false);
+
+  const { apiKeys, getApiKey } = useApiKeys();
 
   const imageGenerationFormRef = useRef<ImageGenerationFormHandles>(null);
   // const cancelGenerationRef = useRef(false); // Handled by hook
@@ -68,21 +69,6 @@ const ImageGenerationToolPage = () => {
   const { data: generatedImagesData, isLoading: isLoadingGenerations } = useListAllGenerations(selectedProjectId);
   const deleteGenerationMutation = useDeleteGeneration();
 
-  // Add state for task creation loading
-  const [isCreatingTask, setIsCreatingTask] = useState(false);
-
-  useEffect(() => {
-    // Initialize Fal client globally
-    // initializeGlobalFalClient(); // REMOVE - Function is obsolete
-    const storedFalKey = localStorage.getItem('fal_api_key') || '0b6f1876-0aab-4b56-b821-b384b64768fa:121392c885a381f93de56d701e3d532f'; // Keep for local display/validation
-    setFalApiKey(storedFalKey);
-    const storedOpenaiKey = localStorage.getItem('openai_api_key') || "";
-    setOpenaiApiKey(storedOpenaiKey);
-    const storedReplicateKey = localStorage.getItem('replicate_api_key') || "";
-    setReplicateApiKey(storedReplicateKey);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedProjectId]);
-  
   useEffect(() => {
     if (generatedImagesData) {
       setGeneratedImages(generatedImagesData);
@@ -97,18 +83,6 @@ const ImageGenerationToolPage = () => {
     setShowPlaceholders(!isLoadingGenerations && (!generatedImagesData || generatedImagesData.length === 0));
   }, [generatedImagesData, isLoadingGenerations]);
 
-  const handleSaveApiKeys = (newFalApiKey: string, newOpenaiApiKey: string, newReplicateApiKey: string) => {
-    localStorage.setItem('fal_api_key', newFalApiKey);
-    localStorage.setItem('openai_api_key', newOpenaiApiKey);
-    localStorage.setItem('replicate_api_key', newReplicateApiKey);
-    // Re-initialize Fal client with the new key
-    // initializeGlobalFalClient(); // REMOVE - Function is obsolete
-    setFalApiKey(newFalApiKey);
-    setOpenaiApiKey(newOpenaiApiKey);
-    setReplicateApiKey(newReplicateApiKey);
-    toast.success("API keys updated successfully");
-  };
-  
   const handleDeleteImage = async (id: string) => {
     deleteGenerationMutation.mutate(id);
   };
@@ -282,6 +256,8 @@ const ImageGenerationToolPage = () => {
     }
   };
 
+  const falApiKey = getApiKey('fal_api_key');
+  const openaiApiKey = getApiKey('openai_api_key');
   const hasValidFalApiKey = !!falApiKey && falApiKey.trim() !== '' && falApiKey !== '0b6f1876-0aab-4b56-b821-b384b64768fa:121392c885a381f93de56d701e3d532f';
 
   const targetShotIdForButton = lastAffectedShotId || (shots && shots.length > 0 ? shots[0].id : undefined);
@@ -397,8 +373,6 @@ const ImageGenerationToolPage = () => {
       <SettingsModal 
           isOpen={showSettingsModal}
           onOpenChange={setShowSettingsModal}
-          currentFalApiKey={falApiKey}
-          onSaveApiKeys={handleSaveApiKeys}
         />
     </div>
   );

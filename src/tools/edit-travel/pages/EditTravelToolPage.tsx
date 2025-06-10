@@ -19,6 +19,7 @@ import { findClosestAspectRatio } from "@/shared/lib/aspectRatios";
 import ShotsPane from '@/shared/components/ShotsPane/ShotsPane';
 import EditTravelForm from "../components/EditTravelForm";
 import usePersistentState from "@/shared/hooks/usePersistentState";
+import { useApiKeys } from '@/shared/hooks/useApiKeys';
 
 // Local definition for Json type
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
@@ -47,15 +48,15 @@ const EditTravelToolPage = () => {
   const [aspectRatio, setAspectRatio] = useState<string>("1:1");
   const [showPlaceholders, setShowPlaceholders] = useState(true);
   const [videoDuration, setVideoDuration] = useState<number | null>(null);
-  const [falApiKey, setFalApiKey] = useState<string | null>(null);
-  const [openaiApiKey, setOpenaiApiKey] = useState<string>('');
   const [isClientSideReconstructing, setIsClientSideReconstructing] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [isCreatingTask, setIsCreatingTask] = useState(false);
+  
+  const { getApiKey } = useApiKeys();
   
   const kontextCancelGenerationRef = useRef(false);
   const kontextCurrentSubscriptionRef = useRef<any>(null);
   const reconstructionCancelRef = useRef(false);
-  const [isCreatingTask, setIsCreatingTask] = useState(false);
   
   const { selectedProjectId } = useProject();
   const queryClient = useQueryClient();
@@ -80,11 +81,6 @@ const EditTravelToolPage = () => {
   ];
 
   useEffect(() => {
-    const localFalApiKey = localStorage.getItem('fal_api_key');
-    setFalApiKey(localFalApiKey);
-    const storedOpenaiKey = localStorage.getItem('openai_api_key') || "";
-    setOpenaiApiKey(storedOpenaiKey);
-
     const savedFileRaw = localStorage.getItem('editTravelInputFile');
     if (savedFileRaw) {
       try {
@@ -147,15 +143,6 @@ const EditTravelToolPage = () => {
     };
   }, [inputFile]);
   
-  const handleSaveApiKeys = (newFalApiKey: string, newOpenaiApiKey: string) => {
-    localStorage.setItem('fal_api_key', newFalApiKey);
-    localStorage.setItem('openai_api_key', newOpenaiApiKey);
-    setFalApiKey(newFalApiKey);
-    setOpenaiApiKey(newOpenaiApiKey);
-    toast.success("API keys updated successfully");
-    setIsSettingsModalOpen(false);
-  };
-
   const handleFileChange = (files: File[]) => {
     const file = files?.[0] || null;
     setInputFile(file);
@@ -268,6 +255,8 @@ const EditTravelToolPage = () => {
     }
   };
 
+  const falApiKey = getApiKey('fal_api_key');
+  const openaiApiKey = getApiKey('openai_api_key');
   const hasValidFalApiKey = !!falApiKey && falApiKey.trim() !== '';
   const effectiveFps = videoDuration && prompts.length > 1 && videoDuration > 0 ? (prompts.length -1) / videoDuration : 0;
   const MemoizedShotsPane = React.memo(ShotsPane);
@@ -367,8 +356,6 @@ const EditTravelToolPage = () => {
       <SettingsModal
         isOpen={isSettingsModalOpen}
         onOpenChange={setIsSettingsModalOpen}
-        currentFalApiKey={falApiKey || ''}
-        onSaveApiKeys={handleSaveApiKeys}
       />
     </div>
   );

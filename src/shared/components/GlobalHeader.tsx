@@ -20,24 +20,9 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
   const [isCreateProjectModalOpen, setIsCreateProjectModalOpen] = useState(false);
   const [isProjectSettingsModalOpen, setIsProjectSettingsModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-  const [falApiKey, setFalApiKey] = useState<string>('');
-
-  useEffect(() => {
-    const storedFalKey = localStorage.getItem('fal_api_key') || '';
-    setFalApiKey(storedFalKey);
-  }, []);
 
   const handleProjectChange = (projectId: string) => {
     setSelectedProjectId(projectId);
-  };
-
-  const handleSaveApiKeys = (newFalApiKey: string, newOpenaiApiKey: string, newReplicateApiKey: string) => {
-    localStorage.setItem('fal_api_key', newFalApiKey);
-    localStorage.setItem('openai_api_key', newOpenaiApiKey);
-    localStorage.setItem('replicate_api_key', newReplicateApiKey);
-    setFalApiKey(newFalApiKey);
-    toast.success("API keys updated successfully");
-    setIsSettingsModalOpen(false);
   };
 
   const selectedProject = projects.find(p => p.id === selectedProjectId);
@@ -245,8 +230,6 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
        <SettingsModal
         isOpen={isSettingsModalOpen}
         onOpenChange={setIsSettingsModalOpen}
-        currentFalApiKey={falApiKey}
-        onSaveApiKeys={handleSaveApiKeys}
       />
     </>
   );

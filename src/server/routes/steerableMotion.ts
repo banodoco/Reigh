@@ -29,6 +29,8 @@ interface TravelRequestBody {
   after_first_post_generation_brightness?: number;
   params_json_str?: string;
   main_output_dir_for_run?: string;
+  enhance_prompt?: boolean; // Whether to enhance prompts using AI
+  openai_api_key?: string; // OpenAI API key for prompt enhancement
 }
 
 // Set a default aspect ratio key, which will be used to look up the resolution.
@@ -140,7 +142,9 @@ router.post('/travel-between-images', async (req: any, res: any) => {
       params_json_str_override: typeof body.params_json_str === 'object' && body.params_json_str !== null ? JSON.stringify(body.params_json_str) : body.params_json_str ?? '{"steps":4}',
       debug_mode_enabled: body.debug ?? true,
       shot_id: body.shot_id ?? undefined,
-      main_output_dir_for_run: body.main_output_dir_for_run ?? './outputs/default_travel_output'
+      main_output_dir_for_run: body.main_output_dir_for_run ?? './outputs/default_travel_output',
+      enhance_prompt: body.enhance_prompt ?? false,
+      openai_api_key: body.openai_api_key ?? ''
     };
     console.log('[API /steerable-motion/travel-between-images] Constructed orchestratorPayload:', JSON.stringify(orchestratorPayload, null, 2)); // Log payload
 

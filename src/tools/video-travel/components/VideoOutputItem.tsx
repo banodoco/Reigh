@@ -13,12 +13,18 @@ interface VideoOutputItemProps {
   isDeleting: boolean;
   onApplySettings?: (settings: {
     prompt?: string;
+    prompts?: string[];
     negativePrompt?: string;
+    negativePrompts?: string[];
     steps?: number;
-    frames?: number;
+    frame?: number;
+    frames?: number[];
     context?: number;
+    contexts?: number[];
     width?: number;
     height?: number;
+    replaceImages?: boolean;
+    inputImages?: string[];
   }) => void;
 }
 

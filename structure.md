@@ -25,6 +25,7 @@
 | `/src/tools` | Tool-specific modules (Image Generation, Video Travel, Edit Travel) |
 | `/src/shared` | Shared components, hooks, utils, contexts, layouts |
 | `/src/server` | Backend API server (Express.js); data access, background tasks |
+| `/src/server/routes/apiKeys.ts` | API key management endpoint (GET, PUT /api/api-keys) for user API key storage |
 | `/src/types` | Shared TS interfaces (incl. Supabase-generated DB types, env.ts) |
 | `/src/integrations` | Supabase & FAL-AI client setup |
 | `/public` | Static assets (favicons, SVGs, JSON) |
@@ -34,7 +35,7 @@
 | Config files | vite.config.ts, tailwind.config.ts, tsconfig*.json, ESLint, etc. |
 | `drizzle.config.ts` | Drizzle Kit config (PostgreSQL/Supabase). For PG migrations |
 | `drizzle-sqlite.config.ts` | Drizzle Kit config (SQLite). For local SQLite migrations |
-| `/db/schema/schema.ts` | Canonical DB schema (Drizzle ORM, PG-first) |
+| `/db/schema/schema.ts` | Canonical DB schema (Drizzle ORM, PG-first). Users table includes api_keys JSON column for storing FAL/OpenAI/Replicate keys |
 | `/db/migrations/` | PostgreSQL migration files |
 | `/db/migrations-sqlite/` | SQLite migration files |
 | `/db/seed.ts` | Seeds local SQLite DB for development |
@@ -83,8 +84,8 @@
 
 ##### Video Travel (`src/tools/video-travel/`)
 - **pages/VideoTravelToolPage.tsx**: Main UI. Lists project shots (ShotListDisplay). Creates new shots (API). Hosts ShotEditor. Manages LoRA state and filtering for "Wan 2.1 14b" models.
-- **components/ShotEditor.tsx**: Main shot editing. VideoOutputsGallery now positioned above main content area for better visibility. Orchestrates BatchSettingsForm, ShotImageManager. Includes LoRA selector UI with strength controls.
-- **components/BatchSettingsForm.tsx**: Form for batch video gen settings (prompts, frames, etc.).
+- **components/ShotEditor.tsx**: Main shot editing. VideoOutputsGallery now positioned above main content area for better visibility. Orchestrates BatchSettingsForm, ShotImageManager. Includes LoRA selector UI with strength controls. Features OpenAI API key validation for prompt enhancement, disabling generate button and showing clickable warning when enhance prompt is enabled but no API key is set.
+- **components/BatchSettingsForm.tsx**: Form for batch video gen settings (prompts, frames, etc.). Includes "Enhance prompt" checkbox that requires OpenAI API key for AI-powered prompt improvement.
 - **components/VideoOutputsGallery.tsx**: Displays generated videos for a shot (pagination, lightbox). Updated to show 3 videos per row consistently across screen sizes.
 - **components/SimpleVideoPlayer.tsx**: Clean video player with speed controls (-2x, -1x, 1x, 2x). Replaces complex HoverScrubVideo functionality in lightbox for simplified playback experience.
 - **components/VideoLightbox.tsx**: Modal video player using SimpleVideoPlayer for clean viewing experience.
@@ -116,7 +117,7 @@
 - **DraggableImage.tsx**: Makes gallery images draggable
 - **ImageGallery.tsx**: Displays generated images; supports delete, upscale, "apply settings", drag-to-shot
 - **ImageDragPreview.tsx**: Renders the visual preview for single or multiple images being dragged from the ShotImageManager
-- **SettingsModal.tsx**: Modal for API key entry/saving to localStorage
+- **SettingsModal.tsx**: Modal for API key entry/saving to database (uses useApiKeys hook). Replaces localStorage-based approach
 - **PromptEditorModal.tsx**: Modal for bulk prompt editing, AI-assisted generation/refinement
 - **LoraSelectorModal.tsx**: Browse/select LoRA models. Supports filtering by `lora_type` (e.g., "Flux.dev", "Wan 2.1 14b")
 - **CreateProjectModal.tsx**: Dialog to create new project (uses ProjectContext.addNewProject)
@@ -131,6 +132,10 @@
   - `useListAllGenerations`: GET all generations for a project
   - `useDeleteGeneration`: DELETE a single generation
   - `useCreateGeneration`: POST a new simple generation record
+- **useApiKeys.ts**: Manages user API keys stored in database:
+  - `useApiKeys`: Fetches/updates API keys from database via react-query. Replaces localStorage-based approach
+  - `getApiKey`: Helper to retrieve specific API key values
+  - `saveApiKeys`: Updates API keys in database with optimistic updates
 - **useShots.ts**: CRUD for shots & shot_generations:
   - `useCreateShot`: POST /api/shots
   - `useListShots`: GET /api/shots?projectId= (API returns shots with ordered images: GenerationRow[])
@@ -145,7 +150,7 @@
   - `useCreateTask`: POST /api/tasks
   - `useCancelTask`: PATCH /api/tasks/:taskId/cancel
   - `useUpdateTaskStatus`: PATCH /api/tasks/:taskId/status. For 'travel_stitch' completion, backend taskProcessingService.ts creates generation/shot_generation
-  - `useCancelAllPendingTasks`: POST /api/tasks/cancel-pending
+- **useCancelAllPendingTasks**: POST /api/tasks/cancel-pending
 - **usePersistentState.ts**: Generic hook to persist component state to `localStorage`.
 - **useWebSocket.ts**: Manages WebSocket. Listens for messages (e.g., TASK_COMPLETED, TASKS_STATUS_UPDATE), invalidates react-query caches for real-time UI
 - **useSlidingPane.ts**: Manages state for hover-to-open, lockable side panels
@@ -165,3 +170,4 @@
 - **utils.ts**: General utilities
 - **imageCropper.ts**: Crops images to supported aspect ratios
 - **aspectRatios.ts**: Defines aspect ratios (e.g., "16:9" -> "902x508"). Single source for project/server dimensions. Parsing/matching helpers
+- **steerableMotion.ts**: Video generation API (POST /api/steerable-motion). Includes prompt enhancement via OpenAI API when enhance_prompt=true and openai_api_key is provided.

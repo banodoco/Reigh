@@ -11,6 +11,8 @@ import { Button } from '@/shared/components/ui/button';
 import { toast } from 'sonner';
 import { Info } from 'lucide-react';
 import { getDisplayUrl } from '@/shared/lib/utils';
+import { Checkbox } from '@/shared/components/ui/checkbox';
+import { Label } from '@/shared/components/ui/label';
 
 // Local definition for Json type to remove dependency on supabase client types
 export type Json =
@@ -26,12 +28,18 @@ interface TaskDetailsModalProps {
   children: React.ReactNode;
   onApplySettings?: (settings: {
     prompt?: string;
+    prompts?: string[];
     negativePrompt?: string;
+    negativePrompts?: string[];
     steps?: number;
-    frames?: number;
+    frame?: number;
+    frames?: number[];
     context?: number;
+    contexts?: number[];
     width?: number;
     height?: number;
+    replaceImages?: boolean;
+    inputImages?: string[];
   }) => void;
 }
 
@@ -44,6 +52,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
   const [isOpen, setIsOpen] = useState(false);
   const [task, setTask] = useState<Task | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [replaceImages, setReplaceImages] = useState(false);
 
   useEffect(() => {
     const fetchTaskDetails = async () => {
@@ -166,45 +175,40 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
   const handleApplySettings = () => {
     if (!onApplySettings || !task) return;
 
-    const settings: any = {};
+    const settings: any = {
+      // Pass the full arrays for by-pair mode handling
+      prompts: orchestratorDetails?.base_prompts_expanded ?? [],
+      frames: orchestratorDetails?.segment_frames_expanded ?? [],
+      negativePrompts: orchestratorDetails?.negative_prompts_expanded ?? [],
+      contexts: orchestratorDetails?.frame_overlap_expanded ?? [],
+    };
     
-    // Extract prompt if available and not "N/A"
+    // Include image replacement data if checkbox is checked
+    if (replaceImages && inputImages.length > 0) {
+      settings.replaceImages = true;
+      settings.inputImages = inputImages;
+    }
+    
+    // Extract single values for fallback or batch-like application
+    const prompt = getPrompt();
     if (prompt && prompt !== 'N/A') {
       settings.prompt = prompt;
     }
     
-    // Extract negative prompt if available and not "N/A"
+    const negativePrompt = getNegativePrompt();
     if (negativePrompt && negativePrompt !== 'N/A') {
       settings.negativePrompt = negativePrompt;
     }
     
-    // Extract steps if available and not "N/A"
+    const steps = getSteps();
     if (steps && steps !== 'N/A') {
       const stepsNum = typeof steps === 'number' ? steps : parseInt(steps.toString(), 10);
       if (!isNaN(stepsNum)) {
         settings.steps = stepsNum;
       }
     }
-    
-    // Extract frames from segment_frames_expanded
-    const segmentFrames = orchestratorDetails?.segment_frames_expanded;
-    if (segmentFrames && Array.isArray(segmentFrames) && segmentFrames.length > 0) {
-      const firstFrameValue = segmentFrames[0];
-      if (typeof firstFrameValue === 'number' && firstFrameValue > 0) {
-        settings.frames = firstFrameValue;
-      }
-    }
-    
-    // Extract context from frame_overlap_expanded
-    const frameOverlap = orchestratorDetails?.frame_overlap_expanded;
-    if (frameOverlap && Array.isArray(frameOverlap) && frameOverlap.length > 0) {
-      const firstOverlapValue = frameOverlap[0];
-      if (typeof firstOverlapValue === 'number' && firstOverlapValue >= 0) {
-        settings.context = firstOverlapValue;
-      }
-    }
-    
-    // Extract resolution if available and not "N/A"
+
+    const resolution = getResolution();
     if (resolution && resolution !== 'N/A') {
       if (typeof resolution === 'string' && resolution.includes('x')) {
         const [width, height] = resolution.split('x').map(n => parseInt(n, 10));
@@ -219,6 +223,14 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
           settings.height = height;
         }
       }
+    }
+    
+    // Add single frame and context for batch mode
+    if (settings.frames.length > 0) {
+        settings.frame = settings.frames[0];
+    }
+    if (settings.contexts.length > 0) {
+        settings.context = settings.contexts[0];
     }
 
     onApplySettings(settings);
@@ -326,17 +338,31 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
         </div>
         
         <DialogFooter className="flex-shrink-0 pt-4 border-t">
-          <div className="flex justify-between w-full">
-            {onApplySettings && task && (
-              <Button 
-                variant="default" 
-                onClick={handleApplySettings}
-                className="text-sm"
-              >
-                Use These Settings
-              </Button>
-            )}
-            <Button variant="outline" onClick={() => setIsOpen(false)} className="w-full sm:w-auto">
+          <div className="flex justify-between w-full items-center">
+            <div className="flex items-center space-x-4">
+              {onApplySettings && task && (
+                <Button 
+                  variant="default" 
+                  onClick={handleApplySettings}
+                  className="text-sm"
+                >
+                  Use These Settings
+                </Button>
+              )}
+              {inputImages.length > 0 && (
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="replaceImages"
+                    checked={replaceImages}
+                    onCheckedChange={(checked) => setReplaceImages(checked as boolean)}
+                  />
+                  <Label htmlFor="replaceImages" className="text-sm font-medium">
+                    Replace these images
+                  </Label>
+                </div>
+              )}
+            </div>
+            <Button variant="outline" onClick={() => setIsOpen(false)} className="text-sm">
               Close
             </Button>
           </div>
