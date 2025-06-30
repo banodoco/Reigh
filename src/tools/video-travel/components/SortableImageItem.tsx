@@ -104,7 +104,15 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
         <Trash2 className="h-4 w-4" />
       </Button>
       <AlertDialog open={isConfirmDeleteDialogOpen} onOpenChange={setIsConfirmDeleteDialogOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent
+          onPointerDown={(e) => {
+            // Prevent underlying sortable item click / drag sensors when the dialog is open
+            e.stopPropagation();
+          }}
+          onClick={(e) => {
+            e.stopPropagation();
+          }}
+        >
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Image</AlertDialogTitle>
             <AlertDialogDescription>
