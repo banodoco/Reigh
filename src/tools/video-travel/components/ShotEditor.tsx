@@ -28,10 +28,9 @@ import { LoraModel, LoraSelectorModal } from '@/shared/components/LoraSelectorMo
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
 import { SliderWithValue } from '@/shared/components/ui/slider-with-value';
 import { useApiKeys } from '@/shared/hooks/useApiKeys';
-import { Checkbox } from '@/shared/components/ui/checkbox';
 import { cropImageToProjectAspectRatio } from '@/shared/lib/imageCropper';
 import { parseRatio } from '@/shared/lib/aspectRatios';
-import { getCropToProjectSizeSetting, setCropToProjectSizeSetting } from '@/shared/lib/cropSettings';
+import { getCropToProjectSizeSetting } from '@/shared/lib/cropSettings';
 import SettingsModal from '@/shared/components/SettingsModal';
 import { ToggleGroup, ToggleGroupItem } from "@/shared/components/ui/toggle-group";
 import { useListTasks, useCancelTask } from "@/shared/hooks/useTasks";
@@ -213,7 +212,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [generationMode, setGenerationMode] = useState<'batch' | 'by-pair'>('batch');
   const [pairConfigs, setPairConfigs] = useState<PairConfig[]>([]);
-  const [cropToProjectSize, setCropToProjectSize] = useState(getCropToProjectSizeSetting());
   const queryClient = useQueryClient();
 
   // Use local state for optimistic updates on image list
@@ -359,7 +357,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     setIsUploadingImage(true);
     toast.info(`Uploading ${files.length} image(s)...`);
 
-    // Get project aspect ratio for cropping if needed
+    // Determine if cropping is enabled via project settings (localStorage)
+    const cropToProjectSize = getCropToProjectSizeSetting();
     let projectAspectRatio: number | null = null;
     if (cropToProjectSize) {
       const currentProject = projects.find(p => p.id === selectedProjectId);
@@ -401,7 +400,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       try {
         let fileToUpload = file;
 
-        // Crop the image if the checkbox is checked
+        // Crop the image if preference is enabled
         if (cropToProjectSize && projectAspectRatio) {
           const cropResult = await cropImageToProjectAspectRatio(file, projectAspectRatio);
           if (cropResult) {
@@ -943,11 +942,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     );
   };
 
-  const handleCropToProjectSizeChange = (checked: boolean) => {
-    setCropToProjectSize(checked);
-    setCropToProjectSizeSetting(checked);
-  };
-
   return (
     <div className="flex flex-col h-full space-y-4">
       {/* Header */}
@@ -999,16 +993,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
               </div>
             </CardContent>
             <div className="p-4 border-t space-y-3">
-              <div className="flex items-center space-x-2">
-                <Checkbox 
-                  id="crop-to-project-size"
-                  checked={cropToProjectSize}
-                  onCheckedChange={(checked) => handleCropToProjectSizeChange(checked === true)}
-                />
-                <Label htmlFor="crop-to-project-size" className="text-sm">
-                  Crop to project size
-                </Label>
-              </div>
               <FileInput
                 key={fileInputKey}
                 onFileChange={handleImageUploadToShot}
