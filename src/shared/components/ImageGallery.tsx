@@ -500,7 +500,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, isDeletin
                     <>
                         {/* Add to Shot UI - Top Left */}
                         {simplifiedShotOptions.length > 0 && onAddToLastShot && (
-                        <div className="absolute top-2 left-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                        <div className="absolute top-2 left-2 flex flex-col items-start gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                             <Select
                                 value={selectedShotIdLocal}
                                 onValueChange={(value) => {
@@ -566,102 +566,117 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, isDeletin
                         </div>
                         )}
 
-                        {/* Other action buttons - Top Right */}
+                        {/* Action buttons - Top Right (timestamp, Info & Apply) */}
                         <div className="absolute top-2 right-2 flex flex-col items-end gap-1.5">
-                            <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                {image.metadata && (
-                                    <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <Button variant="secondary" size="icon" className="h-7 w-7 p-0 rounded-full bg-black/50 hover:bg-black/70 text-white">
-                                        <Info className="h-3.5 w-3.5" />
-                                        </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent 
-                                        side="bottom" 
-                                        className="max-w-md text-xs p-3 leading-relaxed shadow-lg bg-background border max-h-80 overflow-y-auto"
-                                    >
-                                        {image.metadata.userProvidedImageUrl && (
-                                        <img 
-                                            src={image.metadata.userProvidedImageUrl} 
-                                            alt="User provided image preview"
-                                            className="w-full h-auto max-h-24 object-contain rounded-sm mb-2 border"
-                                        />
-                                        )}
-                                        <pre className="font-sans whitespace-pre-wrap">{metadataForDisplay}</pre>
-                                    </TooltipContent>
-                                    </Tooltip>
-                                )}
-                                {image.createdAt && isValid(new Date(image.createdAt)) && (
-                                    <span className="text-xs text-white bg-black/50 px-1.5 py-0.5 rounded-md">
-                                        {formatDistanceToNow(new Date(image.createdAt), { addSuffix: true })}
-                                    </span>
-                                )}
-                            </div>
+                            {/* Timestamp (always visible) */}
+                            {image.createdAt && isValid(new Date(image.createdAt)) && (
+                                <span className="text-xs text-white bg-black/50 px-1.5 py-0.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity">
+                                    {formatDistanceToNow(new Date(image.createdAt), { addSuffix: true })
+                                        .replace(" minutes", " mins")
+                                        .replace(" minute", " min")
+                                        .replace(" hours", " hrs")
+                                        .replace(" hour", " hr")
+                                        .replace(" seconds", " secs")
+                                        .replace(" second", " sec")
+                                        .replace("less than a minute", "< 1 min")}
+                                </span>
+                            )}
 
-                            <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                                {onDelete && (
+                            {/* Info button (shown on hover) */}
+                            {image.metadata && (
+                                <div className="opacity-0 group-hover:opacity-100 transition-opacity">
                                     <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <Button 
-                                        variant="destructive" 
-                                        size="icon" 
-                                        className="h-7 w-7 p-0 rounded-full"
-                                        onClick={() => onDelete(image.id!)}
-                                        disabled={isCurrentDeleting}
+                                        <TooltipTrigger asChild>
+                                            <Button variant="secondary" size="icon" className="h-7 w-7 p-0 rounded-full bg-black/50 hover:bg-black/70 text-white">
+                                                <Info className="h-3.5 w-3.5" />
+                                            </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent 
+                                            side="bottom" 
+                                            className="max-w-md text-xs p-3 leading-relaxed shadow-lg bg-background border max-h-80 overflow-y-auto"
                                         >
-                                        {isCurrentDeleting ? (
-                                            <div className="h-3 w-3 animate-spin rounded-full border-b-2 border-white"></div>
-                                        ) : (
-                                            <Trash2 className="h-3.5 w-3.5" />
-                                        )}
-                                        </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="bottom"><p>Delete Image</p></TooltipContent>
+                                            {image.metadata.userProvidedImageUrl && (
+                                                <img 
+                                                    src={image.metadata.userProvidedImageUrl} 
+                                                    alt="User provided image preview"
+                                                    className="w-full h-auto max-h-24 object-contain rounded-sm mb-2 border"
+                                                />
+                                            )}
+                                            <pre className="font-sans whitespace-pre-wrap">{metadataForDisplay}</pre>
+                                        </TooltipContent>
                                     </Tooltip>
-                                )}
-                                {image.metadata && onApplySettings && (
+                                </div>
+                            )}
+
+                            {/* Apply settings button (shown on hover) */}
+                            {image.metadata && onApplySettings && (
+                                <div className="opacity-0 group-hover:opacity-100 transition-opacity">
                                     <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <Button 
-                                        variant="outline"
-                                        size="icon" 
-                                        className="h-7 w-7 p-0 rounded-full bg-black/50 hover:bg-black/70 text-white"
-                                        onClick={() => onApplySettings(image.metadata!)}
-                                        >
-                                        <Settings className="h-4 w-4 mr-1" /> Apply
-                                        </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>Apply these generation settings to the form</TooltipContent>
+                                        <TooltipTrigger asChild>
+                                            <Button 
+                                                variant="outline"
+                                                size="icon" 
+                                                className="h-7 w-7 p-0 rounded-full bg-black/50 hover:bg-black/70 text-white"
+                                                onClick={() => onApplySettings(image.metadata!)}
+                                            >
+                                                <Settings className="h-4 w-4 mr-1" /> Apply
+                                            </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>Apply these generation settings to the form</TooltipContent>
                                     </Tooltip>
-                                )}
-                            </div>
+                                </div>
+                            )}
                         </div>
+
+                        {/* Delete button - Bottom Right */}
+                        {onDelete && (
+                            <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button 
+                                            variant="destructive" 
+                                            size="icon" 
+                                            className="h-7 w-7 p-0 rounded-full"
+                                            onClick={() => onDelete(image.id!)}
+                                            disabled={isCurrentDeleting}
+                                        >
+                                            {isCurrentDeleting ? (
+                                                <div className="h-3 w-3 animate-spin rounded-full border-b-2 border-white"></div>
+                                            ) : (
+                                                <Trash2 className="h-3.5 w-3.5" />
+                                            )}
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top"><p>Delete Image</p></TooltipContent>
+                                </Tooltip>
+                            </div>
+                        )}
 
                         {/* Download button - Bottom Left */}
                         <div className="absolute bottom-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
                             <Tooltip>
-                            <TooltipTrigger asChild>
-                                <Button
-                                variant="outline"
-                                size="icon"
-                                className="h-7 w-7 p-0 rounded-full bg-black/50 hover:bg-black/70 text-white"
-                                onClick={() => handleDownloadImage(
-                                    displayUrl, 
-                                    `artful_pane_craft_${isActuallyVideo ? 'video' : 'image'}_${image.id || index}`,
-                                    image.id || imageKey,
-                                    isActuallyVideo,
-                                    image.metadata?.content_type
-                                )}
-                                disabled={downloadingImageId === (image.id || imageKey)}
-                                >
-                                {downloadingImageId === (image.id || imageKey) ? (
-                                    <div className="h-3 w-3 animate-spin rounded-full border-b-2 border-current"></div>
-                                ) : (
-                                    <Download className="h-3.5 w-3.5" />
-                                )}
-                                </Button>
-                            </TooltipTrigger>
-                            <TooltipContent side="top"><p>Download Image</p></TooltipContent>
+                                <TooltipTrigger asChild>
+                                    <Button
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-7 w-7 p-0 rounded-full bg-black/50 hover:bg-black/70 text-white"
+                                        onClick={() => handleDownloadImage(
+                                            displayUrl,
+                                            `artful_pane_craft_${isActuallyVideo ? 'video' : 'image'}_${image.id || index}`,
+                                            image.id || imageKey,
+                                            isActuallyVideo,
+                                            image.metadata?.content_type
+                                        )}
+                                        disabled={downloadingImageId === (image.id || imageKey)}
+                                    >
+                                        {downloadingImageId === (image.id || imageKey) ? (
+                                            <div className="h-3 w-3 animate-spin rounded-full border-b-2 border-current"></div>
+                                        ) : (
+                                            <Download className="h-3.5 w-3.5" />
+                                        )}
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="top"><p>Download Image</p></TooltipContent>
                             </Tooltip>
                         </div>
                     </>)
