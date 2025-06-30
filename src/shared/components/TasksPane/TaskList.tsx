@@ -125,7 +125,7 @@ const TaskList: React.FC = () => {
                 onClick={handleCancelAllPending}
                 disabled={cancelAllPendingMutation.isPending || isLoading}
              >
-                {cancelAllPendingMutation.isPending ? 'Cancelling All...' : `Cancel All Pending (${actualPendingTasksInView.length})`}
+                {cancelAllPendingMutation.isPending ? 'Cancelling All...' : `Cancel All (${actualPendingTasksInView.length})`}
              </Button>
           )}
         </div>
