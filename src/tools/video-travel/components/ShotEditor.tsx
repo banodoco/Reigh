@@ -530,12 +530,14 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
       console.log(`[ShotEditor-HandleImageSaved] Database update successful for image:`, imageId);
 
-      // Update local state
+      // Update local state with cache-busting for immediate UI update
       console.log(`[ShotEditor-HandleImageSaved] Updating local state...`);
+      // Use getDisplayUrl with forceRefresh to ensure immediate update
+      const cacheBustedUrl = getDisplayUrl(newImageUrl, true);
       setLocalOrderedShotImages(prevImages => {
         const updated = prevImages.map(img => 
           img.id === imageId 
-            ? { ...img, imageUrl: newImageUrl, thumbUrl: newImageUrl } 
+            ? { ...img, imageUrl: cacheBustedUrl, thumbUrl: cacheBustedUrl } 
             : img
         );
         console.log(`[ShotEditor-HandleImageSaved] Local state updated. Found image to update:`, updated.some(img => img.id === imageId));

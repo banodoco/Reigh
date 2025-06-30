@@ -728,7 +728,14 @@
     position: relative;
     border: 3px dashed hsl(var(--primary) / 0.4);
     background: hsl(var(--wes-cream));
-    transform: rotate(-5deg);
+    /* Keep stamps upright by default */
+    transform: rotate(0deg);
+    transition: transform 0.25s ease;
+  }
+
+  /* Add a subtle playful tilt on hover instead of always being lopsided */
+  .wes-stamp:hover {
+    transform: rotate(-4deg);
   }
 
   .wes-stamp::before {
@@ -820,4 +827,9 @@
 
 .animate-scale-fade {
   animation: scaleFade 0.3s forwards ease-out;
+}
+
+/* Utility: disable the sweeping highlight that .wes-button adds */
+.no-sweep::before {
+  display: none !important;
 }

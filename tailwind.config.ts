@@ -292,7 +292,24 @@ export default {
 						opacity: '1',
 						transform: 'scale(1)'
 					}
-				}
+				},
+				'bubble-pop': {
+					'0%, 100%': {
+						transform: 'translateY(0) scale(1)'
+					},
+					'30%': {
+						transform: 'translateY(-4px) scale(1.08)'
+					},
+					'60%': {
+						transform: 'translateY(1px) scale(0.96)'
+					}
+				},
+				'wrench-turn': {
+					'0%, 100%': { transform: 'rotate(0deg)' },
+					'25%': { transform: 'rotate(25deg)' },
+					'50%': { transform: 'rotate(0deg)' },
+					'75%': { transform: 'rotate(-25deg)' }
+				},
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
@@ -315,6 +332,8 @@ export default {
 				'slide-in-left': 'slide-in-left 0.5s ease-out',
 				'slide-in-right': 'slide-in-right 0.5s ease-out',
 				'scale-in': 'scale-in 0.4s ease-out',
+				'bubble-pop': 'bubble-pop 1s ease-in-out infinite',
+				'wrench-turn': 'wrench-turn 0.8s ease-in-out infinite',
 			},
 			boxShadow: {
 				'wes': '0 10px 40px -10px hsl(var(--primary) / 0.2), 0 4px 20px -4px hsl(var(--accent) / 0.1)',

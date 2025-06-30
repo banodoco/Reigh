@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useDroppable } from '@dnd-kit/core';
-import { Shot, GenerationRow } from '@/types/shots';
+import { Shot } from '@/types/shots';
 import { useUpdateShotName, useHandleExternalImageDrop } from '@/shared/hooks/useShots';
 import { useToast } from '@/shared/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 import { getDisplayUrl } from '@/shared/lib/utils';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 
 interface ShotGroupProps {
   shot: Shot;
@@ -30,6 +31,13 @@ const ShotGroup: React.FC<ShotGroupProps> = ({ shot }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { setCurrentShotId } = useCurrentShot();
+
+  // Collapsible image grid logic
+  const IMAGES_PER_ROW = 4;
+  const allImages = shot.images || [];
+  const hasMultipleRows = allImages.length > IMAGES_PER_ROW;
+
+  const [isExpanded, setIsExpanded] = useState(false);
 
   useEffect(() => {
     if (shot.name !== currentName && !isEditing) {
@@ -82,10 +90,6 @@ const ShotGroup: React.FC<ShotGroupProps> = ({ shot }) => {
     transition: 'border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
     position: 'relative',
   };
-
-  const MAX_THUMBNAILS = 4;
-  const displayedImages = shot.images?.slice(0, MAX_THUMBNAILS) || [];
-  const remainingImagesCount = Math.max(0, (shot.images?.length || 0) - MAX_THUMBNAILS);
 
   const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -221,24 +225,51 @@ const ShotGroup: React.FC<ShotGroupProps> = ({ shot }) => {
       )}
       
       {/* Thumbnail mosaic area */}
-      <div className="flex-grow min-h-[60px]">
-        {displayedImages.length > 0 ? (
-          <div className="flex -space-x-3 rtl:space-x-reverse overflow-hidden p-1">
-            {displayedImages.map((image, index) => (
-              <img 
-                key={image.shotImageEntryId}
-                src={getDisplayUrl(image.thumbUrl || image.imageUrl)}
-                alt={`Shot image ${index + 1}`}
-                className="w-12 h-12 object-cover rounded-full border-2 border-zinc-700 bg-zinc-600 shadow"
-                title={`Image ID: ${image.id} (Entry: ${image.shotImageEntryId})`}
-              />
-            ))}
-            {remainingImagesCount > 0 && (
-              <div className="flex items-center justify-center w-12 h-12 rounded-full bg-zinc-700 border-2 border-zinc-600 text-xs text-zinc-300 font-medium">
-                +{remainingImagesCount}
-              </div>
+      <div className="flex-grow min-h-[60px] relative">
+        {allImages.length > 0 ? (
+          <>
+            <div
+              className="grid grid-cols-4 gap-1 p-1 transition-all duration-300 ease-in-out"
+              style={{
+                maxHeight: isExpanded ? undefined : 56, // approx height of one row (48px img + 8px gap)
+                overflow: isExpanded ? 'visible' : 'hidden',
+              }}
+            >
+              {allImages.map((image, index) => (
+                <img
+                  key={image.shotImageEntryId}
+                  src={getDisplayUrl(image.thumbUrl || image.imageUrl)}
+                  alt={`Shot image ${index + 1}`}
+                  className="w-12 h-12 object-cover rounded border border-zinc-700 bg-zinc-600 shadow"
+                  title={`Image ID: ${image.id} (Entry: ${image.shotImageEntryId})`}
+                />
+              ))}
+            </div>
+
+            {hasMultipleRows && !isExpanded && (
+              <button
+                className="absolute bottom-1 right-1 text-xs bg-black/60 hover:bg-black/80 text-white px-2 py-0.5 rounded flex items-center gap-1"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsExpanded(true);
+                }}
+              >
+                Show All <ChevronDown className="w-3 h-3" />
+              </button>
             )}
-          </div>
+
+            {isExpanded && (
+              <button
+                className="absolute bottom-1 right-1 text-xs bg-black/60 hover:bg-black/80 text-white px-2 py-0.5 rounded flex items-center gap-1"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsExpanded(false);
+                }}
+              >
+                Hide <ChevronUp className="w-3 h-3" />
+              </button>
+            )}
+          </>
         ) : (
           <div className="flex items-center justify-center h-full text-xs text-zinc-500">
             Drop images here

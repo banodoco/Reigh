@@ -16,7 +16,7 @@ import {
 } from '@/shared/components/ui/alert-dialog';
 import { Checkbox } from '@/shared/components/ui/checkbox';
 import { Label } from '@/shared/components/ui/label';
-import { cn } from '@/shared/lib/utils';
+import { cn, getDisplayUrl } from '@/shared/lib/utils';
 
 interface SortableImageItemProps {
   image: GenerationRow;
@@ -27,21 +27,6 @@ interface SortableImageItemProps {
 }
 
 const SKIP_CONFIRMATION_KEY = 'skipImageDeletionConfirmation';
-
-const baseUrl = import.meta.env.VITE_API_TARGET_URL || '';
-
-const getDisplayUrl = (relativePath: string | undefined): string => {
-  if (!relativePath) return '/placeholder.svg'; // Default placeholder if no path
-  // If it's already an absolute URL, a blob URL, or a root-relative path (like /placeholder.svg itself), use as is.
-  if (relativePath.startsWith('http') || relativePath.startsWith('blob:') || relativePath.startsWith('/')) {
-    return relativePath;
-  }
-  // For other relative paths (like 'files/image.png'), prepend the base URL.
-  const cleanBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
-  // Ensure the relative path doesn't start with a slash if we are prepending base
-  const cleanRelative = relativePath.startsWith('/') ? relativePath.substring(1) : relativePath;
-  return `${cleanBase}/${cleanRelative}`;
-};
 
 export const SortableImageItem: React.FC<SortableImageItemProps> = ({
   image,
@@ -84,6 +69,12 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
     setIsConfirmDeleteDialogOpen(false);
   };
 
+  // Add cache-busting parameter to ensure updated images are displayed
+  const imageUrl = image.thumbUrl || image.imageUrl;
+  // Use forceRefresh for flipped images to ensure immediate display update
+  const isFlippedImage = imageUrl && imageUrl.includes('flipped_');
+  const displayUrl = getDisplayUrl(imageUrl, isFlippedImage);
+
   return (
     <div
       ref={setNodeRef}
@@ -98,9 +89,10 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
       onClick={onClick}
     >
       <img
-        src={getDisplayUrl(image.thumbUrl || image.imageUrl)}
+        src={displayUrl}
         alt={`Image ${image.id}`}
         className="max-w-full max-h-full object-contain rounded-sm"
+        key={imageUrl} // Force re-render when imageUrl changes
       />
       <Button
         variant="destructive"

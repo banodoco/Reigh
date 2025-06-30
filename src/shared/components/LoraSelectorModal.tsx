@@ -380,7 +380,11 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, sel
                                                         variant={isSelectedOnGenerator ? "secondary" : "outline"}
                                                         size="sm"
                                                         className="w-full"
-                                                        onClick={() => onAddLora(lora)}
+                                                        onClick={() => {
+                                                            if (!isSelectedOnGenerator && lora["Model Files"] && lora["Model Files"].length > 0) {
+                                                                onAddLora(lora);
+                                                            }
+                                                        }}
                                                         disabled={isSelectedOnGenerator}
                                                     >
                                                         {isSelectedOnGenerator ? "Added" : "Add to Generator"}
@@ -424,7 +428,11 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, sel
                                                     <Button
                                                         variant={isSelectedOnGenerator ? "secondary" : "outline"}
                                                         size="sm"
-                                                        onClick={() => onAddLora(lora)}
+                                                        onClick={() => {
+                                                            if (!isSelectedOnGenerator && lora["Model Files"] && lora["Model Files"].length > 0) {
+                                                                onAddLora(lora);
+                                                            }
+                                                        }}
                                                         disabled={isSelectedOnGenerator}
                                                     >
                                                         {isSelectedOnGenerator ? 'Added to Generator' : 'Add to Generator'}

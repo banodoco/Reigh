@@ -230,6 +230,7 @@ const ImageGenerationToolPage = () => {
 
         if (successCount > 0) {
           toast.success(`${successCount} image generation tasks queued successfully! ${errorCount > 0 ? `(${errorCount} failed)` : ''} Check the Tasks pane for progress.`);
+          queryClient.invalidateQueries({ queryKey: ['tasks', selectedProjectId] });
         } else {
           toast.error(`Failed to create any tasks. ${errorCount} errors occurred.`);
         }
@@ -286,6 +287,7 @@ const ImageGenerationToolPage = () => {
 
       if (newTask) {
         toast.success(`Image generation task created (ID: ${newTask.id.substring(0,8)}...). Check the Tasks pane for progress.`);
+        queryClient.invalidateQueries({ queryKey: ['tasks', selectedProjectId] });
       }
     } catch (err: any) {
       console.error('Error creating image generation task:', err);

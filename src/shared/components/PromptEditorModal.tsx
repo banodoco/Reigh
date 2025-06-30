@@ -73,7 +73,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
 
   const [generationControlValues, setGenerationControlValues] = useState<GenerationControlValues>({
     overallPromptText: '', specificPromptsText: '', rulesToRememberText: '',
-    numberToGenerate: 3, includeExistingContext: false, addSummary: true,
+    numberToGenerate: 24, includeExistingContext: false, addSummary: true,
   });
   const [bulkEditControlValues, setBulkEditControlValues] = useState<BulkEditControlValues>({
     editInstructions: '', modelType: 'smart' as AIModelType,
@@ -132,7 +132,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
         console.log("[PromptEditorModal] No saved control settings found in localStorage on initial open. Defaults will be used (addSummary:true).");
         setGenerationControlValues({
             overallPromptText: '', specificPromptsText: '', rulesToRememberText: '',
-            numberToGenerate: 3, includeExistingContext: false, addSummary: true,
+            numberToGenerate: 24, includeExistingContext: false, addSummary: true,
         });
       }
       setActivePromptIdForFullView(null);
