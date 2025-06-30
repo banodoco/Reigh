@@ -56,7 +56,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
             <Link to="/" className="group flex items-center space-x-4 wes-nav-item relative">
               <div className="relative">
                 <div className="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-wes-pink via-wes-lavender to-wes-dusty-blue rounded-2xl border-3 border-wes-vintage-gold/40 shadow-wes-vintage group-hover:shadow-wes-hover transition-all duration-500 wes-badge">
-                  <Palette className="h-8 w-8 text-white group-hover:rotate-12 transition-transform duration-500 drop-shadow-lg" />
+                  <Palette className="h-8 w-8 text-white group-hover:scale-110 transition-transform duration-500 drop-shadow-lg" />
                 </div>
                 <div className="absolute -inset-1 border border-wes-vintage-gold/20 rounded-2xl animate-rotate-slow opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
                 <div className="absolute -top-2 -right-2">
@@ -109,7 +109,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                     onValueChange={handleProjectChange}
                     disabled={isLoadingProjects || projects.length === 0}
                   >
-                    <SelectTrigger className="w-[280px] wes-select border-3 border-wes-vintage-gold/30 bg-white/95 font-inter text-sm shadow-wes-vintage hover:shadow-wes-hover transition-all duration-500 wes-ornate-frame h-12">
+                    <SelectTrigger className="w-[280px] wes-select border-3 border-wes-vintage-gold/30 bg-white/95 font-inter text-sm shadow-wes-vintage hover:shadow-wes-hover transition-all duration-500 wes-ornate-frame h-14">
                       <div className="flex items-center space-x-3">
                         <div className="w-8 h-8 bg-gradient-to-br from-wes-vintage-gold to-wes-coral rounded-lg flex items-center justify-center">
                           <Palette className="h-4 w-4 text-white" />
@@ -146,7 +146,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                       title="Project settings"
                       disabled={!selectedProject}
                     >
-                      <Wrench className="h-6 w-6 text-white group-hover:rotate-12 group-hover:scale-110 transition-all duration-500" />
+                      <Wrench className="h-6 w-6 text-white group-hover:scale-110 transition-all duration-500" />
                       <div className="absolute -top-1 -right-1">
                         <Sparkles className="w-3 h-3 text-wes-vintage-gold animate-rotate-slow opacity-70" />
                       </div>
@@ -163,7 +163,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                     className="h-14 w-14 wes-button bg-gradient-to-br from-wes-yellow to-wes-salmon border-3 border-wes-vintage-gold/30 hover:from-wes-yellow-dark hover:to-wes-salmon shadow-wes-vintage hover:shadow-wes-hover group wes-viewfinder"
                     title="Create new project"
                   >
-                    <PlusCircle className="h-6 w-6 text-white group-hover:rotate-90 transition-transform duration-500" />
+                    <PlusCircle className="h-6 w-6 text-white group-hover:scale-110 transition-transform duration-500" />
                     <div className="absolute -top-2 -left-2">
                       <Star className="w-3 h-3 text-wes-vintage-gold animate-rotate-slow" />
                     </div>
@@ -186,18 +186,18 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                 <div className="absolute inset-0 bg-film-grain opacity-20 animate-film-grain"></div>
                 
                 {/* Main settings icon */}
-                <Settings className="h-6 w-6 text-white group-hover:rotate-180 transition-transform duration-700 relative z-10" />
+                <Settings className="h-6 w-6 text-white group-hover:scale-110 transition-transform duration-700 relative z-10" />
                 
                 {/* Decorative corner elements */}
                 <div className="absolute -top-1 -right-1">
                   <Crown className="w-3 h-3 text-wes-vintage-gold animate-bounce-gentle opacity-80" />
                 </div>
                 <div className="absolute -bottom-1 -left-1">
-                  <Star className="w-2 h-2 text-wes-coral animate-rotate-slow opacity-60" />
+                  <Star className="w-2 h-2 text-wes-coral opacity-60" />
                 </div>
                 
                 {/* Orbiting decoration */}
-                <div className="absolute inset-0 border border-wes-vintage-gold/30 rounded-2xl animate-rotate-slow opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                <div className="absolute inset-0 border border-wes-vintage-gold/30 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
               </Button>
           </div>
         </div>
