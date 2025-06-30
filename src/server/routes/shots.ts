@@ -44,7 +44,7 @@ shotsRouter.get('/', asyncHandler(async (req: Request, res: Response) => {
     const transformedData = fetchedShots.map(shot => ({
       id: shot.id,
       name: shot.name,
-      created_at: shot.createdAt ? shot.createdAt.toISOString() : new Date().toISOString(), // Handle potential null createdAt
+      created_at: shot.createdAt ?? new Date().toISOString(), // Handle potential null createdAt
       project_id: shot.projectId,
       images: shot.shotGenerations.map(sg => {
         if (!sg.generation) return null; 
@@ -54,7 +54,7 @@ shotsRouter.get('/', asyncHandler(async (req: Request, res: Response) => {
           imageUrl: sg.generation.location,
           thumbUrl: sg.generation.location,
           metadata: sg.generation.params,
-          createdAt: sg.generation.createdAt.toISOString(),
+          createdAt: sg.generation.createdAt,
           type: sg.generation.type,
           location: sg.generation.location
         };
@@ -126,7 +126,7 @@ shotsRouter.put('/:shotId', asyncHandler(async (req: Request, res: Response) => 
 
   try {
     const updatedShotArray = await db.update(shotsTable)
-      .set({ name: newName.trim(), updatedAt: new Date() }) // Also update updatedAt timestamp
+      .set({ name: newName.trim(), updatedAt: new Date().toISOString() }) // Also update updatedAt timestamp
       .where(eq(shotsTable.id, shotId))
       .returning();
 
@@ -141,8 +141,8 @@ shotsRouter.put('/:shotId', asyncHandler(async (req: Request, res: Response) => 
     const responseShot = {
         id: updatedShot.id,
         name: updatedShot.name,
-        created_at: updatedShot.createdAt.toISOString(),
-        updated_at: updatedShot.updatedAt?.toISOString(), // updatedAt can be null if not set on creation
+        created_at: updatedShot.createdAt,
+        updated_at: updatedShot.updatedAt ?? null, // may be null if not set on creation
         project_id: updatedShot.projectId,
         images: [], // For a name update, images array isn't typically returned unless explicitly requested
     };
@@ -225,7 +225,7 @@ shotsRouter.post('/:shotId/duplicate', asyncHandler(async (req: Request, res: Re
     const responseShot = {
       id: duplicatedShotData!.id,
       name: duplicatedShotData!.name,
-      created_at: duplicatedShotData!.createdAt ? duplicatedShotData!.createdAt.toISOString() : new Date().toISOString(),
+      created_at: duplicatedShotData!.createdAt ?? new Date().toISOString(),
       project_id: duplicatedShotData!.projectId,
       images: duplicatedShotData!.shotGenerations.map(sg => {
         if (!sg.generation) return null;
@@ -235,7 +235,7 @@ shotsRouter.post('/:shotId/duplicate', asyncHandler(async (req: Request, res: Re
           imageUrl: sg.generation.location,
           thumbUrl: sg.generation.location,
           metadata: sg.generation.params,
-          createdAt: sg.generation.createdAt.toISOString(),
+          createdAt: sg.generation.createdAt,
           type: sg.generation.type,
           location: sg.generation.location
         };

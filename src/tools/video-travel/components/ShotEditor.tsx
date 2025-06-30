@@ -570,7 +570,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
     setIsCreatingTask(true);
     setCreatingTaskId('batch');
-    toast.info('Queuing travel-between-images task via API...');
+
 
     let resolution: string | undefined = undefined;
 

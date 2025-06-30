@@ -36,8 +36,8 @@ router.post('/', async (req: Request, res: Response) => {
       taskType: task_type,
       params: params, 
       status: status, // Drizzle will map to enum if column is enum
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     };
 
     // Add optional fields if they were provided in the request body
@@ -130,7 +130,7 @@ router.patch('/:taskId/cancel', async (req: Request, res: Response) => {
       .update(tasksSchema)
       .set({ 
         status: 'Cancelled' as typeof taskStatusEnum[number], 
-        updatedAt: new Date() 
+        updatedAt: new Date().toISOString() 
       })
       .where(eq(tasksSchema.id, taskId))
       .returning();
@@ -174,7 +174,7 @@ router.patch('/:taskId/status', async (req: Request, res: Response) => {
       .update(tasksSchema)
       .set({
         status: newStatus as typeof taskStatusEnum[number],
-        updatedAt: new Date(),
+        updatedAt: new Date().toISOString(),
       })
       .where(eq(tasksSchema.id, taskId))
       .returning();
@@ -232,7 +232,7 @@ router.post('/cancel-pending', async (req: Request, res: Response) => {
       .update(tasksSchema)
       .set({ 
         status: 'Cancelled' as typeof taskStatusEnum[number], 
-        updatedAt: new Date() 
+        updatedAt: new Date().toISOString() 
       })
       .where(and(
         eq(tasksSchema.projectId, projectId),

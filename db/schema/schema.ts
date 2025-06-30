@@ -23,7 +23,7 @@ export const projects = sqliteTable('projects', {
   name: text('name').notNull(),
   userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   aspectRatio: text('aspect_ratio'),
-  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
+  createdAt: text('created_at').$defaultFn(() => new Date().toISOString()).notNull(),
 });
 
 // Type for updating projects, allowing optional fields
@@ -39,10 +39,10 @@ export const tasks = sqliteTable('tasks', {
   status: text('status', { enum: taskStatusEnum }).default('Pending').notNull(),
   dependantOn: text('dependant_on'),
   outputLocation: text('output_location'),
-  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }), // No $onUpdate in SQLite
+  createdAt: text('created_at').$defaultFn(() => new Date().toISOString()).notNull(),
+  updatedAt: text('updated_at'),
   projectId: text('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
-  generationProcessedAt: integer('generation_processed_at', { mode: 'timestamp' }),
+  generationProcessedAt: text('generation_processed_at'),
 }, (table) => ({
   // Indexes for better query performance
   statusCreatedIdx: index('idx_status_created').on(table.status, table.createdAt),
@@ -56,16 +56,16 @@ export const generations = sqliteTable('generations', {
   params: text('params', { mode: 'json' }),
   location: text('location'),
   type: text('type'),
-  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }),
+  createdAt: text('created_at').$defaultFn(() => new Date().toISOString()).notNull(),
+  updatedAt: text('updated_at'),
   projectId: text('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
 });
 
 export const shots = sqliteTable('shots', {
   id: text('id').$defaultFn(() => randomUUID()).primaryKey(),
   name: text('name').notNull(),
-  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }),
+  createdAt: text('created_at').$defaultFn(() => new Date().toISOString()).notNull(),
+  updatedAt: text('updated_at'),
   projectId: text('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
 });
 
@@ -81,7 +81,7 @@ export const resources = sqliteTable('resources', {
   userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   type: text('type').notNull(), // 'lora'
   metadata: text('metadata', { mode: 'json' }).notNull(),
-  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
+  createdAt: text('created_at').$defaultFn(() => new Date().toISOString()).notNull(),
 });
 
 // --- Relations ---

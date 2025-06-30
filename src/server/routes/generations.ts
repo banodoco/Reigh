@@ -158,7 +158,7 @@ generationsRouter.patch('/:id', asyncHandler(async (req: Request, res: Response)
 
   try {
     const result = await db.update(generationsTable)
-      .set({ location, updatedAt: new Date() })
+      .set({ location, updatedAt: new Date().toISOString() })
       .where(eq(generationsTable.id, id))
       .returning();
 

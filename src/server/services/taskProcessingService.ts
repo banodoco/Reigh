@@ -100,8 +100,8 @@ export async function processCompletedStitchTask(task: Task): Promise<void> {
       tasks: [task.id],
       location: outputLocation, // This is now normalized
       type: 'video_travel_output',
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     }).returning();
 
     if (insertedGenerations.length === 0) {
@@ -135,7 +135,7 @@ export async function processCompletedStitchTask(task: Task): Promise<void> {
     // Mark the task as processed and update its params with the normalized paths
     await db.update(tasksSchema)
       .set({
-        generationProcessedAt: new Date(),
+        generationProcessedAt: new Date().toISOString(),
         params: normalizedParams,
       })
       .where(eq(tasksSchema.id, task.id));
@@ -203,7 +203,7 @@ export async function cascadeTaskStatus(
     // Update the status of all dependent tasks.
     await db
       .update(tasksSchema)
-      .set({ status, updatedAt: new Date() })
+      .set({ status, updatedAt: new Date().toISOString() })
       .where(inArray(tasksSchema.id, dependentTaskIds));
 
     console.log(`[TaskCascader] Updated status to '${status}' for tasks:`, dependentTaskIds);
@@ -401,8 +401,8 @@ export async function processCompletedSingleImageTask(task: Task): Promise<void>
         resolution: (task.params as any)?.orchestrator_details?.resolution,
         source: 'wan_single_image_task',
       },
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     }).returning();
 
     if (insertedGenerations.length === 0) {
@@ -415,7 +415,7 @@ export async function processCompletedSingleImageTask(task: Task): Promise<void>
     // Mark task as processed so we do not duplicate work later
     await db.update(tasksSchema)
       .set({
-        generationProcessedAt: new Date(),
+        generationProcessedAt: new Date().toISOString(),
       })
       .where(eq(tasksSchema.id, task.id));
 
