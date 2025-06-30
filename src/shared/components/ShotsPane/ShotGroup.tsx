@@ -26,7 +26,6 @@ const ShotGroup: React.FC<ShotGroupProps> = ({ shot }) => {
   const [currentName, setCurrentName] = useState(shot.name || 'Unnamed Shot');
   const inputRef = useRef<HTMLInputElement>(null);
   const [isFileOver, setIsFileOver] = useState(false);
-  const dropZoneRef = useRef<HTMLDivElement>(null);
 
   const updateShotNameMutation = useUpdateShotName();
   const handleExternalImageDropMutation = useHandleExternalImageDrop();
@@ -58,16 +57,6 @@ const ShotGroup: React.FC<ShotGroupProps> = ({ shot }) => {
       inputRef.current.select();
     }
   }, [isEditing]);
-
-  useEffect(() => {
-    // Small delay to ensure layout is settled
-    const timer = setTimeout(() => {
-      if (dropZoneRef.current && setNodeRef) {
-        setNodeRef(dropZoneRef.current);
-      }
-    }, 100);
-    return () => clearTimeout(timer);
-  }, [setNodeRef]);
 
   const handleNameDoubleClick = () => {
     setIsEditing(true);
@@ -204,10 +193,7 @@ const ShotGroup: React.FC<ShotGroupProps> = ({ shot }) => {
 
   return (
     <div 
-      ref={(node) => {
-        dropZoneRef.current = node;
-        setNodeRef(node);
-      }}
+      ref={setNodeRef} 
       style={droppableStyle} 
       className="shot-group p-3 border border-zinc-700 rounded-lg min-w-[200px] max-w-[300px] bg-zinc-800/90 shadow-lg flex flex-col space-y-2 transition-all duration-150 ease-in-out relative cursor-pointer"
       onDragEnter={handleDragEnter}

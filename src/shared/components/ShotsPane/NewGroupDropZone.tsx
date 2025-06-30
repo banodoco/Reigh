@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { useHandleExternalImageDrop } from '@/shared/hooks/useShots';
 import { useProject } from '@/shared/contexts/ProjectContext';
@@ -17,7 +17,6 @@ const NewGroupDropZone: React.FC<NewGroupDropZoneProps> = ({ onZoneClick }) => {
   const handleExternalImageDropMutation = useHandleExternalImageDrop();
   const { toast } = useToast();
   const [isFileOver, setIsFileOver] = useState(false);
-  const dropZoneRef = useRef<HTMLDivElement>(null);
 
   const { isOver: isDndKitOver, setNodeRef } = useDroppable({
     id: NEW_GROUP_DROPPABLE_ID,
@@ -25,16 +24,6 @@ const NewGroupDropZone: React.FC<NewGroupDropZoneProps> = ({ onZoneClick }) => {
       type: 'new-group-zone',
     }
   });
-
-  // Force drop zone to recalculate position after mount
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (dropZoneRef.current && setNodeRef) {
-        setNodeRef(dropZoneRef.current);
-      }
-    }, 100);
-    return () => clearTimeout(timer);
-  }, [setNodeRef]);
 
   const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -118,10 +107,7 @@ const NewGroupDropZone: React.FC<NewGroupDropZoneProps> = ({ onZoneClick }) => {
 
   return (
     <div 
-      ref={(node) => {
-        dropZoneRef.current = node;
-        setNodeRef(node);
-      }}
+      ref={setNodeRef} 
       style={style}
       className="new-group-drop-zone p-4 border-2 border-dashed rounded flex items-center justify-center min-w-[200px] transition-colors"
       onDragEnter={handleDragEnter}
