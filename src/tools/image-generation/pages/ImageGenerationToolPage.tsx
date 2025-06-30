@@ -195,38 +195,46 @@ const ImageGenerationToolPage = () => {
       let errorCount = 0;
 
       try {
-        // Create tasks for each prompt x imagesPerPrompt
-        for (const promptEntry of restOfFormData.prompts) {
-          for (let imageIndex = 0; imageIndex < restOfFormData.imagesPerPrompt; imageIndex++) {
-            const requestPayload: any = {
+        // Build an array of payloads – one per image task
+        const taskPayloads: any[] = restOfFormData.prompts.flatMap((promptEntry: PromptEntry, promptIdx: number) => {
+          return Array.from({ length: restOfFormData.imagesPerPrompt }, (_, imgIdx) => {
+            const globalIndex = promptIdx * restOfFormData.imagesPerPrompt + imgIdx;
+            return {
               project_id: selectedProjectId,
               prompt: promptEntry.fullPrompt,
               resolution: restOfFormData.determinedApiImageSize || undefined,
-              seed: 11111 + (successCount * 100), // Vary seed for each image
+              seed: 11111 + globalIndex * 100, // Vary seed deterministically across all images
               loras: lorasMapped,
             };
+          });
+        });
 
-            try {
-              const response = await fetch('/api/single-image/generate', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(requestPayload),
-              });
-
+        // Fire off all requests concurrently (up to browser limits) and wait for them to settle
+        const results = await Promise.allSettled(
+          taskPayloads.map(payload =>
+            fetch('/api/single-image/generate', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+            }).then(async response => {
               if (!response.ok) {
                 const errorData = await response.json().catch(() => ({ message: response.statusText }));
                 throw new Error(errorData.message || `HTTP error ${response.status}`);
               }
+              return response.json();
+            })
+          )
+        );
 
-              const newTask = await response.json();
-              successCount++;
-              console.log(`[wan-local] Task ${successCount}/${totalTasks} created:`, newTask.id);
-            } catch (taskError: any) {
-              console.error(`[wan-local] Error creating task for prompt "${promptEntry.shortPrompt || promptEntry.fullPrompt.substring(0, 50)}...":`, taskError);
-              errorCount++;
-            }
+        successCount = results.filter(r => r.status === 'fulfilled').length;
+        errorCount = results.length - successCount;
+
+        // Log any errors for debugging purposes
+        results.forEach((res, idx) => {
+          if (res.status === 'rejected') {
+            console.error(`[wan-local] Task ${idx + 1} failed:`, res.reason);
           }
-        }
+        });
 
         if (successCount > 0) {
           toast.success(`${successCount} image generation tasks queued successfully! ${errorCount > 0 ? `(${errorCount} failed)` : ''} Check the Tasks pane for progress.`);
