@@ -28,6 +28,10 @@ import { LoraModel, LoraSelectorModal } from '@/shared/components/LoraSelectorMo
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
 import { SliderWithValue } from '@/shared/components/ui/slider-with-value';
 import { useApiKeys } from '@/shared/hooks/useApiKeys';
+import { Checkbox } from '@/shared/components/ui/checkbox';
+import { cropImageToProjectAspectRatio } from '@/shared/lib/imageCropper';
+import { parseRatio } from '@/shared/lib/aspectRatios';
+import { getCropToProjectSizeSetting, setCropToProjectSizeSetting } from '@/shared/lib/cropSettings';
 import SettingsModal from '@/shared/components/SettingsModal';
 import { ToggleGroup, ToggleGroupItem } from "@/shared/components/ui/toggle-group";
 import { useListTasks, useCancelTask } from "@/shared/hooks/useTasks";
@@ -209,6 +213,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [generationMode, setGenerationMode] = useState<'batch' | 'by-pair'>('batch');
   const [pairConfigs, setPairConfigs] = useState<PairConfig[]>([]);
+  const [cropToProjectSize, setCropToProjectSize] = useState(getCropToProjectSizeSetting());
   const queryClient = useQueryClient();
 
   // Use local state for optimistic updates on image list
@@ -354,6 +359,24 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     setIsUploadingImage(true);
     toast.info(`Uploading ${files.length} image(s)...`);
 
+    // Get project aspect ratio for cropping if needed
+    let projectAspectRatio: number | null = null;
+    if (cropToProjectSize) {
+      const currentProject = projects.find(p => p.id === selectedProjectId);
+      if (currentProject && currentProject.aspectRatio) {
+        projectAspectRatio = parseRatio(currentProject.aspectRatio);
+        if (isNaN(projectAspectRatio)) {
+          toast.error(`Invalid project aspect ratio: ${currentProject.aspectRatio}`);
+          setIsUploadingImage(false);
+          return;
+        }
+      } else {
+        toast.error("Cannot crop to project size: Project aspect ratio not found.");
+        setIsUploadingImage(false);
+        return;
+      }
+    }
+
     const optimisticImages: GenerationRow[] = [];
     for (const file of files) {
       const tempId = nanoid();
@@ -376,7 +399,25 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       const optimisticImage = optimisticImages[i];
 
       try {
-        const imageUrl = await uploadImageToStorage(file);
+        let fileToUpload = file;
+
+        // Crop the image if the checkbox is checked
+        if (cropToProjectSize && projectAspectRatio) {
+          const cropResult = await cropImageToProjectAspectRatio(file, projectAspectRatio);
+          if (cropResult) {
+            fileToUpload = cropResult.croppedFile;
+            // Update optimistic image with cropped version
+            setLocalOrderedShotImages(prev => prev.map(img => 
+              img.shotImageEntryId === optimisticImage.shotImageEntryId 
+                ? { ...img, imageUrl: cropResult.croppedImageUrl, thumbUrl: cropResult.croppedImageUrl }
+                : img
+            ));
+          } else {
+            toast.warning(`Failed to crop image: ${file.name}. Using original image.`);
+          }
+        }
+
+        const imageUrl = await uploadImageToStorage(fileToUpload);
 
         const promptForGeneration = `External image: ${file.name || 'untitled'}`;
         const genResponse = await fetch(`${baseUrl}/api/generations`, {
@@ -902,6 +943,11 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     );
   };
 
+  const handleCropToProjectSizeChange = (checked: boolean) => {
+    setCropToProjectSize(checked);
+    setCropToProjectSizeSetting(checked);
+  };
+
   return (
     <div className="flex flex-col h-full space-y-4">
       {/* Header */}
@@ -952,7 +998,17 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                 />
               </div>
             </CardContent>
-            <div className="p-4 border-t">
+            <div className="p-4 border-t space-y-3">
+              <div className="flex items-center space-x-2">
+                <Checkbox 
+                  id="crop-to-project-size"
+                  checked={cropToProjectSize}
+                  onCheckedChange={(checked) => handleCropToProjectSizeChange(checked === true)}
+                />
+                <Label htmlFor="crop-to-project-size" className="text-sm">
+                  Crop to project size
+                </Label>
+              </div>
               <FileInput
                 key={fileInputKey}
                 onFileChange={handleImageUploadToShot}

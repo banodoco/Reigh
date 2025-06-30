@@ -4,6 +4,11 @@ export interface CropResult {
   croppedImageUrl: string;
 }
 
+export interface ProjectCropResult {
+  croppedFile: File;
+  croppedImageUrl: string;
+}
+
 interface TargetAspectRatio {
   name: string; // For UI or internal reference
   apiString: string;
@@ -104,6 +109,113 @@ export const cropImageToClosestAspectRatio = async (
               resolve({
                 croppedFile,
                 apiImageSize: closestTarget.apiString,
+                croppedImageUrl,
+              });
+            } else {
+              reject(new Error("Failed to create blob from canvas"));
+            }
+          },
+          inputFile.type,
+          0.95 // quality
+        );
+      };
+      img.onerror = (err) => {
+        reject(new Error("Failed to load image: " + err));
+      };
+      if (event.target?.result) {
+        img.src = event.target.result as string;
+      } else {
+        reject(new Error("Failed to read file for cropping."));
+      }
+    };
+    reader.onerror = (err) => {
+      reject(new Error("FileReader error: " + err));
+    };
+    reader.readAsDataURL(inputFile);
+  });
+};
+
+/**
+ * Crops an image to a specific aspect ratio (for project dimensions).
+ * @param inputFile The image file to crop
+ * @param targetAspectRatio The target aspect ratio as a number (width / height)
+ * @returns Promise with the cropped file and image URL
+ */
+export const cropImageToProjectAspectRatio = async (
+  inputFile: File,
+  targetAspectRatio: number
+): Promise<ProjectCropResult | null> => {
+  if (!inputFile.type.startsWith("image/")) {
+    console.error("Invalid file type. Only images are allowed.");
+    return null;
+  }
+
+  if (isNaN(targetAspectRatio) || targetAspectRatio <= 0) {
+    console.error("Invalid target aspect ratio.");
+    return null;
+  }
+
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const originalWidth = img.width;
+        const originalHeight = img.height;
+        const originalAspectRatio = originalWidth / originalHeight;
+
+        let cropX = 0;
+        let cropY = 0;
+        let newCanvasWidth = originalWidth;
+        let newCanvasHeight = originalHeight;
+
+        // Calculate new dimensions for cropping, maintaining center
+        if (originalAspectRatio > targetAspectRatio) {
+          // Original image is wider than target, crop width
+          newCanvasWidth = originalHeight * targetAspectRatio;
+          newCanvasHeight = originalHeight;
+          cropX = (originalWidth - newCanvasWidth) / 2;
+        } else if (originalAspectRatio < targetAspectRatio) {
+          // Original image is taller than target, crop height
+          newCanvasWidth = originalWidth;
+          newCanvasHeight = originalWidth / targetAspectRatio;
+          cropY = (originalHeight - newCanvasHeight) / 2;
+        }
+        // If aspect ratios are the same, no crop needed
+
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(newCanvasWidth);
+        canvas.height = Math.round(newCanvasHeight);
+        const ctx = canvas.getContext("2d");
+
+        if (!ctx) {
+          reject(new Error("Failed to get canvas context"));
+          return;
+        }
+
+        // Draw the cropped portion of the image onto the canvas
+        ctx.drawImage(
+          img,
+          cropX, // source X
+          cropY, // source Y
+          newCanvasWidth, // source width
+          newCanvasHeight, // source height
+          0, // destination X
+          0, // destination Y
+          canvas.width, // destination width
+          canvas.height // destination height
+        );
+
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              const croppedFile = new File([blob], inputFile.name, {
+                type: inputFile.type,
+                lastModified: Date.now(),
+              });
+              const croppedImageUrl = URL.createObjectURL(croppedFile);
+              resolve({
+                croppedFile,
                 croppedImageUrl,
               });
             } else {

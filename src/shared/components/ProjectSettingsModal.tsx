@@ -21,6 +21,8 @@ import { useProject } from '@/shared/contexts/ProjectContext';
 import { toast } from 'sonner';
 import { Project } from '@/types/project';
 import { ASPECT_RATIO_TO_RESOLUTION } from '@/shared/lib/aspectRatios';
+import { Checkbox } from '@/shared/components/ui/checkbox';
+import { getCropToProjectSizeSetting, setCropToProjectSizeSetting } from '@/shared/lib/cropSettings';
 
 // Create the aspect ratio options from the centralized object
 const ASPECT_RATIOS = Object.keys(ASPECT_RATIO_TO_RESOLUTION)
@@ -39,18 +41,25 @@ interface ProjectSettingsModalProps {
 export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({ isOpen, onOpenChange, project }) => {
   const [projectName, setProjectName] = useState('');
   const [aspectRatio, setAspectRatio] = useState<string>('');
+  const [cropToProjectSize, setCropToProjectSize] = useState<boolean>(getCropToProjectSizeSetting());
   const { updateProject, isUpdatingProject } = useProject(); // Use context hook
 
   useEffect(() => {
     if (project && isOpen) { // Also check isOpen to re-init when modal re-opens with same project
       setProjectName(project.name);
       setAspectRatio(project.aspectRatio || ASPECT_RATIOS[0].value); // Fallback if aspectRatio is undefined
+      setCropToProjectSize(getCropToProjectSizeSetting()); // Refresh from localStorage
     } else if (!isOpen) {
       // Optionally reset when modal is closed, or let useEffect handle it if project becomes null
       // setProjectName('');
       // setAspectRatio(ASPECT_RATIOS[0].value);
     }
   }, [project, isOpen]);
+
+  const handleCropToProjectSizeChange = (checked: boolean) => {
+    setCropToProjectSize(checked);
+    setCropToProjectSizeSetting(checked);
+  };
 
   const handleSaveChanges = async () => {
     if (!project) {
@@ -130,6 +139,22 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({ isOp
                 ))}
               </SelectContent>
             </Select>
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label className="text-right">
+              Image Upload
+            </Label>
+            <div className="col-span-3 flex items-center space-x-2">
+              <Checkbox 
+                id="crop-to-project-size-settings"
+                checked={cropToProjectSize}
+                onCheckedChange={(checked) => handleCropToProjectSizeChange(checked === true)}
+                disabled={isUpdatingProject}
+              />
+              <Label htmlFor="crop-to-project-size-settings" className="text-sm">
+                Crop to project size when uploading images
+              </Label>
+            </div>
           </div>
         </div>
         <DialogFooter>
