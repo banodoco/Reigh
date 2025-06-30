@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { Shot } from '@/types/shots';
+import type { GenerationRow } from '@/types/shots';
 import { useUpdateShotName, useHandleExternalImageDrop } from '@/shared/hooks/useShots';
 import { useToast } from '@/shared/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
@@ -32,9 +33,14 @@ const ShotGroup: React.FC<ShotGroupProps> = ({ shot }) => {
   const navigate = useNavigate();
   const { setCurrentShotId } = useCurrentShot();
 
-  // Collapsible image grid logic
+  const isGenerationVideo = (gen: GenerationRow): boolean => {
+    return gen.type === 'video_travel_output' ||
+           (gen.location && gen.location.endsWith('.mp4')) ||
+           (gen.imageUrl && gen.imageUrl.endsWith('.mp4'));
+  };
+
   const IMAGES_PER_ROW = 4;
-  const allImages = shot.images || [];
+  const allImages = (shot.images || []).filter(img => !isGenerationVideo(img));
   const hasMultipleRows = allImages.length > IMAGES_PER_ROW;
 
   const [isExpanded, setIsExpanded] = useState(false);
