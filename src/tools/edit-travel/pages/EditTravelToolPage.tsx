@@ -203,7 +203,7 @@ const EditTravelToolPage = () => {
         project_id: selectedProjectId,
         task_type: taskType, 
         params: specificParams,
-        status: 'Pending',
+        status: 'Queued',
       }).select().single();
 
       if (error) throw error;

@@ -7,7 +7,7 @@ import { v4 as randomUUID } from 'uuid';
 // --- ENUMS (simulated for SQLite) ---
 // Note: Drizzle ORM's `sqlite-core` does not have a native enum type like `pg-core`.
 // We'll use `text` and can enforce values at the application level.
-export const taskStatusEnum = ['Pending', 'Queued', 'In Progress', 'Complete', 'Failed', 'Cancelled'] as const;
+export const taskStatusEnum = ['Queued', 'In Progress', 'Complete', 'Failed', 'Cancelled'] as const;
 
 // --- Canonical Schema for SQLite ---
 
@@ -36,7 +36,7 @@ export const tasks = sqliteTable('tasks', {
   id: text('id').$defaultFn(() => randomUUID()).primaryKey(),
   taskType: text('task_type').notNull(),
   params: text('params', { mode: 'json' }).notNull(),
-  status: text('status', { enum: taskStatusEnum }).default('Pending').notNull(),
+  status: text('status', { enum: taskStatusEnum }).default('Queued').notNull(),
   dependantOn: text('dependant_on'),
   outputLocation: text('output_location'),
   createdAt: text('created_at').$defaultFn(() => new Date().toISOString()).notNull(),

@@ -230,7 +230,7 @@ export const useFalImageGeneration = (): UseFalImageGenerationResult => {
             project_id: selectedProjectId,
             task_type: toolType, // toolType from params is used as task_type for API
             params: taskDbParamsForApi as unknown as Json,
-            status: 'Pending',
+            status: 'Queued',
         };
 
         toast.info(`Creating '${toolType}' task via API...`);

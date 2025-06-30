@@ -59,7 +59,7 @@ export const useCancelTask = () => {
       // Invalidate and refetch tasks list for the current project
       queryClient.invalidateQueries({ queryKey: [TASKS_QUERY_KEY, selectedProjectId] });
       // Also invalidate specific status lists if they are cached separately
-      queryClient.invalidateQueries({ queryKey: [TASKS_QUERY_KEY, selectedProjectId, ['Pending']] });
+      queryClient.invalidateQueries({ queryKey: [TASKS_QUERY_KEY, selectedProjectId, ['Queued']] });
       queryClient.invalidateQueries({ queryKey: [TASKS_QUERY_KEY, selectedProjectId, ['Cancelled']] });
     },
   });
@@ -82,7 +82,7 @@ export const useCancelAllPendingTasks = () => {
     onSuccess: (data) => {
       // Invalidate and refetch tasks list for the current project to reflect the changes
       queryClient.invalidateQueries({ queryKey: [TASKS_QUERY_KEY, selectedProjectId] });
-      queryClient.invalidateQueries({ queryKey: [TASKS_QUERY_KEY, selectedProjectId, ['Pending']] });
+      queryClient.invalidateQueries({ queryKey: [TASKS_QUERY_KEY, selectedProjectId, ['Queued']] });
       queryClient.invalidateQueries({ queryKey: [TASKS_QUERY_KEY, selectedProjectId, ['Cancelled']] });
     },
     onError: (error) => {

@@ -37,7 +37,6 @@ const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
         <span className="text-sm font-semibold text-zinc-200">{task.taskType}</span>
         <span
           className={`px-2 py-0.5 text-xs rounded-full ${
-            task.status === 'Pending' ? 'bg-yellow-500 text-yellow-900' :
             task.status === 'In Progress' ? 'bg-blue-500 text-blue-100' :
             task.status === 'Complete' ? 'bg-green-500 text-green-100' :
             task.status === 'Failed' ? 'bg-red-500 text-red-100' :
@@ -53,7 +52,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
       {/* Add more task details as needed, e.g., from task.params */}
       {/* <pre className="text-xs text-zinc-500 whitespace-pre-wrap break-all">{JSON.stringify(task.params, null, 2)}</pre> */}
 
-      {(task.status === 'Pending' || task.status === 'In Progress' || task.status === 'Queued') && (
+      {(task.status === 'Queued' || task.status === 'In Progress') && (
         <Button 
           variant="destructive"
           size="sm" 

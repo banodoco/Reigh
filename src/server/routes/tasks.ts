@@ -225,7 +225,7 @@ router.post('/cancel-pending', async (req: Request, res: Response) => {
     return res.status(400).json({ message: 'Missing required body parameter: projectId' });
   }
 
-  const STATUSES_TO_CANCEL: (typeof taskStatusEnum[number])[] = ['Pending', 'Queued', 'In Progress'];
+  const STATUSES_TO_CANCEL: (typeof taskStatusEnum[number])[] = ['Queued', 'In Progress'];
 
   try {
     const result = await db

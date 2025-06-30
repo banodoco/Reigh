@@ -46,8 +46,8 @@ const TaskList: React.FC = () => {
     // We would need to fetch all tasks or have a specific hook for just pending tasks count.
     // For simplicity, let's assume 'tasks' reflects the current filter.
     // If statusFilter is 'Pending', tasks are pending tasks. If 'All', we need to filter.
-    if (selectedStatuses.includes('Pending')) return tasks.length;
-    if (selectedStatuses.length === ALL_POSSIBLE_STATUSES.length) return tasks.filter(t => t.status === 'Pending').length;
+    if (selectedStatuses.includes('Queued')) return tasks.length;
+    if (selectedStatuses.length === ALL_POSSIBLE_STATUSES.length) return tasks.filter(t => t.status === 'Queued').length;
     return 0; // Not showing pending tasks, so button might be less relevant or show 0
   }, [tasks, selectedStatuses]);
   
@@ -56,7 +56,7 @@ const TaskList: React.FC = () => {
   // This relies on `tasks` variable containing the data based on `selectedStatuses`.
   const actualPendingTasksInView = useMemo(() => {
     if (!tasks) return [];
-    return tasks.filter(task => task.status === 'Pending');
+    return tasks.filter(task => task.status === 'Queued');
   }, [tasks]);
 
   const handleSelectAll = (checked: boolean | 'indeterminate') => {

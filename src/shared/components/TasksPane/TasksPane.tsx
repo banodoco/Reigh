@@ -20,7 +20,7 @@ const TasksPane: React.FC = () => {
 
   // Project context & task helpers
   const { selectedProjectId } = useProject();
-  const { data: cancellableTasks } = useListTasks({ projectId: selectedProjectId, status: ['Pending', 'Queued', 'In Progress'] });
+  const { data: cancellableTasks } = useListTasks({ projectId: selectedProjectId, status: ['Queued', 'In Progress'] });
   const cancellableCount = cancellableTasks?.length ?? 0;
 
   const cancelAllPendingMutation = useCancelAllPendingTasks();

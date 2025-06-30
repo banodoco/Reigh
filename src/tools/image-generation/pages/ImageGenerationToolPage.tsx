@@ -285,7 +285,7 @@ const ImageGenerationToolPage = () => {
           strength: lora.strength,
         })),
       },
-      status: 'Pending',
+      status: 'Queued',
     };
 
     try {
