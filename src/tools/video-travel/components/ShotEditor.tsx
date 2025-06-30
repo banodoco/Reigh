@@ -1080,6 +1080,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         onClose={() => setIsLoraModalOpen(false)}
         loras={availableLoras}
         onAddLora={onAddLora}
+        onRemoveLora={onRemoveLora}
         selectedLoraIds={selectedLoras.map(l => l.id)}
         lora_type="Wan 2.1 14b"
       />

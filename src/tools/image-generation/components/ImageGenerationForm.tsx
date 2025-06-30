@@ -849,6 +849,7 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
         onClose={() => setIsLoraModalOpen(false)}
         loras={availableLoras}
         onAddLora={handleAddLora}
+        onRemoveLora={handleRemoveLora}
         selectedLoraIds={selectedLoras.map(l => l["Model ID"])}
         lora_type={generationMode === 'wan-local' ? "Wan 2.1 14b" : "Flux.dev"}
       />

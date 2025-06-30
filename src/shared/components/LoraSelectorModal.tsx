@@ -49,6 +49,8 @@ interface LoraSelectorModalProps {
   onClose: () => void;
   loras: LoraModel[];
   onAddLora: (lora: LoraModel) => void;
+  /** Callback to remove a LoRA from the generator */
+  onRemoveLora: (loraId: string) => void;
   selectedLoraIds: string[];
   lora_type: string;
 }
@@ -207,7 +209,7 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps> = ({ loras, onAddLora,
                       <Button
                         variant={isSelectedOnGenerator ? "secondary" : "outline"}
                         size="sm"
-                        className="w-full"
+                        className=""
                         onClick={() => {
                           if (!isSelectedOnGenerator && lora["Model Files"] && lora["Model Files"].length > 0) {
                             onAddLora(lora);
@@ -267,13 +269,15 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps> = ({ loras, onAddLora,
 interface MyLorasTabProps {
   myLorasResource: UseQueryResult<Resource[], Error>;
   onAddLora: (lora: LoraModel) => void;
+  /** Callback to remove a LoRA from the generator */
+  onRemoveLora: (loraId: string) => void;
   selectedLoraIds: string[];
   deleteResource: UseMutationResult<void, Error, { id: string; type: "lora"; }, unknown>;
   createResource: UseMutationResult<Resource, Error, { type: 'lora'; metadata: LoraModel; }, unknown>;
   lora_type: string;
 }
 
-const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, selectedLoraIds, deleteResource, createResource, lora_type }) => {
+const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onRemoveLora, selectedLoraIds, deleteResource, createResource, lora_type }) => {
     const [addForm, setAddForm] = useState({ url: '', type: 'Flux.dev', name: '' });
 
     // Local Wan LoRAs (files dropped into Headless-Wan2GP/loras)
@@ -377,17 +381,18 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, sel
                                                 </CardHeader>
                                                 <ItemCardFooter className="mt-auto pt-2">
                                                     <Button
-                                                        variant={isSelectedOnGenerator ? "secondary" : "outline"}
+                                                        variant={isSelectedOnGenerator ? "destructive" : "outline"}
                                                         size="sm"
-                                                        className="w-full"
+                                                        className=""
                                                         onClick={() => {
-                                                            if (!isSelectedOnGenerator && lora["Model Files"] && lora["Model Files"].length > 0) {
+                                                            if (isSelectedOnGenerator) {
+                                                                onRemoveLora(lora["Model ID"]);
+                                                            } else if (lora["Model Files"] && lora["Model Files"].length > 0) {
                                                                 onAddLora(lora);
                                                             }
                                                         }}
-                                                        disabled={isSelectedOnGenerator}
                                                     >
-                                                        {isSelectedOnGenerator ? "Added" : "Add to Generator"}
+                                                        {isSelectedOnGenerator ? "Remove from Generator" : "Add to Generator"}
                                                     </Button>
                                                 </ItemCardFooter>
                                             </div>
@@ -426,16 +431,18 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, sel
                                                 </CardContent>
                                                 <ItemCardFooter className="mt-auto pt-2 flex justify-between">
                                                     <Button
-                                                        variant={isSelectedOnGenerator ? "secondary" : "outline"}
+                                                        variant={isSelectedOnGenerator ? "destructive" : "outline"}
                                                         size="sm"
+                                                        className=""
                                                         onClick={() => {
-                                                            if (!isSelectedOnGenerator && lora["Model Files"] && lora["Model Files"].length > 0) {
+                                                            if (isSelectedOnGenerator) {
+                                                                onRemoveLora(lora["Model ID"]);
+                                                            } else if (lora["Model Files"] && lora["Model Files"].length > 0) {
                                                                 onAddLora(lora);
                                                             }
                                                         }}
-                                                        disabled={isSelectedOnGenerator}
                                                     >
-                                                        {isSelectedOnGenerator ? 'Added to Generator' : 'Add to Generator'}
+                                                        {isSelectedOnGenerator ? 'Remove from Generator' : 'Add to Generator'}
                                                     </Button>
                                                     <Button
                                                         variant="destructive"
@@ -473,6 +480,7 @@ export const LoraSelectorModal: React.FC<LoraSelectorModalProps> = ({
   onClose,
   loras,
   onAddLora,
+  onRemoveLora,
   selectedLoraIds,
   lora_type,
 }) => {
@@ -516,6 +524,7 @@ export const LoraSelectorModal: React.FC<LoraSelectorModalProps> = ({
                 <MyLorasTab 
                     myLorasResource={myLorasResource}
                     onAddLora={onAddLora}
+                    onRemoveLora={onRemoveLora}
                     selectedLoraIds={selectedLoraIds}
                     deleteResource={deleteResource}
                     createResource={createResource}
