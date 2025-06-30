@@ -515,6 +515,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, isDeletin
                                             aria-label="Select target shot"
                                             onMouseEnter={(e) => e.stopPropagation()}
                                             onMouseLeave={(e) => e.stopPropagation()}
+                                            onPointerDown={(e) => e.stopPropagation()}
                                         >
                                             <SelectValue placeholder="Shot..." />
                                         </SelectTrigger>
@@ -554,6 +555,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, isDeletin
                                         }}
                                         disabled={!selectedShotIdLocal || showTickForImageId === image.id}
                                         aria-label={showTickForImageId === image.id ? `Added to ${currentTargetShotName}` : (currentTargetShotName ? `Add to shot: ${currentTargetShotName}` : "Add to selected shot")}
+                                        onPointerDown={(e) => e.stopPropagation()}
                                     >
                                         {showTickForImageId === image.id ? <Check className="h-4 w-4" /> : <PlusCircle className="h-4 w-4" />}
                                     </Button>
@@ -608,8 +610,8 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, isDeletin
                                 </div>
                             )}
 
-                            {/* Apply settings button (shown on hover) */}
-                            {image.metadata && onApplySettings && (
+                            {/* Apply settings button temporarily disabled */}
+                            {false && image.metadata && onApplySettings && (
                                 <div className="opacity-0 group-hover:opacity-100 transition-opacity">
                                     <Tooltip>
                                         <TooltipTrigger asChild>
