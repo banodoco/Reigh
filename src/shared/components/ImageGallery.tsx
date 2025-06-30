@@ -21,7 +21,7 @@ import {
 import { Checkbox } from "@/shared/components/ui/checkbox";
 import { Label } from "@/shared/components/ui/label";
 import { nanoid } from "nanoid";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, isValid } from "date-fns";
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 import { DraggableImage } from "@/shared/components/DraggableImage";
 
@@ -591,7 +591,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, isDeletin
                                     </TooltipContent>
                                     </Tooltip>
                                 )}
-                                {image.createdAt && (
+                                {image.createdAt && isValid(new Date(image.createdAt)) && (
                                     <span className="text-xs text-white bg-black/50 px-1.5 py-0.5 rounded-md">
                                         {formatDistanceToNow(new Date(image.createdAt), { addSuffix: true })}
                                     </span>
