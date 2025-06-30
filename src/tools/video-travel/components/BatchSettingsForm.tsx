@@ -235,7 +235,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
               <Slider
                 id="batchVideoSteps"
                 min={1}
-                max={20}
+                max={30}
                 step={1}
                 value={[batchVideoSteps]}
                 onValueChange={(value) => onBatchVideoStepsChange(value[0])}
