@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import ShotGroup from './ShotGroup';
 import NewGroupDropZone from './NewGroupDropZone';
 import { useListShots } from '@/shared/hooks/useShots';
@@ -65,15 +65,6 @@ const ShotsPane: React.FC = () => {
   };
 
   const bottomOffset = isGenerationsPaneLocked ? generationsPaneHeight : 0;
-
-  // Force dnd-kit to recompute droppable positions when pane layout changes
-  useEffect(() => {
-    // defer to next frame so DOM styles are applied
-    const id = requestAnimationFrame(() => {
-      window.dispatchEvent(new Event('resize'));
-    });
-    return () => cancelAnimationFrame(id);
-  }, [bottomOffset]);
 
   return (
     <>

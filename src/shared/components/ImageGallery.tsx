@@ -585,27 +585,27 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, isDeletin
                             )}
 
                             {/* Info button (shown on hover) */}
-                            {image.metadata && (
+                                {image.metadata && (
                                 <div className="opacity-0 group-hover:opacity-100 transition-opacity">
                                     <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <Button variant="secondary" size="icon" className="h-7 w-7 p-0 rounded-full bg-black/50 hover:bg-black/70 text-white">
-                                                <Info className="h-3.5 w-3.5" />
-                                            </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent 
-                                            side="bottom" 
-                                            className="max-w-md text-xs p-3 leading-relaxed shadow-lg bg-background border max-h-80 overflow-y-auto"
-                                        >
-                                            {image.metadata.userProvidedImageUrl && (
-                                                <img 
-                                                    src={image.metadata.userProvidedImageUrl} 
-                                                    alt="User provided image preview"
-                                                    className="w-full h-auto max-h-24 object-contain rounded-sm mb-2 border"
-                                                />
-                                            )}
-                                            <pre className="font-sans whitespace-pre-wrap">{metadataForDisplay}</pre>
-                                        </TooltipContent>
+                                    <TooltipTrigger asChild>
+                                        <Button variant="secondary" size="icon" className="h-7 w-7 p-0 rounded-full bg-black/50 hover:bg-black/70 text-white">
+                                        <Info className="h-3.5 w-3.5" />
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent 
+                                        side="bottom" 
+                                        className="max-w-md text-xs p-3 leading-relaxed shadow-lg bg-background border max-h-80 overflow-y-auto"
+                                    >
+                                        {image.metadata.userProvidedImageUrl && (
+                                        <img 
+                                            src={image.metadata.userProvidedImageUrl} 
+                                            alt="User provided image preview"
+                                            className="w-full h-auto max-h-24 object-contain rounded-sm mb-2 border"
+                                        />
+                                        )}
+                                        <pre className="font-sans whitespace-pre-wrap">{metadataForDisplay}</pre>
+                                    </TooltipContent>
                                     </Tooltip>
                                 </div>
                             )}
@@ -627,58 +627,58 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, isDeletin
                                         <TooltipContent>Apply these generation settings to the form</TooltipContent>
                                     </Tooltip>
                                 </div>
-                            )}
-                        </div>
+                                )}
+                            </div>
 
                         {/* Delete button - Bottom Right */}
-                        {onDelete && (
+                                {onDelete && (
                             <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <Tooltip>
+                                    <Tooltip>
                                     <TooltipTrigger asChild>
                                         <Button 
-                                            variant="destructive" 
-                                            size="icon" 
-                                            className="h-7 w-7 p-0 rounded-full"
-                                            onClick={() => onDelete(image.id!)}
-                                            disabled={isCurrentDeleting}
+                                        variant="destructive" 
+                                        size="icon" 
+                                        className="h-7 w-7 p-0 rounded-full"
+                                        onClick={() => onDelete(image.id!)}
+                                        disabled={isCurrentDeleting}
                                         >
-                                            {isCurrentDeleting ? (
-                                                <div className="h-3 w-3 animate-spin rounded-full border-b-2 border-white"></div>
-                                            ) : (
-                                                <Trash2 className="h-3.5 w-3.5" />
-                                            )}
+                                        {isCurrentDeleting ? (
+                                            <div className="h-3 w-3 animate-spin rounded-full border-b-2 border-white"></div>
+                                        ) : (
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                        )}
                                         </Button>
                                     </TooltipTrigger>
                                     <TooltipContent side="top"><p>Delete Image</p></TooltipContent>
-                                </Tooltip>
+                                    </Tooltip>
                             </div>
                         )}
 
                         {/* Download button - Bottom Left */}
                         <div className="absolute bottom-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
                             <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button
-                                        variant="outline"
-                                        size="icon"
-                                        className="h-7 w-7 p-0 rounded-full bg-black/50 hover:bg-black/70 text-white"
-                                        onClick={() => handleDownloadImage(
-                                            displayUrl,
-                                            `artful_pane_craft_${isActuallyVideo ? 'video' : 'image'}_${image.id || index}`,
-                                            image.id || imageKey,
-                                            isActuallyVideo,
-                                            image.metadata?.content_type
-                                        )}
-                                        disabled={downloadingImageId === (image.id || imageKey)}
-                                    >
-                                        {downloadingImageId === (image.id || imageKey) ? (
-                                            <div className="h-3 w-3 animate-spin rounded-full border-b-2 border-current"></div>
-                                        ) : (
-                                            <Download className="h-3.5 w-3.5" />
-                                        )}
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent side="top"><p>Download Image</p></TooltipContent>
+                            <TooltipTrigger asChild>
+                                <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-7 w-7 p-0 rounded-full bg-black/50 hover:bg-black/70 text-white"
+                                onClick={() => handleDownloadImage(
+                                    displayUrl, 
+                                    `artful_pane_craft_${isActuallyVideo ? 'video' : 'image'}_${image.id || index}`,
+                                    image.id || imageKey,
+                                    isActuallyVideo,
+                                    image.metadata?.content_type
+                                )}
+                                disabled={downloadingImageId === (image.id || imageKey)}
+                                >
+                                {downloadingImageId === (image.id || imageKey) ? (
+                                    <div className="h-3 w-3 animate-spin rounded-full border-b-2 border-current"></div>
+                                ) : (
+                                    <Download className="h-3.5 w-3.5" />
+                                )}
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top"><p>Download Image</p></TooltipContent>
                             </Tooltip>
                         </div>
                     </>)
