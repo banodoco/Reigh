@@ -13,6 +13,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogOverlay,
 } from '@/shared/components/ui/alert-dialog';
 import { Checkbox } from '@/shared/components/ui/checkbox';
 import { Label } from '@/shared/components/ui/label';
@@ -104,6 +105,12 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
         <Trash2 className="h-4 w-4" />
       </Button>
       <AlertDialog open={isConfirmDeleteDialogOpen} onOpenChange={setIsConfirmDeleteDialogOpen}>
+        <AlertDialogOverlay
+          onPointerDown={(e) => {
+            // Prevent underlying sortable interactions when clicking overlay
+            e.stopPropagation();
+          }}
+        />
         <AlertDialogContent
           onPointerDown={(e) => {
             // Prevent underlying sortable item click / drag sensors when the dialog is open

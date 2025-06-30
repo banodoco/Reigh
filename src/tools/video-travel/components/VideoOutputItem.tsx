@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button } from '@/shared/components/ui/button';
 import { Info, Trash2 } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, isValid } from 'date-fns';
 import HoverScrubVideo from '@/shared/components/HoverScrubVideo';
 import TaskDetailsModal from './TaskDetailsModal';
 import { GenerationRow } from '@/types/shots';
@@ -56,7 +56,7 @@ export const VideoOutputItem: React.FC<VideoOutputItemProps> = ({
             <Info className="h-5 w-5 text-white" />
           </Button>
         </TaskDetailsModal>
-        {video.createdAt && (
+        {video.createdAt && isValid(new Date(video.createdAt)) && (
           <span className="text-xs text-white bg-black/50 px-1.5 py-0.5 rounded-md">
             {formatDistanceToNow(new Date(video.createdAt), { addSuffix: true })}
           </span>

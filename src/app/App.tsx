@@ -12,7 +12,6 @@ import { ProjectProvider, useProject } from "@/shared/contexts/ProjectContext";
 import { useWebSocket } from '@/shared/hooks/useWebSocket';
 import { PanesProvider } from '@/shared/contexts/PanesContext';
 import { CurrentShotProvider } from '@/shared/contexts/CurrentShotContext';
-import { getRandomDummyName } from '@/shared/lib/dummyNames';
 
 const queryClient = new QueryClient();
 
@@ -133,7 +132,9 @@ const AppInternalContent = () => {
         setLastAffectedShotId(shotId);
 
       } else if (over.id === NEW_GROUP_DROPPABLE_ID && droppableZone.type === 'new-group-zone') {
-        const newShotName = getRandomDummyName();
+        // Determine the next sequential shot number in the current project
+        const currentShotsCount = shotsFromHook?.length ?? 0;
+        const newShotName = `Shot ${currentShotsCount + 1}`;
         
         const newShot = await createShotMutation.mutateAsync({ shotName: newShotName, projectId: selectedProjectId });
         if (newShot && newShot.id) {
