@@ -18,6 +18,7 @@ const ShotsPane: React.FC = () => {
   const { selectedProjectId } = useProject();
   const { data: shots, isLoading, error } = useListShots(selectedProjectId);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [flashEffect, setFlashEffect] = useState(false);
   const createShotMutation = useCreateShot();
   const handleExternalImageDropMutation = useHandleExternalImageDrop();
   const navigate = useNavigate();
@@ -51,6 +52,12 @@ const ShotsPane: React.FC = () => {
         currentShotCount: shots?.length ?? 0
       });
       createdShotId = result?.shotId || null;
+      
+      // Trigger flash effect for successful image drop
+      if (createdShotId) {
+        setFlashEffect(true);
+        setTimeout(() => setFlashEffect(false), 600); // Flash for 600ms
+      }
     } else {
       const newShot = await createShotMutation.mutateAsync({ shotName, projectId: selectedProjectId });
       createdShotId = newShot?.id || null;
@@ -94,8 +101,11 @@ const ShotsPane: React.FC = () => {
         <div
           {...paneProps}
           className={cn(
-            `pointer-events-auto absolute top-0 left-0 h-full w-full bg-zinc-900/95 border-r border-zinc-700 shadow-xl transform transition-transform duration-300 ease-in-out flex flex-col`,
-            transformClass
+            `pointer-events-auto absolute top-0 left-0 h-full w-full border-r shadow-xl transform transition-transform duration-300 ease-in-out flex flex-col`,
+            transformClass,
+            flashEffect 
+              ? "bg-green-400/20 border-green-400 border-2 shadow-green-400/50 animate-pulse" 
+              : "bg-zinc-900/95 border-zinc-700"
           )}
         >
           <div className="p-2 border-b border-zinc-800 flex items-center justify-between flex-shrink-0">
@@ -129,10 +139,10 @@ const ShotsPane: React.FC = () => {
             isLoading={createShotMutation.isPending || handleExternalImageDropMutation.isPending}
             defaultShotName={`Shot ${(shots?.length ?? 0) + 1}`}
           />
+                  </div>
         </div>
-      </div>
-    </>
-  );
-};
+      </>
+    );
+  };
 
 export default ShotsPane; 

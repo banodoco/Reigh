@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { useListTasks, useCancelAllPendingTasks } from '@/shared/hooks/useTasks';
+import { useListTasks } from '@/shared/hooks/useTasks';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import TaskItem from './TaskItem';
 import { TaskStatus, Task } from '@/types/tasks';
@@ -15,7 +15,6 @@ import {
   DropdownMenuSeparator 
 } from "@/shared/components/ui/dropdown-menu";
 import { ScrollArea } from "@/shared/components/ui/scroll-area"
-import { useToast } from '@/shared/hooks/use-toast'; // For user feedback
 
 // Use all statuses from the enum directly
 const ALL_POSSIBLE_STATUSES = [...taskStatusEnum] as TaskStatus[];
@@ -24,7 +23,6 @@ const TaskList: React.FC = () => {
   const { selectedProjectId } = useProject();
   // Default selected statuses: Queued and In Progress
   const [selectedStatuses, setSelectedStatuses] = useState<TaskStatus[]>(['Queued', 'In Progress']);
-  const { toast } = useToast(); // Initialize toast
 
   const { data: tasks, isLoading, error, refetch } = useListTasks({
     projectId: selectedProjectId,
@@ -35,29 +33,7 @@ const TaskList: React.FC = () => {
             : selectedStatuses,
   });
 
-  const cancelAllPendingMutation = useCancelAllPendingTasks();
 
-  const pendingTasksCount = useMemo(() => {
-    if (!tasks) return 0;
-    // If current filter is 'Pending', we can use tasks.length directly if it's accurate
-    // Otherwise, or to be safe, filter all tasks to find pending ones for the count.
-    // This count is for the button's disabled state, not for the displayed list.
-    // For an accurate count of all pending tasks irrespective of current filter:
-    // We would need to fetch all tasks or have a specific hook for just pending tasks count.
-    // For simplicity, let's assume 'tasks' reflects the current filter.
-    // If statusFilter is 'Pending', tasks are pending tasks. If 'All', we need to filter.
-    if (selectedStatuses.includes('Queued')) return tasks.length;
-    if (selectedStatuses.length === ALL_POSSIBLE_STATUSES.length) return tasks.filter(t => t.status === 'Queued').length;
-    return 0; // Not showing pending tasks, so button might be less relevant or show 0
-  }, [tasks, selectedStatuses]);
-  
-  // More accurate pending tasks count by filtering the *currently fetched* tasks if filter is 'All'
-  // or by relying on the length if filter is 'Pending'.
-  // This relies on `tasks` variable containing the data based on `selectedStatuses`.
-  const actualPendingTasksInView = useMemo(() => {
-    if (!tasks) return [];
-    return tasks.filter(task => task.status === 'Queued');
-  }, [tasks]);
 
   const handleSelectAll = (checked: boolean | 'indeterminate') => {
     if (checked === true) {
@@ -87,48 +63,13 @@ const TaskList: React.FC = () => {
     refetch();
   }, [selectedStatuses, refetch]);
 
-  const handleCancelAllPending = () => {
-    if (!selectedProjectId) {
-      toast({ title: 'Error', description: 'No project selected.', variant: 'destructive' });
-      return;
-    }
-    cancelAllPendingMutation.mutate({ projectId: selectedProjectId }, {
-      onSuccess: (data) => {
-        toast({
-          title: 'Tasks Cancellation Initiated',
-          description: data.message || `Attempting to cancel all pending tasks.`,
-          variant: 'default'
-        });
-        refetch(); // Refetch the current list
-      },
-      onError: (error) => {
-        toast({
-          title: 'Cancellation Failed',
-          description: error.message || 'Could not cancel all pending tasks.',
-          variant: 'destructive'
-        });
-      }
-    });
-  };
+
 
   const availableStatuses: (TaskStatus | 'All')[] = ['All', ...taskStatusEnum];
 
   return (
     <div className="p-4 h-full flex flex-col text-zinc-200">
       <div className="mb-4">
-        <div className="flex justify-between items-center mb-2">
-          {/* Display this button only if there are pending tasks based on the current view or a more specific check */}
-          {actualPendingTasksInView.length > 0 && (
-             <Button 
-                variant="destructive"
-                size="sm"
-                onClick={handleCancelAllPending}
-                disabled={cancelAllPendingMutation.isPending || isLoading}
-             >
-                {cancelAllPendingMutation.isPending ? 'Cancelling All...' : `Cancel All (${actualPendingTasksInView.length})`}
-             </Button>
-          )}
-        </div>
         <div className="flex gap-2 items-center">
             {/* Multi-select Dropdown for Status Filter */}
             <DropdownMenu>
