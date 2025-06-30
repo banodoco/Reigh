@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Download, FlipHorizontal, Save } from 'lucide-react'; // Import FlipHorizontal and Save icons
 import { Button } from "./button"; // Updated
 import {
@@ -149,6 +149,8 @@ const FullscreenImageModal: React.FC<FullscreenImageModalProps> = ({ imageUrl, i
             console.warn(`[FlipSave] WARNING: No newImageUrl or onImageSaved callback`, { newImageUrl, hasCallback: !!onImageSaved });
           }
 
+          // RESET FLIP STATE after successful save to avoid double-flip on updated image
+          setIsFlippedHorizontally(false);
           setHasChanges(false);
           console.log(`[FlipSave] Save process completed successfully`);
           toast({ 
@@ -253,6 +255,13 @@ const FullscreenImageModal: React.FC<FullscreenImageModalProps> = ({ imageUrl, i
     top: '0px',
     transition: 'left 300ms ease-in-out, right 300ms ease-in-out, bottom 300ms ease-in-out',
   };
+
+  // Reset flip state when a different image URL is provided (e.g., after saving)
+  useEffect(() => {
+    // Whenever the displayed image source changes, clear flip & change flags
+    setIsFlippedHorizontally(false);
+    setHasChanges(false);
+  }, [imageUrl]);
 
   return (
     <TooltipProvider>

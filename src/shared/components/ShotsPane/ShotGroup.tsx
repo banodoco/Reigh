@@ -284,7 +284,7 @@ const ShotGroup: React.FC<ShotGroupProps> = ({ shot }) => {
       </div>
 
       <div className="text-xs text-zinc-400 pt-1 border-t border-zinc-700/50">
-        Total: {shot.images?.length || 0} image(s)
+        Total: {allImages.length} image(s)
       </div>
     </div>
   );

@@ -200,6 +200,10 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, isDeletin
   };
 
   const handleImageSaved = (newImageUrl: string) => {
+    // Update the lightbox to display the newly saved image immediately
+    setLightboxImageUrl(getDisplayUrl(newImageUrl));
+
+    // Propagate the event to parent if a callback is provided
     if (lightboxImageId && onImageSaved) {
       onImageSaved(lightboxImageId, newImageUrl);
     }
