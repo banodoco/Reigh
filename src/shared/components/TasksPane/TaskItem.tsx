@@ -5,6 +5,7 @@ import { useCancelTask, useListTasks } from '@/shared/hooks/useTasks';
 import { useToast } from '@/shared/hooks/use-toast'; // For user feedback
 import { formatDistanceToNow, isValid } from 'date-fns';
 import { useProject } from '@/shared/contexts/ProjectContext';
+import { useEffect, useState } from 'react';
 
 interface TaskItemProps {
   task: Task;
@@ -29,6 +30,9 @@ const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
   }, [task]);
   const imagesToShow = imageUrls.slice(0, 5);
   const extraImageCount = Math.max(0, imageUrls.length - imagesToShow.length);
+
+  // Local state to show progress percentage temporarily
+  const [progressPercent, setProgressPercent] = useState<number | null>(null);
 
   const handleCancel = () => {
     // Cancel main task first
@@ -76,9 +80,10 @@ const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
     const orchestratorId = (task.params as any)?.orchestrator_details?.orchestrator_task_id || task.id;
     console.log('[TravelProgressIssue] Orchestrator ID:', orchestratorId);
     console.log('[TravelProgressIssue] Task list size:', tasksData.length);
-    const subtasks = tasksData.filter(
-      (t) => (t.params as any)?.orchestrator_task_id_ref === orchestratorId && t.id !== task.id
-    );
+    const subtasks = tasksData.filter((t) => {
+      const p: any = t.params || {};
+      return (p.orchestrator_task_id_ref === orchestratorId || p.orchestrator_task_id === orchestratorId) && t.id !== task.id;
+    });
     console.log('[TravelProgressIssue] Found subtasks:', subtasks.map(t => ({ id: t.id, status: t.status })));
     if (subtasks.length === 0) {
       toast({ title: 'Progress', description: 'No subtasks found yet.', variant: 'default' });
@@ -88,6 +93,10 @@ const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
     const percent = Math.round((completed / subtasks.length) * 100);
     console.log('[TravelProgressIssue] Completed:', completed, 'Total:', subtasks.length, 'Percent:', percent);
     toast({ title: 'Progress', description: `${percent}% Complete`, variant: 'default' });
+
+    // Show inline for 30s
+    setProgressPercent(percent);
+    setTimeout(() => setProgressPercent(null), 30000);
   };
 
   return (
@@ -129,14 +138,18 @@ const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
         {(task.status === 'Queued' || task.status === 'In Progress') && (
           <div className="flex items-center gap-2">
             {task.taskType === 'travel_orchestrator' && task.status === 'In Progress' && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleCheckProgress}
-                className="px-2 py-0.5 text-blue-400 hover:bg-blue-900/20 hover:text-blue-300"
-              >
-                Check Progress
-              </Button>
+              progressPercent === null ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleCheckProgress}
+                  className="px-2 py-0.5 text-blue-400 hover:bg-blue-900/20 hover:text-blue-300"
+                >
+                  Check Progress
+                </Button>
+              ) : (
+                <span className="text-blue-300 text-xs">{progressPercent}% Complete</span>
+              )
             )}
             <Button
               variant="ghost"
