@@ -33,6 +33,27 @@ const TaskList: React.FC = () => {
             : selectedStatuses,
   });
 
+  // State to track tasks that have just been added for flash effect
+  const [newTaskIds, setNewTaskIds] = useState<Set<string>>(new Set());
+  const prevTaskIdsRef = React.useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!tasks) return;
+    const currentIds = new Set(tasks.map(t => t.id));
+    const newlyAddedIds = tasks
+      .filter(t => !prevTaskIdsRef.current.has(t.id))
+      .map(t => t.id);
+
+    if (newlyAddedIds.length > 0) {
+      setNewTaskIds(new Set(newlyAddedIds));
+      const timer = setTimeout(() => setNewTaskIds(new Set()), 3000);
+      return () => clearTimeout(timer);
+    }
+
+    // Update previous IDs ref after processing
+    prevTaskIdsRef.current = currentIds;
+  }, [tasks]);
+
   // Filter out travel_segment and travel_stitch tasks so they do not appear in the sidebar
   const filteredTasks = useMemo(() => {
     if (!tasks) return [] as Task[];
@@ -140,7 +161,7 @@ const TaskList: React.FC = () => {
         <ScrollArea className="flex-grow pr-3">
             {filteredTasks.map((task: Task, idx: number) => (
                 <React.Fragment key={task.id}>
-                  <TaskItem task={task} />
+                  <TaskItem task={task} isNew={newTaskIds.has(task.id)} />
                   {idx < filteredTasks.length - 1 && (
                     <hr className="my-2 border-zinc-700" />
                   )}

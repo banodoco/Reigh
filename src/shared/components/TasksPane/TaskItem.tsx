@@ -6,9 +6,11 @@ import { useToast } from '@/shared/hooks/use-toast'; // For user feedback
 import { formatDistanceToNow, isValid } from 'date-fns';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { useEffect, useState } from 'react';
+import { cn } from '@/shared/lib/utils';
 
 interface TaskItemProps {
   task: Task;
+  isNew?: boolean;
 }
 
 // Helper to abbreviate distance strings (e.g., "5 minutes ago" -> "5 mins ago")
@@ -19,7 +21,7 @@ const abbreviateDistance = (str: string) =>
     .replace(/seconds?/, 'secs')
     .replace(/days?/, 'days');
 
-const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
+const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
   const { toast } = useToast();
   const cancelTaskMutation = useCancelTask();
 
@@ -118,8 +120,13 @@ const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
     setTimeout(() => setProgressPercent(null), 5000);
   };
 
+  const containerClass = cn(
+    "p-3 mb-2 bg-zinc-800/95 rounded-md shadow border transition-colors",
+    isNew ? "border-teal-400 animate-pulse" : "border-zinc-600 hover:border-zinc-400"
+  );
+
   return (
-    <div className="p-3 mb-2 bg-zinc-800/95 rounded-md shadow border border-zinc-600 hover:border-zinc-400 transition-colors">
+    <div className={containerClass}>
       <div className="flex justify-between items-center mb-1">
         <span className="text-sm font-semibold text-zinc-200">{displayTaskType}</span>
         <span
