@@ -168,6 +168,15 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
           Created: {(() => {
             const date = new Date(task.createdAt);
             if (!isValid(date)) return 'Unknown';
+            
+            const now = new Date();
+            const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+            
+            // Show "Seconds ago" for tasks under 10 seconds old
+            if (diffInSeconds < 10) {
+              return 'Seconds ago';
+            }
+            
             return abbreviateDistance(formatDistanceToNow(date, { addSuffix: true }));
           })()}
         </span>
