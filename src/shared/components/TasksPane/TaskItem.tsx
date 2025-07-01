@@ -55,7 +55,10 @@ const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
 
     // If this is an orchestrator task, also cancel its subtasks
     if (task.taskType === 'travel_orchestrator' && allProjectTasks) {
-      const orchestratorId = (task.params as any)?.orchestrator_details?.orchestrator_task_id || task.id;
+      const pRoot: any = task.params || {};
+      const orchestratorDetails = pRoot.orchestrator_details || {};
+      const orchestratorId = orchestratorDetails.orchestrator_task_id || pRoot.orchestrator_task_id || pRoot.task_id || task.id;
+      const orchestratorRunId = orchestratorDetails.run_id || pRoot.orchestrator_run_id;
       const subtasks = allProjectTasks.filter(
         (t) => (t.params as any)?.orchestrator_task_id_ref === orchestratorId && ['Queued', 'In Progress'].includes(t.status)
       );
@@ -77,12 +80,19 @@ const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
   };
 
   const computeAndShowProgress = (tasksData: Task[]) => {
-    const orchestratorId = (task.params as any)?.orchestrator_details?.orchestrator_task_id || task.id;
+    const pRoot: any = task.params || {};
+    const orchestratorDetails = pRoot.orchestrator_details || {};
+    const orchestratorId = orchestratorDetails.orchestrator_task_id || pRoot.orchestrator_task_id || pRoot.task_id || task.id;
+    const orchestratorRunId = orchestratorDetails.run_id || pRoot.orchestrator_run_id;
     console.log('[TravelProgressIssue] Orchestrator ID:', orchestratorId);
+    console.log('[TravelProgressIssue] Orchestrator RunID:', orchestratorRunId);
     console.log('[TravelProgressIssue] Task list size:', tasksData.length);
     const subtasks = tasksData.filter((t) => {
       const p: any = t.params || {};
-      return (p.orchestrator_task_id_ref === orchestratorId || p.orchestrator_task_id === orchestratorId) && t.id !== task.id;
+      return (
+        (p.orchestrator_task_id_ref === orchestratorId || p.orchestrator_task_id === orchestratorId || p.orchestrator_task_id_ref === task.id || p.orchestrator_task_id === task.id || (orchestratorRunId && p.orchestrator_run_id === orchestratorRunId))
+        && t.id !== task.id
+      );
     });
     console.log('[TravelProgressIssue] Found subtasks:', subtasks.map(t => ({ id: t.id, status: t.status })));
     if (subtasks.length === 0) {
