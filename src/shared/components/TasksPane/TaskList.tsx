@@ -175,16 +175,18 @@ const TaskList: React.FC = () => {
       )}
 
       {!isLoading && !error && filteredTasks.length > 0 && (
-        <ScrollArea className="flex-grow pr-3">
-            {filteredTasks.map((task: Task, idx: number) => (
-                <React.Fragment key={task.id}>
-                  <TaskItem task={task} isNew={newTaskIds.has(task.id)} />
-                  {idx < filteredTasks.length - 1 && (
-                    <hr className="my-2 border-zinc-700" />
-                  )}
-                </React.Fragment>
-            ))}
-        </ScrollArea>
+        <div className="flex-grow -mr-4">
+          <ScrollArea className="h-full pr-4">
+              {filteredTasks.map((task: Task, idx: number) => (
+                  <React.Fragment key={task.id}>
+                    <TaskItem task={task} isNew={newTaskIds.has(task.id)} />
+                    {idx < filteredTasks.length - 1 && (
+                      <hr className="my-2 border-zinc-700" />
+                    )}
+                  </React.Fragment>
+              ))}
+          </ScrollArea>
+        </div>
       )}
     </div>
   );
