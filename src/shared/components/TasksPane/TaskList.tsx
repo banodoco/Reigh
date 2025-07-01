@@ -36,7 +36,15 @@ const TaskList: React.FC = () => {
   // Filter out travel_segment and travel_stitch tasks so they do not appear in the sidebar
   const filteredTasks = useMemo(() => {
     if (!tasks) return [] as Task[];
-    return tasks.filter(task => !['travel_segment', 'travel_stitch'].includes(task.taskType));
+    const withoutHidden = tasks.filter(task => !['travel_segment', 'travel_stitch'].includes(task.taskType));
+    // Sort: In Progress first, then by createdAt desc
+    return withoutHidden.sort((a, b) => {
+      const aInProgress = a.status === 'In Progress';
+      const bInProgress = b.status === 'In Progress';
+      if (aInProgress && !bInProgress) return -1;
+      if (!aInProgress && bInProgress) return 1;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
   }, [tasks]);
 
   const handleSelectAll = (checked: boolean | 'indeterminate') => {
