@@ -122,7 +122,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
 
   const containerClass = cn(
     "p-3 mb-2 bg-zinc-800/95 rounded-md shadow border transition-colors",
-    isNew ? "border-teal-400 animate-pulse" : "border-zinc-600 hover:border-zinc-400"
+    isNew ? "border-teal-400 bg-teal-500/10" : "border-zinc-600 hover:border-zinc-400"
   );
 
   return (

@@ -36,6 +36,7 @@ const TaskList: React.FC = () => {
   // State to track tasks that have just been added for flash effect
   const [newTaskIds, setNewTaskIds] = useState<Set<string>>(new Set());
   const prevTaskIdsRef = React.useRef<Set<string>>(new Set());
+  const hasInitializedRef = React.useRef(false);
 
   useEffect(() => {
     if (!tasks) return;
@@ -44,13 +45,19 @@ const TaskList: React.FC = () => {
       .filter(t => !prevTaskIdsRef.current.has(t.id))
       .map(t => t.id);
 
-    if (newlyAddedIds.length > 0) {
-      setNewTaskIds(new Set(newlyAddedIds));
-      const timer = setTimeout(() => setNewTaskIds(new Set()), 3000);
-      return () => clearTimeout(timer);
+    if (hasInitializedRef.current) {
+      if (newlyAddedIds.length > 0) {
+        setNewTaskIds(new Set(newlyAddedIds));
+        const timer = setTimeout(() => setNewTaskIds(new Set()), 3000);
+        // Cleanup timer
+        return () => clearTimeout(timer);
+      }
+    } else {
+      // Skip flashing on initial load
+      hasInitializedRef.current = true;
     }
 
-    // Update previous IDs ref after processing
+    // Update previous IDs regardless
     prevTaskIdsRef.current = currentIds;
   }, [tasks]);
 
