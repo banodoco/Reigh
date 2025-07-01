@@ -21,6 +21,10 @@ const abbreviateDistance = (str: string) => {
   }
   
   return str
+    .replace(/1 minutes ago/, '1 min ago')
+    .replace(/1 hours ago/, '1 hr ago')
+    .replace(/1 seconds ago/, '1 sec ago')
+    .replace(/1 days ago/, '1 day ago')
     .replace(/minutes?/, 'mins')
     .replace(/hours?/, 'hrs')
     .replace(/seconds?/, 'secs')
