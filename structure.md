@@ -117,7 +117,7 @@
 - **TasksPane/**:
   - `TasksPane.tsx`: Right slide-out panel for tasks
   - `TaskList.tsx`: Lists tasks, filters, real-time updates via WebSocket
-  - `TaskItem.tsx`: Displays task details, cancel button
+  - `TaskItem.tsx**: Displays task details, cancel button
 - **ui/**: 50+ re-exports/variants of shadcn components
 - **loading.tsx**: Wes Anderson-inspired loading indicators
 - **DraggableImage.tsx**: Makes gallery images draggable
@@ -179,3 +179,4 @@
 - **cropSettings.ts**: Utility for managing "crop to project size" setting persistence in localStorage. Defaults to true
 - **aspectRatios.ts**: Defines aspect ratios (e.g., "16:9" -> "902x508"). Single source for project/server dimensions. Parsing/matching helpers
 - **steerableMotion.ts**: Video generation API (POST /api/steerable-motion). Includes prompt enhancement via OpenAI API when enhance_prompt=true and openai_api_key is provided. Supports mutually exclusive LoRA options: apply_causvid and use_lighti2x_lora.
+- **taskConfig.ts**: Centralized task configuration system. Manages task visibility, display names, progress support, and cancellation permissions. Provides functions like `isTaskVisible()`, `getTaskDisplayName()`, `taskSupportsProgress()`, and `filterVisibleTasks()`. Replaces hardcoded task type arrays with scalable configuration registry. Supports categories ('generation', 'processing', 'orchestration', 'utility') and extensible task capabilities.
