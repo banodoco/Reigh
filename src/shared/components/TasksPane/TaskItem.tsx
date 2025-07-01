@@ -3,6 +3,7 @@ import { Task } from '@/types/tasks';
 import { Button } from '@/shared/components/ui/button';
 import { useCancelTask } from '@/shared/hooks/useTasks';
 import { useToast } from '@/shared/hooks/use-toast'; // For user feedback
+import { formatDistanceToNow, isValid } from 'date-fns';
 
 interface TaskItemProps {
   task: Task;
@@ -75,8 +76,9 @@ const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
           )}
         </div>
       )}
-      <p className="text-xs text-zinc-400 mb-1">ID: {task.id.substring(0, 8)}...</p>
-      <p className="text-xs text-zinc-400 mb-2">Created: {new Date(task.createdAt).toLocaleString()}</p>
+      <p className="text-xs text-zinc-400 mb-2">
+        Created: {isValid(new Date(task.createdAt)) ? formatDistanceToNow(new Date(task.createdAt), { addSuffix: true }) : 'Unknown'}
+      </p>
       {/* Add more task details as needed, e.g., from task.params */}
       {/* <pre className="text-xs text-zinc-500 whitespace-pre-wrap break-all">{JSON.stringify(task.params, null, 2)}</pre> */}
 
