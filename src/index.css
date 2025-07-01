@@ -825,6 +825,15 @@
   100% { transform: scale(0.3); opacity: 0; }
 }
 
+/* Subtle flash animation for new tasks */
+@keyframes flash {
+  0% { border-color: rgb(45 212 191); opacity: 1; }
+  25% { border-color: rgb(45 212 191); opacity: 0.7; }
+  50% { border-color: rgb(45 212 191); opacity: 1; }
+  75% { border-color: rgb(45 212 191); opacity: 0.8; }
+  100% { border-color: rgb(45 212 191); opacity: 1; }
+}
+
 .animate-scale-fade {
   animation: scaleFade 0.3s forwards ease-out;
 }

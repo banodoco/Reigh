@@ -39,25 +39,42 @@ const TaskList: React.FC = () => {
   const hasInitializedRef = React.useRef(false);
 
   useEffect(() => {
-    if (!tasks) return;
+    if (!tasks || tasks.length === 0) return;
+    
     const currentIds = new Set(tasks.map(t => t.id));
+    
+    // On the very first load with tasks, just set the previous IDs without marking anything as new
+    if (!hasInitializedRef.current) {
+      console.log('[TaskFlash] Initial load - setting up previous IDs:', currentIds.size, 'tasks');
+      prevTaskIdsRef.current = currentIds;
+      hasInitializedRef.current = true;
+      return;
+    }
+    
+    // Find truly new tasks (not present in previous load)
     const newlyAddedIds = tasks
       .filter(t => !prevTaskIdsRef.current.has(t.id))
       .map(t => t.id);
 
-    if (hasInitializedRef.current) {
-      if (newlyAddedIds.length > 0) {
-        setNewTaskIds(new Set(newlyAddedIds));
-        const timer = setTimeout(() => setNewTaskIds(new Set()), 3000);
-        // Cleanup timer
-        return () => clearTimeout(timer);
-      }
-    } else {
-      // Skip flashing on initial load
-      hasInitializedRef.current = true;
+    console.log('[TaskFlash] Checking for new tasks:', {
+      currentTaskCount: currentIds.size,
+      previousTaskCount: prevTaskIdsRef.current.size,
+      newlyAddedIds: newlyAddedIds
+    });
+
+    if (newlyAddedIds.length > 0) {
+      console.log('[TaskFlash] Found new tasks, setting flash effect:', newlyAddedIds);
+      setNewTaskIds(new Set(newlyAddedIds));
+      // Clear the flash effect after 3 seconds
+      const timer = setTimeout(() => setNewTaskIds(new Set()), 3000);
+      
+      // Update previous IDs ref after processing
+      prevTaskIdsRef.current = currentIds;
+      
+      return () => clearTimeout(timer);
     }
 
-    // Update previous IDs regardless
+    // Update previous IDs ref even if no new tasks
     prevTaskIdsRef.current = currentIds;
   }, [tasks]);
 
