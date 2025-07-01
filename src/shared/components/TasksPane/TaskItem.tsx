@@ -11,6 +11,14 @@ interface TaskItemProps {
   task: Task;
 }
 
+// Helper to abbreviate distance strings (e.g., "5 minutes ago" -> "5 mins ago")
+const abbreviateDistance = (str: string) =>
+  str
+    .replace(/minutes?/, 'mins')
+    .replace(/hours?/, 'hrs')
+    .replace(/seconds?/, 'secs')
+    .replace(/days?/, 'days');
+
 const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
   const { toast } = useToast();
   const cancelTaskMutation = useCancelTask();
@@ -105,9 +113,9 @@ const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
     console.log('[TravelProgressIssue] Completed:', completed, 'Total:', subtasks.length, 'Percent:', percent);
     toast({ title: 'Progress', description: `${percent}% Complete`, variant: 'default' });
 
-    // Show inline for 30s
+    // Show inline for 5s
     setProgressPercent(percent);
-    setTimeout(() => setProgressPercent(null), 30000);
+    setTimeout(() => setProgressPercent(null), 5000);
   };
 
   return (
@@ -144,7 +152,11 @@ const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
       )}
       <div className="flex items-center justify-between text-xs text-zinc-400 mb-2">
         <span>
-          Created: {isValid(new Date(task.createdAt)) ? formatDistanceToNow(new Date(task.createdAt), { addSuffix: true }) : 'Unknown'}
+          Created: {(() => {
+            const date = new Date(task.createdAt);
+            if (!isValid(date)) return 'Unknown';
+            return abbreviateDistance(formatDistanceToNow(date, { addSuffix: true }));
+          })()}
         </span>
         {(task.status === 'Queued' || task.status === 'In Progress') && (
           <div className="flex items-center gap-2">
