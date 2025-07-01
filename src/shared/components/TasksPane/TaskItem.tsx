@@ -55,13 +55,14 @@ const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
 
     // If this is an orchestrator task, also cancel its subtasks
     if (task.taskType === 'travel_orchestrator' && allProjectTasks) {
-      const pRoot: any = task.params || {};
+      const pRoot: any = typeof task.params === 'string' ? JSON.parse(task.params) : task.params || {};
       const orchestratorDetails = pRoot.orchestrator_details || {};
       const orchestratorId = orchestratorDetails.orchestrator_task_id || pRoot.orchestrator_task_id || pRoot.task_id || task.id;
       const orchestratorRunId = orchestratorDetails.run_id || pRoot.orchestrator_run_id;
-      const subtasks = allProjectTasks.filter(
-        (t) => (t.params as any)?.orchestrator_task_id_ref === orchestratorId && ['Queued', 'In Progress'].includes(t.status)
-      );
+      const subtasks = allProjectTasks.filter((t) => {
+        const p: any = typeof t.params === 'string' ? JSON.parse(t.params) : t.params || {};
+        return (p.orchestrator_task_id_ref === orchestratorId || p.orchestrator_task_id === orchestratorId) && ['Queued', 'In Progress'].includes(t.status);
+      });
       subtasks.forEach((sub) => {
         cancelTaskMutation.mutate(sub.id);
       });
@@ -80,7 +81,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
   };
 
   const computeAndShowProgress = (tasksData: Task[]) => {
-    const pRoot: any = task.params || {};
+    const pRoot: any = typeof task.params === 'string' ? JSON.parse(task.params) : task.params || {};
     const orchestratorDetails = pRoot.orchestrator_details || {};
     const orchestratorId = orchestratorDetails.orchestrator_task_id || pRoot.orchestrator_task_id || pRoot.task_id || task.id;
     const orchestratorRunId = orchestratorDetails.run_id || pRoot.orchestrator_run_id;
@@ -88,7 +89,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
     console.log('[TravelProgressIssue] Orchestrator RunID:', orchestratorRunId);
     console.log('[TravelProgressIssue] Task list size:', tasksData.length);
     const subtasks = tasksData.filter((t) => {
-      const p: any = t.params || {};
+      const p: any = typeof t.params === 'string' ? JSON.parse(t.params) : t.params || {};
       return (
         (p.orchestrator_task_id_ref === orchestratorId || p.orchestrator_task_id === orchestratorId || p.orchestrator_task_id_ref === task.id || p.orchestrator_task_id === task.id || (orchestratorRunId && p.orchestrator_run_id === orchestratorRunId))
         && t.id !== task.id
