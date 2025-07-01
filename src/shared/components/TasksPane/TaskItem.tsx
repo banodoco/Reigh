@@ -76,23 +76,24 @@ const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
           )}
         </div>
       )}
-      <p className="text-xs text-zinc-400 mb-2">
-        Created: {isValid(new Date(task.createdAt)) ? formatDistanceToNow(new Date(task.createdAt), { addSuffix: true }) : 'Unknown'}
-      </p>
+      <div className="flex items-center justify-between text-xs text-zinc-400 mb-2">
+        <span>
+          Created: {isValid(new Date(task.createdAt)) ? formatDistanceToNow(new Date(task.createdAt), { addSuffix: true }) : 'Unknown'}
+        </span>
+        {(task.status === 'Queued' || task.status === 'In Progress') && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleCancel}
+            disabled={cancelTaskMutation.isPending}
+            className="px-2 py-0.5 text-red-400 hover:bg-red-900/20 hover:text-red-300"
+          >
+            {cancelTaskMutation.isPending ? 'Cancelling...' : 'Cancel'}
+          </Button>
+        )}
+      </div>
       {/* Add more task details as needed, e.g., from task.params */}
       {/* <pre className="text-xs text-zinc-500 whitespace-pre-wrap break-all">{JSON.stringify(task.params, null, 2)}</pre> */}
-
-      {(task.status === 'Queued' || task.status === 'In Progress') && (
-        <Button 
-          variant="destructive"
-          size="sm" 
-          onClick={handleCancel} 
-          disabled={cancelTaskMutation.isPending}
-          className="w-full mt-1"
-        >
-          {cancelTaskMutation.isPending ? 'Cancelling...' : 'Cancel Task'}
-        </Button>
-      )}
     </div>
   );
 };
