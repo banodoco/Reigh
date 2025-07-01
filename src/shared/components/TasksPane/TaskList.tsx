@@ -33,7 +33,11 @@ const TaskList: React.FC = () => {
             : selectedStatuses,
   });
 
-
+  // Filter out travel_segment and travel_stitch tasks so they do not appear in the sidebar
+  const filteredTasks = useMemo(() => {
+    if (!tasks) return [] as Task[];
+    return tasks.filter(task => !['travel_segment', 'travel_stitch'].includes(task.taskType));
+  }, [tasks]);
 
   const handleSelectAll = (checked: boolean | 'indeterminate') => {
     if (checked === true) {
@@ -120,13 +124,13 @@ const TaskList: React.FC = () => {
       {isLoading && <p className="text-zinc-400">Loading tasks...</p>}
       {error && <p className="text-red-500">Error loading tasks: {error.message}</p>}
       
-      {!isLoading && !error && tasks?.length === 0 && (
+      {!isLoading && !error && filteredTasks.length === 0 && (
         <p className="text-zinc-400">No tasks found for the selected criteria.</p>
       )}
 
-      {!isLoading && !error && tasks && tasks.length > 0 && (
+      {!isLoading && !error && filteredTasks.length > 0 && (
         <ScrollArea className="flex-grow pr-3">
-            {tasks.map((task: Task) => (
+            {filteredTasks.map((task: Task) => (
                 <TaskItem key={task.id} task={task} />
             ))}
         </ScrollArea>

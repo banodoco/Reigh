@@ -12,12 +12,15 @@ const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
   const { toast } = useToast();
   const cancelTaskMutation = useCancelTask();
 
+  // Map certain task types to more user-friendly names for display purposes
+  const displayTaskType = task.taskType === 'travel_orchestrator' ? 'Travel Between Images' : task.taskType;
+
   const handleCancel = () => {
     cancelTaskMutation.mutate(task.id, {
       onSuccess: () => {
         toast({
           title: 'Task Cancelled',
-          description: `Task ${task.taskType} (${task.id.substring(0, 8)}) has been cancelled.`,
+          description: `Task ${displayTaskType} (${task.id.substring(0, 8)}) has been cancelled.`,
           variant: 'default',
         });
       },
@@ -34,7 +37,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
   return (
     <div className="p-3 mb-2 bg-zinc-800 rounded-md shadow">
       <div className="flex justify-between items-center mb-1">
-        <span className="text-sm font-semibold text-zinc-200">{task.taskType}</span>
+        <span className="text-sm font-semibold text-zinc-200">{displayTaskType}</span>
         <span
           className={`px-2 py-0.5 text-xs rounded-full ${
             task.status === 'In Progress' ? 'bg-blue-500 text-blue-100' :

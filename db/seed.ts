@@ -33,14 +33,18 @@ async function seed() {
     } catch (tableCheckError: any) {
       // Assuming error means table doesn't exist
       if (tableCheckError.message && tableCheckError.message.includes(`no such table`)) {
-        console.log('[Seed] Tables not found. Attempting to create schema from manual DDL file...');
-        const ddlFilePath = path.join(__dirname, 'migrations-sqlite/0000_clear_rocket_raccoon.sql');
+        console.log('[Seed] Tables not found. Running Drizzle migrations to create schema...');
+        // Run the SQL migrations that live in db/migrations-sqlite using Drizzle Migrator
+        // We create a temporary Drizzle instance without a schema just for the migrator
+        const tmpDb = drizzle(sqliteConnection);
+
+        const { migrate } = await import('drizzle-orm/better-sqlite3/migrator');
+
         try {
-          const ddlSql = fs.readFileSync(ddlFilePath, 'utf-8');
-          sqliteConnection.exec(ddlSql);
-          console.log('[Seed] Successfully executed DDL from 0000_clear_rocket_raccoon.sql');
-        } catch (ddlError) {
-          console.error('[Seed] CRITICAL: Failed to read or execute DDL SQL file:', ddlFilePath, ddlError);
+          await migrate(tmpDb, { migrationsFolder: path.join(__dirname, 'migrations-sqlite') });
+          console.log('[Seed] Migrations executed successfully.');
+        } catch (migErr) {
+          console.error('[Seed] CRITICAL: Failed to run migrations:', migErr);
           if (sqliteConnection) sqliteConnection.close();
           process.exit(1);
         }
