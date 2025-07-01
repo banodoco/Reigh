@@ -45,7 +45,6 @@ const TaskList: React.FC = () => {
     
     // On the very first load with tasks, just set the previous IDs without marking anything as new
     if (!hasInitializedRef.current) {
-      console.log('[TaskFlash] Initial load - setting up previous IDs:', currentIds.size, 'tasks');
       prevTaskIdsRef.current = currentIds;
       hasInitializedRef.current = true;
       return;
@@ -56,14 +55,7 @@ const TaskList: React.FC = () => {
       .filter(t => !prevTaskIdsRef.current.has(t.id))
       .map(t => t.id);
 
-    console.log('[TaskFlash] Checking for new tasks:', {
-      currentTaskCount: currentIds.size,
-      previousTaskCount: prevTaskIdsRef.current.size,
-      newlyAddedIds: newlyAddedIds
-    });
-
     if (newlyAddedIds.length > 0) {
-      console.log('[TaskFlash] Found new tasks, setting flash effect:', newlyAddedIds);
       setNewTaskIds(new Set(newlyAddedIds));
       // Clear the flash effect after 3 seconds
       const timer = setTimeout(() => setNewTaskIds(new Set()), 3000);

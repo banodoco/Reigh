@@ -14,12 +14,18 @@ interface TaskItemProps {
 }
 
 // Helper to abbreviate distance strings (e.g., "5 minutes ago" -> "5 mins ago")
-const abbreviateDistance = (str: string) =>
-  str
+const abbreviateDistance = (str: string) => {
+  // Handle "less than a minute ago" special case
+  if (str.includes('less than a minute')) {
+    return '<1 min ago';
+  }
+  
+  return str
     .replace(/minutes?/, 'mins')
     .replace(/hours?/, 'hrs')
     .replace(/seconds?/, 'secs')
     .replace(/days?/, 'days');
+};
 
 const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
   const { toast } = useToast();
