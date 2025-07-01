@@ -1,9 +1,10 @@
 import React from 'react';
 import { Task } from '@/types/tasks';
 import { Button } from '@/shared/components/ui/button';
-import { useCancelTask } from '@/shared/hooks/useTasks';
+import { useCancelTask, useListTasks } from '@/shared/hooks/useTasks';
 import { useToast } from '@/shared/hooks/use-toast'; // For user feedback
 import { formatDistanceToNow, isValid } from 'date-fns';
+import { useProject } from '@/shared/contexts/ProjectContext';
 
 interface TaskItemProps {
   task: Task;
@@ -12,6 +13,10 @@ interface TaskItemProps {
 const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
   const { toast } = useToast();
   const cancelTaskMutation = useCancelTask();
+
+  // Access all tasks for project (used for orchestrator logic)
+  const { selectedProjectId } = useProject();
+  const { data: allProjectTasks } = useListTasks({ projectId: selectedProjectId });
 
   // Map certain task types to more user-friendly names for display purposes
   const displayTaskType = task.taskType === 'travel_orchestrator' ? 'Travel Between Images' : task.taskType;
@@ -26,6 +31,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
   const extraImageCount = Math.max(0, imageUrls.length - imagesToShow.length);
 
   const handleCancel = () => {
+    // Cancel main task first
     cancelTaskMutation.mutate(task.id, {
       onSuccess: () => {
         toast({
@@ -42,6 +48,33 @@ const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
         });
       },
     });
+
+    // If this is an orchestrator task, also cancel its subtasks
+    if (task.taskType === 'travel_orchestrator' && allProjectTasks) {
+      const orchestratorId = (task.params as any)?.orchestrator_details?.orchestrator_task_id || task.id;
+      const subtasks = allProjectTasks.filter(
+        (t) => (t.params as any)?.orchestrator_task_id_ref === orchestratorId && ['Queued', 'In Progress'].includes(t.status)
+      );
+      subtasks.forEach((sub) => {
+        cancelTaskMutation.mutate(sub.id);
+      });
+    }
+  };
+
+  // Handler to check subtask completion progress for orchestrator tasks
+  const handleCheckProgress = () => {
+    if (!allProjectTasks) return;
+    const orchestratorId = (task.params as any)?.orchestrator_details?.orchestrator_task_id || task.id;
+    const subtasks = allProjectTasks.filter(
+      (t) => (t.params as any)?.orchestrator_task_id_ref === orchestratorId && t.id !== task.id
+    );
+    if (subtasks.length === 0) {
+      toast({ title: 'Progress', description: 'No subtasks found yet.', variant: 'default' });
+      return;
+    }
+    const completed = subtasks.filter((t) => t.status === 'Complete').length;
+    const percent = Math.round((completed / subtasks.length) * 100);
+    toast({ title: 'Progress', description: `${percent}% Complete`, variant: 'default' });
   };
 
   return (
@@ -81,15 +114,27 @@ const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
           Created: {isValid(new Date(task.createdAt)) ? formatDistanceToNow(new Date(task.createdAt), { addSuffix: true }) : 'Unknown'}
         </span>
         {(task.status === 'Queued' || task.status === 'In Progress') && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleCancel}
-            disabled={cancelTaskMutation.isPending}
-            className="px-2 py-0.5 text-red-400 hover:bg-red-900/20 hover:text-red-300"
-          >
-            {cancelTaskMutation.isPending ? 'Cancelling...' : 'Cancel'}
-          </Button>
+          <div className="flex items-center gap-2">
+            {task.taskType === 'travel_orchestrator' && task.status === 'In Progress' && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleCheckProgress}
+                className="px-2 py-0.5 text-blue-400 hover:bg-blue-900/20 hover:text-blue-300"
+              >
+                Check Progress
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleCancel}
+              disabled={cancelTaskMutation.isPending}
+              className="px-2 py-0.5 text-red-400 hover:bg-red-900/20 hover:text-red-300"
+            >
+              {cancelTaskMutation.isPending ? 'Cancelling...' : 'Cancel'}
+            </Button>
+          </div>
         )}
       </div>
       {/* Add more task details as needed, e.g., from task.params */}
