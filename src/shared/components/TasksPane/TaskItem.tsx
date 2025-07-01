@@ -15,6 +15,15 @@ const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
   // Map certain task types to more user-friendly names for display purposes
   const displayTaskType = task.taskType === 'travel_orchestrator' ? 'Travel Between Images' : task.taskType;
 
+  // Extract image URLs for Travel Between Images tasks (travel_orchestrator)
+  const imageUrls: string[] = React.useMemo(() => {
+    if (task.taskType !== 'travel_orchestrator') return [];
+    const resolved = (task.params as any)?.orchestrator_details?.input_image_paths_resolved;
+    return Array.isArray(resolved) ? resolved as string[] : [];
+  }, [task]);
+  const imagesToShow = imageUrls.slice(0, 5);
+  const extraImageCount = Math.max(0, imageUrls.length - imagesToShow.length);
+
   const handleCancel = () => {
     cancelTaskMutation.mutate(task.id, {
       onSuccess: () => {
@@ -50,6 +59,22 @@ const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
           {task.status}
         </span>
       </div>
+      {/* Image previews for Travel Between Images task */}
+      {imagesToShow.length > 0 && (
+        <div className="flex items-center overflow-x-auto mb-1">
+          {imagesToShow.map((url, idx) => (
+            <img
+              key={idx}
+              src={url}
+              alt={`input-${idx}`}
+              className="w-12 h-12 object-cover rounded mr-1 border border-zinc-700"
+            />
+          ))}
+          {extraImageCount > 0 && (
+            <span className="text-xs text-zinc-400 ml-1">+ {extraImageCount} more</span>
+          )}
+        </div>
+      )}
       <p className="text-xs text-zinc-400 mb-1">ID: {task.id.substring(0, 8)}...</p>
       <p className="text-xs text-zinc-400 mb-2">Created: {new Date(task.createdAt).toLocaleString()}</p>
       {/* Add more task details as needed, e.g., from task.params */}
