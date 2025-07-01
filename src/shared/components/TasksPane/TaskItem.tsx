@@ -74,15 +74,19 @@ const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
 
   const computeAndShowProgress = (tasksData: Task[]) => {
     const orchestratorId = (task.params as any)?.orchestrator_details?.orchestrator_task_id || task.id;
+    console.log('[TravelProgressIssue] Orchestrator ID:', orchestratorId);
+    console.log('[TravelProgressIssue] Task list size:', tasksData.length);
     const subtasks = tasksData.filter(
       (t) => (t.params as any)?.orchestrator_task_id_ref === orchestratorId && t.id !== task.id
     );
+    console.log('[TravelProgressIssue] Found subtasks:', subtasks.map(t => ({ id: t.id, status: t.status })));
     if (subtasks.length === 0) {
       toast({ title: 'Progress', description: 'No subtasks found yet.', variant: 'default' });
       return;
     }
     const completed = subtasks.filter((t) => t.status === 'Complete').length;
     const percent = Math.round((completed / subtasks.length) * 100);
+    console.log('[TravelProgressIssue] Completed:', completed, 'Total:', subtasks.length, 'Percent:', percent);
     toast({ title: 'Progress', description: `${percent}% Complete`, variant: 'default' });
   };
 
