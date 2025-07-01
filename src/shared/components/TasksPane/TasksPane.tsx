@@ -21,7 +21,11 @@ const TasksPane: React.FC = () => {
   // Project context & task helpers
   const { selectedProjectId } = useProject();
   const { data: cancellableTasks } = useListTasks({ projectId: selectedProjectId, status: ['Queued', 'In Progress'] });
-  const cancellableCount = cancellableTasks?.length ?? 0;
+  
+  // Count only visible tasks (exclude travel_segment and travel_stitch) for display
+  const visibleCancellableCount = cancellableTasks?.filter(task => 
+    !['travel_segment', 'travel_stitch'].includes(task.taskType)
+  ).length ?? 0;
 
   const cancelAllPendingMutation = useCancelAllPendingTasks();
   const { toast } = useToast();
@@ -94,14 +98,14 @@ const TasksPane: React.FC = () => {
         >
           <div className="p-2 border-b border-zinc-800 flex items-center justify-between flex-shrink-0">
               <h2 className="text-lg font-semibold text-zinc-200 ml-2">Tasks</h2>
-              {cancellableCount > 0 && (
+              {visibleCancellableCount > 0 && (
                 <Button
                   variant="destructive"
                   size="sm"
                   onClick={handleCancelAllPending}
                   disabled={cancelAllPendingMutation.isPending}
                 >
-                  {cancelAllPendingMutation.isPending ? 'Cancelling All...' : `Cancel All (${cancellableCount})`}
+                  {cancelAllPendingMutation.isPending ? 'Cancelling All...' : `Cancel All (${visibleCancellableCount})`}
                 </Button>
               )}
           </div>
