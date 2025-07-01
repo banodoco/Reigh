@@ -9,6 +9,7 @@ import PaneControlTab from '../PaneControlTab';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { useCancelAllPendingTasks, useListTasks } from '@/shared/hooks/useTasks';
 import { useToast } from '@/shared/hooks/use-toast';
+import { filterVisibleTasks } from '@/shared/lib/taskConfig';
 
 const TasksPane: React.FC = () => {
   const {
@@ -23,9 +24,7 @@ const TasksPane: React.FC = () => {
   const { data: cancellableTasks } = useListTasks({ projectId: selectedProjectId, status: ['Queued', 'In Progress'] });
   
   // Count only visible tasks (exclude travel_segment and travel_stitch) for display
-  const visibleCancellableCount = cancellableTasks?.filter(task => 
-    !['travel_segment', 'travel_stitch'].includes(task.taskType)
-  ).length ?? 0;
+  const visibleCancellableCount = filterVisibleTasks(cancellableTasks || []).length;
 
   const cancelAllPendingMutation = useCancelAllPendingTasks();
   const { toast } = useToast();

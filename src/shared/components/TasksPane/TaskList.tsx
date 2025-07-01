@@ -15,6 +15,7 @@ import {
   DropdownMenuSeparator 
 } from "@/shared/components/ui/dropdown-menu";
 import { ScrollArea } from "@/shared/components/ui/scroll-area"
+import { filterVisibleTasks } from '@/shared/lib/taskConfig';
 
 // Use all statuses from the enum directly
 const ALL_POSSIBLE_STATUSES = [...taskStatusEnum] as TaskStatus[];
@@ -73,9 +74,9 @@ const TaskList: React.FC = () => {
   // Filter out travel_segment and travel_stitch tasks so they do not appear in the sidebar
   const filteredTasks = useMemo(() => {
     if (!tasks) return [] as Task[];
-    const withoutHidden = tasks.filter(task => !['travel_segment', 'travel_stitch'].includes(task.taskType));
+    const visibleTasks = filterVisibleTasks(tasks);
     // Sort: In Progress first, then by createdAt desc
-    return withoutHidden.sort((a, b) => {
+    return visibleTasks.sort((a, b) => {
       const aInProgress = a.status === 'In Progress';
       const bInProgress = b.status === 'In Progress';
       if (aInProgress && !bInProgress) return -1;

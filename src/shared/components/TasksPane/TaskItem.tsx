@@ -7,6 +7,7 @@ import { formatDistanceToNow, isValid } from 'date-fns';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { useEffect, useState } from 'react';
 import { cn } from '@/shared/lib/utils';
+import { getTaskDisplayName, taskSupportsProgress } from '@/shared/lib/taskConfig';
 
 interface TaskItemProps {
   task: Task;
@@ -40,7 +41,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
   const { data: allProjectTasks, refetch: refetchAllTasks } = useListTasks({ projectId: selectedProjectId });
 
   // Map certain task types to more user-friendly names for display purposes
-  const displayTaskType = task.taskType === 'travel_orchestrator' ? 'Travel Between Images' : task.taskType;
+  const displayTaskType = getTaskDisplayName(task.taskType);
 
   // Extract image URLs for Travel Between Images tasks (travel_orchestrator)
   const imageUrls: string[] = React.useMemo(() => {
@@ -186,7 +187,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
         </span>
         {(task.status === 'Queued' || task.status === 'In Progress') && (
           <div className="flex items-center gap-2">
-            {task.taskType === 'travel_orchestrator' && task.status === 'In Progress' && (
+            {taskSupportsProgress(task.taskType) && task.status === 'In Progress' && (
               progressPercent === null ? (
                 <Button
                   variant="ghost"
