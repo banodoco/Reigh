@@ -16,7 +16,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
 
   // Access all tasks for project (used for orchestrator logic)
   const { selectedProjectId } = useProject();
-  const { data: allProjectTasks } = useListTasks({ projectId: selectedProjectId });
+  const { data: allProjectTasks, refetch: refetchAllTasks } = useListTasks({ projectId: selectedProjectId });
 
   // Map certain task types to more user-friendly names for display purposes
   const displayTaskType = task.taskType === 'travel_orchestrator' ? 'Travel Between Images' : task.taskType;
@@ -61,11 +61,20 @@ const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
     }
   };
 
-  // Handler to check subtask completion progress for orchestrator tasks
+  // Handler wrapper
   const handleCheckProgress = () => {
-    if (!allProjectTasks) return;
+    if (!allProjectTasks) {
+      refetchAllTasks().then(({ data }) => {
+        if (data) computeAndShowProgress(data);
+      });
+    } else {
+      computeAndShowProgress(allProjectTasks);
+    }
+  };
+
+  const computeAndShowProgress = (tasksData: Task[]) => {
     const orchestratorId = (task.params as any)?.orchestrator_details?.orchestrator_task_id || task.id;
-    const subtasks = allProjectTasks.filter(
+    const subtasks = tasksData.filter(
       (t) => (t.params as any)?.orchestrator_task_id_ref === orchestratorId && t.id !== task.id
     );
     if (subtasks.length === 0) {
