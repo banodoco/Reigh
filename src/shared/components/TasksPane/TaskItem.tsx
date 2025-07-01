@@ -119,7 +119,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
   };
 
   return (
-    <div className="p-3 mb-2 bg-zinc-800 rounded-md shadow">
+    <div className="p-3 mb-2 bg-zinc-800/95 rounded-md shadow border border-zinc-600 hover:border-zinc-400 transition-colors">
       <div className="flex justify-between items-center mb-1">
         <span className="text-sm font-semibold text-zinc-200">{displayTaskType}</span>
         <span
