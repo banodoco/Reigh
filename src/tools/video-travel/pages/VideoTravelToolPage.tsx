@@ -336,6 +336,14 @@ const VideoTravelToolPage: React.FC = () => {
 
   // Save settings to database whenever they change
   useEffect(() => {
+    console.log('[ToolSettingsDebug] Save effect triggered', {
+      shotId: selectedShot?.id,
+      hasSettings: !!settings,
+      hasLoadedInitialSettings: hasLoadedInitialSettings.current,
+      userHasInteracted: userHasInteracted.current,
+      isUpdating
+    });
+
     if (selectedShot?.id && settings && hasLoadedInitialSettings.current && userHasInteracted.current) {
       // Clear any pending save
       if (saveTimeoutRef.current) {
@@ -370,6 +378,13 @@ const VideoTravelToolPage: React.FC = () => {
           console.log('[ToolSettingsDebug] ► No change detected for shot', selectedShot?.id);
         }
       }, 500); // Wait 500ms before saving
+    } else {
+      console.log('[ToolSettingsDebug] ► Save conditions not met', {
+        hasSelectedShot: !!selectedShot?.id,
+        hasSettings: !!settings,
+        hasLoadedInitialSettings: hasLoadedInitialSettings.current,
+        userHasInteracted: userHasInteracted.current
+      });
     }
     
     // Cleanup timeout on unmount
@@ -542,14 +557,17 @@ const VideoTravelToolPage: React.FC = () => {
                   setVideoPairConfigs(prev => prev.map(p => p.id === pairId ? { ...p, [field]: value } : p));
                 }}
                 onBatchVideoPromptChange={(prompt) => {
+                  console.log('[ToolSettingsDebug] User changed batch prompt', prompt);
                   userHasInteracted.current = true;
                   setBatchVideoPrompt(prompt);
                 }}
                 onBatchVideoFramesChange={(frames) => {
+                  console.log('[ToolSettingsDebug] User changed batch frames', frames);
                   userHasInteracted.current = true;
                   setBatchVideoFrames(frames);
                 }}
                 onBatchVideoContextChange={(context) => {
+                  console.log('[ToolSettingsDebug] User changed batch context', context);
                   userHasInteracted.current = true;
                   setBatchVideoContext(context);
                 }}

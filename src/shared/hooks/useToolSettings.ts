@@ -88,6 +88,8 @@ export function useToolSettings<T = unknown>(
 
   const updateMutation = useMutation({
     mutationFn: (params: { scope: SettingsScope; patch: Partial<T> }) => {
+      console.log('[ToolSettingsDebug] Update mutation starting', { toolId, scope: params.scope, patch: params.patch });
+      
       const id = params.scope === 'project' ? ctx.projectId : 
                  params.scope === 'shot' ? ctx.shotId : 
                  'current-user'; // User ID will be handled server-side
@@ -135,10 +137,11 @@ export function useToolSettings<T = unknown>(
   });
 
   const update = useCallback((patch: Partial<T>, scope: SettingsScope = 'shot') => {
+    console.log('[ToolSettingsDebug] Update function called', { toolId, patch, scope, ctx });
     // Mark that the user has interacted
     hasUserInteracted.current = true;
     return updateMutation.mutate({ scope, patch });
-  }, [updateMutation]);
+  }, [updateMutation, toolId, ctx]);
 
   // Expose a method to check if user has interacted
   const hasUserMadeChanges = useCallback(() => hasUserInteracted.current, []);
