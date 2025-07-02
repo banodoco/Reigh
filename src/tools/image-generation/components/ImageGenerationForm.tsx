@@ -426,29 +426,47 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
     setSelectedLoras(selectedLorasMap[generationMode] || []);
   }, [generationMode]);
 
-  useEffect(() => {
-    setSelectedLorasMap(prev => ({ ...prev, [generationMode]: selectedLoras }));
-  }, [selectedLoras]);
-
   const handleAddLora = (loraToAdd: LoraModel) => { 
     markAsInteracted();
     if (selectedLoras.find(sl => sl.id === loraToAdd["Model ID"])) { toast.info(`LoRA already added.`); return; }
     if (loraToAdd["Model Files"] && loraToAdd["Model Files"].length > 0) {
-      setSelectedLoras(prevLoras => [ ...prevLoras, {
-          id: loraToAdd["Model ID"], name: loraToAdd.Name !== "N/A" ? loraToAdd.Name : loraToAdd["Model ID"],
-          path: loraToAdd["Model Files"][0].url, strength: 1.0, 
-          previewImageUrl: loraToAdd.Images && loraToAdd.Images.length > 0 ? loraToAdd.Images[0].url : undefined,
-        }]);
+      const newLora = {
+        id: loraToAdd["Model ID"], 
+        name: loraToAdd.Name !== "N/A" ? loraToAdd.Name : loraToAdd["Model ID"],
+        path: loraToAdd["Model Files"][0].url, 
+        strength: 1.0, 
+        previewImageUrl: loraToAdd.Images && loraToAdd.Images.length > 0 ? loraToAdd.Images[0].url : undefined,
+      };
+      const updatedLoras = [...selectedLoras, newLora];
+      setSelectedLoras(updatedLoras);
+      setSelectedLorasMap(prev => ({
+        ...prev,
+        [generationMode]: updatedLoras
+      }));
       toast.success(`LoRA added.`);
     } else { toast.error("Selected LoRA has no model file specified."); }
   };
   const handleRemoveLora = (loraIdToRemove: string) => {
     markAsInteracted();
-    setSelectedLoras(prevLoras => prevLoras.filter(lora => lora.id !== loraIdToRemove));
+    const updatedLoras = selectedLoras.filter(lora => lora.id !== loraIdToRemove);
+    setSelectedLoras(updatedLoras);
+    setSelectedLorasMap(prev => ({
+      ...prev,
+      [generationMode]: updatedLoras
+    }));
   };
   const handleLoraStrengthChange = (loraId: string, newStrength: number) => {
     markAsInteracted();
-    setSelectedLoras(prevLoras => prevLoras.map(lora => lora.id === loraId ? { ...lora, strength: newStrength } : lora));
+    console.log('[LoRA] Changing strength for', loraId, 'to', newStrength);
+    const updatedLoras = selectedLoras.map(lora => 
+      lora.id === loraId ? { ...lora, strength: newStrength } : lora
+    );
+    setSelectedLoras(updatedLoras);
+    // Force immediate update to the map
+    setSelectedLorasMap(prev => ({
+      ...prev,
+      [generationMode]: updatedLoras
+    }));
   };
   const processFileInternal = async (file: File | null, fromLocalStorageLoad = false) => {
     if (startingImagePreview && startingImagePreview.startsWith("blob:")) {
