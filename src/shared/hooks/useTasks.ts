@@ -1,9 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import axios from 'axios';
-import { Task, TaskStatus } from '@/types/tasks'; // Assuming Task and TaskStatus types will be defined here or imported appropriately
-import { useProject } from "@/shared/contexts/ProjectContext"; // To get selectedProjectId
+import { Task, TaskStatus } from '@/types/tasks';
 import { toast } from 'sonner';
-import { fetchWithAuth } from '@/lib/api';
 import { supabase } from '@/integrations/supabase/client';
 
 const TASKS_QUERY_KEY = 'tasks';
@@ -27,71 +24,65 @@ interface UpdateTaskStatusParams {
   status: TaskStatus;
 }
 
-// Fetch tasks from the API
-const fetchTasks = async ({ projectId, status }: ListTasksParams): Promise<Task[]> => {
-  const params = new URLSearchParams();
-  if (projectId) params.append('projectId', projectId);
-  if (status?.length) {
-    status.forEach(s => params.append('status[]', s));
-  }
+// Hook to create a task
+export const useCreateTask = () => {
+  const queryClient = useQueryClient();
   
-  const response = await fetchWithAuth(`/api/tasks?${params.toString()}`);
-  if (!response.ok) {
-    throw new Error('Failed to fetch tasks');
-  }
-  return response.json();
+  return useMutation({
+    mutationFn: async (task: Partial<Task>) => {
+      const { data, error } = await supabase
+        .from('tasks')
+        .insert({
+          project_id: task.projectId,
+          task_type: task.taskType,
+          params: task.params || {},
+          status: task.status || 'Queued',
+        })
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: [TASKS_QUERY_KEY] });
+      toast.success('Task created successfully');
+    },
+    onError: (error: Error) => {
+      console.error('Error creating task:', error);
+      toast.error(`Failed to create task: ${error.message}`);
+    },
+  });
 };
 
-// Create a new task
-const createTask = async ({ projectId, taskType, params }: CreateTaskParams): Promise<Task> => {
-  const response = await fetchWithAuth('/api/tasks', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ projectId, taskType, params }),
+// Hook to update task status
+export const useUpdateTaskStatus = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ taskId, status }: { taskId: string; status: TaskStatus }) => {
+      const { data, error } = await supabase
+        .from('tasks')
+        .update({ 
+          status,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', taskId)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (_, taskId) => {
+      queryClient.invalidateQueries({ queryKey: [TASKS_QUERY_KEY] });
+      toast.success('Task status updated successfully');
+    },
+    onError: (error: Error) => {
+      console.error('Error updating task status:', error);
+      toast.error(`Failed to update task status: ${error.message}`);
+    },
   });
-  
-  if (!response.ok) {
-    throw new Error('Failed to create task');
-  }
-  
-  return response.json();
-};
-
-// Cancel a task
-const cancelTask = async (taskId: string): Promise<void> => {
-  const response = await fetchWithAuth(`/api/tasks/${taskId}/cancel`, {
-    method: 'PATCH',
-  });
-  
-  if (!response.ok) {
-    throw new Error('Failed to cancel task');
-  }
-};
-
-// Update task status
-const updateTaskStatus = async ({ taskId, status }: UpdateTaskStatusParams): Promise<void> => {
-  const response = await fetchWithAuth(`/api/tasks/${taskId}/status`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ status }),
-  });
-  
-  if (!response.ok) {
-    throw new Error('Failed to update task status');
-  }
-};
-
-// Cancel all pending tasks
-const cancelAllPendingTasks = async (projectId: string): Promise<void> => {
-  const response = await fetchWithAuth('/api/tasks/cancel-pending', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ projectId }),
-  });
-  
-  if (!response.ok) {
-    throw new Error('Failed to cancel pending tasks');
-  }
 };
 
 // Hook to list tasks
@@ -105,19 +96,19 @@ export const useListTasks = (params: ListTasksParams) => {
         return []; 
       }
       
-      const queryParams = new URLSearchParams();
-      queryParams.append('projectId', projectId);
+      // Build query
+      let query = supabase
+        .from('tasks')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('created_at', { ascending: false });
+
+      // Apply status filter if provided
       if (status && status.length > 0) {
-        status.forEach(s => queryParams.append('status[]', s));
+        query = query.in('status', status);
       }
-      
-      // Edge Functions receive query params as part of the URL
-      const { data, error } = await supabase.functions.invoke('tasks-list', {
-        body: {
-          projectId,
-          status: status || []
-        }
-      });
+
+      const { data, error } = await query;
       
       if (error) throw error;
       return data || [];
@@ -138,9 +129,20 @@ interface CancelAllPendingTasksResponse {
 export const useCancelTask = () => {
   const queryClient = useQueryClient();
   
-  return useMutation<void, Error, string>({
-    mutationFn: async (taskId) => {
-      await cancelTask(taskId);
+  return useMutation({
+    mutationFn: async (taskId: string) => {
+      const { data, error } = await supabase
+        .from('tasks')
+        .update({ 
+          status: 'Cancelled',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', taskId)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
     },
     onSuccess: (_, taskId) => {
       queryClient.invalidateQueries({ queryKey: [TASKS_QUERY_KEY] });
@@ -153,28 +155,37 @@ export const useCancelTask = () => {
   });
 };
 
-// Hook to cancel all PENDING tasks for a project
-// Note: The backend sets the status to "Failed" now.
-export const useCancelAllPendingTasks = () => {
+// Hook to cancel pending tasks
+export const useCancelPendingTasks = () => {
   const queryClient = useQueryClient();
-  const { selectedProjectId } = useProject(); // To invalidate queries for the current project
-
-  return useMutation<CancelAllPendingTasksResponse, Error, { projectId: string }>({
-    mutationFn: async ({ projectId }) => {
-      if (!projectId) {
-        throw new Error("Project ID is required to cancel all pending tasks.");
-      }
-      await cancelAllPendingTasks(projectId);
-      return { message: 'All pending tasks cancelled', cancelledCount: 0 };
+  
+  return useMutation({
+    mutationFn: async (projectId: string) => {
+      const { data, error } = await supabase
+        .from('tasks')
+        .update({ 
+          status: 'Cancelled',
+          updated_at: new Date().toISOString()
+        })
+        .eq('project_id', projectId)
+        .in('status', ['Queued', 'In Progress'])
+        .select();
+      
+      if (error) throw error;
+      return data;
     },
-    onSuccess: (data) => {
-      // Invalidate and refetch tasks list for the current project to reflect the changes
-      queryClient.invalidateQueries({ queryKey: [TASKS_QUERY_KEY, selectedProjectId] });
-      queryClient.invalidateQueries({ queryKey: [TASKS_QUERY_KEY, selectedProjectId, ['Queued']] });
-      queryClient.invalidateQueries({ queryKey: [TASKS_QUERY_KEY, selectedProjectId, ['Cancelled']] });
+    onSuccess: (_, projectId) => {
+      queryClient.invalidateQueries({ queryKey: [TASKS_QUERY_KEY, projectId] });
+      queryClient.invalidateQueries({ queryKey: [TASKS_QUERY_KEY, projectId, ['Queued']] });
+      queryClient.invalidateQueries({ queryKey: [TASKS_QUERY_KEY, projectId, ['Cancelled']] });
+      toast.success('Pending tasks cancelled successfully');
     },
-    onError: (error) => {
-      console.error('Cancel-All error:', error);
+    onError: (error: Error) => {
+      console.error('Error cancelling pending tasks:', error);
+      toast.error(`Failed to cancel pending tasks: ${error.message}`);
     },
   });
-}; 
+};
+
+// Export alias for backward compatibility
+export const useCancelAllPendingTasks = useCancelPendingTasks; 

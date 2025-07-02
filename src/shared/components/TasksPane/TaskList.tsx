@@ -80,7 +80,10 @@ const TaskList: React.FC = () => {
       const bInProgress = b.status === 'In Progress';
       if (aInProgress && !bInProgress) return -1;
       if (!aInProgress && bInProgress) return 1;
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      // Handle both createdAt and created_at field names
+      const aDate = new Date((a.createdAt || (a as any).created_at) || 0);
+      const bDate = new Date((b.createdAt || (b as any).created_at) || 0);
+      return bDate.getTime() - aDate.getTime();
     });
   }, [tasks]);
 

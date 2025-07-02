@@ -35,11 +35,11 @@ const TasksPane: React.FC = () => {
       return;
     }
 
-    cancelAllPendingMutation.mutate({ projectId: selectedProjectId }, {
+    cancelAllPendingMutation.mutate(selectedProjectId, {
       onSuccess: (data) => {
         toast({
           title: 'Tasks Cancellation Initiated',
-          description: data.message || `Attempting to cancel all active tasks.`,
+          description: `Cancelled ${data?.length || 0} pending tasks.`,
           variant: 'default',
         });
       },

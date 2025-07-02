@@ -188,7 +188,11 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
       <div className="flex items-center justify-between text-xs text-zinc-400">
         <span>
           Created: {(() => {
-            const date = new Date(task.createdAt);
+            // Handle both createdAt and created_at field names from database
+            const dateStr = task.createdAt || (task as any).created_at;
+            if (!dateStr) return 'Unknown';
+            
+            const date = new Date(dateStr);
             if (!isValid(date)) return 'Unknown';
             
             return abbreviateDistance(formatDistanceToNow(date, { addSuffix: true }));
