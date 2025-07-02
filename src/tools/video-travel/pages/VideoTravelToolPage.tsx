@@ -82,6 +82,7 @@ const VideoTravelToolPage: React.FC = () => {
   const hasLoadedInitialSettings = useRef(false);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const userHasInteracted = useRef(false);
+  const [showSkeleton, setShowSkeleton] = useState(false);
 
   // Update state when settings are loaded from database
   useEffect(() => {
@@ -124,7 +125,24 @@ const VideoTravelToolPage: React.FC = () => {
   useEffect(() => {
     hasLoadedInitialSettings.current = false;
     userHasInteracted.current = false;
-  }, [selectedShot?.id]);
+    setShowSkeleton(false);
+    
+    // Show skeleton after a small delay if settings are still loading
+    const skeletonTimer = setTimeout(() => {
+      if (isLoadingSettings) {
+        setShowSkeleton(true);
+      }
+    }, 200); // 200ms delay
+    
+    return () => clearTimeout(skeletonTimer);
+  }, [selectedShot?.id, isLoadingSettings]);
+
+  // Hide skeleton when settings are loaded
+  useEffect(() => {
+    if (!isLoadingSettings) {
+      setShowSkeleton(false);
+    }
+  }, [isLoadingSettings]);
 
   useEffect(() => {
     fetch('/data/loras.json')
@@ -429,83 +447,156 @@ const VideoTravelToolPage: React.FC = () => {
           />
         </>
       ) : (
-        <ShotEditor
-          selectedShot={selectedShot}
-          projectId={selectedProjectId}
-          videoPairConfigs={videoPairConfigs}
-          videoControlMode={videoControlMode}
-          batchVideoPrompt={batchVideoPrompt}
-          batchVideoFrames={batchVideoFrames}
-          batchVideoContext={batchVideoContext}
-          orderedShotImages={selectedShot.images || []}
-          onShotImagesUpdate={handleShotImagesUpdate}
-          onBack={handleBackToShotList}
-          onVideoControlModeChange={(mode) => {
-            userHasInteracted.current = true;
-            setVideoControlMode(mode);
-          }}
-          onPairConfigChange={(pairId, field, value) => {
-            userHasInteracted.current = true;
-            setVideoPairConfigs(prev => prev.map(p => p.id === pairId ? { ...p, [field]: value } : p));
-          }}
-          onBatchVideoPromptChange={(prompt) => {
-            userHasInteracted.current = true;
-            setBatchVideoPrompt(prompt);
-          }}
-          onBatchVideoFramesChange={(frames) => {
-            userHasInteracted.current = true;
-            setBatchVideoFrames(frames);
-          }}
-          onBatchVideoContextChange={(context) => {
-            userHasInteracted.current = true;
-            setBatchVideoContext(context);
-          }}
-          batchVideoSteps={batchVideoSteps}
-          onBatchVideoStepsChange={(steps) => {
-            userHasInteracted.current = true;
-            setBatchVideoSteps(steps);
-          }}
-          dimensionSource={dimensionSource}
-          onDimensionSourceChange={(source) => {
-            userHasInteracted.current = true;
-            setDimensionSource(source);
-          }}
-          customWidth={customWidth}
-          onCustomWidthChange={(width) => {
-            userHasInteracted.current = true;
-            setCustomWidth(width);
-          }}
-          customHeight={customHeight}
-          onCustomHeightChange={(height) => {
-            userHasInteracted.current = true;
-            setCustomHeight(height);
-          }}
-          steerableMotionSettings={steerableMotionSettings}
-          onSteerableMotionSettingsChange={handleSteerableMotionSettingsChange}
-          onGenerateAllSegments={() => {}}
-          selectedLoras={selectedLoras}
-          onAddLora={handleAddLora}
-          onRemoveLora={handleRemoveLora}
-          onLoraStrengthChange={handleLoraStrengthChange}
-          availableLoras={availableLoras}
-          isLoraModalOpen={isLoraModalOpen}
-          setIsLoraModalOpen={setIsLoraModalOpen}
-          enhancePrompt={enhancePrompt}
-          onEnhancePromptChange={(enhance) => {
-            userHasInteracted.current = true;
-            setEnhancePrompt(enhance);
-          }}
-          generationMode={generationMode}
-          onGenerationModeChange={(mode) => {
-            userHasInteracted.current = true;
-            setGenerationMode(mode);
-          }}
-          pairConfigs={pairConfigs}
-          onPairConfigsChange={(configs) => {
-            userHasInteracted.current = true;
-            setPairConfigs(configs);
-          }}
-        />
+        <>
+          {/* Show loading state while settings are loading for the selected shot */}
+          {showSkeleton ? (
+            <div className="container mx-auto p-4">
+              <div className="mb-6">
+                <Button 
+                  variant="outline" 
+                  onClick={handleBackToShotList}
+                  className="mb-4"
+                >
+                  ← Back to Shots
+                </Button>
+                <div className="h-8 bg-gray-200 rounded w-48 mb-2 animate-pulse"></div>
+                <div className="h-4 bg-gray-100 rounded w-32 animate-pulse"></div>
+              </div>
+              
+              {/* Loading skeleton that matches the form structure */}
+              <div className="space-y-6">
+                {/* Video outputs gallery skeleton */}
+                <div className="p-4 border rounded-lg bg-card shadow-md animate-pulse">
+                  <div className="h-6 bg-gray-200 rounded w-40 mb-4"></div>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="aspect-video bg-gray-200 rounded"></div>
+                    <div className="aspect-video bg-gray-200 rounded"></div>
+                    <div className="aspect-video bg-gray-200 rounded"></div>
+                  </div>
+                </div>
+                
+                {/* Form settings skeleton */}
+                <div className="p-4 border rounded-lg bg-card shadow-md animate-pulse">
+                  <div className="flex justify-between items-center mb-4">
+                    <div className="h-6 bg-gray-200 rounded w-36"></div>
+                    <div className="h-8 bg-gray-200 rounded w-32"></div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <div className="h-4 bg-gray-200 rounded w-16"></div>
+                      <div className="h-20 bg-gray-100 rounded"></div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="h-4 bg-gray-200 rounded w-24"></div>
+                      <div className="h-20 bg-gray-100 rounded"></div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                    <div className="space-y-2">
+                      <div className="h-4 bg-gray-200 rounded w-20"></div>
+                      <div className="h-6 bg-gray-100 rounded"></div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="h-4 bg-gray-200 rounded w-32"></div>
+                      <div className="h-6 bg-gray-100 rounded"></div>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Images section skeleton */}
+                <div className="p-4 border rounded-lg bg-card shadow-md animate-pulse">
+                  <div className="h-6 bg-gray-200 rounded w-24 mb-4"></div>
+                  <div className="grid grid-cols-4 gap-4">
+                    <div className="aspect-square bg-gray-200 rounded"></div>
+                    <div className="aspect-square bg-gray-200 rounded"></div>
+                    <div className="aspect-square bg-gray-200 rounded"></div>
+                    <div className="aspect-square bg-gray-200 rounded opacity-50"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="opacity-0 animate-[fadeIn_0.3s_ease-in_forwards]">
+              <ShotEditor
+                selectedShot={selectedShot}
+                projectId={selectedProjectId}
+                videoPairConfigs={videoPairConfigs}
+                videoControlMode={videoControlMode}
+                batchVideoPrompt={batchVideoPrompt}
+                batchVideoFrames={batchVideoFrames}
+                batchVideoContext={batchVideoContext}
+                orderedShotImages={selectedShot.images || []}
+                onShotImagesUpdate={handleShotImagesUpdate}
+                onBack={handleBackToShotList}
+                onVideoControlModeChange={(mode) => {
+                  userHasInteracted.current = true;
+                  setVideoControlMode(mode);
+                }}
+                onPairConfigChange={(pairId, field, value) => {
+                  userHasInteracted.current = true;
+                  setVideoPairConfigs(prev => prev.map(p => p.id === pairId ? { ...p, [field]: value } : p));
+                }}
+                onBatchVideoPromptChange={(prompt) => {
+                  userHasInteracted.current = true;
+                  setBatchVideoPrompt(prompt);
+                }}
+                onBatchVideoFramesChange={(frames) => {
+                  userHasInteracted.current = true;
+                  setBatchVideoFrames(frames);
+                }}
+                onBatchVideoContextChange={(context) => {
+                  userHasInteracted.current = true;
+                  setBatchVideoContext(context);
+                }}
+                batchVideoSteps={batchVideoSteps}
+                onBatchVideoStepsChange={(steps) => {
+                  userHasInteracted.current = true;
+                  setBatchVideoSteps(steps);
+                }}
+                dimensionSource={dimensionSource}
+                onDimensionSourceChange={(source) => {
+                  userHasInteracted.current = true;
+                  setDimensionSource(source);
+                }}
+                customWidth={customWidth}
+                onCustomWidthChange={(width) => {
+                  userHasInteracted.current = true;
+                  setCustomWidth(width);
+                }}
+                customHeight={customHeight}
+                onCustomHeightChange={(height) => {
+                  userHasInteracted.current = true;
+                  setCustomHeight(height);
+                }}
+                steerableMotionSettings={steerableMotionSettings}
+                onSteerableMotionSettingsChange={handleSteerableMotionSettingsChange}
+                onGenerateAllSegments={() => {}}
+                selectedLoras={selectedLoras}
+                onAddLora={handleAddLora}
+                onRemoveLora={handleRemoveLora}
+                onLoraStrengthChange={handleLoraStrengthChange}
+                availableLoras={availableLoras}
+                isLoraModalOpen={isLoraModalOpen}
+                setIsLoraModalOpen={setIsLoraModalOpen}
+                enhancePrompt={enhancePrompt}
+                onEnhancePromptChange={(enhance) => {
+                  userHasInteracted.current = true;
+                  setEnhancePrompt(enhance);
+                }}
+                generationMode={generationMode}
+                onGenerationModeChange={(mode) => {
+                  userHasInteracted.current = true;
+                  setGenerationMode(mode);
+                }}
+                pairConfigs={pairConfigs}
+                onPairConfigsChange={(configs) => {
+                  userHasInteracted.current = true;
+                  setPairConfigs(configs);
+                }}
+              />
+            </div>
+          )}
+        </>
       )}
 
       <CreateShotModal 
