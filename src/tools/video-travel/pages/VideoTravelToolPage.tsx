@@ -138,6 +138,7 @@ const VideoTravelToolPage: React.FC = () => {
     hasLoadedInitialSettings.current = false;
     userHasInteracted.current = false;
     setShowSkeleton(false);
+    prevLoadingRef.current = true; // Reset loading ref when shot changes
   }, [selectedShot?.id]);
 
   // Control skeleton visibility based on loading state
@@ -149,6 +150,16 @@ const VideoTravelToolPage: React.FC = () => {
       setShowSkeleton(false);
     }
   }, [isLoadingSettings]);
+
+  // Handle case where settings are already cached when switching shots
+  useEffect(() => {
+    if (selectedShot?.id && settings && !isLoadingSettings && !hasLoadedInitialSettings.current) {
+      // Settings are already available (cached), mark as loaded
+      hasLoadedInitialSettings.current = true;
+      userHasInteracted.current = false;
+      console.log('[ToolSettingsDebug] Initial settings already cached', { shotId: selectedShot?.id });
+    }
+  }, [selectedShot?.id, settings, isLoadingSettings]);
 
   useEffect(() => {
     fetch('/data/loras.json')
