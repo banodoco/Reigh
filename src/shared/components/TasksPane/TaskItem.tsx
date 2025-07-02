@@ -132,7 +132,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
   };
 
   const containerClass = cn(
-    "p-3 mb-1 bg-zinc-800/95 rounded-md shadow border transition-colors",
+    "p-3 mb-2 bg-zinc-800/95 rounded-md shadow border transition-colors",
     isNew ? "border-teal-400 animate-[flash_3s_ease-in-out]" : "border-zinc-600 hover:border-zinc-400"
   );
 
@@ -168,7 +168,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
           )}
         </div>
       )}
-      <div className="flex items-center justify-between text-xs text-zinc-400 mb-1">
+      <div className="flex items-center justify-between text-xs text-zinc-400">
         <span>
           Created: {(() => {
             const date = new Date(task.createdAt);
