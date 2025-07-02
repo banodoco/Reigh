@@ -133,8 +133,11 @@ export const useDuplicateShot = () => {
         project_id: completeShot.project_id,
         images: completeShot.shot_generations?.map((sg: any) => ({
           ...sg.generation,
+          shotImageEntryId: sg.id,
           shot_generation_id: sg.id,
-          position: sg.position
+          position: sg.position,
+          imageUrl: sg.generation?.location || sg.generation?.imageUrl,
+          thumbUrl: sg.generation?.thumb_url || sg.generation?.thumbUrl,
         })) || []
       };
     },
@@ -216,8 +219,11 @@ export const useListShots = (projectId: string | null): UseQueryResult<Shot[], E
         if (sg.generation) {
           acc[sg.shot_id].push({
             ...sg.generation,
+            shotImageEntryId: sg.id,
             shot_generation_id: sg.id,
-            position: sg.position
+            position: sg.position,
+            imageUrl: sg.generation?.location || sg.generation?.imageUrl,
+            thumbUrl: sg.generation?.thumb_url || sg.generation?.thumbUrl,
           });
         }
         return acc;
@@ -364,7 +370,7 @@ export const useAddImageToShot = () => {
 interface RemoveImageFromShotArgs {
   shot_id: string;
   shotImageEntryId: string; // Changed from generation_id
-  project_id: string | null;
+  project_id?: string | null;
 }
 
 // Remove an image from a shot VIA API
@@ -372,7 +378,7 @@ export const useRemoveImageFromShot = () => {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async ({ shot_id, shotImageEntryId }: { shot_id: string; shotImageEntryId: string }) => {
+    mutationFn: async ({ shot_id, shotImageEntryId, project_id }: { shot_id: string; shotImageEntryId: string; project_id?: string | null }) => {
       const { error } = await supabase
         .from('shot_generations')
         .delete()

@@ -40,6 +40,7 @@ const GenerationsPane: React.FC = () => {
   }, [allGenerations, page]);
 
   const {
+    isGenerationsPaneLocked,
     setIsGenerationsPaneLocked,
     generationsPaneHeight,
   } = usePanes();
@@ -47,6 +48,7 @@ const GenerationsPane: React.FC = () => {
   const { isLocked, isOpen, toggleLock, openPane, paneProps, transformClass, handlePaneEnter, handlePaneLeave } = useSlidingPane({
     side: 'bottom',
     onLockStateChange: setIsGenerationsPaneLocked,
+    isInitiallyLocked: isGenerationsPaneLocked,
   });
 
   useEffect(() => {
@@ -127,7 +129,7 @@ const GenerationsPane: React.FC = () => {
             <h2 className="text-lg font-semibold text-zinc-200 ml-2">Generations</h2>
             <div className="flex items-center space-x-2">
                 {/* Pagination */}
-                <span className="text-sm text-zinc-400">
+                <span className="text-sm text-white">
                     Page {paginatedData.currentPage} of {paginatedData.totalPages || 1}
                 </span>
                 <Button variant="outline" size="sm" onClick={handlePrevPage} disabled={page === 1 || isLoading}>
@@ -141,7 +143,7 @@ const GenerationsPane: React.FC = () => {
                 <Button 
                   variant="ghost" 
                   size="sm" 
-                  className="text-zinc-400 hover:text-zinc-100"
+                  className="text-white hover:text-white/80"
                   onClick={() => {
                     toggleLock(false); // Unlock the pane
                     navigate('/generations'); // Navigate to generations page
@@ -165,6 +167,7 @@ const GenerationsPane: React.FC = () => {
                     onAddToLastShot={handleAddToShot}
                     offset={(page - 1) * GENERATIONS_PER_PAGE}
                     totalCount={allGenerations?.length || paginatedData.items.length}
+                    whiteText
                 />
             )}
             {paginatedData.items.length === 0 && !isLoading && (

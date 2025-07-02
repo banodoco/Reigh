@@ -41,7 +41,7 @@ export async function resolveToolSettings(
   toolId: string,
   ctx: ToolSettingsContext
 ): Promise<unknown> {
-  console.log('[ToolSettingsDebug] DB-resolve', { toolId, ...ctx });
+  
   const [user, project, shot] = await Promise.all([
     db.query.users.findFirst({ where: eq(users.id, ctx.userId) }),
     ctx.projectId ? db.query.projects.findFirst({ where: eq(projects.id, ctx.projectId) }) : null,
@@ -79,7 +79,7 @@ export async function updateToolSettings(params: UpdateToolSettingsParams): Prom
       if (!user) throw new Error('User not found');
       
       const currentSettings = (user.settings as any) ?? {};
-      console.log('[ToolSettingsDebug] DB-update', { scope: 'user', id, toolId, patch });
+      
       const toolSettings = currentSettings[toolId] ?? {};
       const updatedToolSettings = deepMerge({}, toolSettings, patch);
       
@@ -93,8 +93,7 @@ export async function updateToolSettings(params: UpdateToolSettingsParams): Prom
       const project = await db.query.projects.findFirst({ where: eq(projects.id, id) });
       if (!project) throw new Error('Project not found');
       
-      const currentSettings = (project.settings as any) ?? {};
-      console.log('[ToolSettingsDebug] DB-update', { scope: 'project', id, toolId, patch });
+      const currentSettings = (project.settings as any) ?? {};      
       const toolSettings = currentSettings[toolId] ?? {};
       const updatedToolSettings = deepMerge({}, toolSettings, patch);
       
@@ -108,8 +107,7 @@ export async function updateToolSettings(params: UpdateToolSettingsParams): Prom
       const shot = await db.query.shots.findFirst({ where: eq(shots.id, id) });
       if (!shot) throw new Error('Shot not found');
       
-      const currentSettings = (shot.settings as any) ?? {};
-      console.log('[ToolSettingsDebug] DB-update', { scope: 'shot', id, toolId, patch });
+      const currentSettings = (shot.settings as any) ?? {};      
       const toolSettings = currentSettings[toolId] ?? {};
       const updatedToolSettings = deepMerge({}, toolSettings, patch);
       

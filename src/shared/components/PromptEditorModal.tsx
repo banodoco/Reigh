@@ -13,19 +13,8 @@ import { Label } from '@/shared/components/ui/label';
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/components/ui/tabs";
 import { usePaneAwareModalStyle } from '@/shared/hooks/usePaneAwareModalStyle';
-
-// Debounce utility function
-function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
-  let timeoutId: ReturnType<typeof setTimeout> | null = null;
-  return (...args: Parameters<F>): void => {
-    if (timeoutId !== null) {
-      clearTimeout(timeoutId);
-    }
-    timeoutId = setTimeout(() => func(...args), waitFor);
-  };
-}
-
-const PROMPT_EDITOR_MODAL_CONTROLS_KEY = 'artfulPaneCraftPromptEditorControlsSettings';
+import { useProject } from '@/shared/contexts/ProjectContext';
+import { usePersistentToolState } from '@/shared/hooks/usePersistentToolState';
 
 // Use aliased types for internal state if they were named the same
 interface GenerationControlValues extends PGC_GenerationControlValues {}
@@ -93,72 +82,34 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
     }
   }, []);
 
-  // Effect to initialize modal state (prompts and control settings) when it *first* opens
+  // -------------------------------------------------------------
+  // New persistent settings wiring
+  // -------------------------------------------------------------
+  const { selectedProjectId } = useProject();
+
+  const { markAsInteracted } = usePersistentToolState<PersistedEditorControlsSettings>(
+    'prompt-editor', // isolated settings bucket for this modal
+    { projectId: selectedProjectId || undefined },
+    {
+      generationSettings: [generationControlValues, setGenerationControlValues],
+      bulkEditSettings: [bulkEditControlValues, setBulkEditControlValues],
+      activeTab: [activeTab, setActiveTab],
+    },
+    { debounceMs: 1000, scope: 'project' }
+  );
+
+  // Effect to initialize modal state (prompts) on open – persistence handled by hook
   useEffect(() => {
     if (isOpen) {
       setShowScrollToTop(false);
       if (scrollRef.current) {
         scrollRef.current.scrollTop = 0;
-      }
-      console.log("[PromptEditorModal] Modal is OPENING. Initializing state from props and localStorage.");
-      setPromptToEdit(null); // Ensure individual edit modal is not open from a previous interaction
-      
-      // 1. Set internal prompts from initialPrompts (deep copy)
-      console.log(`[PromptEditorModal] Initializing internalPrompts from initialPrompts on open. Current initialPrompts count: ${initialPrompts.length}`);
+      }      
+      setPromptToEdit(null);
       setInternalPrompts(initialPrompts.map(p => ({ ...p })));
-      
-      // 2. Load control settings from localStorage (only on initial open)
-      const savedSettingsRaw = localStorage.getItem(PROMPT_EDITOR_MODAL_CONTROLS_KEY);
-      if (savedSettingsRaw) {
-        console.log("[PromptEditorModal] Found saved control settings in localStorage.");
-        try {
-          const savedSettings = JSON.parse(savedSettingsRaw) as PersistedEditorControlsSettings;
-          if (savedSettings.generationSettings) {
-            console.log("[PromptEditorModal] Loading generation settings from localStorage:", savedSettings.generationSettings);
-            setGenerationControlValues(prev => ({ ...prev, ...savedSettings.generationSettings, addSummary: savedSettings.generationSettings.addSummary !== undefined ? savedSettings.generationSettings.addSummary : true }));
-          }
-          if (savedSettings.bulkEditSettings) {
-            console.log("[PromptEditorModal] Loading bulk edit settings from localStorage:", savedSettings.bulkEditSettings);
-            setBulkEditControlValues(prev => ({ ...prev, ...savedSettings.bulkEditSettings }));
-          }
-          if (savedSettings.activeTab) {
-            console.log("[PromptEditorModal] Loading active tab from localStorage:", savedSettings.activeTab);
-            setActiveTab(savedSettings.activeTab);
-          }
-        } catch (e) { 
-          console.error("[PromptEditorModal] Failed to parse control settings from localStorage on open:", e); 
-        }
-      } else {
-        console.log("[PromptEditorModal] No saved control settings found in localStorage on initial open. Defaults will be used (addSummary:true).");
-        setGenerationControlValues({
-            overallPromptText: '', specificPromptsText: '', rulesToRememberText: '',
-            numberToGenerate: 24, includeExistingContext: false, addSummary: true,
-        });
-      }
       setActivePromptIdForFullView(null);
     }
-  }, [isOpen]); 
-
-  const debouncedSaveControlSettings = useCallback(
-    debounce((settings: PersistedEditorControlsSettings) => {
-      localStorage.setItem(PROMPT_EDITOR_MODAL_CONTROLS_KEY, JSON.stringify(settings));
-      console.log("[PromptEditorModal] Control settings saved to localStorage (debounced).", JSON.stringify(settings));
-    }, 1000),
-    []
-  );
-
-  useEffect(() => {
-    if (isOpen) {
-      debouncedSaveControlSettings({
-        generationSettings: generationControlValues,
-        bulkEditSettings: bulkEditControlValues,
-        activeTab: activeTab,
-      });
-    }
-  }, [generationControlValues, bulkEditControlValues, activeTab, isOpen, debouncedSaveControlSettings]);
-
-  const handleGenerationValuesChange = useCallback((values: GenerationControlValues) => setGenerationControlValues(values), []);
-  const handleBulkEditValuesChange = useCallback((values: BulkEditControlValues) => setBulkEditControlValues(values), []);
+  }, [isOpen, initialPrompts]);
 
   const { 
     generatePrompts: aiGeneratePrompts, 
@@ -365,6 +316,16 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
     setActivePromptIdForFullView(currentId => currentId === promptId ? null : promptId);
   };
 
+  const handleGenerationValuesChange = useCallback((values: GenerationControlValues) => {
+    setGenerationControlValues(values);
+    markAsInteracted();
+  }, [markAsInteracted]);
+
+  const handleBulkEditValuesChange = useCallback((values: BulkEditControlValues) => {
+    setBulkEditControlValues(values);
+    markAsInteracted();
+  }, [markAsInteracted]);
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleFinalSaveAndClose()}>
       <DialogContent style={modalStyle} className="max-w-4xl flex flex-col p-0">
@@ -384,7 +345,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto">
-          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as EditorMode)} className="px-6">
+          <Tabs value={activeTab} onValueChange={(value) => { markAsInteracted(); setActiveTab(value as EditorMode); }} className="px-6">
             <TabsList className="grid w-full grid-cols-2 mb-4">
               <TabsTrigger value="generate" disabled={!actualCanUseAI}><Wand2Icon className="mr-2 h-4 w-4" />Generate New</TabsTrigger>
               <TabsTrigger value="bulk-edit" disabled={!actualCanUseAI}><Edit className="mr-2 h-4 w-4" />Bulk Edit All</TabsTrigger>

@@ -47,13 +47,13 @@ export function usePersistentToolState<T extends Record<string, any>>(
 ): UsePersistentToolStateResult {
   const { debounceMs = 500, scope = 'project' } = options;
   
-  // Use the underlying tool settings hook
+  // Obtain current settings and mutation helpers
   const {
     settings,
     isLoading: isLoadingSettings,
     update: updateSettings,
-    isUpdating
-  } = useToolSettings<T>(toolId, context, { silent: true });
+    isUpdating,
+  } = useToolSettings<T>(toolId, context);
 
   // Track hydration and interaction state
   const hasHydratedRef = useRef(false);
@@ -140,7 +140,7 @@ export function usePersistentToolState<T extends Record<string, any>>(
       if (!isUpdating && !deepEqual(sanitizeSettings(currentState), sanitizeSettings(settings))) {
         try {
           lastSavedSettingsRef.current = currentState;
-          await updateSettings(currentState, scope);
+          await updateSettings(scope, currentState);
           setSaveError(undefined);
         } catch (error) {
           setSaveError(error as Error);

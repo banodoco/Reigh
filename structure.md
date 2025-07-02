@@ -65,6 +65,47 @@
    - Client-side uses db (Supabase JS client) or API calls
 5. **Seeding**: `npm run db:seed:sqlite` (local SQLite)
 
+### Database Security & Migration Strategy
+
+**Current State**: The project uses a **dual migration system**:
+- **Drizzle migrations** (`/db/migrations/`) for schema changes (tables, columns, indexes)
+- **Supabase migrations** (`/supabase/migrations/`) for Supabase-specific features (RLS policies, triggers, functions)
+
+**Row Level Security (RLS) Status**: ✅ **ACTIVE**
+- All 7 main tables (`users`, `projects`, `shots`, `shot_generations`, `generations`, `resources`, `tasks`) have RLS enabled
+- 17 security policies enforce strict data isolation:
+  - Users can only access their own data
+  - Task creation restricted to `service_role` (Edge Functions only)
+  - Credit validation enforced at database level
+
+**Migration Workflow**:
+
+1. **Schema Changes** (tables, columns):
+   ```bash
+   # Update /db/schema/schema.ts
+   npm run db:generate:pg          # Generate Drizzle migration
+   # Apply via Drizzle or Supabase CLI
+   ```
+
+2. **RLS Policies, Functions, Triggers**:
+   ```bash
+   # Create file in /supabase/migrations/YYYYMMDD_description.sql
+   supabase db push               # Apply to remote
+   ```
+
+3. **Important**: After manual RLS policy application (as done for the initial setup), future `supabase db push` commands should work normally. The migration history is now synchronized.
+
+**Best Practices**:
+- Keep schema definitions in Drizzle (`/db/schema/schema.ts`)
+- Put RLS policies, custom functions, and triggers in Supabase migrations
+- Test RLS policies thoroughly - they're your primary security layer
+- Always verify policies are applied correctly in Supabase dashboard after deployment
+
+**Security Notes**:
+- **Task creation is locked down**: Only Edge Functions can create tasks, ensuring credit validation
+- **Complete data isolation**: Users cannot access each other's data at the database level
+- **Service role policies**: Edge Functions use `service_role` key for elevated database operations
+
 ### 3. Source Code Breakdown
 
 #### 3.1. Core Application (`src/app/`)

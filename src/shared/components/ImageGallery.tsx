@@ -88,6 +88,8 @@ interface ImageGalleryProps {
   offset?: number;
   /** Total number of items in the full list (after any server-side filtering/pagination but before client-side page slice). */
   totalCount?: number;
+  /** Use white text for pagination and filter labels (e.g., in dark pane). */
+  whiteText?: boolean;
 }
 
 // Helper to format metadata for display
@@ -122,7 +124,7 @@ const formatMetadataForDisplay = (metadata: DisplayableMetadata): string => {
   return displayText.trim() || "No metadata available.";
 };
 
-const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, isDeleting, onApplySettings, allShots, lastShotId, onAddToLastShot, currentToolType, initialFilterState = true, onImageSaved, offset = 0, totalCount }) => {
+const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, isDeleting, onApplySettings, allShots, lastShotId, onAddToLastShot, currentToolType, initialFilterState = true, onImageSaved, offset = 0, totalCount, whiteText = false }) => {
   const [lightboxImageUrl, setLightboxImageUrl] = useState<string | null>(null);
   const [lightboxImageAlt, setLightboxImageAlt] = useState<string>("Fullscreen view");
   const [lightboxImageId, setLightboxImageId] = useState<string | undefined>(undefined);
@@ -355,7 +357,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, isDeletin
                     >
                       Prev
                     </Button>
-                    <span className="text-sm text-muted-foreground whitespace-nowrap">
+                    <span className={`text-sm ${whiteText ? 'text-white' : 'text-muted-foreground'} whitespace-nowrap`}>
                       Showing {rangeStart}-{rangeEnd} (out of {totalFilteredItems})
                     </span>
                     <Button
@@ -369,7 +371,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, isDeletin
                   </>
                 )}
                 {totalPages === 1 && (
-                  <span className="text-sm text-muted-foreground whitespace-nowrap ml-auto">
+                  <span className={`text-sm ${whiteText ? 'text-white' : 'text-muted-foreground'} whitespace-nowrap ml-auto`}>
                     Showing {rangeStart}-{rangeEnd} (out of {totalFilteredItems})
                   </span>
                 )}
@@ -378,7 +380,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, isDeletin
             <div className="flex items-center gap-x-4 gap-y-2 flex-wrap"> {/* Grouping filters, added flex-wrap */}
                 {/* New Media Type Filter */}
                 <div className="flex items-center space-x-1.5">
-                    <Label htmlFor="media-type-filter" className="text-sm font-medium text-muted-foreground">Type:</Label>
+                    <Label htmlFor="media-type-filter" className={`text-sm font-medium ${whiteText ? 'text-white' : 'text-muted-foreground'}`}>Type:</Label>
                     <Select value={mediaTypeFilter} onValueChange={(value: 'all' | 'image' | 'video') => setMediaTypeFilter(value)}>
                         <SelectTrigger id="media-type-filter" className="h-8 text-xs w-[100px]"> {/* Adjusted width slightly */}
                             <SelectValue />
@@ -400,7 +402,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, isDeletin
                             onCheckedChange={(checked) => setFilterByToolType(Boolean(checked))}
                             aria-label={`Filter by ${currentToolType} tool`}
                         />
-                        <Label htmlFor={`filter-tool-${currentToolType}`} className="text-sm font-medium cursor-pointer">
+                        <Label htmlFor={`filter-tool-${currentToolType}`} className={`text-sm font-medium cursor-pointer ${whiteText ? 'text-white' : 'text-muted-foreground'}`}>
                             Only from "{currentToolType}"
                         </Label>
                     </div>
@@ -505,25 +507,18 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, isDeletin
                                 value={selectedShotIdLocal}
                                 onValueChange={(value) => {
                                     setSelectedShotIdLocal(value);
-                                    setLastAffectedShotId(value); 
+                                    setLastAffectedShotId(value);
                                 }}
                             >
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <SelectTrigger
-                                            className="h-7 px-2 py-1 rounded-md bg-black/50 hover:bg-black/70 text-white text-xs min-w-[70px] max-w-[120px] truncate focus:ring-0 focus:ring-offset-0"
-                                            aria-label="Select target shot"
-                                            onMouseEnter={(e) => e.stopPropagation()}
-                                            onMouseLeave={(e) => e.stopPropagation()}
-                                            onPointerDown={(e) => e.stopPropagation()}
-                                        >
-                                            <SelectValue placeholder="Shot..." />
-                                        </SelectTrigger>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="bottom">
-                                        <p>Target Shot: {currentTargetShotName || "Select a shot"}</p>
-                                    </TooltipContent>
-                                </Tooltip>
+                                <SelectTrigger
+                                    className="h-7 px-2 py-1 rounded-md bg-black/50 hover:bg-black/70 text-white text-xs min-w-[70px] max-w-[120px] truncate focus:ring-0 focus:ring-offset-0"
+                                    aria-label="Select target shot"
+                                    onMouseEnter={(e) => e.stopPropagation()}
+                                    onMouseLeave={(e) => e.stopPropagation()}
+                                    onPointerDown={(e) => e.stopPropagation()}
+                                >
+                                    <SelectValue placeholder="Shot..." />
+                                </SelectTrigger>
                                 <SelectContent className="z-[9999]" style={{ zIndex: 10000 }}>
                                     {simplifiedShotOptions.map(shot => (
                                         <SelectItem key={shot.id} value={shot.id} className="text-xs">

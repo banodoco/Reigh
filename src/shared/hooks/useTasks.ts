@@ -24,6 +24,19 @@ interface UpdateTaskStatusParams {
   status: TaskStatus;
 }
 
+// Helper to convert DB row (snake_case) to Task interface (camelCase)
+const mapDbTaskToTask = (row: any): Task => ({
+  id: row.id,
+  taskType: row.task_type,
+  params: row.params,
+  status: row.status,
+  dependantOn: row.dependant_on ?? undefined,
+  outputLocation: row.output_location ?? undefined,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at ?? undefined,
+  projectId: row.project_id,
+});
+
 // Hook to create a task
 export const useCreateTask = () => {
   const queryClient = useQueryClient();
@@ -111,7 +124,7 @@ export const useListTasks = (params: ListTasksParams) => {
       const { data, error } = await query;
       
       if (error) throw error;
-      return data || [];
+      return (data || []).map(mapDbTaskToTask);
     },
     enabled: !!projectId, // Only run the query if projectId is available
   });

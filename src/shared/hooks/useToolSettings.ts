@@ -64,6 +64,17 @@ export function useToolSettings<T>(toolId: string, userId?: string, shotId?: str
   isUpdating: boolean;
 };
 
+// Overload: pass a context object containing projectId/shotId
+export function useToolSettings<T>(
+  toolId: string,
+  context: { projectId?: string; shotId?: string }
+): {
+  settings: T | undefined;
+  isLoading: boolean;
+  update: (scope: SettingsScope, settings: Partial<T>) => void;
+  isUpdating: boolean;
+};
+
 // Unified implementation handling both signature styles
 export function useToolSettings<T>(
   toolId: string,

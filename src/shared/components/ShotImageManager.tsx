@@ -190,7 +190,6 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
             <div className="flex space-x-4">
               <div className="flex-1">
                 <SortableImageItem
-                  key={pair.imageA.shotImageEntryId}
                   image={pair.imageA}
                   isSelected={false}
                   onClick={() => {}}
@@ -200,7 +199,6 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
               </div>
               <div className="flex-1">
                 <SortableImageItem
-                  key={pair.imageB.shotImageEntryId}
                   image={pair.imageB}
                   isSelected={false}
                   onClick={() => {}}

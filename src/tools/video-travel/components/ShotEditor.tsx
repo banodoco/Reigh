@@ -30,13 +30,13 @@ import { SliderWithValue } from '@/shared/components/ui/slider-with-value';
 import { useApiKeys } from '@/shared/hooks/useApiKeys';
 import { cropImageToProjectAspectRatio } from '@/shared/lib/imageCropper';
 import { parseRatio } from '@/shared/lib/aspectRatios';
-import { getCropToProjectSizeSetting } from '@/shared/lib/cropSettings';
-import SettingsModal from '@/shared/components/SettingsModal';
+import { useToolSettings } from '@/shared/hooks/useToolSettings';
 import { ToggleGroup, ToggleGroupItem } from "@/shared/components/ui/toggle-group";
 import { useListTasks, useCancelTask } from "@/shared/hooks/useTasks";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from '@tanstack/react-query';
 import { fetchWithAuth } from '@/lib/api';
+import SettingsModal from '@/shared/components/SettingsModal';
 
 // Add the missing type definition
 export interface SegmentGenerationParams {
@@ -275,6 +275,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     }
   }, [nonVideoImages, batchVideoFrames, batchVideoContext]); // Remove pairConfigs from deps to prevent loop
 
+  const {
+    settings: uploadSettings,
+  } = useToolSettings<{ cropToProjectSize?: boolean }>('upload', { projectId: selectedProjectId });
+
   const handleImageUploadToShot = async (files: File[]) => {
     if (!files || files.length === 0) return;
     if (!selectedProjectId || !selectedShot?.id) {
@@ -285,15 +289,16 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     setIsUploadingImage(true);
     toast.info(`Uploading ${files.length} image(s)...`);
 
-    // Determine if cropping is enabled via project settings (localStorage)
-    const cropToProjectSize = getCropToProjectSizeSetting();
+    // Determine if cropping is enabled via project settings (toolSettings)
+    const cropToProjectSize = (uploadSettings?.cropToProjectSize ?? true);
     let projectAspectRatio: number | null = null;
     if (cropToProjectSize) {
       const currentProject = projects.find(p => p.id === selectedProjectId);
-      if (currentProject && currentProject.aspectRatio) {
-        projectAspectRatio = parseRatio(currentProject.aspectRatio);
+      const aspectRatioStr = currentProject?.aspectRatio || (currentProject as any)?.settings?.aspectRatio;
+      if (currentProject && aspectRatioStr) {
+        projectAspectRatio = parseRatio(aspectRatioStr);
         if (isNaN(projectAspectRatio)) {
-          toast.error(`Invalid project aspect ratio: ${currentProject.aspectRatio}`);
+          toast.error(`Invalid project aspect ratio: ${aspectRatioStr}`);
           setIsUploadingImage(false);
           return;
         }
@@ -668,8 +673,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             const tasks = await tasksResponse.json();
             taskConfirmed = tasks.some((task: any) => task.id === newTask.id);
             
-            if (taskConfirmed) {
-              console.log('[ShotEditor] Task confirmed in database after', attempts + 1, 'attempts');
+            if (taskConfirmed) {              
               // Manually invalidate the tasks query to ensure UI updates
               queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
               break;
@@ -910,10 +914,35 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const isGenerationDisabledDueToApiKey = enhancePrompt && (!openaiApiKey || openaiApiKey.trim() === '');
   const isGenerationDisabled = isCreatingTask || nonVideoImages.length < 2 || isGenerationDisabledDueToApiKey;
 
-  const handleUpdatePairConfig = (id: string, field: 'prompt' | 'frames' | 'negativePrompt' | 'context', value: string | number) => {
-    const updatedConfigs = pairConfigs.map(pair =>
-      pair.id === id ? { ...pair, [field]: value } : pair
-    );
+  const handleUpdatePairConfig = (
+    id: string,
+    field: 'prompt' | 'frames' | 'negativePrompt' | 'context',
+    value: string | number
+  ) => {
+    let updatedConfigs: PairConfig[];
+
+    // Find if the pair already exists
+    const existingIndex = pairConfigs.findIndex((p) => p.id === id);
+
+    if (existingIndex !== -1) {
+      // Update the existing pair config
+      updatedConfigs = pairConfigs.map((pair) =>
+        pair.id === id ? { ...pair, [field]: value } : pair
+      );
+    } else {
+      // Create a new pair config with sensible defaults, then apply the field
+      const newConfig: PairConfig = {
+        id,
+        prompt: '',
+        negativePrompt: '',
+        frames: 30,
+        context: 16,
+      };
+      (newConfig as any)[field] = value; // apply the first edited field
+
+      updatedConfigs = [...pairConfigs, newConfig];
+    }
+
     onPairConfigsChange(updatedConfigs);
   };
 

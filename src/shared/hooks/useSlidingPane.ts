@@ -23,6 +23,12 @@ export const useSlidingPane = ({ onLockStateChange, side, isInitiallyLocked = fa
     onLockStateChange?.(isLocked);
   }, [isLocked, onLockStateChange]);
 
+  // Sync internal state when external default changes (e.g., after settings hydration)
+  useEffect(() => {
+    setIsLocked(isInitiallyLocked);
+    setIsOpen(isInitiallyLocked);
+  }, [isInitiallyLocked]);
+
   const openPane = () => {
     if (leaveTimeoutRef.current) {
         clearTimeout(leaveTimeoutRef.current);

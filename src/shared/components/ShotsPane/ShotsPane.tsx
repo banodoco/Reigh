@@ -27,6 +27,7 @@ const ShotsPane: React.FC = () => {
   const {
     isGenerationsPaneLocked,
     generationsPaneHeight,
+    isShotsPaneLocked,
     setIsShotsPaneLocked,
     shotsPaneWidth,
   } = usePanes();
@@ -34,6 +35,7 @@ const ShotsPane: React.FC = () => {
   const { isLocked, isOpen, toggleLock, openPane, paneProps, transformClass, handlePaneEnter, handlePaneLeave } = useSlidingPane({
     side: 'left',
     onLockStateChange: setIsShotsPaneLocked,
+    isInitiallyLocked: isShotsPaneLocked,
   });
 
   const handleCreateShot = async (shotName: string, files: File[]) => {
@@ -59,8 +61,8 @@ const ShotsPane: React.FC = () => {
         setTimeout(() => setFlashEffect(false), 600); // Flash for 600ms
       }
     } else {
-      const newShot = await createShotMutation.mutateAsync({ shotName, projectId: selectedProjectId });
-      createdShotId = newShot?.id || null;
+      const newShotResult = await createShotMutation.mutateAsync({ name: shotName, projectId: selectedProjectId });
+      createdShotId = newShotResult?.shot?.id || null;
     }
 
     setIsCreateModalOpen(false);

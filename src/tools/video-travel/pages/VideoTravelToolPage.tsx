@@ -348,21 +348,15 @@ const VideoTravelToolPage: React.FC = () => {
         };
 
         // Check if we just saved these exact settings
-        if (lastSavedSettingsRef.current && deepEqual(sanitizeSettings(currentSettings), sanitizeSettings(lastSavedSettingsRef.current))) {
-          console.log('[ToolSettingsDebug] ► Skipping save - already saved these settings', selectedShot?.id);
+        if (lastSavedSettingsRef.current && deepEqual(sanitizeSettings(currentSettings), sanitizeSettings(lastSavedSettingsRef.current))) {          
           return;
         }
 
         if (!isUpdating && !deepEqual(sanitizeSettings(currentSettings), sanitizeSettings(settings))) {
-          console.log('[ToolSettingsDebug] ► Will save', {
-            shotId: selectedShot?.id,
-            currentSettings,
-            dbSettings: settings,
-          });
+
           lastSavedSettingsRef.current = currentSettings;
           updateSettings('shot', currentSettings);
-        } else {
-          console.log('[ToolSettingsDebug] ► No change detected for shot', selectedShot?.id);
+        } else {          
         }
       }, 500); // Wait 500ms before saving
     }

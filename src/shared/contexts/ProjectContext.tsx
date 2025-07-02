@@ -38,6 +38,14 @@ const determineProjectIdToSelect = (
   return projects[0].id;
 };
 
+// Helper to convert DB row (snake_case) to our Project interface (camelCase)
+const mapDbProjectToProject = (row: any): Project => ({
+  id: row.id,
+  name: row.name,
+  user_id: row.user_id,
+  aspectRatio: row.aspect_ratio ?? undefined,
+});
+
 export const ProjectProvider = ({ children }: { children: ReactNode }) => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProjectId, setSelectedProjectIdState] = useState<string | null>(null);
@@ -67,27 +75,26 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
           .insert({
             name: 'Default Project',
             user_id: user.id,
-            aspect_ratio: '16:9'
+            aspect_ratio: '16:9',
           })
           .select()
           .single();
 
         if (createError) throw createError;
-        setProjects([newProject]);
+        setProjects([mapDbProjectToProject(newProject)]);
       } else {
-        setProjects(projectsData);
-      }
-
-      if (projectsData.length > 0) {
+        const mappedProjects = projectsData.map(mapDbProjectToProject);
         const storedProjectId = localStorage.getItem('selectedProjectId');
-        const projectIdToSelect = determineProjectIdToSelect(projectsData, null, storedProjectId);
+        const projectIdToSelect = determineProjectIdToSelect(mappedProjects, null, storedProjectId);
         setSelectedProjectIdState(projectIdToSelect);
         if (projectIdToSelect) {
             localStorage.setItem('selectedProjectId', projectIdToSelect);
         }
-      } else {
-        console.warn("API returned no projects, and no default project was provided by the API.");
-        setSelectedProjectIdState(null);
+      }
+
+      // Ensure state is set to mapped projects if not already set
+      if (projectsData && projectsData.length > 0) {
+        setProjects(projectsData.map(mapDbProjectToProject));
       }
     } catch (error: any) {
       console.error('[ProjectContext] Error fetching projects via API:', error);
@@ -117,18 +124,19 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
         .insert({
           name: projectData.name,
           user_id: user.id,
-          aspect_ratio: projectData.aspectRatio
+          aspect_ratio: projectData.aspectRatio,
         })
         .select()
         .single();
 
       if (error) throw error;
 
-      setProjects(prevProjects => [...prevProjects, newProject].sort((a, b) => a.name.localeCompare(b.name)));
-      setSelectedProjectIdState(newProject.id);
-      localStorage.setItem('selectedProjectId', newProject.id);
-      toast.success(`Project "${newProject.name}" created and selected.`);
-      return newProject;
+      const mappedProject = mapDbProjectToProject(newProject);
+      setProjects(prevProjects => [...prevProjects, mappedProject].sort((a, b) => a.name.localeCompare(b.name)));
+      setSelectedProjectIdState(mappedProject.id);
+      localStorage.setItem('selectedProjectId', mappedProject.id);
+      toast.success(`Project "${mappedProject.name}" created and selected.`);
+      return mappedProject;
     } catch (err: any) {
       console.error("[ProjectContext] Exception during project creation via API:", err);
       toast.error(`Failed to create project: ${err.message}`);
@@ -148,9 +156,14 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
+      // Convert camelCase updates to snake_case for DB
+      const dbUpdates: any = {};
+      if (updates.name !== undefined) dbUpdates.name = updates.name;
+      if (updates.aspectRatio !== undefined) dbUpdates.aspect_ratio = updates.aspectRatio;
+
       const { data: updatedProject, error } = await supabase
         .from('projects')
-        .update(updates)
+        .update(dbUpdates)
         .eq('id', projectId)
         .eq('user_id', user.id)
         .select()
@@ -158,13 +171,13 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
 
       if (error) throw error;
 
+      const mappedProject = mapDbProjectToProject(updatedProject);
+
       setProjects(prevProjects => 
-        prevProjects.map(p => p.id === projectId ? updatedProject : p)
+        prevProjects.map(p => p.id === projectId ? mappedProject : p)
                      .sort((a, b) => a.name.localeCompare(b.name))
       );
-      // If the updated project is the currently selected one, ensure its details are fresh (though ID won't change)
-      // This is mostly handled by the projects array update triggering re-renders.
-      toast.success(`Project "${updatedProject.name}" updated successfully.`);
+      toast.success(`Project "${mappedProject.name}" updated successfully.`);
       return true;
     } catch (err: any) {
       console.error("[ProjectContext] Exception during project update via API:", err);

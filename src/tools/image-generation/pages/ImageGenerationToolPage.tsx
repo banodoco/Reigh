@@ -57,6 +57,7 @@ const ImageGenerationToolPage = () => {
   const [isUpscalingImageId, setIsUpscalingImageId] = useState<string | null>(null);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [isCreatingTask, setIsCreatingTask] = useState(false);
+  const [creatingTaskCount, setCreatingTaskCount] = useState(1);
 
   const { apiKeys, getApiKey } = useApiKeys();
 
@@ -174,9 +175,13 @@ const ImageGenerationToolPage = () => {
       return;
     }
 
-    setIsCreatingTask(true);
-
     const { generationMode, ...restOfFormData } = formData;
+
+    const tasksToCreateCount = generationMode === 'wan-local'
+      ? restOfFormData.prompts.length * restOfFormData.imagesPerPrompt
+      : 1;
+    setCreatingTaskCount(tasksToCreateCount);
+    setIsCreatingTask(true);
 
     // Clear placeholders if needed
     if (showPlaceholders && restOfFormData.prompts.length * restOfFormData.imagesPerPrompt > 0) {
@@ -246,6 +251,7 @@ const ImageGenerationToolPage = () => {
         toast.error(`Failed to create tasks: ${err.message || 'Unknown API error'}`);
       } finally {
         setIsCreatingTask(false);
+        setCreatingTaskCount(1);
       }
 
       return; // early exit for wan-local
@@ -310,6 +316,7 @@ const ImageGenerationToolPage = () => {
       toast.error(`Failed to create task: ${err.message || 'Unknown API error'}`);
     } finally {
       setIsCreatingTask(false);
+      setCreatingTaskCount(1);
     }
   };
 
@@ -475,10 +482,13 @@ const ImageGenerationToolPage = () => {
           {isCreatingTask && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={(e) => { if (e.target === e.currentTarget) { /* handleCancelGeneration() */ } }}>
               <div className="bg-background p-8 rounded-lg shadow-2xl w-full max-w-md text-center" onClick={(e) => e.stopPropagation()}>
-                <h2 className="text-2xl font-semibold mb-4">Creating Image Generation Task...</h2>
-                <p className="mb-2">Task ID: {/* generationProgress?.taskId */}</p>
-                <p className="mb-4">Overall progress: {/* generationProgress?.progressPercentage */}%</p>
-                <Button variant="destructive" onClick={(e) => { if (e.target === e.currentTarget) { /* handleCancelGeneration() */ } }}>Cancel Task</Button>
+                <h2 className="text-2xl font-semibold mb-4">
+                  Creating Image Generation {creatingTaskCount > 1 ? 'Tasks' : 'Task'}...
+                </h2>
+
+                <Button variant="destructive" onClick={(e) => { if (e.target === e.currentTarget) { /* handleCancelGeneration() */ } }}>
+                  Cancel {creatingTaskCount > 1 ? 'Tasks' : 'Task'}
+                </Button>
               </div>
             </div>
           )}

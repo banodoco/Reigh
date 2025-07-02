@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
+import { useApiKeys } from '@/shared/hooks/useApiKeys';
 // import { fal } from '@fal-ai/client'; // REMOVE if not used
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -104,6 +105,9 @@ export const useFalImageGeneration = (): UseFalImageGenerationResult => {
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   // const cancelGenerationRef = useRef(false); // Remove, task cancellation is different
   // const currentSubscriptionRef = useRef<any>(null); // Remove
+
+  // Retrieve API keys (Fal, etc.) via persistent user settings
+  const { getApiKey } = useApiKeys();
 
   // Remove old cancelGeneration based on Fal subscription
   // const cancelGeneration = useCallback(() => { ... }, []);
@@ -233,11 +237,13 @@ export const useFalImageGeneration = (): UseFalImageGenerationResult => {
             status: 'Queued',
         };
 
+        // Optionally include API key in request headers if backend expects it
+        const falApiKey = getApiKey('fal_api_key');
         toast.info(`Creating '${toolType}' task via API...`);
 
         const response = await fetch('/api/tasks', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', ...(falApiKey ? { 'X-Fal-Key': falApiKey } : {}) },
             body: JSON.stringify(apiPayload)
         });
 
@@ -292,6 +298,8 @@ export const initializeGlobalFalClient = () => {
   return API_KEY;
 };
 */
+
+// Legacy Fal client initialization removed – API keys are now resolved via useApiKeys and passed per request.
 
 // If fal is not used in this file anymore, the import can be removed.
 // import { fal } from '@fal-ai/client'; // Check if still needed after all changes

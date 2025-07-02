@@ -22,7 +22,7 @@ import { toast } from 'sonner';
 import { Project } from '@/types/project';
 import { ASPECT_RATIO_TO_RESOLUTION } from '@/shared/lib/aspectRatios';
 import { Checkbox } from '@/shared/components/ui/checkbox';
-import { getCropToProjectSizeSetting, setCropToProjectSizeSetting } from '@/shared/lib/cropSettings';
+import { useToolSettings } from '@/shared/hooks/useToolSettings';
 
 // Create the aspect ratio options from the centralized object
 const ASPECT_RATIOS = Object.keys(ASPECT_RATIO_TO_RESOLUTION)
@@ -41,24 +41,31 @@ interface ProjectSettingsModalProps {
 export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({ isOpen, onOpenChange, project }) => {
   const [projectName, setProjectName] = useState('');
   const [aspectRatio, setAspectRatio] = useState<string>('');
-  const [cropToProjectSize, setCropToProjectSize] = useState<boolean>(getCropToProjectSizeSetting());
+  // Persistent project-level upload settings
+  const { settings: uploadSettings, update: updateUploadSettings, isLoading: isLoadingUploadSettings } = useToolSettings<{ cropToProjectSize?: boolean }>('upload', { projectId: project?.id });
+
+  const [cropToProjectSize, setCropToProjectSize] = useState<boolean>(true);
   const { updateProject, isUpdatingProject } = useProject(); // Use context hook
 
   useEffect(() => {
     if (project && isOpen) { // Also check isOpen to re-init when modal re-opens with same project
       setProjectName(project.name);
       setAspectRatio(project.aspectRatio || ASPECT_RATIOS[0].value); // Fallback if aspectRatio is undefined
-      setCropToProjectSize(getCropToProjectSizeSetting()); // Refresh from localStorage
+      if (!isLoadingUploadSettings) {
+        setCropToProjectSize(uploadSettings?.cropToProjectSize ?? true);
+      }
     } else if (!isOpen) {
       // Optionally reset when modal is closed, or let useEffect handle it if project becomes null
       // setProjectName('');
       // setAspectRatio(ASPECT_RATIOS[0].value);
     }
-  }, [project, isOpen]);
+  }, [project, isOpen, uploadSettings, isLoadingUploadSettings]);
 
   const handleCropToProjectSizeChange = (checked: boolean) => {
     setCropToProjectSize(checked);
-    setCropToProjectSizeSetting(checked);
+    if (project?.id) {
+      updateUploadSettings('project', { cropToProjectSize: checked });
+    }
   };
 
   const handleSaveChanges = async () => {

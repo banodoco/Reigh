@@ -548,7 +548,6 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
   };
   
   const handleSavePromptsFromModal = (updatedPrompts: PromptEntry[]) => {
-    console.log("[ImageGenerationForm] Received prompts from modal 'Save & Close':", updatedPrompts);
 
     // De-duplicate IDs and assign new ones where necessary.
     const seenIds = new Set<string>();
@@ -570,8 +569,7 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
   };
 
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    console.log("[ImageGenerationForm] handleSubmit triggered. Event type:", e.type);
+    e.preventDefault();    
 
     const lorasForApi = selectedLorasMap[generationMode].map(lora => ({ path: lora.path, strength: lora.strength }));    
     const normalizedDepthStrength = depthStrength / 100;
@@ -587,7 +585,7 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
 
     const generationData = {
       prompts: activePrompts.map(p => {
-        const combinedFull = `${beforeEachPromptText ? `${beforeEachPromptText} ` : ''}${p.fullPrompt}${afterEachPromptText ? ` ${afterEachPromptText}` : ''}`.trim();
+        const combinedFull = `${beforeEachPromptText ? `${beforeEachPromptText.trim()}, ` : ''}${p.fullPrompt.trim()}${afterEachPromptText ? `, ${afterEachPromptText.trim()}` : ''}`.trim();
         return {
           id: p.id,
           fullPrompt: combinedFull,
@@ -604,8 +602,7 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
       determinedApiImageSize,
       generationMode
     };
-
-    console.log("[ImageGenerationForm] handleSubmit: Calling onGenerate with data:", JSON.stringify(generationData, null, 2));
+    
     onGenerate(generationData);
   };
   
