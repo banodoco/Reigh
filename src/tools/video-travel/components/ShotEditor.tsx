@@ -223,7 +223,25 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // Use local state for optimistic updates on image list
   const [localOrderedShotImages, setLocalOrderedShotImages] = useState(orderedShotImages || []);
   useEffect(() => {
-    setLocalOrderedShotImages(orderedShotImages || []);
+    // When orderedShotImages changes, merge it with any optimistic images
+    setLocalOrderedShotImages(prev => {
+      // Find any optimistic images in the current state
+      const optimisticImages = prev.filter(img => img.isOptimistic);
+      
+      // If there are no optimistic images, just use the new prop
+      if (optimisticImages.length === 0) {
+        return orderedShotImages || [];
+      }
+      
+      // Otherwise, append optimistic images to the new prop data
+      const newImages = orderedShotImages || [];
+      const existingIds = new Set(newImages.map(img => img.id));
+      
+      // Only add optimistic images that don't have a matching ID in the new data
+      const uniqueOptimisticImages = optimisticImages.filter(img => !existingIds.has(img.id));
+      
+      return [...newImages, ...uniqueOptimisticImages];
+    });
   }, [orderedShotImages]);
 
   // Settings are now loaded from the database via the parent component
@@ -386,7 +404,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
     if (successfulUploads > 0) {
       toast.success(`${successfulUploads} image(s) uploaded and added successfully.`);
-      onShotImagesUpdate();
     }
     
     setFileInputKey(Date.now());
@@ -407,8 +424,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       // Delete the generation (this will show success/error toasts automatically)
       await deleteGenerationMutation.mutateAsync(generationId);
       
-      // Refresh the shot data
-      onShotImagesUpdate(); 
+      // Removed onShotImagesUpdate() - the mutation already handles cache invalidation
     } catch (error) {
       // Rollback the optimistic update on error
       setLocalOrderedShotImages(orderedShotImages);
