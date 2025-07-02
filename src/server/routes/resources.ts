@@ -1,5 +1,5 @@
 import express, { Request, Response, NextFunction } from 'express';
-import { db } from '@/lib/db';
+import { db } from '../../lib/db/index';
 import { resources as resourcesTable, users as usersTable } from '../../../db/schema/schema';
 import { eq, and } from 'drizzle-orm';
 import { authenticate } from '../middleware/auth';

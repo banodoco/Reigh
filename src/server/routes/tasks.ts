@@ -1,16 +1,20 @@
 import express, { Request, Response, Router } from 'express';
-import { db } from '@/lib/db'; // Adjusted path assuming db is exported from here
+import { db } from '../../lib/db/index'; // Fixed relative path
 import { tasks as tasksSchema, taskStatusEnum } from '../../../db/schema/schema'; // Adjusted path to schema
 import { sql, eq, and, inArray } from 'drizzle-orm';
 import { processCompletedStitchTask, processCompletedSingleImageTask, cascadeTaskStatus } from '../services/taskProcessingService';
 import { v4 as uuidv4 } from 'uuid';
-import { isTaskVisible } from '@/lib/taskConfig';
+import { isTaskVisible } from '../../shared/lib/taskConfig';
 import { authenticate } from '../middleware/auth';
 
 const router = express.Router() as any; // Changed Router to any to resolve overload errors
 
 // Apply authentication middleware to all routes
 router.use(authenticate);
+
+// Define the valid task statuses as a const array
+const TASK_STATUSES = ['Queued', 'In Progress', 'Complete', 'Failed', 'Cancelled'] as const;
+type TaskStatus = typeof TASK_STATUSES[number];
 
 interface TaskRequestBody {
   project_id: string;
@@ -80,7 +84,7 @@ router.post('/', async (req: Request, res: Response) => {
 // GET /api/tasks - List tasks for a project, with optional status filtering
 router.get('/', async (req: Request, res: Response) => {
   const projectId = req.query.projectId as string;
-  let typedStatusFilter: (typeof taskStatusEnum[number])[] | undefined;
+  let typedStatusFilter: TaskStatus[] | undefined;
 
   const statusQueryParam = req.query.status || req.query['status[]'];
 
@@ -90,8 +94,8 @@ router.get('/', async (req: Request, res: Response) => {
         : [statusQueryParam];
     
     const validStatuses = rawStatuses.filter(
-        (s: any): s is typeof taskStatusEnum[number] => 
-            typeof s === 'string' && (taskStatusEnum as readonly string[]).includes(s as any)
+        (s: any): s is TaskStatus => 
+            typeof s === 'string' && TASK_STATUSES.includes(s as any)
     );
 
     if (validStatuses.length > 0) {
@@ -107,7 +111,7 @@ router.get('/', async (req: Request, res: Response) => {
     const conditions = [eq(tasksSchema.projectId, projectId)];
 
     if (typedStatusFilter && typedStatusFilter.length > 0) {
-        conditions.push(inArray(tasksSchema.status, typedStatusFilter));
+        conditions.push(inArray(tasksSchema.status, typedStatusFilter as any));
     }
 
     const tasks = await db
@@ -135,7 +139,7 @@ router.patch('/:taskId/cancel', async (req: Request, res: Response) => {
     const updatedTasks = await db
       .update(tasksSchema)
       .set({ 
-        status: 'Cancelled' as typeof taskStatusEnum[number], 
+        status: 'Cancelled' as TaskStatus, 
         updatedAt: new Date().toISOString() 
       })
       .where(eq(tasksSchema.id, taskId))
@@ -171,15 +175,15 @@ router.patch('/:taskId/status', async (req: Request, res: Response) => {
     return res.status(400).json({ message: 'Missing required body parameter: status' });
   }
 
-  if (!(taskStatusEnum as readonly string[]).includes(newStatus as any)) {
-    return res.status(400).json({ message: `Invalid status value: ${newStatus}. Must be one of ${taskStatusEnum.join(', ')}` });
+  if (!TASK_STATUSES.includes(newStatus as any)) {
+    return res.status(400).json({ message: `Invalid status value: ${newStatus}. Must be one of ${TASK_STATUSES.join(', ')}` });
   }
 
   try {
     const updatedTasks = await db
       .update(tasksSchema)
       .set({
-        status: newStatus as typeof taskStatusEnum[number],
+        status: newStatus as TaskStatus,
         updatedAt: new Date().toISOString(),
       })
       .where(eq(tasksSchema.id, taskId))

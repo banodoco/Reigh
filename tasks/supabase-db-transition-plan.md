@@ -248,13 +248,14 @@ This part of the plan remains the same. It's the final cleanup.
 8.  [x] **Route Authentication**: Apply auth middleware to all routes, replace DUMMY_USER_ID with req.userId.
 9.  [ ] **RLS**: Enable RLS on all tables and apply comprehensive policies.
 10. [x] **Backend DB Client**: Refactor `src/lib/db/index.ts` to use `drizzle-orm/node-postgres` with `pg`.
-11. [x] **Frontend Client**: Update `src/integrations/supabase/client.ts` to use env vars and add dev auto-login.
-12. [x] **Runtime Seeding**: Update `src/lib/seed.ts` to use Postgres and dev user ID.
-13. [x] **Standalone Seeding**: Update `db/seed.ts` for manual seeding with Postgres.
-14. [x] **Package Scripts**: Update `start:api` to use PG migrations, update/remove SQLite scripts.
-15. [ ] **Testing**: Validate both `dev` and `production` modes work correctly.
-16. [ ] **Cleanup**: Delete `src/lib/db.ts`, `db/migrate.ts`, `db/migrations-sqlite/`, `drizzle-sqlite.config.ts`, remove `better-sqlite3`.
-17. [ ] **Docs**: Update `structure.md` to remove SQLite references and describe the new Supabase-only architecture.
+11. [x] **Frontend Client Authentication**: Update all hooks to use authenticated fetch via `fetchWithAuth` utility.
+12. [x] **Frontend Supabase Client**: Update `src/integrations/supabase/client.ts` to use env vars and add dev auto-login.
+13. [x] **Runtime Seeding**: Update `src/lib/seed.ts` to use Postgres and dev user ID.
+14. [x] **Standalone Seeding**: Update `db/seed.ts` for manual seeding with Postgres.
+15. [x] **Package Scripts**: Update `start:api` to use PG migrations, update/remove SQLite scripts.
+16. [ ] **Testing**: Validate both `dev` and `production` modes work correctly.
+17. [ ] **Cleanup**: Delete `src/lib/db.ts`, `db/migrate.ts`, `db/migrations-sqlite/`, `drizzle-sqlite.config.ts`, remove `better-sqlite3`.
+18. [ ] **Docs**: Update `structure.md` to remove SQLite references and describe the new Supabase-only architecture.
 
 ---
 

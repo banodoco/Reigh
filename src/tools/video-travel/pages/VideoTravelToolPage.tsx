@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import ShotEditor, { SteerableMotionSettings } from '../components/ShotEditor';
 import { useListShots, useCreateShot, useHandleExternalImageDrop } from '@/shared/hooks/useShots';
 import { Shot } from '@/types/shots';
@@ -13,6 +13,7 @@ import { LoraModel } from '@/shared/components/LoraSelectorModal';
 import { useToolSettings } from '@/shared/hooks/useToolSettings';
 import { VideoTravelSettings } from '../settings';
 import { deepEqual, sanitizeSettings } from '@/shared/lib/deepEqual';
+import { supabase } from '@/integrations/supabase/client';
 // import { useLastAffectedShot } from '@/shared/hooks/useLastAffectedShot';
 
 // Placeholder data or logic to fetch actual data for VideoEditLayout
@@ -26,8 +27,9 @@ export interface ActiveLora {
 }
 
 const VideoTravelToolPage: React.FC = () => {
+  const navigate = useNavigate();
   const location = useLocation();
-  const viaShotClick = (location.state as { viaShotClick?: boolean } | null)?.viaShotClick;
+  const viaShotClick = location.state?.fromShotClick === true;
   const { selectedProjectId } = useProject();
   const { data: shots, isLoading, error, refetch: refetchShots } = useListShots(selectedProjectId);
   const [selectedShot, setSelectedShot] = useState<Shot | null>(null);
@@ -40,12 +42,20 @@ const VideoTravelToolPage: React.FC = () => {
   const [isLoraModalOpen, setIsLoraModalOpen] = useState(false);
   const [availableLoras, setAvailableLoras] = useState<LoraModel[]>([]);
   const [selectedLoras, setSelectedLoras] = useState<ActiveLora[]>([]);
+  const [currentUserId, setCurrentUserId] = useState<string | undefined>(undefined);
+
+  // Get current user ID
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setCurrentUserId(user?.id);
+    });
+  }, []);
 
   // Use tool settings for the selected shot
-  const { settings, update: updateSettings, isLoading: isLoadingSettings, isUpdating, hasUserMadeChanges } = useToolSettings<VideoTravelSettings>(
+  const { settings, update: updateSettings, isLoading: isLoadingSettings, isUpdating } = useToolSettings<VideoTravelSettings>(
     'video-travel',
-    { projectId: selectedProjectId || undefined, shotId: selectedShot?.id },
-    { silent: true }
+    currentUserId,
+    selectedShot?.id
   );
 
   // Add state for video generation settings - wait for settings to load before initializing
@@ -264,8 +274,8 @@ const VideoTravelToolPage: React.FC = () => {
         
         if (result?.shotId) {
           // Find the created shot from the shots list after refetching
-          const { data: updatedShots } = await refetchShots();
-          const createdShot = updatedShots?.find(s => s.id === result.shotId);
+          await refetchShots();
+          const createdShot = shots?.find(s => s.id === result.shotId);
           if (createdShot) {
             newShot = createdShot;
           } else {
@@ -349,7 +359,7 @@ const VideoTravelToolPage: React.FC = () => {
             dbSettings: settings,
           });
           lastSavedSettingsRef.current = currentSettings;
-          updateSettings(currentSettings, 'shot');
+          updateSettings('shot', currentSettings);
         } else {
           console.log('[ToolSettingsDebug] ► No change detected for shot', selectedShot?.id);
         }

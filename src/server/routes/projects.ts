@@ -1,5 +1,5 @@
 import express, { Request, Response, NextFunction } from 'express';
-import { db } from '@/lib/db'; // Adjusted path from @/lib/db
+import { db } from '../../lib/db/index'; // Fixed relative path
 import { projects as projectsTable, users as usersTable, ProjectUpdate } from '../../../db/schema/schema';
 import { eq, asc, desc, and } from 'drizzle-orm';
 import { Project } from '@/types/project';

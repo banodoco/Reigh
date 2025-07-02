@@ -1,6 +1,6 @@
 import express, { Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { db } from '@/lib/db';
+import { db } from '../../lib/db/index';
 import { projects as projectsSchema, tasks as tasksSchema } from '../../../db/schema/schema';
 import { randomUUID } from 'crypto';
 import { eq } from 'drizzle-orm';

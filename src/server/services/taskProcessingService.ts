@@ -1,5 +1,5 @@
 import cron from 'node-cron';
-import { db } from '@/lib/db';
+import { db } from '../../lib/db/index';
 import { tasks as tasksSchema, generations as generationsSchema, shotGenerations as shotGenerationsSchema, taskStatusEnum } from '../../../db/schema/schema';
 import { eq, and, isNull, sql, inArray, notInArray, like } from 'drizzle-orm';
 import { randomUUID } from 'crypto';

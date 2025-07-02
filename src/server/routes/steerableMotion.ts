@@ -1,5 +1,5 @@
 import express, { Request, Response } from 'express';
-import { db } from '@/lib/db';
+import { db } from '../../lib/db/index';
 import { tasks as tasksSchema, projects as projectsSchema } from '../../../db/schema/schema';
 import { randomUUID } from 'crypto';
 import { eq } from 'drizzle-orm';
