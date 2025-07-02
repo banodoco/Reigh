@@ -83,7 +83,7 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
       {...attributes}
       {...listeners}
       className={cn(
-        'relative group bg-muted/50 rounded border p-1 flex flex-col items-center justify-center aspect-square overflow-hidden shadow-sm cursor-grab active:cursor-grabbing',
+        'relative group bg-muted/50 rounded border p-1 flex flex-col items-center justify-center aspect-square overflow-hidden shadow-sm cursor-grab active:cursor-grabbing transition-all duration-300',
         { 'ring-2 ring-offset-2 ring-blue-500 border-blue-500': isSelected },
         { 'opacity-75': image.isOptimistic }
       )}
@@ -93,11 +93,11 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
       <img
         src={displayUrl}
         alt={`Image ${image.id}`}
-        className="max-w-full max-h-full object-contain rounded-sm"
+        className="max-w-full max-h-full object-contain rounded-sm transition-opacity duration-300"
         key={imageUrl} // Force re-render when imageUrl changes
       />
       {image.isOptimistic && (
-        <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
+        <div className="absolute inset-0 bg-black/20 flex items-center justify-center transition-opacity duration-300">
           <div className="bg-white/90 rounded-full p-2">
             <Loader2 className="h-6 w-6 animate-spin text-primary" />
           </div>

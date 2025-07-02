@@ -236,6 +236,17 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       // Create a map of real images by their IDs for quick lookup
       const realImagesMap = new Map((orderedShotImages || []).map(img => [img.id, img]));
       
+      // Also create a map by shotImageEntryId for images that have been converted from optimistic
+      const realImagesByEntryId = new Map<string, GenerationRow>();
+      for (const img of prev) {
+        if (!img.isOptimistic && img.realShotImageEntryId) {
+          const realImg = (orderedShotImages || []).find(r => r.shotImageEntryId === img.realShotImageEntryId);
+          if (realImg) {
+            realImagesByEntryId.set(img.shotImageEntryId, realImg);
+          }
+        }
+      }
+      
       // Build the new array preserving order and optimistic images
       const newImages: GenerationRow[] = [];
       const seenRealIds = new Set<string>();
@@ -245,8 +256,17 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         if (img.isOptimistic) {
           // Keep optimistic images in their current position
           newImages.push(img);
+        } else if (img.realShotImageEntryId && realImagesByEntryId.has(img.shotImageEntryId)) {
+          // This was an optimistic image that got converted - use the updated real image
+          const realImg = realImagesByEntryId.get(img.shotImageEntryId)!;
+          newImages.push({
+            ...realImg,
+            shotImageEntryId: img.shotImageEntryId, // Keep the optimistic ID for stability
+            realShotImageEntryId: realImg.shotImageEntryId,
+          });
+          seenRealIds.add(realImg.id);
         } else if (realImagesMap.has(img.id) && !seenRealIds.has(img.id)) {
-          // Replace with updated version from server
+          // Regular image update
           newImages.push(realImagesMap.get(img.id)!);
           seenRealIds.add(img.id);
         }
@@ -402,11 +422,16 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         setLocalOrderedShotImages(prev =>
           prev.map(img => {
             if (img.shotImageEntryId === optimisticImage.shotImageEntryId) {
+              // Keep the same shotImageEntryId to prevent reordering
               const updatedImage: GenerationRow = {
                 ...(newGeneration as Omit<GenerationRow, 'id' | 'shotImageEntryId'>),
-                shotImageEntryId: newShotImage.id,
+                shotImageEntryId: optimisticImage.shotImageEntryId, // Keep the original ID
                 id: newShotImage.generationId,
+                imageUrl: imageUrl,
+                thumbUrl: imageUrl,
                 isOptimistic: false,
+                // Store the real shotImageEntryId for later use if needed
+                realShotImageEntryId: newShotImage.id,
               };
               return updatedImage;
             }
@@ -461,12 +486,16 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       return;
     }
 
+    // Find the image to get the real ID if it exists
+    const imageToDelete = localOrderedShotImages.find(img => img.shotImageEntryId === shotImageEntryId);
+    const idToDelete = imageToDelete?.realShotImageEntryId || shotImageEntryId;
+
     // Optimistically remove the image from the local state
     setLocalOrderedShotImages(prev => prev.filter(img => img.shotImageEntryId !== shotImageEntryId));
     
     removeImageFromShotMutation.mutate({
       shot_id: selectedShot.id,
-      shotImageEntryId: shotImageEntryId, // Use the unique entry ID
+      shotImageEntryId: idToDelete, // Use the real ID for the API call
       project_id: selectedProjectId,
     }, {
       onError: () => {
@@ -489,9 +518,15 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       .filter((img): img is GenerationRow => !!img);
     setLocalOrderedShotImages(reorderedImages);
 
+    // Map to real IDs for the API call
+    const realOrderedIds = orderedShotGenerationIds.map(id => {
+      const img = imageMap.get(id);
+      return img?.realShotImageEntryId || id;
+    });
+
     updateShotImageOrderMutation.mutate({
       shotId: selectedShot.id,
-      orderedShotGenerationIds, // Pass the new array of IDs
+      orderedShotGenerationIds: realOrderedIds, // Use real IDs for the API
       projectId: selectedProjectId,
     }, {
       onError: () => {
