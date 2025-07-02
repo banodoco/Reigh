@@ -223,8 +223,12 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // Use local state for optimistic updates on image list
   const [localOrderedShotImages, setLocalOrderedShotImages] = useState(orderedShotImages || []);
   useEffect(() => {
-    setLocalOrderedShotImages(orderedShotImages || []);
-  }, [orderedShotImages]);
+    // Only sync from props if we are not in the middle of an upload.
+    // The upload function will be the source of truth during the upload process.
+    if (!isUploadingImage) {
+      setLocalOrderedShotImages(orderedShotImages || []);
+    }
+  }, [orderedShotImages, isUploadingImage]);
 
   // Settings are now loaded from the database via the parent component
   // This effect is removed as settings persistence is handled by VideoTravelToolPage
