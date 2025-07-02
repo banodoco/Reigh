@@ -93,12 +93,11 @@ export const useDuplicateShot = () => {
       if (fetchError || !originalShot) throw new Error('Shot not found');
       
       // Create new shot
-      const result = await createShot.mutateAsync({
+      const { shot: newShot } = await createShot.mutateAsync({
         name: newName || originalShot.name + ' Copy',
         projectId: projectId,
         shouldSelectAfterCreation: false
-      });
-      const newShot = result.shot;
+      }) as { shot: Shot };
       
       // Copy all images to the new shot
       if (originalShot.shot_generations && originalShot.shot_generations.length > 0) {
@@ -349,10 +348,8 @@ export const useAddImageToShot = () => {
       return shotGeneration;
     },
     onSuccess: (_, variables) => {
-      // Get project_id from the shot that was mutated
-      const shots = queryClient.getQueryData<Shot[]>(['shots']);
-      const shot = shots?.find(s => s.id === variables.shot_id);
-      const project_id = shot?.project_id;
+      // Use the project_id from variables directly
+      const project_id = variables.project_id;
       
       if (project_id) {
         queryClient.invalidateQueries({ queryKey: ['shots', project_id] });
@@ -389,11 +386,12 @@ export const useRemoveImageFromShot = () => {
       
       return { shot_id, shotImageEntryId };
     },
-    onMutate: async ({ shot_id, shotImageEntryId }) => {
-      // Get project_id from the shot
-      const shots = queryClient.getQueryData<Shot[]>(['shots']);
-      const shot = shots?.find(s => s.id === shot_id);
-      const project_id = shot?.project_id;
+    onMutate: async ({ shot_id, shotImageEntryId, project_id }) => {
+      // Use project_id from arguments if provided
+      if (!project_id) return { previousShots: undefined, project_id: undefined };
+
+      await queryClient.cancelQueries({ queryKey: ['shots', project_id] });
+      const previousShots = queryClient.getQueryData<Shot[]>(['shots', project_id]);
 
       queryClient.setQueryData<Shot[]>(['shots', project_id], (oldShots = []) =>
         oldShots.map(shot => {
@@ -407,7 +405,7 @@ export const useRemoveImageFromShot = () => {
         })
       );
       
-      return { previousShots: shots, project_id };
+      return { previousShots, project_id };
     },
     onError: (err, args, context) => {
       console.error('Optimistic update failed for removeImageFromShot:', err);
@@ -417,10 +415,8 @@ export const useRemoveImageFromShot = () => {
       toast.error(`Failed to remove image: ${err.message}`);
     },
     onSettled: (data, error, variables) => {
-      // Get project_id from the shot
-      const shots = queryClient.getQueryData<Shot[]>(['shots']);
-      const shot = shots?.find(s => s.id === variables.shot_id);
-      const project_id = shot?.project_id;
+      // Use project_id from variables
+      const project_id = variables.project_id;
       
       if (project_id) {
         queryClient.invalidateQueries({ queryKey: ['shots', project_id] });

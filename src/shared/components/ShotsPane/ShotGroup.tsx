@@ -188,14 +188,14 @@ const ShotGroup: React.FC<ShotGroupProps> = ({ shot }) => {
       return;
     }
     setCurrentShotId(shot.id);
-    navigate('/tools/video-travel', { state: { viaShotClick: true } });
+    navigate('/tools/video-travel', { state: { fromShotClick: true } });
   };
 
   return (
     <div 
       ref={setNodeRef} 
       style={droppableStyle} 
-      className="shot-group p-3 border border-zinc-700 rounded-lg min-w-[200px] max-w-[300px] bg-zinc-800/90 shadow-lg flex flex-col space-y-2 transition-all duration-150 ease-in-out relative cursor-pointer"
+      className="shot-group p-3 border border-zinc-700 rounded-lg min-w-[200px] max-w-[300px] bg-zinc-800/90 shadow-lg flex flex-col space-y-2 transition-all duration-150 ease-in-out relative cursor-pointer hover:bg-zinc-700/50 hover:border-zinc-600"
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -221,7 +221,11 @@ const ShotGroup: React.FC<ShotGroupProps> = ({ shot }) => {
           className="bg-zinc-700 text-white p-1 rounded border border-zinc-600 text-sm focus:ring-1 focus:ring-sky-500 outline-none w-full"
         />
       ) : (
-        <p 
+        <p
+          onClick={(e) => {
+            // Prevent title clicks from selecting the shot
+            e.stopPropagation();
+          }}
           onDoubleClick={handleNameDoubleClick}
           className="text-white text-sm font-semibold truncate cursor-pointer hover:bg-zinc-700/70 p-1 rounded transition-colors"
           title={currentName}

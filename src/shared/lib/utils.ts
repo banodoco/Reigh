@@ -56,14 +56,29 @@ export const getDisplayUrl = (relativePath: string | undefined | null, forceRefr
 
   const baseUrl = import.meta.env.VITE_API_TARGET_URL || '';
   
+  // If the configured base URL points to localhost but the app is *not* currently being
+  // served from localhost (e.g. you are viewing the dev server on a phone/tablet via
+  // the LAN IP), using the localhost base breaks image URLs. In this case we fall back
+  // to using a relative path so that requests are sent to the same host that served
+  // the app (window.location.origin).
+  let effectiveBaseUrl = baseUrl;
+  if (typeof window !== 'undefined' && baseUrl && baseUrl.includes('localhost')) {
+    const currentHostIsLocal = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+    if (!currentHostIsLocal) {
+      // Viewing from a non-localhost device – ignore the localhost API base so that
+      // requests resolve against the dev machine instead of the mobile device itself.
+      effectiveBaseUrl = '';
+    }
+  }
+  
   let finalUrl: string;
   
   // No base URL configured – ensure we have a root-relative path
-  if (!baseUrl) {
+  if (!effectiveBaseUrl) {
     finalUrl = relativePath.startsWith('/') ? relativePath : `/${relativePath}`;
   } else {
     // Base URL is configured – combine properly
-    const cleanBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+    const cleanBase = effectiveBaseUrl.endsWith('/') ? effectiveBaseUrl.slice(0, -1) : effectiveBaseUrl;
     
     if (relativePath.startsWith('/')) {
       finalUrl = `${cleanBase}${relativePath}`;

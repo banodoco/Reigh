@@ -42,20 +42,11 @@ const VideoTravelToolPage: React.FC = () => {
   const [isLoraModalOpen, setIsLoraModalOpen] = useState(false);
   const [availableLoras, setAvailableLoras] = useState<LoraModel[]>([]);
   const [selectedLoras, setSelectedLoras] = useState<ActiveLora[]>([]);
-  const [currentUserId, setCurrentUserId] = useState<string | undefined>(undefined);
 
-  // Get current user ID
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      setCurrentUserId(user?.id);
-    });
-  }, []);
-
-  // Use tool settings for the selected shot
+  // Use tool settings for the selected shot - no need to pass userId, server knows it from auth
   const { settings, update: updateSettings, isLoading: isLoadingSettings, isUpdating } = useToolSettings<VideoTravelSettings>(
     'video-travel',
-    currentUserId,
-    selectedShot?.id
+    { shotId: selectedShot?.id }
   );
 
   // Add state for video generation settings - wait for settings to load before initializing
@@ -248,6 +239,14 @@ const VideoTravelToolPage: React.FC = () => {
     setCurrentShotId(shot.id);
   };
 
+  // Deselect the current shot if the global currentShotId is cleared elsewhere (e.g., "See All")
+  useEffect(() => {
+    if (!currentShotId && selectedShot) {
+      setSelectedShot(null);
+      setVideoPairConfigs([]);
+    }
+  }, [currentShotId, selectedShot]);
+
   const handleBackToShotList = () => {
     setSelectedShot(null);
     setVideoPairConfigs([]);
@@ -287,10 +286,12 @@ const VideoTravelToolPage: React.FC = () => {
         }
       } else {
         // Otherwise, just create an empty shot
-        newShot = await createShotMutation.mutateAsync({
-          shotName: name,
+        const result = await createShotMutation.mutateAsync({
+          name,
           projectId: selectedProjectId,
         });
+        
+        newShot = result.shot;
         
         // Refetch shots to update the list
         await refetchShots();
@@ -443,11 +444,62 @@ const VideoTravelToolPage: React.FC = () => {
       ) : (
         // Show a loading state while settings are being fetched
         isLoadingSettings ? (
-          <div className="flex items-center justify-center h-64">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-              <p className="text-muted-foreground">Loading shot settings...</p>
-            </div>
+          <div className="animate-in fade-in duration-300">
+            <ShotEditor
+              selectedShot={selectedShot}
+              projectId={selectedProjectId}
+              videoPairConfigs={videoPairConfigs}
+              videoControlMode={'batch'}
+              batchVideoPrompt={''}
+              batchVideoFrames={30}
+              batchVideoContext={10}
+              orderedShotImages={selectedShot.images || []}
+              onShotImagesUpdate={handleShotImagesUpdate}
+              onBack={handleBackToShotList}
+              onVideoControlModeChange={() => {}}
+              onPairConfigChange={() => {}}
+              onBatchVideoPromptChange={() => {}}
+              onBatchVideoFramesChange={() => {}}
+              onBatchVideoContextChange={() => {}}
+              batchVideoSteps={4}
+              onBatchVideoStepsChange={() => {}}
+              dimensionSource={'firstImage'}
+              onDimensionSourceChange={() => {}}
+              customWidth={undefined}
+              onCustomWidthChange={() => {}}
+              customHeight={undefined}
+              onCustomHeightChange={() => {}}
+              steerableMotionSettings={{
+                negative_prompt: '',
+                model_name: 'vace_14B',
+                seed: 789,
+                debug: true,
+                apply_reward_lora: false,
+                colour_match_videos: true,
+                apply_causvid: true,
+                use_lighti2x_lora: false,
+                fade_in_duration: '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
+                fade_out_duration: '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
+                after_first_post_generation_saturation: 1,
+                after_first_post_generation_brightness: 0,
+                show_input_images: false,
+              }}
+              onSteerableMotionSettingsChange={() => {}}
+              onGenerateAllSegments={() => {}}
+              selectedLoras={[]}
+              onAddLora={() => {}}
+              onRemoveLora={() => {}}
+              onLoraStrengthChange={() => {}}
+              availableLoras={availableLoras}
+              isLoraModalOpen={false}
+              setIsLoraModalOpen={() => {}}
+              enhancePrompt={false}
+              onEnhancePromptChange={() => {}}
+              generationMode={'batch'}
+              onGenerationModeChange={() => {}}
+              pairConfigs={[]}
+              onPairConfigsChange={() => {}}
+            />
           </div>
         ) : (
           <div className="animate-in fade-in duration-300">

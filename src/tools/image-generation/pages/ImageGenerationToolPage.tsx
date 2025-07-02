@@ -442,7 +442,7 @@ const ImageGenerationToolPage = () => {
 
   return (
     <div className="flex flex-col h-screen">
-      <header className="flex justify-between items-center mb-6 sticky top-0 bg-background/90 backdrop-blur-md py-4 z-10">
+      <header className="flex justify-between items-center mb-6 sticky top-0 bg-background py-4 z-40 border-b border-border/50 shadow-sm">
         <h1 className="text-3xl font-bold">Image Generation</h1>
         <Button variant="ghost" onClick={() => setShowSettingsModal(true)}>
           <Settings className="h-5 w-5" />

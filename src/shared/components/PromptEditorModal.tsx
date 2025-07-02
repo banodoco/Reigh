@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogC
 import { Button } from '@/shared/components/ui/button';
 import { PromptEntry, PromptInputRow, PromptInputRowProps } from '@/tools/image-generation/components/ImageGenerationForm';
 import { ScrollArea } from '@/shared/components/ui/scroll-area';
-import { PlusCircle, AlertTriangle, Wand2Icon, Edit, PackagePlus, ArrowUp, Trash2 } from 'lucide-react';
+import { PlusCircle, AlertTriangle, Wand2Icon, Edit, PackagePlus, ArrowUp, Trash2, ChevronDown, ChevronRight, Sparkles } from 'lucide-react';
 import { PromptGenerationControls, GenerationControlValues as PGC_GenerationControlValues } from '@/tools/image-generation/components/PromptGenerationControls';
 import { BulkEditControls, BulkEditParams as BEC_BulkEditParams, BulkEditControlValues as BEC_BulkEditControlValues } from '@/tools/image-generation/components/BulkEditControls';
 import { useAIInteractionService } from '@/shared/hooks/useAIInteractionService';
@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/components/ui
 import { usePaneAwareModalStyle } from '@/shared/hooks/usePaneAwareModalStyle';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { usePersistentToolState } from '@/shared/hooks/usePersistentToolState';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/shared/components/ui/collapsible';
 
 // Use aliased types for internal state if they were named the same
 interface GenerationControlValues extends PGC_GenerationControlValues {}
@@ -24,6 +25,7 @@ interface PersistedEditorControlsSettings {
   generationSettings?: GenerationControlValues;
   bulkEditSettings?: BulkEditControlValues;
   activeTab?: EditorMode;
+  isAIPromptSectionExpanded?: boolean;
 }
 
 interface PromptToEditState {
@@ -55,6 +57,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
   const [activeTab, setActiveTab] = useState<EditorMode>('generate');
   const [activePromptIdForFullView, setActivePromptIdForFullView] = useState<string | null>(null);
   const modalStyle = usePaneAwareModalStyle();
+  const [isAIPromptSectionExpanded, setIsAIPromptSectionExpanded] = useState(false);
   
   // Scroll state and ref
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -94,6 +97,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
       generationSettings: [generationControlValues, setGenerationControlValues],
       bulkEditSettings: [bulkEditControlValues, setBulkEditControlValues],
       activeTab: [activeTab, setActiveTab],
+      isAIPromptSectionExpanded: [isAIPromptSectionExpanded, setIsAIPromptSectionExpanded],
     },
     { debounceMs: 1000, scope: 'project' }
   );
@@ -310,7 +314,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
     }
   };
 
-  if (!isOpen) return null;
+  // if (!isOpen) return null;  // Commented out to keep hook order stable
 
   const toggleFullView = (promptId: string) => {
     setActivePromptIdForFullView(currentId => currentId === promptId ? null : promptId);
@@ -323,6 +327,11 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
 
   const handleBulkEditValuesChange = useCallback((values: BulkEditControlValues) => {
     setBulkEditControlValues(values);
+    markAsInteracted();
+  }, [markAsInteracted]);
+
+  const handleToggleAIPromptSection = useCallback(() => {
+    setIsAIPromptSectionExpanded(prev => !prev);
     markAsInteracted();
   }, [markAsInteracted]);
 
@@ -345,32 +354,63 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto">
-          <Tabs value={activeTab} onValueChange={(value) => { markAsInteracted(); setActiveTab(value as EditorMode); }} className="px-6">
-            <TabsList className="grid w-full grid-cols-2 mb-4">
-              <TabsTrigger value="generate" disabled={!actualCanUseAI}><Wand2Icon className="mr-2 h-4 w-4" />Generate New</TabsTrigger>
-              <TabsTrigger value="bulk-edit" disabled={!actualCanUseAI}><Edit className="mr-2 h-4 w-4" />Bulk Edit All</TabsTrigger>
-            </TabsList>
-            <TabsContent value="generate">
-              <PromptGenerationControls 
-                onGenerate={handleGenerateAndAddPrompts} 
-                isGenerating={isAIGenerating}
-                initialValues={generationControlValues}
-                onValuesChange={handleGenerationValuesChange}
-                hasApiKey={actualCanUseAI}
-                existingPromptsForContext={internalPrompts.map(p => ({ id: p.id, text: p.fullPrompt, shortText: p.shortPrompt, hidden: false}))}
-              />
-            </TabsContent>
-            <TabsContent value="bulk-edit">
-              <BulkEditControls 
-                onBulkEdit={handleBulkEditPrompts} 
-                isEditing={isAIEditing}
-                initialValues={bulkEditControlValues}
-                onValuesChange={handleBulkEditValuesChange}
-                hasApiKey={actualCanUseAI}
-                numberOfPromptsToEdit={internalPrompts.length}
-              />
-            </TabsContent>
-          </Tabs>
+          <Collapsible 
+            open={isAIPromptSectionExpanded} 
+            onOpenChange={setIsAIPromptSectionExpanded}
+            className="px-6"
+          >
+            <CollapsibleTrigger asChild>
+              <Button
+                variant="ghost"
+                className={`${isAIPromptSectionExpanded ? 'w-full justify-between p-4 mb-4 hover:bg-accent/50' : 'w-full justify-between p-4 mb-4 bg-gradient-to-r from-purple-500/20 via-pink-500/20 to-red-500/20 border border-pink-400/40 hover:from-purple-500/30 hover:to-red-500/30'} transition-colors duration-300`}
+                onClick={handleToggleAIPromptSection}
+              >
+                <div className="flex items-center gap-2">
+                  <Wand2Icon className="h-4 w-4" />
+                  <span className="font-medium flex items-center gap-1">
+                    AI Prompt Tools
+                    {!isAIPromptSectionExpanded && <Sparkles className="h-3 w-3 text-pink-400 animate-pulse" />}
+                  </span>
+                  <span className="text-sm text-muted-foreground">
+                    {actualCanUseAI ? "(Generate new or bulk edit existing prompts)" : "(API key required)"}
+                  </span>
+                </div>
+                {isAIPromptSectionExpanded ? (
+                  <ChevronDown className="h-4 w-4" />
+                ) : (
+                  <ChevronRight className="h-4 w-4" />
+                )}
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <Tabs value={activeTab} onValueChange={(value) => { markAsInteracted(); setActiveTab(value as EditorMode); }}>
+                <TabsList className="grid w-full grid-cols-2 mb-4">
+                  <TabsTrigger value="generate" disabled={!actualCanUseAI}><Wand2Icon className="mr-2 h-4 w-4" />Generate New</TabsTrigger>
+                  <TabsTrigger value="bulk-edit" disabled={!actualCanUseAI}><Edit className="mr-2 h-4 w-4" />Bulk Edit All</TabsTrigger>
+                </TabsList>
+                <TabsContent value="generate">
+                  <PromptGenerationControls 
+                    onGenerate={handleGenerateAndAddPrompts} 
+                    isGenerating={isAIGenerating}
+                    initialValues={generationControlValues}
+                    onValuesChange={handleGenerationValuesChange}
+                    hasApiKey={actualCanUseAI}
+                    existingPromptsForContext={internalPrompts.map(p => ({ id: p.id, text: p.fullPrompt, shortText: p.shortPrompt, hidden: false}))}
+                  />
+                </TabsContent>
+                <TabsContent value="bulk-edit">
+                  <BulkEditControls 
+                    onBulkEdit={handleBulkEditPrompts} 
+                    isEditing={isAIEditing}
+                    initialValues={bulkEditControlValues}
+                    onValuesChange={handleBulkEditValuesChange}
+                    hasApiKey={actualCanUseAI}
+                    numberOfPromptsToEdit={internalPrompts.length}
+                  />
+                </TabsContent>
+              </Tabs>
+            </CollapsibleContent>
+          </Collapsible>
           
           <div className="px-6 text-sm text-muted-foreground mb-2 flex justify-between items-center">
             <span>Editing {internalPrompts.length} prompt(s). Changes are auto-saved.</span>
@@ -451,10 +491,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
            <Button variant="outline" onClick={handleInternalAddBlankPrompt} className="mr-auto">
             <PackagePlus className="mr-2 h-4 w-4" /> Add Blank Prompt
           </Button>
-          <DialogClose asChild>
-            <Button variant="outline" onClick={onClose}>Cancel (No Save)</Button>
-          </DialogClose>
-          <Button onClick={handleFinalSaveAndClose}>Save & Close</Button>
+          <Button onClick={handleFinalSaveAndClose}>Close</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

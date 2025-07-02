@@ -187,7 +187,7 @@ export const PromptInputRow: React.FC<PromptInputRowProps> = ({
 
   return (
     <div 
-      className="p-3 border rounded-md space-y-2 bg-slate-50/50 dark:bg-slate-800/30"
+      className="p-3 rounded-md shadow-sm bg-slate-50/30 dark:bg-slate-800/30"
     >
       <div className="flex justify-between items-center">
         <Label htmlFor={`fullPrompt-${promptEntry.id}`} className="text-sm font-medium">
@@ -548,7 +548,7 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
   };
   
   const handleSavePromptsFromModal = (updatedPrompts: PromptEntry[]) => {
-
+    markAsInteracted();
     // De-duplicate IDs and assign new ones where necessary.
     const seenIds = new Set<string>();
     const sanitizedPrompts = updatedPrompts.map(original => {
@@ -666,7 +666,7 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
 
   return (
     <>
-      <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-white rounded-lg shadow-sm">
+      <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Generation Mode Selector */}
         <div className="md:col-span-2 mb-6">
           <Label className="text-lg font-semibold mb-3 block">Generation Mode</Label>
@@ -683,50 +683,83 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
         </div>
 
         <div className="space-y-6">
-          <div className="space-y-3">
+          <div>
             <div className="flex justify-between items-center mb-2">
               <Label className="text-lg font-semibold">Prompts</Label>
               <div className="flex items-center space-x-2">
+                {/* Manage Prompts button (hidden when >3 prompts) */}
                 {prompts.length <= 3 && (
-                  <Button type="button" variant="outline" size="sm" onClick={() => handleAddPrompt('form')} disabled={!hasApiKey || isGenerating}>
-                    <PlusCircle className="mr-2 h-4 w-4" /> Add Prompt
-                  </Button>
+                  <TooltipProvider delayDuration={300}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setIsPromptModalOpen(true)}
+                          disabled={!hasApiKey || isGenerating}
+                          aria-label="Manage Prompts"
+                        >
+                          <Edit3 className="h-4 w-4 mr-0 sm:mr-2" />
+                          <span className="hidden sm:inline">Manage Prompts</span>
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">
+                        Manage Prompts
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 )}
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsPromptModalOpen(true)} 
-                  disabled={!hasApiKey || isGenerating}
-                  title="Open Advanced Prompt Editor"
-                >
-                  <Edit3 className="mr-2 h-4 w-4" /> 
-                  {prompts.length > 3 ? `Manage Prompts (${prompts.length})` : "Manage Prompts"}
-                </Button>
               </div>
             </div>
 
-            {prompts.length <= 3 ? (
-              prompts.map((promptEntry, index) => (
-                <PromptInputRow
-                  key={promptEntry.id}
-                  promptEntry={promptEntry}
-                  onUpdate={handleUpdatePrompt}
-                  onRemove={handleRemovePrompt}
-                  canRemove={prompts.length > 1}
-                  isGenerating={isGenerating}
-                  hasApiKey={hasApiKey}
-                  index={index}
-                  onEditWithAI={() => { /* Placeholder for direct form AI edit */ }}
-                  aiEditButtonIcon={null} 
-                  onSetActiveForFullView={setDirectFormActivePromptId}
-                  isActiveForFullView={directFormActivePromptId === promptEntry.id}
-                />
-              ))
-            ) : (
-              <div className="p-3 border rounded-md text-center bg-slate-50/50 hover:border-primary/50 cursor-pointer" onClick={() => setIsPromptModalOpen(true)}>
-                  <p className="text-sm text-muted-foreground"><span className="font-semibold text-primary">{prompts.length} prompts</span> currently active.</p>
-                  <p className="text-xs text-primary">(Click to Edit)</p>
+            <div className="space-y-3">
+              {prompts.length <= 3 ? (
+                prompts.map((promptEntry, index) => (
+                  <PromptInputRow
+                    key={promptEntry.id}
+                    promptEntry={promptEntry}
+                    onUpdate={handleUpdatePrompt}
+                    onRemove={handleRemovePrompt}
+                    canRemove={prompts.length > 1}
+                    isGenerating={isGenerating}
+                    hasApiKey={hasApiKey}
+                    index={index}
+                    onEditWithAI={() => { /* Placeholder for direct form AI edit */ }}
+                    aiEditButtonIcon={null} 
+                    onSetActiveForFullView={setDirectFormActivePromptId}
+                    isActiveForFullView={directFormActivePromptId === promptEntry.id}
+                  />
+                ))
+              ) : (
+                <div className="hidden md:block p-3 border rounded-md text-center bg-slate-50/50 hover:border-primary/50 cursor-pointer" onClick={() => setIsPromptModalOpen(true)}>
+                    <p className="text-sm text-muted-foreground"><span className="font-semibold text-primary">{prompts.length} prompts</span> currently active.</p>
+                    <p className="text-xs text-primary">(Click to Edit)</p>
+                </div>
+              )}
+            </div>
+
+            {/* Add Prompt button below list, larger, left-aligned */}
+            {prompts.length <= 3 && (
+              <div className="mt-3">
+                <TooltipProvider delayDuration={300}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => handleAddPrompt('form')}
+                        disabled={!hasApiKey || isGenerating}
+                        aria-label="Add Prompt"
+                      >
+                        <PlusCircle className="h-4 w-4 mr-2" />
+                        <span>Add Prompt</span>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      Add Prompt
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
             )}
           </div>
@@ -757,7 +790,7 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 pt-4 border-t">
+          <div className="grid grid-cols-1 gap-4 pt-4">
             <div className="mt-1">
               <SliderWithValue
                 label="Images per Prompt"
@@ -786,7 +819,7 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
                 />
               </div>
 
-              <div className="space-y-6 pt-4 border-t">
+              <div className="space-y-6 pt-4">
                 <h3 className="text-md font-semibold">ControlNet Strengths:</h3>
                 <SliderWithValue label="Depth Strength" value={depthStrength} onChange={handleSliderChange(setDepthStrength)} disabled={!hasApiKey || isGenerating}/>
                 <SliderWithValue label="Soft Edge Strength" value={softEdgeStrength} onChange={handleSliderChange(setSoftEdgeStrength)} disabled={!hasApiKey || isGenerating}/>
@@ -806,7 +839,7 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
             {availableLoras.length === 0 && !isLoraModalOpen && <p className="text-xs text-muted-foreground mt-1">Loading LoRA models for selection...</p>}
             {selectedLorasMap[generationMode].length > 0 && (
               <TooltipProvider>
-                <div className="mt-4 space-y-4 pt-2 border-t">
+                <div className="mt-4 space-y-4 pt-2">
                   <h3 className="text-md font-semibold">Active LoRAs:</h3>
                   {selectedLorasMap[generationMode].map((lora) => (
                     <div key={lora.id} className="p-3 border rounded-md shadow-sm bg-slate-50">
@@ -845,9 +878,9 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
                       </div>
                     </div>
                   ))}
-                                  </div>
-                </TooltipProvider>
-              )}
+                </div>
+              </TooltipProvider>
+            )}
             </div>
           )}
 

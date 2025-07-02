@@ -41,23 +41,38 @@ export async function resolveToolSettings(
   toolId: string,
   ctx: ToolSettingsContext
 ): Promise<unknown> {
-  
-  const [user, project, shot] = await Promise.all([
-    db.query.users.findFirst({ where: eq(users.id, ctx.userId) }),
-    ctx.projectId ? db.query.projects.findFirst({ where: eq(projects.id, ctx.projectId) }) : null,
-    ctx.shotId ? db.query.shots.findFirst({ where: eq(shots.id, ctx.shotId) }) : null,
-  ]);
+  // Build a single query that fetches all needed data at once
+  const query = db
+    .select({
+      userSettings: users.settings,
+      projectSettings: projects.settings,
+      shotSettings: shots.settings,
+    })
+    .from(users)
+    .leftJoin(projects, ctx.projectId ? eq(projects.id, ctx.projectId) : undefined)
+    .leftJoin(shots, ctx.shotId ? eq(shots.id, ctx.shotId) : undefined)
+    .where(eq(users.id, ctx.userId))
+    .limit(1);
 
-  const userSettings = (user?.settings as any)?.[toolId] ?? {};
-  const projectSettings = (project?.settings as any)?.[toolId] ?? {};
-  const shotSettings = (shot?.settings as any)?.[toolId] ?? {};
+  const result = await query;
+  
+  if (!result.length) {
+    // If no user found, just return tool defaults
+    return toolDefaults[toolId] ?? {};
+  }
+
+  const { userSettings, projectSettings, shotSettings } = result[0];
+  
+  const userToolSettings = (userSettings as any)?.[toolId] ?? {};
+  const projectToolSettings = (projectSettings as any)?.[toolId] ?? {};
+  const shotToolSettings = (shotSettings as any)?.[toolId] ?? {};
 
   return deepMerge(
     {},
     toolDefaults[toolId] ?? {},
-    userSettings,
-    projectSettings,
-    shotSettings
+    userToolSettings,
+    projectToolSettings,
+    shotToolSettings
   );
 }
 

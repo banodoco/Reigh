@@ -6,7 +6,7 @@ import { useProject } from "@/shared/contexts/ProjectContext";
 import { useSlidingPane } from '@/shared/hooks/useSlidingPane';
 import { cn } from '@/shared/lib/utils';
 import { Button } from '@/shared/components/ui/button';
-import { LockIcon, UnlockIcon, ArrowRightIcon } from 'lucide-react';
+import { ArrowRightIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { usePanes } from '@/shared/contexts/PanesContext';
 import CreateShotModal from '@/tools/video-travel/components/CreateShotModal';
@@ -69,7 +69,7 @@ const ShotsPane: React.FC = () => {
 
     if (createdShotId) {
       setCurrentShotId(createdShotId);
-      navigate('/tools/video-travel', { state: { viaShotClick: true } });
+      navigate('/tools/video-travel', { state: { fromShotClick: true } });
     }
   };
 

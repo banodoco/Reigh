@@ -47,10 +47,10 @@ export function useWebSocket() {
           case 'GENERATIONS_UPDATED': {
             const { projectId, shotId } = message.payload;
             console.log(`[WebSocket] Invalidating generation/shot queries for project: ${projectId}, shot: ${shotId}`);
-            queryClient.invalidateQueries({ queryKey: ['shots', { projectId }] });
+            queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
             queryClient.invalidateQueries({ queryKey: ['generations', projectId] });
             if (shotId) {
-              queryClient.invalidateQueries({ queryKey: ['shots', { shotId }] });
+              queryClient.invalidateQueries({ queryKey: ['shots', shotId] });
             }
             break;
           }

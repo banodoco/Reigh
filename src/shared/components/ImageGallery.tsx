@@ -24,6 +24,7 @@ import { nanoid } from "nanoid";
 import { formatDistanceToNow, isValid } from "date-fns";
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 import { DraggableImage } from "@/shared/components/DraggableImage";
+import { getDisplayUrl } from "@/shared/lib/utils";
 
 // Define the structure for individual LoRA details within metadata
 export interface MetadataLora {
@@ -154,19 +155,6 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, isDeletin
   }, [filterByToolType, mediaTypeFilter]);
 
   const tickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  const baseUrl = import.meta.env.VITE_API_TARGET_URL || '';
-
-  const getDisplayUrl = (relativePath: string | undefined): string => {
-    if (!relativePath) return ''; // Or a placeholder image URL
-    if (relativePath.startsWith('http') || relativePath.startsWith('blob:')) {
-      return relativePath;
-    }
-    // Ensure no double slashes if baseUrl ends with / and relativePath starts with /
-    const cleanBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
-    const cleanRelative = relativePath.startsWith('/') ? relativePath.substring(1) : relativePath;
-    return `${cleanBase}/${cleanRelative}`;
-  };
 
   useEffect(() => {
     const newSelectedShotId = currentShotId || lastShotId || (simplifiedShotOptions.length > 0 ? simplifiedShotOptions[0].id : "");

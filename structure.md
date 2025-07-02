@@ -1,5 +1,5 @@
-# Artful Pane Craft: Developer Onboarding
-*(React + Vite Image-Generation Playground)*
+# Reigh: Developer Onboarding
+This document is meant to sereve as a comprehensive view of Reigh's archtiecture. 
 
 ## 1. Tech Stack & Ports
 
@@ -199,38 +199,25 @@
 - **ui/FullscreenImageModal.tsx**: Enhanced fullscreen image modal with horizontal flip and save functionality. Features flip button, save button (appears when changes made), canvas-based image processing for accurate flipping. Uses local SQLite API for database updates
 
 ##### Hooks
-- **useGenerations.ts**: CRUD for generations:
-  - `useListAllGenerations`: GET all generations for a project
-  - `useDeleteGeneration`: DELETE a single generation
-  - `useCreateGeneration`: POST a new simple generation record
-- **useApiKeys.ts**: Manages user API keys stored in database:
-  - `useApiKeys`: Fetches/updates API keys from database via react-query. Replaces localStorage-based approach
-  - `getApiKey`: Helper to retrieve specific API key values
-  - `saveApiKeys`: Updates API keys in database with optimistic updates
-- **useShots.ts**: CRUD for shots & shot_generations:
-  - `useCreateShot`: POST /api/shots
-  - `useListShots`: GET /api/shots?projectId= (API returns shots with ordered images: GenerationRow[])
-  - `useAddImageToShot`: POST /api/shots/shot_generations
-  - `useDeleteShot`: DELETE /api/shots/:shotId
-  - `useUpdateShotName`: PUT /api/shots/:shotId
-  - `useRemoveImageFromShot`: DELETE /api/shots/:shot_id/generations/:generation_id. Optimistic updates
-  - `useUpdateShotImageOrder`: PUT /api/shots/:shotId/generations/order (payload: { orderedGenerationIds: string[] }). Optimistic updates
-  - `useHandleExternalImageDrop`: Handles external image drop: upload, POST /api/generations, link to shot (creates shot if new)
-- **useTasks.ts**: Task management:
-  - `useListTasks`: GET /api/tasks?projectId=&status=
-  - `useCreateTask`: POST /api/tasks
-  - `useCancelTask`: PATCH /api/tasks/:taskId/cancel
-  - `useUpdateTaskStatus`: PATCH /api/tasks/:taskId/status. For 'travel_stitch' completion, backend taskProcessingService.ts creates generation/shot_generation
-- **useCancelAllPendingTasks**: POST /api/tasks/cancel-pending
-- **usePersistentState.ts**: Generic hook to persist component state to `localStorage`.
-- **useWebSocket.ts**: Manages WebSocket. Listens for messages (e.g., TASK_COMPLETED, TASKS_STATUS_UPDATE), invalidates react-query caches for real-time UI
-- **useSlidingPane.ts**: Manages state for hover-to-open, lockable side panels
-- **useLastAffectedShot.ts**: For LastAffectedShotContext
-- **use-mobile.tsx**: Media query helper
-- **use-toast.ts**: Sonner toast wrapper
-- **useAIInteractionService.ts**: AI prompt editing abstraction
-- **usePaneAwareModalStyle.ts**: Calculates and returns a style object to correctly position modals within the main content area, accounting for locked side panes.
-- **usePersistentToolState.ts**: Shared hook that synchronizes React state with database-persisted tool settings. Provides automatic hydration, debounced saves, deep equality checks, and interaction tracking. Used by all tools for consistent settings persistence.
+- **useApiKeys.ts**: Manages API keys for external services
+- **useFalImageGeneration.ts**: Handles image generation with Fal.ai
+- **useGenerations.ts**: Manages generation CRUD operations
+- **useLastAffectedShot.ts**: Tracks the last shot that was affected by an action
+- **usePaneAwareModalStyle.ts**: Provides modal styling that respects pane visibility
+- **usePersistentState.ts**: localStorage-backed state management
+- **usePersistentToolState.ts**: Tool-specific persistent state with debouncing
+- **useResources.ts**: Manages resources (uploaded files)
+- **useShots.ts**: Comprehensive shot management (CRUD, ordering, duplication)
+- **useSlidingPane.ts**: Handles sliding pane animations and state
+- **useTasks.ts**: Task management and status tracking
+- **useToolSettings.ts**: Tool-specific settings management with performance optimizations:
+  - No longer requires userId parameter (server gets it from auth header)
+  - Includes React Query caching (5 min stale time, 10 min cache time)
+  - Single database query instead of 3 parallel queries
+  - Prevents double-fetching on initial load
+- **useVideoScrubbing.ts**: Video scrubbing functionality
+- **useWebSocket.ts**: WebSocket connection for real-time updates
+- **useAIInteractionService.ts**: AI interaction service for generating prompts and editing
 
 ##### Contexts
 - **LastAffectedShotContext.tsx**: Remembers last modified shot
@@ -241,8 +228,12 @@
 - **ToolSettingsGate.tsx**: Wrapper component that shows loading spinner until tool settings are hydrated, then fades in content. Ensures smooth UX during settings fetch.
 
 ##### Library (`lib/`)
+- **api.ts**: Authentication utilities:
+  - `fetchWithAuth`: Makes authenticated fetch requests with JWT token caching to avoid repeated auth calls
+  - Caches session tokens with 1-minute expiry buffer to reduce latency on mobile
+  - Automatically clears cache on auth state changes
 - **imageUploader.ts**: Uploads to Supabase storage
-- **utils.ts**: General utilities
+- **utils.ts**: General utilities. Includes `getDisplayUrl()` which safely converts relative storage paths to fully-qualified URLs. If `VITE_API_TARGET_URL` is set to a localhost address but the app is being accessed from another host (e.g. mobile device on LAN), the helper automatically falls back to a relative URL so images and videos still load. **Always use this helper instead of hand-rolling URL logic.**
 - **imageCropper.ts**: Crops images to supported aspect ratios. Includes `cropImageToProjectAspectRatio` function for cropping to specific project dimensions
 - **cropSettings.ts**: Utility for managing "crop to project size" setting persistence in localStorage. Defaults to true
 - **aspectRatios.ts**: Defines aspect ratios (e.g., "16:9" -> "902x508"). Single source for project/server dimensions. Parsing/matching helpers
@@ -254,7 +245,13 @@
 - **useToolSettings.ts**: Manages tool-specific settings stored in database at user/project/shot scopes. Provides `useToolSettings<T>()` hook that fetches merged settings and `update()` function for saving. Settings cascade from app defaults → user → project → shot, with later scopes overriding earlier ones.
 
 ##### Services (`src/server/services/`)
-- **toolSettingsService.ts**: Server-side service for resolving and updating tool settings. Provides `resolveToolSettings()` to merge settings across scopes and `updateToolSettings()` to save changes. Settings cascade from **app defaults → user → project → shot**, so preferences saved at the user level automatically apply to every project/shot unless overridden. Implements deep merge logic for nested settings objects.
+- **taskProcessingService.ts**: Processes task completions and creates generations
+- **toolSettingsService.ts**: Tool settings management with performance optimizations:
+  - `resolveToolSettings`: Fetches and merges settings from user/project/shot levels in a single optimized query
+  - Uses left joins to fetch all data at once instead of 3 parallel queries
+  - Reduces database round-trips for better mobile performance
+  - `updateToolSettings`: Updates settings at specified scope
+- **webSocketService.ts**: WebSocket server for real-time updates
 
 ##### Tool Settings (`src/tools/*/settings.ts`)
 - **video-travel/settings.ts**: Defines `VideoTravelSettings` interface and default values for Video Travel tool (per-shot scope – generation parameters, LoRA configs, pair prompts/frames).

@@ -4,6 +4,7 @@ import { useRef, useCallback } from 'react';
 import { deepMerge } from '../lib/deepEqual';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { fetchWithAuth } from '@/lib/api';
+import { supabase } from '@/integrations/supabase/client';
 
 const baseUrl = import.meta.env.VITE_API_TARGET_URL || window.location.origin;
 
@@ -57,53 +58,30 @@ async function updateToolSettings(params: UpdateToolSettingsParams): Promise<voi
 }
 
 // Overload type definitions
-export function useToolSettings<T>(toolId: string, userId?: string, shotId?: string): {
+export function useToolSettings<T>(toolId: string, context?: { projectId?: string; shotId?: string }): {
   settings: T | undefined;
   isLoading: boolean;
   update: (scope: SettingsScope, settings: Partial<T>) => void;
   isUpdating: boolean;
 };
 
-// Overload: pass a context object containing projectId/shotId
+// Unified implementation
 export function useToolSettings<T>(
   toolId: string,
-  context: { projectId?: string; shotId?: string }
-): {
-  settings: T | undefined;
-  isLoading: boolean;
-  update: (scope: SettingsScope, settings: Partial<T>) => void;
-  isUpdating: boolean;
-};
-
-// Unified implementation handling both signature styles
-export function useToolSettings<T>(
-  toolId: string,
-  userIdOrContext?: string | { projectId?: string; shotId?: string },
-  maybeShotId?: string
+  context?: { projectId?: string; shotId?: string }
 ) {
   const { selectedProjectId } = useProject();
   const queryClient = useQueryClient();
 
   // Determine parameter shapes
-  let userId: string | undefined;
-  let projectId: string | undefined = selectedProjectId;
-  let shotId: string | undefined;
-
-  if (typeof userIdOrContext === 'string' || userIdOrContext === undefined) {
-    userId = userIdOrContext;
-    shotId = maybeShotId;
-  } else if (typeof userIdOrContext === 'object') {
-    const ctx = userIdOrContext;
-    projectId = ctx.projectId ?? selectedProjectId;
-    shotId = ctx.shotId;
-  }
+  let projectId: string | undefined = context?.projectId ?? selectedProjectId;
+  let shotId: string | undefined = context?.shotId;
 
   // Fetch merged settings from API
   const { data: settings, isLoading } = useQuery({
-    queryKey: ['toolSettings', toolId, userId, projectId, shotId],
+    queryKey: ['toolSettings', toolId, projectId, shotId],
     queryFn: async () => {
       const params = new URLSearchParams({ toolId });
-      if (userId) params.append('userId', userId);
       if (projectId) params.append('projectId', projectId);
       if (shotId) params.append('shotId', shotId);
       
@@ -118,12 +96,25 @@ export function useToolSettings<T>(
       return response.json() as Promise<T>;
     },
     enabled: !!toolId,
+    staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
+    gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
   });
 
   // Update settings mutation
   const updateMutation = useMutation({
     mutationFn: async ({ scope, settings: newSettings }: { scope: SettingsScope; settings: Partial<T> }) => {
-      const idForScope = scope === 'user' ? userId : scope === 'project' ? projectId : shotId;
+      let idForScope: string | undefined;
+      
+      if (scope === 'user') {
+        // Get userId from auth for user scope
+        const { data: { user } } = await supabase.auth.getUser();
+        idForScope = user?.id;
+      } else if (scope === 'project') {
+        idForScope = projectId;
+      } else if (scope === 'shot') {
+        idForScope = shotId;
+      }
+      
       if (!idForScope) {
         throw new Error('Missing identifier for tool settings update');
       }
@@ -147,7 +138,7 @@ export function useToolSettings<T>(
     onSuccess: () => {
       // Invalidate the query to refetch updated settings
       queryClient.invalidateQueries({ 
-        queryKey: ['toolSettings', toolId, userId, projectId, shotId] 
+        queryKey: ['toolSettings', toolId, projectId, shotId] 
       });
     },
   });
