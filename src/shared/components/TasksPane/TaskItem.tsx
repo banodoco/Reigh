@@ -154,7 +154,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
       </div>
       {/* Image previews for Travel Between Images task */}
       {imagesToShow.length > 0 && (
-        <div className="flex items-center overflow-x-auto mb-1">
+        <div className="flex items-center overflow-x-auto mb-1 mt-2">
           {imagesToShow.map((url, idx) => (
             <img
               key={idx}
