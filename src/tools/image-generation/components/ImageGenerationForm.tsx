@@ -422,6 +422,7 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
     if (settingsToLoad.softEdgeStrength !== undefined) setSoftEdgeStrength(settingsToLoad.softEdgeStrength);
     if (settingsToLoad.beforeEachPromptText !== undefined) setBeforeEachPromptText(settingsToLoad.beforeEachPromptText);
     if (settingsToLoad.afterEachPromptText !== undefined) setAfterEachPromptText(settingsToLoad.afterEachPromptText);
+    if (settingsToLoad.generationMode !== undefined) setGenerationMode(settingsToLoad.generationMode as GenerationMode);
 
     hydratedProjectIdRef.current = selectedProjectId;
   }, [isSettingsLoading, persistedSettings, selectedProjectId]);
@@ -435,6 +436,7 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
       selectedLorasByMode: selectedLorasMap,
       depthStrength,
       softEdgeStrength,
+      generationMode,
       beforeEachPromptText,
       afterEachPromptText,
     };

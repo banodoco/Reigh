@@ -20,6 +20,7 @@ export interface ImageGenerationSettings {
   selectedLorasByMode?: Record<GenerationMode, ActiveLora[]>;
   depthStrength?: number;
   softEdgeStrength?: number;
+  generationMode?: GenerationMode;
   beforeEachPromptText?: string;
   afterEachPromptText?: string;
 }
@@ -40,6 +41,7 @@ export const defaultImageGenerationSettings: ImageGenerationSettings = {
   },
   depthStrength: 50,
   softEdgeStrength: 20,
+  generationMode: 'wan-local',
   beforeEachPromptText: '',
   afterEachPromptText: '',
 }; 
