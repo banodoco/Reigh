@@ -89,42 +89,49 @@ const VideoTravelToolPage: React.FC = () => {
   const userHasInteracted = useRef(false);
   const [showSkeleton, setShowSkeleton] = useState(false);
 
-  // Update state when settings are loaded from database
+  // Mark initial settings load completion using loading-state transition
+  const prevLoadingRef = useRef(true);
+
   useEffect(() => {
-    if (settings && !isLoadingSettings && !hasLoadedInitialSettings.current) {
+    const wasLoading = prevLoadingRef.current;
+    prevLoadingRef.current = isLoadingSettings;
+
+    if (wasLoading && !isLoadingSettings && settings && !hasLoadedInitialSettings.current) {
       hasLoadedInitialSettings.current = true;
-      // Reset user interaction flag when loading new settings
       userHasInteracted.current = false;
-      
-      setVideoControlMode(settings.videoControlMode || 'batch');
-      setBatchVideoPrompt(settings.batchVideoPrompt || '');
-      setBatchVideoFrames(settings.batchVideoFrames || 30);
-      setBatchVideoContext(settings.batchVideoContext || 10);
-      setBatchVideoSteps(settings.batchVideoSteps || 4);
-      setDimensionSource(settings.dimensionSource || 'firstImage');
+
+      // Copy settings into local state
+      setVideoControlMode(settings.videoControlMode ?? 'batch');
+      setBatchVideoPrompt(settings.batchVideoPrompt ?? '');
+      setBatchVideoFrames(settings.batchVideoFrames ?? 30);
+      setBatchVideoContext(settings.batchVideoContext ?? 10);
+      setBatchVideoSteps(settings.batchVideoSteps ?? 4);
+      setDimensionSource(settings.dimensionSource ?? 'firstImage');
       setCustomWidth(settings.customWidth);
       setCustomHeight(settings.customHeight);
-      setEnhancePrompt(settings.enhancePrompt || false);
-      setVideoPairConfigs(settings.pairConfigs || []);
-      setGenerationMode(settings.generationMode || 'batch');
-      setPairConfigs(settings.pairConfigs || []);
-      setSteerableMotionSettings(settings.steerableMotionSettings || {
-    negative_prompt: '',
-    model_name: 'vace_14B',
-    seed: 789,
-    debug: true,
-    apply_reward_lora: false,
-    colour_match_videos: true,
-    apply_causvid: true,
-    use_lighti2x_lora: false,
-    fade_in_duration: '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
-    fade_out_duration: '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
-    after_first_post_generation_saturation: 1,
-    after_first_post_generation_brightness: 0,
-    show_input_images: false,
-  });
+      setEnhancePrompt(settings.enhancePrompt ?? false);
+      setVideoPairConfigs(settings.pairConfigs ?? []);
+      setGenerationMode(settings.generationMode ?? 'batch');
+      setPairConfigs(settings.pairConfigs ?? []);
+      setSteerableMotionSettings(settings.steerableMotionSettings ?? {
+        negative_prompt: '',
+        model_name: 'vace_14B',
+        seed: 789,
+        debug: true,
+        apply_reward_lora: false,
+        colour_match_videos: true,
+        apply_causvid: true,
+        use_lighti2x_lora: false,
+        fade_in_duration: '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
+        fade_out_duration: '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
+        after_first_post_generation_saturation: 1,
+        after_first_post_generation_brightness: 0,
+        show_input_images: false,
+      });
+
+      console.log('[ToolSettingsDebug] Initial settings load complete', { shotId: selectedShot?.id });
     }
-  }, [settings, isLoadingSettings]);
+  }, [isLoadingSettings, settings, selectedShot?.id]);
 
   // Reset loaded flag when switching shots
   useEffect(() => {
