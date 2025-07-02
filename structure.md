@@ -183,6 +183,7 @@
 - **aspectRatios.ts**: Defines aspect ratios (e.g., "16:9" -> "902x508"). Single source for project/server dimensions. Parsing/matching helpers
 - **steerableMotion.ts**: Video generation API (POST /api/steerable-motion). Includes prompt enhancement via OpenAI API when enhance_prompt=true and openai_api_key is provided. Supports mutually exclusive LoRA options: apply_causvid and use_lighti2x_lora.
 - **taskConfig.ts**: Centralized task configuration system. Manages task visibility, display names, progress support, and cancellation permissions. Provides functions like `isTaskVisible()`, `getTaskDisplayName()`, `taskSupportsProgress()`, and `filterVisibleTasks()`. Replaces hardcoded task type arrays with scalable configuration registry. Supports categories ('generation', 'processing', 'orchestration', 'utility') and extensible task capabilities.
+- **deepEqual.ts**: Deep equality comparison utility with `sanitizeSettings()` function to ignore undefined values. Used by tool settings system to detect actual changes vs initialization.
 
 ##### Hooks
 - **useToolSettings.ts**: Manages tool-specific settings stored in database at user/project/shot scopes. Provides `useToolSettings<T>()` hook that fetches merged settings and `update()` function for saving. Settings cascade from app defaults → user → project → shot, with later scopes overriding earlier ones.
