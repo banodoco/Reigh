@@ -21,7 +21,7 @@ import FileInput from "@/shared/components/FileInput";
 import { fileToDataURL, dataURLtoFile } from "@/shared/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/components/ui/select";
 import { useProject } from "@/shared/contexts/ProjectContext";
-import { useToolSettings } from "@/shared/hooks/useToolSettings";
+import { usePersistentToolState } from "@/shared/hooks/usePersistentToolState";
 import { ImageGenerationSettings } from "../settings";
 
 const STARTING_IMAGE_KEY = 'artfulPaneCraftStartingImage';
@@ -281,23 +281,33 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
   const [determinedApiImageSize, setDeterminedApiImageSize] = useState<string | null>(null);
   const [isLoraModalOpen, setIsLoraModalOpen] = useState(false);
   const [availableLoras, setAvailableLoras] = useState<LoraModel[]>([]);
-  const hydratedProjectIdRef = useRef<string | null>(null);
   const defaultsApplied = useRef(false);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [directFormActivePromptId, setDirectFormActivePromptId] = useState<string | null>(null);
   const [generationMode, setGenerationMode] = useState<GenerationMode>('wan-local');
 
-  // 🗄️ Project-level settings persistence -----------------------------
-  const { selectedProjectId } = useProject();
-  const {
-    settings: persistedSettings,
-    isLoading: isSettingsLoading,
-    update: updatePersistedSettings,
-  } = useToolSettings<ImageGenerationSettings>('image-generation', { projectId: selectedProjectId }, { silent: true });
-
   // Text to prepend/append to every prompt
   const [beforeEachPromptText, setBeforeEachPromptText] = useState('');
   const [afterEachPromptText, setAfterEachPromptText] = useState('');
+
+  // Get project context
+  const { selectedProjectId } = useProject();
+
+  // 🗄️ Use the shared persistent state hook
+  const { ready, isSaving, markAsInteracted } = usePersistentToolState<ImageGenerationSettings>(
+    'image-generation',
+    { projectId: selectedProjectId },
+    {
+      prompts: [prompts, setPrompts],
+      imagesPerPrompt: [imagesPerPrompt, setImagesPerPrompt],
+      selectedLorasByMode: [selectedLorasMap, setSelectedLorasMap],
+      depthStrength: [depthStrength, setDepthStrength],
+      softEdgeStrength: [softEdgeStrength, setSoftEdgeStrength],
+      generationMode: [generationMode, setGenerationMode],
+      beforeEachPromptText: [beforeEachPromptText, setBeforeEachPromptText],
+      afterEachPromptText: [afterEachPromptText, setAfterEachPromptText],
+    }
+  );
 
   // Treat Wan-local mode as not requiring a stored API key.
   const hasApiKey = generationMode === 'wan-local' ? true : incomingHasApiKey;
@@ -338,6 +348,7 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
 
   useImperativeHandle(ref, () => ({
     applySettings: (settings: DisplayableMetadata) => {
+      markAsInteracted();
       toast.info("Applying settings from selected image...");
       if (settings.prompt) {
         const newId = generatePromptId();
@@ -382,72 +393,11 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
     }
   }));
 
-  // 🔄 Hydrate local state from project-level persisted settings
-  useEffect(() => {
-    if (isSettingsLoading) return;
-    if (!persistedSettings) return;
-    if (!selectedProjectId) return;
-    if (hydratedProjectIdRef.current === selectedProjectId) return; // already hydrated for this project
-
-    let loadedPrompts: PromptEntry[] | null = null;
-    const settingsToLoad = persistedSettings as ImageGenerationSettings & { prompt?: string };
-
-    if (settingsToLoad.prompts && settingsToLoad.prompts.length > 0) {
-      loadedPrompts = settingsToLoad.prompts.map(p => ({ ...p, id: p.id || generatePromptId() }));
-    } else if (settingsToLoad.prompt && typeof settingsToLoad.prompt === 'string') {
-      const short = settingsToLoad.prompt.substring(0, 30) + (settingsToLoad.prompt.length > 30 ? "..." : "");
-      loadedPrompts = [{ id: generatePromptId(), fullPrompt: settingsToLoad.prompt, shortPrompt: short }];
-    }
-
-    if (loadedPrompts && loadedPrompts.length > 0) {
-      let maxIdNum = 0;
-      loadedPrompts.forEach(p => {
-        const idStr = p.id || "";
-        let idPart = idStr.startsWith('prompt-') ? idStr.substring('prompt-'.length) : idStr;
-        if (idStr === 'initial-0') idPart = '0';
-        if (idPart && !isNaN(parseInt(idPart))) {
-          maxIdNum = Math.max(maxIdNum, parseInt(idPart));
-        }
-      });
-      promptIdCounter.current = maxIdNum + 1;
-      setPrompts(loadedPrompts);
-    }
-
-    if (settingsToLoad.imagesPerPrompt !== undefined) setImagesPerPrompt(settingsToLoad.imagesPerPrompt);
-    if (settingsToLoad.selectedLorasByMode) {
-      const emptyMap: Record<GenerationMode, ActiveLora[]> = { 'wan-local': [], 'flux-api': [], 'hidream-api': [] };
-      setSelectedLorasMap({ ...emptyMap, ...(settingsToLoad.selectedLorasByMode as Record<GenerationMode, ActiveLora[]>) });
-    }
-    if (settingsToLoad.depthStrength !== undefined) setDepthStrength(settingsToLoad.depthStrength);
-    if (settingsToLoad.softEdgeStrength !== undefined) setSoftEdgeStrength(settingsToLoad.softEdgeStrength);
-    if (settingsToLoad.beforeEachPromptText !== undefined) setBeforeEachPromptText(settingsToLoad.beforeEachPromptText);
-    if (settingsToLoad.afterEachPromptText !== undefined) setAfterEachPromptText(settingsToLoad.afterEachPromptText);
-    if (settingsToLoad.generationMode !== undefined) setGenerationMode(settingsToLoad.generationMode as GenerationMode);
-
-    hydratedProjectIdRef.current = selectedProjectId;
-  }, [isSettingsLoading, persistedSettings, selectedProjectId]);
-
-  // 📝 Persist settings to backend whenever they change
-  useEffect(() => {
-    if (!selectedProjectId || hydratedProjectIdRef.current !== selectedProjectId) return; // ensure initial hydration done
-    const currentSettings: ImageGenerationSettings = {
-      prompts,
-      imagesPerPrompt,
-      selectedLorasByMode: selectedLorasMap,
-      depthStrength,
-      softEdgeStrength,
-      generationMode,
-      beforeEachPromptText,
-      afterEachPromptText,
-    };
-    updatePersistedSettings(currentSettings, 'project');
-  }, [prompts, imagesPerPrompt, selectedLorasMap, depthStrength, softEdgeStrength, beforeEachPromptText, afterEachPromptText, selectedProjectId]);
-
   useEffect(() => { fetch('/data/loras.json').then(response => response.json()).then((data: LoraData) => setAvailableLoras(data.models || [])).catch(error => console.error("Error fetching LoRA data:", error)); }, []);
   useEffect(() => { 
     if (
       generationMode === 'flux-api' && // only apply defaults when in Flux mode
-      hydratedProjectIdRef.current !== null && 
+      ready &&
       !defaultsApplied.current && 
       availableLoras.length > 0 && 
       selectedLoras.length === 0
@@ -470,7 +420,7 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
         defaultsApplied.current = true;
       }
     } 
-  }, [generationMode, availableLoras, hydratedProjectIdRef.current, defaultsApplied.current, selectedLoras.length]);
+  }, [generationMode, availableLoras, ready, defaultsApplied.current, selectedLoras.length]);
 
   useEffect(() => {
     setSelectedLoras(selectedLorasMap[generationMode] || []);
@@ -481,6 +431,7 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
   }, [selectedLoras]);
 
   const handleAddLora = (loraToAdd: LoraModel) => { 
+    markAsInteracted();
     if (selectedLoras.find(sl => sl.id === loraToAdd["Model ID"])) { toast.info(`LoRA already added.`); return; }
     if (loraToAdd["Model Files"] && loraToAdd["Model Files"].length > 0) {
       setSelectedLoras(prevLoras => [ ...prevLoras, {
@@ -491,8 +442,14 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
       toast.success(`LoRA added.`);
     } else { toast.error("Selected LoRA has no model file specified."); }
   };
-  const handleRemoveLora = (loraIdToRemove: string) => setSelectedLoras(prevLoras => prevLoras.filter(lora => lora.id !== loraIdToRemove));
-  const handleLoraStrengthChange = (loraId: string, newStrength: number) => setSelectedLoras(prevLoras => prevLoras.map(lora => lora.id === loraId ? { ...lora, strength: newStrength } : lora));
+  const handleRemoveLora = (loraIdToRemove: string) => {
+    markAsInteracted();
+    setSelectedLoras(prevLoras => prevLoras.filter(lora => lora.id !== loraIdToRemove));
+  };
+  const handleLoraStrengthChange = (loraId: string, newStrength: number) => {
+    markAsInteracted();
+    setSelectedLoras(prevLoras => prevLoras.map(lora => lora.id === loraId ? { ...lora, strength: newStrength } : lora));
+  };
   const processFileInternal = async (file: File | null, fromLocalStorageLoad = false) => {
     if (startingImagePreview && startingImagePreview.startsWith("blob:")) {
       URL.revokeObjectURL(startingImagePreview);
@@ -542,6 +499,7 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
   const handleFileRemove = () => { processFile(null); };
 
   const handleAddPrompt = (source: 'form' | 'modal' = 'form') => {
+    markAsInteracted();
     const newId = generatePromptId();
     const newPromptNumber = prompts.length + 1;
     const newPrompt = { id: newId, fullPrompt: "", shortPrompt: `Prompt ${newPromptNumber}` };
@@ -549,6 +507,7 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
   };
 
   const handleUpdatePrompt = (id: string, field: 'fullPrompt' | 'shortPrompt', value: string) => {
+    markAsInteracted();
     setPrompts(prev => prev.map(p => {
       if (p.id === id) {
         const updatedPrompt = { ...p, [field]: value };
@@ -562,6 +521,7 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
   };
 
   const handleRemovePrompt = (id: string) => {
+    markAsInteracted();
     if (prompts.length > 1) {
       setPrompts(prev => prev.filter(p => p.id !== id));
     } else {
@@ -621,13 +581,33 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
   
   const actionablePromptsCount = prompts.filter(p => p.fullPrompt.trim() !== "").length;
 
+  // Mark as interacted when other controls change
+  const handleSliderChange = (setter: React.Dispatch<React.SetStateAction<number>>) => (value: number) => {
+    markAsInteracted();
+    setter(value);
+  };
+
+  const handleTextChange = (setter: React.Dispatch<React.SetStateAction<string>>) => (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    markAsInteracted();
+    setter(e.target.value);
+  };
+
+  const handleSelectChange = (setter: React.Dispatch<React.SetStateAction<GenerationMode>>) => (value: GenerationMode) => {
+    markAsInteracted();
+    setter(value);
+  };
+
+  if (!ready) {
+    return null; // Parent component should wrap with ToolSettingsGate
+  }
+
   return (
     <>
       <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-white rounded-lg shadow-sm">
         {/* Generation Mode Selector */}
         <div className="md:col-span-2 mb-6">
           <Label className="text-lg font-semibold mb-3 block">Generation Mode</Label>
-          <Select value={generationMode} onValueChange={(value: GenerationMode) => setGenerationMode(value)}>
+          <Select value={generationMode} onValueChange={handleSelectChange(setGenerationMode)}>
             <SelectTrigger className="w-full">
               <SelectValue placeholder="Select generation mode" />
             </SelectTrigger>
@@ -695,7 +675,7 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
               <Textarea
                 id="beforeEachPromptText"
                 value={beforeEachPromptText}
-                onChange={(e) => setBeforeEachPromptText(e.target.value)}
+                onChange={handleTextChange(setBeforeEachPromptText)}
                 placeholder="Text to prepend"
                 disabled={!hasApiKey || isGenerating}
                 className="mt-1"
@@ -706,7 +686,7 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
               <Textarea
                 id="afterEachPromptText"
                 value={afterEachPromptText}
-                onChange={(e) => setAfterEachPromptText(e.target.value)}
+                onChange={handleTextChange(setAfterEachPromptText)}
                 placeholder="Text to append"
                 disabled={!hasApiKey || isGenerating}
                 className="mt-1"
@@ -719,7 +699,7 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
               <SliderWithValue
                 label="Images per Prompt"
                 value={imagesPerPrompt}
-                onChange={setImagesPerPrompt}
+                onChange={handleSliderChange(setImagesPerPrompt)}
                 min={1}
                 max={16}
                 step={1}
@@ -745,8 +725,8 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
 
               <div className="space-y-6 pt-4 border-t">
                 <h3 className="text-md font-semibold">ControlNet Strengths:</h3>
-                <SliderWithValue label="Depth Strength" value={depthStrength} onChange={setDepthStrength} disabled={!hasApiKey || isGenerating}/>
-                <SliderWithValue label="Soft Edge Strength" value={softEdgeStrength} onChange={setSoftEdgeStrength} disabled={!hasApiKey || isGenerating}/>
+                <SliderWithValue label="Depth Strength" value={depthStrength} onChange={handleSliderChange(setDepthStrength)} disabled={!hasApiKey || isGenerating}/>
+                <SliderWithValue label="Soft Edge Strength" value={softEdgeStrength} onChange={handleSliderChange(setSoftEdgeStrength)} disabled={!hasApiKey || isGenerating}/>
               </div>
             </>
           )}

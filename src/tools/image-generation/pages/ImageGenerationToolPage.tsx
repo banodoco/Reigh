@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { ToolSettingsGate } from "@/shared/components/ToolSettingsGate";
 import ImageGenerationForm, { ImageGenerationFormHandles, PromptEntry } from "../components/ImageGenerationForm";
 import ImageGallery, { GeneratedImageWithMetadata, DisplayableMetadata, MetadataLora } from "@/shared/components/ImageGallery";
 import SettingsModal from "@/shared/components/SettingsModal";
@@ -452,14 +453,16 @@ const ImageGenerationToolPage = () => {
       {hasValidFalApiKey && (
         <>
           <div className="mb-8 p-6 border rounded-lg shadow-sm bg-card">
-            <ImageGenerationForm 
-              ref={imageGenerationFormRef} 
-              onGenerate={handleNewGenerate} // Use the new handler
-              isGenerating={isGenerating} // isCreatingTask from handleNewGenerate
-              hasApiKey={!!falApiKey} // Still relevant for UI
-              apiKey={falApiKey} // Potentially for display or direct use by form
-              openaiApiKey={openaiApiKey}
-            />
+            <ToolSettingsGate ready={true} loadingMessage="Loading form settings...">
+              <ImageGenerationForm 
+                ref={imageGenerationFormRef} 
+                onGenerate={handleNewGenerate} // Use the new handler
+                isGenerating={isGenerating} // isCreatingTask from handleNewGenerate
+                hasApiKey={!!falApiKey} // Still relevant for UI
+                apiKey={falApiKey} // Potentially for display or direct use by form
+                openaiApiKey={openaiApiKey}
+              />
+            </ToolSettingsGate>
           </div>
 
           {isCreatingTask && (

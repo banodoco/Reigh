@@ -169,11 +169,15 @@
 - **use-toast.ts**: Sonner toast wrapper
 - **useAIInteractionService.ts**: AI prompt editing abstraction
 - **usePaneAwareModalStyle.ts**: Calculates and returns a style object to correctly position modals within the main content area, accounting for locked side panes.
+- **usePersistentToolState.ts**: Shared hook that synchronizes React state with database-persisted tool settings. Provides automatic hydration, debounced saves, deep equality checks, and interaction tracking. Used by all tools for consistent settings persistence.
 
 ##### Contexts
 - **LastAffectedShotContext.tsx**: Remembers last modified shot
 - **ProjectContext.tsx**: Manages selected project ID (localStorage). Fetches projects (GET /api/projects). API creates "Default Project" if none. Provides addNewProject (POST /api/projects), updateProject (PUT /api/projects/:id) & loading states
 - **PanesContext.tsx**: Manages shared state (dimensions, lock states) for ShotsPane, TasksPane, GenerationsPane
+
+##### Components
+- **ToolSettingsGate.tsx**: Wrapper component that shows loading spinner until tool settings are hydrated, then fades in content. Ensures smooth UX during settings fetch.
 
 ##### Library (`lib/`)
 - **imageUploader.ts**: Uploads to Supabase storage
@@ -193,4 +197,5 @@
 
 ##### Tool Settings (`src/tools/*/settings.ts`)
 - **video-travel/settings.ts**: Defines `VideoTravelSettings` interface and default values for Video Travel tool (per-shot scope – generation parameters, LoRA configs, pair prompts/frames).
+- **image-generation/settings.ts**: Defines `ImageGenerationSettings` interface and default values for Image Generation tool (project scope – prompts, LoRA selections, ControlNet strengths, etc.).
 - **image-generation/settings.ts**: Defines `ImageGenerationSettings` interface and default values for Image Generation tool (project scope – prompts, LoRA selections, ControlNet strengths, etc.).
