@@ -199,6 +199,3 @@
 - **video-travel/settings.ts**: Defines `VideoTravelSettings` interface and default values for Video Travel tool (per-shot scope – generation parameters, LoRA configs, pair prompts/frames).
 - **image-generation/settings.ts**: Defines `ImageGenerationSettings` interface and default values for Image Generation tool (project scope – prompts, LoRA selections, ControlNet strengths, etc.).
 - **image-generation/settings.ts**: Defines `ImageGenerationSettings` interface and default values for Image Generation tool (project scope – prompts, LoRA selections, ControlNet strengths, etc.).
-
-##### Database Migrations (Supabase)
-- **20240802000000_add_project_id_to_tasks.sql**: Adds missing `project_id` column to `tasks` table and index used by RLS/queries.
