@@ -11,4 +11,25 @@ export function sanitizeSettings(obj: any): any {
 
 export function deepEqual(a: any, b: any): boolean {
   return JSON.stringify(sanitizeSettings(a)) === JSON.stringify(sanitizeSettings(b));
+}
+
+export function deepMerge(target: any, source: any): any {
+  if (!source) return target;
+  if (!target) return source;
+  
+  const output = { ...target };
+  
+  Object.keys(source).forEach(key => {
+    if (source[key] === undefined) return;
+    
+    if (typeof source[key] === 'object' && source[key] !== null && !Array.isArray(source[key])) {
+      // If it's an object (but not an array), merge recursively
+      output[key] = deepMerge(target[key], source[key]);
+    } else {
+      // Otherwise, just assign the value
+      output[key] = source[key];
+    }
+  });
+  
+  return output;
 } 

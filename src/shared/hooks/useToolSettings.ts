@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useRef, useCallback } from 'react';
+import { deepMerge } from '../lib/deepEqual';
 
 const baseUrl = import.meta.env.VITE_API_TARGET_URL || '';
 
@@ -94,11 +95,8 @@ export function useToolSettings<T = unknown>(
       await queryClient.cancelQueries({ queryKey });
       // Snapshot the previous value
       const previousSettings = queryClient.getQueryData(queryKey);
-      // Optimistically update to the new value
-      queryClient.setQueryData(queryKey, (old: any) => ({
-        ...old,
-        ...patch,
-      }));
+      // Optimistically update to the new value using deep merge
+      queryClient.setQueryData(queryKey, (old: any) => deepMerge(old, patch));
       // Return a context object with the snapshotted value
       return { previousSettings };
     },

@@ -80,6 +80,7 @@ const VideoTravelToolPage: React.FC = () => {
   const hasLoadedInitialSettings = useRef(false);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const userHasInteracted = useRef(false);
+  const lastSavedSettingsRef = useRef<VideoTravelSettings | null>(null);
 
   // Update state when settings are loaded from database
   useEffect(() => {
@@ -122,6 +123,7 @@ const VideoTravelToolPage: React.FC = () => {
   useEffect(() => {
     hasLoadedInitialSettings.current = false;
     userHasInteracted.current = false;
+    lastSavedSettingsRef.current = null;
   }, [selectedShot?.id]);
 
   useEffect(() => {
@@ -334,12 +336,19 @@ const VideoTravelToolPage: React.FC = () => {
           pairConfigs,
         };
 
+        // Check if we just saved these exact settings
+        if (lastSavedSettingsRef.current && deepEqual(sanitizeSettings(currentSettings), sanitizeSettings(lastSavedSettingsRef.current))) {
+          console.log('[ToolSettingsDebug] ► Skipping save - already saved these settings', selectedShot?.id);
+          return;
+        }
+
         if (!isUpdating && !deepEqual(sanitizeSettings(currentSettings), sanitizeSettings(settings))) {
           console.log('[ToolSettingsDebug] ► Will save', {
             shotId: selectedShot?.id,
             currentSettings,
             dbSettings: settings,
           });
+          lastSavedSettingsRef.current = currentSettings;
           updateSettings(currentSettings, 'shot');
         } else {
           console.log('[ToolSettingsDebug] ► No change detected for shot', selectedShot?.id);
