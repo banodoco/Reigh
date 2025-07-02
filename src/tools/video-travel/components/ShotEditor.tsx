@@ -348,7 +348,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         if (!genResponse.ok) throw new Error(await genResponse.text());
         const newGeneration = await genResponse.json();
 
-        const newShotImage = await addImageToShotMutation.mutateAsync({
+        // Save link in DB (ignore returned shotImageEntryId for UI key stability)
+        await addImageToShotMutation.mutateAsync({
           shot_id: selectedShot.id,
           generation_id: newGeneration.id,
           project_id: selectedProjectId,
@@ -358,7 +359,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
         const finalImage: GenerationRow = {
           ...(newGeneration as Omit<GenerationRow, 'id' | 'shotImageEntryId'>),
-          shotImageEntryId: newShotImage.id,
+          // Preserve the optimistic shotImageEntryId so React key stays stable
+          shotImageEntryId: optimisticImage.shotImageEntryId,
           id: newGeneration.id,
           isOptimistic: false,
           imageUrl: finalImageUrl, // Ensure final URL is used
