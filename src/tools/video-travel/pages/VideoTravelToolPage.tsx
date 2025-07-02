@@ -131,20 +131,14 @@ const VideoTravelToolPage: React.FC = () => {
     hasLoadedInitialSettings.current = false;
     userHasInteracted.current = false;
     setShowSkeleton(false);
-    
-    // Show skeleton after a small delay if settings are still loading
-    const skeletonTimer = setTimeout(() => {
-      if (isLoadingSettings) {
-        setShowSkeleton(true);
-      }
-    }, 200); // 200ms delay
-    
-    return () => clearTimeout(skeletonTimer);
-  }, [selectedShot?.id, isLoadingSettings]);
+  }, [selectedShot?.id]);
 
-  // Hide skeleton when settings are loaded
+  // Control skeleton visibility based on loading state
   useEffect(() => {
-    if (!isLoadingSettings) {
+    if (isLoadingSettings) {
+      const timer = setTimeout(() => setShowSkeleton(true), 200);
+      return () => clearTimeout(timer);
+    } else {
       setShowSkeleton(false);
     }
   }, [isLoadingSettings]);
