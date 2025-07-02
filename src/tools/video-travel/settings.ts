@@ -23,24 +23,49 @@ export interface VideoTravelSettings {
   shotImageIds?: string[];
 }
 
+// Define which settings belong to which scope
+export const PROJECT_LEVEL_SETTINGS = [
+  'dimensionSource',
+  'customWidth', 
+  'customHeight',
+  'batchVideoSteps',
+  'enhancePrompt'
+] as const;
+
+export const SHOT_LEVEL_SETTINGS = [
+  'videoControlMode',
+  'batchVideoPrompt',
+  'batchVideoFrames',
+  'batchVideoContext',
+  'generationMode',
+  'pairConfigs',
+  'shotImageIds',
+  'steerableMotionSettings'
+] as const;
+
 export const videoTravelSettings = {
   id: 'video-travel',
-  scope: ['shot'], // Video travel settings are per-shot
+  scope: ['project', 'shot'], // Video travel uses both project and shot settings
   defaults: {
+    // Project-level defaults
+    dimensionSource: 'project' as const, // Default to project dimensions for consistency
+    customWidth: undefined,
+    customHeight: undefined,
+    batchVideoSteps: 4, // Lower default for faster generation
+    enhancePrompt: false,
+    
+    // Shot-level defaults
     videoControlMode: 'batch' as const,
     batchVideoPrompt: '',
-    batchVideoFrames: 24,
-    batchVideoContext: 16,
-    batchVideoSteps: 20,
-    dimensionSource: 'firstImage' as const,
+    batchVideoFrames: 30, // Standard video frame count
+    batchVideoContext: 10, // Reasonable overlap for smooth transitions
     generationMode: 'batch' as const,
-    enhancePrompt: false,
     steerableMotionSettings: {
-      negative_prompt: '',
+      negative_prompt: 'blurry, distorted, low quality, artifacts',
       model_name: 'vace_14B',
-      seed: 789,
-      debug: true,
-      apply_reward_lora: false,
+      seed: Math.floor(Math.random() * 10000), // Random seed by default
+      debug: false, // Debug off by default for cleaner output
+      apply_reward_lora: true, // Better quality with reward LoRA
       colour_match_videos: true,
       apply_causvid: true,
       use_lighti2x_lora: false,
@@ -51,4 +76,12 @@ export const videoTravelSettings = {
       show_input_images: false,
     },
   },
-}; 
+};
+
+// Helper to determine which scope a setting belongs to
+export function getSettingScope(settingKey: keyof VideoTravelSettings): 'project' | 'shot' {
+  if (PROJECT_LEVEL_SETTINGS.includes(settingKey as any)) {
+    return 'project';
+  }
+  return 'shot';
+} 

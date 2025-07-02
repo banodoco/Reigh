@@ -1,6 +1,6 @@
 import { db } from '../../lib/db';
 import { users, projects, shots } from '../../../db/schema/schema';
-import { eq } from 'drizzle-orm';
+import { eq, desc } from 'drizzle-orm';
 
 // Tool defaults registry
 export const toolDefaults: Record<string, unknown> = {
@@ -142,4 +142,20 @@ export async function updateToolSettings(params: UpdateToolSettingsParams): Prom
     default:
       throw new Error(`Invalid scope: ${scope}`);
   }
+}
+
+// Get the most recent shot settings for a project
+export async function getLastShotSettings(
+  toolId: string,
+  projectId: string
+): Promise<unknown | null> {
+  const lastShot = await db.query.shots.findFirst({
+    where: eq(shots.projectId, projectId),
+    orderBy: [desc(shots.createdAt)]
+  });
+
+  if (!lastShot || !lastShot.settings) return null;
+  
+  const settings = lastShot.settings as any;
+  return settings[toolId] ?? null;
 } 

@@ -1,6 +1,6 @@
 import express, { Request, Response, NextFunction } from 'express';
 import { authenticate } from '../middleware/auth';
-import { resolveToolSettings, updateToolSettings, SettingsScope } from '../services/toolSettingsService';
+import { resolveToolSettings, updateToolSettings, SettingsScope, getLastShotSettings } from '../services/toolSettingsService';
 
 // Re-augment the Express Request type
 declare global {
@@ -144,6 +144,32 @@ router.patch('/', authenticate, asyncHandler(async (req: Request, res: Response)
   } catch (error) {
     console.error('[tool-settings] Error updating settings:', error);
     res.status(500).json({ error: 'Failed to update tool settings' });
+  }
+}));
+
+// GET /api/tool-settings/last-shot
+router.get('/last-shot', authenticate, asyncHandler(async (req: Request, res: Response) => {
+  try {
+    const { toolId, projectId } = req.query;
+    
+    if (!toolId || typeof toolId !== 'string') {
+      return res.status(400).json({ error: 'toolId is required' });
+    }
+    
+    if (!projectId || typeof projectId !== 'string') {
+      return res.status(400).json({ error: 'projectId is required' });
+    }
+
+    const settings = await getLastShotSettings(toolId, projectId);
+    
+    if (!settings) {
+      return res.status(404).json({ error: 'No previous shot settings found' });
+    }
+
+    res.json(settings);
+  } catch (error) {
+    console.error('[tool-settings] Error getting last shot settings:', error);
+    res.status(500).json({ error: 'Failed to get last shot settings' });
   }
 }));
 

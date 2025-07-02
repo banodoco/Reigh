@@ -108,7 +108,7 @@ export function useToolSettings<T = unknown>(
     onSuccess: () => {
       // Invalidate and refetch
       queryClient.invalidateQueries({ queryKey });
-      toast.success('Settings updated successfully');
+      // Remove the toast to prevent spam
     },
   });
 
