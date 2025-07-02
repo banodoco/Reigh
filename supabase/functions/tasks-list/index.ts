@@ -22,7 +22,7 @@ function jsonResponse(body: any, status = 200) {
     headers: {
       "Content-Type": "application/json",
       "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
       "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
     },
   });
@@ -34,16 +34,19 @@ serve(async (req) => {
     return jsonResponse({ ok: true });
   }
 
-  if (req.method !== "GET") {
+  if (req.method !== "POST") {
     return jsonResponse({ error: "Method not allowed" }, 405);
   }
 
-  // Parse query parameters
-  const url = new URL(req.url);
-  const projectId = url.searchParams.get("projectId");
-  const statusFilter = url.searchParams.getAll("status[]").length > 0 
-    ? url.searchParams.getAll("status[]") 
-    : url.searchParams.get("status")?.split(",") || [];
+  // Parse body
+  let body: any;
+  try {
+    body = await req.json();
+  } catch (err) {
+    return jsonResponse({ error: "Invalid JSON payload" }, 400);
+  }
+
+  const { projectId, status: statusFilter = [] } = body;
 
   if (!projectId) {
     return jsonResponse({ error: "projectId is required" }, 400);

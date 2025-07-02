@@ -112,7 +112,12 @@ export const useListTasks = (params: ListTasksParams) => {
       }
       
       // Edge Functions receive query params as part of the URL
-      const { data, error } = await supabase.functions.invoke(`tasks-list?${queryParams.toString()}`);
+      const { data, error } = await supabase.functions.invoke('tasks-list', {
+        body: {
+          projectId,
+          status: status || []
+        }
+      });
       
       if (error) throw error;
       return data || [];

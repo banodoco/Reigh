@@ -243,7 +243,7 @@ const ShotGroup: React.FC<ShotGroupProps> = ({ shot }) => {
             >
               {allImages.map((image, index) => (
                 <img
-                  key={image.shotImageEntryId}
+                  key={image.shotImageEntryId || `image-${index}`}
                   src={getDisplayUrl(image.thumbUrl || image.imageUrl)}
                   alt={`Shot image ${index + 1}`}
                   className="w-12 h-12 object-cover rounded border border-zinc-700 bg-zinc-600 shadow"
