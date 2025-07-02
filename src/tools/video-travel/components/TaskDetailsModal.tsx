@@ -41,6 +41,7 @@ interface TaskDetailsModalProps {
     replaceImages?: boolean;
     inputImages?: string[];
   }) => void;
+  onApplySettingsFromTask?: (taskId: string, replaceImages: boolean, inputImages: string[]) => void;
 }
 
 interface Task {
@@ -48,11 +49,12 @@ interface Task {
   params: Json;
 }
 
-const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, children, onApplySettings }) => {
+const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, children, onApplySettings, onApplySettingsFromTask }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [task, setTask] = useState<Task | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [replaceImages, setReplaceImages] = useState(false);
+  const [taskId, setTaskId] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchTaskDetails = async () => {
@@ -66,18 +68,21 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
           const errorData = await taskIdResponse.json().catch(() => ({ message: `Generation not found or has no task.` }));
           throw new Error(errorData.message);
         }
-        const { taskId } = await taskIdResponse.json();
+        const { taskId: fetchedTaskId } = await taskIdResponse.json();
 
-        if (!taskId) {
+        if (!fetchedTaskId) {
             console.log(`[TaskDetailsModal] No task ID found for generation ID: ${generationId}`);
             setTask(null);
+            setTaskId(null);
             return;
         }
+        
+        setTaskId(fetchedTaskId);
 
         // Step 2: Fetch the task details using the task ID
-        const taskDetailsResponse = await fetch(`/api/tasks/by-task-id/${taskId}`);
+        const taskDetailsResponse = await fetch(`/api/tasks/by-task-id/${fetchedTaskId}`);
         if (!taskDetailsResponse.ok) {
-            const errorData = await taskDetailsResponse.json().catch(() => ({ message: `Task with ID ${taskId} not found.` }));
+            const errorData = await taskDetailsResponse.json().catch(() => ({ message: `Task with ID ${fetchedTaskId} not found.` }));
             throw new Error(errorData.message);
         }
         
@@ -173,6 +178,15 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
   const resolution = getResolution();
 
   const handleApplySettings = () => {
+    // Use the new approach if available, otherwise fall back to the old one
+    if (onApplySettingsFromTask && taskId) {
+      onApplySettingsFromTask(taskId, replaceImages, inputImages);
+      setIsOpen(false);
+      toast.success('Settings applied successfully!');
+      return;
+    }
+    
+    // Fall back to the old approach for backwards compatibility
     if (!onApplySettings || !task) return;
 
     const settings: any = {

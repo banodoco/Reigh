@@ -35,7 +35,7 @@
 | Config files | vite.config.ts, tailwind.config.ts, tsconfig*.json, ESLint, etc. |
 | `drizzle.config.ts` | Drizzle Kit config (PostgreSQL/Supabase). For PG migrations |
 | `drizzle-sqlite.config.ts` | Drizzle Kit config (SQLite). For local SQLite migrations |
-| `/db/schema/schema.ts` | Canonical DB schema (Drizzle ORM, PG-first). Users table includes api_keys JSON column for storing FAL/OpenAI/Replicate keys |
+| `/db/schema/schema.ts` | Canonical DB schema (Drizzle ORM, PG-first). Users table includes api_keys JSON column for storing FAL/OpenAI/Replicate keys. Users, projects, and shots tables include settings JSON column for tool-specific settings |
 | `/db/migrations/` | PostgreSQL migration files |
 | `/db/migrations-sqlite/` | SQLite migration files |
 | `/db/seed.ts` | Seeds local SQLite DB for development |
@@ -45,6 +45,9 @@
 | `POST /api/local-image-upload` | Upload single image files to server local storage |
 | `POST /api/upload-flipped-image` | Upload processed (flipped) images from lightbox edit functionality |
 | `PATCH /api/generations/:id` | Update generation location (used by horizontal flip save functionality) |
+| `GET /api/tool-settings/resolve` | Resolve merged tool settings from user/project/shot scopes |
+| `PATCH /api/tool-settings` | Update tool settings at specific scope |
+| `GET /api/tool-settings/from-task/:taskId` | Extract tool settings from task parameters |
 
 ### DB Workflow (Drizzle ORM - SQLite & PostgreSQL)
 1. **Schema**: `/db/schema/schema.ts` (Drizzle, PG-first)
@@ -180,3 +183,12 @@
 - **aspectRatios.ts**: Defines aspect ratios (e.g., "16:9" -> "902x508"). Single source for project/server dimensions. Parsing/matching helpers
 - **steerableMotion.ts**: Video generation API (POST /api/steerable-motion). Includes prompt enhancement via OpenAI API when enhance_prompt=true and openai_api_key is provided. Supports mutually exclusive LoRA options: apply_causvid and use_lighti2x_lora.
 - **taskConfig.ts**: Centralized task configuration system. Manages task visibility, display names, progress support, and cancellation permissions. Provides functions like `isTaskVisible()`, `getTaskDisplayName()`, `taskSupportsProgress()`, and `filterVisibleTasks()`. Replaces hardcoded task type arrays with scalable configuration registry. Supports categories ('generation', 'processing', 'orchestration', 'utility') and extensible task capabilities.
+
+##### Hooks
+- **useToolSettings.ts**: Manages tool-specific settings stored in database at user/project/shot scopes. Provides `useToolSettings<T>()` hook that fetches merged settings and `update()` function for saving. Settings cascade from app defaults → user → project → shot, with later scopes overriding earlier ones.
+
+##### Services (`src/server/services/`)
+- **toolSettingsService.ts**: Server-side service for resolving and updating tool settings. Provides `resolveToolSettings()` to merge settings across scopes and `updateToolSettings()` to save changes. Implements deep merge logic for nested settings objects.
+
+##### Tool Settings (`src/tools/*/settings.ts`)
+- **video-travel/settings.ts**: Defines `VideoTravelSettings` interface and default values for video travel tool. Settings are stored per-shot and include all generation parameters, LoRA configs, and pair-specific prompts/frames.

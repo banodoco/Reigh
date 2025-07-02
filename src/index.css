@@ -493,12 +493,14 @@
       0 4px 8px hsl(var(--primary) / 0.1),
       0 0 0 1px hsl(var(--primary) / 0.05),
       inset 0 0 0 1px hsl(var(--primary) / 0.1);
-    transform: rotate(-2deg);
+    /* Removed default rotation to keep cards straight */
+    transform: none;
     transition: transform 0.3s ease;
   }
 
   .wes-polaroid:hover {
-    transform: rotate(0deg) scale(1.05);
+    /* Subtle scale on hover without rotation */
+    transform: scale(1.05);
   }
 
   .wes-polaroid::after {
@@ -610,7 +612,8 @@
   }
 
   .wes-tool-card:hover {
-    transform: translateY(-12px) scale(1.03) rotate(0.5deg);
+    /* Slight lift and scale on hover without rotation */
+    transform: translateY(-12px) scale(1.03);
   }
 
   .wes-modal {

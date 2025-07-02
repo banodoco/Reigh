@@ -140,6 +140,10 @@ export interface ShotEditorProps {
   setIsLoraModalOpen: (isOpen: boolean) => void;
   enhancePrompt: boolean;
   onEnhancePromptChange: (enhance: boolean) => void;
+  generationMode: 'batch' | 'by-pair';
+  onGenerationModeChange: (mode: 'batch' | 'by-pair') => void;
+  pairConfigs: PairConfig[];
+  onPairConfigsChange: (configs: PairConfig[]) => void;
 }
 
 const baseUrl = import.meta.env.VITE_API_TARGET_URL || '';
@@ -197,6 +201,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   setIsLoraModalOpen,
   enhancePrompt,
   onEnhancePromptChange,
+  generationMode,
+  onGenerationModeChange,
+  pairConfigs,
+  onPairConfigsChange,
 }) => {
   const { selectedProjectId, projects } = useProject();
   const { getApiKey } = useApiKeys();
@@ -210,8 +218,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [creatingTaskId, setCreatingTaskId] = useState<string | null>(null);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-  const [generationMode, setGenerationMode] = useState<'batch' | 'by-pair'>('batch');
-  const [pairConfigs, setPairConfigs] = useState<PairConfig[]>([]);
   const queryClient = useQueryClient();
 
   // Use local state for optimistic updates on image list
@@ -220,104 +226,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     setLocalOrderedShotImages(orderedShotImages || []);
   }, [orderedShotImages]);
 
-  useEffect(() => {
-    if (!selectedShot?.id) return;
+  // Settings are now loaded from the database via the parent component
+  // This effect is removed as settings persistence is handled by VideoTravelToolPage
 
-    const shotId = selectedShot.id;
-    let settingsToApply: ShotSettings | null = null;
-
-    const loadSettings = (key: string): ShotSettings | null => {
-      const settingsStr = localStorage.getItem(key);
-      if (settingsStr) {
-        try {
-          return JSON.parse(settingsStr) as ShotSettings;
-        } catch (e) {
-          console.error(`[ShotEditor] Failed to parse settings from localStorage for key ${key}`, e);
-          return null;
-        }
-      }
-      return null;
-    };
-
-    settingsToApply = loadSettings(`shot-settings-${shotId}`);
-
-    if (!settingsToApply) {
-      const lastEditedShotId = localStorage.getItem('last-edited-shot-id');
-      if (lastEditedShotId) {
-        settingsToApply = loadSettings(`shot-settings-${lastEditedShotId}`);
-      }
-    }
-
-    if (settingsToApply) {
-      if (settingsToApply.videoControlMode) onVideoControlModeChange(settingsToApply.videoControlMode);
-      if (typeof settingsToApply.batchVideoPrompt === 'string') onBatchVideoPromptChange(settingsToApply.batchVideoPrompt);
-      if (typeof settingsToApply.batchVideoFrames === 'number') onBatchVideoFramesChange(settingsToApply.batchVideoFrames);
-      if (typeof settingsToApply.batchVideoContext === 'number') onBatchVideoContextChange(settingsToApply.batchVideoContext);
-      if (typeof settingsToApply.batchVideoSteps === 'number') onBatchVideoStepsChange(settingsToApply.batchVideoSteps);
-      if (settingsToApply.dimensionSource) onDimensionSourceChange(settingsToApply.dimensionSource);
-      if (settingsToApply.customWidth) onCustomWidthChange(settingsToApply.customWidth);
-      if (settingsToApply.customHeight) onCustomHeightChange(settingsToApply.customHeight);
-      if (settingsToApply.generationMode) setGenerationMode(settingsToApply.generationMode);
-      if (settingsToApply.pairConfigs) setPairConfigs(settingsToApply.pairConfigs);
-      if (settingsToApply.steerableMotionSettings) {
-        const defaultSteerableSettings = {
-          negative_prompt: '',
-          model_name: 'vace_14B',
-          seed: 789,
-          debug: true,
-          apply_reward_lora: false,
-          colour_match_videos: true,
-          apply_causvid: true,
-          use_lighti2x_lora: false,
-          fade_in_duration: '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
-          fade_out_duration: '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
-          after_first_post_generation_saturation: 1,
-          after_first_post_generation_brightness: 0,
-          show_input_images: false,
-        };
-        onSteerableMotionSettingsChange({
-          ...defaultSteerableSettings,
-          ...settingsToApply.steerableMotionSettings
-        });
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedShot?.id]);
-
-  const settingsToSave = useMemo(() => ({
-    videoControlMode,
-    batchVideoPrompt,
-    batchVideoFrames,
-    batchVideoContext,
-    batchVideoSteps,
-    dimensionSource,
-    customWidth,
-    customHeight,
-    steerableMotionSettings,
-    enhancePrompt,
-    generationMode,
-    pairConfigs,
-  }), [
-    videoControlMode,
-    batchVideoPrompt,
-    batchVideoFrames,
-    batchVideoContext,
-    batchVideoSteps,
-    dimensionSource,
-    customWidth,
-    customHeight,
-    steerableMotionSettings,
-    enhancePrompt,
-    generationMode,
-    pairConfigs,
-  ]);
-
-  useEffect(() => {
-    if (selectedShot?.id) {
-      localStorage.setItem(`shot-settings-${selectedShot.id}`, JSON.stringify(settingsToSave));
-      localStorage.setItem('last-edited-shot-id', selectedShot.id);
-    }
-  }, [selectedShot?.id, settingsToSave]);
+  // Settings persistence is now handled by the parent component via database
 
   const nonVideoImages = useMemo(() => {
     return localOrderedShotImages.filter(g => !isGenerationVideo(g));
@@ -328,24 +240,22 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   }, [localOrderedShotImages]);
 
   useEffect(() => {
-    setPairConfigs(previousPairConfigs => {
-      const newPairConfigs = nonVideoImages.slice(0, -1).map((image, index) => {
-        const nextImage = nonVideoImages[index + 1];
-        const pairId = `${image.id}-${nextImage.id}`;
-        
-        const existingConfig = previousPairConfigs.find(p => p.id === pairId);
-        
-        return existingConfig || {
-          id: pairId,
-          prompt: '',
-          frames: batchVideoFrames,
-          negativePrompt: '',
-          context: 16,
-        };
-      });
-      return newPairConfigs;
+    const newPairConfigs = nonVideoImages.slice(0, -1).map((image, index) => {
+      const nextImage = nonVideoImages[index + 1];
+      const pairId = `${image.id}-${nextImage.id}`;
+      
+      const existingConfig = pairConfigs.find(p => p.id === pairId);
+      
+      return existingConfig || {
+        id: pairId,
+        prompt: '',
+        frames: batchVideoFrames,
+        negativePrompt: '',
+        context: 16,
+      };
     });
-  }, [nonVideoImages, batchVideoFrames, batchVideoContext]);
+    onPairConfigsChange(newPairConfigs);
+  }, [nonVideoImages, batchVideoFrames, batchVideoContext, pairConfigs, onPairConfigsChange]);
 
   const handleImageUploadToShot = async (files: File[]) => {
     if (!files || files.length === 0) return;
@@ -713,8 +623,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         throw new Error(errorData.message || `HTTP error ${response.status}`);
       }
 
-      const newTask = await response.json();
-      toast.success(`Travel task queued (ID: ${(newTask.id as string).substring(0, 8)}...).`);
+      const newTask = await response.json();      
       
       // Poll for task confirmation in database
       const maxAttempts = 30; // 15 seconds max wait
@@ -767,6 +676,44 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     // This would gather all configs and prompts and then trigger generation
   };
 
+  const handleApplySettingsFromTaskNew = async (taskId: string, replaceImages: boolean, inputImages: string[]) => {
+    try {
+      // Fetch the settings from the task
+      const response = await fetch(`${baseUrl}/api/tool-settings/from-task/${taskId}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch settings from task');
+      }
+      
+      const settings = await response.json();
+      
+      // Apply the settings
+      onVideoControlModeChange(settings.videoControlMode || 'batch');
+      onBatchVideoPromptChange(settings.batchVideoPrompt || '');
+      onBatchVideoFramesChange(settings.batchVideoFrames || 24);
+      onBatchVideoContextChange(settings.batchVideoContext || 16);
+      onBatchVideoStepsChange(settings.batchVideoSteps || 20);
+      onDimensionSourceChange(settings.dimensionSource || 'custom');
+      if (settings.customWidth) onCustomWidthChange(settings.customWidth);
+      if (settings.customHeight) onCustomHeightChange(settings.customHeight);
+      onEnhancePromptChange(settings.enhancePrompt || false);
+      onGenerationModeChange(settings.generationMode || 'batch');
+      if (settings.pairConfigs) onPairConfigsChange(settings.pairConfigs);
+      if (settings.steerableMotionSettings) {
+        onSteerableMotionSettingsChange(settings.steerableMotionSettings);
+      }
+      
+      // Handle image replacement if requested
+      if (replaceImages && inputImages && inputImages.length > 0) {
+        await handleReplaceImagesFromTask(inputImages);
+      }
+      
+      toast.success('Settings applied successfully!');
+    } catch (error) {
+      console.error('Error applying settings from task:', error);
+      toast.error('Failed to apply settings from task');
+    }
+  };
+
   const handleApplySettingsFromTask = (settings: {
     prompt?: string;
     prompts?: string[];
@@ -789,7 +736,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     const isByPair = uniquePrompts.length > 1 || uniqueFrames.length > 1;
 
     if (isByPair) {
-      setGenerationMode('by-pair');
+      onGenerationModeChange('by-pair');
       
       // Create pair configs from the settings
       const imagePairsCount = Math.max(0, nonVideoImages.length - 1);
@@ -808,9 +755,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           context: settings.contexts?.[i] || settings.context || 16,
         });
       }
-      setPairConfigs(newPairConfigs);
+              onPairConfigsChange(newPairConfigs);
     } else {
-      setGenerationMode('batch');
+      onGenerationModeChange('batch');
       
       // Apply single values to batch settings
       if (settings.prompt) {
@@ -935,11 +882,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const isGenerationDisabled = isCreatingTask || nonVideoImages.length < 2 || isGenerationDisabledDueToApiKey;
 
   const handleUpdatePairConfig = (id: string, field: 'prompt' | 'frames' | 'negativePrompt' | 'context', value: string | number) => {
-    setPairConfigs(prev =>
-      prev.map(pair =>
-        pair.id === id ? { ...pair, [field]: value } : pair
-      )
+    const updatedConfigs = pairConfigs.map(pair =>
+      pair.id === id ? { ...pair, [field]: value } : pair
     );
+    onPairConfigsChange(updatedConfigs);
   };
 
   return (
@@ -960,6 +906,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           onDelete={handleDeleteVideoOutput}
           deletingVideoId={deletingVideoId}
           onApplySettings={handleApplySettingsFromTask}
+          onApplySettingsFromTask={handleApplySettingsFromTaskNew}
         />
       </div>
 
@@ -1035,7 +982,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                     enhancePrompt={enhancePrompt}
                     onEnhancePromptChange={onEnhancePromptChange}
                     generationMode={generationMode}
-                    onGenerationModeChange={setGenerationMode}
+                    onGenerationModeChange={onGenerationModeChange}
                 />
                 
                 <div className="space-y-4 py-6 border-t mt-6">
@@ -1045,7 +992,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                     </Button>
                     {availableLoras.length === 0 && !isLoraModalOpen && <p className="text-xs text-muted-foreground mt-1">Loading LoRA models for selection...</p>}
                     {selectedLoras.length > 0 && (
-                      <TooltipProvider delayDuration={300}>
+                      <TooltipProvider>
                         <div className="mt-4 space-y-4">
                           <h3 className="text-md font-semibold">Active LoRAs:</h3>
                           {selectedLoras.map((lora) => (

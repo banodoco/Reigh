@@ -193,7 +193,7 @@ export const PromptInputRow: React.FC<PromptInputRowProps> = ({
         </Label>
         <div className="flex items-center space-x-1">
           {onEditWithAI && aiEditButtonIcon && hasApiKey && (
-            <TooltipProvider delayDuration={200}>
+            <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -214,7 +214,7 @@ export const PromptInputRow: React.FC<PromptInputRowProps> = ({
             </TooltipProvider>
           )}
           {canRemove && (
-            <TooltipProvider delayDuration={200}>
+            <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -778,7 +778,7 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
               </Button>
             {availableLoras.length === 0 && !isLoraModalOpen && <p className="text-xs text-muted-foreground mt-1">Loading LoRA models for selection...</p>}
             {selectedLoras.length > 0 && (
-              <TooltipProvider delayDuration={300}>
+              <TooltipProvider>
                 <div className="mt-4 space-y-4 pt-2 border-t">
                   <h3 className="text-md font-semibold">Active LoRAs:</h3>
                   {selectedLoras.map((lora) => (

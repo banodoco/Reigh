@@ -339,7 +339,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, isDeletin
   }, [totalPages, page]);
 
   return (
-    <TooltipProvider delayDuration={300}>
+                <TooltipProvider>
       <div className="space-y-4">
         <div className="flex flex-wrap justify-between items-center mb-2 gap-x-4 gap-y-2"> {/* Added gap-y-2 and flex-wrap for better responsiveness */}
             {images.length > 0 && (

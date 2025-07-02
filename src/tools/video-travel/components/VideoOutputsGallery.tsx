@@ -32,10 +32,11 @@ interface VideoOutputsGalleryProps {
     replaceImages?: boolean;
     inputImages?: string[];
   }) => void;
+  onApplySettingsFromTask?: (taskId: string, replaceImages: boolean, inputImages: string[]) => void;
   onImageSaved?: (newImageUrl: string) => void;
 }
 
-const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({ videoOutputs, onDelete, deletingVideoId, onApplySettings, onImageSaved }) => {
+const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({ videoOutputs, onDelete, deletingVideoId, onApplySettings, onApplySettingsFromTask, onImageSaved }) => {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [animatedVideoOutputs, setAnimatedVideoOutputs] = useState<GenerationRow[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -125,6 +126,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({ videoOutputs,
                     onDelete={onDelete}
                     isDeleting={deletingVideoId === video.id}
                     onApplySettings={onApplySettings}
+                    onApplySettingsFromTask={onApplySettingsFromTask}
                   />
                 </div>
               );

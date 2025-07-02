@@ -36,6 +36,20 @@
       "when": 1749567840919,
       "tag": "0004_broad_mephisto",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1751416284651,
+      "tag": "0005_mighty_screwball",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1751416306971,
+      "tag": "0006_organic_colossus",
+      "breakpoints": true
     }
   ]
 }

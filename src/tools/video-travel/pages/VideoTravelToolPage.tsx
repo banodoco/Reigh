@@ -10,6 +10,8 @@ import ShotListDisplay from '../components/ShotListDisplay';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 import { LoraModel } from '@/shared/components/LoraSelectorModal';
+import { useToolSettings } from '@/shared/hooks/useToolSettings';
+import { VideoTravelSettings } from '../settings';
 // import { useLastAffectedShot } from '@/shared/hooks/useLastAffectedShot';
 
 // Placeholder data or logic to fetch actual data for VideoEditLayout
@@ -38,32 +40,75 @@ const VideoTravelToolPage: React.FC = () => {
   const [availableLoras, setAvailableLoras] = useState<LoraModel[]>([]);
   const [selectedLoras, setSelectedLoras] = useState<ActiveLora[]>([]);
 
-  // Add state for video generation settings
-  const [videoControlMode, setVideoControlMode] = useState<'individual' | 'batch'>('batch');
-  const [batchVideoPrompt, setBatchVideoPrompt] = useState('');
-  const [batchVideoFrames, setBatchVideoFrames] = useState(30);
-  const [batchVideoContext, setBatchVideoContext] = useState(10);
-  const [batchVideoSteps, setBatchVideoSteps] = useState(4);
-  const [dimensionSource, setDimensionSource] = useState<'project' | 'firstImage' | 'custom'>('firstImage');
-  const [customWidth, setCustomWidth] = useState<number | undefined>();
-  const [customHeight, setCustomHeight] = useState<number | undefined>();
-  const [enhancePrompt, setEnhancePrompt] = useState<boolean>(false);
-  const [videoPairConfigs, setVideoPairConfigs] = useState<any[]>([]);
-  const [steerableMotionSettings, setSteerableMotionSettings] = useState<SteerableMotionSettings>({
-    negative_prompt: '',
-    model_name: 'vace_14B',
-    seed: 789,
-    debug: true,
-    apply_reward_lora: false,
-    colour_match_videos: true,
-    apply_causvid: true,
-    use_lighti2x_lora: false,
-    fade_in_duration: '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
-    fade_out_duration: '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
-    after_first_post_generation_saturation: 1,
-    after_first_post_generation_brightness: 0,
-    show_input_images: false,
-  });
+  // Use tool settings for the selected shot
+  const { settings, update: updateSettings, isLoading: isLoadingSettings } = useToolSettings<VideoTravelSettings>(
+    'video-travel',
+    { projectId: selectedProjectId || undefined, shotId: selectedShot?.id }
+  );
+
+  // Add state for video generation settings - initialized from tool settings
+  const [videoControlMode, setVideoControlMode] = useState<'individual' | 'batch'>(settings?.videoControlMode || 'batch');
+  const [batchVideoPrompt, setBatchVideoPrompt] = useState(settings?.batchVideoPrompt || '');
+  const [batchVideoFrames, setBatchVideoFrames] = useState(settings?.batchVideoFrames || 30);
+  const [batchVideoContext, setBatchVideoContext] = useState(settings?.batchVideoContext || 10);
+  const [batchVideoSteps, setBatchVideoSteps] = useState(settings?.batchVideoSteps || 4);
+  const [dimensionSource, setDimensionSource] = useState<'project' | 'firstImage' | 'custom'>(settings?.dimensionSource || 'firstImage');
+  const [customWidth, setCustomWidth] = useState<number | undefined>(settings?.customWidth);
+  const [customHeight, setCustomHeight] = useState<number | undefined>(settings?.customHeight);
+  const [enhancePrompt, setEnhancePrompt] = useState<boolean>(settings?.enhancePrompt || false);
+  const [videoPairConfigs, setVideoPairConfigs] = useState<any[]>(settings?.pairConfigs || []);
+  const [generationMode, setGenerationMode] = useState<'batch' | 'by-pair'>(settings?.generationMode || 'batch');
+  const [pairConfigs, setPairConfigs] = useState<any[]>(settings?.pairConfigs || []);
+  const [steerableMotionSettings, setSteerableMotionSettings] = useState<SteerableMotionSettings>(
+    settings?.steerableMotionSettings || {
+      negative_prompt: '',
+      model_name: 'vace_14B',
+      seed: 789,
+      debug: true,
+      apply_reward_lora: false,
+      colour_match_videos: true,
+      apply_causvid: true,
+      use_lighti2x_lora: false,
+      fade_in_duration: '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
+      fade_out_duration: '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
+      after_first_post_generation_saturation: 1,
+      after_first_post_generation_brightness: 0,
+      show_input_images: false,
+    }
+  );
+
+  // Update state when settings are loaded from database
+  useEffect(() => {
+    if (settings && !isLoadingSettings) {
+      setVideoControlMode(settings.videoControlMode || 'batch');
+      setBatchVideoPrompt(settings.batchVideoPrompt || '');
+      setBatchVideoFrames(settings.batchVideoFrames || 30);
+      setBatchVideoContext(settings.batchVideoContext || 10);
+      setBatchVideoSteps(settings.batchVideoSteps || 4);
+      setDimensionSource(settings.dimensionSource || 'firstImage');
+      setCustomWidth(settings.customWidth);
+      setCustomHeight(settings.customHeight);
+      setEnhancePrompt(settings.enhancePrompt || false);
+      setVideoPairConfigs(settings.pairConfigs || []);
+      setGenerationMode(settings.generationMode || 'batch');
+      setPairConfigs(settings.pairConfigs || []);
+      setSteerableMotionSettings(settings.steerableMotionSettings || {
+        negative_prompt: '',
+        model_name: 'vace_14B',
+        seed: 789,
+        debug: true,
+        apply_reward_lora: false,
+        colour_match_videos: true,
+        apply_causvid: true,
+        use_lighti2x_lora: false,
+        fade_in_duration: '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
+        fade_out_duration: '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
+        after_first_post_generation_saturation: 1,
+        after_first_post_generation_brightness: 0,
+        show_input_images: false,
+      });
+    }
+  }, [settings, isLoadingSettings]);
 
   useEffect(() => {
     fetch('/data/loras.json')
@@ -249,6 +294,47 @@ const VideoTravelToolPage: React.FC = () => {
     }));
   };
 
+  // Save settings to database whenever they change
+  useEffect(() => {
+    if (selectedShot?.id && settings) {
+      const currentSettings: VideoTravelSettings = {
+        videoControlMode,
+        batchVideoPrompt,
+        batchVideoFrames,
+        batchVideoContext,
+        batchVideoSteps,
+        dimensionSource,
+        customWidth,
+        customHeight,
+        steerableMotionSettings,
+        enhancePrompt,
+        generationMode,
+        pairConfigs,
+      };
+
+      // Only update if settings have actually changed
+      if (JSON.stringify(currentSettings) !== JSON.stringify(settings)) {
+        updateSettings(currentSettings, 'shot');
+      }
+    }
+  }, [
+    selectedShot?.id,
+    videoControlMode,
+    batchVideoPrompt,
+    batchVideoFrames,
+    batchVideoContext,
+    batchVideoSteps,
+    dimensionSource,
+    customWidth,
+    customHeight,
+    steerableMotionSettings,
+    enhancePrompt,
+    generationMode,
+    pairConfigs,
+    settings,
+    updateSettings
+  ]);
+
   const handleAddLora = (loraToAdd: LoraModel) => {
     if (selectedLoras.find(sl => sl.id === loraToAdd["Model ID"])) {
       console.log(`LoRA already added.`);
@@ -342,6 +428,10 @@ const VideoTravelToolPage: React.FC = () => {
           setIsLoraModalOpen={setIsLoraModalOpen}
           enhancePrompt={enhancePrompt}
           onEnhancePromptChange={setEnhancePrompt}
+          generationMode={generationMode}
+          onGenerationModeChange={setGenerationMode}
+          pairConfigs={pairConfigs}
+          onPairConfigsChange={setPairConfigs}
         />
       )}
 

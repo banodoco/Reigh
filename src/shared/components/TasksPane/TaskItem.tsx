@@ -43,6 +43,13 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
   // Map certain task types to more user-friendly names for display purposes
   const displayTaskType = getTaskDisplayName(task.taskType);
 
+  // Extract prompt for Image Generation tasks (single_image)
+  const promptText: string = React.useMemo(() => {
+    if (task.taskType !== 'single_image') return '';
+    const params = typeof task.params === 'string' ? JSON.parse(task.params) : task.params || {};
+    return params?.orchestrator_details?.prompt || '';
+  }, [task]);
+
   // Extract image URLs for Travel Between Images tasks (travel_orchestrator)
   const imageUrls: string[] = React.useMemo(() => {
     if (task.taskType !== 'travel_orchestrator') return [];
@@ -166,6 +173,16 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
           {extraImageCount > 0 && (
             <span className="text-xs text-zinc-400 ml-1">+ {extraImageCount}</span>
           )}
+        </div>
+      )}
+      {/* Show prompt for Image Generation tasks */}
+      {promptText && (
+        <div className="mb-1 mt-3">
+          <div className="bg-blue-500/10 border border-blue-400/20 rounded px-2 py-1.5">
+            <div className="text-xs text-zinc-200">
+              "{promptText.length > 50 ? `${promptText.substring(0, 50)}...` : promptText}"
+            </div>
+          </div>
         </div>
       )}
       <div className="flex items-center justify-between text-xs text-zinc-400">

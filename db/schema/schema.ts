@@ -16,6 +16,7 @@ export const users = sqliteTable('users', {
   name: text('name'),
   email: text('email'),
   apiKeys: text('api_keys', { mode: 'json' }), // Store API keys as JSON object
+  settings: text('settings', { mode: 'json' }), // Store tool settings as JSON object
 });
 
 export const projects = sqliteTable('projects', {
@@ -24,6 +25,7 @@ export const projects = sqliteTable('projects', {
   userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   aspectRatio: text('aspect_ratio'),
   createdAt: text('created_at').$defaultFn(() => new Date().toISOString()).notNull(),
+  settings: text('settings', { mode: 'json' }), // Store tool settings as JSON object
 });
 
 // Type for updating projects, allowing optional fields
@@ -67,6 +69,7 @@ export const shots = sqliteTable('shots', {
   createdAt: text('created_at').$defaultFn(() => new Date().toISOString()).notNull(),
   updatedAt: text('updated_at'),
   projectId: text('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+  settings: text('settings', { mode: 'json' }), // Store tool settings as JSON object
 });
 
 export const shotGenerations = sqliteTable('shot_generations', {
