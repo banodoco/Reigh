@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import ShotEditor, { SteerableMotionSettings } from '../components/ShotEditor';
 import { useListShots, useCreateShot, useHandleExternalImageDrop } from '@/shared/hooks/useShots';
@@ -42,9 +42,14 @@ const VideoTravelToolPage: React.FC = () => {
   const [selectedLoras, setSelectedLoras] = useState<ActiveLora[]>([]);
 
   // Use tool settings for the selected shot
+  const toolSettingsContext = useMemo(() => ({
+    projectId: selectedProjectId || undefined,
+    shotId: selectedShot?.id,
+  }), [selectedProjectId, selectedShot?.id]);
+
   const { settings, update: updateSettings, isLoading: isLoadingSettings, isUpdating, hasUserMadeChanges } = useToolSettings<VideoTravelSettings>(
     'video-travel',
-    { projectId: selectedProjectId || undefined, shotId: selectedShot?.id },
+    toolSettingsContext,
     { silent: true }
   );
 
