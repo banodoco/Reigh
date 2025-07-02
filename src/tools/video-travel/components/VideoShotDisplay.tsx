@@ -6,6 +6,29 @@ import { Button } from '@/shared/components/ui/button';
 import { Pencil, Trash2, Check, X, Copy } from 'lucide-react'; // Icons
 import { toast } from 'sonner';
 import { getDisplayUrl } from '@/shared/lib/utils';
+import { useQueryClient } from '@tanstack/react-query';
+
+const baseUrl = import.meta.env.VITE_API_TARGET_URL || '';
+
+async function fetchToolSettings(toolId: string, ctx: { projectId?: string; shotId?: string }): Promise<unknown> {
+  const params = new URLSearchParams({ toolId });
+  if (ctx.projectId) params.append('projectId', ctx.projectId);
+  if (ctx.shotId) params.append('shotId', ctx.shotId);
+
+  const response = await fetch(`${baseUrl}/api/tool-settings/resolve?${params}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Failed to fetch tool settings' }));
+    throw new Error(error.error || 'Failed to fetch tool settings');
+  }
+
+  return response.json();
+}
 
 interface VideoShotDisplayProps {
   shot: Shot;
@@ -16,6 +39,7 @@ interface VideoShotDisplayProps {
 const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot, currentProjectId }) => {
   const [isEditingName, setIsEditingName] = useState(false);
   const [editableName, setEditableName] = useState(shot.name);
+  const queryClient = useQueryClient();
 
   const updateShotNameMutation = useUpdateShotName();
   const deleteShotMutation = useDeleteShot();
@@ -24,6 +48,21 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
   useEffect(() => {
     setEditableName(shot.name); // Reset editable name if shot prop changes
   }, [shot.name]);
+
+  const handlePrefetchSettings = () => {
+    if (currentProjectId) {
+      const queryKey = ['tool-settings', 'video-travel', { projectId: currentProjectId, shotId: shot.id }];
+      
+      // Only prefetch if we don't already have the data
+      if (!queryClient.getQueryData(queryKey)) {
+        queryClient.prefetchQuery({
+          queryKey,
+          queryFn: () => fetchToolSettings('video-travel', { projectId: currentProjectId, shotId: shot.id }),
+          staleTime: 30 * 60 * 1000, // 30 minutes
+        });
+      }
+    }
+  };
 
   const handleNameEditToggle = () => {
     if (isEditingName) {
@@ -119,6 +158,7 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
       key={shot.id} 
       className="mb-6 p-4 border rounded-lg hover:shadow-lg transition-shadow duration-200 relative cursor-pointer"
       onClick={() => onSelectShot(shot.id)}
+      onMouseEnter={handlePrefetchSettings}
     >
       <div className="flex justify-between items-start mb-3">
         {isEditingName ? (
