@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import ShotEditor, { SteerableMotionSettings } from '../components/ShotEditor';
 import { useListShots, useCreateShot, useHandleExternalImageDrop } from '@/shared/hooks/useShots';
@@ -42,124 +42,87 @@ const VideoTravelToolPage: React.FC = () => {
   const [selectedLoras, setSelectedLoras] = useState<ActiveLora[]>([]);
 
   // Use tool settings for the selected shot
-  const toolSettingsContext = useMemo(() => ({
-    projectId: selectedProjectId || undefined,
-    shotId: selectedShot?.id,
-  }), [selectedProjectId, selectedShot?.id]);
-
   const { settings, update: updateSettings, isLoading: isLoadingSettings, isUpdating, hasUserMadeChanges } = useToolSettings<VideoTravelSettings>(
     'video-travel',
-    toolSettingsContext,
+    { projectId: selectedProjectId || undefined, shotId: selectedShot?.id },
     { silent: true }
   );
 
-  // Add state for video generation settings - initialized from tool settings
-  const [videoControlMode, setVideoControlMode] = useState<'individual' | 'batch'>(settings?.videoControlMode || 'batch');
-  const [batchVideoPrompt, setBatchVideoPrompt] = useState(settings?.batchVideoPrompt || '');
-  const [batchVideoFrames, setBatchVideoFrames] = useState(settings?.batchVideoFrames || 30);
-  const [batchVideoContext, setBatchVideoContext] = useState(settings?.batchVideoContext || 10);
-  const [batchVideoSteps, setBatchVideoSteps] = useState(settings?.batchVideoSteps || 4);
-  const [dimensionSource, setDimensionSource] = useState<'project' | 'firstImage' | 'custom'>(settings?.dimensionSource || 'firstImage');
-  const [customWidth, setCustomWidth] = useState<number | undefined>(settings?.customWidth);
-  const [customHeight, setCustomHeight] = useState<number | undefined>(settings?.customHeight);
-  const [enhancePrompt, setEnhancePrompt] = useState<boolean>(settings?.enhancePrompt || false);
-  const [videoPairConfigs, setVideoPairConfigs] = useState<any[]>(settings?.pairConfigs || []);
-  const [generationMode, setGenerationMode] = useState<'batch' | 'by-pair'>(settings?.generationMode || 'batch');
-  const [pairConfigs, setPairConfigs] = useState<any[]>(settings?.pairConfigs || []);
-  const [steerableMotionSettings, setSteerableMotionSettings] = useState<SteerableMotionSettings>(
-    settings?.steerableMotionSettings || {
-      negative_prompt: '',
-      model_name: 'vace_14B',
-      seed: 789,
-      debug: true,
-      apply_reward_lora: false,
-      colour_match_videos: true,
-      apply_causvid: true,
-      use_lighti2x_lora: false,
-      fade_in_duration: '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
-      fade_out_duration: '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
-      after_first_post_generation_saturation: 1,
-      after_first_post_generation_brightness: 0,
-      show_input_images: false,
-    }
-  );
+  // Add state for video generation settings - wait for settings to load before initializing
+  const [videoControlMode, setVideoControlMode] = useState<'individual' | 'batch'>('batch');
+  const [batchVideoPrompt, setBatchVideoPrompt] = useState('');
+  const [batchVideoFrames, setBatchVideoFrames] = useState(30);
+  const [batchVideoContext, setBatchVideoContext] = useState(10);
+  const [batchVideoSteps, setBatchVideoSteps] = useState(4);
+  const [dimensionSource, setDimensionSource] = useState<'project' | 'firstImage' | 'custom'>('firstImage');
+  const [customWidth, setCustomWidth] = useState<number | undefined>(undefined);
+  const [customHeight, setCustomHeight] = useState<number | undefined>(undefined);
+  const [enhancePrompt, setEnhancePrompt] = useState<boolean>(false);
+  const [videoPairConfigs, setVideoPairConfigs] = useState<any[]>([]);
+  const [generationMode, setGenerationMode] = useState<'batch' | 'by-pair'>('batch');
+  const [pairConfigs, setPairConfigs] = useState<any[]>([]);
+  const [steerableMotionSettings, setSteerableMotionSettings] = useState<SteerableMotionSettings>({
+    negative_prompt: '',
+    model_name: 'vace_14B',
+    seed: 789,
+    debug: true,
+    apply_reward_lora: false,
+    colour_match_videos: true,
+    apply_causvid: true,
+    use_lighti2x_lora: false,
+    fade_in_duration: '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
+    fade_out_duration: '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
+    after_first_post_generation_saturation: 1,
+    after_first_post_generation_brightness: 0,
+    show_input_images: false,
+  });
 
   const hasLoadedInitialSettings = useRef(false);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const userHasInteracted = useRef(false);
-  const [showSkeleton, setShowSkeleton] = useState(false);
 
-  // Mark initial settings load completion using loading-state transition
-  const prevLoadingRef = useRef(true);
-
+  // Update state when settings are loaded from database
   useEffect(() => {
-    const wasLoading = prevLoadingRef.current;
-    prevLoadingRef.current = isLoadingSettings;
-
-    if (wasLoading && !isLoadingSettings && settings && !hasLoadedInitialSettings.current) {
+    if (settings && !isLoadingSettings && !hasLoadedInitialSettings.current) {
       hasLoadedInitialSettings.current = true;
+      // Reset user interaction flag when loading new settings
       userHasInteracted.current = false;
-
-      // Copy settings into local state
-      setVideoControlMode(settings.videoControlMode ?? 'batch');
-      setBatchVideoPrompt(settings.batchVideoPrompt ?? '');
-      setBatchVideoFrames(settings.batchVideoFrames ?? 30);
-      setBatchVideoContext(settings.batchVideoContext ?? 10);
-      setBatchVideoSteps(settings.batchVideoSteps ?? 4);
-      setDimensionSource(settings.dimensionSource ?? 'firstImage');
+      
+      setVideoControlMode(settings.videoControlMode || 'batch');
+      setBatchVideoPrompt(settings.batchVideoPrompt || '');
+      setBatchVideoFrames(settings.batchVideoFrames || 30);
+      setBatchVideoContext(settings.batchVideoContext || 10);
+      setBatchVideoSteps(settings.batchVideoSteps || 4);
+      setDimensionSource(settings.dimensionSource || 'firstImage');
       setCustomWidth(settings.customWidth);
       setCustomHeight(settings.customHeight);
-      setEnhancePrompt(settings.enhancePrompt ?? false);
-      setVideoPairConfigs(settings.pairConfigs ?? []);
-      setGenerationMode(settings.generationMode ?? 'batch');
-      setPairConfigs(settings.pairConfigs ?? []);
-      setSteerableMotionSettings(settings.steerableMotionSettings ?? {
-        negative_prompt: '',
-        model_name: 'vace_14B',
-        seed: 789,
-        debug: true,
-        apply_reward_lora: false,
-        colour_match_videos: true,
-        apply_causvid: true,
-        use_lighti2x_lora: false,
-        fade_in_duration: '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
-        fade_out_duration: '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
-        after_first_post_generation_saturation: 1,
-        after_first_post_generation_brightness: 0,
-        show_input_images: false,
-      });
-
-      console.log('[ToolSettingsDebug] Initial settings load complete', { shotId: selectedShot?.id });
+      setEnhancePrompt(settings.enhancePrompt || false);
+      setVideoPairConfigs(settings.pairConfigs || []);
+      setGenerationMode(settings.generationMode || 'batch');
+      setPairConfigs(settings.pairConfigs || []);
+      setSteerableMotionSettings(settings.steerableMotionSettings || {
+    negative_prompt: '',
+    model_name: 'vace_14B',
+    seed: 789,
+    debug: true,
+    apply_reward_lora: false,
+    colour_match_videos: true,
+    apply_causvid: true,
+    use_lighti2x_lora: false,
+    fade_in_duration: '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
+    fade_out_duration: '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
+    after_first_post_generation_saturation: 1,
+    after_first_post_generation_brightness: 0,
+    show_input_images: false,
+  });
     }
-  }, [isLoadingSettings, settings, selectedShot?.id]);
+  }, [settings, isLoadingSettings]);
 
   // Reset loaded flag when switching shots
   useEffect(() => {
     hasLoadedInitialSettings.current = false;
     userHasInteracted.current = false;
-    setShowSkeleton(false);
-    prevLoadingRef.current = true; // Reset loading ref when shot changes
   }, [selectedShot?.id]);
-
-  // Control skeleton visibility based on loading state
-  useEffect(() => {
-    if (isLoadingSettings) {
-      const timer = setTimeout(() => setShowSkeleton(true), 200);
-      return () => clearTimeout(timer);
-    } else {
-      setShowSkeleton(false);
-    }
-  }, [isLoadingSettings]);
-
-  // Handle case where settings are already cached when switching shots
-  useEffect(() => {
-    if (selectedShot?.id && settings && !isLoadingSettings && !hasLoadedInitialSettings.current) {
-      // Settings are already available (cached), mark as loaded
-      hasLoadedInitialSettings.current = true;
-      userHasInteracted.current = false;
-      console.log('[ToolSettingsDebug] Initial settings already cached', { shotId: selectedShot?.id });
-    }
-  }, [selectedShot?.id, settings, isLoadingSettings]);
 
   useEffect(() => {
     fetch('/data/loras.json')
@@ -348,14 +311,6 @@ const VideoTravelToolPage: React.FC = () => {
 
   // Save settings to database whenever they change
   useEffect(() => {
-    console.log('[ToolSettingsDebug] Save effect triggered', {
-      shotId: selectedShot?.id,
-      hasSettings: !!settings,
-      hasLoadedInitialSettings: hasLoadedInitialSettings.current,
-      userHasInteracted: userHasInteracted.current,
-      isUpdating
-    });
-
     if (selectedShot?.id && settings && hasLoadedInitialSettings.current && userHasInteracted.current) {
       // Clear any pending save
       if (saveTimeoutRef.current) {
@@ -390,13 +345,6 @@ const VideoTravelToolPage: React.FC = () => {
           console.log('[ToolSettingsDebug] ► No change detected for shot', selectedShot?.id);
         }
       }, 500); // Wait 500ms before saving
-    } else {
-      console.log('[ToolSettingsDebug] ► Save conditions not met', {
-        hasSelectedShot: !!selectedShot?.id,
-        hasSettings: !!settings,
-        hasLoadedInitialSettings: hasLoadedInitialSettings.current,
-        userHasInteracted: userHasInteracted.current
-      });
     }
     
     // Cleanup timeout on unmount
@@ -479,159 +427,95 @@ const VideoTravelToolPage: React.FC = () => {
           />
         </>
       ) : (
-        <>
-          {/* Show loading state while settings are loading for the selected shot */}
-          {showSkeleton ? (
-            <div className="container mx-auto p-4">
-              <div className="mb-6">
-                <Button 
-                  variant="outline" 
-                  onClick={handleBackToShotList}
-                  className="mb-4"
-                >
-                  ← Back to Shots
-                </Button>
-                <div className="h-8 bg-gray-200 rounded w-48 mb-2 animate-pulse"></div>
-                <div className="h-4 bg-gray-100 rounded w-32 animate-pulse"></div>
-              </div>
-              
-              {/* Loading skeleton that matches the form structure */}
-              <div className="space-y-6">
-                {/* Video outputs gallery skeleton */}
-                <div className="p-4 border rounded-lg bg-card shadow-md animate-pulse">
-                  <div className="h-6 bg-gray-200 rounded w-40 mb-4"></div>
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="aspect-video bg-gray-200 rounded"></div>
-                    <div className="aspect-video bg-gray-200 rounded"></div>
-                    <div className="aspect-video bg-gray-200 rounded"></div>
-                  </div>
-                </div>
-                
-                {/* Form settings skeleton */}
-                <div className="p-4 border rounded-lg bg-card shadow-md animate-pulse">
-                  <div className="flex justify-between items-center mb-4">
-                    <div className="h-6 bg-gray-200 rounded w-36"></div>
-                    <div className="h-8 bg-gray-200 rounded w-32"></div>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <div className="h-4 bg-gray-200 rounded w-16"></div>
-                      <div className="h-20 bg-gray-100 rounded"></div>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="h-4 bg-gray-200 rounded w-24"></div>
-                      <div className="h-20 bg-gray-100 rounded"></div>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                    <div className="space-y-2">
-                      <div className="h-4 bg-gray-200 rounded w-20"></div>
-                      <div className="h-6 bg-gray-100 rounded"></div>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="h-4 bg-gray-200 rounded w-32"></div>
-                      <div className="h-6 bg-gray-100 rounded"></div>
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Images section skeleton */}
-                <div className="p-4 border rounded-lg bg-card shadow-md animate-pulse">
-                  <div className="h-6 bg-gray-200 rounded w-24 mb-4"></div>
-                  <div className="grid grid-cols-4 gap-4">
-                    <div className="aspect-square bg-gray-200 rounded"></div>
-                    <div className="aspect-square bg-gray-200 rounded"></div>
-                    <div className="aspect-square bg-gray-200 rounded"></div>
-                    <div className="aspect-square bg-gray-200 rounded opacity-50"></div>
-                  </div>
-                </div>
-              </div>
+        // Show a loading state while settings are being fetched
+        isLoadingSettings ? (
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+              <p className="text-muted-foreground">Loading shot settings...</p>
             </div>
-          ) : (
-            <div className="opacity-0 animate-[fadeIn_0.3s_ease-in_forwards]">
-              <ShotEditor
-                selectedShot={selectedShot}
-                projectId={selectedProjectId}
-                videoPairConfigs={videoPairConfigs}
-                videoControlMode={videoControlMode}
-                batchVideoPrompt={batchVideoPrompt}
-                batchVideoFrames={batchVideoFrames}
-                batchVideoContext={batchVideoContext}
-                orderedShotImages={selectedShot.images || []}
-                onShotImagesUpdate={handleShotImagesUpdate}
-                onBack={handleBackToShotList}
-                onVideoControlModeChange={(mode) => {
-                  userHasInteracted.current = true;
-                  setVideoControlMode(mode);
-                }}
-                onPairConfigChange={(pairId, field, value) => {
-                  userHasInteracted.current = true;
-                  setVideoPairConfigs(prev => prev.map(p => p.id === pairId ? { ...p, [field]: value } : p));
-                }}
-                onBatchVideoPromptChange={(prompt) => {
-                  console.log('[ToolSettingsDebug] User changed batch prompt', prompt);
-                  userHasInteracted.current = true;
-                  setBatchVideoPrompt(prompt);
-                }}
-                onBatchVideoFramesChange={(frames) => {
-                  console.log('[ToolSettingsDebug] User changed batch frames', frames);
-                  userHasInteracted.current = true;
-                  setBatchVideoFrames(frames);
-                }}
-                onBatchVideoContextChange={(context) => {
-                  console.log('[ToolSettingsDebug] User changed batch context', context);
-                  userHasInteracted.current = true;
-                  setBatchVideoContext(context);
-                }}
-                batchVideoSteps={batchVideoSteps}
-                onBatchVideoStepsChange={(steps) => {
-                  userHasInteracted.current = true;
-                  setBatchVideoSteps(steps);
-                }}
-                dimensionSource={dimensionSource}
-                onDimensionSourceChange={(source) => {
-                  userHasInteracted.current = true;
-                  setDimensionSource(source);
-                }}
-                customWidth={customWidth}
-                onCustomWidthChange={(width) => {
-                  userHasInteracted.current = true;
-                  setCustomWidth(width);
-                }}
-                customHeight={customHeight}
-                onCustomHeightChange={(height) => {
-                  userHasInteracted.current = true;
-                  setCustomHeight(height);
-                }}
-                steerableMotionSettings={steerableMotionSettings}
-                onSteerableMotionSettingsChange={handleSteerableMotionSettingsChange}
-                onGenerateAllSegments={() => {}}
-                selectedLoras={selectedLoras}
-                onAddLora={handleAddLora}
-                onRemoveLora={handleRemoveLora}
-                onLoraStrengthChange={handleLoraStrengthChange}
-                availableLoras={availableLoras}
-                isLoraModalOpen={isLoraModalOpen}
-                setIsLoraModalOpen={setIsLoraModalOpen}
-                enhancePrompt={enhancePrompt}
-                onEnhancePromptChange={(enhance) => {
-                  userHasInteracted.current = true;
-                  setEnhancePrompt(enhance);
-                }}
-                generationMode={generationMode}
-                onGenerationModeChange={(mode) => {
-                  userHasInteracted.current = true;
-                  setGenerationMode(mode);
-                }}
-                pairConfigs={pairConfigs}
-                onPairConfigsChange={(configs) => {
-                  userHasInteracted.current = true;
-                  setPairConfigs(configs);
-                }}
-              />
-            </div>
-          )}
-        </>
+          </div>
+        ) : (
+          <div className="animate-in fade-in duration-300">
+            <ShotEditor
+              selectedShot={selectedShot}
+              projectId={selectedProjectId}
+              videoPairConfigs={videoPairConfigs}
+              videoControlMode={videoControlMode}
+              batchVideoPrompt={batchVideoPrompt}
+              batchVideoFrames={batchVideoFrames}
+              batchVideoContext={batchVideoContext}
+              orderedShotImages={selectedShot.images || []}
+              onShotImagesUpdate={handleShotImagesUpdate}
+              onBack={handleBackToShotList}
+              onVideoControlModeChange={(mode) => {
+                userHasInteracted.current = true;
+                setVideoControlMode(mode);
+              }}
+              onPairConfigChange={(pairId, field, value) => {
+                userHasInteracted.current = true;
+                setVideoPairConfigs(prev => prev.map(p => p.id === pairId ? { ...p, [field]: value } : p));
+              }}
+              onBatchVideoPromptChange={(prompt) => {
+                userHasInteracted.current = true;
+                setBatchVideoPrompt(prompt);
+              }}
+              onBatchVideoFramesChange={(frames) => {
+                userHasInteracted.current = true;
+                setBatchVideoFrames(frames);
+              }}
+              onBatchVideoContextChange={(context) => {
+                userHasInteracted.current = true;
+                setBatchVideoContext(context);
+              }}
+              batchVideoSteps={batchVideoSteps}
+              onBatchVideoStepsChange={(steps) => {
+                userHasInteracted.current = true;
+                setBatchVideoSteps(steps);
+              }}
+              dimensionSource={dimensionSource}
+              onDimensionSourceChange={(source) => {
+                userHasInteracted.current = true;
+                setDimensionSource(source);
+              }}
+              customWidth={customWidth}
+              onCustomWidthChange={(width) => {
+                userHasInteracted.current = true;
+                setCustomWidth(width);
+              }}
+              customHeight={customHeight}
+              onCustomHeightChange={(height) => {
+                userHasInteracted.current = true;
+                setCustomHeight(height);
+              }}
+              steerableMotionSettings={steerableMotionSettings}
+              onSteerableMotionSettingsChange={handleSteerableMotionSettingsChange}
+              onGenerateAllSegments={() => {}}
+              selectedLoras={selectedLoras}
+              onAddLora={handleAddLora}
+              onRemoveLora={handleRemoveLora}
+              onLoraStrengthChange={handleLoraStrengthChange}
+              availableLoras={availableLoras}
+              isLoraModalOpen={isLoraModalOpen}
+              setIsLoraModalOpen={setIsLoraModalOpen}
+              enhancePrompt={enhancePrompt}
+              onEnhancePromptChange={(enhance) => {
+                userHasInteracted.current = true;
+                setEnhancePrompt(enhance);
+              }}
+              generationMode={generationMode}
+              onGenerationModeChange={(mode) => {
+                userHasInteracted.current = true;
+                setGenerationMode(mode);
+              }}
+              pairConfigs={pairConfigs}
+              onPairConfigsChange={(configs) => {
+                userHasInteracted.current = true;
+                setPairConfigs(configs);
+              }}
+            />
+          </div>
+        )
       )}
 
       <CreateShotModal 

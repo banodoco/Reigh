@@ -62,34 +62,17 @@ export function useToolSettings<T = unknown>(
   const queryKey = ['tool-settings', toolId, ctx];
   const hasUserInteracted = useRef(false);
 
-  // Don't make API calls if we don't have the minimum required context
-  const shouldFetch = Boolean(toolId && (ctx.projectId || ctx.shotId));
-
-  // Debug logging
-  console.log('[ToolSettingsDebug] Hook called', {
-    toolId,
-    ctx,
-    shouldFetch,
-    queryKey: JSON.stringify(queryKey)
-  });
-
   const { data: settings, isLoading, error } = useQuery({
     queryKey,
-    queryFn: () => {
-      console.log('[ToolSettingsDebug] Executing query', { toolId, ctx });
-      return fetchToolSettings(toolId, ctx);
-    },
+    queryFn: () => fetchToolSettings(toolId, ctx),
     staleTime: 30 * 60 * 1000, // Consider data fresh for 30 minutes
     refetchInterval: false, // Disable automatic refetching
     refetchOnWindowFocus: false, // Don't refetch on window focus
     refetchOnMount: 'always', // Only fetch once when component mounts
-    enabled: shouldFetch, // Only run query if we have valid context
   });
 
   const updateMutation = useMutation({
     mutationFn: (params: { scope: SettingsScope; patch: Partial<T> }) => {
-      console.log('[ToolSettingsDebug] Update mutation starting', { toolId, scope: params.scope, patch: params.patch });
-      
       const id = params.scope === 'project' ? ctx.projectId : 
                  params.scope === 'shot' ? ctx.shotId : 
                  'current-user'; // User ID will be handled server-side
@@ -137,11 +120,10 @@ export function useToolSettings<T = unknown>(
   });
 
   const update = useCallback((patch: Partial<T>, scope: SettingsScope = 'shot') => {
-    console.log('[ToolSettingsDebug] Update function called', { toolId, patch, scope, ctx });
     // Mark that the user has interacted
     hasUserInteracted.current = true;
     return updateMutation.mutate({ scope, patch });
-  }, [updateMutation, toolId, ctx]);
+  }, [updateMutation]);
 
   // Expose a method to check if user has interacted
   const hasUserMadeChanges = useCallback(() => hasUserInteracted.current, []);
