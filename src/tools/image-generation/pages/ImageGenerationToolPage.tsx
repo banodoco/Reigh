@@ -458,7 +458,7 @@ const ImageGenerationToolPage = () => {
                 ref={imageGenerationFormRef} 
                 onGenerate={handleNewGenerate} // Use the new handler
                 isGenerating={isGenerating} // isCreatingTask from handleNewGenerate
-                hasApiKey={!!falApiKey} // Still relevant for UI
+                hasApiKey={hasValidFalApiKey}
                 apiKey={falApiKey} // Potentially for display or direct use by form
                 openaiApiKey={openaiApiKey}
               />
