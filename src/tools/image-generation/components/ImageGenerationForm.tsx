@@ -273,7 +273,6 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
     'flux-api': [],
     'hidream-api': []
   });
-  const [selectedLoras, setSelectedLoras] = useState<ActiveLora[]>([]);
   const [depthStrength, setDepthStrength] = useState(50);
   const [softEdgeStrength, setSoftEdgeStrength] = useState(20);
   const [startingImage, setStartingImage] = useState<File | null>(null);
@@ -373,9 +372,15 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
             });
           }
         });
-        setSelectedLoras(newSelectedLoras);
+        setSelectedLorasMap(prev => ({
+          ...prev,
+          [generationMode]: newSelectedLoras
+        }));
       } else if (settings.activeLoras && settings.activeLoras.length === 0) {
-        setSelectedLoras([]); 
+        setSelectedLorasMap(prev => ({
+          ...prev,
+          [generationMode]: []
+        }));
       }
 
       if (settings.userProvidedImageUrl) {
@@ -400,7 +405,7 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
       ready &&
       !defaultsApplied.current && 
       availableLoras.length > 0 && 
-      selectedLoras.length === 0
+      selectedLorasMap[generationMode].length === 0
     ) { 
       const newSelectedLoras: ActiveLora[] = [];
       for (const defaultConfig of defaultLorasConfig) {
@@ -416,19 +421,18 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
         }
       }
       if (newSelectedLoras.length > 0) {
-        setSelectedLoras(newSelectedLoras);
+        setSelectedLorasMap(prev => ({
+          ...prev,
+          [generationMode]: newSelectedLoras
+        }));
         defaultsApplied.current = true;
       }
     } 
-  }, [generationMode, availableLoras, ready, defaultsApplied.current, selectedLoras.length]);
-
-  useEffect(() => {
-    setSelectedLoras(selectedLorasMap[generationMode] || []);
-  }, [generationMode]);
+  }, [generationMode, availableLoras, ready, defaultsApplied.current, selectedLorasMap[generationMode].length]);
 
   const handleAddLora = (loraToAdd: LoraModel) => { 
     markAsInteracted();
-    if (selectedLoras.find(sl => sl.id === loraToAdd["Model ID"])) { toast.info(`LoRA already added.`); return; }
+    if (selectedLorasMap[generationMode].find(sl => sl.id === loraToAdd["Model ID"])) { toast.info(`LoRA already added.`); return; }
     if (loraToAdd["Model Files"] && loraToAdd["Model Files"].length > 0) {
       const newLora = {
         id: loraToAdd["Model ID"], 
@@ -437,8 +441,7 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
         strength: 1.0, 
         previewImageUrl: loraToAdd.Images && loraToAdd.Images.length > 0 ? loraToAdd.Images[0].url : undefined,
       };
-      const updatedLoras = [...selectedLoras, newLora];
-      setSelectedLoras(updatedLoras);
+      const updatedLoras = [...selectedLorasMap[generationMode], newLora];
       setSelectedLorasMap(prev => ({
         ...prev,
         [generationMode]: updatedLoras
@@ -448,8 +451,7 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
   };
   const handleRemoveLora = (loraIdToRemove: string) => {
     markAsInteracted();
-    const updatedLoras = selectedLoras.filter(lora => lora.id !== loraIdToRemove);
-    setSelectedLoras(updatedLoras);
+    const updatedLoras = selectedLorasMap[generationMode].filter(lora => lora.id !== loraIdToRemove);
     setSelectedLorasMap(prev => ({
       ...prev,
       [generationMode]: updatedLoras
@@ -458,11 +460,9 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
   const handleLoraStrengthChange = (loraId: string, newStrength: number) => {
     markAsInteracted();
     console.log('[LoRA] Changing strength for', loraId, 'to', newStrength);
-    const updatedLoras = selectedLoras.map(lora => 
+    const updatedLoras = selectedLorasMap[generationMode].map(lora => 
       lora.id === loraId ? { ...lora, strength: newStrength } : lora
     );
-    setSelectedLoras(updatedLoras);
-    // Force immediate update to the map
     setSelectedLorasMap(prev => ({
       ...prev,
       [generationMode]: updatedLoras
@@ -561,7 +561,7 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
     e.preventDefault();
     console.log("[ImageGenerationForm] handleSubmit triggered. Event type:", e.type);
 
-    const lorasForApi = selectedLoras.map(lora => ({ path: lora.path, strength: lora.strength }));    
+    const lorasForApi = selectedLorasMap[generationMode].map(lora => ({ path: lora.path, strength: lora.strength }));    
     const normalizedDepthStrength = depthStrength / 100;
     const normalizedSoftEdgeStrength = softEdgeStrength / 100;
     const appliedStartingImageUrl = (startingImagePreview && !startingImagePreview.startsWith('data:image')) ? startingImagePreview : null;
@@ -584,7 +584,7 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
       }), 
       imagesPerPrompt, 
       loras: lorasForApi, 
-      fullSelectedLoras: selectedLoras, 
+      fullSelectedLoras: selectedLorasMap[generationMode], 
       depthStrength: normalizedDepthStrength, 
       softEdgeStrength: normalizedSoftEdgeStrength, 
       startingImage,
@@ -759,11 +759,11 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
                 Add or Manage LoRA Models
               </Button>
             {availableLoras.length === 0 && !isLoraModalOpen && <p className="text-xs text-muted-foreground mt-1">Loading LoRA models for selection...</p>}
-            {selectedLoras.length > 0 && (
+            {selectedLorasMap[generationMode].length > 0 && (
               <TooltipProvider>
                 <div className="mt-4 space-y-4 pt-2 border-t">
                   <h3 className="text-md font-semibold">Active LoRAs:</h3>
-                  {selectedLoras.map((lora) => (
+                  {selectedLorasMap[generationMode].map((lora) => (
                     <div key={lora.id} className="p-3 border rounded-md shadow-sm bg-slate-50">
                       <div className="flex items-start gap-3">
                         {lora.previewImageUrl && (
@@ -832,7 +832,7 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
         loras={availableLoras}
         onAddLora={handleAddLora}
         onRemoveLora={handleRemoveLora}
-        selectedLoraIds={selectedLoras.map(l => l["Model ID"])}
+        selectedLoraIds={selectedLorasMap[generationMode].map(l => l.id)}
         lora_type={generationMode === 'wan-local' ? "Wan 2.1 14b" : "Flux.dev"}
       />
         
