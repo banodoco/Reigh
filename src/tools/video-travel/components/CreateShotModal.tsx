@@ -11,15 +11,13 @@ import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
 import FileInput from '@/shared/components/FileInput';
-import { Checkbox } from '@/shared/components/ui/checkbox';
 
 interface CreateShotModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (shotName: string, files: File[], copySettings: boolean) => Promise<void>;
+  onSubmit: (shotName: string, files: File[]) => Promise<void>;
   isLoading?: boolean;
   defaultShotName?: string;
-  hasPreviousShot: boolean;
 }
 
 const CreateShotModal: React.FC<CreateShotModalProps> = ({ 
@@ -27,19 +25,17 @@ const CreateShotModal: React.FC<CreateShotModalProps> = ({
   onClose, 
   onSubmit, 
   isLoading, 
-  defaultShotName,
-  hasPreviousShot,
+  defaultShotName 
 }) => {
   const [shotName, setShotName] = useState('');
   const [files, setFiles] = useState<File[]>([]);
-  const [copySettings, setCopySettings] = useState(true);
 
   const handleSubmit = async () => {
     let finalShotName = shotName.trim();
     if (!finalShotName) {
       finalShotName = defaultShotName || 'Untitled Shot';
     }
-    await onSubmit(finalShotName, files, copySettings && hasPreviousShot);
+    await onSubmit(finalShotName, files);
     setShotName('');
     setFiles([]);
   };
@@ -78,16 +74,6 @@ const CreateShotModal: React.FC<CreateShotModalProps> = ({
             acceptTypes={['image']}
             label="Starting Images (Optional)"
           />
-          {hasPreviousShot && (
-            <div className="flex items-center space-x-2">
-              <Checkbox 
-                id="copy-settings" 
-                checked={copySettings} 
-                onCheckedChange={(checked) => setCopySettings(checked as boolean)}
-              />
-              <Label htmlFor="copy-settings">Copy settings from last shot</Label>
-            </div>
-          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={handleClose} disabled={isLoading}>

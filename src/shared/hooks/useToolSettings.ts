@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { useRef, useCallback } from 'react';
 
 const baseUrl = import.meta.env.VITE_API_TARGET_URL || '';
 
@@ -54,15 +55,20 @@ async function updateToolSettings(params: UpdateToolSettingsParams): Promise<voi
 
 export function useToolSettings<T = unknown>(
   toolId: string,
-  ctx: ToolSettingsContext
+  ctx: ToolSettingsContext,
+  options?: { silent?: boolean }
 ) {
   const queryClient = useQueryClient();
   const queryKey = ['tool-settings', toolId, ctx];
+  const hasUserInteracted = useRef(false);
 
   const { data: settings, isLoading, error } = useQuery({
     queryKey,
     queryFn: () => fetchToolSettings(toolId, ctx),
-    staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
+    staleTime: 30 * 60 * 1000, // Consider data fresh for 30 minutes
+    refetchInterval: false, // Disable automatic refetching
+    refetchOnWindowFocus: false, // Don't refetch on window focus
+    refetchOnMount: 'always', // Only fetch once when component mounts
   });
 
   const updateMutation = useMutation({
@@ -83,22 +89,21 @@ export function useToolSettings<T = unknown>(
       });
     },
     onMutate: async ({ scope, patch }) => {
+      console.log('[ToolSettingsDebug] PATCH-optimistic', { toolId, scope, patch });
       // Cancel any outgoing refetches
       await queryClient.cancelQueries({ queryKey });
-
       // Snapshot the previous value
       const previousSettings = queryClient.getQueryData(queryKey);
-
       // Optimistically update to the new value
       queryClient.setQueryData(queryKey, (old: any) => ({
         ...old,
         ...patch,
       }));
-
       // Return a context object with the snapshotted value
       return { previousSettings };
     },
     onError: (err, newData, context) => {
+      console.error('[ToolSettingsDebug] PATCH-error', err);
       // If the mutation fails, use the context returned from onMutate to roll back
       if (context?.previousSettings) {
         queryClient.setQueryData(queryKey, context.previousSettings);
@@ -106,15 +111,22 @@ export function useToolSettings<T = unknown>(
       toast.error('Failed to update settings');
     },
     onSuccess: () => {
-      // Invalidate and refetch
-      queryClient.invalidateQueries({ queryKey });
-      // Remove the toast to prevent spam
+      // Don't invalidate queries - we already have the latest data from optimistic update
+      console.log('[ToolSettingsDebug] PATCH-success', { toolId });
+      if (!options?.silent) {
+        toast.success('Settings updated successfully');
+      }
     },
   });
 
-  const update = (patch: Partial<T>, scope: SettingsScope = 'shot') => {
+  const update = useCallback((patch: Partial<T>, scope: SettingsScope = 'shot') => {
+    // Mark that the user has interacted
+    hasUserInteracted.current = true;
     return updateMutation.mutate({ scope, patch });
-  };
+  }, [updateMutation]);
+
+  // Expose a method to check if user has interacted
+  const hasUserMadeChanges = useCallback(() => hasUserInteracted.current, []);
 
   return {
     settings: settings as T | undefined,
@@ -122,5 +134,6 @@ export function useToolSettings<T = unknown>(
     error,
     update,
     isUpdating: updateMutation.isPending,
+    hasUserMadeChanges,
   };
 } 

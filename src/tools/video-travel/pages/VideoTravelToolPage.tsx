@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import ShotEditor, { SteerableMotionSettings } from '../components/ShotEditor';
 import { useListShots, useCreateShot, useHandleExternalImageDrop } from '@/shared/hooks/useShots';
@@ -12,6 +12,7 @@ import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 import { LoraModel } from '@/shared/components/LoraSelectorModal';
 import { useToolSettings } from '@/shared/hooks/useToolSettings';
 import { VideoTravelSettings } from '../settings';
+import { deepEqual, sanitizeSettings } from '@/shared/lib/deepEqual';
 // import { useLastAffectedShot } from '@/shared/hooks/useLastAffectedShot';
 
 // Placeholder data or logic to fetch actual data for VideoEditLayout
@@ -41,9 +42,10 @@ const VideoTravelToolPage: React.FC = () => {
   const [selectedLoras, setSelectedLoras] = useState<ActiveLora[]>([]);
 
   // Use tool settings for the selected shot
-  const { settings, update: updateSettings, isLoading: isLoadingSettings } = useToolSettings<VideoTravelSettings>(
+  const { settings, update: updateSettings, isLoading: isLoadingSettings, isUpdating, hasUserMadeChanges } = useToolSettings<VideoTravelSettings>(
     'video-travel',
-    { projectId: selectedProjectId || undefined, shotId: selectedShot?.id }
+    { projectId: selectedProjectId || undefined, shotId: selectedShot?.id },
+    { silent: true }
   );
 
   // Add state for video generation settings - initialized from tool settings
@@ -77,65 +79,17 @@ const VideoTravelToolPage: React.FC = () => {
     }
   );
 
-  const onBatchVideoPromptChange = useCallback((value: string) => {
-    setBatchVideoPrompt(value);
-    updateSettings({ batchVideoPrompt: value }, 'shot');
-  }, [updateSettings]);
-
-  const onBatchVideoFramesChange = useCallback((value: number) => {
-    setBatchVideoFrames(value);
-    updateSettings({ batchVideoFrames: value }, 'shot');
-  }, [updateSettings]);
-
-  const onBatchVideoContextChange = useCallback((value: number) => {
-    setBatchVideoContext(value);
-    updateSettings({ batchVideoContext: value }, 'shot');
-  }, [updateSettings]);
-
-  const onBatchVideoStepsChange = useCallback((value: number) => {
-    setBatchVideoSteps(value);
-    updateSettings({ batchVideoSteps: value }, 'shot');
-  }, [updateSettings]);
-
-  const onDimensionSourceChange = useCallback((value: 'project' | 'firstImage' | 'custom') => {
-    setDimensionSource(value);
-    updateSettings({ dimensionSource: value }, 'shot');
-  }, [updateSettings]);
-
-  const onCustomWidthChange = useCallback((value: number | undefined) => {
-    setCustomWidth(value);
-    updateSettings({ customWidth: value }, 'shot');
-  }, [updateSettings]);
-  
-  const onCustomHeightChange = useCallback((value: number | undefined) => {
-    setCustomHeight(value);
-    updateSettings({ customHeight: value }, 'shot');
-  }, [updateSettings]);
-
-  const onEnhancePromptChange = useCallback((value: boolean) => {
-    setEnhancePrompt(value);
-    updateSettings({ enhancePrompt: value }, 'shot');
-  }, [updateSettings]);
-
-  const onGenerationModeChange = useCallback((value: 'batch' | 'by-pair') => {
-    setGenerationMode(value);
-    updateSettings({ generationMode: value }, 'shot');
-  }, [updateSettings]);
-
-  const onPairConfigsChange = useCallback((value: any[]) => {
-    setPairConfigs(value);
-    updateSettings({ pairConfigs: value }, 'shot');
-  }, [updateSettings]);
-
-  const onSteerableMotionSettingsChange = useCallback((value: Partial<SteerableMotionSettings>) => {
-    const newSettings = { ...steerableMotionSettings, ...value };
-    setSteerableMotionSettings(newSettings);
-    updateSettings({ steerableMotionSettings: newSettings }, 'shot');
-  }, [steerableMotionSettings, updateSettings]);
+  const hasLoadedInitialSettings = useRef(false);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const userHasInteracted = useRef(false);
 
   // Update state when settings are loaded from database
   useEffect(() => {
-    if (settings && !isLoadingSettings) {
+    if (settings && !isLoadingSettings && !hasLoadedInitialSettings.current) {
+      hasLoadedInitialSettings.current = true;
+      // Reset user interaction flag when loading new settings
+      userHasInteracted.current = false;
+      
       setVideoControlMode(settings.videoControlMode || 'batch');
       setBatchVideoPrompt(settings.batchVideoPrompt || '');
       setBatchVideoFrames(settings.batchVideoFrames || 30);
@@ -149,22 +103,28 @@ const VideoTravelToolPage: React.FC = () => {
       setGenerationMode(settings.generationMode || 'batch');
       setPairConfigs(settings.pairConfigs || []);
       setSteerableMotionSettings(settings.steerableMotionSettings || {
-        negative_prompt: '',
-        model_name: 'vace_14B',
-        seed: 789,
-        debug: true,
-        apply_reward_lora: false,
-        colour_match_videos: true,
-        apply_causvid: true,
-        use_lighti2x_lora: false,
-        fade_in_duration: '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
-        fade_out_duration: '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
-        after_first_post_generation_saturation: 1,
-        after_first_post_generation_brightness: 0,
-        show_input_images: false,
-      });
+    negative_prompt: '',
+    model_name: 'vace_14B',
+    seed: 789,
+    debug: true,
+    apply_reward_lora: false,
+    colour_match_videos: true,
+    apply_causvid: true,
+    use_lighti2x_lora: false,
+    fade_in_duration: '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
+    fade_out_duration: '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
+    after_first_post_generation_saturation: 1,
+    after_first_post_generation_brightness: 0,
+    show_input_images: false,
+  });
     }
   }, [settings, isLoadingSettings]);
+
+  // Reset loaded flag when switching shots
+  useEffect(() => {
+    hasLoadedInitialSettings.current = false;
+    userHasInteracted.current = false;
+  }, [selectedShot?.id]);
 
   useEffect(() => {
     fetch('/data/loras.json')
@@ -284,7 +244,7 @@ const VideoTravelToolPage: React.FC = () => {
     setCurrentShotId(null);
   };
 
-  const handleModalSubmitCreateShot = async (name: string, files: File[], copySettings: boolean) => {
+  const handleModalSubmitCreateShot = async (name: string, files: File[]) => {
     if (!selectedProjectId) {
       console.error("[VideoTravelToolPage] Cannot create shot: No project selected");
       return;
@@ -325,49 +285,9 @@ const VideoTravelToolPage: React.FC = () => {
         await refetchShots();
       }
       
-      // If copySettings is true, copy settings from the last shot
-      if (copySettings && newShot && shots && shots.length > 0) {
-        // Sort shots by creation date to find the last one (excluding the one just created)
-        const sortedShots = [...shots].sort((a, b) => 
-          new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
-        );
-        const lastShot = sortedShots[0];
-        
-        if (lastShot) {
-          // Fetch settings from last shot
-          const response = await fetch(`/api/tool-settings/resolve?toolId=video-travel&projectId=${selectedProjectId}&shotId=${lastShot.id}`);
-          if (response.ok) {
-            const lastShotSettings = await response.json();
-            // Apply settings to the new shot
-            await fetch(`/api/tool-settings`, {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                scope: 'shot',
-                id: newShot.id,
-                toolId: 'video-travel',
-                patch: lastShotSettings,
-              }),
-            });
-          }
-        }
-      }
-
       // Select the newly created shot
-      if (newShot) {
-        await refetchShots();
-        const updatedShots = queryClient.getQueryData<Shot[]>(['shots', selectedProjectId]);
-        const finalShot = updatedShots?.find(s => s.id === newShot.id);
-
-        if (finalShot) {
-          setSelectedShot(finalShot);
-          setCurrentShotId(finalShot.id);
-        }
-      } else {
-        // This case handles when a shot is created by dropping an image on a new group
-        // The shot is created, and we just need to refetch to see it in the list.
-        await refetchShots();
-      }
+      setSelectedShot(newShot);
+      setCurrentShotId(newShot.id);
       
       // Close the modal
       setIsCreateShotModalOpen(false);
@@ -384,11 +304,75 @@ const VideoTravelToolPage: React.FC = () => {
   };
 
   const handleSteerableMotionSettingsChange = (settings: Partial<typeof steerableMotionSettings>) => {
+    userHasInteracted.current = true;
     setSteerableMotionSettings(prev => ({
       ...prev,
       ...settings
     }));
   };
+
+  // Save settings to database whenever they change
+  useEffect(() => {
+    if (selectedShot?.id && settings && hasLoadedInitialSettings.current && userHasInteracted.current) {
+      // Clear any pending save
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+      
+      // Debounce the save
+      saveTimeoutRef.current = setTimeout(() => {
+        const currentSettings: VideoTravelSettings = {
+          videoControlMode,
+          batchVideoPrompt,
+          batchVideoFrames,
+          batchVideoContext,
+          batchVideoSteps,
+          dimensionSource,
+          customWidth,
+          customHeight,
+          steerableMotionSettings,
+          enhancePrompt,
+          generationMode,
+          pairConfigs,
+        };
+
+        if (!isUpdating && !deepEqual(sanitizeSettings(currentSettings), sanitizeSettings(settings))) {
+          console.log('[ToolSettingsDebug] ► Will save', {
+            shotId: selectedShot?.id,
+            currentSettings,
+            dbSettings: settings,
+          });
+          updateSettings(currentSettings, 'shot');
+        } else {
+          console.log('[ToolSettingsDebug] ► No change detected for shot', selectedShot?.id);
+        }
+      }, 500); // Wait 500ms before saving
+    }
+    
+    // Cleanup timeout on unmount
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [
+    selectedShot?.id,
+    videoControlMode,
+    batchVideoPrompt,
+    batchVideoFrames,
+    batchVideoContext,
+    batchVideoSteps,
+    dimensionSource,
+    customWidth,
+    customHeight,
+    JSON.stringify(steerableMotionSettings),
+    enhancePrompt,
+    generationMode,
+    JSON.stringify(pairConfigs),
+    settings,
+    updateSettings,
+    isUpdating
+  ]);
 
   const handleAddLora = (loraToAdd: LoraModel) => {
     if (selectedLoras.find(sl => sl.id === loraToAdd["Model ID"])) {
@@ -457,27 +441,47 @@ const VideoTravelToolPage: React.FC = () => {
           onShotImagesUpdate={handleShotImagesUpdate}
           onBack={handleBackToShotList}
           onVideoControlModeChange={(mode) => {
+            userHasInteracted.current = true;
             setVideoControlMode(mode);
-            updateSettings({ videoControlMode: mode }, 'shot');
           }}
           onPairConfigChange={(pairId, field, value) => {
-            const newPairConfigs = videoPairConfigs.map(p => p.id === pairId ? { ...p, [field]: value } : p);
-            setVideoPairConfigs(newPairConfigs);
-            updateSettings({ pairConfigs: newPairConfigs }, 'shot');
+            userHasInteracted.current = true;
+            setVideoPairConfigs(prev => prev.map(p => p.id === pairId ? { ...p, [field]: value } : p));
           }}
-          onBatchVideoPromptChange={onBatchVideoPromptChange}
-          onBatchVideoFramesChange={onBatchVideoFramesChange}
-          onBatchVideoContextChange={onBatchVideoContextChange}
+          onBatchVideoPromptChange={(prompt) => {
+            userHasInteracted.current = true;
+            setBatchVideoPrompt(prompt);
+          }}
+          onBatchVideoFramesChange={(frames) => {
+            userHasInteracted.current = true;
+            setBatchVideoFrames(frames);
+          }}
+          onBatchVideoContextChange={(context) => {
+            userHasInteracted.current = true;
+            setBatchVideoContext(context);
+          }}
           batchVideoSteps={batchVideoSteps}
-          onBatchVideoStepsChange={onBatchVideoStepsChange}
+          onBatchVideoStepsChange={(steps) => {
+            userHasInteracted.current = true;
+            setBatchVideoSteps(steps);
+          }}
           dimensionSource={dimensionSource}
-          onDimensionSourceChange={onDimensionSourceChange}
+          onDimensionSourceChange={(source) => {
+            userHasInteracted.current = true;
+            setDimensionSource(source);
+          }}
           customWidth={customWidth}
-          onCustomWidthChange={onCustomWidthChange}
+          onCustomWidthChange={(width) => {
+            userHasInteracted.current = true;
+            setCustomWidth(width);
+          }}
           customHeight={customHeight}
-          onCustomHeightChange={onCustomHeightChange}
+          onCustomHeightChange={(height) => {
+            userHasInteracted.current = true;
+            setCustomHeight(height);
+          }}
           steerableMotionSettings={steerableMotionSettings}
-          onSteerableMotionSettingsChange={onSteerableMotionSettingsChange}
+          onSteerableMotionSettingsChange={handleSteerableMotionSettingsChange}
           onGenerateAllSegments={() => {}}
           selectedLoras={selectedLoras}
           onAddLora={handleAddLora}
@@ -487,11 +491,20 @@ const VideoTravelToolPage: React.FC = () => {
           isLoraModalOpen={isLoraModalOpen}
           setIsLoraModalOpen={setIsLoraModalOpen}
           enhancePrompt={enhancePrompt}
-          onEnhancePromptChange={onEnhancePromptChange}
+          onEnhancePromptChange={(enhance) => {
+            userHasInteracted.current = true;
+            setEnhancePrompt(enhance);
+          }}
           generationMode={generationMode}
-          onGenerationModeChange={onGenerationModeChange}
+          onGenerationModeChange={(mode) => {
+            userHasInteracted.current = true;
+            setGenerationMode(mode);
+          }}
           pairConfigs={pairConfigs}
-          onPairConfigsChange={onPairConfigsChange}
+          onPairConfigsChange={(configs) => {
+            userHasInteracted.current = true;
+            setPairConfigs(configs);
+          }}
         />
       )}
 
@@ -501,7 +514,6 @@ const VideoTravelToolPage: React.FC = () => {
         onSubmit={handleModalSubmitCreateShot}
         isLoading={createShotMutation.isPending || handleExternalImageDropMutation.isPending}
         defaultShotName={`Shot ${(shots?.length ?? 0) + 1}`}
-        hasPreviousShot={(shots?.length ?? 0) > 0}
       />
     </div>
   );

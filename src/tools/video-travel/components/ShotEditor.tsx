@@ -254,8 +254,14 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         context: 16,
       };
     });
-    onPairConfigsChange(newPairConfigs);
-  }, [nonVideoImages, batchVideoFrames, batchVideoContext, pairConfigs, onPairConfigsChange]);
+    
+    // Only update if the configs have actually changed
+    const newConfigsStr = JSON.stringify(newPairConfigs);
+    const currentConfigsStr = JSON.stringify(pairConfigs);
+    if (newConfigsStr !== currentConfigsStr) {
+      onPairConfigsChange(newPairConfigs);
+    }
+  }, [nonVideoImages, batchVideoFrames, batchVideoContext]); // Remove pairConfigs from deps to prevent loop
 
   const handleImageUploadToShot = async (files: File[]) => {
     if (!files || files.length === 0) return;
