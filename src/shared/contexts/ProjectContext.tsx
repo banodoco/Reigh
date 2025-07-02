@@ -1,29 +1,18 @@
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
-// import { supabase } from '@/integrations/supabase/client'; // No longer using direct supabase client for this
-// import { db } from '@/lib/db'; // Import Drizzle instance
-// import { projects as projectsTable, users as usersTable } from '../../../db/schema/schema'; // Corrected path
-// import { eq, and, asc, desc } from 'drizzle-orm'; // Import Drizzle operators
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Project } from '@/types/project'; // Added import
-import { fetchWithAuth } from '@/lib/api';
-
-// Define the project type - ensure this matches API response structure for projects
-// interface Project {  // Removed local definition
-//   id: string;
-//   name: string;
-//   user_id: string; 
-//   aspectRatio?: string; 
-// }
+import { ProjectUpdate } from '../../../db/schema/schema';
 
 interface ProjectContextType {
   projects: Project[];
   selectedProjectId: string | null;
   setSelectedProjectId: (projectId: string | null) => void;
   isLoadingProjects: boolean;
-  fetchProjects: (selectProjectIdAfterFetch?: string | null) => Promise<void>;
-  addNewProject: (projectName: string, aspectRatio: string) => Promise<Project | null>;
+  fetchProjects: () => Promise<void>;
+  addNewProject: (projectData: { name: string; aspectRatio: string }) => Promise<Project | null>;
   isCreatingProject: boolean;
-  updateProject: (projectId: string, updates: { name?: string; aspectRatio?: string }) => Promise<boolean>;
+  updateProject: (projectId: string, updates: ProjectUpdate) => Promise<boolean>;
   isUpdatingProject: boolean;
 }
 
@@ -56,21 +45,42 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [isUpdatingProject, setIsUpdatingProject] = useState(false);
 
-  const fetchProjects = async (selectProjectIdAfterFetch?: string | null) => {
-    setIsLoadingProjects(true);
+  const fetchProjects = async () => {
     try {
-      const response = await fetchWithAuth('/api/projects');
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: response.statusText }));
-        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      // Fetch projects for the user
+      const { data: projectsData, error } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('name', { ascending: true });
+
+      if (error) throw error;
+
+      // Create default project if none exist
+      if (!projectsData || projectsData.length === 0) {
+        const { data: newProject, error: createError } = await supabase
+          .from('projects')
+          .insert({
+            name: 'Default Project',
+            user_id: user.id,
+            aspect_ratio: '16:9'
+          })
+          .select()
+          .single();
+
+        if (createError) throw createError;
+        setProjects([newProject]);
+      } else {
+        setProjects(projectsData);
       }
-      const fetchedProjects: Project[] = await response.json();
 
-      setProjects(fetchedProjects);
-
-      if (fetchedProjects.length > 0) {
+      if (projectsData.length > 0) {
         const storedProjectId = localStorage.getItem('selectedProjectId');
-        const projectIdToSelect = determineProjectIdToSelect(fetchedProjects, selectProjectIdAfterFetch, storedProjectId);
+        const projectIdToSelect = determineProjectIdToSelect(projectsData, null, storedProjectId);
         setSelectedProjectIdState(projectIdToSelect);
         if (projectIdToSelect) {
             localStorage.setItem('selectedProjectId', projectIdToSelect);
@@ -88,28 +98,31 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
     setIsLoadingProjects(false);
   };
 
-  const addNewProject = async (projectName: string, aspectRatio: string): Promise<Project | null> => {
-    if (!projectName.trim()) {
+  const addNewProject = async (projectData: { name: string; aspectRatio: string }) => {
+    if (!projectData.name.trim()) {
       toast.error("Project name cannot be empty.");
       return null;
     }
-    if (!aspectRatio) {
+    if (!projectData.aspectRatio) {
       toast.error("Aspect ratio cannot be empty.");
       return null;
     }
     setIsCreatingProject(true);
     try {
-      const response = await fetchWithAuth('/api/projects', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: projectName.trim(), aspectRatio: aspectRatio }),
-      });
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: response.statusText }));
-        throw new Error(errorData.message || `HTTP error! status: ${response.status} - ${response.statusText}`);
-      }
-      const newProject: Project = await response.json();
+      const { data: newProject, error } = await supabase
+        .from('projects')
+        .insert({
+          name: projectData.name,
+          user_id: user.id,
+          aspect_ratio: projectData.aspectRatio
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
 
       setProjects(prevProjects => [...prevProjects, newProject].sort((a, b) => a.name.localeCompare(b.name)));
       setSelectedProjectIdState(newProject.id);
@@ -125,32 +138,33 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const updateProject = async (projectId: string, updates: { name?: string; aspectRatio?: string }): Promise<boolean> => {
+  const updateProject = async (projectId: string, updates: ProjectUpdate): Promise<boolean> => {
     if (!updates.name?.trim() && !updates.aspectRatio) {
       toast.error("No changes to save.");
       return false;
     }
     setIsUpdatingProject(true);
     try {
-      const response = await fetchWithAuth(`/api/projects/${projectId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updates),
-      });
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: response.statusText }));
-        throw new Error(errorData.message || `HTTP error! status: ${response.status} - ${response.statusText}`);
-      }
-      const updatedProjectFromApi: Project = await response.json();
+      const { data: updatedProject, error } = await supabase
+        .from('projects')
+        .update(updates)
+        .eq('id', projectId)
+        .eq('user_id', user.id)
+        .select()
+        .single();
+
+      if (error) throw error;
 
       setProjects(prevProjects => 
-        prevProjects.map(p => p.id === projectId ? { ...p, ...updatedProjectFromApi } : p)
+        prevProjects.map(p => p.id === projectId ? updatedProject : p)
                      .sort((a, b) => a.name.localeCompare(b.name))
       );
       // If the updated project is the currently selected one, ensure its details are fresh (though ID won't change)
       // This is mostly handled by the projects array update triggering re-renders.
-      toast.success(`Project "${updatedProjectFromApi.name}" updated successfully.`);
+      toast.success(`Project "${updatedProject.name}" updated successfully.`);
       return true;
     } catch (err: any) {
       console.error("[ProjectContext] Exception during project update via API:", err);

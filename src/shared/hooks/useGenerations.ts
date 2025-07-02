@@ -37,7 +37,22 @@ export const useListAllGenerations = (projectId: string | null) => {
     queryKey: ['generations', projectId],
     queryFn: async () => {
       if (!projectId) return [];
-      return await fetchGenerations(projectId, 1000); // Request a larger limit for gallery
+      
+      const { data, error } = await supabase
+        .from('generations')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('created_at', { ascending: false })
+        .limit(1000);
+      
+      if (error) throw error;
+      
+      return data?.map((item: any) => ({
+        id: item.id,
+        url: item.location,
+        prompt: item.params?.prompt || item.metadata?.prompt || 'No prompt',
+        metadata: item.params || item.metadata || {}
+      })) || [];
     },
     enabled: !!projectId,
   });
@@ -45,13 +60,12 @@ export const useListAllGenerations = (projectId: string | null) => {
 
 // 2. Delete Generation
 const deleteGeneration = async (generationId: string) => {
-  const response = await fetchWithAuth(`/api/generations/${generationId}`, {
-    method: 'DELETE',
-  });
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ message: 'Failed to delete and could not parse error' }));
-    throw new Error(errorData.message || `Failed to delete generation: ${response.statusText}`);
-  }
+  const { error } = await supabase
+    .from('generations')
+    .delete()
+    .eq('id', generationId);
+  
+  if (error) throw error;
   // The API might return a confirmation message, which we can use or ignore.
   // For this hook, we don't need to return anything on success.
 };
@@ -81,25 +95,19 @@ interface CreateGenerationParams {
 }
 
 const createGeneration = async ({ projectId, imageUrl, prompt, metadata }: CreateGenerationParams) => {
-    const response = await fetchWithAuth('/api/generations', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            projectId,
-            imageUrl,
-            fileName: 'generated_image',
-            fileType: 'image/png',
-            prompt,
-        }),
-    });
+    const { data, error } = await supabase
+        .from('generations')
+        .insert({
+            location: imageUrl,
+            type: 'image',
+            project_id: projectId,
+            params: metadata || {}
+        })
+        .select()
+        .single();
     
-    if (!response.ok) {
-        throw new Error(`Failed to create generation: ${response.status} ${response.statusText}`);
-    }
-    
-    return await response.json();
+    if (error) throw error;
+    return data;
 }
 
 export const useCreateGeneration = () => {

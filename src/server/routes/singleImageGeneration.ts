@@ -108,8 +108,8 @@ router.post('/generate', async (req: Request, res: Response) => {
         task_id: taskId,
       },
       status: 'Queued',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
     }).returning();
 
     if (inserted.length === 0) {

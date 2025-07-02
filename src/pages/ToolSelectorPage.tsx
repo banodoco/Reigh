@@ -6,19 +6,7 @@ import { toolsUIManifest, type ToolUIDefinition } from '../tools';
 
 const tools: ToolUIDefinition[] = [
   ...toolsUIManifest,
-  // Additional placeholder tools that aren't yet implemented can be added here
-  {
-    id: 'in-scene-generation',
-    name: 'Generate Images In-Scene',
-    path: '#',
-    description: 'Generate images that are contextually placed within a scene.',
-    environments: [AppEnv.DEV], // Changed from LOCAL_ENVS since this is just a placeholder
-    icon: Palette,
-    gradient: 'from-wes-coral via-wes-peach to-wes-cream',
-    accent: 'wes-coral',
-    ornament: '✦',
-    badge: 'New',
-  },
+
 ];
 
 export default function ToolSelectorPage() {

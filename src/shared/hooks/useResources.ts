@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { fetchWithAuth } from '@/lib/api';
 import { LoraModel } from '@/shared/components/LoraSelectorModal';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface Resource {
     id: string;
@@ -16,12 +17,17 @@ export const useListResources = (type: 'lora') => {
     return useQuery<Resource[], Error>({
         queryKey: ['resources', type],
         queryFn: async () => {
-            const response = await fetchWithAuth(`/api/resources?type=${type}`);
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({ message: response.statusText }));
-                throw new Error(errorData.message || `Failed to fetch resources: ${response.statusText}`);
-            }
-            return response.json();
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error('Not authenticated');
+            
+            const { data, error } = await supabase
+                .from('resources')
+                .select('*')
+                .eq('user_id', user.id)
+                .eq('type', type);
+            
+            if (error) throw error;
+            return data || [];
         },
     });
 };
@@ -36,17 +42,20 @@ export const useCreateResource = () => {
     const queryClient = useQueryClient();
     return useMutation<Resource, Error, CreateResourceArgs>({
         mutationFn: async ({ type, metadata }) => {
-            const response = await fetchWithAuth('/api/resources', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ type, metadata }),
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({ message: response.statusText }));
-                throw new Error(errorData.message || `Failed to create resource: ${response.statusText}`);
-            }
-            return response.json();
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error('Not authenticated');
+            
+            const { data, error } = await supabase
+                .from('resources')
+                .insert({
+                    ...{ type, metadata },
+                    user_id: user.id
+                })
+                .select()
+                .single();
+            
+            if (error) throw error;
+            return data;
         },
         onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: ['resources', data.type] });
@@ -63,14 +72,16 @@ export const useDeleteResource = () => {
     const queryClient = useQueryClient();
     return useMutation<void, Error, { id: string, type: 'lora' }>({
         mutationFn: async ({ id }) => {
-            const response = await fetchWithAuth(`/api/resources/${id}`, {
-                method: 'DELETE',
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({ message: response.statusText }));
-                throw new Error(errorData.message || `Failed to delete resource: ${response.statusText}`);
-            }
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error('Not authenticated');
+            
+            const { error } = await supabase
+                .from('resources')
+                .delete()
+                .eq('id', id)
+                .eq('user_id', user.id);
+            
+            if (error) throw error;
         },
         onSuccess: (data, variables) => {
             queryClient.invalidateQueries({ queryKey: ['resources', variables.type] });

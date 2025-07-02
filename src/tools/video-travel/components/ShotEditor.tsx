@@ -36,6 +36,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/shared/components/ui/toggle-grou
 import { useListTasks, useCancelTask } from "@/shared/hooks/useTasks";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from '@tanstack/react-query';
+import { fetchWithAuth } from '@/lib/api';
 
 // Add the missing type definition
 export interface SegmentGenerationParams {
@@ -339,7 +340,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         const finalImageUrl = croppedImageUrl ? getDisplayUrl(imageUrl) : imageUrl;
 
         const promptForGeneration = `External image: ${file.name || 'untitled'}`;
-        const genResponse = await fetch(`${baseUrl}/api/generations`, {
+        const genResponse = await fetchWithAuth(`${baseUrl}/api/generations`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -494,7 +495,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     try {
       // Update the database record via local API
       console.log(`[ShotEditor-HandleImageSaved] Updating database record for image:`, imageId);
-      const response = await fetch(`/api/generations/${imageId}`, {
+      const response = await fetchWithAuth(`/api/generations/${imageId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -643,18 +644,15 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         requestBody.resolution = resolution;
       }
       
-      const response = await fetch('/api/steerable-motion/travel-between-images', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody),
+      const { data, error } = await supabase.functions.invoke('steerable-motion', {
+        body: requestBody,
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: response.statusText }));
-        throw new Error(errorData.message || `HTTP error ${response.status}`);
+      if (error) {
+        throw new Error(error.message || 'Failed to create task');
       }
 
-      const newTask = await response.json();      
+      const newTask = data;
       
       // Poll for task confirmation in database
       const maxAttempts = 30; // 15 seconds max wait
@@ -665,7 +663,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       while (attempts < maxAttempts && !taskConfirmed) {
         try {
           // Query the tasks list to check if our task exists
-          const tasksResponse = await fetch(`/api/tasks?projectId=${projectId}`);
+          const tasksResponse = await fetchWithAuth(`/api/tasks?projectId=${projectId}`);
           if (tasksResponse.ok) {
             const tasks = await tasksResponse.json();
             taskConfirmed = tasks.some((task: any) => task.id === newTask.id);
@@ -710,7 +708,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const handleApplySettingsFromTaskNew = async (taskId: string, replaceImages: boolean, inputImages: string[]) => {
     try {
       // Fetch the settings from the task
-      const response = await fetch(`${baseUrl}/api/tool-settings/from-task/${taskId}`);
+      const response = await fetchWithAuth(`${baseUrl}/api/tool-settings/from-task/${taskId}`);
       if (!response.ok) {
         throw new Error('Failed to fetch settings from task');
       }
@@ -854,7 +852,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         
         // Create a generation record for the input image
         const promptForGeneration = `Input image from task ${i + 1}`;
-        const genResponse = await fetch(`${baseUrl}/api/generations`, {
+        const genResponse = await fetchWithAuth(`${baseUrl}/api/generations`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -883,7 +881,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         const newGenerationRow: GenerationRow = {
           ...(newGeneration as Omit<GenerationRow, 'id' | 'shotImageEntryId'>),
           shotImageEntryId: newShotImage.id,
-          id: newShotImage.generationId,
+          id: (newShotImage as any).generationId ?? (newShotImage as any).generation_id,
           isOptimistic: false,
         };
         newGenerationRows.push(newGenerationRow);

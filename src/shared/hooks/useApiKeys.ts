@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { fetchWithAuth } from '@/lib/api';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ApiKeys {
   fal_api_key?: string;
@@ -11,27 +11,63 @@ interface ApiKeys {
 
 // Fetch API keys from the database
 const fetchApiKeys = async (): Promise<ApiKeys> => {
-  const response = await fetchWithAuth('/api/api-keys');
-  if (!response.ok) {
-    throw new Error('Failed to fetch API keys');
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+  
+  const { data, error } = await supabase
+    .from('users')
+    .select('api_keys')
+    .eq('id', user.id)
+    .single();
+  
+  if (error) {
+    // User might not exist yet, return empty keys
+    if (error.code === 'PGRST116') {
+      return {};
+    }
+    throw error;
   }
-  return response.json();
+  
+  return (data?.api_keys as ApiKeys) || {};
 };
 
 // Update API keys in the database
 const updateApiKeys = async (apiKeys: ApiKeys): Promise<ApiKeys> => {
-  const response = await fetchWithAuth('/api/api-keys', {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(apiKeys),
-  });
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
   
-  if (!response.ok) {
-    throw new Error('Failed to update API keys');
+  // Check if user exists
+  const { data: existingUser } = await supabase
+    .from('users')
+    .select('id')
+    .eq('id', user.id)
+    .single();
+  
+  if (!existingUser) {
+    // Create user with API keys
+    const { data, error } = await supabase
+      .from('users')
+      .insert({
+        id: user.id,
+        api_keys: apiKeys
+      })
+      .select('api_keys')
+      .single();
+    
+    if (error) throw error;
+    return (data?.api_keys as ApiKeys) || {};
+  } else {
+    // Update existing user's API keys
+    const { data, error } = await supabase
+      .from('users')
+      .update({ api_keys: apiKeys })
+      .eq('id', user.id)
+      .select('api_keys')
+      .single();
+    
+    if (error) throw error;
+    return (data?.api_keys as ApiKeys) || {};
   }
-  
-  const result = await response.json();
-  return result.apiKeys;
 };
 
 export const useApiKeys = () => {

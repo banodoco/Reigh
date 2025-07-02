@@ -549,11 +549,23 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
   
   const handleSavePromptsFromModal = (updatedPrompts: PromptEntry[]) => {
     console.log("[ImageGenerationForm] Received prompts from modal 'Save & Close':", updatedPrompts);
-    setPrompts(updatedPrompts.map(p => ({
-        ...p,
-        id: p.id || generatePromptId(),
-        shortPrompt: p.shortPrompt || (p.fullPrompt.substring(0,30) + (p.fullPrompt.length > 30 ? "..." : ""))
-    })));
+
+    // De-duplicate IDs and assign new ones where necessary.
+    const seenIds = new Set<string>();
+    const sanitizedPrompts = updatedPrompts.map(original => {
+      let id = original.id && !seenIds.has(original.id) ? original.id : "";
+      if (!id) {
+        id = generatePromptId();
+      }
+      seenIds.add(id);
+      return {
+        ...original,
+        id,
+        shortPrompt: original.shortPrompt || (original.fullPrompt.substring(0, 30) + (original.fullPrompt.length > 30 ? "..." : "")),
+      };
+    });
+
+    setPrompts(sanitizedPrompts);
     setIsPromptModalOpen(false);
   };
 
@@ -614,6 +626,42 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
     markAsInteracted();
     setter(value);
   };
+
+  // Ensure the `promptIdCounter` is always ahead of any existing numeric IDs.
+  // This prevents duplicate IDs which caused multiple prompts to update together.
+  useEffect(() => {
+    let nextId = prompts.reduce((max, p) => {
+      const match = /^prompt-(\d+)$/.exec(p.id || "");
+      if (match) {
+        const num = parseInt(match[1], 10) + 1;
+        return num > max ? num : max;
+      }
+      return max;
+    }, 1);
+
+    // Resolve any duplicate IDs on the fly by assigning new ones.
+    const seen = new Set<string>();
+    let hadDuplicates = false;
+    const dedupedPrompts = prompts.map(p => {
+      if (!seen.has(p.id)) {
+        seen.add(p.id);
+        return p;
+      }
+      hadDuplicates = true;
+      // Duplicate found – give it a fresh ID.
+      const newId = `prompt-${nextId++}`;
+      seen.add(newId);
+      return { ...p, id: newId };
+    });
+
+    if (hadDuplicates) {
+      setPrompts(dedupedPrompts);
+    }
+
+    if (nextId > promptIdCounter.current) {
+      promptIdCounter.current = nextId;
+    }
+  }, [prompts]);
 
   if (!ready) {
     return null; // Parent component should wrap with ToolSettingsGate

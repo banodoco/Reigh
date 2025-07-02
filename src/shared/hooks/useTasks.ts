@@ -4,6 +4,7 @@ import { Task, TaskStatus } from '@/types/tasks'; // Assuming Task and TaskStatu
 import { useProject } from "@/shared/contexts/ProjectContext"; // To get selectedProjectId
 import { toast } from 'sonner';
 import { fetchWithAuth } from '@/lib/api';
+import { supabase } from '@/integrations/supabase/client';
 
 const TASKS_QUERY_KEY = 'tasks';
 
@@ -101,12 +102,20 @@ export const useListTasks = (params: ListTasksParams) => {
     queryKey: [TASKS_QUERY_KEY, projectId, status],
     queryFn: async () => {
       if (!projectId) {
-        // Return an empty array or throw an error if projectId is not available
-        // This prevents calling the API with undefined projectId
         return []; 
       }
-      const response = await fetchTasks({ projectId, status });
-      return response;
+      
+      const queryParams = new URLSearchParams();
+      queryParams.append('projectId', projectId);
+      if (status && status.length > 0) {
+        status.forEach(s => queryParams.append('status[]', s));
+      }
+      
+      // Edge Functions receive query params as part of the URL
+      const { data, error } = await supabase.functions.invoke(`tasks-list?${queryParams.toString()}`);
+      
+      if (error) throw error;
+      return data || [];
     },
     enabled: !!projectId, // Only run the query if projectId is available
   });

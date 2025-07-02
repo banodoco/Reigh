@@ -273,9 +273,10 @@ const VideoTravelToolPage: React.FC = () => {
         });
         
         if (result?.shotId) {
-          // Find the created shot from the shots list after refetching
+          // Refetch shots and use fresh query cache to locate the new shot
           await refetchShots();
-          const createdShot = shots?.find(s => s.id === result.shotId);
+          const updatedShots = queryClient.getQueryData<Shot[]>(['shots', selectedProjectId]);
+          const createdShot = updatedShots?.find(s => s.id === result.shotId);
           if (createdShot) {
             newShot = createdShot;
           } else {

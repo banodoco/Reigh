@@ -17,6 +17,7 @@ export interface Shot {
   name: string;
   images: GenerationRow[]; // This will be populated by joining data
   created_at?: string; // Optional, matches the DB schema
+  updated_at?: string | null; // Optional, matches the DB schema
   project_id?: string; // Add project_id here
 }
 

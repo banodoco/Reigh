@@ -15,6 +15,7 @@ import { useListAllGenerations, useDeleteGeneration } from "@/shared/hooks/useGe
 import { Settings } from "lucide-react";
 import { useApiKeys } from '@/shared/hooks/useApiKeys';
 import { useQueryClient } from '@tanstack/react-query';
+import { fetchWithAuth } from '@/lib/api';
 
 export type Json =
   | string
@@ -213,16 +214,13 @@ const ImageGenerationToolPage = () => {
         // Fire off all requests concurrently (up to browser limits) and wait for them to settle
         const results = await Promise.allSettled(
           taskPayloads.map(payload =>
-            fetch('/api/single-image/generate', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(payload),
-            }).then(async response => {
-              if (!response.ok) {
-                const errorData = await response.json().catch(() => ({ message: response.statusText }));
-                throw new Error(errorData.message || `HTTP error ${response.status}`);
+            supabase.functions.invoke('single-image-generate', {
+              body: payload,
+            }).then(async ({ data, error }) => {
+              if (error) {
+                throw new Error(error.message || 'Edge function error');
               }
-              return response.json();
+              return data;
             })
           )
         );
@@ -290,7 +288,7 @@ const ImageGenerationToolPage = () => {
     };
 
     try {
-      const response = await fetch('/api/tasks', {
+      const response = await fetchWithAuth('/api/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(taskPayload),

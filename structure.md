@@ -41,6 +41,9 @@
 | `/db/seed.ts` | Seeds local SQLite DB for development |
 | `/src/lib/db/index.ts` | Runtime DAL: Exports Drizzle client (server-side, SQLite/PG) & Supabase JS client (client-side) |
 | `/src/server/routes/singleImageGeneration.ts` | New route for single-image tasks (POST /api/single-image/generate). Queues `single_image` tasks mirroring Wan local image generation |
+| **Supabase Edge Functions** | |
+| `/supabase/functions/single-image-generate/` | Edge Function replacement for /api/single-image/generate. Creates `single_image` tasks for wan-local generation mode |
+| `/supabase/functions/steerable-motion/` | Edge Function replacement for /api/steerable-motion/travel-between-images. Creates `travel_orchestrator` tasks for video generation |
 | **API Endpoints** | |
 | `POST /api/local-image-upload` | Upload single image files to server local storage |
 | `POST /api/upload-flipped-image` | Upload processed (flipped) images from lightbox edit functionality |
@@ -75,6 +78,23 @@
 - Set in .env.local (root), restart Vite server after changes.
 - `VITE_API_TARGET_URL`: Vite proxy target & client-side base URL for assets.
 - Visibility logic: ToolSelectorPage.tsx filters tools array based on tool.environments (array of AppEnv from src/types/env.ts) matching VITE_APP_ENV. Modify environments array in ToolSelectorPage.tsx to change visibility.
+
+##### Direct Supabase Usage:
+- Projects management: `ProjectContext` now uses Supabase client directly instead of API calls
+- Shots CRUD: `useShots` hooks use Supabase client for all operations (create, read, update, delete, reorder)
+- Generations: Direct Supabase queries replace API endpoints
+
+##### Active Edge Functions:
+- `single-image-generate`: Handles wan-local image generation tasks
+- `steerable-motion`: Handles video travel generation tasks
+
+##### Remaining Express Endpoints (to be migrated):
+- `/api/tasks/*` - Task management (list, update status, cancel)
+- `/api/tool-settings/*` - Tool settings resolution and updates
+- `/api/api-keys` - API key storage (to be replaced with direct Supabase)
+- `/api/resources` - User resources management
+- `/api/local-loras` - Local LoRA file listing
+- `/api/local-image-upload` - Local file uploads
 
 #### 3.2. Top-Level Pages (`src/pages/`)
 - **ToolSelectorPage.tsx**: App entry. Grid of available tools. (Shown when VITE_APP_ENV is 'dev' or 'local')

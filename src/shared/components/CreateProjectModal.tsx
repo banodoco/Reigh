@@ -50,14 +50,17 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, 
       toast.error("Please select an aspect ratio.");
       return;
     }
-    const newProject = await addNewProject(finalProjectName, aspectRatio);
-    if (newProject) {
-      toast.success(`Project "${newProject.name}" created successfully!`);
-      setProjectName('');
-      setAspectRatio(ASPECT_RATIOS[0].value);
-      onOpenChange(false);
+    try {
+      const newProject = await addNewProject({ name: finalProjectName, aspectRatio: aspectRatio });
+      if (newProject) {
+        toast.success(`Project "${newProject.name}" created successfully!`);
+        setProjectName('');
+        setAspectRatio(ASPECT_RATIOS[0].value);
+        onOpenChange(false);
+      }
+    } catch (error) {
+      toast.error("An error occurred while creating the project.");
     }
-    // Errors are handled within addNewProject with toasts
   };
 
   return (

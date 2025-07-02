@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, MutationFunction, UseQueryResult } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client'; 
 import { Shot, ShotImage, GenerationRow } from '@/types/shots'; 
 import { Database } from '@/integrations/supabase/types';
@@ -28,25 +28,24 @@ interface CreateShotArgs {
 export const useCreateShot = () => {
   const queryClient = useQueryClient();
   
-  return useMutation<Shot, Error, { shotName: string, projectId: string }>({
-    mutationFn: async ({ shotName, projectId }) => {
-      const response = await fetchWithAuth('/api/shots', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: shotName, projectId }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: response.statusText }));
-        throw new Error(errorData.message || `Failed to create shot: ${response.statusText}`);
-      }
-
-      const newShot: Shot = await response.json();
-      return newShot;
+  return useMutation({
+    mutationFn: async ({ name, projectId, shouldSelectAfterCreation = true }: { name: string; projectId: string; shouldSelectAfterCreation?: boolean }) => {
+      const { data: newShot, error } = await supabase
+        .from('shots')
+        .insert({ 
+          name, 
+          project_id: projectId 
+        })
+        .select()
+        .single();
+      
+      if (error) throw error;
+      
+      return { shot: newShot, shouldSelectAfterCreation };
     },
     onSuccess: (newShot) => {
-      queryClient.invalidateQueries({ queryKey: ['shots', newShot.project_id] });
-      toast.success(`Shot "${newShot.name}" created`);
+      queryClient.invalidateQueries({ queryKey: ['shots'] });
+      toast.success(`Shot "${newShot.shot.name}" created successfully`);
     },
     onError: (error: Error) => {
       console.error('Error creating shot:', error);
@@ -64,6 +63,9 @@ interface DuplicateShotArgs {
 
 export const useDuplicateShot = () => {
   const queryClient = useQueryClient();
+  const createShot = useCreateShot();
+  const addImageToShot = useAddImageToShot();
+  
   return useMutation<
     Shot,
     Error,
@@ -72,23 +74,69 @@ export const useDuplicateShot = () => {
   >({
     mutationFn: async ({ shotId, projectId, newName }: DuplicateShotArgs): Promise<Shot> => {
       if (!projectId) {
-        console.error('Error duplicating shot: Project ID is missing');
         throw new Error('Project ID is required to duplicate a shot.');
       }
 
-      const response = await fetch(`/api/shots/${shotId}/duplicate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ newName }),
+      // Get the shot to duplicate
+      const { data: originalShot, error: fetchError } = await supabase
+        .from('shots')
+        .select(`
+          *,
+          shot_generations(
+            *,
+            generation:generations(*)
+          )
+        `)
+        .eq('id', shotId)
+        .single();
+      
+      if (fetchError || !originalShot) throw new Error('Shot not found');
+      
+      // Create new shot
+      const result = await createShot.mutateAsync({
+        name: newName || originalShot.name + ' Copy',
+        projectId: projectId,
+        shouldSelectAfterCreation: false
       });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: response.statusText }));
-        throw new Error(errorData.message || `Failed to duplicate shot: ${response.statusText}`);
+      const newShot = result.shot;
+      
+      // Copy all images to the new shot
+      if (originalShot.shot_generations && originalShot.shot_generations.length > 0) {
+        for (const sg of originalShot.shot_generations) {
+          await addImageToShot.mutateAsync({
+            shot_id: newShot.id,
+            generation_id: sg.generation_id,
+            project_id: projectId
+          });
+        }
       }
-
-      const duplicatedShot: Shot = await response.json();
-      return duplicatedShot;
+      
+      // Return the new shot with its images
+      const { data: completeShot } = await supabase
+        .from('shots')
+        .select(`
+          *,
+          shot_generations(
+            *,
+            generation:generations(*)
+          )
+        `)
+        .eq('id', newShot.id)
+        .single();
+      
+      // Transform to match Shot interface
+      return {
+        id: completeShot.id,
+        name: completeShot.name,
+        created_at: completeShot.created_at,
+        updated_at: completeShot.updated_at,
+        project_id: completeShot.project_id,
+        images: completeShot.shot_generations?.map((sg: any) => ({
+          ...sg.generation,
+          shot_generation_id: sg.id,
+          position: sg.position
+        })) || []
+      };
     },
     onMutate: async ({ projectId, newName, shotId }) => {
       if (!projectId) return { previousShots: [], projectId: null };
@@ -131,30 +179,59 @@ export const useDuplicateShot = () => {
 };
 
 // List all shots with their full image details for a specific project VIA API
-export const useListShots = (projectId: string | null | undefined): {
-  data: Shot[] | undefined,
-  isLoading: boolean,
-  isError: boolean,
-  error: Error | null,
-  refetch: () => void
-} => {
-  return useQuery<Shot[], Error>({
+export const useListShots = (projectId: string | null): UseQueryResult<Shot[], Error> => {
+  return useQuery({
     queryKey: ['shots', projectId],
     queryFn: async () => {
-      if (!projectId) {
-        throw new Error('Project ID is required to fetch shots');
-      }
+      if (!projectId) return [];
       
-      const response = await fetchWithAuth(`/api/shots?projectId=${projectId}`);
+      // First get all shots for the project
+      const { data: shots, error: shotsError } = await supabase
+        .from('shots')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('created_at', { ascending: true });
       
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: response.statusText }));
-        console.error('[API Error UseListShots] Error fetching shots for project:', projectId, errorData.message || response.statusText);
-        throw new Error(errorData.message || `Failed to fetch shots: ${response.statusText}`);
-      }
+      if (shotsError) throw shotsError;
       
-      const data: Shot[] = await response.json();
-      return data;
+      // Then get shot_generations with generation details for each shot
+      const shotIds = shots.map(s => s.id);
+      
+      if (shotIds.length === 0) return [];
+      
+      const { data: shotGenerations, error: sgError } = await supabase
+        .from('shot_generations')
+        .select(`
+          *,
+          generation:generations(*)
+        `)
+        .in('shot_id', shotIds)
+        .order('position', { ascending: true });
+      
+      if (sgError) throw sgError;
+      
+      // Group generations by shot_id
+      const generationsByShot = shotGenerations.reduce((acc, sg) => {
+        if (!acc[sg.shot_id]) acc[sg.shot_id] = [];
+        if (sg.generation) {
+          acc[sg.shot_id].push({
+            ...sg.generation,
+            shot_generation_id: sg.id,
+            position: sg.position
+          });
+        }
+        return acc;
+      }, {} as Record<string, any[]>);
+      
+      // Transform to match Shot interface
+      return shots.map(shot => ({
+        id: shot.id,
+        name: shot.name,
+        created_at: shot.created_at,
+        updated_at: shot.updated_at,
+        project_id: shot.project_id,
+        images: generationsByShot[shot.id] || []
+      }));
     },
     enabled: !!projectId,
     refetchOnWindowFocus: false,
@@ -174,7 +251,7 @@ interface AddImageToShotArgs {
 // Type for the response from adding an image to a shot
 type ShotImageResponse = Database['public']['Tables']['shot_images']['Row'];
 
-// Helper function to create a generation record for an externally uploaded image VIA API
+// Helper function to create a generation record for an externally uploaded image
 const createGenerationForUploadedImage = async (
   imageUrl: string,
   fileName: string,
@@ -188,26 +265,26 @@ const createGenerationForUploadedImage = async (
   
   const promptForGeneration = `External image: ${fileName || 'untitled'}`;
   
-  const response = await fetchWithAuth('/api/generations', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      imageUrl,
-      fileName,
-      fileType,
-      fileSize,
-      projectId,
-      prompt: promptForGeneration,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ message: response.statusText }));
-    console.error('[useShots] createGenerationForUploadedImage (API): Error creating generation:', errorData);
-    throw new Error(errorData.message || `Failed to create generation record: ${response.statusText}`);
+  const { data: newGeneration, error } = await supabase
+    .from('generations')
+    .insert({
+      location: imageUrl,
+      type: fileType,
+      project_id: projectId,
+      params: {
+        fileName,
+        fileSize,
+        prompt: promptForGeneration
+      }
+    })
+    .select()
+    .single();
+  
+  if (error) {
+    console.error('[useShots] createGenerationForUploadedImage: Error creating generation:', error);
+    throw error;
   }
   
-  const newGeneration: Database['public']['Tables']['generations']['Row'] = await response.json();
   return newGeneration;
 };
 
@@ -215,28 +292,65 @@ const createGenerationForUploadedImage = async (
 export const useAddImageToShot = () => {
   const queryClient = useQueryClient();
   
-  return useMutation<
-    Database['public']['Tables']['shot_images']['Row'], 
-    Error, 
-    AddImageToShotArgs
-  >({
-    mutationFn: async ({ shot_id, generation_id, imageUrl, thumbUrl, project_id }: AddImageToShotArgs) => {
-      const response = await fetchWithAuth('/api/shots/shot_generations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ shotId: shot_id, generationId: generation_id, imageUrl, thumbUrl, projectId: project_id }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: response.statusText }));
-        throw new Error(errorData.message || `Failed to add image to shot: ${response.statusText}`);
+  return useMutation({
+    mutationFn: async ({ shot_id, generation_id, imageUrl, thumbUrl, project_id }: { 
+      shot_id: string; 
+      generation_id: string; 
+      imageUrl?: string;
+      thumbUrl?: string;
+      project_id: string;
+    }) => {
+      // First create generation if imageUrl is provided
+      if (imageUrl && !generation_id) {
+        const { data: newGeneration, error: genError } = await supabase
+          .from('generations')
+          .insert({
+            location: imageUrl,
+            type: 'image',
+            project_id: project_id,
+            params: {}
+          })
+          .select()
+          .single();
+        
+        if (genError) throw genError;
+        generation_id = newGeneration.id;
       }
-
-      const result: Database['public']['Tables']['shot_images']['Row'] = await response.json();
-      return result;
+      
+      // Then link generation to shot
+      // First get the max position for this shot
+      const { data: maxPosData } = await supabase
+        .from('shot_generations')
+        .select('position')
+        .eq('shot_id', shot_id)
+        .order('position', { ascending: false })
+        .limit(1);
+      
+      const nextPosition = maxPosData && maxPosData.length > 0 ? maxPosData[0].position + 1 : 0;
+      
+      const { data: shotGeneration, error: linkError } = await supabase
+        .from('shot_generations')
+        .insert({
+          shot_id: shot_id,
+          generation_id: generation_id,
+          position: nextPosition
+        })
+        .select()
+        .single();
+      
+      if (linkError) throw linkError;
+      
+      return shotGeneration;
     },
-    onSuccess: (_, { project_id }) => {
-      queryClient.invalidateQueries({ queryKey: ['shots', project_id] });
+    onSuccess: (_, variables) => {
+      // Get project_id from the shot that was mutated
+      const shots = queryClient.getQueryData<Shot[]>(['shots']);
+      const shot = shots?.find(s => s.id === variables.shot_id);
+      const project_id = shot?.project_id;
+      
+      if (project_id) {
+        queryClient.invalidateQueries({ queryKey: ['shots', project_id] });
+      }
       toast.success('Image added to shot');
     },
     onError: (error: Error) => {
@@ -256,26 +370,24 @@ interface RemoveImageFromShotArgs {
 // Remove an image from a shot VIA API
 export const useRemoveImageFromShot = () => {
   const queryClient = useQueryClient();
-  return useMutation<
-    void, 
-    Error,
-    RemoveImageFromShotArgs,
-    { previousShots?: Shot[], project_id?: string | null }
-  >({
-    mutationFn: async ({ shot_id, shotImageEntryId }: RemoveImageFromShotArgs) => {
-      const response = await fetchWithAuth(`/api/shots/${shot_id}/generations/${shotImageEntryId}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: response.statusText }));
-        throw new Error(errorData.message || `Failed to remove image from shot: ${response.statusText}`);
-      }
+  
+  return useMutation({
+    mutationFn: async ({ shot_id, shotImageEntryId }: { shot_id: string; shotImageEntryId: string }) => {
+      const { error } = await supabase
+        .from('shot_generations')
+        .delete()
+        .eq('id', shotImageEntryId)
+        .eq('shot_id', shot_id);
+      
+      if (error) throw error;
+      
+      return { shot_id, shotImageEntryId };
     },
-    onMutate: async ({ shot_id, shotImageEntryId, project_id }) => {
-      if (!project_id) return { previousShots: [], project_id: null };
-      await queryClient.cancelQueries({ queryKey: ['shots', project_id] });
-      const previousShots = queryClient.getQueryData<Shot[]>(['shots', project_id]);
+    onMutate: async ({ shot_id, shotImageEntryId }) => {
+      // Get project_id from the shot
+      const shots = queryClient.getQueryData<Shot[]>(['shots']);
+      const shot = shots?.find(s => s.id === shot_id);
+      const project_id = shot?.project_id;
 
       queryClient.setQueryData<Shot[]>(['shots', project_id], (oldShots = []) =>
         oldShots.map(shot => {
@@ -289,7 +401,7 @@ export const useRemoveImageFromShot = () => {
         })
       );
       
-      return { previousShots, project_id };
+      return { previousShots: shots, project_id };
     },
     onError: (err, args, context) => {
       console.error('Optimistic update failed for removeImageFromShot:', err);
@@ -298,7 +410,12 @@ export const useRemoveImageFromShot = () => {
       }
       toast.error(`Failed to remove image: ${err.message}`);
     },
-    onSettled: (data, error, { project_id }) => {
+    onSettled: (data, error, variables) => {
+      // Get project_id from the shot
+      const shots = queryClient.getQueryData<Shot[]>(['shots']);
+      const shot = shots?.find(s => s.id === variables.shot_id);
+      const project_id = shot?.project_id;
+      
       if (project_id) {
         queryClient.invalidateQueries({ queryKey: ['shots', project_id] });
       }
@@ -310,16 +427,16 @@ export const useRemoveImageFromShot = () => {
 export const useDeleteShot = () => {
   const queryClient = useQueryClient();
   
-  return useMutation<void, Error, { shotId: string, projectId: string }>({
-    mutationFn: async ({ shotId }) => {
-      const response = await fetchWithAuth(`/api/shots/${shotId}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: response.statusText }));
-        throw new Error(errorData.message || `Failed to delete shot: ${response.statusText}`);
-      }
+  return useMutation({
+    mutationFn: async ({ shotId, projectId }: { shotId: string; projectId: string }) => {
+      const { error } = await supabase
+        .from('shots')
+        .delete()
+        .eq('id', shotId);
+      
+      if (error) throw error;
+      
+      return shotId;
     },
     onSuccess: (_, { projectId }) => {
       queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
@@ -343,18 +460,21 @@ interface UpdateShotNameArgs {
 export const useUpdateShotName = () => {
   const queryClient = useQueryClient();
   
-  return useMutation<void, Error, { shotId: string, newName: string, projectId: string }>({
-    mutationFn: async ({ shotId, newName }) => {
-      const response = await fetchWithAuth(`/api/shots/${shotId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newName }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: response.statusText }));
-        throw new Error(errorData.message || `Failed to update shot name: ${response.statusText}`);
-      }
+  return useMutation({
+    mutationFn: async ({ shotId, newName, projectId }: { shotId: string; newName: string; projectId: string }) => {
+      const { data: updatedShot, error } = await supabase
+        .from('shots')
+        .update({ 
+          name: newName,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', shotId)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      
+      return updatedShot;
     },
     onSuccess: (_, { projectId }) => {
       queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
@@ -377,23 +497,26 @@ interface UpdateShotImageOrderArgs {
 // Update the order of images in a shot VIA API
 export const useUpdateShotImageOrder = () => {
   const queryClient = useQueryClient();
-  return useMutation<
-    void,
-    Error,
-    UpdateShotImageOrderArgs,
-    { previousShots?: Shot[], projectId: string | null }
-  >({
-    mutationFn: async ({ shotId, orderedShotGenerationIds }: UpdateShotImageOrderArgs) => {
-      const response = await fetchWithAuth(`/api/shots/${shotId}/generations/order`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderedShotGenerationIds }), // Changed payload key
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: response.statusText }));
-        throw new Error(errorData.message || 'Failed to update image order');
-      }
+  
+  return useMutation({
+    mutationFn: async ({ shotId, orderedShotGenerationIds, projectId }: { shotId: string; orderedShotGenerationIds: string[]; projectId: string }) => {
+      // Update positions for all shot_generations in a transaction-like manner
+      const updates = orderedShotGenerationIds.map((id, index) => 
+        supabase
+          .from('shot_generations')
+          .update({ position: index })
+          .eq('id', id)
+          .eq('shot_id', shotId)
+      );
+      
+      // Execute all updates
+      const results = await Promise.all(updates);
+      
+      // Check for errors
+      const error = results.find(r => r.error)?.error;
+      if (error) throw error;
+      
+      return { message: 'Image order updated successfully' };
     },
     onMutate: async ({ shotId, orderedShotGenerationIds, projectId }) => {
       if (!projectId) return { previousShots: [], projectId: null };
@@ -462,9 +585,13 @@ export const useHandleExternalImageDrop = () => {
       // 1. Create a new shot if targetShotId is null
       if (!shotId) {
         const newShotName = `Shot ${currentShotCount + 1}`;
-        const createdShot = await createShotMutation.mutateAsync({ shotName: newShotName, projectId: projectIdForOperation });
-        if (createdShot && createdShot.id) {
-          shotId = createdShot.id;
+        const result = await createShotMutation.mutateAsync({ 
+          name: newShotName, 
+          projectId: projectIdForOperation,
+          shouldSelectAfterCreation: true
+        });
+        if (result && result.shot && result.shot.id) {
+          shotId = result.shot.id;
           toast.success(`New shot "${newShotName}" created!`);
         } else {
           toast.error("Failed to create new shot.");
