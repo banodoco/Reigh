@@ -164,7 +164,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
             />
           ))}
           {extraImageCount > 0 && (
-            <span className="text-xs text-zinc-400 ml-1">+ {extraImageCount} more</span>
+            <span className="text-xs text-zinc-400 ml-1">+ {extraImageCount}</span>
           )}
         </div>
       )}
