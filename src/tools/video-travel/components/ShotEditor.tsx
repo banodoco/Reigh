@@ -223,63 +223,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // Use local state for optimistic updates on image list
   const [localOrderedShotImages, setLocalOrderedShotImages] = useState(orderedShotImages || []);
   useEffect(() => {
-    // Smart sync: preserve optimistic images while updating real ones
-    setLocalOrderedShotImages(prev => {
-      // Keep track of optimistic images
-      const optimisticImages = prev.filter(img => img.isOptimistic);
-      
-      // If there are no optimistic images, just use the new data
-      if (optimisticImages.length === 0) {
-        return orderedShotImages || [];
-      }
-      
-      // Create a map of real images by their IDs for quick lookup
-      const realImagesMap = new Map((orderedShotImages || []).map(img => [img.id, img]));
-      
-      // Also create a map by shotImageEntryId for images that have been converted from optimistic
-      const realImagesByEntryId = new Map<string, GenerationRow>();
-      for (const img of prev) {
-        if (!img.isOptimistic && img.realShotImageEntryId) {
-          const realImg = (orderedShotImages || []).find(r => r.shotImageEntryId === img.realShotImageEntryId);
-          if (realImg) {
-            realImagesByEntryId.set(img.realShotImageEntryId, realImg); // map by real entryId
-          }
-        }
-      }
-      
-      const mappedRealEntryIds = new Set(realImagesByEntryId.keys());
-      
-      // Build the new array preserving order and optimistic images
-      const newImages: GenerationRow[] = [];
-      const seenRealIds = new Set<string>();
-      
-      // Go through previous images to maintain order
-      for (const img of prev) {
-        if (img.isOptimistic) {
-          newImages.push(img);
-        } else if (img.realShotImageEntryId && realImagesByEntryId.has(img.realShotImageEntryId)) {
-          const realImg = realImagesByEntryId.get(img.realShotImageEntryId)!;
-          newImages.push({
-            ...realImg,
-            shotImageEntryId: img.shotImageEntryId,
-            realShotImageEntryId: realImg.shotImageEntryId,
-          });
-          seenRealIds.add(realImg.id);
-        } else if (realImagesMap.has(img.id) && !seenRealIds.has(img.id)) {
-          newImages.push(realImagesMap.get(img.id)!);
-          seenRealIds.add(img.id);
-        }
-      }
-      
-      // Add any new real images that weren't mapped to an optimistic image and weren't already present
-      for (const img of (orderedShotImages || [])) {
-        if (!seenRealIds.has(img.id) && !mappedRealEntryIds.has(img.shotImageEntryId)) {
-          newImages.push(img);
-        }
-      }
-      
-      return newImages;
-    });
+    setLocalOrderedShotImages(orderedShotImages || []);
   }, [orderedShotImages]);
 
   // Settings are now loaded from the database via the parent component
@@ -364,38 +308,31 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
     setLocalOrderedShotImages(prev => [...prev, ...optimisticImages]);
 
-    let successfulUploads = 0;
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
+    const uploadPromises = files.map(async (file, i) => {
       const optimisticImage = optimisticImages[i];
-
       try {
         let fileToUpload = file;
+        let croppedImageUrl: string | undefined;
 
-        // Crop the image if preference is enabled
         if (cropToProjectSize && projectAspectRatio) {
           const cropResult = await cropImageToProjectAspectRatio(file, projectAspectRatio);
           if (cropResult) {
             fileToUpload = cropResult.croppedFile;
-            // Update optimistic image with cropped version
-            setLocalOrderedShotImages(prev => prev.map(img => 
-              img.shotImageEntryId === optimisticImage.shotImageEntryId 
-                ? { ...img, imageUrl: cropResult.croppedImageUrl, thumbUrl: cropResult.croppedImageUrl }
-                : img
-            ));
+            croppedImageUrl = cropResult.croppedImageUrl;
           } else {
             toast.warning(`Failed to crop image: ${file.name}. Using original image.`);
           }
         }
 
         const imageUrl = await uploadImageToStorage(fileToUpload);
+        const finalImageUrl = croppedImageUrl ? getDisplayUrl(imageUrl) : imageUrl;
 
         const promptForGeneration = `External image: ${file.name || 'untitled'}`;
         const genResponse = await fetch(`${baseUrl}/api/generations`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            imageUrl: imageUrl,
+            imageUrl: finalImageUrl,
             fileName: file.name,
             fileType: file.type,
             fileSize: file.size,
@@ -404,51 +341,55 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           }),
         });
 
-        if (!genResponse.ok) {
-          const errorData = await genResponse.json().catch(() => ({ message: genResponse.statusText }));
-          throw new Error(errorData.message || `Failed to create generation record: ${genResponse.statusText}`);
-        }
+        if (!genResponse.ok) throw new Error(await genResponse.text());
         const newGeneration = await genResponse.json();
 
         const newShotImage = await addImageToShotMutation.mutateAsync({
           shot_id: selectedShot.id,
           generation_id: newGeneration.id,
           project_id: selectedProjectId,
-          imageUrl: imageUrl,
-          thumbUrl: imageUrl,
+          imageUrl: finalImageUrl,
+          thumbUrl: finalImageUrl,
         });
 
-        setLocalOrderedShotImages(prev =>
-          prev.map(img => {
-            if (img.shotImageEntryId === optimisticImage.shotImageEntryId) {
-              // Keep the same shotImageEntryId to prevent reordering
-              const updatedImage: GenerationRow = {
-                ...(newGeneration as Omit<GenerationRow, 'id' | 'shotImageEntryId'>),
-                shotImageEntryId: optimisticImage.shotImageEntryId, // Keep the original ID
-                id: newShotImage.generationId,
-                imageUrl: imageUrl,
-                thumbUrl: imageUrl,
-                isOptimistic: false,
-                // Store the real shotImageEntryId for later use if needed
-                realShotImageEntryId: newShotImage.id,
-              };
-              return updatedImage;
-            }
-            return img;
-          })
-        );
-        successfulUploads++;
+        const finalImage: GenerationRow = {
+          ...(newGeneration as Omit<GenerationRow, 'id' | 'shotImageEntryId'>),
+          shotImageEntryId: newShotImage.id,
+          id: newGeneration.id,
+          isOptimistic: false,
+          imageUrl: finalImageUrl, // Ensure final URL is used
+          thumbUrl: finalImageUrl,
+        };
+        
+        return { optimisticId: optimisticImage.shotImageEntryId, finalImage, success: true };
       } catch (error: any) {
         console.error(`[ShotEditor] Error uploading one image: ${file.name}`, error);
         toast.error(`Failed to upload ${file.name}: ${error.message}`);
-        setLocalOrderedShotImages(prev => prev.filter(img => img.shotImageEntryId !== optimisticImage.shotImageEntryId));
+        return { optimisticId: optimisticImage.shotImageEntryId, success: false };
       }
-    }
+    });
 
+    const results = await Promise.all(uploadPromises);
+
+    setLocalOrderedShotImages(currentImages => {
+      let finalImages = [...currentImages];
+      results.forEach(result => {
+        if (result.success) {
+          const index = finalImages.findIndex(img => img.shotImageEntryId === result.optimisticId);
+          if (index !== -1) {
+            finalImages[index] = result.finalImage!;
+          }
+        } else {
+          finalImages = finalImages.filter(img => img.shotImageEntryId !== result.optimisticId);
+        }
+      });
+      return finalImages;
+    });
+    
+    const successfulUploads = results.filter(r => r.success).length;
     if (successfulUploads > 0) {
       toast.success(`${successfulUploads} image(s) uploaded and added successfully.`);
-      // Don't call onShotImagesUpdate() here - let the optimistic updates handle the UI
-      // The parent component will refetch when needed
+      onShotImagesUpdate();
     }
     
     setFileInputKey(Date.now());
@@ -485,16 +426,12 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       return;
     }
 
-    // Find the image to get the real ID if it exists
-    const imageToDelete = localOrderedShotImages.find(img => img.shotImageEntryId === shotImageEntryId);
-    const idToDelete = imageToDelete?.realShotImageEntryId || shotImageEntryId;
-
     // Optimistically remove the image from the local state
     setLocalOrderedShotImages(prev => prev.filter(img => img.shotImageEntryId !== shotImageEntryId));
     
     removeImageFromShotMutation.mutate({
       shot_id: selectedShot.id,
-      shotImageEntryId: idToDelete, // Use the real ID for the API call
+      shotImageEntryId: shotImageEntryId, // Use the unique entry ID
       project_id: selectedProjectId,
     }, {
       onError: () => {
@@ -517,15 +454,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       .filter((img): img is GenerationRow => !!img);
     setLocalOrderedShotImages(reorderedImages);
 
-    // Map to real IDs for the API call
-    const realOrderedIds = orderedShotGenerationIds.map(id => {
-      const img = imageMap.get(id);
-      return img?.realShotImageEntryId || id;
-    });
-
     updateShotImageOrderMutation.mutate({
       shotId: selectedShot.id,
-      orderedShotGenerationIds: realOrderedIds, // Use real IDs for the API
+      orderedShotGenerationIds, // Pass the new array of IDs
       projectId: selectedProjectId,
     }, {
       onError: () => {
