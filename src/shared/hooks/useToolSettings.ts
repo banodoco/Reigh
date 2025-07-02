@@ -85,15 +85,18 @@ export function useToolSettings<T>(toolId: string, userId?: string, shotId?: str
   // Update settings mutation
   const updateMutation = useMutation({
     mutationFn: async ({ scope, settings: newSettings }: { scope: SettingsScope; settings: Partial<T> }) => {
+      const idForScope = scope === 'user' ? userId : scope === 'project' ? selectedProjectId : shotId;
+      if (!idForScope) {
+        throw new Error('Missing identifier for tool settings update');
+      }
       const response = await fetchWithAuth(`${baseUrl}/api/tool-settings`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          scope,
+          id: idForScope,
           toolId,
-          userId: scope === 'user' ? userId : undefined,
-          projectId: (scope === 'project' || scope === 'shot') ? selectedProjectId : undefined,
-          shotId: scope === 'shot' ? shotId : undefined,
-          settings: newSettings,
+          patch: newSettings,
         }),
       });
       
