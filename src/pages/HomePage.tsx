@@ -1,9 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowRight, Sparkles, Image as ImageIcon, Video, UserPlus, Users, ChevronDown, ChevronUp } from 'lucide-react';
 
 export default function HomePage() {
   const [isHovered, setIsHovered] = useState(false);
   const [expandedFAQ, setExpandedFAQ] = useState<number | null>(null);
+
+  // Scroll to top when component mounts
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
 
   const ImageTravelAnimation = () => {
     return (

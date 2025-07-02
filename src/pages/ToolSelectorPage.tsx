@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { AppEnv, LOCAL_ENVS, type AppEnvValue } from '../types/env';
 import { Paintbrush, Video, Edit, Sparkles, Camera, Palette, Zap, Star, Crown, Gem } from 'lucide-react';
+import { useEffect } from 'react';
 
 interface Tool {
   name: string;
@@ -66,6 +67,11 @@ const tools: Tool[] = [
 
 export default function ToolSelectorPage() {
   const currentEnv = (import.meta.env.VITE_APP_ENV?.toLowerCase() || AppEnv.DEV) as AppEnvValue;
+
+  // Scroll to top when component mounts
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
 
   const visibleTools = tools.filter(tool => {
     if (currentEnv === AppEnv.DEV) {

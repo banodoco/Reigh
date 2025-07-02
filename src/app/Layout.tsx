@@ -1,11 +1,22 @@
-import React from 'react';
-import { Outlet } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { Outlet, useLocation } from 'react-router-dom';
 import { GlobalHeader } from '@/shared/components/GlobalHeader';
 import TasksPane from '@/shared/components/TasksPane/TasksPane';
 import ShotsPane from '@/shared/components/ShotsPane/ShotsPane';
 import GenerationsPane from '@/shared/components/GenerationsPane/GenerationsPane';
 import { cn } from '@/shared/lib/utils';
 import { usePanes } from '@/shared/contexts/PanesContext';
+
+// Scroll to top component
+function ScrollToTop() {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+
+  return null;
+}
 
 const Layout: React.FC = () => {
   const { 
@@ -25,6 +36,7 @@ const Layout: React.FC = () => {
 
   return (
     <div className="flex flex-col min-h-screen wes-texture">
+      <ScrollToTop />
       {/* Subtle background gradient */}
       <div className="fixed inset-0 bg-gradient-to-br from-wes-cream via-white to-wes-mint/10 opacity-60 pointer-events-none"></div>
       

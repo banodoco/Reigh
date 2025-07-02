@@ -1,7 +1,12 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Video, Heart, Eye, Calendar } from 'lucide-react';
 
 export default function ArtPage() {
+  // Scroll to top when component mounts
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   const artPieces = [
     {
       id: 1,
