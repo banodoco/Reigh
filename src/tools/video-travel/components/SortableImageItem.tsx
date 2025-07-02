@@ -3,7 +3,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { GenerationRow } from '@/types/shots';
 import { Button } from '@/shared/components/ui/button';
-import { Trash2, Loader2 } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -83,9 +83,8 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
       {...attributes}
       {...listeners}
       className={cn(
-        'relative group bg-muted/50 rounded border p-1 flex flex-col items-center justify-center aspect-square overflow-hidden shadow-sm cursor-grab active:cursor-grabbing transition-all duration-300',
+        'relative group bg-muted/50 rounded border p-1 flex flex-col items-center justify-center aspect-square overflow-hidden shadow-sm cursor-grab active:cursor-grabbing',
         { 'ring-2 ring-offset-2 ring-blue-500 border-blue-500': isSelected },
-        { 'opacity-75': image.isOptimistic }
       )}
       onDoubleClick={onDoubleClick}
       onClick={onClick}
@@ -93,23 +92,15 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
       <img
         src={displayUrl}
         alt={`Image ${image.id}`}
-        className="max-w-full max-h-full object-contain rounded-sm transition-opacity duration-300"
+        className="max-w-full max-h-full object-contain rounded-sm"
         key={imageUrl} // Force re-render when imageUrl changes
       />
-      {image.isOptimistic && (
-        <div className="absolute inset-0 bg-black/20 flex items-center justify-center transition-opacity duration-300">
-          <div className="bg-white/90 rounded-full p-2">
-            <Loader2 className="h-6 w-6 animate-spin text-primary" />
-          </div>
-        </div>
-      )}
       <Button
         variant="destructive"
         size="icon"
         className="absolute top-1 right-1 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity z-10"
         onClick={handleDeleteClick}
         title="Remove image from shot"
-        disabled={image.isOptimistic}
       >
         <Trash2 className="h-4 w-4" />
       </Button>

@@ -10,7 +10,6 @@ export interface GenerationRow {
   createdAt?: string;
   metadata?: any; // Added metadata field, consider a more specific type if known
   isOptimistic?: boolean;
-  realShotImageEntryId?: string; // For tracking the real ID after optimistic updates
 }
 
 export interface Shot {

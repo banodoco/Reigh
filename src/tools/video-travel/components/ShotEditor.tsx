@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { nanoid } from "nanoid";
 import { Button } from "@/shared/components/ui/button";
 import { Slider } from "@/shared/components/ui/slider";
@@ -219,10 +219,17 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const [creatingTaskId, setCreatingTaskId] = useState<string | null>(null);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const queryClient = useQueryClient();
+  const skipNextSyncRef = useRef(false);
 
   // Use local state for optimistic updates on image list
   const [localOrderedShotImages, setLocalOrderedShotImages] = useState(orderedShotImages || []);
   useEffect(() => {
+    // Skip sync if we just finished uploading to prevent flicker
+    if (skipNextSyncRef.current) {
+      skipNextSyncRef.current = false;
+      return;
+    }
+    
     // Only sync from props if we are not in the middle of an upload.
     // The upload function will be the source of truth during the upload process.
     if (!isUploadingImage) {
@@ -408,6 +415,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     }
     
     setFileInputKey(Date.now());
+    skipNextSyncRef.current = true; // Skip the next prop sync to prevent flicker
     setIsUploadingImage(false);
   };
 
