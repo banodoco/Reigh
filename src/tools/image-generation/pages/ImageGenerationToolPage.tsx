@@ -290,9 +290,18 @@ const ImageGenerationToolPage = () => {
     };
 
     try {
-      const { data: newTask, error } = await supabase.from('tasks').insert(taskPayload).select().single();
+      const response = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(taskPayload),
+      });
 
-      if (error) throw error;
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: response.statusText }));
+        throw new Error(errorData.message || `HTTP error ${response.status}`);
+      }
+
+      const newTask = await response.json();
 
       if (newTask) {
         toast.success(`Image generation task created (ID: ${newTask.id.substring(0,8)}...). Check the Tasks pane for progress.`);

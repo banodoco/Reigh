@@ -1,32 +1,31 @@
 // Temporarily empty schema for Drizzle Kit to initialize the migrations folder.
 
-import { pgTable, text, timestamp, json, pgEnum, index } from 'drizzle-orm/pg-core';
-import { relations } from 'drizzle-orm';
+import { sqliteTable, text, integer, index } from 'drizzle-orm/sqlite-core';
+import { relations, sql } from 'drizzle-orm';
 import { v4 as randomUUID } from 'uuid';
 
-// --- ENUMS for PostgreSQL ---
-export const taskStatusEnum = pgEnum('task_status', ['Queued', 'In Progress', 'Complete', 'Failed', 'Cancelled']);
+// --- ENUMS (simulated for SQLite) ---
+// Note: Drizzle ORM's `sqlite-core` does not have a native enum type like `pg-core`.
+// We'll use `text` and can enforce values at the application level.
+export const taskStatusEnum = ['Queued', 'In Progress', 'Complete', 'Failed', 'Cancelled'] as const;
 
-// Convenient array form for front-end filtering & joins
-export const taskStatusEnumValues = ['Queued', 'In Progress', 'Complete', 'Failed', 'Cancelled'] as const;
+// --- Canonical Schema for SQLite ---
 
-// --- Canonical Schema for PostgreSQL ---
-
-export const users = pgTable('users', {
+export const users = sqliteTable('users', {
   id: text('id').primaryKey(),
   name: text('name'),
   email: text('email'),
-  apiKeys: json('api_keys'), // Store API keys as JSONB
-  settings: json('settings'), // Store tool settings as JSONB
+  apiKeys: text('api_keys', { mode: 'json' }), // Store API keys as JSON object
+  settings: text('settings', { mode: 'json' }), // Store tool settings as JSON object
 });
 
-export const projects = pgTable('projects', {
+export const projects = sqliteTable('projects', {
   id: text('id').$defaultFn(() => randomUUID()).primaryKey(),
   name: text('name').notNull(),
   userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   aspectRatio: text('aspect_ratio'),
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-  settings: json('settings'), // Store tool settings as JSONB
+  createdAt: text('created_at').$defaultFn(() => new Date().toISOString()).notNull(),
+  settings: text('settings', { mode: 'json' }), // Store tool settings as JSON object
 });
 
 // Type for updating projects, allowing optional fields
@@ -35,17 +34,17 @@ export type ProjectUpdate = {
   aspectRatio?: string;
 };
 
-export const tasks = pgTable('tasks', {
+export const tasks = sqliteTable('tasks', {
   id: text('id').$defaultFn(() => randomUUID()).primaryKey(),
   taskType: text('task_type').notNull(),
-  params: json('params').notNull(),
-  status: taskStatusEnum('status').default('Queued').notNull(),
+  params: text('params', { mode: 'json' }).notNull(),
+  status: text('status', { enum: taskStatusEnum }).default('Queued').notNull(),
   dependantOn: text('dependant_on'),
   outputLocation: text('output_location'),
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }),
+  createdAt: text('created_at').$defaultFn(() => new Date().toISOString()).notNull(),
+  updatedAt: text('updated_at'),
   projectId: text('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
-  generationProcessedAt: timestamp('generation_processed_at', { withTimezone: true }),
+  generationProcessedAt: text('generation_processed_at'),
 }, (table) => ({
   // Indexes for better query performance
   statusCreatedIdx: index('idx_status_created').on(table.status, table.createdAt),
@@ -53,39 +52,39 @@ export const tasks = pgTable('tasks', {
   projectStatusIdx: index('idx_project_status').on(table.projectId, table.status),
 }));
 
-export const generations = pgTable('generations', {
+export const generations = sqliteTable('generations', {
   id: text('id').$defaultFn(() => randomUUID()).primaryKey(),
-  tasks: json('tasks'), // Storing array as JSONB
-  params: json('params'),
+  tasks: text('tasks', { mode: 'json' }), // Storing array as JSON string
+  params: text('params', { mode: 'json' }),
   location: text('location'),
   type: text('type'),
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }),
+  createdAt: text('created_at').$defaultFn(() => new Date().toISOString()).notNull(),
+  updatedAt: text('updated_at'),
   projectId: text('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
 });
 
-export const shots = pgTable('shots', {
+export const shots = sqliteTable('shots', {
   id: text('id').$defaultFn(() => randomUUID()).primaryKey(),
   name: text('name').notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }),
+  createdAt: text('created_at').$defaultFn(() => new Date().toISOString()).notNull(),
+  updatedAt: text('updated_at'),
   projectId: text('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
-  settings: json('settings'),
+  settings: text('settings', { mode: 'json' }), // Store tool settings as JSON object
 });
 
-export const shotGenerations = pgTable('shot_generations', {
+export const shotGenerations = sqliteTable('shot_generations', {
   id: text('id').$defaultFn(() => randomUUID()).primaryKey(),
   shotId: text('shot_id').notNull().references(() => shots.id, { onDelete: 'cascade' }),
   generationId: text('generation_id').notNull().references(() => generations.id, { onDelete: 'cascade' }),
-  position: text('position').default('0').notNull(),
+  position: integer('position').default(0).notNull(),
 });
 
-export const resources = pgTable('resources', {
+export const resources = sqliteTable('resources', {
   id: text('id').$defaultFn(() => randomUUID()).primaryKey(),
   userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   type: text('type').notNull(), // 'lora'
-  metadata: json('metadata').notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  metadata: text('metadata', { mode: 'json' }).notNull(),
+  createdAt: text('created_at').$defaultFn(() => new Date().toISOString()).notNull(),
 });
 
 // --- Relations ---

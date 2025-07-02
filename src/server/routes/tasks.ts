@@ -1,6 +1,6 @@
 import express, { Request, Response, Router } from 'express';
 import { db } from '@/lib/db'; // Adjusted path assuming db is exported from here
-import { tasks as tasksSchema, taskStatusEnum, taskStatusEnumValues } from '../../../db/schema/schema'; // Adjusted path to schema
+import { tasks as tasksSchema, taskStatusEnum } from '../../../db/schema/schema'; // Adjusted path to schema
 import { sql, eq, and, inArray } from 'drizzle-orm';
 import { processCompletedStitchTask, processCompletedSingleImageTask, cascadeTaskStatus } from '../services/taskProcessingService';
 
@@ -37,7 +37,7 @@ router.post('/', async (req: Request, res: Response) => {
       params: params, 
       status: status, // Drizzle will map to enum if column is enum
       createdAt: new Date().toISOString(),
-      updatedAt: new Date(),
+      updatedAt: new Date().toISOString(),
     };
 
     // Add optional fields if they were provided in the request body
@@ -74,7 +74,7 @@ router.post('/', async (req: Request, res: Response) => {
 // GET /api/tasks - List tasks for a project, with optional status filtering
 router.get('/', async (req: Request, res: Response) => {
   const projectId = req.query.projectId as string;
-  let typedStatusFilter: (typeof taskStatusEnumValues[number])[] | undefined;
+  let typedStatusFilter: (typeof taskStatusEnum[number])[] | undefined;
 
   const statusQueryParam = req.query.status || req.query['status[]'];
 
@@ -84,8 +84,8 @@ router.get('/', async (req: Request, res: Response) => {
         : [statusQueryParam];
     
     const validStatuses = rawStatuses.filter(
-        (s: any): s is typeof taskStatusEnumValues[number] => 
-            typeof s === 'string' && (taskStatusEnumValues as readonly string[]).includes(s as any)
+        (s: any): s is typeof taskStatusEnum[number] => 
+            typeof s === 'string' && (taskStatusEnum as readonly string[]).includes(s as any)
     );
 
     if (validStatuses.length > 0) {
@@ -129,8 +129,8 @@ router.patch('/:taskId/cancel', async (req: Request, res: Response) => {
     const updatedTasks = await db
       .update(tasksSchema)
       .set({ 
-        status: 'Cancelled' as typeof taskStatusEnumValues[number], 
-        updatedAt: new Date() 
+        status: 'Cancelled' as typeof taskStatusEnum[number], 
+        updatedAt: new Date().toISOString() 
       })
       .where(eq(tasksSchema.id, taskId))
       .returning();
@@ -165,16 +165,16 @@ router.patch('/:taskId/status', async (req: Request, res: Response) => {
     return res.status(400).json({ message: 'Missing required body parameter: status' });
   }
 
-  if (!(taskStatusEnumValues as readonly string[]).includes(newStatus as any)) {
-    return res.status(400).json({ message: `Invalid status value: ${newStatus}. Must be one of ${taskStatusEnumValues.join(', ')}` });
+  if (!(taskStatusEnum as readonly string[]).includes(newStatus as any)) {
+    return res.status(400).json({ message: `Invalid status value: ${newStatus}. Must be one of ${taskStatusEnum.join(', ')}` });
   }
 
   try {
     const updatedTasks = await db
       .update(tasksSchema)
       .set({
-        status: newStatus as typeof taskStatusEnumValues[number],
-        updatedAt: new Date(),
+        status: newStatus as typeof taskStatusEnum[number],
+        updatedAt: new Date().toISOString(),
       })
       .where(eq(tasksSchema.id, taskId))
       .returning();
@@ -225,20 +225,20 @@ router.post('/cancel-pending', async (req: Request, res: Response) => {
     return res.status(400).json({ message: 'Missing required body parameter: projectId' });
   }
 
-  const STATUSES_TO_CANCEL: (typeof taskStatusEnumValues[number])[] = ['Queued', 'In Progress'];
+  const STATUSES_TO_CANCEL: (typeof taskStatusEnum[number])[] = ['Queued', 'In Progress'];
 
   try {
     const result = await db
       .update(tasksSchema)
       .set({ 
-        status: 'Cancelled' as typeof taskStatusEnumValues[number], 
-        updatedAt: new Date() 
+        status: 'Cancelled' as typeof taskStatusEnum[number], 
+        updatedAt: new Date().toISOString() 
       })
       .where(and(
         eq(tasksSchema.projectId, projectId),
         inArray(tasksSchema.status, STATUSES_TO_CANCEL)
       ))
-      .returning();
+      .returning({ id: tasksSchema.id });
 
     const cancelledCount = result.length;
 
