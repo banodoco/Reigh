@@ -375,25 +375,34 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
     const results = await Promise.all(uploadPromises);
 
-    setLocalOrderedShotImages(currentImages => {
-      let finalImages = [...currentImages];
-      results.forEach(result => {
-        if (result.success) {
-          const index = finalImages.findIndex(img => img.shotImageEntryId === result.optimisticId);
-          if (index !== -1) {
-            finalImages[index] = result.finalImage!;
-          }
-        } else {
-          finalImages = finalImages.filter(img => img.shotImageEntryId !== result.optimisticId);
+    // Build the final images array after processing results
+    let updatedImages = [...localOrderedShotImages];
+    results.forEach(result => {
+      if (result.success) {
+        const idx = updatedImages.findIndex(img => img.shotImageEntryId === result.optimisticId);
+        if (idx !== -1) {
+          updatedImages[idx] = result.finalImage!;
         }
-      });
-      return finalImages;
+      } else {
+        updatedImages = updatedImages.filter(img => img.shotImageEntryId !== result.optimisticId);
+      }
     });
-    
+
+    // Apply the single state update
+    setLocalOrderedShotImages(updatedImages);
+
     const successfulUploads = results.filter(r => r.success).length;
     if (successfulUploads > 0) {
       toast.success(`${successfulUploads} image(s) uploaded and added successfully.`);
-      onShotImagesUpdate();
+      // Update parent cache directly to avoid refetch-based reordering
+      if (selectedProjectId) {
+        queryClient.setQueryData<Shot[]>(['shots', selectedProjectId], (oldShots = []) => {
+          return oldShots.map(shot => {
+            if (shot.id !== selectedShot.id) return shot;
+            return { ...shot, images: updatedImages };
+          });
+        });
+      }
     }
     
     setFileInputKey(Date.now());
