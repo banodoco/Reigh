@@ -2,10 +2,26 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = "https://ddbobialzdjkzainyqgb.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkYm9iaWFsemRqa3phaW55cWdiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDY2MzQ0MTgsImV4cCI6MjA2MjIxMDQxOH0.CAstIrTFMcIAIDht0ZacLYY-obBptH3XXShohSzbwjU";
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://ddbobialzdjkzainyqgb.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkYm9iaWFsemRqa3phaW55cWdiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDY2MzQ0MTgsImV4cCI6MjA2MjIxMDQxOH0.CAstIrTFMcIAIDht0ZacLYY-obBptH3XXShohSzbwjU";
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+
+// Auto-login for dev mode
+if (import.meta.env.VITE_APP_ENV === 'dev') {
+  const DEV_USER_EMAIL = import.meta.env.VITE_DEV_USER_EMAIL;
+  const DEV_USER_PASSWORD = import.meta.env.VITE_DEV_USER_PASSWORD;
+  
+  if (DEV_USER_EMAIL && DEV_USER_PASSWORD) {
+    supabase.auth.signInWithPassword({
+      email: DEV_USER_EMAIL,
+      password: DEV_USER_PASSWORD,
+    }).then(({ error }) => {
+      if (error) console.error('Dev auto-login failed:', error);
+      else console.log('Dev user auto-logged in');
+    });
+  }
+}

@@ -1,15 +1,21 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { GeneratedImageWithMetadata } from '@/shared/components/ImageGallery';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { GeneratedImageWithMetadata } from '@/shared/components/ImageGallery';
+import { fetchWithAuth } from '@/lib/api';
 
-// 1. Fetch Generations using API endpoint
-const fetchGenerations = async (projectId: string): Promise<GeneratedImageWithMetadata[]> => {
-  // Request a larger limit than the API default (24) so the gallery can display more images.
-  // TODO: In the future we might replace this with proper pagination / infinite scroll.
-  const response = await fetch(`/api/generations?projectId=${projectId}&limit=1000`);
+// Fetch generations from the API server
+const fetchGenerations = async (projectId: string | null, limit?: number): Promise<GeneratedImageWithMetadata[]> => {
+  if (!projectId) return [];
+  
+  const url = new URL('/api/generations', window.location.origin);
+  url.searchParams.append('projectId', projectId);
+  if (limit) url.searchParams.append('limit', limit.toString());
+  
+  const response = await fetchWithAuth(url.toString());
+  
   if (!response.ok) {
-    throw new Error(`Failed to fetch generations: ${response.status} ${response.statusText}`);
+    throw new Error('Failed to fetch generations');
   }
   
   const data = await response.json();
@@ -31,7 +37,7 @@ export const useListAllGenerations = (projectId: string | null) => {
     queryKey: ['generations', projectId],
     queryFn: async () => {
       if (!projectId) return [];
-      return await fetchGenerations(projectId);
+      return await fetchGenerations(projectId, 1000); // Request a larger limit for gallery
     },
     enabled: !!projectId,
   });
@@ -39,7 +45,7 @@ export const useListAllGenerations = (projectId: string | null) => {
 
 // 2. Delete Generation
 const deleteGeneration = async (generationId: string) => {
-  const response = await fetch(`/api/generations/${generationId}`, {
+  const response = await fetchWithAuth(`/api/generations/${generationId}`, {
     method: 'DELETE',
   });
   if (!response.ok) {
@@ -75,7 +81,7 @@ interface CreateGenerationParams {
 }
 
 const createGeneration = async ({ projectId, imageUrl, prompt, metadata }: CreateGenerationParams) => {
-    const response = await fetch('/api/generations', {
+    const response = await fetchWithAuth('/api/generations', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',

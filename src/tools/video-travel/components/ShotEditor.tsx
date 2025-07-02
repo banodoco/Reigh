@@ -401,8 +401,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     setLocalOrderedShotImages(updatedImages);
 
     const successfulUploads = results.filter(r => r.success).length;
-    if (successfulUploads > 0) {
-      toast.success(`${successfulUploads} image(s) uploaded and added successfully.`);
+    if (successfulUploads > 0) {      
       // Update parent cache directly to avoid refetch-based reordering
       if (selectedProjectId) {
         queryClient.setQueryData<Shot[]>(['shots', selectedProjectId], (oldShots = []) => {

@@ -159,8 +159,8 @@ const startServer = async () => {
     await seedDatabase();
 
     // The existing server initialization logic
-    const server = app.listen(PORT, '0.0.0.0', () => {
-      console.log(`API Server listening on port ${PORT} on all interfaces (0.0.0.0)`);
+    const server = app.listen(PORT, () => {
+      console.log(`API Server listening on port ${PORT}`);
       initializeWebSocketServer(server);
       startTaskPoller(); // Start the background task poller
       startTaskStatusPoller(); // Start the task status poller

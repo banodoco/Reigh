@@ -3,8 +3,14 @@ import { db } from '@/lib/db'; // Adjusted path assuming db is exported from her
 import { tasks as tasksSchema, taskStatusEnum } from '../../../db/schema/schema'; // Adjusted path to schema
 import { sql, eq, and, inArray } from 'drizzle-orm';
 import { processCompletedStitchTask, processCompletedSingleImageTask, cascadeTaskStatus } from '../services/taskProcessingService';
+import { v4 as uuidv4 } from 'uuid';
+import { isTaskVisible } from '@/lib/taskConfig';
+import { authenticate } from '../middleware/auth';
 
 const router = express.Router() as any; // Changed Router to any to resolve overload errors
+
+// Apply authentication middleware to all routes
+router.use(authenticate);
 
 interface TaskRequestBody {
   project_id: string;

@@ -5,6 +5,7 @@ import React, { createContext, useState, useContext, ReactNode, useEffect } from
 // import { eq, and, asc, desc } from 'drizzle-orm'; // Import Drizzle operators
 import { toast } from 'sonner';
 import { Project } from '@/types/project'; // Added import
+import { fetchWithAuth } from '@/lib/api';
 
 // Define the project type - ensure this matches API response structure for projects
 // interface Project {  // Removed local definition
@@ -58,7 +59,7 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
   const fetchProjects = async (selectProjectIdAfterFetch?: string | null) => {
     setIsLoadingProjects(true);
     try {
-      const response = await fetch('/api/projects');
+      const response = await fetchWithAuth('/api/projects');
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: response.statusText }));
         throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
@@ -98,7 +99,7 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
     }
     setIsCreatingProject(true);
     try {
-      const response = await fetch('/api/projects', {
+      const response = await fetchWithAuth('/api/projects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: projectName.trim(), aspectRatio: aspectRatio }),
@@ -131,7 +132,7 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
     }
     setIsUpdatingProject(true);
     try {
-      const response = await fetch(`/api/projects/${projectId}`, {
+      const response = await fetchWithAuth(`/api/projects/${projectId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updates),
@@ -161,8 +162,12 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
-    fetchProjects();
+    // Wait a bit for auth to be ready before fetching projects
+    const timer = setTimeout(() => {
+      fetchProjects();
+    }, 500); // Give auth time to complete
    
+    return () => clearTimeout(timer);
   }, []); 
 
   const handleSetSelectedProjectId = (projectId: string | null) => {

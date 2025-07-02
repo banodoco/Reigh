@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { fetchWithAuth } from '@/lib/api';
 import { LoraModel } from '@/shared/components/LoraSelectorModal';
 
 export interface Resource {
@@ -15,7 +16,7 @@ export const useListResources = (type: 'lora') => {
     return useQuery<Resource[], Error>({
         queryKey: ['resources', type],
         queryFn: async () => {
-            const response = await fetch(`/api/resources?type=${type}`);
+            const response = await fetchWithAuth(`/api/resources?type=${type}`);
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({ message: response.statusText }));
                 throw new Error(errorData.message || `Failed to fetch resources: ${response.statusText}`);
@@ -35,7 +36,7 @@ export const useCreateResource = () => {
     const queryClient = useQueryClient();
     return useMutation<Resource, Error, CreateResourceArgs>({
         mutationFn: async ({ type, metadata }) => {
-            const response = await fetch('/api/resources', {
+            const response = await fetchWithAuth('/api/resources', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ type, metadata }),
@@ -62,7 +63,7 @@ export const useDeleteResource = () => {
     const queryClient = useQueryClient();
     return useMutation<void, Error, { id: string, type: 'lora' }>({
         mutationFn: async ({ id }) => {
-            const response = await fetch(`/api/resources/${id}`, {
+            const response = await fetchWithAuth(`/api/resources/${id}`, {
                 method: 'DELETE',
             });
 

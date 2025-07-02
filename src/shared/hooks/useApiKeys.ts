@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { fetchWithAuth } from '@/lib/api';
 
 interface ApiKeys {
   fal_api_key?: string;
@@ -10,7 +11,7 @@ interface ApiKeys {
 
 // Fetch API keys from the database
 const fetchApiKeys = async (): Promise<ApiKeys> => {
-  const response = await fetch('/api/api-keys');
+  const response = await fetchWithAuth('/api/api-keys');
   if (!response.ok) {
     throw new Error('Failed to fetch API keys');
   }
@@ -19,7 +20,7 @@ const fetchApiKeys = async (): Promise<ApiKeys> => {
 
 // Update API keys in the database
 const updateApiKeys = async (apiKeys: ApiKeys): Promise<ApiKeys> => {
-  const response = await fetch('/api/api-keys', {
+  const response = await fetchWithAuth('/api/api-keys', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(apiKeys),

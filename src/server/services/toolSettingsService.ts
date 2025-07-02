@@ -1,36 +1,12 @@
 import { db } from '../../lib/db';
 import { users, projects, shots } from '../../../db/schema/schema';
 import { eq } from 'drizzle-orm';
+import { toolsManifest } from '../../tools';
 
-// Tool defaults registry
-export const toolDefaults: Record<string, unknown> = {
-  'video-travel': {
-    videoControlMode: 'batch',
-    batchVideoPrompt: '',
-    batchVideoFrames: 24,
-    batchVideoContext: 16,
-    batchVideoSteps: 20,
-    dimensionSource: 'firstImage',
-    generationMode: 'batch',
-    enhancePrompt: false,
-    steerableMotionSettings: {
-      negative_prompt: '',
-      model_name: 'vace_14B',
-      seed: 789,
-      debug: true,
-      apply_reward_lora: false,
-      colour_match_videos: true,
-      apply_causvid: true,
-      use_lighti2x_lora: false,
-      fade_in_duration: '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
-      fade_out_duration: '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
-      after_first_post_generation_saturation: 1,
-      after_first_post_generation_brightness: 0,
-      show_input_images: false,
-    },
-  },
-  // Add other tools' defaults here
-};
+// Tool defaults registry - automatically populated from tools manifest
+export const toolDefaults: Record<string, unknown> = Object.fromEntries(
+  toolsManifest.map(toolSettings => [toolSettings.id, toolSettings.defaults])
+);
 
 // Deep merge helper
 function deepMerge(target: any, ...sources: any[]): any {

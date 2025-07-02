@@ -1,77 +1,53 @@
-import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
-import BetterSqlite3 from 'better-sqlite3';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { Pool } from 'pg';
 import * as schema from './schema/schema';
 import { eq, sql, and } from 'drizzle-orm';
-import fs from 'node:fs';
-import path, { dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { config as dotenvConfig } from 'dotenv';
 
-// --- Calculate __dirname for ESM ---
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-// --- End Calculate __dirname ---
+// Load environment variables
+dotenvConfig({ path: '.env.local' });
 
-const DUMMY_USER_ID = '00000000-0000-0000-0000-000000000000';
 const SEEDED_PROJECT_NAME = 'My Seeded Project';
-const SQLITE_DB_PATH = process.env.DATABASE_URL_SQLITE || './local.db';
 
 async function seed() {
-  console.log(`[Seed] Starting database seed process for SQLite at ${SQLITE_DB_PATH}...`);
+  console.log(`[Seed] Starting database seed process for PostgreSQL...`);
 
-  let sqliteConnection: BetterSqlite3.Database | null = null;
-  let localDb: BetterSQLite3Database<typeof schema>;
+  let pool: Pool | null = null;
+  let db: any;
 
   try {
-    sqliteConnection = new BetterSqlite3(SQLITE_DB_PATH, { /* verbose: console.log */ });
+    const connectionString = process.env.DATABASE_URL;
     
-    // ---- Execute DDL to create tables if they don't exist ----
-    console.log('[Seed] Checking if initial schema setup is needed...');
-    try {
-      // Check if a key table (e.g., users) exists
-      sqliteConnection.prepare('SELECT 1 FROM users LIMIT 1').get();
-      console.log('[Seed] Tables seem to exist. Skipping DDL execution.');
-    } catch (tableCheckError: any) {
-      // Assuming error means table doesn't exist
-      if (tableCheckError.message && tableCheckError.message.includes(`no such table`)) {
-        console.log('[Seed] Tables not found. Running Drizzle migrations to create schema...');
-        // Run the SQL migrations that live in db/migrations-sqlite using Drizzle Migrator
-        // We create a temporary Drizzle instance without a schema just for the migrator
-        const tmpDb = drizzle(sqliteConnection);
-
-        const { migrate } = await import('drizzle-orm/better-sqlite3/migrator');
-
-        try {
-          await migrate(tmpDb, { migrationsFolder: path.join(__dirname, 'migrations-sqlite') });
-          console.log('[Seed] Migrations executed successfully.');
-        } catch (migErr) {
-          console.error('[Seed] CRITICAL: Failed to run migrations:', migErr);
-          if (sqliteConnection) sqliteConnection.close();
-          process.exit(1);
-        }
-      } else {
-        // Different error during table check, rethrow or handle
-        console.error('[Seed] Error checking for tables existence (not \'no such table\'):', tableCheckError);
-        throw tableCheckError;
-      }
+    if (!connectionString) {
+      throw new Error('DATABASE_URL environment variable is not set');
     }
-    // ---- End DDL Execution ----
+    
+    pool = new Pool({ connectionString });
+    db = drizzle(pool, { schema });
+    
+    console.log('[Seed] Connected to PostgreSQL for seeding.');
 
-    localDb = drizzle(sqliteConnection, { schema, logger: true });
-    console.log('[Seed] Connected to SQLite for seeding.');
+    // Get the dev user ID - this should match what's created in Supabase Auth
+    const userId = process.env.DEV_USER_ID || 'dev-user-id-placeholder';
+    const userEmail = process.env.VITE_DEV_USER_EMAIL || 'dev@reigh.local';
 
     // 1. Upsert User
-    console.log(`[Seed] Ensuring dummy user ${DUMMY_USER_ID} exists...`);
-    await localDb.insert(schema.users)
-      .values({ id: DUMMY_USER_ID })
+    console.log(`[Seed] Ensuring dev user ${userId} exists...`);
+    await db.insert(schema.users)
+      .values({ 
+        id: userId,
+        email: userEmail,
+        name: 'Dev User'
+      })
       .onConflictDoNothing()
       .execute();
-    console.log(`[Seed] Dummy user ${DUMMY_USER_ID} upserted.`);
+    console.log(`[Seed] Dev user ${userId} upserted.`);
 
     // 2. Find or Create Project
     let projectId: string;
-    console.log(`[Seed] Looking for project: "${SEEDED_PROJECT_NAME}" for user ${DUMMY_USER_ID}`);
-    const existingProject = await localDb.query.projects.findFirst({
-      where: (p, { eq }) => and(eq(p.name, SEEDED_PROJECT_NAME), eq(p.userId, DUMMY_USER_ID)),
+    console.log(`[Seed] Looking for project: "${SEEDED_PROJECT_NAME}" for user ${userId}`);
+    const existingProject = await db.query.projects.findFirst({
+      where: (p: any, { eq, and }: any) => and(eq(p.name, SEEDED_PROJECT_NAME), eq(p.userId, userId)),
     });
 
     if (existingProject) {
@@ -79,13 +55,13 @@ async function seed() {
       console.log(`[Seed] Found existing project: "${existingProject.name}" (${projectId})`);
     } else {
       console.log(`[Seed] Project "${SEEDED_PROJECT_NAME}" not found, creating...`);
-      const newProjectResult = await localDb.insert(schema.projects)
-        .values({ name: SEEDED_PROJECT_NAME, userId: DUMMY_USER_ID })
+      const newProjectResult = await db.insert(schema.projects)
+        .values({ name: SEEDED_PROJECT_NAME, userId: userId, aspectRatio: '16:9' })
         .returning();
       
       if (!newProjectResult || newProjectResult.length === 0) {
         console.error('[Seed] CRITICAL: Failed to create project for seeding. Cannot continue.');
-        if (sqliteConnection) sqliteConnection.close();
+        if (pool) await pool.end();
         process.exit(1);
       }
       projectId = newProjectResult[0].id as string;
@@ -95,68 +71,92 @@ async function seed() {
 
     // For idempotency, clear related data for this project before re-seeding them
     console.log(`[Seed] Clearing existing tasks, generations, shots for project ${projectId}...`);
-    await localDb.delete(schema.shotGenerations).where(sql`generation_id IN (SELECT id FROM ${schema.generations} WHERE project_id = ${projectId})`);
-    await localDb.delete(schema.generations).where(eq(schema.generations.projectId, projectId));
-    await localDb.delete(schema.shots).where(eq(schema.shots.projectId, projectId));
-    await localDb.delete(schema.tasks).where(eq(schema.tasks.projectId, projectId));
-    console.log(`[Seed] Existing data cleared for project ${projectId}.`);
+    await db.delete(schema.shotGenerations).where(sql`generation_id IN (SELECT id FROM ${schema.generations} WHERE project_id = ${projectId})`);
+    await db.delete(schema.generations).where(eq(schema.generations.projectId, projectId));
+    await db.delete(schema.shots).where(eq(schema.shots.projectId, projectId));
+    await db.delete(schema.tasks).where(eq(schema.tasks.projectId, projectId));
+    console.log(`[Seed] Cleared existing data for project ${projectId}.`);
 
-    // Create some tasks for the generation
-    console.log('[Seed] Creating new tasks...');
-    const [task1] = await localDb.insert(schema.tasks).values({
-      taskType: 'render',
-      params: { scene: 'scene1.blend', frames: '1-100' },
-      projectId: projectId,
-    }).returning();
-    const [task2] = await localDb.insert(schema.tasks).values({
-      taskType: 'encode',
-      params: { input: 'frames_*.png', output: 'shot.mp4' },
-      projectId: projectId,
-    }).returning();
-    console.log(`[Seed] Created tasks: ${task1.id}, ${task2.id}`);
+    // 3. Create sample tasks
+    console.log('[Seed] Creating sample tasks...');
+    const taskIds = [];
+    for (let i = 0; i < 5; i++) {
+      const taskData = {
+        taskType: i % 2 === 0 ? 'single_image' : 'travel_stitch',
+        params: {
+          prompt: `Sample task ${i + 1}`,
+          width: 1024,
+          height: 1024,
+          steps: 20,
+          model: 'flux-dev',
+        },
+        status: i === 0 ? 'Complete' : i === 1 ? 'In Progress' : 'Queued',
+        projectId: projectId,
+      };
+      const [newTask] = await db.insert(schema.tasks).values(taskData).returning();
+      taskIds.push(newTask.id);
+      console.log(`[Seed]   Created task: ${newTask.id} (${taskData.taskType}, ${taskData.status})`);
+    }
 
-    // 4. Create Shot
-    console.log('[Seed] Creating new shot...');
-    const [shot] = await localDb.insert(schema.shots).values({
-      name: 'Shot_010_0010',
-      projectId: projectId,
-    }).returning();
-    console.log(`[Seed] Created shot: ${shot.id} - ${shot.name}`);
+    // 4. Create sample generations
+    console.log('[Seed] Creating sample generations...');
+    const generationIds = [];
+    for (let i = 0; i < 3; i++) {
+      const genData = {
+        tasks: [taskIds[i]],
+        params: { 
+          prompt: `Sample generation ${i + 1}`,
+          seed: 42 + i,
+        },
+        location: `/public/files/sample-gen-${i + 1}.png`,
+        type: 'image',
+        projectId: projectId,
+      };
+      const [newGen] = await db.insert(schema.generations).values(genData).returning();
+      generationIds.push(newGen.id);
+      console.log(`[Seed]   Created generation: ${newGen.id}`);
+    }
 
-    // 5. Create Generation
-    console.log('[Seed] Creating new generation...');
-    const [generation] = await localDb.insert(schema.generations).values({
-      tasks: [task1.id, task2.id],
-      location: '/renders/project_alpha/shot_010/gen_005',
-      type: 'Final Render',
-      projectId: projectId,
-    }).returning();
-    console.log(`[Seed] Created generation: ${generation.id}`);
-    
-    // 6. Link Shot and Generation
-    console.log('[Seed] Linking shot and generation...');
-    await localDb.insert(schema.shotGenerations).values({
-      shotId: shot.id,
-      generationId: generation.id,
-      position: 1,
-    }).execute();
-    console.log(`[Seed] Linked shot ${shot.id} with generation ${generation.id}`);
+    // 5. Create sample shots
+    console.log('[Seed] Creating sample shots...');
+    const shotIds = [];
+    for (let i = 0; i < 2; i++) {
+      const shotData = {
+        name: `Shot ${i + 1}`,
+        projectId: projectId,
+      };
+      const [newShot] = await db.insert(schema.shots).values(shotData).returning();
+      shotIds.push(newShot.id);
+      console.log(`[Seed]   Created shot: ${newShot.id} ("${shotData.name}")`);
+    }
 
-    console.log('[Seed] Database seeding completed successfully.');
+    // 6. Link generations to shots
+    console.log('[Seed] Linking generations to shots...');
+    for (let i = 0; i < generationIds.length; i++) {
+      const shotId = shotIds[i % shotIds.length];
+      const shotGenData = {
+        shotId: shotId,
+        generationId: generationIds[i],
+        position: i,
+      };
+      await db.insert(schema.shotGenerations).values(shotGenData);
+      console.log(`[Seed]   Linked generation ${generationIds[i]} to shot ${shotId} at position ${i}`);
+    }
 
+    console.log('[Seed] Seeding completed successfully!');
   } catch (error) {
-    console.error('[Seed] Error during database seeding:', error);
-    if (sqliteConnection) sqliteConnection.close();
+    console.error('[Seed] Error during seeding:', error);
     process.exit(1);
   } finally {
-    if (sqliteConnection) {
-      sqliteConnection.close();
-      console.log('[Seed] SQLite connection closed.');
+    if (pool) {
+      await pool.end();
+      console.log('[Seed] PostgreSQL connection closed.');
     }
   }
 }
 
-seed().catch((err) => {
-  console.error('[Seed] Unhandled error in seed execution:', err);
+// Execute the seed function
+seed().catch((error) => {
+  console.error('[Seed] Unexpected error:', error);
   process.exit(1);
 }); 

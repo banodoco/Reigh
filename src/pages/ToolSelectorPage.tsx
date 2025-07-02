@@ -1,68 +1,24 @@
 import { Link } from 'react-router-dom';
-import { AppEnv, LOCAL_ENVS, type AppEnvValue } from '../types/env';
-import { Paintbrush, Video, Edit, Sparkles, Camera, Palette, Zap, Star, Crown, Gem } from 'lucide-react';
+import { AppEnv, type AppEnvValue } from '../types/env';
+import { Camera, Palette, Zap, Star, Crown, Gem } from 'lucide-react';
 import { useEffect } from 'react';
+import { toolsUIManifest, type ToolUIDefinition } from '../tools';
 
-interface Tool {
-  name: string;
-  path: string;
-  description: string;
-  environments: AppEnvValue[];
-  icon: React.ComponentType<any>;
-  gradient: string;
-  accent: string;
-  ornament: string;
-  badge?: string;
-}
-
-const tools: Tool[] = [
+const tools: ToolUIDefinition[] = [
+  ...toolsUIManifest,
+  // Additional placeholder tools that aren't yet implemented can be added here
   {
-    name: 'Generate Images with Structure',
-    path: '/tools/image-generation',
-    description: 'Craft and generate intricate images using a structured approach with precision and artistic flair, bringing your creative visions to life.',
-    environments: LOCAL_ENVS,
-    icon: Paintbrush,
-    gradient: 'from-wes-pink via-wes-lavender to-wes-dusty-blue',
-    accent: 'wes-pink',
-    ornament: '❋',
-    badge: 'Featured',
-  },
-  {
-    name: 'Travel Between Images',
-    path: '/tools/video-travel',
-    description: 'Create mesmerizing video sequences by defining elegant paths between existing images, weaving stories through visual transitions.',
-    environments: LOCAL_ENVS,
-    icon: Video,
-    gradient: 'from-wes-mint via-wes-sage to-wes-dusty-blue',
-    accent: 'wes-mint',
-    ornament: '◆',
-    badge: 'Popular',
-  },
-  {
-    name: 'Edit Travel (Image Edit)',
-    path: '/tools/edit-travel',
-    description: 'Transform existing images using poetic text prompts with the sophisticated Fal Kontext model, reimagining reality with artistic precision.',
-    environments: [AppEnv.DEV],
-    icon: Edit,
-    gradient: 'from-wes-yellow via-wes-salmon to-wes-pink',
-    accent: 'wes-yellow',
-    ornament: '✧',
-    badge: 'New',
-  },
-  {
+    id: 'in-scene-generation',
     name: 'Generate Images In-Scene',
     path: '#',
     description: 'Generate images that are contextually placed within a scene.',
-    environments: LOCAL_ENVS,
+    environments: [AppEnv.DEV], // Changed from LOCAL_ENVS since this is just a placeholder
     icon: Palette,
     gradient: 'from-wes-coral via-wes-peach to-wes-cream',
     accent: 'wes-coral',
     ornament: '✦',
     badge: 'New',
   },
-  // Placeholder examples if you add more tools:
-  // { name: 'Placeholder Tool 1', path: '#', description: 'Future tool placeholder.', environments: [AppEnv.DEV, AppEnv.WEB] }, // DEV and WEB
-  // { name: 'Placeholder Tool 2', path: '#', description: 'Another future tool placeholder.', environments: [AppEnv.LOCAL, AppEnv.WEB] }, // LOCAL and WEB
 ];
 
 export default function ToolSelectorPage() {

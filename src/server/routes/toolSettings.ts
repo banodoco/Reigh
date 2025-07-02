@@ -30,7 +30,7 @@ router.get('/resolve', authenticate, asyncHandler(async (req: Request, res: Resp
       return res.status(400).json({ error: 'toolId is required' });
     }
 
-    const userId = req.userId || req.user?.id;
+    const userId = req.userId;
     if (!userId) {
       return res.status(401).json({ error: 'User not authenticated' });
     }
@@ -129,7 +129,7 @@ router.patch('/', authenticate, asyncHandler(async (req: Request, res: Response)
     }
 
     // For user scope, ensure the user can only update their own settings
-    if (scope === 'user' && id !== req.user?.id) {
+    if (scope === 'user' && id !== req.userId) {
       return res.status(403).json({ error: 'Cannot update settings for another user' });
     }
 

@@ -2,8 +2,12 @@ import express, { Request, Response, NextFunction } from 'express';
 import { db } from '../../lib/db'; // Drizzle instance
 import { shots as shotsTable, shotGenerations as shotGenerationsTable, generations as generationsTable } from '../../../db/schema/schema';
 import { eq, asc, desc, and } from 'drizzle-orm';
+import { authenticate } from '../middleware/auth';
 
 const shotsRouter = express.Router();
+
+// Apply authentication middleware to all routes
+shotsRouter.use(authenticate);
 
 // Helper for async routes
 const asyncHandler = (fn: (req: Request, res: Response, next: NextFunction) => Promise<any>) => {

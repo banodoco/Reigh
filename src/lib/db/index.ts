@@ -1,6 +1,6 @@
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
-import { drizzle as drizzleBetterSqlite3, BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
-import BetterSqlite3 from 'better-sqlite3';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { Pool } from 'pg';
 import { config as dotenvConfig } from 'dotenv';
 import * as schema from '../../../db/schema/schema'; // Import the full schema
 
@@ -9,14 +9,7 @@ if (typeof process !== 'undefined' && process.env) {
   dotenvConfig({ path: '.env.local' });
 }
 
-let DATABASE_URL_SQLITE: string;
-if (typeof process !== 'undefined' && process.env) {
-  DATABASE_URL_SQLITE = process.env.DATABASE_URL_SQLITE || './local.db';
-} else {
-  DATABASE_URL_SQLITE = './local.db'; // Fallback for environments where process.env might be missing
-}
-
-let db: BetterSQLite3Database<typeof schema> | any; // Update db type to include schema
+let db: any; // Database client (either Drizzle or Supabase)
 
 if (typeof window !== 'undefined') {
   // Browser environment: use Supabase JS Client
@@ -31,14 +24,23 @@ if (typeof window !== 'undefined') {
   console.log('[DB] Browser environment: Initialized Supabase JS Client.');
 
 } else if (typeof process !== 'undefined' && process.versions && process.versions.node) {
-  // Node.js (server) environment: use SQLite via better-sqlite3 and Drizzle
+  // Node.js (server) environment: use PostgreSQL via pg and Drizzle
   try {
-    const sqlite = new BetterSqlite3(DATABASE_URL_SQLITE);
+    const connectionString = process.env.DATABASE_URL;
+    
+    if (!connectionString) {
+      throw new Error('DATABASE_URL environment variable is not set');
+    }
+    
+    const pool = new Pool({
+      connectionString,
+    });
+    
     // Pass the imported schema to Drizzle for relational queries
-    db = drizzleBetterSqlite3(sqlite, { schema });
-    console.log(`[DB] Node.js environment: Initialized Drizzle with better-sqlite3 and schema. Target: ${DATABASE_URL_SQLITE}`);
+    db = drizzle(pool, { schema });
+    console.log('[DB] Node.js environment: Initialized Drizzle with PostgreSQL and schema.');
   } catch (error) {
-    console.error(`[DB] Node.js environment: Failed to initialize Drizzle with better-sqlite3. Target: ${DATABASE_URL_SQLITE}`, error);
+    console.error('[DB] Node.js environment: Failed to initialize Drizzle with PostgreSQL.', error);
     throw error; // Re-throw the error to make it visible during server startup
   }
 } else {

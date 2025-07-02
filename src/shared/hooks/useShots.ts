@@ -4,6 +4,7 @@ import { Shot, ShotImage, GenerationRow } from '@/types/shots';
 import { Database } from '@/integrations/supabase/types';
 import { uploadImageToStorage } from '@/shared/lib/imageUploader';
 import { toast } from 'sonner';
+import { fetchWithAuth } from '@/lib/api';
 
 // Define the type for the new shot data returned by Supabase
 // This should align with your 'shots' table structure from `supabase/types.ts`
@@ -26,63 +27,30 @@ interface CreateShotArgs {
 }
 export const useCreateShot = () => {
   const queryClient = useQueryClient();
-  return useMutation<
-    Shot, // Expecting the API to return a Shot (or Shot like structure)
-    Error, 
-    CreateShotArgs,
-    { previousShots?: Shot[], projectId?: string | null } 
-  >({
-    mutationFn: async ({ shotName, projectId }: CreateShotArgs): Promise<Shot> => {
-      if (!projectId) {
-        console.error('Error creating shot: Project ID is missing');
-        throw new Error('Project ID is required to create a shot.');
-      }
-      
-      const response = await fetch('/api/shots', {
+  
+  return useMutation<Shot, Error, { shotName: string, projectId: string }>({
+    mutationFn: async ({ shotName, projectId }) => {
+      const response = await fetchWithAuth('/api/shots', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: shotName, projectId }),
+        body: JSON.stringify({ name: shotName, project_id: projectId }),
       });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: response.statusText }));
         throw new Error(errorData.message || `Failed to create shot: ${response.statusText}`);
       }
-      
+
       const newShot: Shot = await response.json();
-      return newShot; // API should return the created shot in the expected Shot format
+      return newShot;
     },
-    onMutate: async ({ shotName, projectId }) => {
-      if (!projectId) return { previousShots: [], projectId: null }; // Handle missing projectId
-      await queryClient.cancelQueries({ queryKey: ['shots', projectId] });
-      const previousShots = queryClient.getQueryData<Shot[]>(['shots', projectId]);
-      
-      const optimisticShot: Shot = {
-        id: `optimistic-${Date.now()}`,
-        name: shotName,
-        created_at: new Date().toISOString(),
-        images: [],
-        project_id: projectId, 
-      };
-      
-      queryClient.setQueryData<Shot[]>(['shots', projectId], (oldShots = []) => 
-        [optimisticShot, ...oldShots] // Add at beginning since server orders by newest first
-      );
-      return { previousShots, projectId };
+    onSuccess: (newShot) => {
+      queryClient.invalidateQueries({ queryKey: ['shots', newShot.project_id] });
+      toast.success(`Shot "${newShot.name}" created`);
     },
-    onError: (err, { projectId }, context) => { 
-      console.error('Optimistic update failed, rolling back for createShot:', err);
-      if (context?.previousShots && projectId) { // Ensure projectId for rollback key
-        queryClient.setQueryData<Shot[]>(['shots', projectId], context.previousShots);
-      }
-    },
-    onSettled: (data, error, { projectId }) => { 
-      if (projectId) {
-        queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
-      }
-      if (!error && data) {
-        toast.success(`Shot "${data.name}" created!`);
-      }
+    onError: (error: Error) => {
+      console.error('Error creating shot:', error);
+      toast.error(`Failed to create shot: ${error.message}`);
     },
   });
 };
@@ -163,27 +131,33 @@ export const useDuplicateShot = () => {
 };
 
 // List all shots with their full image details for a specific project VIA API
-export const useListShots = (projectId: string | null) => {
+export const useListShots = (projectId: string | null | undefined): {
+  data: Shot[] | undefined,
+  isLoading: boolean,
+  isError: boolean,
+  error: Error | null,
+  refetch: () => void
+} => {
   return useQuery<Shot[], Error>({
-    queryKey: ['shots', projectId], 
+    queryKey: ['shots', projectId],
     queryFn: async () => {
-      if (!projectId) return []; 
-
-      // API Call to fetch shots
-      const response = await fetch(`/api/shots?projectId=${projectId}`);
+      if (!projectId) {
+        throw new Error('Project ID is required to fetch shots');
+      }
+      
+      const response = await fetchWithAuth(`/api/shots?projectId=${projectId}`);
+      
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: response.statusText }));
-        console.error('[API Error UseListShots] Error fetching shots for project:', projectId, errorData.message); 
+        console.error('[API Error UseListShots] Error fetching shots for project:', projectId, errorData.message || response.statusText);
         throw new Error(errorData.message || `Failed to fetch shots: ${response.statusText}`);
       }
       
       const data: Shot[] = await response.json();
-      // The API now returns data in the client's expected Shot[] structure, including transformed images
-      // So, direct transformation here is no longer needed if API does it correctly.
       return data;
     },
-    enabled: !!projectId, 
-    // refetchInterval: 5000, // Temporarily commented out for testing proxy issues
+    enabled: !!projectId,
+    refetchOnWindowFocus: false,
   });
 };
 
@@ -214,8 +188,7 @@ const createGenerationForUploadedImage = async (
   
   const promptForGeneration = `External image: ${fileName || 'untitled'}`;
   
-  
-  const response = await fetch('/api/generations', {
+  const response = await fetchWithAuth('/api/generations', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -238,71 +211,37 @@ const createGenerationForUploadedImage = async (
   return newGeneration;
 };
 
-// Add an image to a shot VIA API
+// Add image to shot VIA API
 export const useAddImageToShot = () => {
   const queryClient = useQueryClient();
+  
   return useMutation<
-    ShotGenerationRow, // Updated type
-    Error,
-    AddImageToShotArgs,
-    { previousShots?: Shot[], projectId?: string | null }
+    Database['public']['Tables']['shot_images']['Row'], 
+    Error, 
+    AddImageToShotArgs
   >({
-    mutationFn: async ({ shot_id, generation_id, position, project_id }: AddImageToShotArgs):
-      Promise<ShotGenerationRow> => { // Updated return type
-      // This is the original, correct signature for useAddImageToShot's mutationFn
-      const response = await fetch('/api/shots/shot_generations', {
+    mutationFn: async ({ shot_id, generation_id, imageUrl, thumbUrl, project_id }: AddImageToShotArgs) => {
+      const response = await fetchWithAuth('/api/shots/shot_generations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ shotId: shot_id, generationId: generation_id, position }),
+        body: JSON.stringify({ shot_id, generation_id, imageUrl, thumbUrl, project_id }),
       });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: response.statusText }));
-        console.error('[useShots] useAddImageToShot (API): Error adding image to shot:', errorData);
         throw new Error(errorData.message || `Failed to add image to shot: ${response.statusText}`);
       }
-      
-      const newShotGenerationEntry = await response.json();
-      return newShotGenerationEntry;
+
+      const result: Database['public']['Tables']['shot_images']['Row'] = await response.json();
+      return result;
     },
-    onMutate: async (args) => {
-      if (!args.project_id) return { previousShots: [], projectId: null };
-      await queryClient.cancelQueries({ queryKey: ['shots', args.project_id] });
-      const previousShots = queryClient.getQueryData<Shot[]>(['shots', args.project_id]);
-      
-      queryClient.setQueryData<Shot[]>(['shots', args.project_id], (oldShots = []) => 
-        oldShots.map(shot => {
-          if (shot.id === args.shot_id) {
-            const newImage: GenerationRow = {
-              shotImageEntryId: `optimistic-sg-${Date.now()}`,
-              id: args.generation_id,
-              imageUrl: args.imageUrl, 
-              thumbUrl: args.thumbUrl || args.imageUrl,
-              metadata: {}, 
-            };
-            return {
-              ...shot,
-              images: shot.images ? [...shot.images, newImage] : [newImage],
-            };
-          }
-          return shot;
-        })
-      );
-      return { previousShots, projectId: args.project_id };
+    onSuccess: (_, { project_id }) => {
+      queryClient.invalidateQueries({ queryKey: ['shots', project_id] });
+      toast.success('Image added to shot');
     },
-    onError: (err, args, context) => {
-      console.error('Optimistic update failed for addImageToShot:', err);
-      if (context?.previousShots && context.projectId) {
-        queryClient.setQueryData<Shot[]>(['shots', context.projectId], context.previousShots);
-      }
-      // Ensure toast is shown for add image error
-      toast.error(`Failed to add image: ${err.message}`);
-    },
-    onSettled: (data, error, args) => {
-      if (args.project_id) {
-        queryClient.invalidateQueries({ queryKey: ['shots', args.project_id] });
-      }
-      // Removed toast.success notification
+    onError: (error: Error) => {
+      console.error('Error adding image to shot:', error);
+      toast.error(`Failed to add image to shot: ${error.message}`);
     },
   });
 };
@@ -324,7 +263,7 @@ export const useRemoveImageFromShot = () => {
     { previousShots?: Shot[], project_id?: string | null }
   >({
     mutationFn: async ({ shot_id, shotImageEntryId }: RemoveImageFromShotArgs) => {
-      const response = await fetch(`/api/shots/${shot_id}/generations/${shotImageEntryId}`, {
+      const response = await fetchWithAuth(`/api/shots/${shot_id}/generations/${shotImageEntryId}`, {
         method: 'DELETE',
       });
 
@@ -370,47 +309,25 @@ export const useRemoveImageFromShot = () => {
 // Delete a shot VIA API
 export const useDeleteShot = () => {
   const queryClient = useQueryClient();
-  return useMutation<
-    void, // DELETE typically returns 204 No Content, so no specific data on success
-    Error,
-    { shotId: string; projectId: string | null },
-    { previousShots?: Shot[]; projectId?: string | null }
-  >({
-    mutationFn: async ({ shotId, projectId }) => { // projectId is mainly for client-side cache operations
-      const response = await fetch(`/api/shots/${shotId}`, {
+  
+  return useMutation<void, Error, { shotId: string, projectId: string }>({
+    mutationFn: async ({ shotId }) => {
+      const response = await fetchWithAuth(`/api/shots/${shotId}`, {
         method: 'DELETE',
       });
 
       if (!response.ok) {
-        // For 404, server sends { message: 'Shot not found' }
-        // For other errors, it might be different or no JSON body.
-        const errorData = await response.json().catch(() => ({ message: `Failed to delete shot: ${response.statusText}` }));
-        throw new Error(errorData.message);
+        const errorData = await response.json().catch(() => ({ message: response.statusText }));
+        throw new Error(errorData.message || `Failed to delete shot: ${response.statusText}`);
       }
-      // No explicit return needed for success as it's a 204 or similar
     },
-    onMutate: async ({ shotId, projectId }) => {
-      if (!projectId) return { previousShots: [], projectId };
-      await queryClient.cancelQueries({ queryKey: ['shots', projectId] });
-      const previousShots = queryClient.getQueryData<Shot[]>(['shots', projectId]);
-      queryClient.setQueryData<Shot[]>(['shots', projectId], (old = []) => old.filter(s => s.id !== shotId));
-      return { previousShots, projectId };
+    onSuccess: (_, { projectId }) => {
+      queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
+      toast.success('Shot deleted');
     },
-    onError: (err, { shotId, projectId }, context) => { // Corrected args access
-      if (context?.previousShots && context.projectId) {
-        queryClient.setQueryData<Shot[]>(['shots', context.projectId], context.previousShots);
-      }
-      // Toasting is handled by the component calling mutateAsync in VideoShotDisplay
-      // toast.error(`Failed to delete shot: ${err.message}`); // Can be added here too if general
-    },
-    onSettled: (data, error, { projectId, shotId }) => { // Corrected args access
-      if (projectId) {
-        queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
-      }
-      // Toasting is handled by the component calling mutateAsync in VideoShotDisplay
-      // if (!error) {
-      //   toast.success(`Shot deleted successfully.`); // Can be added here too if general
-      // }
+    onError: (error: Error) => {
+      console.error('Error deleting shot:', error);
+      toast.error(`Failed to delete shot: ${error.message}`);
     },
   });
 };
@@ -425,14 +342,10 @@ interface UpdateShotNameArgs {
 // Update shot name VIA API
 export const useUpdateShotName = () => {
   const queryClient = useQueryClient();
-  return useMutation<
-    Shot, // Expecting the API to return a simplified Shot-like structure after update
-    Error, 
-    UpdateShotNameArgs,
-    { previousShots?: Shot[]; projectId?: string | null } 
-  >({
-    mutationFn: async ({ shotId, newName, projectId }: UpdateShotNameArgs): Promise<Shot> => {
-      const response = await fetch(`/api/shots/${shotId}`, {
+  
+  return useMutation<void, Error, { shotId: string, newName: string, projectId: string }>({
+    mutationFn: async ({ shotId, newName }) => {
+      const response = await fetchWithAuth(`/api/shots/${shotId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: newName }),
@@ -442,37 +355,14 @@ export const useUpdateShotName = () => {
         const errorData = await response.json().catch(() => ({ message: response.statusText }));
         throw new Error(errorData.message || `Failed to update shot name: ${response.statusText}`);
       }
-      
-      const updatedShot: Shot = await response.json(); // API returns the updated shot (basic fields)
-      return updatedShot;
     },
-    onMutate: async ({ shotId, newName, projectId }) => {
-      if (!projectId) return { previousShots: [], projectId };
-      await queryClient.cancelQueries({ queryKey: ['shots', projectId] });
-      const previousShots = queryClient.getQueryData<Shot[]>(['shots', projectId]);
-
-      queryClient.setQueryData<Shot[]>(['shots', projectId], (oldShots = []) => 
-        oldShots.map(shot => 
-          shot.id === shotId ? { ...shot, name: newName.trim() } : shot
-        )
-      );
-      return { previousShots, projectId };
+    onSuccess: (_, { projectId }) => {
+      queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
+      toast.success('Shot name updated');
     },
-    onError: (err, { shotId, newName, projectId }, context) => { // Corrected args access
-      console.error('Optimistic update for shot name failed, rolling back:', err);
-      if (context?.previousShots && context.projectId) {
-        queryClient.setQueryData<Shot[]>(['shots', context.projectId], context.previousShots);
-      }
-    },
-    onSettled: (data, error, { projectId, newName }) => { // Corrected args access
-      if (projectId) {
-        queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
-      }
-      // Toasting is handled by the component calling mutateAsync via its own onSuccess/onError
-      // Or can be added here if a general toast is always desired for this hook
-      // if (!error && data) { // data here is the updatedShot from mutationFn
-      //   toast.success(`Shot "${data.name}" updated successfully.`);
-      // }
+    onError: (error: Error) => {
+      console.error('Error updating shot name:', error);
+      toast.error(`Failed to update shot name: ${error.message}`);
     },
   });
 };
@@ -494,7 +384,7 @@ export const useUpdateShotImageOrder = () => {
     { previousShots?: Shot[], projectId: string | null }
   >({
     mutationFn: async ({ shotId, orderedShotGenerationIds }: UpdateShotImageOrderArgs) => {
-      const response = await fetch(`/api/shots/${shotId}/generations/order`, {
+      const response = await fetchWithAuth(`/api/shots/${shotId}/generations/order`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ orderedShotGenerationIds }), // Changed payload key
@@ -617,8 +507,8 @@ export const useHandleExternalImageDrop = () => {
             shot_id: shotId,
             generation_id: newGeneration.id as string,
             project_id: projectIdForOperation,
-            imageUrl: newGeneration.image_url || undefined,
-            thumbUrl: newGeneration.image_url || undefined,
+            imageUrl: newGeneration.location || undefined,
+            thumbUrl: newGeneration.location || undefined,
           });
           generationIds.push(newGeneration.id as string);
           toast.success(`Image ${imageFile.name} added to shot!`);

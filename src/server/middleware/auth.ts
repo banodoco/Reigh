@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { supabaseAdmin } from '../../integrations/supabase/admin';
 
 // Re-augment the Express Request type here as well to be safe
 declare global {
@@ -9,13 +10,36 @@ declare global {
   }
 }
 
-// This is a placeholder for actual authentication logic.
-// In a real app, you would verify a JWT, session, or API key.
-export const authenticate = (req: Request, res: Response, next: NextFunction): void => {
+// Authenticate requests using Supabase JWT validation
+export const authenticate = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    // For now, we'll just attach a dummy user ID to the request.
-    // This should be replaced with real user data from your auth provider.
-    req.userId = '3e3e3e3e-3e3e-3e3e-3e3e-3e3e3e3e3e3e'; // Correct User ID
+    // Extract the authorization header
+    const authHeader = req.headers.authorization;
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      res.status(401).json({ message: 'Missing or invalid authorization header' });
+      return;
+    }
+    
+    // Extract the token
+    const token = authHeader.substring(7);
+    
+    // Validate the token with Supabase
+    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+    
+    if (error || !user) {
+      res.status(401).json({ message: 'Invalid or expired token' });
+      return;
+    }
+    
+    // Attach the user ID to the request
+    req.userId = user.id;
+    
+    // In dev mode, optionally log authentication
+    if (process.env.VITE_APP_ENV === 'dev') {
+      console.log('[Auth] Authenticated user:', user.email);
+    }
+    
     next();
   } catch (error) {
     // If any unexpected error occurs, send a generic server error

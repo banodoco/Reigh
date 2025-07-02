@@ -1,12 +1,17 @@
 import express, { Request, Response } from 'express';
+import { v4 as uuidv4 } from 'uuid';
 import { db } from '@/lib/db';
 import { projects as projectsSchema, tasks as tasksSchema } from '../../../db/schema/schema';
 import { randomUUID } from 'crypto';
 import { eq } from 'drizzle-orm';
 import { ASPECT_RATIO_TO_RESOLUTION } from '@/shared/lib/aspectRatios';
 import { broadcast } from '../services/webSocketService';
+import { authenticate } from '../middleware/auth';
 
 const router = express.Router() as any;
+
+// Apply authentication middleware to all routes
+router.use(authenticate);
 
 interface SingleImageRequestBody {
   project_id: string;

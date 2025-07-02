@@ -5,8 +5,12 @@ import { randomUUID } from 'crypto';
 import { eq } from 'drizzle-orm';
 import { ASPECT_RATIO_TO_RESOLUTION } from '@/shared/lib/aspectRatios';
 import { broadcast } from '../services/webSocketService';
+import { authenticate } from '../middleware/auth';
 
 const router = express.Router() as any;
+
+// Apply authentication middleware to all routes
+router.use(authenticate);
 
 interface TravelRequestBody {
   project_id: string;

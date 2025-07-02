@@ -1,0 +1,70 @@
+// Centralized tool settings exports - automatically registers defaults in toolSettingsService
+export { videoTravelSettings } from './video-travel/settings';
+export { imageGenerationSettings } from './image-generation/settings';
+export { editTravelSettings } from './edit-travel/settings';
+
+// Tool manifest for UI discovery and automatic registration
+import { videoTravelSettings } from './video-travel/settings';
+import { imageGenerationSettings } from './image-generation/settings';
+import { editTravelSettings } from './edit-travel/settings';
+import { AppEnv, LOCAL_ENVS, type AppEnvValue } from '../types/env';
+import { Paintbrush, Video, Edit } from 'lucide-react';
+
+export const toolsManifest = [
+  videoTravelSettings,
+  imageGenerationSettings,
+  editTravelSettings,
+] as const;
+
+// UI-specific tool definitions that extend the settings with display properties
+export interface ToolUIDefinition {
+  id: string;
+  name: string;
+  path: string;
+  description: string;
+  environments: AppEnvValue[];
+  icon: React.ComponentType<any>;
+  gradient: string;
+  accent: string;
+  ornament: string;
+  badge?: string;
+}
+
+export const toolsUIManifest: ToolUIDefinition[] = [
+  {
+    id: imageGenerationSettings.id,
+    name: 'Generate Images with Structure',
+    path: '/tools/image-generation',
+    description: 'Craft and generate intricate images using a structured approach with precision and artistic flair, bringing your creative visions to life.',
+    environments: LOCAL_ENVS,
+    icon: Paintbrush,
+    gradient: 'from-wes-pink via-wes-lavender to-wes-dusty-blue',
+    accent: 'wes-pink',
+    ornament: '❋',
+    badge: 'Featured',
+  },
+  {
+    id: videoTravelSettings.id,
+    name: 'Travel Between Images',
+    path: '/tools/video-travel',
+    description: 'Create mesmerizing video sequences by defining elegant paths between existing images, weaving stories through visual transitions.',
+    environments: LOCAL_ENVS,
+    icon: Video,
+    gradient: 'from-wes-mint via-wes-sage to-wes-dusty-blue',
+    accent: 'wes-mint',
+    ornament: '◆',
+    badge: 'Popular',
+  },
+  {
+    id: editTravelSettings.id,
+    name: 'Edit Travel (Image Edit)',
+    path: '/tools/edit-travel',
+    description: 'Transform existing images using poetic text prompts with the sophisticated Fal Kontext model, reimagining reality with artistic precision.',
+    environments: [AppEnv.DEV],
+    icon: Edit,
+    gradient: 'from-wes-yellow via-wes-salmon to-wes-pink',
+    accent: 'wes-yellow',
+    ornament: '✧',
+    badge: 'New',
+  },
+]; 

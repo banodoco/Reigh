@@ -44,4 +44,10 @@ export const defaultImageGenerationSettings: ImageGenerationSettings = {
   generationMode: 'wan-local',
   beforeEachPromptText: '',
   afterEachPromptText: '',
+};
+
+export const imageGenerationSettings = {
+  id: 'image-generation',
+  scope: ['project'] as const,
+  defaults: defaultImageGenerationSettings,
 }; 

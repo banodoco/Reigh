@@ -3,10 +3,12 @@ import { db } from '@/lib/db'; // Adjusted path from @/lib/db
 import { projects as projectsTable, users as usersTable, ProjectUpdate } from '../../../db/schema/schema';
 import { eq, asc, desc, and } from 'drizzle-orm';
 import { Project } from '@/types/project';
+import { authenticate } from '../middleware/auth';
 
 const projectsRouter = express.Router();
-// This should be replaced with actual user session data in a real app
-const DUMMY_USER_ID = '3e3e3e3e-3e3e-3e3e-3e3e-3e3e3e3e3e3e';
+
+// Apply authentication middleware to all routes
+projectsRouter.use(authenticate);
 
 // Define an asyncHandler to wrap async route handlers
 const asyncHandler = (fn: (req: Request, res: Response, next: NextFunction) => Promise<any>) => {
@@ -17,8 +19,8 @@ const asyncHandler = (fn: (req: Request, res: Response, next: NextFunction) => P
 
 // GET /api/projects
 projectsRouter.get('/', asyncHandler(async (req: Request, res: Response) => {
-  // Hardcoded user ID is now defined at the module level.
-  // console.log(`[API] GET /api/projects: Querying projects for user: ${DUMMY_USER_ID}`);
+  const userId = req.userId!;
+  // console.log(`[API] GET /api/projects: Querying projects for user: ${userId}`);
 
   try {
     let fetchedData = await db.select({
@@ -28,7 +30,7 @@ projectsRouter.get('/', asyncHandler(async (req: Request, res: Response) => {
       aspectRatio: projectsTable.aspectRatio,
     })
       .from(projectsTable)
-      .where(eq(projectsTable.userId, DUMMY_USER_ID))
+      .where(eq(projectsTable.userId, userId))
       .orderBy(asc(projectsTable.name));
 
     // console.log(`[API] GET /api/projects: Found ${fetchedData.length} existing projects.`);
@@ -37,7 +39,7 @@ projectsRouter.get('/', asyncHandler(async (req: Request, res: Response) => {
       // console.log('[API] GET /api/projects: No projects found. Creating a default project.');
       const defaultProject = {
         name: 'Default Project',
-        userId: DUMMY_USER_ID,
+        userId: userId,
         aspectRatio: '16:9', // or some other sensible default
       };
       
@@ -68,6 +70,7 @@ projectsRouter.get('/', asyncHandler(async (req: Request, res: Response) => {
 
 // POST /api/projects
 projectsRouter.post('/', asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.userId!;
   let projectNameFromRequest: string | undefined;
   let aspectRatioFromRequest: string | undefined;
   try {
@@ -87,16 +90,16 @@ projectsRouter.post('/', asyncHandler(async (req: Request, res: Response) => {
       // return res.status(400).json({ message: 'Aspect ratio is required and must be a non-empty string' });
     }
 
-    // Ensure the dummy user exists before creating a project
-    const existingUser = await db.select().from(usersTable).where(eq(usersTable.id, DUMMY_USER_ID));
+    // Ensure the user exists before creating a project
+    const existingUser = await db.select().from(usersTable).where(eq(usersTable.id, userId));
     if (existingUser.length === 0) {
-      console.log(`[API] User ${DUMMY_USER_ID} not found, creating it.`);
-      await db.insert(usersTable).values({ id: DUMMY_USER_ID, name: 'Default User' });
+      console.log(`[API] User ${userId} not found, creating it.`);
+      await db.insert(usersTable).values({ id: userId, name: 'Default User' });
     }
 
     const newProjects = await db.insert(projectsTable).values({
       name: trimmedProjectName,
-      userId: DUMMY_USER_ID,
+      userId: userId,
       aspectRatio: aspectRatioFromRequest, // Save aspectRatio
     }).returning({
       id: projectsTable.id,
@@ -106,64 +109,66 @@ projectsRouter.post('/', asyncHandler(async (req: Request, res: Response) => {
     });
 
     if (!newProjects || newProjects.length === 0) {
-      console.error('[API Error Creating Project]', 'Insert operation did not return the new project.');
-      return res.status(500).json({ message: 'Failed to create project after insert' });
+      throw new Error('Failed to create new project');
     }
 
-    // .returning() returns an array, so pick the first element.
-    const createdProject = {
+    // API response should match client expectation (user_id)
+    const newProjectResponse = {
       id: newProjects[0].id,
       name: newProjects[0].name,
       user_id: newProjects[0].userId,
       aspectRatio: newProjects[0].aspectRatio,
     };
+    // delete newProjectResponse.userId; // If client only expects user_id
 
-    res.status(201).json(createdProject);
+    res.status(201).json(newProjectResponse);
   } catch (error: any) {
-    console.error('[API Error Creating Project]', error);
-    if (error.code === '23505') { // Unique violation example
-      const nameForError = (typeof projectNameFromRequest === 'string' && projectNameFromRequest.trim())
-        ? projectNameFromRequest.trim()
-        : 'the given name';
-      return res.status(409).json({ message: `Project with name "${nameForError}" already exists.` });
+    console.error('[API] Error creating project:', error);
+    // Handle potential unique constraint violation for name if your schema enforces it
+    if (error.code === '23505') { 
+      return res.status(409).json({ message: `Project with name "${projectNameFromRequest}" already exists.` });
     }
-    res.status(500).json({ message: 'Failed to create project' });
+    res.status(500).json({ message: 'Failed to create new project' });
   }
 }));
 
-// PUT /api/projects/:id - Update an existing project
+// PUT /api/projects/:id
+// Update an existing project's name and/or aspectRatio
 projectsRouter.put('/:id', asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.userId!;
   const projectId = req.params.id;
-  const { name, aspectRatio } = req.body;
+  const { name, aspectRatio } = req.body as { name?: string; aspectRatio?: string };
 
   if (!projectId) {
-    return res.status(400).json({ message: 'Project ID is required' });
+    return res.status(400).json({ message: 'Project ID is required in the URL' });
   }
 
-  const updates: ProjectUpdate = {}; // Use ProjectUpdate type from schema
+  if (!name && !aspectRatio) {
+    return res.status(400).json({ message: 'At least one of name or aspectRatio must be provided' });
+  }
 
+  const updates: ProjectUpdate = {};
+  
+  // Validate and add name to updates if provided
   if (name !== undefined) {
     if (typeof name !== 'string' || !name.trim()) {
-      return res.status(400).json({ message: 'Project name must be a non-empty string if provided' });
+      return res.status(400).json({ message: 'Project name must be a non-empty string' });
     }
     updates.name = name.trim();
   }
-
+  
+  // Add aspectRatio to updates if provided (optional validation)
   if (aspectRatio !== undefined) {
-    if (typeof aspectRatio !== 'string' || !aspectRatio.trim()) { // Basic validation, can be more specific
-      return res.status(400).json({ message: 'Aspect ratio must be a non-empty string if provided' });
+    if (typeof aspectRatio !== 'string' || !aspectRatio.trim()) {
+      return res.status(400).json({ message: 'Aspect ratio must be a non-empty string' });
     }
-    updates.aspectRatio = aspectRatio;
-  }
-
-  if (Object.keys(updates).length === 0) {
-    return res.status(400).json({ message: 'No update data provided' });
+    updates.aspectRatio = aspectRatio.trim();
   }
 
   try {
     const updatedProjects = await db.update(projectsTable)
       .set(updates)
-      .where(and(eq(projectsTable.id, projectId), eq(projectsTable.userId, DUMMY_USER_ID))) // Ensure user owns project
+      .where(and(eq(projectsTable.id, projectId), eq(projectsTable.userId, userId))) // Ensure user owns project
       .returning({
         id: projectsTable.id,
         name: projectsTable.name,
@@ -198,11 +203,6 @@ projectsRouter.put('/:id', asyncHandler(async (req: Request, res: Response) => {
 // A very simple synchronous test route
 projectsRouter.get('/ping', (req: Request, res: Response) => {
   res.status(200).json({ message: 'pong' });
-});
-
-// Keep the POST test route as is
-projectsRouter.post('/ping', (req: Request, res: Response) => {
-  res.status(201).json({ message: 'pong post' });
 });
 
 export default projectsRouter; 

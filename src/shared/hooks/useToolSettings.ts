@@ -2,8 +2,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useRef, useCallback } from 'react';
 import { deepMerge } from '../lib/deepEqual';
+import { useProject } from '@/shared/contexts/ProjectContext';
+import { fetchWithAuth } from '@/lib/api';
 
-const baseUrl = import.meta.env.VITE_API_TARGET_URL || '';
+const baseUrl = import.meta.env.VITE_API_TARGET_URL || window.location.origin;
 
 export type SettingsScope = 'user' | 'project' | 'shot';
 
@@ -54,84 +56,69 @@ async function updateToolSettings(params: UpdateToolSettingsParams): Promise<voi
   }
 }
 
-export function useToolSettings<T = unknown>(
-  toolId: string,
-  ctx: ToolSettingsContext,
-  options?: { silent?: boolean }
-) {
+export function useToolSettings<T>(toolId: string, userId?: string, shotId?: string) {
+  const { selectedProjectId } = useProject();
   const queryClient = useQueryClient();
-  const queryKey = ['tool-settings', toolId, ctx];
-  const hasUserInteracted = useRef(false);
 
-  const { data: settings, isLoading, error } = useQuery({
-    queryKey,
-    queryFn: () => fetchToolSettings(toolId, ctx),
-    staleTime: 30 * 60 * 1000, // Consider data fresh for 30 minutes
-    refetchInterval: false, // Disable automatic refetching
-    refetchOnWindowFocus: false, // Don't refetch on window focus
-    refetchOnMount: 'always', // Only fetch once when component mounts
+  // Fetch merged settings from API
+  const { data: settings, isLoading } = useQuery({
+    queryKey: ['toolSettings', toolId, userId, selectedProjectId, shotId],
+    queryFn: async () => {
+      const params = new URLSearchParams({ toolId });
+      if (userId) params.append('userId', userId);
+      if (selectedProjectId) params.append('projectId', selectedProjectId);
+      if (shotId) params.append('shotId', shotId);
+      
+      const response = await fetchWithAuth(`${baseUrl}/api/tool-settings/resolve?${params}`, {
+        headers: { 'Content-Type': 'application/json' },
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch tool settings');
+      }
+      
+      return response.json() as Promise<T>;
+    },
+    enabled: !!toolId,
   });
 
+  // Update settings mutation
   const updateMutation = useMutation({
-    mutationFn: (params: { scope: SettingsScope; patch: Partial<T> }) => {
-      const id = params.scope === 'project' ? ctx.projectId : 
-                 params.scope === 'shot' ? ctx.shotId : 
-                 'current-user'; // User ID will be handled server-side
-      
-      if (!id) {
-        throw new Error(`No ${params.scope} ID available for updating settings`);
-      }
-
-      return updateToolSettings({
-        scope: params.scope,
-        id,
-        toolId,
-        patch: params.patch,
+    mutationFn: async ({ scope, settings: newSettings }: { scope: SettingsScope; settings: Partial<T> }) => {
+      const response = await fetchWithAuth(`${baseUrl}/api/tool-settings`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          toolId,
+          userId: scope === 'user' ? userId : undefined,
+          projectId: (scope === 'project' || scope === 'shot') ? selectedProjectId : undefined,
+          shotId: scope === 'shot' ? shotId : undefined,
+          settings: newSettings,
+        }),
       });
-    },
-    onMutate: async ({ scope, patch }) => {
-      console.log('[ToolSettingsDebug] PATCH-optimistic', { toolId, scope, patch });
-      // Cancel any outgoing refetches
-      await queryClient.cancelQueries({ queryKey });
-      // Snapshot the previous value
-      const previousSettings = queryClient.getQueryData(queryKey);
-      // Optimistically update to the new value using deep merge
-      queryClient.setQueryData(queryKey, (old: any) => deepMerge(old, patch));
-      // Return a context object with the snapshotted value
-      return { previousSettings };
-    },
-    onError: (err, newData, context) => {
-      console.error('[ToolSettingsDebug] PATCH-error', err);
-      // If the mutation fails, use the context returned from onMutate to roll back
-      if (context?.previousSettings) {
-        queryClient.setQueryData(queryKey, context.previousSettings);
+      
+      if (!response.ok) {
+        throw new Error('Failed to update tool settings');
       }
-      toast.error('Failed to update settings');
+      
+      return response.json();
     },
     onSuccess: () => {
-      // Don't invalidate queries - we already have the latest data from optimistic update
-      console.log('[ToolSettingsDebug] PATCH-success', { toolId });
-      if (!options?.silent) {
-        toast.success('Settings updated successfully');
-      }
+      // Invalidate the query to refetch updated settings
+      queryClient.invalidateQueries({ 
+        queryKey: ['toolSettings', toolId, userId, selectedProjectId, shotId] 
+      });
     },
   });
 
-  const update = useCallback((patch: Partial<T>, scope: SettingsScope = 'shot') => {
-    // Mark that the user has interacted
-    hasUserInteracted.current = true;
-    return updateMutation.mutate({ scope, patch });
-  }, [updateMutation]);
-
-  // Expose a method to check if user has interacted
-  const hasUserMadeChanges = useCallback(() => hasUserInteracted.current, []);
+  const update = (scope: SettingsScope, settings: Partial<T>) => {
+    return updateMutation.mutate({ scope, settings });
+  };
 
   return {
-    settings: settings as T | undefined,
+    settings,
     isLoading,
-    error,
     update,
     isUpdating: updateMutation.isPending,
-    hasUserMadeChanges,
   };
 } 

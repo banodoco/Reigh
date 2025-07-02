@@ -1,11 +1,12 @@
 import { defineConfig } from 'drizzle-kit';
 
 export default defineConfig({
-  dialect: 'sqlite',
+  dialect: 'postgresql',
   schema: './db/schema/schema.ts',
   out: './db/migrations',
   dbCredentials: {
-    url: 'local.db',
+    // Use the connection string with the password from your Supabase project
+    url: process.env.DATABASE_URL!,
   },
   verbose: true,
   strict: true,
