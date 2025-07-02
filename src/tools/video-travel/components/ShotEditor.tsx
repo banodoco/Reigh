@@ -236,16 +236,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       // Create a map of real images by their IDs for quick lookup
       const realImagesMap = new Map((orderedShotImages || []).map(img => [img.id, img]));
       
-      // Also create a map by shotImageEntryId for images that have been converted from optimistic
-      const realImagesByEntryId = new Map<string, GenerationRow>();
-      for (const img of prev) {
-        if (!img.isOptimistic && img.realShotImageEntryId) {
-          const realImg = (orderedShotImages || []).find(r => r.shotImageEntryId === img.realShotImageEntryId);
-          if (realImg) {
-            realImagesByEntryId.set(img.shotImageEntryId, realImg);
-          }
-        }
-      }
+      // Track which real shotImageEntryIds we've already handled (for converted optimistic images)
+      const handledRealEntryIds = new Set<string>();
       
       // Build the new array preserving order and optimistic images
       const newImages: GenerationRow[] = [];
@@ -256,15 +248,25 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         if (img.isOptimistic) {
           // Keep optimistic images in their current position
           newImages.push(img);
-        } else if (img.realShotImageEntryId && realImagesByEntryId.has(img.shotImageEntryId)) {
-          // This was an optimistic image that got converted - use the updated real image
-          const realImg = realImagesByEntryId.get(img.shotImageEntryId)!;
-          newImages.push({
-            ...realImg,
-            shotImageEntryId: img.shotImageEntryId, // Keep the optimistic ID for stability
-            realShotImageEntryId: realImg.shotImageEntryId,
-          });
-          seenRealIds.add(realImg.id);
+        } else if (img.realShotImageEntryId) {
+          // This was an optimistic image that got converted
+          // Find the real image by its entry ID
+          const realImg = (orderedShotImages || []).find(r => r.shotImageEntryId === img.realShotImageEntryId);
+          if (realImg) {
+            newImages.push({
+              ...realImg,
+              shotImageEntryId: img.shotImageEntryId, // Keep the optimistic ID for stability
+              realShotImageEntryId: realImg.shotImageEntryId,
+            });
+            seenRealIds.add(realImg.id);
+            handledRealEntryIds.add(realImg.shotImageEntryId);
+          } else {
+            // If we can't find the real image, keep the current one
+            newImages.push(img);
+            if (realImagesMap.has(img.id)) {
+              seenRealIds.add(img.id);
+            }
+          }
         } else if (realImagesMap.has(img.id) && !seenRealIds.has(img.id)) {
           // Regular image update
           newImages.push(realImagesMap.get(img.id)!);
@@ -273,8 +275,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       }
       
       // Add any new real images that weren't in the previous list
+      // BUT skip any that we've already handled as converted optimistic images
       for (const img of (orderedShotImages || [])) {
-        if (!seenRealIds.has(img.id)) {
+        if (!seenRealIds.has(img.id) && !handledRealEntryIds.has(img.shotImageEntryId)) {
           newImages.push(img);
         }
       }
@@ -429,10 +432,22 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                 id: newShotImage.generationId,
                 imageUrl: imageUrl,
                 thumbUrl: imageUrl,
-                isOptimistic: false,
+                isOptimistic: true, // Keep it optimistic for now
                 // Store the real shotImageEntryId for later use if needed
                 realShotImageEntryId: newShotImage.id,
               };
+              
+              // Remove the optimistic flag after a short delay for smooth transition
+              setTimeout(() => {
+                setLocalOrderedShotImages(current =>
+                  current.map(currentImg =>
+                    currentImg.shotImageEntryId === optimisticImage.shotImageEntryId
+                      ? { ...currentImg, isOptimistic: false }
+                      : currentImg
+                  )
+                );
+              }, 300); // 300ms delay to match CSS transition
+              
               return updatedImage;
             }
             return img;
