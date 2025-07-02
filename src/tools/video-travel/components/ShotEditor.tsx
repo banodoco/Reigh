@@ -223,24 +223,43 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // Use local state for optimistic updates on image list
   const [localOrderedShotImages, setLocalOrderedShotImages] = useState(orderedShotImages || []);
   useEffect(() => {
-    // When orderedShotImages changes, merge it with any optimistic images
+    // Smart sync: preserve optimistic images while updating real ones
     setLocalOrderedShotImages(prev => {
-      // Find any optimistic images in the current state
+      // Keep track of optimistic images
       const optimisticImages = prev.filter(img => img.isOptimistic);
       
-      // If there are no optimistic images, just use the new prop
+      // If there are no optimistic images, just use the new data
       if (optimisticImages.length === 0) {
         return orderedShotImages || [];
       }
       
-      // Otherwise, append optimistic images to the new prop data
-      const newImages = orderedShotImages || [];
-      const existingIds = new Set(newImages.map(img => img.id));
+      // Create a map of real images by their IDs for quick lookup
+      const realImagesMap = new Map((orderedShotImages || []).map(img => [img.id, img]));
       
-      // Only add optimistic images that don't have a matching ID in the new data
-      const uniqueOptimisticImages = optimisticImages.filter(img => !existingIds.has(img.id));
+      // Build the new array preserving order and optimistic images
+      const newImages: GenerationRow[] = [];
+      const seenRealIds = new Set<string>();
       
-      return [...newImages, ...uniqueOptimisticImages];
+      // Go through previous images to maintain order
+      for (const img of prev) {
+        if (img.isOptimistic) {
+          // Keep optimistic images in their current position
+          newImages.push(img);
+        } else if (realImagesMap.has(img.id) && !seenRealIds.has(img.id)) {
+          // Replace with updated version from server
+          newImages.push(realImagesMap.get(img.id)!);
+          seenRealIds.add(img.id);
+        }
+      }
+      
+      // Add any new real images that weren't in the previous list
+      for (const img of (orderedShotImages || [])) {
+        if (!seenRealIds.has(img.id)) {
+          newImages.push(img);
+        }
+      }
+      
+      return newImages;
     });
   }, [orderedShotImages]);
 
@@ -404,6 +423,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
     if (successfulUploads > 0) {
       toast.success(`${successfulUploads} image(s) uploaded and added successfully.`);
+      // Don't call onShotImagesUpdate() here - let the optimistic updates handle the UI
+      // The parent component will refetch when needed
     }
     
     setFileInputKey(Date.now());
@@ -424,7 +445,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       // Delete the generation (this will show success/error toasts automatically)
       await deleteGenerationMutation.mutateAsync(generationId);
       
-      // Removed onShotImagesUpdate() - the mutation already handles cache invalidation
+      // Refresh the shot data
+      onShotImagesUpdate(); 
     } catch (error) {
       // Rollback the optimistic update on error
       setLocalOrderedShotImages(orderedShotImages);
