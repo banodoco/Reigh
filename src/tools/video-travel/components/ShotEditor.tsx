@@ -236,8 +236,18 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       // Create a map of real images by their IDs for quick lookup
       const realImagesMap = new Map((orderedShotImages || []).map(img => [img.id, img]));
       
-      // Track which real shotImageEntryIds we've already handled (for converted optimistic images)
-      const handledRealEntryIds = new Set<string>();
+      // Also create a map by shotImageEntryId for images that have been converted from optimistic
+      const realImagesByEntryId = new Map<string, GenerationRow>();
+      for (const img of prev) {
+        if (!img.isOptimistic && img.realShotImageEntryId) {
+          const realImg = (orderedShotImages || []).find(r => r.shotImageEntryId === img.realShotImageEntryId);
+          if (realImg) {
+            realImagesByEntryId.set(img.realShotImageEntryId, realImg); // map by real entryId
+          }
+        }
+      }
+      
+      const mappedRealEntryIds = new Set(realImagesByEntryId.keys());
       
       // Build the new array preserving order and optimistic images
       const newImages: GenerationRow[] = [];
@@ -246,38 +256,24 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       // Go through previous images to maintain order
       for (const img of prev) {
         if (img.isOptimistic) {
-          // Keep optimistic images in their current position
           newImages.push(img);
-        } else if (img.realShotImageEntryId) {
-          // This was an optimistic image that got converted
-          // Find the real image by its entry ID
-          const realImg = (orderedShotImages || []).find(r => r.shotImageEntryId === img.realShotImageEntryId);
-          if (realImg) {
-            newImages.push({
-              ...realImg,
-              shotImageEntryId: img.shotImageEntryId, // Keep the optimistic ID for stability
-              realShotImageEntryId: realImg.shotImageEntryId,
-            });
-            seenRealIds.add(realImg.id);
-            handledRealEntryIds.add(realImg.shotImageEntryId);
-          } else {
-            // If we can't find the real image, keep the current one
-            newImages.push(img);
-            if (realImagesMap.has(img.id)) {
-              seenRealIds.add(img.id);
-            }
-          }
+        } else if (img.realShotImageEntryId && realImagesByEntryId.has(img.realShotImageEntryId)) {
+          const realImg = realImagesByEntryId.get(img.realShotImageEntryId)!;
+          newImages.push({
+            ...realImg,
+            shotImageEntryId: img.shotImageEntryId,
+            realShotImageEntryId: realImg.shotImageEntryId,
+          });
+          seenRealIds.add(realImg.id);
         } else if (realImagesMap.has(img.id) && !seenRealIds.has(img.id)) {
-          // Regular image update
           newImages.push(realImagesMap.get(img.id)!);
           seenRealIds.add(img.id);
         }
       }
       
-      // Add any new real images that weren't in the previous list
-      // BUT skip any that we've already handled as converted optimistic images
+      // Add any new real images that weren't mapped to an optimistic image and weren't already present
       for (const img of (orderedShotImages || [])) {
-        if (!seenRealIds.has(img.id) && !handledRealEntryIds.has(img.shotImageEntryId)) {
+        if (!seenRealIds.has(img.id) && !mappedRealEntryIds.has(img.shotImageEntryId)) {
           newImages.push(img);
         }
       }
@@ -432,22 +428,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                 id: newShotImage.generationId,
                 imageUrl: imageUrl,
                 thumbUrl: imageUrl,
-                isOptimistic: true, // Keep it optimistic for now
+                isOptimistic: false,
                 // Store the real shotImageEntryId for later use if needed
                 realShotImageEntryId: newShotImage.id,
               };
-              
-              // Remove the optimistic flag after a short delay for smooth transition
-              setTimeout(() => {
-                setLocalOrderedShotImages(current =>
-                  current.map(currentImg =>
-                    currentImg.shotImageEntryId === optimisticImage.shotImageEntryId
-                      ? { ...currentImg, isOptimistic: false }
-                      : currentImg
-                  )
-                );
-              }, 300); // 300ms delay to match CSS transition
-              
               return updatedImage;
             }
             return img;
