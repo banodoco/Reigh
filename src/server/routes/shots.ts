@@ -1,5 +1,5 @@
 import express, { Request, Response, NextFunction } from 'express';
-import { db } from '../../lib/db'; // Drizzle instance
+import { db } from '../../lib/db/index'; // Drizzle instance
 import { shots as shotsTable, shotGenerations as shotGenerationsTable, generations as generationsTable } from '../../../db/schema/schema';
 import { eq, asc, desc, and } from 'drizzle-orm';
 import { authenticate } from '../middleware/auth';

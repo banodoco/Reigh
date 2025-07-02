@@ -33,7 +33,7 @@ export const useCreateShot = () => {
       const response = await fetchWithAuth('/api/shots', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: shotName, project_id: projectId }),
+        body: JSON.stringify({ name: shotName, projectId }),
       });
 
       if (!response.ok) {
@@ -224,7 +224,7 @@ export const useAddImageToShot = () => {
       const response = await fetchWithAuth('/api/shots/shot_generations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ shot_id, generation_id, imageUrl, thumbUrl, project_id }),
+        body: JSON.stringify({ shotId: shot_id, generationId: generation_id, imageUrl, thumbUrl, projectId: project_id }),
       });
 
       if (!response.ok) {
