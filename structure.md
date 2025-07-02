@@ -192,4 +192,5 @@
 - **toolSettingsService.ts**: Server-side service for resolving and updating tool settings. Provides `resolveToolSettings()` to merge settings across scopes and `updateToolSettings()` to save changes. Implements deep merge logic for nested settings objects.
 
 ##### Tool Settings (`src/tools/*/settings.ts`)
-- **video-travel/settings.ts**: Defines `VideoTravelSettings` interface and default values for video travel tool. Settings are stored per-shot and include all generation parameters, LoRA configs, and pair-specific prompts/frames.
+- **video-travel/settings.ts**: Defines `VideoTravelSettings` interface and default values for Video Travel tool (per-shot scope – generation parameters, LoRA configs, pair prompts/frames).
+- **image-generation/settings.ts**: Defines `ImageGenerationSettings` interface and default values for Image Generation tool (project scope – prompts, LoRA selections, ControlNet strengths, etc.).

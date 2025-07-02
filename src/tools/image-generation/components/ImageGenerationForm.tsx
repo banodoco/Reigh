@@ -20,8 +20,10 @@ import { useToast } from "@/shared/hooks/use-toast";
 import FileInput from "@/shared/components/FileInput";
 import { fileToDataURL, dataURLtoFile } from "@/shared/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/components/ui/select";
+import { useProject } from "@/shared/contexts/ProjectContext";
+import { useToolSettings } from "@/shared/hooks/useToolSettings";
+import { ImageGenerationSettings } from "../settings";
 
-const FORM_SETTINGS_KEY = 'artfulPaneCraftFormSettings';
 const STARTING_IMAGE_KEY = 'artfulPaneCraftStartingImage';
 
 type GenerationMode = 'wan-local' | 'flux-api' | 'hidream-api';
@@ -285,6 +287,14 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
   const [directFormActivePromptId, setDirectFormActivePromptId] = useState<string | null>(null);
   const [generationMode, setGenerationMode] = useState<GenerationMode>('wan-local');
 
+  // 🗄️ Project-level settings persistence -----------------------------
+  const { selectedProjectId } = useProject();
+  const {
+    settings: persistedSettings,
+    isLoading: isSettingsLoading,
+    update: updatePersistedSettings,
+  } = useToolSettings<ImageGenerationSettings>('image-generation', { projectId: selectedProjectId }, { silent: true });
+
   // Text to prepend/append to every prompt
   const [beforeEachPromptText, setBeforeEachPromptText] = useState('');
   const [afterEachPromptText, setAfterEachPromptText] = useState('');
@@ -372,91 +382,61 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
     }
   }));
 
+  // 🔄 Hydrate local state from project-level persisted settings
   useEffect(() => {
-    const savedSettingsRaw = localStorage.getItem(FORM_SETTINGS_KEY);
+    if (isSettingsLoading || hasLoadedFromStorage.current) return;
+    if (!persistedSettings) return;
+
     let loadedPrompts: PromptEntry[] | null = null;
+    const settingsToLoad = persistedSettings as ImageGenerationSettings & { prompt?: string };
 
-    if (savedSettingsRaw) {
-      try {
-        const parsedSettings = JSON.parse(savedSettingsRaw);
-        const settingsToLoad = parsedSettings as PersistedFormSettings & { prompt?: string }; 
-
-        if (settingsToLoad.prompts && settingsToLoad.prompts.length > 0) {
-            loadedPrompts = settingsToLoad.prompts.map(p => ({...p, id: p.id || generatePromptId() }));
-        } else if (settingsToLoad.prompt && typeof settingsToLoad.prompt === 'string') { 
-             const short = settingsToLoad.prompt.substring(0, 30) + (settingsToLoad.prompt.length > 30 ? "..." : "");
-             loadedPrompts = [{ id: generatePromptId(), fullPrompt: settingsToLoad.prompt, shortPrompt: short }];
-        }
-        
-        if (loadedPrompts && loadedPrompts.length > 0) {
-            let maxIdNum = 0; 
-            loadedPrompts.forEach(p => {
-                const idStr = p.id || "";
-                let idPart = idStr.startsWith('prompt-') ? idStr.substring('prompt-'.length) : idStr;
-                if (idStr === 'initial-0') idPart = '0';
-                if (idPart && !isNaN(parseInt(idPart))) {
-                    maxIdNum = Math.max(maxIdNum, parseInt(idPart));
-                }
-            });
-            promptIdCounter.current = maxIdNum + 1;
-        } else {
-            promptIdCounter.current = 1; 
-        }
-
-        if (settingsToLoad.imagesPerPrompt !== undefined) setImagesPerPrompt(settingsToLoad.imagesPerPrompt);
-        if (settingsToLoad.selectedLorasByMode) {
-            const emptyMap: Record<GenerationMode, ActiveLora[]> = { 'wan-local': [], 'flux-api': [], 'hidream-api': [] };
-            setSelectedLorasMap({ ...emptyMap, ...(settingsToLoad.selectedLorasByMode as Record<GenerationMode, ActiveLora[]>) });
-        } else if (settingsToLoad.selectedLoras !== undefined && settingsToLoad.selectedLoras.length > 0) {
-            setSelectedLorasMap({ 'wan-local': [], 'flux-api': settingsToLoad.selectedLoras, 'hidream-api': [] });
-        }
-        if (settingsToLoad.depthStrength !== undefined) setDepthStrength(settingsToLoad.depthStrength);
-        if (settingsToLoad.softEdgeStrength !== undefined) setSoftEdgeStrength(settingsToLoad.softEdgeStrength);
-
-        if (settingsToLoad.beforeEachPromptText !== undefined) setBeforeEachPromptText(settingsToLoad.beforeEachPromptText);
-        if (settingsToLoad.afterEachPromptText !== undefined) setAfterEachPromptText(settingsToLoad.afterEachPromptText);
-
-      } catch (error) { 
-          console.error("Error loading saved form settings:", error); 
-          localStorage.removeItem(FORM_SETTINGS_KEY);
-      }
+    if (settingsToLoad.prompts && settingsToLoad.prompts.length > 0) {
+      loadedPrompts = settingsToLoad.prompts.map(p => ({ ...p, id: p.id || generatePromptId() }));
+    } else if (settingsToLoad.prompt && typeof settingsToLoad.prompt === 'string') {
+      const short = settingsToLoad.prompt.substring(0, 30) + (settingsToLoad.prompt.length > 30 ? "..." : "");
+      loadedPrompts = [{ id: generatePromptId(), fullPrompt: settingsToLoad.prompt, shortPrompt: short }];
     }
 
     if (loadedPrompts && loadedPrompts.length > 0) {
-        setPrompts(loadedPrompts);
-    } else {
-        promptIdCounter.current = 1; 
-        const initialPromptId = generatePromptId(); 
-        setPrompts([{ id: initialPromptId, fullPrompt: "A majestic cat astronaut exploring a vibrant nebula, artstation", shortPrompt: "Cat Astronaut" }]);
-        defaultsApplied.current = false;
+      let maxIdNum = 0;
+      loadedPrompts.forEach(p => {
+        const idStr = p.id || "";
+        let idPart = idStr.startsWith('prompt-') ? idStr.substring('prompt-'.length) : idStr;
+        if (idStr === 'initial-0') idPart = '0';
+        if (idPart && !isNaN(parseInt(idPart))) {
+          maxIdNum = Math.max(maxIdNum, parseInt(idPart));
+        }
+      });
+      promptIdCounter.current = maxIdNum + 1;
+      setPrompts(loadedPrompts);
     }
 
-    // Load starting image from localStorage
-    const savedImageRaw = localStorage.getItem(STARTING_IMAGE_KEY);
-    if (savedImageRaw) {
-      try {
-        const savedImageData = JSON.parse(savedImageRaw);
-        if (savedImageData && savedImageData.dataUrl && savedImageData.name && savedImageData.type) {
-          const restoredFile = dataURLtoFile(savedImageData.dataUrl, savedImageData.name, savedImageData.type);
-          if (restoredFile) {
-            processFileInternal(restoredFile, true); // Pass a flag to avoid re-saving
-          }
-        }
-      } catch (error) {
-        console.error("Error loading starting image from localStorage:", error);
-        localStorage.removeItem(STARTING_IMAGE_KEY);
-      }
+    if (settingsToLoad.imagesPerPrompt !== undefined) setImagesPerPrompt(settingsToLoad.imagesPerPrompt);
+    if (settingsToLoad.selectedLorasByMode) {
+      const emptyMap: Record<GenerationMode, ActiveLora[]> = { 'wan-local': [], 'flux-api': [], 'hidream-api': [] };
+      setSelectedLorasMap({ ...emptyMap, ...(settingsToLoad.selectedLorasByMode as Record<GenerationMode, ActiveLora[]>) });
     }
+    if (settingsToLoad.depthStrength !== undefined) setDepthStrength(settingsToLoad.depthStrength);
+    if (settingsToLoad.softEdgeStrength !== undefined) setSoftEdgeStrength(settingsToLoad.softEdgeStrength);
+    if (settingsToLoad.beforeEachPromptText !== undefined) setBeforeEachPromptText(settingsToLoad.beforeEachPromptText);
+    if (settingsToLoad.afterEachPromptText !== undefined) setAfterEachPromptText(settingsToLoad.afterEachPromptText);
 
     hasLoadedFromStorage.current = true;
-  }, []);
+  }, [isSettingsLoading, persistedSettings]);
 
+  // 📝 Persist settings to backend whenever they change
   useEffect(() => {
-    if (hasLoadedFromStorage.current) { 
-      const currentSettings: PersistedFormSettings = { prompts, imagesPerPrompt, selectedLorasByMode: selectedLorasMap, depthStrength, softEdgeStrength, beforeEachPromptText, afterEachPromptText };
-      console.log("[ImageGenerationForm] Saving to localStorage. Prompts count:", prompts.length, "Data:", currentSettings);
-      localStorage.setItem(FORM_SETTINGS_KEY, JSON.stringify(currentSettings));
-    }
+    if (!hasLoadedFromStorage.current) return;
+    const currentSettings: ImageGenerationSettings = {
+      prompts,
+      imagesPerPrompt,
+      selectedLorasByMode: selectedLorasMap,
+      depthStrength,
+      softEdgeStrength,
+      beforeEachPromptText,
+      afterEachPromptText,
+    };
+    updatePersistedSettings(currentSettings, 'project');
   }, [prompts, imagesPerPrompt, selectedLorasMap, depthStrength, softEdgeStrength, beforeEachPromptText, afterEachPromptText]);
 
   useEffect(() => { fetch('/data/loras.json').then(response => response.json()).then((data: LoraData) => setAvailableLoras(data.models || [])).catch(error => console.error("Error fetching LoRA data:", error)); }, []);
