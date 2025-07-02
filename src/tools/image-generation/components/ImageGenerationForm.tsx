@@ -281,7 +281,7 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
   const [determinedApiImageSize, setDeterminedApiImageSize] = useState<string | null>(null);
   const [isLoraModalOpen, setIsLoraModalOpen] = useState(false);
   const [availableLoras, setAvailableLoras] = useState<LoraModel[]>([]);
-  const hasLoadedFromStorage = useRef(false);
+  const hydratedProjectIdRef = useRef<string | null>(null);
   const defaultsApplied = useRef(false);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [directFormActivePromptId, setDirectFormActivePromptId] = useState<string | null>(null);
@@ -384,8 +384,10 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
 
   // 🔄 Hydrate local state from project-level persisted settings
   useEffect(() => {
-    if (isSettingsLoading || hasLoadedFromStorage.current) return;
+    if (isSettingsLoading) return;
     if (!persistedSettings) return;
+    if (!selectedProjectId) return;
+    if (hydratedProjectIdRef.current === selectedProjectId) return; // already hydrated for this project
 
     let loadedPrompts: PromptEntry[] | null = null;
     const settingsToLoad = persistedSettings as ImageGenerationSettings & { prompt?: string };
@@ -421,12 +423,12 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
     if (settingsToLoad.beforeEachPromptText !== undefined) setBeforeEachPromptText(settingsToLoad.beforeEachPromptText);
     if (settingsToLoad.afterEachPromptText !== undefined) setAfterEachPromptText(settingsToLoad.afterEachPromptText);
 
-    hasLoadedFromStorage.current = true;
-  }, [isSettingsLoading, persistedSettings]);
+    hydratedProjectIdRef.current = selectedProjectId;
+  }, [isSettingsLoading, persistedSettings, selectedProjectId]);
 
   // 📝 Persist settings to backend whenever they change
   useEffect(() => {
-    if (!hasLoadedFromStorage.current) return;
+    if (!selectedProjectId || hydratedProjectIdRef.current !== selectedProjectId) return; // ensure initial hydration done
     const currentSettings: ImageGenerationSettings = {
       prompts,
       imagesPerPrompt,
@@ -437,13 +439,13 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
       afterEachPromptText,
     };
     updatePersistedSettings(currentSettings, 'project');
-  }, [prompts, imagesPerPrompt, selectedLorasMap, depthStrength, softEdgeStrength, beforeEachPromptText, afterEachPromptText]);
+  }, [prompts, imagesPerPrompt, selectedLorasMap, depthStrength, softEdgeStrength, beforeEachPromptText, afterEachPromptText, selectedProjectId]);
 
   useEffect(() => { fetch('/data/loras.json').then(response => response.json()).then((data: LoraData) => setAvailableLoras(data.models || [])).catch(error => console.error("Error fetching LoRA data:", error)); }, []);
   useEffect(() => { 
     if (
       generationMode === 'flux-api' && // only apply defaults when in Flux mode
-      hasLoadedFromStorage.current && 
+      hydratedProjectIdRef.current !== null && 
       !defaultsApplied.current && 
       availableLoras.length > 0 && 
       selectedLoras.length === 0
@@ -466,7 +468,7 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
         defaultsApplied.current = true;
       }
     } 
-  }, [generationMode, availableLoras, hasLoadedFromStorage.current, defaultsApplied.current, selectedLoras.length]);
+  }, [generationMode, availableLoras, hydratedProjectIdRef.current, defaultsApplied.current, selectedLoras.length]);
 
   useEffect(() => {
     setSelectedLoras(selectedLorasMap[generationMode] || []);
