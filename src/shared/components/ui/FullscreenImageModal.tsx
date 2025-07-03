@@ -266,7 +266,7 @@ const FullscreenImageModal: React.FC<FullscreenImageModalProps> = ({ imageUrl, i
   return (
     <TooltipProvider>
       <div
-        className="fixed z-50 flex items-center justify-center bg-black bg-opacity-75 transition-opacity duration-300 ease-in-out"
+        className="fixed z-[9999] flex items-center justify-center bg-black bg-opacity-75 transition-opacity duration-300 ease-in-out"
         style={modalStyle}
         onClick={onClose} // Close on backdrop click
       >

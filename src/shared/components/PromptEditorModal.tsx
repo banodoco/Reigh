@@ -342,14 +342,6 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
           <DialogTitle>Prompt Editor</DialogTitle>
           <DialogDescription>
             Manage your prompts. Use the 'Generate' tab to create new prompts with AI, or the 'Bulk Edit' tab to refine existing ones.
-            {!actualCanUseAI && (
-                 <div className="mt-2 p-2 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 rounded-md">
-                    <div className="flex items-center">
-                        <AlertTriangle className="h-5 w-5 text-yellow-500 mr-2" />
-                        <span>AI features are disabled. Please enter an API key in settings.</span>
-                    </div>
-                </div>
-            )}
           </DialogDescription>
         </DialogHeader>
 
@@ -383,32 +375,42 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
               </Button>
             </CollapsibleTrigger>
             <CollapsibleContent>
-              <Tabs value={activeTab} onValueChange={(value) => { markAsInteracted(); setActiveTab(value as EditorMode); }}>
-                <TabsList className="grid w-full grid-cols-2 mb-4">
-                  <TabsTrigger value="generate" disabled={!actualCanUseAI}><Wand2Icon className="mr-2 h-4 w-4" />Generate New</TabsTrigger>
-                  <TabsTrigger value="bulk-edit" disabled={!actualCanUseAI}><Edit className="mr-2 h-4 w-4" />Bulk Edit All</TabsTrigger>
-                </TabsList>
-                <TabsContent value="generate">
-                  <PromptGenerationControls 
-                    onGenerate={handleGenerateAndAddPrompts} 
-                    isGenerating={isAIGenerating}
-                    initialValues={generationControlValues}
-                    onValuesChange={handleGenerationValuesChange}
-                    hasApiKey={actualCanUseAI}
-                    existingPromptsForContext={internalPrompts.map(p => ({ id: p.id, text: p.fullPrompt, shortText: p.shortPrompt, hidden: false}))}
-                  />
-                </TabsContent>
-                <TabsContent value="bulk-edit">
-                  <BulkEditControls 
-                    onBulkEdit={handleBulkEditPrompts} 
-                    isEditing={isAIEditing}
-                    initialValues={bulkEditControlValues}
-                    onValuesChange={handleBulkEditValuesChange}
-                    hasApiKey={actualCanUseAI}
-                    numberOfPromptsToEdit={internalPrompts.length}
-                  />
-                </TabsContent>
-              </Tabs>
+              <div className="bg-accent/30 border border-accent-foreground/10 rounded-lg p-4 mb-4">
+                {!actualCanUseAI && (
+                  <div className="mb-4 p-3 bg-yellow-100 border border-yellow-300 text-yellow-800 rounded-md">
+                    <div className="flex items-center">
+                      <AlertTriangle className="h-5 w-5 text-yellow-600 mr-2" />
+                      <span>AI features are disabled. Please enter an API key in settings.</span>
+                    </div>
+                  </div>
+                )}
+                <Tabs value={activeTab} onValueChange={(value) => { markAsInteracted(); setActiveTab(value as EditorMode); }}>
+                  <TabsList className="grid w-full grid-cols-2 mb-4">
+                    <TabsTrigger value="generate" disabled={!actualCanUseAI}><Wand2Icon className="mr-2 h-4 w-4" />Generate New</TabsTrigger>
+                    <TabsTrigger value="bulk-edit" disabled={!actualCanUseAI}><Edit className="mr-2 h-4 w-4" />Bulk Edit All</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="generate">
+                    <PromptGenerationControls 
+                      onGenerate={handleGenerateAndAddPrompts} 
+                      isGenerating={isAIGenerating}
+                      initialValues={generationControlValues}
+                      onValuesChange={handleGenerationValuesChange}
+                      hasApiKey={actualCanUseAI}
+                      existingPromptsForContext={internalPrompts.map(p => ({ id: p.id, text: p.fullPrompt, shortText: p.shortPrompt, hidden: false}))}
+                    />
+                  </TabsContent>
+                  <TabsContent value="bulk-edit">
+                    <BulkEditControls 
+                      onBulkEdit={handleBulkEditPrompts} 
+                      isEditing={isAIEditing}
+                      initialValues={bulkEditControlValues}
+                      onValuesChange={handleBulkEditValuesChange}
+                      hasApiKey={actualCanUseAI}
+                      numberOfPromptsToEdit={internalPrompts.length}
+                    />
+                  </TabsContent>
+                </Tabs>
+              </div>
             </CollapsibleContent>
           </Collapsible>
           

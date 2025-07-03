@@ -480,7 +480,7 @@ const ImageGenerationToolPage = () => {
           </div>
 
           {isCreatingTask && (
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={(e) => { if (e.target === e.currentTarget) { /* handleCancelGeneration() */ } }}>
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999]" onClick={(e) => { if (e.target === e.currentTarget) { /* handleCancelGeneration() */ } }}>
               <div className="bg-background p-8 rounded-lg shadow-2xl w-full max-w-md text-center" onClick={(e) => e.stopPropagation()}>
                 <h2 className="text-2xl font-semibold mb-4">
                   Creating Image Generation {creatingTaskCount > 1 ? 'Tasks' : 'Task'}...

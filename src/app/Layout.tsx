@@ -50,7 +50,7 @@ const Layout: React.FC = () => {
         style={mainContentStyle}
       >
         <main className="container mx-auto py-8 px-4 md:px-6 h-full overflow-y-auto">
-          <div className="wes-frame min-h-full">
+          <div className="min-h-full">
             <Outlet /> 
           </div>
         </main>
