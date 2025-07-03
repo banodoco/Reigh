@@ -247,9 +247,9 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
 ##### Services (`src/server/services/`)
 - **taskProcessingService.ts**: Processes task completions and creates generations
 - **toolSettingsService.ts**: Tool settings management with performance optimizations:
-  - `resolveToolSettings`: Fetches and merges settings from user/project/shot levels in a single optimized query
-  - Uses left joins to fetch all data at once instead of 3 parallel queries
-  - Reduces database round-trips for better mobile performance
+  - `resolveToolSettings`: Fetches and merges settings from user/project/shot levels using parallel queries
+  - Uses Promise.all to fetch all data concurrently instead of sequentially
+  - Merges settings with deep merge: defaults → user → project → shot
   - `updateToolSettings`: Updates settings at specified scope
 - **webSocketService.ts**: WebSocket server for real-time updates
 
