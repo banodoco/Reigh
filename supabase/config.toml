@@ -1,1 +1,6 @@
 project_id = "ddbobialzdjkzainyqgb"
+
+[auth]
+  external_discord_enabled = true
+  external_discord_client_id = "${DISCORD_CLIENT_ID}"
+  external_discord_secret = "${DISCORD_CLIENT_SECRET}"

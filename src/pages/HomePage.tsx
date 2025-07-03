@@ -1,14 +1,51 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, Sparkles, Image as ImageIcon, Video, UserPlus, Users, ChevronDown, ChevronUp } from 'lucide-react';
+import { ArrowRight, Sparkles, Image as ImageIcon, Video, UserPlus, Users, FileText, ChevronDown, ChevronUp, GitBranch } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import type { Session } from '@supabase/supabase-js';
+import { useNavigate } from 'react-router-dom';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/shared/components/ui/dialog';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
 
 export default function HomePage() {
   const [isHovered, setIsHovered] = useState(false);
   const [expandedFAQ, setExpandedFAQ] = useState<number | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [showCreativePartner, setShowCreativePartner] = useState(false);
+  const [showPhilosophy, setShowPhilosophy] = useState(false);
+  const navigate = useNavigate();
 
   // Scroll to top when component mounts
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
+
+  useEffect(() => {
+    // Initialize auth session tracking
+    supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+    // Redirect signed-in users straight to the app
+    if (session) {
+      navigate('/shots');
+    }
+    return () => {
+      listener.subscription.unsubscribe();
+    };
+  }, [navigate, session]);
+
+  const handleDiscordSignIn = async () => {
+    await supabase.auth.signInWithOAuth({
+      provider: 'discord',
+      options: {
+        redirectTo: window.location.origin,
+      },
+    });
+  };
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+  };
 
   const ImageTravelAnimation = () => {
     return (
@@ -30,10 +67,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Hint text */}
-        <div className="absolute -bottom-6 text-xs text-muted-foreground/60 font-inter">
-          hover to see the blend
-        </div>
+
       </div>
     );
   };
@@ -78,35 +112,39 @@ export default function HomePage() {
       <div className="absolute bottom-20 left-1/4 w-40 h-40 bg-wes-lavender/10 rounded-full blur-3xl animate-parallax-float" style={{ animationDelay: '4s' }}></div>
       
       {/* Top Navigation Links */}
-      <div className="absolute top-8 right-8 z-20 flex items-center space-x-6">
-        <a
-          href="#signup"
+      <div className="fixed top-12 left-12 z-20 flex items-center space-x-6">
+        {/* Philosophy Link */}
+        <button
+          onClick={() => setShowPhilosophy(true)}
           className="group flex items-center space-x-2 px-4 py-2 bg-white/80 backdrop-blur-sm rounded-full border-2 border-wes-vintage-gold/20 hover:border-wes-vintage-gold/40 transition-all duration-300 hover:shadow-wes-ornate"
         >
-          <UserPlus className="w-4 h-4 text-wes-vintage-gold group-hover:text-wes-mustard transition-colors" />
-          <span className="font-inter text-sm font-medium text-primary group-hover:text-primary/80">Sign Up</span>
-        </a>
+          <FileText className="w-4 h-4 text-wes-vintage-gold" />
+          <span className="font-inter text-sm font-medium text-primary group-hover:text-primary/80">Philosophy</span>
+        </button>
+      </div>
         
-        <a
-          href="#creative-partner"
+      <div className="fixed top-12 right-12 z-20 flex items-center">
+        {/* Creative Partner Programme */}
+        <button
+          onClick={() => setShowCreativePartner(true)}
           className="group flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-wes-coral/90 to-wes-pink/90 backdrop-blur-sm rounded-full border-2 border-wes-coral/30 hover:border-wes-coral/50 transition-all duration-300 hover:shadow-wes-ornate text-white hover:from-wes-coral hover:to-wes-pink"
         >
           <Users className="w-4 h-4 group-hover:scale-110 transition-transform" />
-          <span className="font-inter text-sm font-medium">Creative Partner Programme</span>
-        </a>
+          <span className="font-inter text-sm font-medium">Open Creative Partner Programme</span>
+        </button>
       </div>
 
-      <div className="container mx-auto px-4 py-24 relative z-10">
+      <div className="container mx-auto px-4 relative z-10 min-h-screen flex items-center justify-center">
         {/* Hero Section */}
-        <div className="text-center mb-32 mt-16">
-          <div className="max-w-4xl mx-auto animate-fade-in-up">
+        <div className="text-center w-full">
+          <div className="max-w-4xl mx-auto">
             {/* Image Travel Animation */}
-            <div className="mb-8 animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
+            <div className="mb-8">
               <ImageTravelAnimation />
             </div>
 
             {/* Main title */}
-            <h1 className="font-playfair text-6xl md:text-8xl font-bold text-primary mb-8 text-shadow-vintage animate-scale-in">
+            <h1 className="font-playfair text-6xl md:text-8xl font-bold text-primary mb-8 text-shadow-vintage">
               Reigh
             </h1>
             
@@ -114,8 +152,8 @@ export default function HomePage() {
             <div className="w-32 h-1.5 bg-gradient-to-r from-wes-pink to-wes-vintage-gold rounded-full mx-auto mb-8 shadow-inner-vintage"></div>
             
             {/* Subtitle */}
-            <p className="font-inter text-xl md:text-2xl text-muted-foreground leading-relaxed tracking-wide mb-12 animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
-              A tool for for the found art of travelling between images
+            <p className="font-inter text-xl md:text-2xl text-muted-foreground leading-relaxed tracking-wide mb-8">
+              A tool for the found art of travelling between images
             </p>
             
             {/* Ornamental elements */}
@@ -123,261 +161,84 @@ export default function HomePage() {
               <div className="text-3xl text-wes-vintage-gold animate-rotate-slow">❋</div>
               <div className="text-2xl text-wes-coral animate-bounce-gentle">◆</div>
               <div className="text-3xl text-wes-mint animate-sway">✧</div>
+        </div>
+
+            {/* Sign-in button below hero */}
+            {!session && (
+              <button
+                onClick={handleDiscordSignIn}
+                className="group flex items-center space-x-2 px-6 py-4 bg-gradient-to-r from-wes-vintage-gold to-wes-coral rounded-full border-2 border-wes-vintage-gold/40 hover:border-wes-vintage-gold/60 transition-all duration-300 shadow-wes-vintage hover:shadow-wes-hover text-white text-lg font-medium mx-auto"
+              >
+                <UserPlus className="w-5 h-5" />
+                <span>Sign in with Discord</span>
+              </button>
+            )}
+
+            {/* Open Source Indicator - Same distance from content as top nav is from top */}
+            <div className="mt-12 flex justify-center">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="group relative cursor-pointer">
+                      {/* Floating particles */}
+                      <div className="absolute -inset-4 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                        <div className="absolute top-0 left-0 w-1 h-1 bg-wes-vintage-gold rounded-full animate-ping" style={{ animationDelay: '0s' }}></div>
+                        <div className="absolute top-2 right-1 w-0.5 h-0.5 bg-wes-coral rounded-full animate-ping" style={{ animationDelay: '0.3s' }}></div>
+                        <div className="absolute bottom-1 left-2 w-0.5 h-0.5 bg-wes-mint rounded-full animate-ping" style={{ animationDelay: '0.6s' }}></div>
+                      </div>
+                      
+                      {/* Spinning dashed ring */}
+                      <div className="absolute -inset-3 rounded-full border-2 border-dashed border-wes-vintage-gold/20 opacity-0 group-hover:opacity-100 group-hover:animate-spin transition-all duration-500"></div>
+                      
+                      {/* Expanding glow */}
+                      <div className="absolute -inset-2 bg-gradient-to-r from-wes-vintage-gold/10 to-wes-coral/10 rounded-full blur-md opacity-0 group-hover:opacity-100 group-hover:scale-150 transition-all duration-500"></div>
+                      
+                      {/* Main icon container */}
+                      <div className="relative bg-white/80 backdrop-blur-sm rounded-full p-3 border-2 border-wes-vintage-gold/20 hover:border-wes-vintage-gold/40 transition-all duration-300 hover:shadow-wes-ornate">
+                        <GitBranch className="w-5 h-5 text-wes-vintage-gold group-hover:rotate-12 transition-transform duration-300" />
+                      </div>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Reigh is an open tool — <a href="https://github.com/peteromalley/reigh" className="underline text-wes-vintage-gold hover:text-wes-coral transition-colors">view on GitHub</a></p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
+
           </div>
         </div>
 
-        {/* Examples Section */}
-        <div className="max-w-6xl mx-auto mb-24 animate-fade-in-up" style={{ animationDelay: '0.6s' }}>
-          <div className="text-center mb-16">
-            <h2 className="font-playfair text-4xl md:text-5xl font-bold text-primary mb-6 text-shadow-vintage">
-              Visual Journeys
-            </h2>
-            <div className="w-24 h-1 bg-gradient-to-r from-wes-sage to-wes-dusty-blue rounded-full mx-auto mb-6"></div>
-            <p className="font-inter text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-              Witness the metamorphosis of images through time and imagination
-            </p>
-          </div>
+        {/*
+          Additional landing content (examples, community art, philosophy/FAQ, and decorative film strips)
+          has been commented out for a simplified hero-only layout.
+        */}
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {examples.map((example, index) => (
-              <div key={example.id} className="relative group" style={{ animationDelay: `${0.8 + index * 0.2}s` }}>
-                {/* Stable hover area to prevent flicker */}
-                <div className="absolute inset-0 -m-4 z-0 pointer-events-none" />
-                <div className="wes-vintage-card relative z-10 animate-fade-in-up">
-                  <div className="p-8">
-                    {/* Input */}
-                    <div className="mb-6">
-                      <div className="flex items-center mb-3">
-                        <ImageIcon className="w-5 h-5 text-wes-sage mr-2" />
-                        <h3 className="font-playfair text-lg font-semibold text-primary">
-                          {example.inputTitle}
-                        </h3>
-                      </div>
-                      <div className="w-full h-32 bg-gradient-to-br from-wes-cream to-wes-mint/20 rounded-lg border-2 border-wes-vintage-gold/20 flex items-center justify-center mb-3">
-                        <div className="text-center">
-                          <div className="w-12 h-12 bg-wes-vintage-gold/20 rounded-full flex items-center justify-center mx-auto mb-2">
-                            <ImageIcon className="w-6 h-6 text-wes-vintage-gold" />
-                          </div>
-                          <p className="text-xs text-muted-foreground font-inter">Input Image</p>
-                        </div>
-                      </div>
-                      <p className="text-sm text-muted-foreground font-inter">{example.inputDesc}</p>
-                    </div>
+        {/* Pop-ups */}
+        <Dialog open={showCreativePartner} onOpenChange={setShowCreativePartner}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Creative Partner Programme</DialogTitle>
+              <DialogDescription>
+                Coming soon — join our wait-list to collaborate on experimental visual journeys.
+              </DialogDescription>
+            </DialogHeader>
+          </DialogContent>
+        </Dialog>
 
-                    {/* Transition Arrow */}
-                    <div className="flex items-center justify-center mb-6">
-                      <div className="flex items-center space-x-2 text-wes-coral">
-                        <ArrowRight className="w-5 h-5" />
-                        <span className="text-sm font-inter font-medium">{example.transition}</span>
-                        <ArrowRight className="w-5 h-5" />
-                      </div>
-                    </div>
-
-                    {/* Output */}
-                    <div>
-                      <div className="flex items-center mb-3">
-                        <Video className="w-5 h-5 text-wes-coral mr-2" />
-                        <h3 className="font-playfair text-lg font-semibold text-primary">
-                          {example.outputTitle}
-                        </h3>
-                      </div>
-                      <div className="w-full h-32 bg-gradient-to-br from-wes-pink/20 to-wes-coral/20 rounded-lg border-2 border-wes-coral/20 flex items-center justify-center mb-3">
-                        <div className="text-center">
-                          <div className="w-12 h-12 bg-wes-coral/20 rounded-full flex items-center justify-center mx-auto mb-2">
-                            <Video className="w-6 h-6 text-wes-coral" />
-                          </div>
-                          <p className="text-xs text-muted-foreground font-inter">Video Journey</p>
-                        </div>
-                      </div>
-                      <p className="text-sm text-muted-foreground font-inter">{example.outputDesc}</p>
-                    </div>
-
-                    {/* Decorative ornament */}
-                    <div className="absolute top-4 right-4 opacity-20 group-hover:opacity-50 transition-opacity duration-500">
-                      <Sparkles className="w-5 h-5 text-wes-vintage-gold" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Art Gallery Section */}
-        <div className="max-w-6xl mx-auto mb-24 animate-fade-in-up" style={{ animationDelay: '1.2s' }}>
-          <div className="text-center mb-16">
-            <h2 className="font-playfair text-4xl md:text-5xl font-bold text-primary mb-6 text-shadow-vintage">
-              Community Art
-            </h2>
-            <div className="w-24 h-1 bg-gradient-to-r from-wes-coral to-wes-vintage-gold rounded-full mx-auto mb-6"></div>
-            <p className="font-inter text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-              Discover the beautiful journeys our community has created
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
-            {/* Art Placeholder 1 */}
-            <div className="relative group">
-              <div className="absolute inset-0 -m-4 z-0 pointer-events-none" />
-              <div className="wes-vintage-card relative z-10">
-                <div className="aspect-video bg-gradient-to-br from-wes-vintage-gold/20 to-wes-mustard/20 rounded-lg border-2 border-wes-vintage-gold/20 flex items-center justify-center mb-4 overflow-hidden">
-                  <div className="text-center">
-                    <div className="w-16 h-16 bg-wes-vintage-gold/30 rounded-full flex items-center justify-center mx-auto mb-3">
-                      <Video className="w-8 h-8 text-wes-vintage-gold" />
-                    </div>
-                    <p className="text-sm text-muted-foreground font-inter">Journey #1</p>
-                  </div>
-                </div>
-                <div className="p-6">
-                  <h3 className="font-playfair text-lg font-semibold text-primary mb-2">Morning to Midnight</h3>
-                  <p className="text-sm text-muted-foreground font-inter">A serene transition from dawn's first light to the electric energy of city nightlife.</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Art Placeholder 2 */}
-            <div className="relative group">
-              <div className="absolute inset-0 -m-4 z-0 pointer-events-none" />
-              <div className="wes-vintage-card relative z-10">
-                <div className="aspect-video bg-gradient-to-br from-wes-coral/20 to-wes-pink/20 rounded-lg border-2 border-wes-coral/20 flex items-center justify-center mb-4 overflow-hidden">
-                  <div className="text-center">
-                    <div className="w-16 h-16 bg-wes-coral/30 rounded-full flex items-center justify-center mx-auto mb-3">
-                      <Video className="w-8 h-8 text-wes-coral" />
-                    </div>
-                    <p className="text-sm text-muted-foreground font-inter">Journey #2</p>
-                  </div>
-                </div>
-                <div className="p-6">
-                  <h3 className="font-playfair text-lg font-semibold text-primary mb-2">Seasonal Metamorphosis</h3>
-                  <p className="text-sm text-muted-foreground font-inter">Watch as autumn leaves transform through winter snow into spring blossoms.</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Art Placeholder 3 */}
-            <div className="relative group">
-              <div className="absolute inset-0 -m-4 z-0 pointer-events-none" />
-              <div className="wes-vintage-card relative z-10">
-                <div className="aspect-video bg-gradient-to-br from-wes-sage/20 to-wes-mint/20 rounded-lg border-2 border-wes-sage/20 flex items-center justify-center mb-4 overflow-hidden">
-                  <div className="text-center">
-                    <div className="w-16 h-16 bg-wes-sage/30 rounded-full flex items-center justify-center mx-auto mb-3">
-                      <Video className="w-8 h-8 text-wes-sage" />
-                    </div>
-                    <p className="text-sm text-muted-foreground font-inter">Journey #3</p>
-                  </div>
-                </div>
-                <div className="p-6">
-                  <h3 className="font-playfair text-lg font-semibold text-primary mb-2">Ocean Dreams</h3>
-                  <p className="text-sm text-muted-foreground font-inter">A meditative flow between calm waters and turbulent waves of emotion.</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* View All Art Link */}
-          <div className="text-center">
-            <a
-              href="/art"
-              className="inline-flex items-center space-x-3 px-8 py-4 bg-gradient-to-r from-wes-sage to-wes-mint text-white rounded-full border-2 border-wes-sage/30 hover:border-wes-sage/50 transition-all duration-300 hover:shadow-wes-ornate hover:scale-105 font-inter font-medium"
-            >
-              <span>View All Community Art</span>
-              <ArrowRight className="w-5 h-5" />
-            </a>
-          </div>
-        </div>
-
-        {/* Philosophy and FAQ Side by Side */}
-        <div className="max-w-7xl mx-auto mb-24 animate-fade-in-up" style={{ animationDelay: '1.4s' }}>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-            
-            {/* Philosophy Section */}
-            <div className="text-center">
-              <div className="wes-ornate-frame p-8 h-full">
-                <h2 className="font-playfair text-3xl md:text-4xl font-bold text-primary mb-6 text-shadow-vintage">
-                  Philosophy
-                </h2>
-                <div className="w-20 h-1 bg-gradient-to-r from-wes-lavender to-wes-pink rounded-full mx-auto mb-8"></div>
-                
-                <div className="space-y-6 text-left">
-                  <p className="font-inter text-base text-muted-foreground leading-relaxed">
-                    In the spaces between images lies a universe of possibility. Reigh embraces the concept of 
-                    <em className="text-primary font-medium"> found art</em> — discovering beauty not in the destination, 
-                    but in the journey itself.
-                  </p>
-                  
-                  <p className="font-inter text-base text-muted-foreground leading-relaxed">
-                    Each transformation becomes a meditation on change, time, and the fluid nature of visual perception. 
-                    We don't simply create; we uncover the hidden narratives that exist in the liminal spaces between 
-                    one moment and the next.
-                  </p>
-                  
-                  <p className="font-inter text-base text-muted-foreground leading-relaxed">
-                    Like watching clouds shift across an endless sky, or observing how light travels across a room 
-                    throughout the day, Reigh reveals the profound poetry embedded in transition — making visible 
-                    the invisible threads that connect all things.
-                  </p>
-                </div>
-
-                {/* Closing ornamental elements */}
-                <div className="flex justify-center items-center space-x-6 mt-8 opacity-40">
-                  <div className="text-xl text-wes-lavender animate-sway">✧</div>
-                  <div className="text-2xl text-wes-vintage-gold animate-rotate-slow">❋</div>
-                  <div className="text-xl text-wes-coral animate-bounce-gentle">◆</div>
-                </div>
-              </div>
-            </div>
-
-            {/* FAQ Section */}
-            <div>
-              <div className="text-center mb-8">
-                <h2 className="font-playfair text-3xl md:text-4xl font-bold text-primary mb-6 text-shadow-vintage">
-                  Frequently Asked Questions
-                </h2>
-                <div className="w-20 h-1 bg-gradient-to-r from-wes-coral to-wes-sage rounded-full mx-auto"></div>
-              </div>
-
-              <div className="space-y-4">
-                {/* FAQ Item */}
-                <div className="wes-vintage-card">
-                  <button
-                    className="w-full p-6 text-left flex items-center justify-between hover:bg-wes-cream/10 transition-colors"
-                    onClick={() => setExpandedFAQ(expandedFAQ === 1 ? null : 1)}
-                  >
-                    <h3 className="font-playfair text-lg font-semibold text-primary flex items-start flex-1">
-                      <span className="text-wes-coral mr-3 text-xl leading-none">Q:</span>
-                      "I made something and it doesn't look what I want"
-                    </h3>
-                    {expandedFAQ === 1 ? (
-                      <ChevronUp className="w-5 h-5 text-wes-coral flex-shrink-0 ml-4" />
-                    ) : (
-                      <ChevronDown className="w-5 h-5 text-wes-coral flex-shrink-0 ml-4" />
-                    )}
-                  </button>
-                  
-                  {expandedFAQ === 1 && (
-                    <div className="px-6 pb-6 ml-8 space-y-4 animate-fade-in-up">
-                      <p className="font-inter text-sm text-muted-foreground leading-relaxed">
-                        This is the beauty of found art — sometimes the most profound discoveries happen when we let go of our expectations. Reigh is designed to reveal unexpected journeys between images, not to fulfill predetermined visions.
-                      </p>
-                      <p className="font-inter text-sm text-muted-foreground leading-relaxed">
-                        Consider what emerged instead of what you intended. Often, the algorithm uncovers connections and transitions that our conscious minds wouldn't have imagined. The "mistake" might be pointing toward something more interesting than your original concept.
-                      </p>
-                      <p className="font-inter text-sm text-muted-foreground leading-relaxed">
-                        Try adjusting your input images or experimenting with different sequences. Sometimes a small change in the starting point can lead to dramatically different — and surprisingly compelling — results.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <Dialog open={showPhilosophy} onOpenChange={setShowPhilosophy}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Our Philosophy</DialogTitle>
+              <DialogDescription>
+                Reigh celebrates the "found art of travelling between images": embracing randomness, transformation, and narrative to kindle creativity.
+              </DialogDescription>
+            </DialogHeader>
+          </DialogContent>
+        </Dialog>
       </div>
-      
-      {/* Vintage film strips */}
-      <div className="absolute left-0 top-1/4 w-8 h-64 wes-filmstrip opacity-20"></div>
-      <div className="absolute right-0 bottom-1/4 w-8 h-64 wes-filmstrip opacity-20"></div>
+
+
     </div>
   );
 } 

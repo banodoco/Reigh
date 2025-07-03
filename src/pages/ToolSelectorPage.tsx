@@ -61,7 +61,7 @@ const assistantTools = [
   {
     id: 'edit-images',
     name: 'Edit\nImages',
-    description: 'Transform and enhance images with text-based editing and artistic reimagining.',
+    description: 'Transform and enhance images with text-based editing and reimagining.',
     tool: null, // Marked as coming soon
     icon: Edit,
     gradient: 'from-wes-yellow via-wes-salmon to-wes-pink',
