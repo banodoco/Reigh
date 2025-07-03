@@ -1,10 +1,10 @@
-import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
+import React, { createContext, useState, useContext, ReactNode, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Project } from '@/types/project'; // Added import
 import { ProjectUpdate } from '../../../db/schema/schema';
-import { useToolSettings } from '@/shared/hooks/useToolSettings';
 import { UserPreferences } from '@/shared/settings/userPreferences';
+import { fetchWithAuth } from '@/lib/api';
 
 interface ProjectContextType {
   projects: Project[];
@@ -58,6 +58,9 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
   const [isUpdatingProject, setIsUpdatingProject] = useState(false);
   const [isDeletingProject, setIsDeletingProject] = useState(false);
   const [userId, setUserId] = useState<string | undefined>(undefined);
+  const [userPreferences, setUserPreferences] = useState<UserPreferences | undefined>(undefined);
+  const [isLoadingPreferences, setIsLoadingPreferences] = useState(false);
+  const userPreferencesRef = useRef<UserPreferences | undefined>(undefined);
 
   // Set up auth state tracking
   useEffect(() => {
@@ -74,11 +77,69 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
 
-  // Use tool settings for user preferences (only when we have a userId)
-  const { settings: userPreferences, update: updateUserPreferences } = useToolSettings<UserPreferences>(
-    'user-preferences', 
-    { enabled: !!userId }
-  );
+  // Fetch user preferences directly without circular dependency
+  const fetchUserPreferences = async () => {
+    if (!userId) return;
+    
+    setIsLoadingPreferences(true);
+    try {
+      const baseUrl = import.meta.env.VITE_API_TARGET_URL || window.location.origin;
+      const params = new URLSearchParams({ toolId: 'user-preferences' });
+      
+      const response = await fetchWithAuth(`${baseUrl}/api/tool-settings/resolve?${params}`, {
+        headers: { 'Content-Type': 'application/json' },
+      });
+      
+      if (response.ok) {
+        const preferences = await response.json();
+        setUserPreferences(preferences);
+        userPreferencesRef.current = preferences;
+      }
+    } catch (error) {
+      console.error('Failed to fetch user preferences:', error);
+    } finally {
+      setIsLoadingPreferences(false);
+    }
+  };
+
+  // Update user preferences directly
+  const updateUserPreferences = async (scope: 'user', patch: Partial<UserPreferences>) => {
+    if (!userId) return;
+    
+    try {
+      const baseUrl = import.meta.env.VITE_API_TARGET_URL || window.location.origin;
+      
+      const response = await fetchWithAuth(`${baseUrl}/api/tool-settings`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scope,
+          id: userId,
+          toolId: 'user-preferences',
+          patch,
+        }),
+      });
+      
+      if (response.ok) {
+        // Update local state
+        const newPreferences = { ...userPreferences, ...patch };
+        setUserPreferences(newPreferences);
+        userPreferencesRef.current = newPreferences;
+      }
+    } catch (error) {
+      console.error('Failed to update user preferences:', error);
+    }
+  };
+
+  // Fetch preferences when userId changes
+  useEffect(() => {
+    if (userId) {
+      fetchUserPreferences();
+    } else {
+      setUserPreferences(undefined);
+      userPreferencesRef.current = undefined;
+    }
+  }, [userId]);
 
   const fetchProjects = async () => {
     try {
@@ -264,13 +325,15 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
-    // Wait a bit for auth to be ready before fetching projects
-    const timer = setTimeout(() => {
-      fetchProjects();
-    }, 500); // Give auth time to complete
-   
-    return () => clearTimeout(timer);
-  }, [userPreferences]); // Also depend on userPreferences so we refetch when they load
+    // Wait for auth and user preferences to be ready before fetching projects
+    if (userId && !isLoadingPreferences) {
+      const timer = setTimeout(() => {
+        fetchProjects();
+      }, 100); // Small delay to ensure everything is ready
+     
+      return () => clearTimeout(timer);
+    }
+  }, [userId, isLoadingPreferences]); // Refetch when user changes or preferences finish loading
 
   const handleSetSelectedProjectId = (projectId: string | null) => {
     setSelectedProjectIdState(projectId);
