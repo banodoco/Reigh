@@ -94,10 +94,9 @@ const ShotsPane: React.FC = () => {
           position: 'fixed',
           left: 0,
           top: 0,
-          bottom: `${bottomOffset}px`,
+          bottom: 0,
           width: `${shotsPaneWidth}px`,
           zIndex: 60,
-          transition: 'bottom 300ms ease-in-out',
         }}
       >
         <div
@@ -141,10 +140,10 @@ const ShotsPane: React.FC = () => {
             isLoading={createShotMutation.isPending || handleExternalImageDropMutation.isPending}
             defaultShotName={`Shot ${(shots?.length ?? 0) + 1}`}
           />
-                  </div>
         </div>
-      </>
-    );
-  };
+      </div>
+    </>
+  );
+};
 
 export default ShotsPane; 

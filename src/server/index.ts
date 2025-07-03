@@ -29,7 +29,6 @@ import { initializeWebSocketServer } from './services/webSocketService';
 import http from 'http';
 import { seedDatabase } from '../lib/seed';
 import singleImageRouter from './routes/singleImageGeneration';
-import localLorasRouter from './routes/localLoras';
 // import { fileURLToPath } from 'url'; // No longer needed if using process.cwd()
 
 // // Determine __dirname for ES modules
@@ -47,100 +46,6 @@ const PORT: number = process.env.PORT ? parseInt(process.env.PORT, 10) : 8085;
 app.use(cors()); // Basic CORS setup, configure as needed for production
 app.use(express.json()); // To parse JSON request bodies
 
-// --- START: Local Image Upload Logic ---
-const LOCAL_FILES_DIR_NAME = 'files'; // Changed from UPLOADS_DIR_NAME
-
-// Relative to project root
-const projectRoot = process.cwd(); // Assumes server is run from project root
-const publicDir = path.join(projectRoot, 'public');
-// Updated to point directly to public/files
-const localFilesStorageDir = path.join(publicDir, LOCAL_FILES_DIR_NAME);
-
-// Ensure the upload directory exists
-if (!fs.existsSync(localFilesStorageDir)) {
-  fs.mkdirSync(localFilesStorageDir, { recursive: true });
-  console.log(`Created directory: ${localFilesStorageDir}`);
-} else {
-  console.log(`Upload directory already exists: ${localFilesStorageDir}`);
-}
-
-
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, localFilesStorageDir); // Updated destination
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
-  }
-});
-
-const upload = multer({ storage: storage });
-
-// Add static middleware to serve local files via Express
-app.use('/files', express.static(localFilesStorageDir));
-
-// --- START: Local File Upload Logic ---
-app.post('/api/local-image-upload', upload.single('image'), (req: express.Request, res: express.Response): void => {
-  if (!req.file) {
-    res.status(400).json({ message: 'No file uploaded.' });
-    return;
-  }
-  // Build relative URL for the uploaded file
-  const relativeFileUrl = `/${LOCAL_FILES_DIR_NAME}/${req.file.filename}`;
-  // Construct full absolute URL using req.protocol and host - REMOVED, NOT NEEDED FOR CLIENT
-  // const fullUrl = `${req.protocol}://${req.get('host')}${relativeFileUrl}`; 
-  res.json({ url: relativeFileUrl }); // Return the relative URL
-  return;
-});
-
-// --- START: Flipped Image Upload Logic ---
-app.post('/api/upload-flipped-image', upload.single('file'), (req: express.Request, res: express.Response): void => {
-  console.log(`[FlippedImageUpload] Started processing flipped image upload`);
-  console.log(`[FlippedImageUpload] Request headers:`, {
-    'content-type': req.headers['content-type'],
-    'content-length': req.headers['content-length']
-  });
-  
-  if (!req.file) {
-    console.error(`[FlippedImageUpload] ERROR: No file uploaded in request`);
-    res.status(400).json({ message: 'No file uploaded.' });
-    return;
-  }
-  
-  console.log(`[FlippedImageUpload] File details:`, {
-    originalname: req.file.originalname,
-    filename: req.file.filename,
-    size: req.file.size,
-    mimetype: req.file.mimetype,
-    destination: req.file.destination,
-    path: req.file.path
-  });
-  
-  // Build relative URL for the uploaded file
-  const relativeFileUrl = `/${LOCAL_FILES_DIR_NAME}/${req.file.filename}`;
-  const fullPath = path.join(localFilesStorageDir, req.file.filename);
-  
-  // Verify file exists on disk
-  const fileExists = fs.existsSync(fullPath);
-  console.log(`[FlippedImageUpload] File saved successfully:`, {
-    relativeUrl: relativeFileUrl,
-    fullPath: fullPath,
-    fileExists: fileExists,
-    storageDirectory: localFilesStorageDir
-  });
-  
-  console.log(`[FlippedImageUpload] Saved flipped image: ${req.file.filename} (${req.file.size} bytes)`);
-  
-  const response = { url: relativeFileUrl, imageUrl: relativeFileUrl };
-  console.log(`[FlippedImageUpload] Sending response:`, response);
-  
-  res.json(response); // Return both url and imageUrl for compatibility
-  return;
-});
-// --- END: Flipped Image Upload Logic ---
-// --- END: Local File Upload Logic ---
-
 // API Routes
 app.use('/api/projects', projectsRouter);
 app.use('/api/shots', shotsRouter);
@@ -151,12 +56,13 @@ app.use('/api/resources', resourcesRouter);
 app.use('/api/api-keys', apiKeysRouter);
 app.use('/api/tool-settings', toolSettingsRouter);
 app.use('/api/single-image', singleImageRouter);
-app.use('/api/local-loras', localLorasRouter);
 
 const startServer = async () => {
   try {
-    // Seed the database with necessary initial data
-    await seedDatabase();
+    // Only seed the database in development mode
+    if (process.env.NODE_ENV === 'development') {
+      await seedDatabase();
+    }
 
     // The existing server initialization logic
     const server = app.listen(PORT, () => {

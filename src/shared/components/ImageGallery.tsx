@@ -91,6 +91,8 @@ interface ImageGalleryProps {
   totalCount?: number;
   /** Use white text for pagination and filter labels (e.g., in dark pane). */
   whiteText?: boolean;
+  /** Number of columns per row for the grid layout (default 5) */
+  columnsPerRow?: number;
 }
 
 // Helper to format metadata for display
@@ -125,7 +127,7 @@ const formatMetadataForDisplay = (metadata: DisplayableMetadata): string => {
   return displayText.trim() || "No metadata available.";
 };
 
-const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, isDeleting, onApplySettings, allShots, lastShotId, onAddToLastShot, currentToolType, initialFilterState = true, onImageSaved, offset = 0, totalCount, whiteText = false }) => {
+const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, isDeleting, onApplySettings, allShots, lastShotId, onAddToLastShot, currentToolType, initialFilterState = true, onImageSaved, offset = 0, totalCount, whiteText = false, columnsPerRow = 5 }) => {
   const [lightboxImageUrl, setLightboxImageUrl] = useState<string | null>(null);
   const [lightboxImageAlt, setLightboxImageAlt] = useState<string>("Fullscreen view");
   const [lightboxImageId, setLightboxImageId] = useState<string | undefined>(undefined);
@@ -415,7 +417,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, isDeletin
         )}
 
         {paginatedImages.length > 0 && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 2xl:grid-cols-5 gap-4">
+            <div className={`grid gap-4 ${columnsPerRow === 6 ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-6' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 2xl:grid-cols-5'}`}>
             {paginatedImages.map((image, index) => {
                 const displayUrl = getDisplayUrl(image.url);
                 const metadataForDisplay = image.metadata ? formatMetadataForDisplay(image.metadata) : "No metadata available.";

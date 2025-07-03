@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/card";
 import { GenerationRow } from "@/types/shots";
 import VideoLightbox from "./VideoLightbox.tsx";
@@ -11,7 +11,6 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/shared/components/ui/pagination";
-import { Skeleton } from '@/shared/components/ui/skeleton';
 
 interface VideoOutputsGalleryProps {
   videoOutputs: GenerationRow[];
@@ -38,9 +37,23 @@ interface VideoOutputsGalleryProps {
 
 const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({ videoOutputs, onDelete, deletingVideoId, onApplySettings, onApplySettingsFromTask, onImageSaved }) => {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
-  const [animatedVideoOutputs, setAnimatedVideoOutputs] = useState<GenerationRow[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const videosPerPage = 9;
+
+  /**
+   * NOTE: We previously used a map of setTimeout callbacks (one per video
+   * output) to create a staggered fade-in effect. Chrome surfaced this as
+   * '[Violation] "setTimeout" handler took <N> ms' warnings because mounting
+   * each <VideoOutputItem/>—especially when videos are heavy—can take 50 ms+
+   * of main-thread time, and running that work inside a timer blocks the event
+   * loop.
+   *
+   * The animation is now fully delegated to CSS.  We still want the items to
+   * fade & zoom in sequentially, so we pass `animationDelay` based on the
+   * list index.  No JavaScript timers are needed and the main thread remains
+   * free, eliminating the warning.
+   */
+  // Removed animatedVideoOutputs state – we now render everything immediately.
 
   // Sort videos by creation date (newest first)
   const sortedVideoOutputs = useMemo(() => {
@@ -65,23 +78,6 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({ videoOutputs,
     return sortedVideoOutputs.slice(startIndex, endIndex);
   }, [sortedVideoOutputs, currentPage]);
 
-  useEffect(() => {
-    // This effect handles the sequential fade-in of video items.
-    // When the list of videos changes, it resets and re-runs the animation.
-    setAnimatedVideoOutputs([]);
-
-    const timeouts = paginatedVideos.map((video, index) => {
-        return setTimeout(() => {
-            setAnimatedVideoOutputs(prev => [...prev, video]);
-        }, index * 150); // Stagger by 150ms
-    });
-
-    // Cleanup timeouts on unmount or if videoOutputs changes again
-    return () => {
-        timeouts.forEach(clearTimeout);
-    };
-  }, [paginatedVideos]);
-
   if (sortedVideoOutputs.length === 0) {
     return null;
   }
@@ -105,32 +101,25 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({ videoOutputs,
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {paginatedVideos.map((video) => {
-              const isVisible = animatedVideoOutputs.some(v => v.id === video.id);
-              if (!isVisible) {
-                return (
-                  <Skeleton
-                    key={video.id}
-                    className="w-full aspect-video rounded-lg bg-muted/40"
-                  />
-                );
-              }
-              return (
-                <div key={video.id} className="animate-in fade-in zoom-in-95 duration-500 ease-out">
-                  <VideoOutputItem
-                    video={video}
-                    onDoubleClick={() => {
-                      const originalIndex = sortedVideoOutputs.findIndex(v => v.id === video.id);
-                      setLightboxIndex(originalIndex);
-                    }}
-                    onDelete={onDelete}
-                    isDeleting={deletingVideoId === video.id}
-                    onApplySettings={onApplySettings}
-                    onApplySettingsFromTask={onApplySettingsFromTask}
-                  />
-                </div>
-              );
-            })}
+            {paginatedVideos.map((video, index) => (
+              <div
+                key={video.id}
+                className="animate-in fade-in zoom-in-95 duration-500 ease-out"
+                style={{ animationDelay: `${index * 150}ms` }}
+              >
+                <VideoOutputItem
+                  video={video}
+                  onDoubleClick={() => {
+                    const originalIndex = sortedVideoOutputs.findIndex(v => v.id === video.id);
+                    setLightboxIndex(originalIndex);
+                  }}
+                  onDelete={onDelete}
+                  isDeleting={deletingVideoId === video.id}
+                  onApplySettings={onApplySettings}
+                  onApplySettingsFromTask={onApplySettingsFromTask}
+                />
+              </div>
+            ))}
           </div>
           {pageCount > 1 && (
             <Pagination className="mt-8">

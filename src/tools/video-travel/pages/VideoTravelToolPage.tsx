@@ -25,6 +25,7 @@ export interface ActiveLora {
   path: string;
   strength: number;
   previewImageUrl?: string;
+  trigger_word?: string;
 }
 
 const VideoTravelToolPage: React.FC = () => {
@@ -120,6 +121,7 @@ const VideoTravelToolPage: React.FC = () => {
       setVideoPairConfigs(settings.pairConfigs || []);
       setGenerationMode(settings.generationMode || 'batch');
       setPairConfigs(settings.pairConfigs || []);
+      setSelectedLoras(settings.selectedLoras || []);
       setSteerableMotionSettings(settings.steerableMotionSettings || {
     negative_prompt: '',
     model_name: 'vace_14B',
@@ -145,15 +147,7 @@ const VideoTravelToolPage: React.FC = () => {
     lastSavedSettingsRef.current = null;
   }, [selectedShot?.id]);
 
-  useEffect(() => {
-    fetch('/data/loras.json')
-      .then(response => response.json())
-      .then(data => {
-        const allLoras = Object.values(data).flat();
-        setAvailableLoras(allLoras as LoraModel[]);
-      })
-      .catch(error => console.error("Error fetching LoRA data:", error));
-  }, []);
+
 
   useEffect(() => {
     if (!selectedProjectId) {
@@ -401,6 +395,7 @@ const VideoTravelToolPage: React.FC = () => {
           enhancePrompt,
           generationMode,
           pairConfigs,
+          selectedLoras,
         };
 
         // Check if we just saved these exact settings
@@ -437,6 +432,7 @@ const VideoTravelToolPage: React.FC = () => {
     enhancePrompt,
     generationMode,
     JSON.stringify(pairConfigs),
+    JSON.stringify(selectedLoras),
     settings,
     updateSettings,
     isUpdating
@@ -448,6 +444,7 @@ const VideoTravelToolPage: React.FC = () => {
       return;
     }
     if (loraToAdd["Model Files"] && loraToAdd["Model Files"].length > 0) {
+      userHasInteracted.current = true;
       setSelectedLoras(prevLoras => [
         ...prevLoras,
         {
@@ -456,6 +453,7 @@ const VideoTravelToolPage: React.FC = () => {
           path: loraToAdd["Model Files"][0].url,
           strength: 1.0,
           previewImageUrl: loraToAdd.Images && loraToAdd.Images.length > 0 ? loraToAdd.Images[0].url : undefined,
+          trigger_word: loraToAdd.trigger_word,
         },
       ]);
       console.log(`LoRA added.`);
@@ -465,10 +463,12 @@ const VideoTravelToolPage: React.FC = () => {
   };
 
   const handleRemoveLora = (loraIdToRemove: string) => {
+    userHasInteracted.current = true;
     setSelectedLoras(prevLoras => prevLoras.filter(lora => lora.id !== loraIdToRemove));
   };
 
   const handleLoraStrengthChange = (loraId: string, newStrength: number) => {
+    userHasInteracted.current = true;
     setSelectedLoras(prevLoras =>
       prevLoras.map(lora => (lora.id === loraId ? { ...lora, strength: newStrength } : lora))
     );

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToolSettings } from '@/shared/hooks/useToolSettings';
 
@@ -28,14 +28,14 @@ interface PanesContextType {
 const PanesContext = createContext<PanesContextType | undefined>(undefined);
 
 export const PanesProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [isGenerationsPaneLocked, setIsGenerationsPaneLocked] = useState(false);
-  const [generationsPaneHeight, setGenerationsPaneHeight] = useState(350);
+  const [isGenerationsPaneLocked, setIsGenerationsPaneLockedState] = useState(false);
+  const [generationsPaneHeight, setGenerationsPaneHeightState] = useState(350);
 
-  const [isShotsPaneLocked, setIsShotsPaneLocked] = useState(false);
-  const [shotsPaneWidth, setShotsPaneWidth] = useState(300);
+  const [isShotsPaneLocked, setIsShotsPaneLockedState] = useState(false);
+  const [shotsPaneWidth, setShotsPaneWidthState] = useState(300);
 
-  const [isTasksPaneLocked, setIsTasksPaneLocked] = useState(false);
-  const [tasksPaneWidth, setTasksPaneWidth] = useState(350);
+  const [isTasksPaneLocked, setIsTasksPaneLockedState] = useState(false);
+  const [tasksPaneWidth, setTasksPaneWidthState] = useState(350);
 
   const [userId, setUserId] = useState<string | undefined>(undefined);
 
@@ -53,18 +53,18 @@ export const PanesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     };
   }, []);
 
-  const { settings: persistedSettings, isLoading: isLoadingSettings, update } = useToolSettings<PaneLockSettings>('pane-locks', userId);
+  const { settings: persistedSettings, isLoading: isLoadingSettings, update } = useToolSettings<PaneLockSettings>('pane-locks');
 
   useEffect(() => {
     if (!isLoadingSettings && persistedSettings) {
       if (persistedSettings.isGenerationsPaneLocked !== undefined) {
-        setIsGenerationsPaneLocked(persistedSettings.isGenerationsPaneLocked);
+        setIsGenerationsPaneLockedState(persistedSettings.isGenerationsPaneLocked);
       }
       if (persistedSettings.isShotsPaneLocked !== undefined) {
-        setIsShotsPaneLocked(persistedSettings.isShotsPaneLocked);
+        setIsShotsPaneLockedState(persistedSettings.isShotsPaneLocked);
       }
       if (persistedSettings.isTasksPaneLocked !== undefined) {
-        setIsTasksPaneLocked(persistedSettings.isTasksPaneLocked);
+        setIsTasksPaneLockedState(persistedSettings.isTasksPaneLocked);
       }
     }
   }, [isLoadingSettings, persistedSettings]);
@@ -94,20 +94,61 @@ export const PanesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     };
   }, [isGenerationsPaneLocked, isShotsPaneLocked, isTasksPaneLocked, isLoadingSettings, userId, update]);
 
-  const value = {
-    isGenerationsPaneLocked,
-    setIsGenerationsPaneLocked,
-    generationsPaneHeight,
-    setGenerationsPaneHeight,
-    isShotsPaneLocked,
-    setIsShotsPaneLocked,
-    shotsPaneWidth,
-    setShotsPaneWidth,
-    isTasksPaneLocked,
-    setIsTasksPaneLocked,
-    tasksPaneWidth,
-    setTasksPaneWidth,
-  };
+  // Memoize setters to prevent re-creation on every render
+  const setIsGenerationsPaneLocked = useCallback((isLocked: boolean) => {
+    setIsGenerationsPaneLockedState(isLocked);
+  }, []);
+
+  const setGenerationsPaneHeight = useCallback((height: number) => {
+    setGenerationsPaneHeightState(height);
+  }, []);
+
+  const setIsShotsPaneLocked = useCallback((isLocked: boolean) => {
+    setIsShotsPaneLockedState(isLocked);
+  }, []);
+
+  const setShotsPaneWidth = useCallback((width: number) => {
+    setShotsPaneWidthState(width);
+  }, []);
+
+  const setIsTasksPaneLocked = useCallback((isLocked: boolean) => {
+    setIsTasksPaneLockedState(isLocked);
+  }, []);
+
+  const setTasksPaneWidth = useCallback((width: number) => {
+    setTasksPaneWidthState(width);
+  }, []);
+
+  const value = useMemo(
+    () => ({
+      isGenerationsPaneLocked,
+      setIsGenerationsPaneLocked,
+      generationsPaneHeight,
+      setGenerationsPaneHeight,
+      isShotsPaneLocked,
+      setIsShotsPaneLocked,
+      shotsPaneWidth,
+      setShotsPaneWidth,
+      isTasksPaneLocked,
+      setIsTasksPaneLocked,
+      tasksPaneWidth,
+      setTasksPaneWidth,
+    }),
+    [
+      isGenerationsPaneLocked,
+      setIsGenerationsPaneLocked,
+      generationsPaneHeight,
+      setGenerationsPaneHeight,
+      isShotsPaneLocked,
+      setIsShotsPaneLocked,
+      shotsPaneWidth,
+      setShotsPaneWidth,
+      isTasksPaneLocked,
+      setIsTasksPaneLocked,
+      tasksPaneWidth,
+      setTasksPaneWidth,
+    ]
+  );
 
   return <PanesContext.Provider value={value}>{children}</PanesContext.Provider>;
 };

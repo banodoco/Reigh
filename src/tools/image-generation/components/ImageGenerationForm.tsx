@@ -398,7 +398,9 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
     }
   }));
 
-  useEffect(() => { fetch('/data/loras.json').then(response => response.json()).then((data: LoraData) => setAvailableLoras(data.models || [])).catch(error => console.error("Error fetching LoRA data:", error)); }, []);
+  useEffect(() => {
+    setAvailableLoras([]);
+  }, []);
   useEffect(() => { 
     if (
       generationMode === 'flux-api' && // only apply defaults when in Flux mode
@@ -800,8 +802,7 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
                 max={16}
                 step={1}
                 disabled={!hasApiKey || isGenerating}
-              />
-            </div>
+              />            </div>
           </div>
           {/* Show starting image and ControlNet for Flux API only */}
           {generationMode === 'flux-api' && (
@@ -836,7 +837,7 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
               <Button type="button" variant="outline" className="w-full mt-1" onClick={() => setIsLoraModalOpen(true)} disabled={isGenerating}>
                 Add or Manage LoRA Models
               </Button>
-            {availableLoras.length === 0 && !isLoraModalOpen && <p className="text-xs text-muted-foreground mt-1">Loading LoRA models for selection...</p>}
+            
             {selectedLorasMap[generationMode].length > 0 && (
               <TooltipProvider>
                 <div className="mt-4 space-y-4 pt-2">

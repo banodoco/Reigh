@@ -1,4 +1,4 @@
-import React, { createContext, useState, ReactNode } from 'react';
+import React, { createContext, useState, ReactNode, useCallback, useMemo } from 'react';
 
 interface LastAffectedShotContextType {
   lastAffectedShotId: string | null;
@@ -10,8 +10,13 @@ export const LastAffectedShotContext = createContext<LastAffectedShotContextType
 export const LastAffectedShotProvider = ({ children }: { children: ReactNode }) => {
   const [lastAffectedShotId, setLastAffectedShotId] = useState<string | null>(null);
 
+  const value = useMemo(
+    () => ({ lastAffectedShotId, setLastAffectedShotId }),
+    [lastAffectedShotId]
+  );
+
   return (
-    <LastAffectedShotContext.Provider value={{ lastAffectedShotId, setLastAffectedShotId }}>
+    <LastAffectedShotContext.Provider value={value}>
       {children}
     </LastAffectedShotContext.Provider>
   );

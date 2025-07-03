@@ -1,4 +1,5 @@
 import { SteerableMotionSettings } from './components/ShotEditor';
+import { ActiveLora } from './pages/VideoTravelToolPage';
 
 export interface VideoTravelSettings {
   videoControlMode: 'individual' | 'batch';
@@ -21,6 +22,8 @@ export interface VideoTravelSettings {
   }>;
   // Store the shot images as part of settings
   shotImageIds?: string[];
+  // Store selected LoRAs
+  selectedLoras?: ActiveLora[];
 }
 
 export const videoTravelSettings = {

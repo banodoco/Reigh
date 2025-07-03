@@ -1140,6 +1140,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                     onEnhancePromptChange={onEnhancePromptChange}
                     generationMode={generationMode}
                     onGenerationModeChange={onGenerationModeChange}
+                    selectedLoras={selectedLoras}
+                    availableLoras={availableLoras}
                 />
                 
                 <div className="space-y-4 py-6 border-t mt-6">
@@ -1147,7 +1149,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                     <Button type="button" variant="outline" className="w-full" onClick={() => setIsLoraModalOpen(true)}>
                      Add or Manage LoRAs
                     </Button>
-                    {availableLoras.length === 0 && !isLoraModalOpen && <p className="text-xs text-muted-foreground mt-1">Loading LoRA models for selection...</p>}
+                    
                     {selectedLoras.length > 0 && (
                       <TooltipProvider>
                         <div className="mt-4 space-y-4">

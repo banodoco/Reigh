@@ -17,6 +17,9 @@ import { uploadImageToStorage } from '@/shared/lib/imageUploader';
 import { Checkbox } from "@/shared/components/ui/checkbox";
 import { toast } from "sonner";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/shared/components/ui/alert-dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/shared/components/ui/tooltip";
+import { Info } from 'lucide-react';
+import HoverScrubVideo from '@/shared/components/HoverScrubVideo';
 
 interface LoraModelImage {
   alt_text: string;
@@ -59,6 +62,7 @@ export interface LoraModel {
   }[];
   main_generation?: string; // URL to the main generation
   is_public?: boolean;
+  trigger_word?: string; // New field for trigger word
   [key: string]: unknown;
 }
 
@@ -120,28 +124,6 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps> = ({ loras, onAddLora,
   
   // Local Wan LoRAs (files dropped into Headless-Wan2GP/loras)
   const [localWanLoras, setLocalWanLoras] = useState<LoraModel[]>([]);
-
-  useEffect(() => {
-    // Fetch local LoRAs
-    fetch('/api/local-loras')
-      .then(res => res.json())
-      .then((data) => {
-        if (Array.isArray(data.files)) {
-          const parsed: LoraModel[] = data.files.map((filePath: string) => ({
-            "Model ID": filePath,
-            Name: filePath.split('/').pop() || filePath,
-            Author: 'You (Local)',
-            Images: [],
-            "Model Files": [{ path: filePath, url: filePath }],
-            lora_type: 'Wan 2.1 14b',
-            created_by: { is_you: true },
-            is_public: false,
-          }));
-          setLocalWanLoras(parsed);
-        }
-      })
-      .catch(err => console.error('Error fetching local LoRAs:', err));
-  }, []);
 
   // Combine all LoRAs (community + saved + local)
   const allLoras = useMemo(() => {
@@ -297,7 +279,26 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps> = ({ loras, onAddLora,
               const resourceId = (lora as any)._resourceId;
 
               return (
-                <Card key={lora["Model ID"]} className="w-full">
+                <Card 
+                  key={lora["Model ID"]} 
+                  className={`w-full cursor-pointer transition-all duration-200 ${
+                    isSelectedOnGenerator 
+                      ? 'border-green-500 bg-green-50 dark:bg-green-950/20 shadow-sm' 
+                      : 'hover:border-gray-400 hover:shadow-sm'
+                  }`}
+                  onClick={(e) => {
+                    // Prevent click if clicking on a button
+                    const target = e.target as HTMLElement;
+                    if (target.closest('button')) return;
+                    
+                    // Toggle selection
+                    if (isSelectedOnGenerator) {
+                      onRemoveLora(lora["Model ID"]);
+                    } else if (lora["Model Files"] && lora["Model Files"].length > 0) {
+                      onAddLora(lora);
+                    }
+                  }}
+                >
                   <div className="flex flex-col">
                     <CardHeader className="pb-2">
                         <div className="flex justify-between items-start gap-2">
@@ -306,8 +307,13 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps> = ({ loras, onAddLora,
                                   <CardTitle className="text-lg" title={lora.Name !== "N/A" ? lora.Name : lora["Model ID"]}>
                                       {lora.Name !== "N/A" ? lora.Name : lora["Model ID"]}
                                   </CardTitle>
+                                  {isSelectedOnGenerator && (
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-600 text-white">
+                                      Added
+                                    </span>
+                                  )}
                                   {isMyLora && (
-                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                                       {isLocalLora ? 'Local' : 'Mine'}
                                     </span>
                                   )}
@@ -332,7 +338,7 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps> = ({ loras, onAddLora,
                                     onClick={() => handleDeleteClick(resourceId, lora.Name)}
                                     disabled={deleteResource.isPending}
                                 >
-                                    Remove
+                                    Delete
                                 </Button>
                               )}
                             </div>
@@ -351,37 +357,33 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps> = ({ loras, onAddLora,
                       )}
                       {lora.Images && lora.Images.length > 0 ? (
                         <div className="flex space-x-2 overflow-x-auto pb-2 pt-1">
-                          {lora.Images.slice(0, 5).map((image, index) => (
-                            <img
-                              key={index}
-                              src={image.url}
-                              alt={image.alt_text || `${lora.Name} sample ${index + 1}`}
-                              className="h-28 w-auto object-contain rounded border p-0.5 hover:opacity-80 transition-opacity cursor-pointer"
-                              title={image.alt_text || image.url}
-                            />
-                          ))}
+                          {lora.Images.slice(0, 5).map((image, index) => {
+                            const isVideo = image.type?.startsWith('video');
+                            return isVideo ? (
+                              <HoverScrubVideo
+                                key={index}
+                                src={image.url}
+                                className="h-28 w-auto rounded border p-0.5 hover:opacity-80 transition-opacity cursor-pointer"
+                                videoClassName="object-contain"
+                                enableScrubbing={false}
+                                loop
+                                muted
+                              />
+                            ) : (
+                              <img
+                                key={index}
+                                src={image.url}
+                                alt={image.alt_text || `${lora.Name} sample ${index + 1}`}
+                                className="h-28 w-auto object-contain rounded border p-0.5 hover:opacity-80 transition-opacity cursor-pointer"
+                                title={image.alt_text || image.url}
+                              />
+                            );
+                          })}
                         </div>
                       ) : (
                         <p className="text-xs text-muted-foreground">No sample images available.</p>
                       )}
                     </CardContent>
-                    <ItemCardFooter className="mt-auto pt-2">
-                      <Button
-                        variant={isSelectedOnGenerator ? "destructive" : "outline"}
-                        size="sm"
-                        className=""
-                        onClick={() => {
-                          if (isSelectedOnGenerator) {
-                            onRemoveLora(lora["Model ID"]);
-                          } else if (lora["Model Files"] && lora["Model Files"].length > 0) {
-                            onAddLora(lora);
-                          }
-                        }}
-                        disabled={!lora["Model Files"] || lora["Model Files"].length === 0}
-                      >
-                        {isSelectedOnGenerator ? "Remove from Generator" : "Add to Generator"}
-                      </Button>
-                    </ItemCardFooter>
                   </div>
                 </Card>
               );
@@ -459,6 +461,7 @@ interface MyLorasTabProps {
   selectedLoraIds: string[];
   deleteResource: UseMutationResult<void, Error, { id: string; type: "lora"; }, unknown>;
   createResource: UseMutationResult<Resource, Error, { type: 'lora'; metadata: LoraModel; }, unknown>;
+  /** The LoRA type currently being viewed/edited */
   lora_type: string;
 }
 
@@ -469,16 +472,16 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
         created_by_is_you: true,
         created_by_username: '',
         huggingface_url: '',
-        filename: '',
         base_model: 'Wan 2.1 T2V',
         is_public: true,
-        lora_type: 'Wan 2.1 14b',
+        trigger_word: '', // Add trigger word to form state
     });
     
     const [sampleFiles, setSampleFiles] = useState<File[]>([]);
     const [mainGenerationIndex, setMainGenerationIndex] = useState<number>(0);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [previewUrls, setPreviewUrls] = useState<string[]>([]);
+    const [fileInputKey, setFileInputKey] = useState<number>(0); // Used to reset FileInput
 
     // Local Wan LoRAs (files dropped into Headless-Wan2GP/loras)
     const [localWanLoras, setLocalWanLoras] = useState<LoraModel[]>([]);
@@ -503,53 +506,76 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
         };
     }, [sampleFiles]);
 
-    useEffect(() => {
-        console.log('[LoraSelectorModal] useEffect triggered, lora_type:', lora_type);
-        // Always fetch local LoRAs regardless of type
-        console.log('[LoraSelectorModal] Fetching local LoRAs...');
-        fetch('/api/local-loras')
-          .then(res => {
-              console.log('[LoraSelectorModal] Fetch response status:', res.status);
-              return res.json();
-          })
-          .then((data) => {
-              console.log('[LoraSelectorModal] Fetch response data:', data);
-              if (Array.isArray(data.files)) {
-                  const parsed: LoraModel[] = data.files.map((filePath: string) => ({
-                      "Model ID": filePath,
-                      Name: filePath.split('/').pop() || filePath,
-                      Author: 'Local',
-                      Images: [],
-                      "Model Files": [{ path: filePath, url: filePath }],
-                      lora_type: 'Wan 2.1 14b',
-                  }));
-                  console.log('[LoraSelectorModal] Parsed local LoRAs:', parsed);
-                  setLocalWanLoras(parsed);
-              } else {
-                  console.log('[LoraSelectorModal] data.files is not an array:', data.files);
-              }
-          })
-          .catch(err => console.error('[LoraSelectorModal] Error fetching local LoRAs:', err));
-    }, []);
+    const extractFilenameFromUrl = (url: string) => {
+        try {
+            // Extract filename from /resolve/ URL
+            const urlParts = url.split('/');
+            const filename = urlParts[urlParts.length - 1];
+            return filename || '';
+        } catch {
+            return '';
+        }
+    };
 
-    const generateFilename = (name: string, baseModel: string) => {
-        const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '_');
-        const cleanBaseModel = baseModel.toLowerCase().replace(/[^a-z0-9]/g, '_');
-        const timestamp = Date.now();
-        return `${cleanName}_${cleanBaseModel}_${timestamp}.safetensors`;
+    const generateUniqueFilename = (name: string, baseModel: string, huggingfaceUrl: string = '', existingFilenames: string[] = []) => {
+        // First try to get filename from HuggingFace URL
+        let filename = extractFilenameFromUrl(huggingfaceUrl);
+        
+        // If filename is generic, too short, or missing, make it specific
+        const genericNames = ['model.safetensors', 'lora.safetensors', 'pytorch_lora_weights.safetensors'];
+        const isGeneric = genericNames.includes(filename.toLowerCase()) || filename.length < 8;
+        
+        if (!filename || isGeneric) {
+            const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '_');
+            const cleanBaseModel = baseModel.toLowerCase().replace(/[^a-z0-9]/g, '_');
+            const extension = filename.includes('.') ? filename.split('.').pop() : 'safetensors';
+            filename = `${cleanName}_${cleanBaseModel}.${extension}`;
+        }
+        
+        // Ensure filename is unique by adding suffix if needed
+        let uniqueFilename = filename;
+        let counter = 1;
+        while (existingFilenames.includes(uniqueFilename)) {
+            const baseName = filename.substring(0, filename.lastIndexOf('.'));
+            const extension = filename.substring(filename.lastIndexOf('.'));
+            uniqueFilename = `${baseName}_${counter}${extension}`;
+            counter++;
+        }
+        
+        return uniqueFilename;
+    };
+
+    // Get existing filenames from saved LoRAs and local LoRAs
+    const getExistingFilenames = () => {
+        const savedFilenames = myLorasResource.data?.map(r => r.metadata.filename || r.metadata["Model ID"]) || [];
+        const localFilenames = localWanLoras.map(l => l.filename || l["Model ID"]);
+        return [...savedFilenames, ...localFilenames];
+    };
+
+    const validateHuggingFaceUrl = (url: string) => {
+        if (!url) return { isValid: false, message: 'URL is required' };
+        
+        // Check if it's a /resolve/ URL
+        if (!url.includes('/resolve/')) {
+            return { 
+                isValid: false, 
+                message: 'Must be a /resolve/ URL for direct download' 
+            };
+        }
+        
+        // Check if it's a HuggingFace URL
+        if (!url.includes('huggingface.co')) {
+            return { 
+                isValid: false, 
+                message: 'Must be a HuggingFace URL' 
+            };
+        }
+        
+        return { isValid: true, message: '' };
     };
 
     const handleFormChange = (field: string, value: any) => {
-        setAddForm(prev => {
-            const updated = { ...prev, [field]: value };
-            
-            // Auto-generate filename if name or base_model changes
-            if ((field === 'name' || field === 'base_model') && updated.name && updated.base_model) {
-                updated.filename = generateFilename(updated.name, updated.base_model);
-            }
-            
-            return updated;
-        });
+        setAddForm(prev => ({ ...prev, [field]: value }));
     };
 
     const handleAddLoraFromForm = async () => {
@@ -558,8 +584,9 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
             return;
         }
         
-        if (!addForm.huggingface_url.trim()) {
-            toast.error("HuggingFace URL is required");
+        const urlValidation = validateHuggingFaceUrl(addForm.huggingface_url);
+        if (!urlValidation.isValid) {
+            toast.error(`Invalid HuggingFace URL: ${urlValidation.message}`);
             return;
         }
 
@@ -583,9 +610,13 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
                 ? uploadedSamples[mainGenerationIndex].url 
                 : undefined;
 
+            // Generate unique filename
+            const existingFilenames = getExistingFilenames();
+            const uniqueFilename = generateUniqueFilename(addForm.name, addForm.base_model, addForm.huggingface_url, existingFilenames);
+
             // Create the LoRA model
             const newLora: LoraModel = {
-                "Model ID": addForm.filename || generateFilename(addForm.name, addForm.base_model),
+                "Model ID": uniqueFilename,
                 Name: addForm.name,
                 Author: addForm.created_by_is_you ? 'You' : (addForm.created_by_username || 'Unknown'),
                 Description: addForm.description || undefined,
@@ -595,21 +626,22 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
                     type: sample.type,
                 })),
                 "Model Files": [{
-                    path: addForm.filename || generateFilename(addForm.name, addForm.base_model),
+                    path: uniqueFilename,
                     url: addForm.huggingface_url,
                 }],
-                lora_type: addForm.lora_type,
+                lora_type: 'Wan 2.1 14b', // Fixed value since we removed the field
                 created_by: {
                     is_you: addForm.created_by_is_you,
                     username: addForm.created_by_is_you ? undefined : addForm.created_by_username,
                 },
                 huggingface_url: addForm.huggingface_url,
-                filename: addForm.filename || generateFilename(addForm.name, addForm.base_model),
+                filename: uniqueFilename,
                 base_model: addForm.base_model,
                 sample_generations: uploadedSamples,
                 main_generation: mainGeneration,
                 is_public: addForm.is_public,
                 "Last Modified": new Date().toISOString(),
+                trigger_word: addForm.trigger_word,
             };
 
             await createResource.mutateAsync({ type: 'lora', metadata: newLora });
@@ -621,13 +653,13 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
                 created_by_is_you: true,
                 created_by_username: '',
                 huggingface_url: '',
-                filename: '',
                 base_model: 'Wan 2.1 T2V',
                 is_public: true,
-                lora_type: 'Wan 2.1 14b',
+                trigger_word: '',
             });
             setSampleFiles([]);
             setMainGenerationIndex(0);
+            setFileInputKey(prev => prev + 1); // Reset file input
 
             toast.success("LoRA added successfully!");
         } catch (error) {
@@ -647,9 +679,9 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
                     <CardTitle>Add a New LoRA</CardTitle>
                     <CardDescription>Create and save a new LoRA to your collection.</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
+                <CardContent className="space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="space-y-1">
                             <Label htmlFor="lora-name">Name *</Label>
                             <Input 
                                 id="lora-name" 
@@ -658,74 +690,87 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
                                 onChange={e => handleFormChange('name', e.target.value)} 
                             />
                         </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="lora-filename">Filename</Label>
+                        
+                        <div className="space-y-1">
+                            <Label htmlFor="lora-trigger-word">Trigger Word</Label>
                             <Input 
-                                id="lora-filename" 
-                                placeholder="Auto-generated from name and base model" 
-                                value={addForm.filename} 
-                                onChange={e => handleFormChange('filename', e.target.value)} 
+                                id="lora-trigger-word" 
+                                placeholder="e.g., ohwx, sks, xyz style" 
+                                value={addForm.trigger_word} 
+                                onChange={e => handleFormChange('trigger_word', e.target.value)} 
                             />
                         </div>
                     </div>
                     
-                    <div className="space-y-2">
+                    <div className="space-y-1">
                         <Label htmlFor="lora-description">Description</Label>
                         <Textarea 
                             id="lora-description" 
                             placeholder="Describe what this LoRA does..." 
                             value={addForm.description} 
                             onChange={e => handleFormChange('description', e.target.value)} 
-                            rows={3}
+                            rows={2}
                         />
                     </div>
 
-                    <div className="space-y-2">
-                        <Label htmlFor="lora-url">HuggingFace URL *</Label>
+                    <div className="space-y-1">
+                        <TooltipProvider>
+                            <div className="flex items-center gap-2">
+                                <Label htmlFor="lora-url">HuggingFace Direct Download URL *</Label>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <span className="text-muted-foreground cursor-help hover:text-foreground transition-colors">
+                                          <Info className="h-4 w-4" />
+                                        </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent className="max-w-md">
+                                        <div className="text-xs space-y-1">
+                                            <p><strong>How to get the correct URL:</strong></p>
+                                            <ol className="list-decimal list-inside space-y-1 pl-2">
+                                                <li>Go to the HuggingFace model page</li>
+                                                <li>Click on "Files" tab</li>
+                                                <li>Find the .safetensors file you want</li>
+                                                <li>Right-click the download button (⬇️) and copy link</li>
+                                                <li>The URL should contain "/resolve/" and end with the filename</li>
+                                            </ol>
+                                        </div>
+                                    </TooltipContent>
+                                </Tooltip>
+                            </div>
+                        </TooltipProvider>
                         <Input 
                             id="lora-url" 
-                            placeholder="https://huggingface.co/..." 
+                            placeholder="https://huggingface.co/username/model/resolve/main/filename.safetensors" 
                             value={addForm.huggingface_url} 
                             onChange={e => handleFormChange('huggingface_url', e.target.value)} 
+                            className={!validateHuggingFaceUrl(addForm.huggingface_url).isValid && addForm.huggingface_url ? 'border-red-500' : ''}
                         />
+                        {!validateHuggingFaceUrl(addForm.huggingface_url).isValid && addForm.huggingface_url && (
+                            <p className="text-xs text-red-600">
+                                ⚠️ {validateHuggingFaceUrl(addForm.huggingface_url).message}
+                            </p>
+                        )}
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label>Base Model</Label>
-                            <Select 
-                                value={addForm.base_model} 
-                                onValueChange={(value) => handleFormChange('base_model', value)}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select Base Model" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="Wan 2.1 T2V">Wan 2.1 T2V</SelectItem>
-                                    <SelectItem value="Flux.dev">Flux.dev</SelectItem>
-                                    <SelectItem value="SD 1.5">SD 1.5</SelectItem>
-                                    <SelectItem value="SDXL">SDXL</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="space-y-2">
-                            <Label>LoRA Type</Label>
-                            <Select 
-                                value={addForm.lora_type} 
-                                onValueChange={(value) => handleFormChange('lora_type', value)}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select LoRA Type" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="Flux.dev">Flux.dev</SelectItem>
-                                    <SelectItem value="Wan 2.1 14b">Wan 2.1 14b</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
+                    <div className="space-y-1">
+                        <Label>Base Model</Label>
+                        <Select 
+                            value={addForm.base_model} 
+                            onValueChange={(value) => handleFormChange('base_model', value)}
+                        >
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select Base Model" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="Wan 2.1 T2V">Wan 2.1 T2V</SelectItem>
+                                <SelectItem value="Flux.dev">Flux.dev</SelectItem>
+                                <SelectItem value="SD 1.5">SD 1.5</SelectItem>
+                                <SelectItem value="SDXL">SDXL</SelectItem>
+                            </SelectContent>
+                        </Select>
                     </div>
 
-                    <div className="space-y-2">
+                    <div className="space-y-1">
                         <Label>Created By</Label>
                         <div className="flex items-center space-x-2 mb-2">
                             <Checkbox 
@@ -733,7 +778,7 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
                                 checked={addForm.created_by_is_you}
                                 onCheckedChange={(checked) => handleFormChange('created_by_is_you', checked)}
                             />
-                            <Label htmlFor="created-by-you">This is my creation</Label>
+                            <Label htmlFor="created-by-you" className="font-normal">This is my creation</Label>
                         </div>
                         {!addForm.created_by_is_you && (
                             <Input 
@@ -747,9 +792,12 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
                     <div className="space-y-2">
                         <Label>Sample Generations</Label>
                         <FileInput
+                            key={fileInputKey} // Reset component when key changes
                             onFileChange={(newFiles) => {
                                 // Append new files to existing ones instead of replacing
                                 setSampleFiles(prevFiles => [...prevFiles, ...newFiles]);
+                                // Reset the file input after files are added
+                                setFileInputKey(prev => prev + 1);
                             }}
                             acceptTypes={['image', 'video']}
                             multiple={true}
@@ -758,9 +806,9 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
                         
                         {/* Display uploaded files */}
                         {sampleFiles.length > 0 && (
-                            <div className="space-y-3 mt-4">
+                            <div className="space-y-2 mt-3">
                                 <Label className="text-sm font-medium">Uploaded Files ({sampleFiles.length})</Label>
-                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                                     {sampleFiles.map((file, index) => (
                                         <div key={index} className="relative group">
                                             <div 
@@ -841,7 +889,7 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
                 <ItemCardFooter>
                     <Button 
                         onClick={handleAddLoraFromForm}
-                        disabled={isSubmitting || !addForm.name.trim() || !addForm.huggingface_url.trim()}
+                        disabled={isSubmitting || !addForm.name.trim() || !validateHuggingFaceUrl(addForm.huggingface_url).isValid}
                     >
                         {isSubmitting ? 'Adding LoRA...' : 'Add LoRA'}
                     </Button>

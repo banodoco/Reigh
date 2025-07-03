@@ -141,58 +141,62 @@ export default function HomePage() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {examples.map((example, index) => (
-              <div key={example.id} className="wes-vintage-card group animate-fade-in-up" style={{ animationDelay: `${0.8 + index * 0.2}s` }}>
-                <div className="p-8">
-                  {/* Input */}
-                  <div className="mb-6">
-                    <div className="flex items-center mb-3">
-                      <ImageIcon className="w-5 h-5 text-wes-sage mr-2" />
-                      <h3 className="font-playfair text-lg font-semibold text-primary">
-                        {example.inputTitle}
-                      </h3>
-                    </div>
-                    <div className="w-full h-32 bg-gradient-to-br from-wes-cream to-wes-mint/20 rounded-lg border-2 border-wes-vintage-gold/20 flex items-center justify-center mb-3">
-                      <div className="text-center">
-                        <div className="w-12 h-12 bg-wes-vintage-gold/20 rounded-full flex items-center justify-center mx-auto mb-2">
-                          <ImageIcon className="w-6 h-6 text-wes-vintage-gold" />
+              <div key={example.id} className="relative group" style={{ animationDelay: `${0.8 + index * 0.2}s` }}>
+                {/* Stable hover area to prevent flicker */}
+                <div className="absolute inset-0 -m-4 z-0 pointer-events-none" />
+                <div className="wes-vintage-card relative z-10 animate-fade-in-up">
+                  <div className="p-8">
+                    {/* Input */}
+                    <div className="mb-6">
+                      <div className="flex items-center mb-3">
+                        <ImageIcon className="w-5 h-5 text-wes-sage mr-2" />
+                        <h3 className="font-playfair text-lg font-semibold text-primary">
+                          {example.inputTitle}
+                        </h3>
+                      </div>
+                      <div className="w-full h-32 bg-gradient-to-br from-wes-cream to-wes-mint/20 rounded-lg border-2 border-wes-vintage-gold/20 flex items-center justify-center mb-3">
+                        <div className="text-center">
+                          <div className="w-12 h-12 bg-wes-vintage-gold/20 rounded-full flex items-center justify-center mx-auto mb-2">
+                            <ImageIcon className="w-6 h-6 text-wes-vintage-gold" />
+                          </div>
+                          <p className="text-xs text-muted-foreground font-inter">Input Image</p>
                         </div>
-                        <p className="text-xs text-muted-foreground font-inter">Input Image</p>
+                      </div>
+                      <p className="text-sm text-muted-foreground font-inter">{example.inputDesc}</p>
+                    </div>
+
+                    {/* Transition Arrow */}
+                    <div className="flex items-center justify-center mb-6">
+                      <div className="flex items-center space-x-2 text-wes-coral">
+                        <ArrowRight className="w-5 h-5" />
+                        <span className="text-sm font-inter font-medium">{example.transition}</span>
+                        <ArrowRight className="w-5 h-5" />
                       </div>
                     </div>
-                    <p className="text-sm text-muted-foreground font-inter">{example.inputDesc}</p>
-                  </div>
 
-                  {/* Transition Arrow */}
-                  <div className="flex items-center justify-center mb-6">
-                    <div className="flex items-center space-x-2 text-wes-coral">
-                      <ArrowRight className="w-5 h-5" />
-                      <span className="text-sm font-inter font-medium">{example.transition}</span>
-                      <ArrowRight className="w-5 h-5" />
-                    </div>
-                  </div>
-
-                  {/* Output */}
-                  <div>
-                    <div className="flex items-center mb-3">
-                      <Video className="w-5 h-5 text-wes-coral mr-2" />
-                      <h3 className="font-playfair text-lg font-semibold text-primary">
-                        {example.outputTitle}
-                      </h3>
-                    </div>
-                    <div className="w-full h-32 bg-gradient-to-br from-wes-pink/20 to-wes-coral/20 rounded-lg border-2 border-wes-coral/20 flex items-center justify-center mb-3">
-                      <div className="text-center">
-                        <div className="w-12 h-12 bg-wes-coral/20 rounded-full flex items-center justify-center mx-auto mb-2">
-                          <Video className="w-6 h-6 text-wes-coral" />
-                        </div>
-                        <p className="text-xs text-muted-foreground font-inter">Video Journey</p>
+                    {/* Output */}
+                    <div>
+                      <div className="flex items-center mb-3">
+                        <Video className="w-5 h-5 text-wes-coral mr-2" />
+                        <h3 className="font-playfair text-lg font-semibold text-primary">
+                          {example.outputTitle}
+                        </h3>
                       </div>
+                      <div className="w-full h-32 bg-gradient-to-br from-wes-pink/20 to-wes-coral/20 rounded-lg border-2 border-wes-coral/20 flex items-center justify-center mb-3">
+                        <div className="text-center">
+                          <div className="w-12 h-12 bg-wes-coral/20 rounded-full flex items-center justify-center mx-auto mb-2">
+                            <Video className="w-6 h-6 text-wes-coral" />
+                          </div>
+                          <p className="text-xs text-muted-foreground font-inter">Video Journey</p>
+                        </div>
+                      </div>
+                      <p className="text-sm text-muted-foreground font-inter">{example.outputDesc}</p>
                     </div>
-                    <p className="text-sm text-muted-foreground font-inter">{example.outputDesc}</p>
-                  </div>
 
-                  {/* Decorative ornament */}
-                  <div className="absolute top-4 right-4 opacity-20 group-hover:opacity-50 transition-opacity duration-500">
-                    <Sparkles className="w-5 h-5 text-wes-vintage-gold" />
+                    {/* Decorative ornament */}
+                    <div className="absolute top-4 right-4 opacity-20 group-hover:opacity-50 transition-opacity duration-500">
+                      <Sparkles className="w-5 h-5 text-wes-vintage-gold" />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -214,50 +218,59 @@ export default function HomePage() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
             {/* Art Placeholder 1 */}
-            <div className="wes-vintage-card group">
-              <div className="aspect-video bg-gradient-to-br from-wes-vintage-gold/20 to-wes-mustard/20 rounded-lg border-2 border-wes-vintage-gold/20 flex items-center justify-center mb-4 overflow-hidden">
-                <div className="text-center">
-                  <div className="w-16 h-16 bg-wes-vintage-gold/30 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <Video className="w-8 h-8 text-wes-vintage-gold" />
+            <div className="relative group">
+              <div className="absolute inset-0 -m-4 z-0 pointer-events-none" />
+              <div className="wes-vintage-card relative z-10">
+                <div className="aspect-video bg-gradient-to-br from-wes-vintage-gold/20 to-wes-mustard/20 rounded-lg border-2 border-wes-vintage-gold/20 flex items-center justify-center mb-4 overflow-hidden">
+                  <div className="text-center">
+                    <div className="w-16 h-16 bg-wes-vintage-gold/30 rounded-full flex items-center justify-center mx-auto mb-3">
+                      <Video className="w-8 h-8 text-wes-vintage-gold" />
+                    </div>
+                    <p className="text-sm text-muted-foreground font-inter">Journey #1</p>
                   </div>
-                  <p className="text-sm text-muted-foreground font-inter">Journey #1</p>
                 </div>
-              </div>
-              <div className="p-6">
-                <h3 className="font-playfair text-lg font-semibold text-primary mb-2">Morning to Midnight</h3>
-                <p className="text-sm text-muted-foreground font-inter">A serene transition from dawn's first light to the electric energy of city nightlife.</p>
+                <div className="p-6">
+                  <h3 className="font-playfair text-lg font-semibold text-primary mb-2">Morning to Midnight</h3>
+                  <p className="text-sm text-muted-foreground font-inter">A serene transition from dawn's first light to the electric energy of city nightlife.</p>
+                </div>
               </div>
             </div>
 
             {/* Art Placeholder 2 */}
-            <div className="wes-vintage-card group">
-              <div className="aspect-video bg-gradient-to-br from-wes-coral/20 to-wes-pink/20 rounded-lg border-2 border-wes-coral/20 flex items-center justify-center mb-4 overflow-hidden">
-                <div className="text-center">
-                  <div className="w-16 h-16 bg-wes-coral/30 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <Video className="w-8 h-8 text-wes-coral" />
+            <div className="relative group">
+              <div className="absolute inset-0 -m-4 z-0 pointer-events-none" />
+              <div className="wes-vintage-card relative z-10">
+                <div className="aspect-video bg-gradient-to-br from-wes-coral/20 to-wes-pink/20 rounded-lg border-2 border-wes-coral/20 flex items-center justify-center mb-4 overflow-hidden">
+                  <div className="text-center">
+                    <div className="w-16 h-16 bg-wes-coral/30 rounded-full flex items-center justify-center mx-auto mb-3">
+                      <Video className="w-8 h-8 text-wes-coral" />
+                    </div>
+                    <p className="text-sm text-muted-foreground font-inter">Journey #2</p>
                   </div>
-                  <p className="text-sm text-muted-foreground font-inter">Journey #2</p>
                 </div>
-              </div>
-              <div className="p-6">
-                <h3 className="font-playfair text-lg font-semibold text-primary mb-2">Seasonal Metamorphosis</h3>
-                <p className="text-sm text-muted-foreground font-inter">Watch as autumn leaves transform through winter snow into spring blossoms.</p>
+                <div className="p-6">
+                  <h3 className="font-playfair text-lg font-semibold text-primary mb-2">Seasonal Metamorphosis</h3>
+                  <p className="text-sm text-muted-foreground font-inter">Watch as autumn leaves transform through winter snow into spring blossoms.</p>
+                </div>
               </div>
             </div>
 
             {/* Art Placeholder 3 */}
-            <div className="wes-vintage-card group">
-              <div className="aspect-video bg-gradient-to-br from-wes-sage/20 to-wes-mint/20 rounded-lg border-2 border-wes-sage/20 flex items-center justify-center mb-4 overflow-hidden">
-                <div className="text-center">
-                  <div className="w-16 h-16 bg-wes-sage/30 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <Video className="w-8 h-8 text-wes-sage" />
+            <div className="relative group">
+              <div className="absolute inset-0 -m-4 z-0 pointer-events-none" />
+              <div className="wes-vintage-card relative z-10">
+                <div className="aspect-video bg-gradient-to-br from-wes-sage/20 to-wes-mint/20 rounded-lg border-2 border-wes-sage/20 flex items-center justify-center mb-4 overflow-hidden">
+                  <div className="text-center">
+                    <div className="w-16 h-16 bg-wes-sage/30 rounded-full flex items-center justify-center mx-auto mb-3">
+                      <Video className="w-8 h-8 text-wes-sage" />
+                    </div>
+                    <p className="text-sm text-muted-foreground font-inter">Journey #3</p>
                   </div>
-                  <p className="text-sm text-muted-foreground font-inter">Journey #3</p>
                 </div>
-              </div>
-              <div className="p-6">
-                <h3 className="font-playfair text-lg font-semibold text-primary mb-2">Ocean Dreams</h3>
-                <p className="text-sm text-muted-foreground font-inter">A meditative flow between calm waters and turbulent waves of emotion.</p>
+                <div className="p-6">
+                  <h3 className="font-playfair text-lg font-semibold text-primary mb-2">Ocean Dreams</h3>
+                  <p className="text-sm text-muted-foreground font-inter">A meditative flow between calm waters and turbulent waves of emotion.</p>
+                </div>
               </div>
             </div>
           </div>

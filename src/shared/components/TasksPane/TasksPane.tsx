@@ -82,10 +82,9 @@ const TasksPane: React.FC = () => {
           position: 'fixed',
           right: 0,
           top: 0,
-          bottom: `${bottomOffset}px`,
+          bottom: 0,
           width: `${tasksPaneWidth}px`,
           zIndex: 60, // On top of header (z-50)
-          transition: 'bottom 300ms ease-in-out',
         }}
       >
         {/* Tasks Pane */}

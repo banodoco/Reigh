@@ -128,6 +128,7 @@ const GenerationsPage: React.FC = () => {
             onAddToLastShot={handleAddToShot}
             offset={(page - 1) * GENERATIONS_PER_PAGE}
             totalCount={allGenerations?.length || paginatedData.items.length}
+            columnsPerRow={6}
           />
         </div>
       ) : (

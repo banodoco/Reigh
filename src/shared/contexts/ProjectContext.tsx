@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, ReactNode, useEffect, useRef } from 'react';
+import React, { createContext, useState, useContext, ReactNode, useEffect, useRef, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Project } from '@/types/project'; // Added import
@@ -78,7 +78,7 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   // Fetch user preferences directly without circular dependency
-  const fetchUserPreferences = async () => {
+  const fetchUserPreferences = useCallback(async () => {
     if (!userId) return;
     
     setIsLoadingPreferences(true);
@@ -100,10 +100,10 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setIsLoadingPreferences(false);
     }
-  };
+  }, [userId]);
 
   // Update user preferences directly
-  const updateUserPreferences = async (scope: 'user', patch: Partial<UserPreferences>) => {
+  const updateUserPreferences = useCallback(async (scope: 'user', patch: Partial<UserPreferences>) => {
     if (!userId) return;
     
     try {
@@ -129,7 +129,7 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
     } catch (error) {
       console.error('Failed to update user preferences:', error);
     }
-  };
+  }, [userId, userPreferences]);
 
   // Fetch preferences when userId changes
   useEffect(() => {
@@ -139,9 +139,9 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
       setUserPreferences(undefined);
       userPreferencesRef.current = undefined;
     }
-  }, [userId]);
+  }, [userId, fetchUserPreferences]);
 
-  const fetchProjects = async () => {
+  const fetchProjects = useCallback(async () => {
     try {
       // Get current user
       const { data: { user } } = await supabase.auth.getUser();
@@ -195,9 +195,9 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
       setSelectedProjectIdState(null);
     }
     setIsLoadingProjects(false);
-  };
+  }, [userPreferences?.lastOpenedProjectId, updateUserPreferences]);
 
-  const addNewProject = async (projectData: { name: string; aspectRatio: string }) => {
+  const addNewProject = useCallback(async (projectData: { name: string; aspectRatio: string }) => {
     if (!projectData.name.trim()) {
       toast.error("Project name cannot be empty.");
       return null;
@@ -239,9 +239,9 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setIsCreatingProject(false);
     }
-  };
+  }, [updateUserPreferences]);
 
-  const updateProject = async (projectId: string, updates: ProjectUpdate): Promise<boolean> => {
+  const updateProject = useCallback(async (projectId: string, updates: ProjectUpdate): Promise<boolean> => {
     if (!updates.name?.trim() && !updates.aspectRatio) {
       toast.error("No changes to save.");
       return false;
@@ -281,9 +281,9 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setIsUpdatingProject(false);
     }
-  };
+  }, []);
 
-  const deleteProject = async (projectId: string): Promise<boolean> => {
+  const deleteProject = useCallback(async (projectId: string): Promise<boolean> => {
     setIsDeletingProject(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -322,7 +322,7 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setIsDeletingProject(false);
     }
-  };
+  }, [updateUserPreferences]);
 
   useEffect(() => {
     // Wait for auth and user preferences to be ready before fetching projects
@@ -333,9 +333,9 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
      
       return () => clearTimeout(timer);
     }
-  }, [userId, isLoadingPreferences]); // Refetch when user changes or preferences finish loading
+  }, [userId, isLoadingPreferences, fetchProjects]); // Refetch when user changes or preferences finish loading
 
-  const handleSetSelectedProjectId = (projectId: string | null) => {
+  const handleSetSelectedProjectId = useCallback((projectId: string | null) => {
     setSelectedProjectIdState(projectId);
     
     // Save to user settings instead of localStorage
@@ -344,10 +344,10 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
     } else {
       updateUserPreferences('user', { lastOpenedProjectId: undefined });
     }
-  };
+  }, [updateUserPreferences]);
 
-  return (
-    <ProjectContext.Provider value={{ 
+  const contextValue = useMemo(
+    () => ({ 
       projects, 
       selectedProjectId, 
       setSelectedProjectId: handleSetSelectedProjectId, 
@@ -359,7 +359,24 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
       isUpdatingProject,
       deleteProject,
       isDeletingProject
-    }}>
+    }),
+    [
+      projects,
+      selectedProjectId,
+      handleSetSelectedProjectId,
+      isLoadingProjects,
+      fetchProjects,
+      addNewProject,
+      isCreatingProject,
+      updateProject,
+      isUpdatingProject,
+      deleteProject,
+      isDeletingProject
+    ]
+  );
+
+  return (
+    <ProjectContext.Provider value={contextValue}>
       {children}
     </ProjectContext.Provider>
   );

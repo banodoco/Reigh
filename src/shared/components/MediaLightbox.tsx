@@ -8,6 +8,7 @@ import { usePanes } from '@/shared/contexts/PanesContext';
 import { Button } from '@/shared/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
 import { useToast } from '@/shared/hooks/use-toast';
+import { uploadImageToStorage } from '@/shared/lib/imageUploader';
 
 interface MediaLightboxProps {
   media: GenerationRow;
@@ -104,33 +105,14 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({ media, onClose, onNext, o
 
         console.log(`[MediaLightbox-FlipSave] Blob created:`, { size: blob.size, type: blob.type });
 
-        // Create a FormData object to send the file
-        const formData = new FormData();
         const fileName = `flipped_${media.id || 'image'}_${Date.now()}.png`;
         const file = new File([blob], fileName, { type: 'image/png' });
-        formData.append('file', file);
 
-        console.log(`[MediaLightbox-FlipSave] Uploading file:`, { fileName, fileSize: file.size, fileType: file.type });
+        console.log(`[MediaLightbox-FlipSave] Uploading file to Supabase:`, { fileName, fileSize: file.size, fileType: file.type });
 
         try {
-          // Send to your API endpoint to save the flipped image
-          const response = await fetch('/api/upload-flipped-image', {
-            method: 'POST',
-            body: formData,
-          });
-
-          console.log(`[MediaLightbox-FlipSave] Upload response status:`, response.status, response.statusText);
-
-          if (!response.ok) {
-            const errorText = await response.text().catch(() => 'Unknown error');
-            console.error(`[MediaLightbox-FlipSave] Upload failed:`, { status: response.status, statusText: response.statusText, errorText });
-            throw new Error(`Failed to save image: ${response.status} ${response.statusText}`);
-          }
-
-          const result = await response.json();
-          console.log(`[MediaLightbox-FlipSave] Upload successful, server response:`, result);
-          
-          const newImageUrl = result.url || result.imageUrl;
+          // Upload directly to Supabase Storage and get the public URL
+          const newImageUrl = await uploadImageToStorage(file);
           console.log(`[MediaLightbox-FlipSave] New image URL:`, newImageUrl);
 
           if (newImageUrl && onImageSaved) {
@@ -147,7 +129,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({ media, onClose, onNext, o
             description: "Flipped image has been saved successfully",
           });
         } catch (error) {
-          console.error('[MediaLightbox-FlipSave] ERROR during upload:', error);
+          console.error('[MediaLightbox-FlipSave] ERROR during upload to Supabase:', error);
           toast({ 
             title: "Save Failed", 
             description: "Could not save the flipped image",

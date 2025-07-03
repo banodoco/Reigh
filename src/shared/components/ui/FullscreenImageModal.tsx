@@ -9,6 +9,7 @@ import {
 } from "./tooltip"; // Updated
 import { useToast } from "@/shared/hooks/use-toast"; // Updated
 import { usePanes } from "@/shared/contexts/PanesContext"; // Added
+import { uploadImageToStorage } from '@/shared/lib/imageUploader';
 
 
 interface FullscreenImageModalProps {
@@ -50,30 +51,56 @@ const FullscreenImageModal: React.FC<FullscreenImageModalProps> = ({ imageUrl, i
   const downloadFileName = `artful_pane_craft_fullscreen_${imageId || 'image'}_${Date.now()}.png`;
 
   // Function to create a canvas with the flipped image
-  const createFlippedCanvas = useCallback(async (): Promise<HTMLCanvasElement> => {
+  const createFlippedCanvas = useCallback(async (): Promise<HTMLCanvasElement | Blob> => {
     return new Promise((resolve, reject) => {
       const img = new Image();
       img.crossOrigin = 'anonymous';
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          reject(new Error('Could not get canvas context'));
-          return;
+      img.onload = async () => {
+        try {
+          // Check if OffscreenCanvas is available for better performance
+          if (typeof OffscreenCanvas !== 'undefined') {
+            const offscreen = new OffscreenCanvas(img.width, img.height);
+            const ctx = offscreen.getContext('2d');
+            if (!ctx) {
+              throw new Error('Could not get offscreen canvas context');
+            }
+
+            // Apply horizontal flip if needed
+            if (isFlippedHorizontally) {
+              ctx.scale(-1, 1);
+              ctx.drawImage(img, -img.width, 0);
+            } else {
+              ctx.drawImage(img, 0, 0);
+            }
+
+            // Convert to blob directly from OffscreenCanvas
+            const blob = await offscreen.convertToBlob({ type: 'image/png', quality: 0.95 });
+            resolve(blob);
+          } else {
+            // Fallback to regular canvas
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+              reject(new Error('Could not get canvas context'));
+              return;
+            }
+
+            canvas.width = img.width;
+            canvas.height = img.height;
+
+            // Apply horizontal flip if needed
+            if (isFlippedHorizontally) {
+              ctx.scale(-1, 1);
+              ctx.drawImage(img, -img.width, 0);
+            } else {
+              ctx.drawImage(img, 0, 0);
+            }
+
+            resolve(canvas);
+          }
+        } catch (error) {
+          reject(error);
         }
-
-        canvas.width = img.width;
-        canvas.height = img.height;
-
-        // Apply horizontal flip if needed
-        if (isFlippedHorizontally) {
-          ctx.scale(-1, 1);
-          ctx.drawImage(img, -img.width, 0);
-        } else {
-          ctx.drawImage(img, 0, 0);
-        }
-
-        resolve(canvas);
       };
       img.onerror = () => reject(new Error('Failed to load image'));
       img.src = imageUrl;
@@ -93,45 +120,37 @@ const FullscreenImageModal: React.FC<FullscreenImageModalProps> = ({ imageUrl, i
     setIsSaving(true);
     try {
       console.log(`[FlipSave] Creating flipped canvas...`);
-      const canvas = await createFlippedCanvas();
-      console.log(`[FlipSave] Canvas created:`, { width: canvas.width, height: canvas.height });
+      const result = await createFlippedCanvas();
       
-      // Convert canvas to blob
-      canvas.toBlob(async (blob) => {
-        if (!blob) {
-          console.error(`[FlipSave] ERROR: Failed to create image blob from canvas`);
-          throw new Error('Failed to create image blob');
-        }
+      let blob: Blob;
+      if (result instanceof Blob) {
+        console.log(`[FlipSave] OffscreenCanvas blob created:`, { size: result.size, type: result.type });
+        blob = result;
+      } else {
+        console.log(`[FlipSave] Canvas created:`, { width: result.width, height: result.height });
+        // Convert canvas to blob
+        blob = await new Promise<Blob>((resolve, reject) => {
+          result.toBlob((b) => {
+            if (!b) {
+              console.error(`[FlipSave] ERROR: Failed to create image blob from canvas`);
+              reject(new Error('Failed to create image blob'));
+            } else {
+              resolve(b);
+            }
+          }, 'image/png', 0.95);
+        });
+      }
 
         console.log(`[FlipSave] Blob created:`, { size: blob.size, type: blob.type });
 
-        // Create a FormData object to send the file
-        const formData = new FormData();
         const fileName = `flipped_${imageId || 'image'}_${Date.now()}.png`;
         const file = new File([blob], fileName, { type: 'image/png' });
-        formData.append('file', file);
 
-        console.log(`[FlipSave] Uploading file:`, { fileName, fileSize: file.size, fileType: file.type });
+        console.log(`[FlipSave] Uploading file to Supabase:`, { fileName, fileSize: file.size, fileType: file.type });
 
         try {
-          // Send to your API endpoint to save the flipped image
-          const response = await fetch('/api/upload-flipped-image', {
-            method: 'POST',
-            body: formData,
-          });
-
-          console.log(`[FlipSave] Upload response status:`, response.status, response.statusText);
-
-          if (!response.ok) {
-            const errorText = await response.text().catch(() => 'Unknown error');
-            console.error(`[FlipSave] Upload failed:`, { status: response.status, statusText: response.statusText, errorText });
-            throw new Error(`Failed to save image: ${response.status} ${response.statusText}`);
-          }
-
-          const result = await response.json();
-          console.log(`[FlipSave] Upload successful, server response:`, result);
-          
-          const newImageUrl = result.url || result.imageUrl;
+          // Upload directly to Supabase Storage and get the public URL
+          const newImageUrl = await uploadImageToStorage(file);
           console.log(`[FlipSave] New image URL:`, newImageUrl);
 
           console.log(`[FlipSave] CRITICAL CHECK - About to call callback:`, {
@@ -158,14 +177,13 @@ const FullscreenImageModal: React.FC<FullscreenImageModalProps> = ({ imageUrl, i
             description: "Flipped image has been saved successfully",
           });
         } catch (error) {
-          console.error('[FlipSave] ERROR during upload:', error);
+          console.error('[FlipSave] ERROR during upload to Supabase:', error);
           toast({ 
             title: "Save Failed", 
             description: "Could not save the flipped image",
             variant: "destructive"
           });
         }
-      }, 'image/png');
     } catch (error) {
       console.error('[FlipSave] ERROR creating flipped image:', error);
       toast({ 
@@ -188,22 +206,34 @@ const FullscreenImageModal: React.FC<FullscreenImageModalProps> = ({ imageUrl, i
 
       // If the image has been flipped, download the flipped version
       if (isFlippedHorizontally) {
-        const canvas = await createFlippedCanvas();
-        canvas.toBlob((blob) => {
-          if (blob) {
-            downloadUrl = URL.createObjectURL(blob);
-            downloadName = `flipped_${downloadFileName}`;
-            
-            const a = document.createElement('a');
-            a.style.display = 'none';
-            a.href = downloadUrl;
-            a.download = downloadName;
-            document.body.appendChild(a);
-            a.click();
-            URL.revokeObjectURL(downloadUrl);
-            document.body.removeChild(a);
-          }
-        }, 'image/png');
+        const result = await createFlippedCanvas();
+        let blob: Blob;
+        
+        if (result instanceof Blob) {
+          blob = result;
+        } else {
+          blob = await new Promise<Blob>((resolve, reject) => {
+            result.toBlob((b) => {
+              if (!b) {
+                reject(new Error('Failed to create blob'));
+              } else {
+                resolve(b);
+              }
+            }, 'image/png', 0.95);
+          });
+        }
+        
+        downloadUrl = URL.createObjectURL(blob);
+        downloadName = `flipped_${downloadFileName}`;
+        
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = downloadUrl;
+        a.download = downloadName;
+        document.body.appendChild(a);
+        a.click();
+        URL.revokeObjectURL(downloadUrl);
+        document.body.removeChild(a);
         return;
       }
 

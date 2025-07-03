@@ -5,6 +5,7 @@ export const useVideoScrubbing = () => {
   const animationFrameRef = useRef<number | null>(null);
   const lastFrameTimeRef = useRef<number>(0);
   const playbackRateRef = useRef<number>(0);
+  const isVisibleRef = useRef<boolean>(true);
 
   const [playbackRate, setPlaybackRate] = useState<number | null>(null);
   const [progress, setProgress] = useState<number>(0);
@@ -29,8 +30,8 @@ export const useVideoScrubbing = () => {
 
   const scrub = useCallback((timestamp: number) => {
     const video = videoRef.current;
-    // If the video element is gone, stop the loop.
-    if (!video) {
+    // If the video element is gone or not visible, stop the loop.
+    if (!video || !isVisibleRef.current) {
         stopScrubbing();
         return;
     };
@@ -94,13 +95,14 @@ export const useVideoScrubbing = () => {
       const width = e.currentTarget.offsetWidth;
       const normalizedPosition = offsetX / width; // Value from 0.0 to 1.0
 
-      const MAX_SPEED = 3.0;
+      // Reduced max speed from 3.0 to 2.0 for better performance
+      const MAX_SPEED = 2.0;
       let newRate;
 
       // The new logic is simpler:
-      // - Cursor at 0% width -> -3x speed (max reverse)
+      // - Cursor at 0% width -> -2x speed (max reverse)
       // - Cursor at 50% width -> 0x speed (paused)
-      // - Cursor at 100% width -> +3x speed (max forward)
+      // - Cursor at 100% width -> +2x speed (max forward)
       // The rate is linearly interpolated between these points.
       
       newRate = (normalizedPosition - 0.5) * 2 * MAX_SPEED;
@@ -148,6 +150,31 @@ export const useVideoScrubbing = () => {
     video.currentTime = newTime;
     setProgress((newTime / video.duration) * 100);
   }, []);
+
+  // Set up intersection observer to pause when off-screen
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          isVisibleRef.current = entry.isIntersecting;
+          if (!entry.isIntersecting && animationFrameRef.current) {
+            // Stop scrubbing when video goes off-screen
+            stopScrubbing();
+          }
+        });
+      },
+      { threshold: 0.1 } // Trigger when at least 10% visible
+    );
+
+    observer.observe(video);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [stopScrubbing]);
 
   useEffect(() => {
     const video = videoRef.current;

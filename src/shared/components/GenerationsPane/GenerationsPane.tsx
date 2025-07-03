@@ -43,6 +43,10 @@ const GenerationsPane: React.FC = () => {
     isGenerationsPaneLocked,
     setIsGenerationsPaneLocked,
     generationsPaneHeight,
+    isShotsPaneLocked,
+    shotsPaneWidth,
+    isTasksPaneLocked,
+    tasksPaneWidth,
   } = usePanes();
 
   const { isLocked, isOpen, toggleLock, openPane, paneProps, transformClass, handlePaneEnter, handlePaneLeave } = useSlidingPane({
@@ -119,9 +123,13 @@ const GenerationsPane: React.FC = () => {
       />
       <div
         {...paneProps}
-        style={{ height: `${generationsPaneHeight}px` }}
+        style={{
+          height: `${generationsPaneHeight}px`,
+          left: isShotsPaneLocked ? `${shotsPaneWidth}px` : 0,
+          right: isTasksPaneLocked ? `${tasksPaneWidth}px` : 0,
+        }}
         className={cn(
-          `fixed bottom-0 left-0 w-full bg-zinc-900/95 border-t border-zinc-700 shadow-xl z-[100] transform transition-transform duration-300 ease-in-out flex flex-col`,
+          `fixed bottom-0 bg-zinc-900/95 border-t border-zinc-700 shadow-xl z-[100] transform transition-transform duration-300 ease-in-out flex flex-col`,
           transformClass
         )}
       >
@@ -168,6 +176,7 @@ const GenerationsPane: React.FC = () => {
                     offset={(page - 1) * GENERATIONS_PER_PAGE}
                     totalCount={allGenerations?.length || paginatedData.items.length}
                     whiteText
+                    columnsPerRow={6}
                 />
             )}
             {paginatedData.items.length === 0 && !isLoading && (

@@ -504,6 +504,7 @@ const ImageGenerationToolPage = () => {
               lastShotId={lastAffectedShotId}
               currentToolType="image-generation"
               onImageSaved={handleImageSaved}
+              columnsPerRow={5}
             />
           </div>
         </>

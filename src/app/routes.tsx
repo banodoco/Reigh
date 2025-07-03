@@ -1,20 +1,29 @@
+import React, { Suspense } from 'react';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import ToolSelectorPage from '@/pages/ToolSelectorPage';
 import HomePage from '@/pages/HomePage';
 import ArtPage from '@/pages/ArtPage';
-// Placeholder imports for tool pages - these will be updated in later phases
-import ImageGenerationToolPage from '@/tools/image-generation/pages/ImageGenerationToolPage';
-import VideoTravelToolPage from '@/tools/video-travel/pages/VideoTravelToolPage';
+// Lazy load tool pages for better performance
+const ImageGenerationToolPage = React.lazy(() => import('@/tools/image-generation/pages/ImageGenerationToolPage'));
+const VideoTravelToolPage = React.lazy(() => import('@/tools/video-travel/pages/VideoTravelToolPage'));
+const EditTravelToolPage = React.lazy(() => import('@/tools/edit-travel/pages/EditTravelToolPage'));
 import NotFoundPage from '@/pages/NotFoundPage'; // Assuming NotFoundPage will be moved here or created
 import { LastAffectedShotProvider } from '@/shared/contexts/LastAffectedShotContext';
-import EditTravelToolPage from '@/tools/edit-travel/pages/EditTravelToolPage';
 import ShotsPage from "@/pages/ShotsPage";
 import GenerationsPage from "@/pages/GenerationsPage"; // Import the new GenerationsPage
 import Layout from './Layout'; // Import the new Layout component
 import { AppEnv } from '@/types/env';
+import { Loading } from '@/shared/components/ui/loading';
 
 // Determine the environment
 const currentEnv = (import.meta.env.VITE_APP_ENV?.toLowerCase() || AppEnv.DEV);
+
+// Loading fallback component for lazy loaded pages
+const LazyLoadingFallback = () => (
+  <div className="flex items-center justify-center h-[50vh]">
+    <Loading />
+  </div>
+);
 
 const router = createBrowserRouter([
   // HomePage route without Layout (no header) when in web environment
@@ -35,15 +44,27 @@ const router = createBrowserRouter([
       }] : []),
       {
         path: '/tools/image-generation',
-        element: <ImageGenerationToolPage />,
+        element: (
+          <Suspense fallback={<LazyLoadingFallback />}>
+            <ImageGenerationToolPage />
+          </Suspense>
+        ),
       },
       {
         path: '/tools/video-travel',
-        element: <VideoTravelToolPage />,
+        element: (
+          <Suspense fallback={<LazyLoadingFallback />}>
+            <VideoTravelToolPage />
+          </Suspense>
+        ),
       },
       {
         path: '/tools/edit-travel',
-        element: <EditTravelToolPage />,
+        element: (
+          <Suspense fallback={<LazyLoadingFallback />}>
+            <EditTravelToolPage />
+          </Suspense>
+        ),
       },
       {
         path: '/shots',

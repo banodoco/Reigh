@@ -30,7 +30,6 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
 | `/src/types` | Shared TS interfaces (incl. Supabase-generated DB types, env.ts) |
 | `/src/integrations` | Supabase & FAL-AI client setup |
 | `/public` | Static assets (favicons, SVGs, JSON) |
-| `/public/data/loras.json` | LoRA models database with filtering support via `lora_type` field |
 | `/supabase` | Supabase CLI/config |
 | `/dist` | Build output (auto-generated) |
 | Config files | vite.config.ts, tailwind.config.ts, tsconfig*.json, ESLint, etc. |
@@ -70,7 +69,7 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
 
 **Current State**: The project uses a **dual migration system**:
 - **Drizzle migrations** (`/db/migrations/`) for schema changes (tables, columns, indexes)
-- **Supabase migrations** (`/supabase/migrations/`) for Supabase-specific features (RLS policies, triggers, functions)
+- **Supabase migrations** (`/supabase/migrations/`) for Supabase-specific features (RLS policies, storage bucket setup, triggers, functions)
 
 **Row Level Security (RLS) Status**: ✅ **ACTIVE**
 - All 7 main tables (`users`, `projects`, `shots`, `shot_generations`, `generations`, `resources`, `tasks`) have RLS enabled
@@ -106,6 +105,11 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
 - **Task creation is locked down**: Only Edge Functions can create tasks, ensuring credit validation
 - **Complete data isolation**: Users cannot access each other's data at the database level
 - **Service role policies**: Edge Functions use `service_role` key for elevated database operations
+
+**Recent additions**:
+
+- `20250710000000_create_lora_files_bucket.sql` – creates the `lora_files` public storage bucket.
+- `20250710000001_setup_storage_policies.sql` – adds SELECT/INSERT/UPDATE/DELETE policies for both `image_uploads` and `lora_files` buckets.
 
 ### 3. Source Code Breakdown
 
