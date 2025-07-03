@@ -35,11 +35,6 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
     // Attach the user ID to the request
     req.userId = user.id;
     
-    // In dev mode, optionally log authentication
-    if (process.env.VITE_APP_ENV === 'dev') {
-      console.log('[Auth] Authenticated user:', user.email);
-    }
-    
     next();
   } catch (error) {
     // If any unexpected error occurs, send a generic server error

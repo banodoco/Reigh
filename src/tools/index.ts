@@ -2,11 +2,13 @@
 export { videoTravelSettings } from './video-travel/settings';
 export { imageGenerationSettings } from './image-generation/settings';
 export { editTravelSettings } from './edit-travel/settings';
+export { userPreferencesSettings } from '../shared/settings/userPreferences';
 
 // Tool manifest for UI discovery and automatic registration
 import { videoTravelSettings } from './video-travel/settings';
 import { imageGenerationSettings } from './image-generation/settings';
 import { editTravelSettings } from './edit-travel/settings';
+import { userPreferencesSettings } from '../shared/settings/userPreferences';
 import { AppEnv, LOCAL_ENVS, type AppEnvValue } from '../types/env';
 import { Paintbrush, Video, Edit } from 'lucide-react';
 
@@ -14,6 +16,7 @@ export const toolsManifest = [
   videoTravelSettings,
   imageGenerationSettings,
   editTravelSettings,
+  userPreferencesSettings,
 ] as const;
 
 // UI-specific tool definitions that extend the settings with display properties

@@ -136,16 +136,16 @@ const AppInternalContent = () => {
         const currentShotsCount = shotsFromHook?.length ?? 0;
         const newShotName = `Shot ${currentShotsCount + 1}`;
         
-        const newShot = await createShotMutation.mutateAsync({ shotName: newShotName, projectId: selectedProjectId });
-        if (newShot && newShot.id) {
+        const newShot = await createShotMutation.mutateAsync({ name: newShotName, projectId: selectedProjectId });
+        if (newShot && newShot.shot && newShot.shot.id) {
           await addImageToShotMutation.mutateAsync({ 
-            shot_id: newShot.id,
+            shot_id: newShot.shot.id,
             generation_id: generationId,
             imageUrl: imageUrl,
             thumbUrl: thumbUrl,
             project_id: selectedProjectId,
           });
-          setLastAffectedShotId(newShot.id);
+          setLastAffectedShotId(newShot.shot.id);
         } else {
           throw new Error('Failed to create new shot or new shot ID is missing.');
         }

@@ -3,6 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Project } from '@/types/project'; // Added import
 import { ProjectUpdate } from '../../../db/schema/schema';
+import { useToolSettings } from '@/shared/hooks/useToolSettings';
+import { UserPreferences } from '@/shared/settings/userPreferences';
 
 interface ProjectContextType {
   projects: Project[];
@@ -25,7 +27,7 @@ const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 const determineProjectIdToSelect = (
   projects: Project[],
   preferredId: string | null | undefined,
-  storedId: string | null
+  lastOpenedId: string | null | undefined
 ): string | null => {
   if (!projects.length) return null;
 
@@ -34,8 +36,8 @@ const determineProjectIdToSelect = (
   if (preferredId && projectIds.has(preferredId)) {
     return preferredId;
   }
-  if (storedId && projectIds.has(storedId)) {
-    return storedId;
+  if (lastOpenedId && projectIds.has(lastOpenedId)) {
+    return lastOpenedId;
   }
   return projects[0].id;
 };
@@ -55,6 +57,28 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [isUpdatingProject, setIsUpdatingProject] = useState(false);
   const [isDeletingProject, setIsDeletingProject] = useState(false);
+  const [userId, setUserId] = useState<string | undefined>(undefined);
+
+  // Set up auth state tracking
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUserId(session?.user?.id);
+    });
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUserId(session?.user?.id);
+    });
+
+    return () => {
+      listener.subscription.unsubscribe();
+    };
+  }, []);
+
+  // Use tool settings for user preferences (only when we have a userId)
+  const { settings: userPreferences, update: updateUserPreferences } = useToolSettings<UserPreferences>(
+    'user-preferences', 
+    { enabled: !!userId }
+  );
 
   const fetchProjects = async () => {
     try {
@@ -84,20 +108,24 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
           .single();
 
         if (createError) throw createError;
-        setProjects([mapDbProjectToProject(newProject)]);
+        const mappedProject = mapDbProjectToProject(newProject);
+        setProjects([mappedProject]);
+        setSelectedProjectIdState(mappedProject.id);
+        // Save the default project as last opened
+        updateUserPreferences('user', { lastOpenedProjectId: mappedProject.id });
       } else {
         const mappedProjects = projectsData.map(mapDbProjectToProject);
-        const storedProjectId = localStorage.getItem('selectedProjectId');
-        const projectIdToSelect = determineProjectIdToSelect(mappedProjects, null, storedProjectId);
+        setProjects(mappedProjects);
+        
+        // Use the last opened project from user settings instead of localStorage
+        const lastOpenedProjectId = userPreferences?.lastOpenedProjectId;
+        const projectIdToSelect = determineProjectIdToSelect(mappedProjects, null, lastOpenedProjectId);
         setSelectedProjectIdState(projectIdToSelect);
-        if (projectIdToSelect) {
-            localStorage.setItem('selectedProjectId', projectIdToSelect);
+        
+        // Save the selected project if it's different from what was stored
+        if (projectIdToSelect && projectIdToSelect !== lastOpenedProjectId) {
+          updateUserPreferences('user', { lastOpenedProjectId: projectIdToSelect });
         }
-      }
-
-      // Ensure state is set to mapped projects if not already set
-      if (projectsData && projectsData.length > 0) {
-        setProjects(projectsData.map(mapDbProjectToProject));
       }
     } catch (error: any) {
       console.error('[ProjectContext] Error fetching projects via API:', error);
@@ -137,7 +165,10 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
       const mappedProject = mapDbProjectToProject(newProject);
       setProjects(prevProjects => [...prevProjects, mappedProject].sort((a, b) => a.name.localeCompare(b.name)));
       setSelectedProjectIdState(mappedProject.id);
-      localStorage.setItem('selectedProjectId', mappedProject.id);
+      
+      // Save the new project as last opened in user settings
+      updateUserPreferences('user', { lastOpenedProjectId: mappedProject.id });
+      
       toast.success(`Project "${mappedProject.name}" created and selected.`);
       return mappedProject;
     } catch (err: any) {
@@ -210,11 +241,14 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
         // Choose next project to select (first alphabetically)
         const nextProjectId = determineProjectIdToSelect(updated, null, null);
         setSelectedProjectIdState(nextProjectId);
+        
+        // Update user preferences with the new selected project
         if (nextProjectId) {
-          localStorage.setItem('selectedProjectId', nextProjectId);
+          updateUserPreferences('user', { lastOpenedProjectId: nextProjectId });
         } else {
-          localStorage.removeItem('selectedProjectId');
+          updateUserPreferences('user', { lastOpenedProjectId: undefined });
         }
+        
         return updated;
       });
 
@@ -236,14 +270,16 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
     }, 500); // Give auth time to complete
    
     return () => clearTimeout(timer);
-  }, []); 
+  }, [userPreferences]); // Also depend on userPreferences so we refetch when they load
 
   const handleSetSelectedProjectId = (projectId: string | null) => {
     setSelectedProjectIdState(projectId);
+    
+    // Save to user settings instead of localStorage
     if (projectId) {
-      localStorage.setItem('selectedProjectId', projectId);
+      updateUserPreferences('user', { lastOpenedProjectId: projectId });
     } else {
-      localStorage.removeItem('selectedProjectId');
+      updateUserPreferences('user', { lastOpenedProjectId: undefined });
     }
   };
 
