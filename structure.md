@@ -24,6 +24,7 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
 | `/src/pages` | Top-level page components (Tool Selector, NotFound, etc.) |
 | `/src/tools` | Tool-specific modules (Image Generation, Video Travel, Edit Travel) |
 | `/src/shared` | Shared components, hooks, utils, contexts, layouts |
+| `/src/shared/settings/userPreferences.ts` | User preference settings (last opened project, global user settings) stored in database |
 | `/src/server` | Backend API server (Express.js); data access, background tasks |
 | `/src/server/routes/apiKeys.ts` | API key management endpoint (GET, PUT /api/api-keys) for user API key storage |
 | `/src/types` | Shared TS interfaces (incl. Supabase-generated DB types, env.ts) |
@@ -124,6 +125,7 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
 - Projects management: `ProjectContext` now uses Supabase client directly instead of API calls
 - Shots CRUD: `useShots` hooks use Supabase client for all operations (create, read, update, delete, reorder)
 - Generations: Direct Supabase queries replace API endpoints
+- User preferences: Last opened project is saved in user settings (database) instead of localStorage for cross-device persistence
 
 ##### Active Edge Functions:
 - `single-image-generate`: Handles wan-local image generation tasks
@@ -221,7 +223,7 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
 
 ##### Contexts
 - **LastAffectedShotContext.tsx**: Remembers last modified shot
-- **ProjectContext.tsx**: Manages selected project ID (localStorage). Fetches projects (GET /api/projects). API creates "Default Project" if none. Provides addNewProject (POST /api/projects), updateProject (PUT /api/projects/:id) & loading states
+- **ProjectContext.tsx**: Manages selected project ID using user settings database storage. Fetches projects via Supabase client. Creates "Default Project" if none exist. Provides addNewProject, updateProject, deleteProject & loading states. Automatically saves and restores last opened project across sessions.
 - **PanesContext.tsx**: Manages shared state (dimensions, lock states) for ShotsPane, TasksPane, GenerationsPane
 
 ##### Components
