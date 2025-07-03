@@ -9,7 +9,6 @@ import { usePanes } from '@/shared/contexts/PanesContext';
 import { supabase } from '@/integrations/supabase/client';
 import type { Session } from '@supabase/supabase-js';
 import { Loading } from '@/shared/components/ui/loading';
-import { toast } from '@/shared/components/ui/use-toast';
 
 // Scroll to top component
 function ScrollToTop() {
@@ -39,13 +38,6 @@ const Layout: React.FC = () => {
     };
   }, []);
 
-  // Show toast on unauthenticated access (after session resolved)
-  useEffect(() => {
-    if (session === null) {
-      toast({ description: "You need to be logged in to view that page." });
-    }
-  }, [session]);
-
   // Show loading spinner while determining auth state
   if (session === undefined) {
     return (
@@ -57,7 +49,7 @@ const Layout: React.FC = () => {
 
   // Redirect unauthenticated users to home page
   if (!session) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/" replace state={{ fromProtected: true }} />;
   }
 
   const { 

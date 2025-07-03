@@ -2,17 +2,28 @@ import React, { useState, useEffect } from 'react';
 import { ArrowRight, Sparkles, Image as ImageIcon, Video, UserPlus, Users, FileText, ChevronDown, ChevronUp, GitBranch } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import type { Session } from '@supabase/supabase-js';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/shared/components/ui/dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
+import { toast } from '@/shared/components/ui/use-toast';
 
 export default function HomePage() {
   const [isHovered, setIsHovered] = useState(false);
   const [expandedFAQ, setExpandedFAQ] = useState<number | null>(null);
   const [session, setSession] = useState<Session | null>(null);
+  const location = useLocation();
+  const navigate = useNavigate();
   const [showCreativePartner, setShowCreativePartner] = useState(false);
   const [showPhilosophy, setShowPhilosophy] = useState(false);
-  const navigate = useNavigate();
+
+  // Show toast if redirected from protected page
+  useEffect(() => {
+    if ((location.state as any)?.fromProtected) {
+      toast({ description: 'You need to be logged in to view that page.' });
+      // Clear state to avoid duplicate toast on back/forward navigation
+      navigate(location.pathname, { replace: true });
+    }
+  }, [location, navigate]);
 
   // Scroll to top when component mounts
   useEffect(() => {
