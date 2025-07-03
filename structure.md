@@ -175,6 +175,12 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
 
 ##### Components
 - **GlobalHeader.tsx**: Site-wide header (branding, project selector/settings, new project '+', global settings). Content offset by locked panes.
+
+**Z-Index Hierarchy**: The app uses a layered z-index system:
+- Header: `z-50`
+- Panes: `z-60` (shots/tasks), `z-[100]` (generations), `z-[101/102]` (pane controls)  
+- Modals/Lightboxes: `z-[9999]` (ensures they appear above all panes)
+- Drag overlays: `z-[10000]` (above everything during drag operations)
 - **ShotsPane/**:
   - `ShotsPane.tsx`: Left slide-out panel for shots
   - `ShotGroup.tsx`: Droppable area in shot
@@ -184,7 +190,7 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
   - `TasksPane.tsx`: Right slide-out panel for tasks
   - `TaskList.tsx`: Lists tasks, filters, real-time updates via WebSocket
   - `TaskItem.tsx**: Displays task details, cancel button
-- **ui/**: 50+ re-exports/variants of shadcn components
+- **ui/**: 50+ re-exports/variants of shadcn components. All modal components (Dialog, Sheet, Drawer) use `z-[9999]` to ensure they appear above sliding panes (which use z-60 to z-102)
 - **loading.tsx**: Wes Anderson-inspired loading indicators
 - **DraggableImage.tsx**: Makes gallery images draggable
 - **ImageGallery.tsx**: Displays generated images; supports delete, upscale, "apply settings", drag-to-shot
