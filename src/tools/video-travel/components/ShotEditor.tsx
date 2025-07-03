@@ -145,6 +145,13 @@ export interface ShotEditorProps {
   onGenerationModeChange: (mode: 'batch' | 'by-pair') => void;
   pairConfigs: PairConfig[];
   onPairConfigsChange: (configs: PairConfig[]) => void;
+  // Navigation props
+  onPreviousShot?: () => void;
+  onNextShot?: () => void;
+  hasPrevious?: boolean;
+  hasNext?: boolean;
+  // Shot name editing
+  onUpdateShotName?: (newName: string) => void;
 }
 
 const baseUrl = import.meta.env.VITE_API_TARGET_URL || '';
@@ -206,6 +213,11 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   onGenerationModeChange,
   pairConfigs,
   onPairConfigsChange,
+  onPreviousShot,
+  onNextShot,
+  hasPrevious,
+  hasNext,
+  onUpdateShotName,
 }) => {
   const { selectedProjectId, projects } = useProject();
   const { getApiKey } = useApiKeys();
@@ -221,6 +233,42 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const queryClient = useQueryClient();
   const skipNextSyncRef = useRef(false);
+  
+  // Shot name editing state
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editingName, setEditingName] = useState(selectedShot.name);
+
+  // Update editing name when selected shot changes
+  useEffect(() => {
+    setEditingName(selectedShot.name);
+    setIsEditingName(false);
+  }, [selectedShot.id, selectedShot.name]);
+
+  const handleNameClick = () => {
+    if (onUpdateShotName) {
+      setIsEditingName(true);
+    }
+  };
+
+  const handleNameSave = () => {
+    if (onUpdateShotName && editingName.trim() && editingName.trim() !== selectedShot.name) {
+      onUpdateShotName(editingName.trim());
+    }
+    setIsEditingName(false);
+  };
+
+  const handleNameCancel = () => {
+    setEditingName(selectedShot.name);
+    setIsEditingName(false);
+  };
+
+  const handleNameKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleNameSave();
+    } else if (e.key === 'Escape') {
+      handleNameCancel();
+    }
+  };
 
   // Use local state for optimistic updates on image list
   const [localOrderedShotImages, setLocalOrderedShotImages] = useState(orderedShotImages || []);
@@ -951,10 +999,57 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       {/* Header */}
       <div className="flex-shrink-0 flex justify-between items-center">
         <Button onClick={onBack}>&larr; Back to Shot List</Button>
-        <h2 className="text-2xl font-bold text-center truncate px-4">
-          Editing Shot: <span className="text-primary">{selectedShot.name}</span>
-        </h2>
-        <div className="w-[150px]" /> {/* Spacer to balance the back button */}
+        <div className="flex items-center space-x-2 min-w-0 flex-1 justify-center px-4">
+          <span className="text-2xl font-bold">Editing Shot:</span>
+          {isEditingName ? (
+            <div className="flex items-center space-x-2">
+              <Input
+                value={editingName}
+                onChange={(e) => setEditingName(e.target.value)}
+                onKeyDown={handleNameKeyDown}
+                onBlur={handleNameSave}
+                className="text-2xl font-bold text-primary h-auto py-1 px-2 min-w-[200px]"
+                autoFocus
+              />
+              <Button size="sm" variant="outline" onClick={handleNameSave}>
+                Save
+              </Button>
+              <Button size="sm" variant="ghost" onClick={handleNameCancel}>
+                Cancel
+              </Button>
+            </div>
+          ) : (
+            <span 
+              className={`text-2xl font-bold text-primary truncate ${onUpdateShotName ? 'cursor-pointer hover:underline' : ''}`}
+              onClick={handleNameClick}
+              title={onUpdateShotName ? "Click to edit shot name" : undefined}
+            >
+              {selectedShot.name}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center space-x-2">
+          {(hasPrevious || hasNext) && (
+            <>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={onPreviousShot}
+                disabled={!hasPrevious}
+              >
+                Previous
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={onNextShot}
+                disabled={!hasNext}
+              >
+                Next
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Output Videos Section - Now at the top */}

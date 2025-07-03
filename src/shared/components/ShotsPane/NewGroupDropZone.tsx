@@ -61,7 +61,7 @@ const NewGroupDropZone: React.FC<NewGroupDropZoneProps> = ({ onZoneClick }) => {
     const files = Array.from(e.dataTransfer.files);
     if (files.length === 0) return;
 
-    const validImageTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    const validImageTypes = ['image/jpeg', 'image/png', 'image/webp'];
     const shotCount = shots?.length ?? 0;
     
     const validFiles = files.filter(f => validImageTypes.includes(f.type));
@@ -69,7 +69,7 @@ const NewGroupDropZone: React.FC<NewGroupDropZoneProps> = ({ onZoneClick }) => {
     if (validFiles.length === 0) {
       toast({
         title: "No Valid Files Found",
-        description: `Only JPEG, PNG, WEBP, or GIF files can be used to create a new shot.`,
+        description: `Only JPEG, PNG, WEBP files can be used to create a new shot.`,
         variant: "destructive",
       });
       return;

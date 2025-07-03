@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import ShotEditor, { SteerableMotionSettings } from '../components/ShotEditor';
-import { useListShots, useCreateShot, useHandleExternalImageDrop } from '@/shared/hooks/useShots';
+import { useListShots, useCreateShot, useHandleExternalImageDrop, useUpdateShotName } from '@/shared/hooks/useShots';
 import { Shot } from '@/types/shots';
 import { Button } from '@/shared/components/ui/button';
 import { useProject } from "@/shared/contexts/ProjectContext";
@@ -37,6 +37,7 @@ const VideoTravelToolPage: React.FC = () => {
   const { currentShotId, setCurrentShotId } = useCurrentShot();
   const createShotMutation = useCreateShot();
   const handleExternalImageDropMutation = useHandleExternalImageDrop();
+  const updateShotNameMutation = useUpdateShotName();
   const [isCreateShotModalOpen, setIsCreateShotModalOpen] = useState(false);
   const queryClient = useQueryClient();
   // const { lastAffectedShotId, setLastAffectedShotId } = useLastAffectedShot(); // Keep for later if needed
@@ -268,6 +269,43 @@ const VideoTravelToolPage: React.FC = () => {
     setSelectedShot(null);
     setVideoPairConfigs([]);
     setCurrentShotId(null);
+  };
+
+  // Navigation handlers
+  const handlePreviousShot = () => {
+    if (!shots || !selectedShot) return;
+    const currentIndex = shots.findIndex(shot => shot.id === selectedShot.id);
+    if (currentIndex > 0) {
+      const previousShot = shots[currentIndex - 1];
+      setSelectedShot(previousShot);
+      setCurrentShotId(previousShot.id);
+    }
+  };
+
+  const handleNextShot = () => {
+    if (!shots || !selectedShot) return;
+    const currentIndex = shots.findIndex(shot => shot.id === selectedShot.id);
+    if (currentIndex < shots.length - 1) {
+      const nextShot = shots[currentIndex + 1];
+      setSelectedShot(nextShot);
+      setCurrentShotId(nextShot.id);
+    }
+  };
+
+  // Calculate navigation state
+  const currentShotIndex = shots?.findIndex(shot => shot.id === selectedShot?.id) ?? -1;
+  const hasPrevious = currentShotIndex > 0;
+  const hasNext = currentShotIndex >= 0 && currentShotIndex < (shots?.length ?? 0) - 1;
+
+  // Shot name update handler
+  const handleUpdateShotName = (newName: string) => {
+    if (selectedShot && selectedProjectId) {
+      updateShotNameMutation.mutate({
+        shotId: selectedShot.id,
+        newName: newName,
+        projectId: selectedProjectId,
+      });
+    }
   };
 
   const handleModalSubmitCreateShot = async (name: string, files: File[]) => {
@@ -532,6 +570,11 @@ const VideoTravelToolPage: React.FC = () => {
               onGenerationModeChange={() => {}}
               pairConfigs={[]}
               onPairConfigsChange={() => {}}
+              onPreviousShot={handlePreviousShot}
+              onNextShot={handleNextShot}
+              hasPrevious={hasPrevious}
+              hasNext={hasNext}
+              onUpdateShotName={handleUpdateShotName}
             />
           </div>
         ) : (
@@ -612,6 +655,11 @@ const VideoTravelToolPage: React.FC = () => {
                 userHasInteracted.current = true;
                 setPairConfigs(configs);
               }}
+              onPreviousShot={handlePreviousShot}
+              onNextShot={handleNextShot}
+              hasPrevious={hasPrevious}
+              hasNext={hasNext}
+              onUpdateShotName={handleUpdateShotName}
             />
           </div>
         )

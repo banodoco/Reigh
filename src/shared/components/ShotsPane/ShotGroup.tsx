@@ -139,7 +139,7 @@ const ShotGroup: React.FC<ShotGroupProps> = ({ shot }) => {
       return;
     }
 
-    const validImageTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    const validImageTypes = ['image/jpeg', 'image/png', 'image/webp'];
     const validFiles = files.filter(file => {
       if (validImageTypes.includes(file.type)) {
         return true;
@@ -147,7 +147,7 @@ const ShotGroup: React.FC<ShotGroupProps> = ({ shot }) => {
       console.warn(`[ShotGroup:${shot.id}] handleDrop: Invalid file type for ${file.name}: ${file.type}. Skipping.`);
       toast({
         title: "Invalid File Type",
-        description: `Skipped '${file.name}'. Only JPEG, PNG, WEBP, GIF are allowed. `,
+        description: `Skipped '${file.name}'. Only JPEG, PNG, WEBP are allowed. `,
         variant: "destructive",
       });
       return false;
