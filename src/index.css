@@ -874,3 +874,20 @@
 .animate-subtle-wiggle {
   animation: subtleWiggle 0.5s ease-in-out;
 }
+
+/* Custom utility overrides for tool selector page */
+@layer utilities {
+  .text-lg {
+    font-size: 0.725rem;
+    line-height: 1.75rem;
+  }
+
+  .py-3 {
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+  }
+
+  .py-8 {
+    padding-top: 0rem;
+  }
+}

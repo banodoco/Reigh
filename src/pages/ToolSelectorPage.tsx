@@ -51,7 +51,7 @@ const assistantTools = [
   {
     id: 'edit-videos',
     name: 'Edit\nVideos',
-    description: 'Professional video editing with AI-assisted cuts, transitions, and effects.',
+    description: 'Video editing with AI-assisted cuts, transitions, and effects.',
     tool: null, // Coming soon
     icon: Wand2,
     gradient: 'from-wes-dusty-blue via-wes-sage to-wes-mint',
@@ -61,7 +61,7 @@ const assistantTools = [
   {
     id: 'edit-images',
     name: 'Edit\nImages',
-    description: 'Transform and enhance images with text-based editing and reimagining.',
+    description: 'Transform and enhance images with text-based editing andI reimagining.',
     tool: null, // Marked as coming soon
     icon: Edit,
     gradient: 'from-wes-yellow via-wes-salmon to-wes-pink',
@@ -71,7 +71,7 @@ const assistantTools = [
   {
     id: 'generate-perspectives',
     name: 'Different\nPerspectives',
-    description: 'Create multiple viewpoints and angles from a single image using AI technology.',
+    description: 'Create multiple viewpoints and angles from a single image.',
     tool: null, // Coming soon
     icon: Eye,
     gradient: 'from-wes-lavender via-wes-pink to-wes-coral',
@@ -81,7 +81,7 @@ const assistantTools = [
   {
     id: 'train-lora',
     name: 'Train\nLoRA',
-    description: 'Fine-tune custom LoRA models using your own image datasets for unique styles.',
+    description: 'Fine-tune models using your own datasets for unique styles & motion.',
     tool: null, // Coming soon
     icon: Layers,
     gradient: 'from-wes-sage via-wes-mint to-wes-dusty-blue',
@@ -107,7 +107,7 @@ const ToolCard = ({ item, isSquare = false, index, isVisible }: { item: any, isS
   if (!shouldShow) return null;
 
   const content = (
-    <div className={`wes-tool-card relative overflow-hidden ${isSquare ? 'h-full !p-0' : 'h-32'} wes-polaroid ${isComingSoon ? 'opacity-75' : ''}`}>
+    <div className={`wes-tool-card relative overflow-hidden ${isSquare ? 'h-full !p-0' : 'h-32'} wes-polaroid ${isComingSoon ? 'opacity-30' : ''}`}>
       {/* Coming Soon Badge */}
       {isComingSoon && (
         <div className={`absolute ${isSquare ? 'top-1 right-2' : 'top-2 right-2'} z-10 ${isWiggling ? 'animate-subtle-wiggle' : ''}`}>
@@ -122,8 +122,8 @@ const ToolCard = ({ item, isSquare = false, index, isVisible }: { item: any, isS
         <div className="flex items-center h-full p-6 relative">
           {/* Large subtle number in background */}
           {index !== undefined && (
-            <div className="absolute right-0 top-0 bottom-0 flex items-center justify-center pr-4">
-              <span className="font-playfair text-[5rem] font-bold text-wes-vintage-gold/10 select-none">
+            <div className="absolute right-6 top-1/2 -translate-y-1/2 -translate-y-5">
+              <span className="font-playfair text-[10.5rem] font-bold text-wes-vintage-gold/50 select-none block w-24 text-center">
                 {index + 1}
               </span>
             </div>
@@ -245,19 +245,7 @@ export default function ToolSelectorPage() {
         <div className="flex flex-col lg:flex-row gap-8 max-w-7xl mx-auto">
           {/* Process Column (2/3 width) */}
           <div className="lg:w-2/3">
-            <div className="mb-4">
-              {/* Enhanced header with distinct styling */}
-              <div className="inline-flex items-center space-x-3 bg-gradient-to-r from-wes-coral/20 to-wes-vintage-gold/20 px-6 py-3 rounded-full border border-wes-vintage-gold/30">
-                <div className="relative">
-                  <h2 className="font-inter text-lg font-semibold text-wes-coral uppercase tracking-wider">
-                    Process
-                  </h2>
-                </div>
-                <Crown className="w-4 h-4 text-wes-vintage-gold animate-bounce-gentle opacity-80" />
-              </div>
-            </div>
-            
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-4 mt-4">
               {processTools.map((tool, index) => (
                 <div key={tool.id} style={{ animationDelay: `${index * 100}ms` }}>
                   <ToolCard item={tool} index={index} isVisible={isToolVisible(tool.tool)} />
@@ -268,17 +256,7 @@ export default function ToolSelectorPage() {
 
           {/* Assistant Tools Column (1/3 width) */}
           <div className="lg:w-1/3">
-            <div className="mb-4">
-              {/* Enhanced header with distinct styling */}
-              <div className="inline-flex items-center space-x-3 bg-gradient-to-r from-wes-dusty-blue/20 to-wes-lavender/20 px-6 py-3 rounded-full border border-wes-dusty-blue/30">
-                <h2 className="font-inter text-lg font-semibold text-wes-dusty-blue uppercase tracking-wider">
-                  Assistants
-                </h2>
-                <Sparkles className="w-4 h-4 text-wes-dusty-blue animate-rotate-slow opacity-80" />
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4 mt-4">
               {assistantTools.map((tool, index) => (
                 <div key={tool.id} style={{ animationDelay: `${(index + 4) * 100}ms` }}>
                   <ToolCard item={tool} isSquare isVisible={isToolVisible(tool.tool)} />
