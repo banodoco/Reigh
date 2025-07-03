@@ -14,6 +14,7 @@ import { useToolSettings } from '@/shared/hooks/useToolSettings';
 import { VideoTravelSettings } from '../settings';
 import { deepEqual, sanitizeSettings } from '@/shared/lib/deepEqual';
 import { supabase } from '@/integrations/supabase/client';
+import { Skeleton } from '@/shared/components/ui/skeleton';
 // import { useLastAffectedShot } from '@/shared/hooks/useLastAffectedShot';
 
 // Placeholder data or logic to fetch actual data for VideoEditLayout
@@ -46,7 +47,7 @@ const VideoTravelToolPage: React.FC = () => {
   // Use tool settings for the selected shot - no need to pass userId, server knows it from auth
   const { settings, update: updateSettings, isLoading: isLoadingSettings, isUpdating } = useToolSettings<VideoTravelSettings>(
     'video-travel',
-    { shotId: selectedShot?.id }
+    { shotId: selectedShot?.id, enabled: !!selectedShot }
   );
 
   // Add state for video generation settings - wait for settings to load before initializing
@@ -82,6 +83,22 @@ const VideoTravelToolPage: React.FC = () => {
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const userHasInteracted = useRef(false);
   const lastSavedSettingsRef = useRef<VideoTravelSettings | null>(null);
+
+  /* ------------------------------------------------------------------
+     Handle rare case where no project is selected. We optimistically
+     assume a project *will* be selected after context hydration and
+     show a skeleton meanwhile. If, after a short delay, there is still
+     no project we fall back to an error message.  */
+  const [showProjectError, setShowProjectError] = useState(false);
+
+  useEffect(() => {
+    if (!selectedProjectId) {
+      const t = setTimeout(() => setShowProjectError(true), 1500);
+      return () => clearTimeout(t);
+    }
+    // A project became available – reset flag
+    setShowProjectError(false);
+  }, [selectedProjectId]);
 
   // Update state when settings are loaded from database
   useEffect(() => {
@@ -420,7 +437,23 @@ const VideoTravelToolPage: React.FC = () => {
   };
 
   if (!selectedProjectId) {
-    return <div className="p-4">Please select a project first.</div>;
+    if (showProjectError) {
+      return <div className="p-4 text-center text-muted-foreground">Please select a project first.</div>;
+    }
+    // Skeleton while we wait for ProjectContext to hydrate
+    return (
+      <div className="p-4 space-y-4">
+        {/* Header skeleton */}
+        <Skeleton className="h-9 w-40" />
+
+        {/* List skeleton – resembles shot tiles */}
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          {Array.from({ length: 8 }).map((_, idx) => (
+            <Skeleton key={idx} className="h-40 rounded-lg" />
+          ))}
+        </div>
+      </div>
+    );
   }
 
   if (error) {

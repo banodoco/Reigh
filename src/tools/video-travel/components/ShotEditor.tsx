@@ -973,17 +973,21 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         
         {/* Left Column: Image Manager */}
         <div className="flex flex-col lg:w-1/2 xl:w-1/2 gap-4 min-h-0">
-          <Card className="flex-grow flex flex-col min-h-0">
+          <Card className="flex flex-col">
             <CardHeader>
               <CardTitle>Manage Shot Images</CardTitle>
-              <div className="flex justify-between items-center mb-2">
-                <h3 className="text-lg font-semibold tracking-tight">Images</h3>
-              </div>
-              <p className="text-sm text-muted-foreground pt-1">
-                Drag to reorder. Cmd+click to select and move multiple images.
-              </p>
+              {nonVideoImages.length > 0 && (
+                <>
+                  <div className="flex justify-between items-center mb-2">
+                    <h3 className="text-lg font-semibold tracking-tight">Images</h3>
+                  </div>
+                  <p className="text-sm text-muted-foreground pt-1">
+                    Drag to reorder. Cmd+click to select and move multiple images.
+                  </p>
+                </>
+              )}
             </CardHeader>
-            <CardContent className="flex-grow overflow-y-auto">
+            <CardContent className={nonVideoImages.length > 0 ? "overflow-y-auto" : ""}>
               <div className="p-1">
                 <ShotImageManager
                   images={nonVideoImages}

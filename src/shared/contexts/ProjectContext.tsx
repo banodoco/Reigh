@@ -14,6 +14,8 @@ interface ProjectContextType {
   isCreatingProject: boolean;
   updateProject: (projectId: string, updates: ProjectUpdate) => Promise<boolean>;
   isUpdatingProject: boolean;
+  deleteProject: (projectId: string) => Promise<boolean>;
+  isDeletingProject: boolean;
 }
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
@@ -52,6 +54,7 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
   const [isLoadingProjects, setIsLoadingProjects] = useState(true);
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [isUpdatingProject, setIsUpdatingProject] = useState(false);
+  const [isDeletingProject, setIsDeletingProject] = useState(false);
 
   const fetchProjects = async () => {
     try {
@@ -188,6 +191,44 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const deleteProject = async (projectId: string): Promise<boolean> => {
+    setIsDeletingProject(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { error } = await supabase
+        .from('projects')
+        .delete()
+        .eq('id', projectId)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      setProjects(prevProjects => {
+        const updated = prevProjects.filter(p => p.id !== projectId);
+        // Choose next project to select (first alphabetically)
+        const nextProjectId = determineProjectIdToSelect(updated, null, null);
+        setSelectedProjectIdState(nextProjectId);
+        if (nextProjectId) {
+          localStorage.setItem('selectedProjectId', nextProjectId);
+        } else {
+          localStorage.removeItem('selectedProjectId');
+        }
+        return updated;
+      });
+
+      toast.success('Project deleted successfully.');
+      return true;
+    } catch (err: any) {
+      console.error('[ProjectContext] Exception during project deletion via API:', err);
+      toast.error(`Failed to delete project: ${err.message}`);
+      return false;
+    } finally {
+      setIsDeletingProject(false);
+    }
+  };
+
   useEffect(() => {
     // Wait a bit for auth to be ready before fetching projects
     const timer = setTimeout(() => {
@@ -216,7 +257,9 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
       addNewProject, 
       isCreatingProject,
       updateProject,
-      isUpdatingProject
+      isUpdatingProject,
+      deleteProject,
+      isDeletingProject
     }}>
       {children}
     </ProjectContext.Provider>

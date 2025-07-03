@@ -99,9 +99,18 @@ export const useDuplicateShot = () => {
         shouldSelectAfterCreation: false
       }) as { shot: Shot };
       
-      // Copy all images to the new shot
+      // Copy only non-video images to the new shot
       if (originalShot.shot_generations && originalShot.shot_generations.length > 0) {
         for (const sg of originalShot.shot_generations) {
+          // Skip video outputs
+          const generation = sg.generation;
+          if (generation && (
+            generation.type === 'video_travel_output' ||
+            (generation.location && generation.location.endsWith('.mp4'))
+          )) {
+            continue; // Skip this video output
+          }
+          
           await addImageToShot.mutateAsync({
             shot_id: newShot.id,
             generation_id: sg.generation_id,
@@ -148,11 +157,18 @@ export const useDuplicateShot = () => {
       // Create an optimistic shot for immediate UI feedback
       const originalShot = previousShots?.find(s => s.id === shotId);
       if (originalShot) {
+        // Filter out video outputs for optimistic update
+        const nonVideoImages = originalShot.images.filter(img => 
+          img.type !== 'video_travel_output' && 
+          !(img.location && img.location.endsWith('.mp4')) &&
+          !(img.imageUrl && img.imageUrl.endsWith('.mp4'))
+        );
+        
         const optimisticDuplicatedShot: Shot = {
           id: `optimistic-duplicate-${Date.now()}`,
           name: newName || `${originalShot.name} (Copy)`,
           created_at: new Date().toISOString(),
-          images: originalShot.images, // Copy images reference for optimistic update
+          images: nonVideoImages, // Only copy non-video images for optimistic update
           project_id: projectId,
         };
 

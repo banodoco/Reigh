@@ -23,6 +23,8 @@ import { Project } from '@/types/project';
 import { ASPECT_RATIO_TO_RESOLUTION } from '@/shared/lib/aspectRatios';
 import { Checkbox } from '@/shared/components/ui/checkbox';
 import { useToolSettings } from '@/shared/hooks/useToolSettings';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/shared/components/ui/collapsible';
+import { ChevronDown, AlertTriangle } from 'lucide-react';
 
 // Create the aspect ratio options from the centralized object
 const ASPECT_RATIOS = Object.keys(ASPECT_RATIO_TO_RESOLUTION)
@@ -45,7 +47,9 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({ isOp
   const { settings: uploadSettings, update: updateUploadSettings, isLoading: isLoadingUploadSettings } = useToolSettings<{ cropToProjectSize?: boolean }>('upload', { projectId: project?.id });
 
   const [cropToProjectSize, setCropToProjectSize] = useState<boolean>(true);
-  const { updateProject, isUpdatingProject } = useProject(); // Use context hook
+  const { updateProject, isUpdatingProject, deleteProject, isDeletingProject } = useProject();
+  const [deleteConfirmText, setDeleteConfirmText] = useState<string>('');
+  const [isDangerZoneOpen, setIsDangerZoneOpen] = useState(false);
 
   useEffect(() => {
     if (project && isOpen) { // Also check isOpen to re-init when modal re-opens with same project
@@ -106,6 +110,14 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({ isOp
     // Errors are handled within updateProject with toasts
   };
 
+  const handleDeleteProject = async () => {
+    if (!project) return;
+    const success = await deleteProject(project.id);
+    if (success) {
+      onOpenChange(false);
+    }
+  };
+
   if (!project) return null;
 
   return (
@@ -163,6 +175,51 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({ isOp
               </Label>
             </div>
           </div>
+          {/* Danger Zone */}
+          <Collapsible open={isDangerZoneOpen} onOpenChange={setIsDangerZoneOpen}>
+            <div className="mt-6 border-t pt-4">
+              <CollapsibleTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className="w-full justify-between p-0 h-auto text-left hover:bg-transparent"
+                  type="button"
+                >
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-red-500" />
+                    <span className="text-red-600 font-semibold">Delete Project</span>
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-red-500 transition-transform ${isDangerZoneOpen ? 'rotate-180' : ''}`} />
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="mt-4">
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4 space-y-4">
+                  <div className="space-y-3">
+                    <div>
+                      <Label htmlFor="delete-confirm-input" className="text-sm font-medium text-red-900">
+                        Type "confirm" to make it clear you wish to delete the project and all associated data.
+                      </Label>
+                      <Input
+                        id="delete-confirm-input"
+                        placeholder='Type "confirm" to enable'
+                        value={deleteConfirmText}
+                        onChange={(e) => setDeleteConfirmText(e.target.value)}
+                        disabled={isDeletingProject}
+                        className="mt-1 border-red-300 focus:border-red-500 focus:ring-red-500"
+                      />
+                    </div>
+                    <Button
+                      variant="destructive"
+                      onClick={handleDeleteProject}
+                      disabled={deleteConfirmText !== 'confirm' || isDeletingProject}
+                      className="w-full"
+                    >
+                      {isDeletingProject ? 'Deleting...' : 'Delete Project Forever'}
+                    </Button>
+                  </div>
+                </div>
+              </CollapsibleContent>
+            </div>
+          </Collapsible>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isUpdatingProject}>

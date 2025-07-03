@@ -58,7 +58,7 @@ async function updateToolSettings(params: UpdateToolSettingsParams): Promise<voi
 }
 
 // Overload type definitions
-export function useToolSettings<T>(toolId: string, context?: { projectId?: string; shotId?: string }): {
+export function useToolSettings<T>(toolId: string, context?: { projectId?: string; shotId?: string; enabled?: boolean }): {
   settings: T | undefined;
   isLoading: boolean;
   update: (scope: SettingsScope, settings: Partial<T>) => void;
@@ -68,7 +68,7 @@ export function useToolSettings<T>(toolId: string, context?: { projectId?: strin
 // Unified implementation
 export function useToolSettings<T>(
   toolId: string,
-  context?: { projectId?: string; shotId?: string }
+  context?: { projectId?: string; shotId?: string; enabled?: boolean }
 ) {
   const { selectedProjectId } = useProject();
   const queryClient = useQueryClient();
@@ -76,6 +76,7 @@ export function useToolSettings<T>(
   // Determine parameter shapes
   let projectId: string | undefined = context?.projectId ?? selectedProjectId;
   let shotId: string | undefined = context?.shotId;
+  const fetchEnabled: boolean = context?.enabled ?? true;
 
   // Fetch merged settings from API
   const { data: settings, isLoading } = useQuery({
@@ -95,7 +96,7 @@ export function useToolSettings<T>(
       
       return response.json() as Promise<T>;
     },
-    enabled: !!toolId,
+    enabled: !!toolId && fetchEnabled,
     staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
     gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
   });
