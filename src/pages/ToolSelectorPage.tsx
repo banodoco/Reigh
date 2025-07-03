@@ -9,7 +9,7 @@ const processTools = [
   {
     id: 'image-generation',
     name: 'Generate Images',
-    description: 'Create stunning images with AI-powered generation using structured prompts and artistic control.',
+    description: 'Create images using a variety of models and styles, with support from LLMs.',
     tool: toolsUIManifest.find(t => t.id === 'image-generation'),
     icon: Paintbrush,
     gradient: 'from-wes-pink via-wes-lavender to-wes-dusty-blue',
