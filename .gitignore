@@ -22,6 +22,13 @@ dist-ssr
 *.sln
 *.sw?
 
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
 # User uploaded files and images
 public/files/
 public/uploads/
