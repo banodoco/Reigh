@@ -215,7 +215,7 @@ const ToolCard = ({ item, isSquare = false, index, isVisible }: { item: any, isS
 };
 
 export default function ToolSelectorPage() {
-  const currentEnv = (import.meta.env.VITE_APP_ENV?.toLowerCase() || AppEnv.DEV) as AppEnvValue;
+  const currentEnv = (import.meta.env.VITE_APP_ENV?.toLowerCase() || AppEnv.WEB) as AppEnvValue;
 
   // Scroll to top when component mounts
   useEffect(() => {

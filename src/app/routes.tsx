@@ -16,7 +16,7 @@ import { AppEnv } from '@/types/env';
 import { Loading } from '@/shared/components/ui/loading';
 
 // Determine the environment
-const currentEnv = (import.meta.env.VITE_APP_ENV?.toLowerCase() || AppEnv.DEV);
+const currentEnv = (import.meta.env.VITE_APP_ENV?.toLowerCase() || AppEnv.WEB);
 
 // Loading fallback component for lazy loaded pages
 const LazyLoadingFallback = () => (
