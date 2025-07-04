@@ -22,6 +22,15 @@ function ScrollToTop() {
 }
 
 const Layout: React.FC = () => {
+  const { 
+    isTasksPaneLocked, 
+    tasksPaneWidth, 
+    isShotsPaneLocked, 
+    shotsPaneWidth, 
+    isGenerationsPaneLocked, 
+    generationsPaneHeight 
+  } = usePanes();
+
   // Auth guard state
   const [session, setSession] = useState<Session | null | undefined>(undefined);
 
@@ -51,15 +60,6 @@ const Layout: React.FC = () => {
   if (!session) {
     return <Navigate to="/" replace state={{ fromProtected: true }} />;
   }
-
-  const { 
-    isTasksPaneLocked, 
-    tasksPaneWidth, 
-    isShotsPaneLocked, 
-    shotsPaneWidth, 
-    isGenerationsPaneLocked, 
-    generationsPaneHeight 
-  } = usePanes();
 
   const mainContentStyle = {
     marginRight: isTasksPaneLocked ? `${tasksPaneWidth}px` : '0px',
