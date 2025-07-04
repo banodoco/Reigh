@@ -48,7 +48,7 @@ const AppInternalContent = () => {
     if (relativePath.startsWith('http') || relativePath.startsWith('blob:')) {
       return relativePath;
     }
-    const baseUrl = import.meta.env.VITE_API_TARGET_URL || '';
+    const baseUrl = import.meta.env.VITE_API_TARGET_URL || window.location.origin;
     const cleanBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
     const cleanRelative = relativePath.startsWith('/') ? relativePath.substring(1) : relativePath;
     return `${cleanBase}/${cleanRelative}`;

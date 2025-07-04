@@ -1,7 +1,7 @@
 import React from 'react';
 import { GenerationRow } from '@/types/shots';
 
-const baseUrl = import.meta.env.VITE_API_TARGET_URL || '';
+const baseUrl = import.meta.env.VITE_API_TARGET_URL || window.location.origin;
 
 const getDisplayUrl = (relativePath: string | undefined): string => {
   if (!relativePath) return '/placeholder.svg'; // Default placeholder if no path

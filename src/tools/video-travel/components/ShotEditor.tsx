@@ -154,7 +154,7 @@ export interface ShotEditorProps {
   onUpdateShotName?: (newName: string) => void;
 }
 
-const baseUrl = import.meta.env.VITE_API_TARGET_URL || '';
+const baseUrl = import.meta.env.VITE_API_TARGET_URL || window.location.origin;
 
 const DEFAULT_RESOLUTION = '840x552';
 
