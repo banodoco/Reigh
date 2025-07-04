@@ -15,6 +15,7 @@ import {
 } from "@/shared/components/ui/dropdown-menu";
 import { ScrollArea } from "@/shared/components/ui/scroll-area"
 import { filterVisibleTasks } from '@/shared/lib/taskConfig';
+import { RefreshCw } from 'lucide-react';
 
 // Define the status values as an array (matching the enum values in the schema)
 const ALL_POSSIBLE_STATUSES: TaskStatus[] = ['Queued', 'In Progress', 'Complete', 'Failed', 'Cancelled'];
@@ -164,7 +165,7 @@ const TaskList: React.FC = () => {
               </DropdownMenuContent>
             </DropdownMenu>
           <Button onClick={() => refetch()} variant="outline" size="sm" className="bg-zinc-700 border-zinc-600 hover:bg-zinc-600">
-            Refresh
+            <RefreshCw className="h-4 w-4" />
           </Button>
         </div>
       </div>

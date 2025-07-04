@@ -56,7 +56,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
     const resolved = (task.params as any)?.orchestrator_details?.input_image_paths_resolved;
     return Array.isArray(resolved) ? resolved as string[] : [];
   }, [task]);
-  const imagesToShow = imageUrls.slice(0, 5);
+  const imagesToShow = imageUrls.slice(0, 4);
   const extraImageCount = Math.max(0, imageUrls.length - imagesToShow.length);
 
   // Local state to show progress percentage temporarily

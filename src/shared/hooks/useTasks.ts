@@ -43,9 +43,11 @@ const mapDbTaskToTask = (row: any): Task => ({
  * It handles loading states, toast notifications, and automatically invalidates
  * the tasks query to refresh the UI upon successful creation.
  */
-export const useCreateTask = () => {
+export const useCreateTask = (options?: { showToast?: boolean }) => {
   const queryClient = useQueryClient();
   const { selectedProjectId } = useProject();
+  // Allow callers to suppress per-task success toasts (useful for bulk operations)
+  const { showToast = true } = options || {};
 
   return useMutation({
     mutationFn: async ({ functionName, payload }: { functionName: string, payload: object }) => {
@@ -61,8 +63,10 @@ export const useCreateTask = () => {
       return data;
     },
     onSuccess: (data, variables) => {
-      // This will run after a successful mutation
-      toast.success(`Task created successfully!`);
+      // Show per-task success toast only if not suppressed
+      if (showToast) {
+        toast.success(`Task created successfully!`);
+      }
       
       // Invalidate the tasks query to trigger a refetch
       // This ensures the TasksPane updates automatically

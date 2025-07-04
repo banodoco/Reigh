@@ -16,7 +16,7 @@ import { Settings } from "lucide-react";
 import { useApiKeys } from '@/shared/hooks/useApiKeys';
 import { useQueryClient } from '@tanstack/react-query';
 import { fetchWithAuth } from '@/lib/api';
-import { useCreateTask } from "@/shared/hooks/useTasks";
+import { useCreateTask, useListTasks } from "@/shared/hooks/useTasks";
 
 // Remove unnecessary environment detection - tool should work in all environments
 
@@ -71,14 +71,19 @@ const ImageGenerationToolPage = () => {
   const [isUpscalingImageId, setIsUpscalingImageId] = useState<string | null>(null);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   
-  const { mutate: createTask, isPending: isCreatingTask } = useCreateTask();
+  // Suppress per-task success toasts; we'll show a single aggregated toast
+  const { mutateAsync: createTaskAsync } = useCreateTask({ showToast: false });
 
-  const [creatingTaskCount, setCreatingTaskCount] = useState(1);
+  const [isCreatingTasks, setIsCreatingTasks] = useState(false);
+  const [pendingTasksInfo, setPendingTasksInfo] = useState<{ initial: number; expected: number } | null>(null);
 
   // Always use hooks - no environment-based disabling
   const { apiKeys, getApiKey } = useApiKeys();
   const imageGenerationFormRef = useRef<ImageGenerationFormHandles>(null);
   const { selectedProjectId } = useProject();
+
+  // Track project tasks to know when they appear in the TasksPane (must be after selectedProjectId)
+  const { data: projectTasks } = useListTasks({ projectId: selectedProjectId });
   const { data: shots, isLoading: isLoadingShots, error: shotsError } = useListShots(selectedProjectId);
   const addImageToShotMutation = useAddImageToShot();
   const { lastAffectedShotId, setLastAffectedShotId } = useLastAffectedShot();
@@ -174,7 +179,12 @@ const ImageGenerationToolPage = () => {
     const tasksToCreateCount = generationMode === 'wan-local'
       ? restOfFormData.prompts.length * restOfFormData.imagesPerPrompt
       : 1;
-    setCreatingTaskCount(tasksToCreateCount);
+
+    // Record current task count so we can detect when new tasks have appeared
+    const initialTaskCount = projectTasks?.length || 0;
+    setPendingTasksInfo({ initial: initialTaskCount, expected: tasksToCreateCount });
+
+    setIsCreatingTasks(true);
     
     // Clear placeholders if needed
     if (showPlaceholders && restOfFormData.prompts.length * restOfFormData.imagesPerPrompt > 0) {
@@ -203,25 +213,77 @@ const ImageGenerationToolPage = () => {
         });
       });
 
-      // Fire off all requests concurrently
-      taskPayloads.forEach(payload => {
-        createTask({ functionName: 'single-image-generate', payload });
+      // Fire off all requests concurrently and wait for them to finish
+      let successfulCreations = 0;
+      const results = await Promise.allSettled(
+        taskPayloads.map(payload => createTaskAsync({ functionName: 'single-image-generate', payload }))
+      );
+
+      results.forEach(r => {
+        if (r.status === 'fulfilled') successfulCreations += 1;
       });
+
+      const failedCreations = taskPayloads.length - successfulCreations;
+
+      if (failedCreations > 0) {
+        toast.error(`${failedCreations} of ${taskPayloads.length} tasks failed to create.`);
+      }
+
+      if (successfulCreations === 0) {
+        setIsCreatingTasks(false);
+        setPendingTasksInfo(null);
+        return;
+      }
+
+      // Ensure the task list is refreshed so the user sees the new tasks
+      await queryClient.invalidateQueries({ queryKey: ['tasks', selectedProjectId] });
+      await queryClient.refetchQueries({ queryKey: ['tasks', selectedProjectId] });
+
+      setIsCreatingTasks(false);
+      toast.success(`${successfulCreations} tasks added`);
+      setPendingTasksInfo(null);
 
     } else {
       // Single task for API-based modes
-      createTask({
-        functionName: 'single-image-generate',
-        payload: {
-          project_id: selectedProjectId,
-          prompts: restOfFormData.prompts.map((p: PromptEntry) => p.fullPrompt),
-          images_per_prompt: restOfFormData.imagesPerPrompt,
-          loras: restOfFormData.loras,
-          generation_mode: generationMode,
-        }
-      });
+      try {
+        await createTaskAsync({
+          functionName: 'single-image-generate',
+          payload: {
+            project_id: selectedProjectId,
+            prompts: restOfFormData.prompts.map((p: PromptEntry) => p.fullPrompt),
+            images_per_prompt: restOfFormData.imagesPerPrompt,
+            loras: restOfFormData.loras,
+            generation_mode: generationMode,
+          }
+        });
+
+        // Refresh tasks and then clear loading state
+        await queryClient.invalidateQueries({ queryKey: ['tasks', selectedProjectId] });
+        await queryClient.refetchQueries({ queryKey: ['tasks', selectedProjectId] });
+
+        setIsCreatingTasks(false);
+        toast.success(`1 task added`);
+        setPendingTasksInfo(null);
+      } catch (err) {
+        console.error('[ImageGeneration] Error creating task:', err);
+        toast.error('Failed to create task.');
+        setIsCreatingTasks(false);
+        setPendingTasksInfo(null);
+        return;
+      }
     }
   };
+
+  // When tasks list updates, check if we've reached the expected count
+  useEffect(() => {
+    if (isCreatingTasks && pendingTasksInfo && projectTasks) {
+      if (projectTasks.length >= pendingTasksInfo.initial + pendingTasksInfo.expected) {
+        setIsCreatingTasks(false);
+        toast.success(`${pendingTasksInfo.expected} tasks added`);
+        setPendingTasksInfo(null);
+      }
+    }
+  }, [projectTasks, isCreatingTasks, pendingTasksInfo]);
 
   const handleImageSaved = async (imageId: string, newImageUrl: string) => {
     console.log(`[ImageGeneration-HandleImageSaved] Starting image update process:`, { imageId, newImageUrl });
@@ -311,10 +373,7 @@ const ImageGenerationToolPage = () => {
 
   const validShots = shots || [];
 
-  // Update the condition for showing the form, and disable generate button if task is being created
-  const canGenerate = hasValidFalApiKey && !isCreatingTask;
-
-  const isGenerating = isCreatingTask; // Simplified generating state
+  const isGenerating = isCreatingTasks;
 
   const imagesToShow = showPlaceholders 
     ? placeholderImages 
@@ -379,26 +438,6 @@ const ImageGenerationToolPage = () => {
         </>
       )}
 
-      {/* Progress Display */}
-      {isCreatingTask && (
-        <div className="sticky bottom-0 bg-background border-t border-border/50 p-4 shadow-lg">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>
-              <span className="text-sm font-medium">
-                Creating Image Generation Tasks...
-              </span>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => { /* The hook doesn't support cancellation yet, but UI can be reset */ }}
-            >
-              Cancel Tasks
-            </Button>
-          </div>
-        </div>
-      )}
 
       {/* Settings Modal */}
       <SettingsModal

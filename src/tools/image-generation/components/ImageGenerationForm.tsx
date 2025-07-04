@@ -647,27 +647,24 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
               />
             </div>
           </div>
-        </div>
 
-        {/* Controls and Settings Section */}
-        <div className="space-y-6">
-
-          <div className="grid grid-cols-1 gap-4 pt-4">
-            <div className="mt-1">
-              <SliderWithValue
-                label="Images per Prompt"
-                value={imagesPerPrompt}
-                onChange={handleSliderChange(setImagesPerPrompt)}
-                min={1}
-                max={16}
-                step={1}
-                disabled={!hasApiKey || isGenerating}
-              />            </div>
+          {/* Images per Prompt Slider */}
+          <div className="mt-4">
+            <SliderWithValue
+              label="Images per Prompt"
+              value={imagesPerPrompt}
+              onChange={handleSliderChange(setImagesPerPrompt)}
+              min={1}
+              max={16}
+              step={1}
+              disabled={!hasApiKey || isGenerating}
+            />
           </div>
-        </div>
 
-        <div className="space-y-6">
-          {/* Show LoRA section */}
+        </div>
+        
+        {/* LoRA Section */}
+        <div className="space-y-6 md:order-2 md:row-start-1 md:col-start-2">
           <div>
             <Label>LoRA Models (Wan)</Label>
             <Button type="button" variant="outline" className="w-full mt-1" onClick={() => setIsLoraModalOpen(true)} disabled={isGenerating}>
@@ -725,7 +722,7 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
             className="w-full md:w-1/2" 
             disabled={isGenerating || !hasApiKey || actionablePromptsCount === 0}
           >
-            {isGenerating ? "Generating..." : "Generate Images"}
+            {isGenerating ? "Creating tasks..." : "Generate Images"}
           </Button>
         </div>
       </form>

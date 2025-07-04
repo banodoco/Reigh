@@ -116,7 +116,7 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
 - **Layout.tsx**: Main layout: `<GlobalHeader/>`, `<Outlet/>`, `<TasksPane/>`, `<ShotsPane/>`, `<GenerationsPane/>`. Adjusts margins for locked panes.
 
 ##### Environment (`VITE_APP_ENV`):
-- Controls tool visibility on ToolSelectorPage.tsx (dev, local, web). Default: dev.
+- Controls tool visibility on ToolSelectorPage.tsx (dev, local, web). Default: web (when unset).
 - Set in .env.local (root), restart Vite server after changes.
 - `VITE_API_TARGET_URL`: Vite proxy target & client-side base URL for assets.
 - Visibility logic: ToolSelectorPage.tsx filters tools array based on tool.environments (array of AppEnv from src/types/env.ts) matching VITE_APP_ENV. Modify environments array in ToolSelectorPage.tsx to change visibility.
@@ -140,7 +140,7 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
 - `/api/local-image-upload` - Local file uploads
 
 #### 3.2. Top-Level Pages (`src/pages/`)
-- **ToolSelectorPage.tsx**: App entry. Grid of available tools. (Shown when VITE_APP_ENV is 'dev' or 'local')
+- **ToolSelectorPage.tsx**: Grid of available tools. Accessible at `/tools` in all environments (and at `/` when VITE_APP_ENV is not 'web').
 - **HomePage.tsx**: Landing page with "Reigh" title, tagline, example showcase, and philosophy section. Renders without header/layout. (Shown when VITE_APP_ENV is 'web')
 - **NotFoundPage.tsx**: 404 errors.
 - **ShotsPage.tsx**: Lists project shots (ShotListDisplay). Manages selected shot's images (ShotImageManager).
@@ -189,7 +189,7 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
 - **GenerationsPane/GenerationsPane.tsx**: Bottom slide-up panel (browsing project's generated media, paginated)
 - **TasksPane/**:
   - `TasksPane.tsx`: Right slide-out panel for tasks
-  - `TaskList.tsx`: Lists tasks, filters, real-time updates via WebSocket
+  - `TaskList.tsx`: Lists tasks, filters, real-time updates via Supabase Realtime
   - `TaskItem.tsx**: Displays task details, cancel button
 - **ui/**: 50+ re-exports/variants of shadcn components. All modal components (Dialog, Sheet, Drawer) use `z-[9999]` to ensure they appear above sliding panes (which use z-60 to z-102)
 - **loading.tsx**: Wes Anderson-inspired loading indicators
@@ -225,7 +225,7 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
   - Single database query instead of 3 parallel queries
   - Prevents double-fetching on initial load
 - **useVideoScrubbing.ts**: Video scrubbing functionality
-- **useWebSocket.ts**: WebSocket connection for real-time updates
+- **useWebSocket.ts**: Supabase Realtime channel connection for real-time updates
 - **useAIInteractionService.ts**: AI interaction service for generating prompts and editing
 
 ##### Contexts
@@ -260,7 +260,7 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
   - Uses Promise.all to fetch all data concurrently instead of sequentially
   - Merges settings with deep merge: defaults → user → project → shot
   - `updateToolSettings`: Updates settings at specified scope
-- **webSocketService.ts**: WebSocket server for real-time updates
+- **webSocketService.ts**: Supabase Realtime broadcast service for real-time updates
 
 ##### Tool Settings (`src/tools/*/settings.ts`)
 - **video-travel/settings.ts**: Defines `VideoTravelSettings` interface and default values for Video Travel tool (per-shot scope – generation parameters, LoRA configs, pair prompts/frames).

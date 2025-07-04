@@ -35,7 +35,7 @@ export const PanesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [shotsPaneWidth, setShotsPaneWidthState] = useState(300);
 
   const [isTasksPaneLocked, setIsTasksPaneLockedState] = useState(false);
-  const [tasksPaneWidth, setTasksPaneWidthState] = useState(350);
+  const [tasksPaneWidth, setTasksPaneWidthState] = useState(300);
 
   const [userId, setUserId] = useState<string | undefined>(undefined);
 
