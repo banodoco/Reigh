@@ -31,6 +31,11 @@ function isObject(item: any): boolean {
   return item && typeof item === 'object' && !Array.isArray(item);
 }
 
+// Helper to validate UUIDs (basic format check)
+function isValidUUID(value: string | undefined): value is string {
+  return !!value && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(value);
+}
+
 export interface ToolSettingsContext {
   userId: string;
   projectId?: string;
@@ -41,11 +46,16 @@ export async function resolveToolSettings(
   toolId: string,
   ctx: ToolSettingsContext
 ): Promise<unknown> {
+  // Sanitize incoming IDs – avoid querying with invalid UUID strings (e.g. the literal "undefined") which crash Postgres
+  const userId = isValidUUID(ctx.userId) ? ctx.userId : undefined;
+  const projectId = isValidUUID(ctx.projectId) ? ctx.projectId : undefined;
+  const shotId = isValidUUID(ctx.shotId) ? ctx.shotId : undefined;
+
   // Fetch all needed data in parallel (still better than sequential)
   const [user, project, shot] = await Promise.all([
-    db.query.users.findFirst({ where: eq(users.id, ctx.userId) }),
-    ctx.projectId ? db.query.projects.findFirst({ where: eq(projects.id, ctx.projectId) }) : Promise.resolve(null),
-    ctx.shotId ? db.query.shots.findFirst({ where: eq(shots.id, ctx.shotId) }) : Promise.resolve(null),
+    userId ? db.query.users.findFirst({ where: eq(users.id, userId) }) : Promise.resolve(null),
+    projectId ? db.query.projects.findFirst({ where: eq(projects.id, projectId) }) : Promise.resolve(null),
+    shotId ? db.query.shots.findFirst({ where: eq(shots.id, shotId) }) : Promise.resolve(null),
   ]);
 
   const userSettings = (user?.settings as any)?.[toolId] ?? {};

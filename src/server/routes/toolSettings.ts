@@ -24,8 +24,11 @@ const asyncHandler = (fn: (req: Request, res: Response, next: NextFunction) => P
 // GET /api/tool-settings/resolve
 router.get('/resolve', authenticate, asyncHandler(async (req: Request, res: Response) => {
   try {
-    const { toolId, projectId, shotId } = req.query;
-    
+    const { toolId } = req.query;
+    // Sanitize query params – sometimes we get the literal string "undefined" from the client
+    const projectIdRaw = req.query.projectId as string | undefined;
+    const shotIdRaw = req.query.shotId as string | undefined;
+
     if (!toolId || typeof toolId !== 'string') {
       return res.status(400).json({ error: 'toolId is required' });
     }
@@ -35,10 +38,13 @@ router.get('/resolve', authenticate, asyncHandler(async (req: Request, res: Resp
       return res.status(401).json({ error: 'User not authenticated' });
     }
 
+    const projectId = projectIdRaw && projectIdRaw !== 'undefined' ? projectIdRaw : undefined;
+    const shotId = shotIdRaw && shotIdRaw !== 'undefined' ? shotIdRaw : undefined;
+
     const settings = await resolveToolSettings(toolId, {
       userId,
-      projectId: projectId as string | undefined,
-      shotId: shotId as string | undefined,
+      projectId,
+      shotId,
     });
 
     res.json(settings);
