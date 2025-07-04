@@ -225,8 +225,30 @@ export default function ToolSelectorPage() {
   const isToolVisible = (tool: ToolUIDefinition | null) => {
     if (!tool) return false;
     if (currentEnv === AppEnv.DEV) return true;
-    return tool.environments.includes(currentEnv);
+    const result = tool.environments.includes(currentEnv);
+    console.log('[ToolSelectorPage] Tool visibility check:', {
+      toolId: tool.id,
+      environments: tool.environments,
+      currentEnv,
+      includes: result,
+    });
+    return result;
   };
+
+  // Debug logging
+  console.log('[ToolSelectorPage] Environment detection:', {
+    VITE_APP_ENV: import.meta.env.VITE_APP_ENV,
+    currentEnv,
+    AppEnv,
+  });
+
+  // Debug tool visibility
+  const imageGenTool = toolsUIManifest.find(t => t.id === 'image-generation');
+  console.log('[ToolSelectorPage] Image generation tool:', {
+    tool: imageGenTool,
+    environments: imageGenTool?.environments,
+    isVisible: isToolVisible(imageGenTool),
+  });
 
   return (
     <div className="min-h-screen wes-texture relative overflow-hidden">

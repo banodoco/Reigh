@@ -75,8 +75,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
     return (
         <div className="space-y-6 mb-8">
           <div className="p-4 border rounded-lg bg-card shadow-md space-y-4">
-            <div className="flex justify-between items-center">
-              <h3 className="text-lg font-semibold">Generation Settings</h3>
+            <div className="flex justify-between items-center">              
               <ToggleGroup type="single" value={generationMode} onValueChange={(value: 'batch' | 'by-pair') => value && onGenerationModeChange(value)} className="my-2">
                 <ToggleGroupItem value="batch" aria-label="Toggle batch">
                   Batch
