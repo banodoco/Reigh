@@ -48,6 +48,7 @@ const placeholderImages: GeneratedImageWithMetadata[] = Array(8).fill(null).map(
 }));
 
 const ImageGenerationToolPage = () => {
+  console.log('[ImageGenerationToolPage] Component loading...');
   const [generatedImages, setGeneratedImages] = useState<GeneratedImageWithMetadata[]>(placeholderImages);
   // const [isGenerating, setIsGenerating] = useState(false); // From hook
   // const [currentPromptIndex, setCurrentPromptIndex] = useState<number | null>(null); // Part of hook's progress

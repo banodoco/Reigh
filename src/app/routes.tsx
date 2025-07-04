@@ -4,7 +4,12 @@ import ToolSelectorPage from '@/pages/ToolSelectorPage';
 import HomePage from '@/pages/HomePage';
 import ArtPage from '@/pages/ArtPage';
 // Lazy load tool pages for better performance
-const ImageGenerationToolPage = React.lazy(() => import('@/tools/image-generation/pages/ImageGenerationToolPage'));
+const ImageGenerationToolPage = React.lazy(() => 
+  import('@/tools/image-generation/pages/ImageGenerationToolPage').catch(error => {
+    console.error('Failed to load ImageGenerationToolPage:', error);
+    throw error;
+  })
+);
 const VideoTravelToolPage = React.lazy(() => import('@/tools/video-travel/pages/VideoTravelToolPage'));
 const EditTravelToolPage = React.lazy(() => import('@/tools/edit-travel/pages/EditTravelToolPage'));
 import NotFoundPage from '@/pages/NotFoundPage'; // Assuming NotFoundPage will be moved here or created
