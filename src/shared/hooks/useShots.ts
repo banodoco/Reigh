@@ -208,7 +208,7 @@ export const useListShots = (projectId: string | null): UseQueryResult<Shot[], E
         .from('shots')
         .select('*')
         .eq('project_id', projectId)
-        .order('created_at', { ascending: true });
+        .order('created_at', { ascending: false });
       
       if (shotsError) throw shotsError;
       

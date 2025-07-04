@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import ShotGroup from './ShotGroup';
 import NewGroupDropZone from './NewGroupDropZone';
 import { useListShots } from '@/shared/hooks/useShots';
@@ -19,6 +19,17 @@ const ShotsPane: React.FC = () => {
   const { data: shots, isLoading, error } = useListShots(selectedProjectId);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [flashEffect, setFlashEffect] = useState(false);
+  // Pagination state
+  const pageSize = 5;
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Adjust currentPage if shots length changes (e.g., after create/delete)
+  useEffect(() => {
+    const totalPages = Math.max(1, Math.ceil((shots?.length ?? 0) / pageSize));
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [shots?.length]);
   const createShotMutation = useCreateShot();
   const handleExternalImageDropMutation = useHandleExternalImageDrop();
   const navigate = useNavigate();
@@ -102,10 +113,10 @@ const ShotsPane: React.FC = () => {
         <div
           {...paneProps}
           className={cn(
-            `pointer-events-auto absolute top-0 left-0 h-full w-full border-r shadow-xl transform transition-transform duration-300 ease-in-out flex flex-col`,
+            `pointer-events-auto absolute top-0 left-0 h-full w-full border-2 border-r shadow-xl transform transition-transform duration-300 ease-in-out flex flex-col`,
             transformClass,
             flashEffect 
-              ? "bg-green-400/20 border-green-400 border-2 shadow-green-400/50 animate-pulse" 
+              ? "bg-green-400/20 border-green-400 shadow-green-400/50 animate-pulse" 
               : "bg-zinc-900/95 border-zinc-700"
           )}
         >
@@ -131,8 +142,34 @@ const ShotsPane: React.FC = () => {
             <NewGroupDropZone onZoneClick={() => setIsCreateModalOpen(true)} />
             {isLoading && <p className="text-white">Loading shots...</p>}
             {error && <p className="text-red-500">Error loading shots: {error.message}</p>}
-            {shots && shots.map(shot => <ShotGroup key={shot.id} shot={shot} />)}
+            {shots && shots
+              .slice((currentPage - 1) * pageSize, currentPage * pageSize)
+              .map(shot => <ShotGroup key={shot.id} shot={shot} />)}
           </div>
+          {/* Pagination Controls */}
+          {shots && shots.length > pageSize && (
+            <div className="p-2 border-t border-zinc-800 flex items-center justify-between flex-shrink-0">
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              >
+                Previous
+              </Button>
+              <span className="text-zinc-400 text-sm">
+                Page {currentPage} of {Math.ceil(shots.length / pageSize)}
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={currentPage === Math.ceil(shots.length / pageSize)}
+                onClick={() => setCurrentPage((p) => Math.min(Math.ceil(shots.length / pageSize), p + 1))}
+              >
+                Next
+              </Button>
+            </div>
+          )}
           <CreateShotModal
             isOpen={isCreateModalOpen}
             onClose={() => setIsCreateModalOpen(false)}
