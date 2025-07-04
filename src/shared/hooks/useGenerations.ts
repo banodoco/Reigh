@@ -8,11 +8,10 @@ import { fetchWithAuth } from '@/lib/api';
 const fetchGenerations = async (projectId: string | null, limit?: number): Promise<GeneratedImageWithMetadata[]> => {
   if (!projectId) return [];
   
-  const url = new URL('/api/generations', window.location.origin);
-  url.searchParams.append('projectId', projectId);
-  if (limit) url.searchParams.append('limit', limit.toString());
+  const params = new URLSearchParams({ projectId });
+  if (limit) params.append('limit', limit.toString());
   
-  const response = await fetchWithAuth(url.toString());
+  const response = await fetchWithAuth(`/api/generations?${params}`);
   
   if (!response.ok) {
     throw new Error('Failed to fetch generations');

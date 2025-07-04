@@ -91,10 +91,9 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
     
     setIsLoadingPreferences(true);
     try {
-      const baseUrl = import.meta.env.VITE_API_TARGET_URL || window.location.origin;
       const params = new URLSearchParams({ toolId: 'user-preferences' });
       
-      const response = await fetchWithAuth(`${baseUrl}/api/tool-settings/resolve?${params}`, {
+      const response = await fetchWithAuth(`/api/tool-settings/resolve?${params}`, {
         headers: { 'Content-Type': 'application/json' },
       });
       
@@ -122,9 +121,7 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
     }
     
     try {
-      const baseUrl = import.meta.env.VITE_API_TARGET_URL || window.location.origin;
-      
-      const response = await fetchWithAuth(`${baseUrl}/api/tool-settings`, {
+      const response = await fetchWithAuth('/api/tool-settings', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

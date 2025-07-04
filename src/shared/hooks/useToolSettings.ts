@@ -6,7 +6,7 @@ import { useProject } from '@/shared/contexts/ProjectContext';
 import { fetchWithAuth } from '@/lib/api';
 import { supabase } from '@/integrations/supabase/client';
 
-const baseUrl = import.meta.env.VITE_API_TARGET_URL || window.location.origin;
+// Removed baseUrl - using relative URLs with fetchWithAuth
 
 export type SettingsScope = 'user' | 'project' | 'shot';
 
@@ -27,8 +27,7 @@ async function fetchToolSettings(toolId: string, ctx: ToolSettingsContext): Prom
   if (ctx.projectId) params.append('projectId', ctx.projectId);
   if (ctx.shotId) params.append('shotId', ctx.shotId);
 
-  const response = await fetch(`${baseUrl}/api/tool-settings/resolve?${params}`, {
-    method: 'GET',
+  const response = await fetchWithAuth(`/api/tool-settings/resolve?${params}`, {
     headers: {
       'Content-Type': 'application/json',
     },
@@ -43,7 +42,7 @@ async function fetchToolSettings(toolId: string, ctx: ToolSettingsContext): Prom
 }
 
 async function updateToolSettings(params: UpdateToolSettingsParams): Promise<void> {
-  const response = await fetch(`${baseUrl}/api/tool-settings`, {
+  const response = await fetchWithAuth('/api/tool-settings', {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
@@ -86,7 +85,7 @@ export function useToolSettings<T>(
       if (projectId) params.append('projectId', projectId);
       if (shotId) params.append('shotId', shotId);
       
-      const response = await fetchWithAuth(`${baseUrl}/api/tool-settings/resolve?${params}`, {
+      const response = await fetchWithAuth(`/api/tool-settings/resolve?${params}`, {
         headers: { 'Content-Type': 'application/json' },
       });
       
@@ -119,7 +118,7 @@ export function useToolSettings<T>(
       if (!idForScope) {
         throw new Error('Missing identifier for tool settings update');
       }
-      const response = await fetchWithAuth(`${baseUrl}/api/tool-settings`, {
+      const response = await fetchWithAuth('/api/tool-settings', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
