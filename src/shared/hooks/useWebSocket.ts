@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { AppEnv } from '@/types/env';
 
 const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
 // Connect to the same host and port as the web page, but on the /ws path
@@ -9,8 +10,18 @@ const WS_URL = `${protocol}//${window.location.host}/ws`;
 export function useWebSocket() {
   const queryClient = useQueryClient();
   const ws = useRef<WebSocket | null>(null);
+  
+  // Disable WebSocket for web environment (production)
+  const currentEnv = (import.meta.env.VITE_APP_ENV?.toLowerCase() || AppEnv.WEB);
+  const isWebEnv = currentEnv === AppEnv.WEB;
 
   useEffect(() => {
+    // Skip WebSocket connection in web environment
+    if (isWebEnv) {
+      console.log('[WebSocket] Skipping WebSocket connection in web environment');
+      return;
+    }
+    
     if (ws.current) return;
 
     ws.current = new WebSocket(WS_URL);
@@ -77,5 +88,5 @@ export function useWebSocket() {
         ws.current.close();
       }
     };
-  }, [queryClient]);
+  }, [queryClient, isWebEnv]);
 } 

@@ -43,6 +43,10 @@ const router = createBrowserRouter([
         element: <ToolSelectorPage />,
       }] : []),
       {
+        path: '/tools',
+        element: <ToolSelectorPage />,
+      },
+      {
         path: '/tools/image-generation',
         element: (
           <Suspense fallback={<LazyLoadingFallback />}>

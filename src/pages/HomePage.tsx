@@ -38,7 +38,7 @@ export default function HomePage() {
     });
     // Redirect signed-in users straight to the app
     if (session) {
-      navigate('/shots');
+      navigate('/tools');
     }
     return () => {
       listener.subscription.unsubscribe();

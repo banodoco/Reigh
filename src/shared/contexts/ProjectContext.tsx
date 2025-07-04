@@ -81,6 +81,14 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
   const fetchUserPreferences = useCallback(async () => {
     if (!userId) return;
     
+    // Skip user preferences in web environment (no backend server)
+    const currentEnv = import.meta.env.VITE_APP_ENV?.toLowerCase() || 'web';
+    if (currentEnv === 'web') {
+      console.log('[ProjectContext] Skipping user preferences fetch in web environment');
+      setIsLoadingPreferences(false);
+      return;
+    }
+    
     setIsLoadingPreferences(true);
     try {
       const baseUrl = import.meta.env.VITE_API_TARGET_URL || window.location.origin;
@@ -105,6 +113,13 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
   // Update user preferences directly
   const updateUserPreferences = useCallback(async (scope: 'user', patch: Partial<UserPreferences>) => {
     if (!userId) return;
+    
+    // Skip user preferences in web environment (no backend server)
+    const currentEnv = import.meta.env.VITE_APP_ENV?.toLowerCase() || 'web';
+    if (currentEnv === 'web') {
+      console.log('[ProjectContext] Skipping user preferences update in web environment');
+      return;
+    }
     
     try {
       const baseUrl = import.meta.env.VITE_API_TARGET_URL || window.location.origin;
