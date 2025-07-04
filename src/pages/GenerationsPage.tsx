@@ -59,8 +59,7 @@ const GenerationsPage: React.FC = () => {
         generation_id: generationId,
         project_id: selectedProjectId!,
       }, {
-        onSuccess: () => {
-          toast.success("Image added to shot");
+        onSuccess: () => {          
           resolve(true);
         },
         onError: (error) => {

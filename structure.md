@@ -44,6 +44,8 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
 | **Supabase Edge Functions** | |
 | `/supabase/functions/single-image-generate/` | Edge Function replacement for /api/single-image/generate. Creates `single_image` tasks for wan-local generation mode |
 | `/supabase/functions/steerable-motion/` | Edge Function replacement for /api/steerable-motion/travel-between-images. Creates `travel_orchestrator` tasks for video generation |
+| `/supabase/functions/generate-pat/` | Edge Function for generating personal access tokens (PAT) for local worker scripts |
+| `/supabase/functions/revoke-pat/` | Edge Function for revoking personal access tokens |
 | **API Endpoints** | |
 | `POST /api/local-image-upload` | Upload single image files to server local storage |
 | `POST /api/upload-flipped-image` | Upload processed (flipped) images from lightbox edit functionality |
@@ -73,11 +75,28 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
 - **Supabase migrations** (`/supabase/migrations/`) for Supabase-specific features (RLS policies, storage bucket setup, triggers, functions)
 
 **Row Level Security (RLS) Status**: ✅ **ACTIVE**
-- All 7 main tables (`users`, `projects`, `shots`, `shot_generations`, `generations`, `resources`, `tasks`) have RLS enabled
-- 17 security policies enforce strict data isolation:
+- All 8 main tables (`users`, `projects`, `shots`, `shot_generations`, `generations`, `resources`, `tasks`, `user_api_tokens`) have RLS enabled
+- 18 security policies enforce strict data isolation:
   - Users can only access their own data
   - Task creation restricted to `service_role` (Edge Functions only)
   - Credit validation enforced at database level
+  - API tokens can only be viewed by their owner
+
+**Personal Access Tokens (PAT) System**: ✅ **IMPLEMENTED**
+- **Purpose**: Allow users to run local worker scripts that process tasks without exposing elevated privileges
+- **Architecture**: Long-lived JWTs signed with service role key that impersonate the user
+- **Security**: 
+  - Tokens honor all existing RLS policies
+  - JTI hash stored for revocation
+  - Expiry dates enforced
+  - Last-used tracking
+- **Components**:
+  - `user_api_tokens` table: Stores token metadata (hash, label, expiry)
+  - `generate-pat` Edge Function: Creates new tokens by signing JWTs with the project's JWT secret
+  - `revoke-pat` Edge Function: Revokes existing tokens
+  - `verify_api_token()` PostgreSQL function: Validates tokens at database level
+  - `useApiTokens` hook: Client-side token management
+  - Updated Settings Modal: Primary section for token management
 
 **Migration Workflow**:
 
@@ -209,6 +228,7 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
 
 ##### Hooks
 - **useApiKeys.ts**: Manages API keys for external services
+- **useApiTokens.ts**: Manages personal access tokens (PAT) for local worker scripts
 - **useFalImageGeneration.ts**: Handles image generation with Fal.ai
 - **useGenerations.ts**: Manages generation CRUD operations
 - **useLastAffectedShot.ts**: Tracks the last shot that was affected by an action

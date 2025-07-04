@@ -73,8 +73,7 @@ export const useDeleteGeneration = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: deleteGeneration,
-    onSuccess: (_, generationId) => {
-      toast.success("Generation deleted successfully.");
+    onSuccess: (_, generationId) => {      
       queryClient.invalidateQueries({ queryKey: ['generations'] });
     },
     onError: (error: Error) => {

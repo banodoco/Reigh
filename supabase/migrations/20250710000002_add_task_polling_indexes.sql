@@ -22,7 +22,7 @@ CREATE INDEX IF NOT EXISTS idx_tasks_active_status
 
 -- Index for finding dependent tasks (for cascade operations)
 CREATE INDEX IF NOT EXISTS idx_tasks_dependant_on
-  ON tasks USING gin (dependant_on);
+  ON tasks (dependant_on);
 
 -- Add index on created_at for better ordering performance
 CREATE INDEX IF NOT EXISTS idx_tasks_created_at

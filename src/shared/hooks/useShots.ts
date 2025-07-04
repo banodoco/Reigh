@@ -369,8 +369,7 @@ export const useAddImageToShot = () => {
       
       if (project_id) {
         queryClient.invalidateQueries({ queryKey: ['shots', project_id] });
-      }
-      toast.success('Image added to shot');
+      }      
     },
     onError: (error: Error) => {
       console.error('Error adding image to shot:', error);
