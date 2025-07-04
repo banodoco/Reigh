@@ -129,12 +129,12 @@ const GenerationsPane: React.FC = () => {
           right: isTasksPaneLocked ? `${tasksPaneWidth}px` : 0,
         }}
         className={cn(
-          `fixed bottom-0 bg-zinc-900/95 border-t border-zinc-700 shadow-xl z-[100] transform transition-transform duration-300 ease-in-out flex flex-col`,
+          `fixed bottom-0 bg-zinc-900/95 border-t border-zinc-700 shadow-xl z-[100] transform transition-all duration-300 ease-in-out flex flex-col`,
           transformClass
         )}
       >
         <div className="p-2 border-b border-zinc-800 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-zinc-200 ml-2">Generations</h2>
+            <h2 className="text-xl font-semibold text-zinc-200 ml-2">Generations</h2>
             <div className="flex items-center space-x-2">
                 {/* Pagination */}
                 <span className="text-sm text-white">

@@ -18,7 +18,7 @@ const processTools = [
   {
     id: 'video-travel',
     name: 'Travel Between Images',
-    description: 'Transform static images into dynamic video sequences with smooth, artistic transitions.',
+    description: 'Transform static images into video sequences with controllable transitions.',
     tool: toolsUIManifest.find(t => t.id === 'video-travel'),
     icon: Video,
     gradient: 'from-wes-mint via-wes-sage to-wes-dusty-blue',
@@ -51,7 +51,7 @@ const assistantTools = [
   {
     id: 'edit-videos',
     name: 'Edit\nVideos',
-    description: 'Video editing with AI-assisted cuts, transitions, and effects.',
+    description: 'AI-assisted cuts, transitions, and effects.',
     tool: null, // Coming soon
     icon: Wand2,
     gradient: 'from-wes-dusty-blue via-wes-sage to-wes-mint',
@@ -61,7 +61,7 @@ const assistantTools = [
   {
     id: 'edit-images',
     name: 'Edit\nImages',
-    description: 'Transform and enhance images with text-based editing andI reimagining.',
+    description: 'Transform, reimagine, and enhance images.',
     tool: null, // Marked as coming soon
     icon: Edit,
     gradient: 'from-wes-yellow via-wes-salmon to-wes-pink',
@@ -71,7 +71,7 @@ const assistantTools = [
   {
     id: 'generate-perspectives',
     name: 'Different\nPerspectives',
-    description: 'Create multiple viewpoints and angles from a single image.',
+    description: 'Create multiple viewpoints from a single image.',
     tool: null, // Coming soon
     icon: Eye,
     gradient: 'from-wes-lavender via-wes-pink to-wes-coral',
@@ -81,7 +81,7 @@ const assistantTools = [
   {
     id: 'train-lora',
     name: 'Train\nLoRA',
-    description: 'Fine-tune models using your own datasets for unique styles & motion.',
+    description: 'Fine-tune models for unique styles & motion.',
     tool: null, // Coming soon
     icon: Layers,
     gradient: 'from-wes-sage via-wes-mint to-wes-dusty-blue',

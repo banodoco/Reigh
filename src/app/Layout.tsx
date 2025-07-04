@@ -78,8 +78,8 @@ const Layout: React.FC = () => {
         contentOffsetLeft={isShotsPaneLocked ? shotsPaneWidth : 0}
       />
       
-      <div 
-        className="flex-grow relative z-10"
+      <div
+        className="flex-grow relative z-10 transition-all duration-300 ease-in-out"
         style={mainContentStyle}
       >
         <main className="container mx-auto py-8 px-4 md:px-6 h-full overflow-y-auto">

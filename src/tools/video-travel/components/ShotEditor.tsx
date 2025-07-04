@@ -1073,9 +1073,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
               <CardTitle>Manage Shot Images</CardTitle>
               {nonVideoImages.length > 0 && (
                 <>
-                  <div className="flex justify-between items-center mb-2">
-                    <h3 className="text-lg font-semibold tracking-tight">Images</h3>
-                  </div>
+
                   <p className="text-sm text-muted-foreground pt-1">
                     Drag to reorder. Cmd+click to select and move multiple images.
                   </p>
