@@ -67,7 +67,7 @@ const startServer = async () => {
     // The existing server initialization logic
     const server = app.listen(PORT, () => {
       console.log(`API Server listening on port ${PORT}`);
-      initializeWebSocketServer(server);
+      initializeWebSocketServer();
       startTaskPoller(); // Start the background task poller
       startTaskStatusPoller(); // Start the task status poller
     });

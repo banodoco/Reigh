@@ -143,14 +143,14 @@ export async function processCompletedStitchTask(task: Task): Promise<void> {
     console.log(`[VideoStitchGenDebug] Marked task ${task.id} as generation_processed and updated its params.`);
 
     // After creating the generation and shot_generation, notify the client.
-    broadcast({ 
+    await broadcast({ 
       type: 'TASK_COMPLETED', 
       payload: { 
         taskId: task.id, 
         projectId: task.projectId 
       } 
     });
-    broadcast({
+    await broadcast({
       type: 'GENERATIONS_UPDATED',
       payload: {
         projectId: task.projectId,
@@ -209,7 +209,7 @@ export async function cascadeTaskStatus(
     console.log(`[TaskCascader] Updated status to '${status}' for tasks:`, dependentTaskIds);
     
     // Notify clients about the update
-    broadcast({
+    await broadcast({
       type: 'TASKS_STATUS_UPDATE',
       payload: {
         // We don't have projectId here easily without another query,
@@ -260,7 +260,7 @@ export async function pollAndBroadcastTaskUpdates(): Promise<void> {
 
       // Broadcast updates for each project
       for (const [projectId, tasks] of Object.entries(tasksByProject)) {
-        broadcast({
+        await broadcast({
           type: 'TASKS_STATUS_UPDATE',
           payload: {
             projectId,
@@ -420,14 +420,14 @@ export async function processCompletedSingleImageTask(task: Task): Promise<void>
       .where(eq(tasksSchema.id, task.id));
 
     // Notify clients that tasks/generations changed
-    broadcast({
+    await broadcast({
       type: 'TASK_COMPLETED',
       payload: {
         taskId: task.id,
         projectId: task.projectId,
       },
     });
-    broadcast({
+    await broadcast({
       type: 'GENERATIONS_UPDATED',
       payload: {
         projectId: task.projectId,

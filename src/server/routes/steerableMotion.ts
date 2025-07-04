@@ -188,7 +188,7 @@ router.post('/travel-between-images', async (req: any, res: any) => {
     console.log('[API /steerable-motion/travel-between-images] Task inserted successfully:', JSON.stringify(inserted[0], null, 2));
 
     // After successful insertion, broadcast an update to all clients for that project
-    broadcast({
+    await broadcast({
       type: 'TASK_CREATED',
       payload: {
         projectId: body.project_id,

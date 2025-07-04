@@ -120,7 +120,7 @@ router.post('/generate', async (req: Request, res: Response) => {
     console.log('[API /single-image/generate] Task inserted successfully:', JSON.stringify(inserted[0], null, 2));
 
     // Broadcast to clients
-    broadcast({
+    await broadcast({
       type: 'TASK_CREATED',
       payload: {
         projectId: body.project_id,
