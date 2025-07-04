@@ -147,6 +147,29 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
+      // Ensure user exists in our users table first
+      const { data: existingUser } = await supabase
+        .from('users')
+        .select('id')
+        .eq('id', user.id)
+        .single();
+
+      if (!existingUser) {
+        // Create user record if it doesn't exist
+        const { error: userError } = await supabase
+          .from('users')
+          .insert({
+            id: user.id,
+            name: user.user_metadata?.full_name || user.email || 'Discord User',
+            email: user.email
+          });
+        
+        if (userError) {
+          console.error('Failed to create user:', userError);
+          // Continue anyway, the user might exist due to race condition
+        }
+      }
+
       // Fetch projects for the user
       const { data: projectsData, error } = await supabase
         .from('projects')
@@ -210,6 +233,29 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
+
+      // Ensure user exists in our users table first
+      const { data: existingUser } = await supabase
+        .from('users')
+        .select('id')
+        .eq('id', user.id)
+        .single();
+
+      if (!existingUser) {
+        // Create user record if it doesn't exist
+        const { error: userError } = await supabase
+          .from('users')
+          .insert({
+            id: user.id,
+            name: user.user_metadata?.full_name || user.email || 'Discord User',
+            email: user.email
+          });
+        
+        if (userError) {
+          console.error('Failed to create user:', userError);
+          // Continue anyway, the user might exist due to race condition
+        }
+      }
 
       const { data: newProject, error } = await supabase
         .from('projects')
