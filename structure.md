@@ -53,7 +53,6 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
 | `GET /api/tool-settings/resolve` | Resolve merged tool settings from user/project/shot scopes |
 | `PATCH /api/tool-settings` | Update tool settings at specific scope |
 | `GET /api/tool-settings/from-task/:taskId` | Extract tool settings from task parameters |
-| `GET /api/loras` | Fetch available LoRA models (Wan) |
 
 ### DB Workflow (Drizzle ORM - SQLite & PostgreSQL)
 1. **Schema**: `/db/schema/schema.ts` (Drizzle, PG-first)
@@ -155,7 +154,6 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
 - `/api/tool-settings/*` - Tool settings resolution and updates
 - `/api/api-keys` - API key storage (to be replaced with direct Supabase)
 - `/api/resources` - User resources management
-- `/api/loras` - LoRA model listing (implemented via new route)
 - `/api/local-image-upload` - Local file uploads
 
 #### 3.2. Top-Level Pages (`src/pages/`)
@@ -171,7 +169,7 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
 *Completely overhauled for Wan-local workflow only*
  - **pages/ImageGenerationToolPage.tsx**: Orchestrates Wan task creation via `useCreateTask`, displays progress bar, and integrates ImageGallery with live updates & upscaling. No environment-specific branches.
  - **components/ImageGenerationForm.tsx**: Simplified form: prompts, images-per-prompt, before/after prompt text, Wan LoRA picker. ControlNet sliders & starting-image inputs removed. Supports persistent state via `usePersistentToolState`.
- - **LoraSelectorModal.tsx**: Fed by new `/api/loras` endpoint; allows strength sliders & removal.
+ - **LoraSelectorModal.tsx**: Fetches LoRA models via the Supabase `resources` table and a community LoRA API; allows strength sliders & removal. No Express endpoint required.
  - **hooks/useGenerations.ts**: Still provides list/upscale/delete hooks (now wired to new task flow).
 
 ##### Video Travel (`src/tools/video-travel/`)

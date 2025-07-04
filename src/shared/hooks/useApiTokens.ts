@@ -86,8 +86,7 @@ export const useApiTokens = () => {
     },
     onSuccess: (data) => {
       setGeneratedToken(data.token);
-      queryClient.invalidateQueries({ queryKey: ['apiTokens'] });
-      toast.success('API token generated successfully');
+      queryClient.invalidateQueries({ queryKey: ['apiTokens'] });      
     },
     onError: (error: Error) => {
       console.error('Error generating API token:', error);

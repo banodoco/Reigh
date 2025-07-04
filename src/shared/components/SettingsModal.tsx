@@ -64,6 +64,14 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   // Generation method preferences (persistent)
   const [onComputerChecked, setOnComputerChecked] = usePersistentState<boolean>("generation-on-computer", true);
   const [inCloudChecked, setInCloudChecked] = usePersistentState<boolean>("generation-in-cloud", true);
+
+  // Copy command feedback states
+  const [copiedInstallCommand, setCopiedInstallCommand] = useState(false);
+  const [copiedRunCommand, setCopiedRunCommand] = useState(false);
+
+  // Show / hide full command previews
+  const [showFullInstallCommand, setShowFullInstallCommand] = useState(false);
+  const [showFullRunCommand, setShowFullRunCommand] = useState(false);
   
   // Load API keys from the database when they change
   useEffect(() => {
@@ -151,10 +159,20 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     return tokens.find(token => !isTokenExpired(token.expires_at));
   };
 
-  const copyInstallCommand = (command: string) => {
-    navigator.clipboard.writeText(command);
-    toast.success("Command copied to clipboard");
+  // Handle copying commands and provide inline visual feedback instead of a toast
+  const handleCopyInstallCommand = () => {
+    navigator.clipboard.writeText(getInstallationCommand());
+    setCopiedInstallCommand(true);
+    setTimeout(() => setCopiedInstallCommand(false), 3000);
   };
+
+  const handleCopyRunCommand = () => {
+    navigator.clipboard.writeText(getRunCommand());
+    setCopiedRunCommand(true);
+    setTimeout(() => setCopiedRunCommand(false), 3000);
+  };
+
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndjenlzcXp4bHdkbmRneGl0cnZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE1MDI4NjgsImV4cCI6MjA2NzA3ODg2OH0.r-4RyHZiDibUjgdgDDM2Vo6x3YpgIO5-BTwfkB2qyYA";
 
   const getInstallationCommand = () => {
     // Use the actual token from database or freshly generated one
@@ -169,6 +187,7 @@ pip install --no-cache-dir -r Wan2GP/requirements.txt && \\
 pip install --no-cache-dir -r requirements.txt && \\
 python headless.py --db-type supabase \\
   --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
+  --supabase-anon-key ${SUPABASE_ANON_KEY} \
   --supabase-access-token ${token}`;
   };
 
@@ -177,6 +196,7 @@ python headless.py --db-type supabase \\
     const token = generatedToken || getActiveToken()?.token || 'your-jwt-token';
     return `python headless.py --db-type supabase \\
   --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
+  --supabase-anon-key ${SUPABASE_ANON_KEY} \
   --supabase-access-token ${token}`;
   };
 
@@ -199,9 +219,20 @@ python headless.py --db-type supabase \\
                     <TabsContent value="generate-locally" className="space-y-4">
             <div className="space-y-4">
               {/* Generation Method Selection */}
-              <div className="flex items-start space-x-4">
-                <div className="space-y-4 flex-1">
-                  <h3 className="text-xl font-semibold">How would you like to generate?</h3>
+              <div className="grid grid-cols-[120px,1fr] gap-6 items-start">
+                {/* Show GIF when neither option is selected */}
+                <div className="flex justify-start">
+                  {!onComputerChecked && !inCloudChecked && (
+                    <img 
+                      src="https://wczysqzxlwdndgxitrvc.supabase.co/storage/v1/object/public/image_uploads/files/ds.gif" 
+                      alt="Choose generation method" 
+                      className="w-[120px] h-[120px] object-contain transform scale-x-[-1]"
+                    />
+                  )}
+                </div>
+
+                <div className="space-y-4">
+                  <h3 className="font-semibold">How would you like to generate?</h3>
                   
                   <div className="space-y-3">
                     <div className="flex items-center space-x-2">
@@ -237,16 +268,7 @@ python headless.py --db-type supabase \\
                   </div>
                 </div>
                 
-                {/* Show GIF when neither option is selected */}
-                {!onComputerChecked && !inCloudChecked && (
-                  <div className="w-[120px]">
-                    <img 
-                      src="https://wczysqzxlwdndgxitrvc.supabase.co/storage/v1/object/public/image_uploads/files/ds.gif" 
-                      alt="Choose generation method" 
-                      className="w-[120px] h-[120px] object-contain transform scale-x-[-1]"
-                    />
-                  </div>
-                )}
+                {/* End GIF column */}
               </div>
 
               {/* Local Generation Setup - Only show when "On my computer" is checked */}
@@ -283,17 +305,30 @@ python headless.py --db-type supabase \\
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {/* Installation tabs */}
-                      <Tabs value={activeInstallTab} onValueChange={setActiveInstallTab} className="w-full">
-                        <TabsList className="grid w-full grid-cols-2">
-                          <TabsTrigger value="need-install">I need to install</TabsTrigger>
-                          <TabsTrigger value="already-installed">I've already installed</TabsTrigger>
-                        </TabsList>
+                      {/* Installation section */}
+                      <div className="space-y-4">
+                        <h4 className="font-semibold">Run on your computer:</h4>
+                        
+                        <Tabs value={activeInstallTab} onValueChange={setActiveInstallTab} className="w-full">
+                          <TabsList className="grid w-full grid-cols-2 bg-gray-100 border border-gray-200">
+                            <TabsTrigger 
+                              value="need-install"
+                              className="data-[state=active]:bg-white data-[state=active]:shadow-sm"
+                            >
+                              I need to install
+                            </TabsTrigger>
+                            <TabsTrigger 
+                              value="already-installed"
+                              className="data-[state=active]:bg-white data-[state=active]:shadow-sm"
+                            >
+                              I've already installed
+                            </TabsTrigger>
+                          </TabsList>
 
                         <TabsContent value="need-install" className="space-y-4">
                           <div className="space-y-4">
                             <div>
-                              <h4 className="font-semibold mb-2">Installation Instructions</h4>
+                              
                               <p className="text-sm text-gray-600 mb-4">
                                 Run this command to install and start the local worker:
                               </p>
@@ -301,25 +336,47 @@ python headless.py --db-type supabase \\
 
                             <div className="bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm overflow-x-auto">
                               <pre className="whitespace-pre-wrap break-all">
-                                {getInstallationCommand()}
+                                {showFullInstallCommand
+                                  ? getInstallationCommand()
+                                  : `${getInstallationCommand()
+                                      .split("\n")
+                                      .slice(0, 3)
+                                      .join("\n")}\n...`}
                               </pre>
                             </div>
 
+                            {getInstallationCommand().split("\n").length > 3 && (
+                              <Button
+                                variant="link"
+                                size="sm"
+                                onClick={() => setShowFullInstallCommand(!showFullInstallCommand)}
+                                className="px-0"
+                              >
+                                {showFullInstallCommand ? "Hide command" : "Reveal full command"}
+                              </Button>
+                            )}
+
                             <Button 
-                              onClick={() => copyInstallCommand(getInstallationCommand())}
-                              variant="outline"
+                              onClick={handleCopyInstallCommand}
+                              variant="wes"
+                              size="wes-default"
                               className="w-full"
                             >
-                              <Copy className="h-4 w-4 mr-2" />
-                              Copy Installation Command
+                              {copiedInstallCommand ? (
+                                "Copied!"
+                              ) : (
+                                <>
+                                  <Copy className="h-4 w-4 mr-2" />
+                                  Copy Installation Command
+                                </>
+                              )}
                             </Button>
                           </div>
                         </TabsContent>
 
                         <TabsContent value="already-installed" className="space-y-4">
                           <div className="space-y-4">
-                            <div>
-                              <h4 className="font-semibold mb-2">Run Command</h4>
+                            <div>                              
                               <p className="text-sm text-gray-600 mb-4">
                                 Use this command to start your local worker:
                               </p>
@@ -327,21 +384,45 @@ python headless.py --db-type supabase \\
 
                             <div className="bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm overflow-x-auto">
                               <pre className="whitespace-pre-wrap break-all">
-                                {getRunCommand()}
+                                {showFullRunCommand
+                                  ? getRunCommand()
+                                  : `${getRunCommand()
+                                      .split("\n")
+                                      .slice(0, 3)
+                                      .join("\n")}\n...`}
                               </pre>
                             </div>
 
+                            {getRunCommand().split("\n").length > 3 && (
+                              <Button
+                                variant="link"
+                                size="sm"
+                                onClick={() => setShowFullRunCommand(!showFullRunCommand)}
+                                className="px-0"
+                              >
+                                {showFullRunCommand ? "Hide command" : "Reveal full command"}
+                              </Button>
+                            )}
+
                             <Button 
-                              onClick={() => copyInstallCommand(getRunCommand())}
-                              variant="outline"
+                              onClick={handleCopyRunCommand}
+                              variant="wes"
+                              size="wes-default"
                               className="w-full"
                             >
-                              <Copy className="h-4 w-4 mr-2" />
-                              Copy Run Command
+                              {copiedRunCommand ? (
+                                "Copied!"
+                              ) : (
+                                <>
+                                  <Copy className="h-4 w-4 mr-2" />
+                                  Copy Run Command
+                                </>
+                              )}
                             </Button>
                           </div>
                         </TabsContent>
                       </Tabs>
+                      </div>
                     </div>
                   )}
 
