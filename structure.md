@@ -111,7 +111,6 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
 - `20250710000000_create_lora_files_bucket.sql` – creates the `lora_files` public storage bucket.
 - `20250710000001_setup_storage_policies.sql` – adds SELECT/INSERT/UPDATE/DELETE policies for both `image_uploads` and `lora_files` buckets.
 - `20250711000000_enable_discord_provider.sql` – enables the Discord OAuth provider (creates/updates the `auth.providers` row with `status = 'ENABLED'`).
-- `supabase/config.toml` – `[auth]` section now sets `external_discord_enabled = true` and expects `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET` env vars for local development.
 
 ### 3. Source Code Breakdown
 
