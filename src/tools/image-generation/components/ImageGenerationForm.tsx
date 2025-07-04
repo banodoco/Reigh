@@ -525,8 +525,15 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
     }
   }, [prompts]);
 
+  // Show a minimal skeleton while settings hydrate so the layout is visible immediately
   if (!ready) {
-    return null; // Parent component should wrap with ToolSettingsGate
+    return (
+      <div className="animate-pulse space-y-4">
+        <div className="h-10 bg-muted rounded" />
+        <div className="h-32 bg-muted rounded" />
+        <div className="h-8 bg-muted rounded" />
+      </div>
+    );
   }
 
   return (
@@ -582,7 +589,7 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
                   />
                 ))
               ) : (
-                <div className="hidden md:block p-3 border rounded-md text-center bg-slate-50/50 hover:border-primary/50 cursor-pointer" onClick={() => setIsPromptModalOpen(true)}>
+                <div className="p-3 border rounded-md text-center bg-slate-50/50 hover:border-primary/50 cursor-pointer" onClick={() => setIsPromptModalOpen(true)}>
                     <p className="text-sm text-muted-foreground"><span className="font-semibold text-primary">{prompts.length} prompts</span> currently active.</p>
                     <p className="text-xs text-primary">(Click to Edit)</p>
                 </div>

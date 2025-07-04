@@ -20,7 +20,7 @@ import {
 } from "@/shared/components/ui/select";
 import { Checkbox } from "@/shared/components/ui/checkbox";
 import { Label } from "@/shared/components/ui/label";
-import { nanoid } from "nanoid";
+// Removed nanoid import to avoid random generation overhead per render
 import { formatDistanceToNow, isValid } from "date-fns";
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 import { DraggableImage } from "@/shared/components/DraggableImage";
@@ -259,8 +259,6 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, isDeletin
   };
 
   const filteredImages = React.useMemo(() => {
-    const galleryLogId = nanoid(5);
-
     let currentFiltered = images;
 
     // 1. Apply tool_type filter
@@ -423,7 +421,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, isDeletin
                 const metadataForDisplay = image.metadata ? formatMetadataForDisplay(image.metadata) : "No metadata available.";
                 const isCurrentDeleting = isDeleting === image.id;
                 const imageKey = image.id || `image-${displayUrl}-${index}`;
-                const galleryRenderLogId = nanoid(5);
+                // Removed unused render log ID
 
                 // Determine if it's a video by checking the URL extension if isVideo prop is not explicitly set
                 const urlIsVideo = displayUrl && (displayUrl.toLowerCase().endsWith('.webm') || displayUrl.toLowerCase().endsWith('.mp4') || displayUrl.toLowerCase().endsWith('.mov'));
@@ -482,6 +480,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, isDeletin
                                 className="absolute inset-0 w-full h-full object-cover group-hover:opacity-80 transition-opacity duration-300"
                                 onDoubleClick={() => handleOpenLightbox(image)}
                                 style={{ cursor: 'pointer' }}
+                                loading="lazy"
                             />
                         )}
                     </div>
@@ -587,6 +586,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, isDeletin
                                             src={image.metadata.userProvidedImageUrl} 
                                             alt="User provided image preview"
                                             className="w-full h-auto max-h-24 object-contain rounded-sm mb-2 border"
+                                            loading="lazy"
                                         />
                                         )}
                                         <pre className="font-sans whitespace-pre-wrap">{metadataForDisplay}</pre>

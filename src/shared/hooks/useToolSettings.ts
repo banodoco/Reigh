@@ -22,7 +22,7 @@ interface UpdateToolSettingsParams {
   patch: unknown;
 }
 
-async function fetchToolSettings(toolId: string, ctx: ToolSettingsContext): Promise<unknown> {
+export async function fetchToolSettings(toolId: string, ctx: ToolSettingsContext): Promise<unknown> {
   const params = new URLSearchParams({ toolId });
   if (ctx.projectId) params.append('projectId', ctx.projectId);
   if (ctx.shotId) params.append('shotId', ctx.shotId);

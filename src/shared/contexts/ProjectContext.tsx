@@ -5,6 +5,7 @@ import { Project } from '@/types/project'; // Added import
 import { ProjectUpdate } from '../../../db/schema/schema';
 import { UserPreferences } from '@/shared/settings/userPreferences';
 import { fetchWithAuth } from '@/lib/api';
+import { usePrefetchToolSettings } from '@/shared/hooks/usePrefetchToolSettings';
 
 interface ProjectContextType {
   projects: Project[];
@@ -61,6 +62,10 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
   const [userPreferences, setUserPreferences] = useState<UserPreferences | undefined>(undefined);
   const [isLoadingPreferences, setIsLoadingPreferences] = useState(false);
   const userPreferencesRef = useRef<UserPreferences | undefined>(undefined);
+
+  // Prefetch all tool settings for the currently selected project so that
+  // tool pages hydrate instantly without an extra round-trip.
+  usePrefetchToolSettings(selectedProjectId);
 
   // Set up auth state tracking
   useEffect(() => {
