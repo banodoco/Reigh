@@ -391,21 +391,49 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         const finalImageUrl = croppedImageUrl ? getDisplayUrl(imageUrl) : imageUrl;
 
         const promptForGeneration = `External image: ${file.name || 'untitled'}`;
-        const genResponse = await fetchWithAuth('/api/generations', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            imageUrl: finalImageUrl,
-            fileName: file.name,
-            fileType: file.type,
-            fileSize: file.size,
-            projectId: selectedProjectId,
-            prompt: promptForGeneration,
-          }),
-        });
 
-        if (!genResponse.ok) throw new Error(await genResponse.text());
-        const newGeneration = await genResponse.json();
+        // Support environments without API server (e.g., static web build)
+        const currentEnv = import.meta.env.VITE_APP_ENV?.toLowerCase() || 'web';
+        let newGeneration: any;
+
+        if (currentEnv === 'web') {
+          // Directly insert into Supabase instead of hitting the API server
+          const { data: inserted, error } = await supabase
+            .from('generations')
+            .insert({
+              location: finalImageUrl,
+              type: file.type || 'image',
+              project_id: selectedProjectId,
+              params: {
+                prompt: promptForGeneration,
+                source: 'external_upload',
+                original_filename: file.name,
+                file_type: file.type,
+                file_size: file.size,
+              },
+            })
+            .select()
+            .single();
+
+          if (error || !inserted) throw error || new Error('Failed to create generation');
+          newGeneration = inserted;
+        } else {
+          const genResponse = await fetchWithAuth('/api/generations', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              imageUrl: finalImageUrl,
+              fileName: file.name,
+              fileType: file.type,
+              fileSize: file.size,
+              projectId: selectedProjectId,
+              prompt: promptForGeneration,
+            }),
+          });
+
+          if (!genResponse.ok) throw new Error(await genResponse.text());
+          newGeneration = await genResponse.json();
+        }
 
         // Save link in DB (ignore returned shotImageEntryId for UI key stability)
         await addImageToShotMutation.mutateAsync({
@@ -902,22 +930,44 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         
         // Create a generation record for the input image
         const promptForGeneration = `Input image from task ${i + 1}`;
-        const genResponse = await fetchWithAuth('/api/generations', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            imageUrl: imageUrl,
-            fileName: `task-input-${i + 1}.jpg`,
-            fileType: 'image/jpeg',
-            projectId: selectedProjectId,
-            prompt: promptForGeneration,
-          }),
-        });
 
-        if (!genResponse.ok) {
-          throw new Error(`Failed to create generation record for image ${i + 1}`);
+        const currentEnv = import.meta.env.VITE_APP_ENV?.toLowerCase() || 'web';
+        let newGeneration: any;
+
+        if (currentEnv === 'web') {
+          const { data: inserted, error } = await supabase
+            .from('generations')
+            .insert({
+              location: imageUrl,
+              type: 'image',
+              project_id: projectId,
+              params: {
+                prompt: promptForGeneration,
+                source: 'task_input',
+              },
+            })
+            .select()
+            .single();
+
+          if (error || !inserted) throw error || new Error('Failed to create generation');
+          newGeneration = inserted;
+        } else {
+          const genResponse = await fetchWithAuth('/api/generations', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              imageUrl: imageUrl,
+              fileName: `input-image-${i + 1}`,
+              fileType: 'image/jpeg', // Placeholder, adjust if needed
+              fileSize: 0, // Placeholder, adjust if needed
+              projectId: projectId,
+              prompt: promptForGeneration,
+            }),
+          });
+
+          if (!genResponse.ok) throw new Error(await genResponse.text());
+          newGeneration = await genResponse.json();
         }
-        const newGeneration = await genResponse.json();
 
         // Add the generation to the shot
         const newShotImage = await addImageToShotMutation.mutateAsync({
