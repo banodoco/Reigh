@@ -32,7 +32,7 @@ import { cropImageToProjectAspectRatio } from '@/shared/lib/imageCropper';
 import { parseRatio } from '@/shared/lib/aspectRatios';
 import { useToolSettings } from '@/shared/hooks/useToolSettings';
 import { ToggleGroup, ToggleGroupItem } from "@/shared/components/ui/toggle-group";
-import { useListTasks, useCancelTask } from "@/shared/hooks/useTasks";
+import { useListTasks, useCancelTask, useCreateTask } from "@/shared/hooks/useTasks";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from '@tanstack/react-query';
 import { fetchWithAuth } from '@/lib/api';
@@ -226,7 +226,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const deleteGenerationMutation = useDeleteGeneration();
   const [fileInputKey, setFileInputKey] = useState<number>(Date.now());
   const [deletingVideoId, setDeletingVideoId] = useState<string | null>(null);
-  const [isCreatingTask, setIsCreatingTask] = useState(false);
+  
+  const { mutate: createTask, isPending: isCreatingTask } = useCreateTask();
+
   const [creatingTaskId, setCreatingTaskId] = useState<string | null>(null);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const queryClient = useQueryClient();
@@ -629,10 +631,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       return;
     }
 
-    setIsCreatingTask(true);
-    setCreatingTaskId('batch');
-
-
     let resolution: string | undefined = undefined;
 
     if ((dimensionSource || 'firstImage') === 'firstImage' && nonVideoImages.length > 0) {
@@ -658,8 +656,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         resolution = `${customWidth}x${customHeight}`;        
       } else {
         toast.error('Custom dimensions are selected, but width or height is not set.');
-        setIsCreatingTask(false);
-        setCreatingTaskId(null);
         return;
       }
     }
@@ -672,8 +668,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
     if (absoluteImageUrls.length < 2) {
       toast.error('Not enough valid image URLs to generate video. Ensure images are processed correctly.');
-      setIsCreatingTask(false);
-      setCreatingTaskId(null);
       return;
     }
 
@@ -689,92 +683,43 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     const negativePrompts = 
       generationMode === 'batch' ? [steerableMotionSettings.negative_prompt] : pairConfigs.map((cfg) => cfg.negativePrompt);
 
-    try {
-      const requestBody: any = {
-        project_id: projectId,
-        shot_id: selectedShot.id,
-        image_urls: absoluteImageUrls,
-        base_prompts: basePrompts,
-        segment_frames: segmentFrames,
-        frame_overlap: frameOverlap,
-        negative_prompts: negativePrompts,
-        model_name: steerableMotionSettings.model_name,
-        seed: steerableMotionSettings.seed,
-        debug: steerableMotionSettings.debug,
-        apply_reward_lora: steerableMotionSettings.apply_reward_lora,
-        colour_match_videos: steerableMotionSettings.colour_match_videos ?? true,
-        apply_causvid: steerableMotionSettings.apply_causvid ?? true,
-        use_lighti2x_lora: steerableMotionSettings.use_lighti2x_lora ?? false,
-        fade_in_duration: steerableMotionSettings.fade_in_duration,
-        fade_out_duration: steerableMotionSettings.fade_out_duration,
-        after_first_post_generation_saturation: steerableMotionSettings.after_first_post_generation_saturation,
-        after_first_post_generation_brightness: steerableMotionSettings.after_first_post_generation_brightness,
-        params_json_str: JSON.stringify({ steps: batchVideoSteps }),
-        enhance_prompt: enhancePrompt,
-        openai_api_key: enhancePrompt ? openaiApiKey : '',
-        show_input_images: steerableMotionSettings.show_input_images,
-      };
+    const requestBody: any = {
+      project_id: projectId,
+      shot_id: selectedShot.id,
+      image_urls: absoluteImageUrls,
+      base_prompts: basePrompts,
+      segment_frames: segmentFrames,
+      frame_overlap: frameOverlap,
+      negative_prompts: negativePrompts,
+      model_name: steerableMotionSettings.model_name,
+      seed: steerableMotionSettings.seed,
+      debug: steerableMotionSettings.debug,
+      apply_reward_lora: steerableMotionSettings.apply_reward_lora,
+      colour_match_videos: steerableMotionSettings.colour_match_videos ?? true,
+      apply_causvid: steerableMotionSettings.apply_causvid ?? true,
+      use_lighti2x_lora: steerableMotionSettings.use_lighti2x_lora ?? false,
+      fade_in_duration: steerableMotionSettings.fade_in_duration,
+      fade_out_duration: steerableMotionSettings.fade_out_duration,
+      after_first_post_generation_saturation: steerableMotionSettings.after_first_post_generation_saturation,
+      after_first_post_generation_brightness: steerableMotionSettings.after_first_post_generation_brightness,
+      params_json_str: JSON.stringify({ steps: batchVideoSteps }),
+      enhance_prompt: enhancePrompt,
+      openai_api_key: enhancePrompt ? openaiApiKey : '',
+      show_input_images: steerableMotionSettings.show_input_images,
+    };
 
-      if (selectedLoras && selectedLoras.length > 0) {
-        requestBody.loras = selectedLoras.map(l => ({ path: l.path, strength: l.strength }));
-      }
-
-      if (resolution) {
-        requestBody.resolution = resolution;
-      }
-      
-      const { data, error } = await supabase.functions.invoke('steerable-motion', {
-        body: requestBody,
-      });
-
-      if (error) {
-        throw new Error(error.message || 'Failed to create task');
-      }
-
-      const newTask = data;
-      
-      // Poll for task confirmation in database
-      const maxAttempts = 30; // 15 seconds max wait
-      const pollInterval = 500; // 500ms between checks
-      let attempts = 0;
-      let taskConfirmed = false;
-      
-      while (attempts < maxAttempts && !taskConfirmed) {
-        try {
-          // Query the tasks list to check if our task exists
-          const tasksResponse = await fetchWithAuth(`/api/tasks?projectId=${projectId}`);
-          if (tasksResponse.ok) {
-            const tasks = await tasksResponse.json();
-            taskConfirmed = tasks.some((task: any) => task.id === newTask.id);
-            
-            if (taskConfirmed) {              
-              // Manually invalidate the tasks query to ensure UI updates
-              queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
-              break;
-            }
-          }
-        } catch (pollError) {
-          console.warn('[ShotEditor] Error polling for task confirmation:', pollError);
-        }
-        
-        attempts++;
-        if (!taskConfirmed && attempts < maxAttempts) {
-          await new Promise(resolve => setTimeout(resolve, pollInterval));
-        }
-      }
-      
-      if (!taskConfirmed) {
-        console.warn('[ShotEditor] Task not confirmed in database after maximum attempts, but proceeding anyway');
-        toast.warning('Task created but confirmation delayed. Check the Tasks pane for updates.');
-      }
-      
-    } catch (err: any) {
-      console.error('[ShotEditor] Error creating travel task:', err);
-      toast.error(`Failed to create travel task: ${err.message || 'Unknown error'}`);
-    } finally {
-      setIsCreatingTask(false);
-      setCreatingTaskId(null);
+    if (selectedLoras && selectedLoras.length > 0) {
+      requestBody.loras = selectedLoras.map(l => ({ path: l.path, strength: l.strength }));
     }
+
+    if (resolution) {
+      requestBody.resolution = resolution;
+    }
+    
+    createTask({
+      functionName: 'steerable-motion',
+      payload: requestBody,
+    });
   };
 
   const handleGenerateAll = () => {

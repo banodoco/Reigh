@@ -16,12 +16,9 @@ import { Settings } from "lucide-react";
 import { useApiKeys } from '@/shared/hooks/useApiKeys';
 import { useQueryClient } from '@tanstack/react-query';
 import { fetchWithAuth } from '@/lib/api';
+import { useCreateTask } from "@/shared/hooks/useTasks";
 
-// Environment detection
-const isWebEnvironment = () => {
-  const env = (import.meta.env.VITE_APP_ENV?.toLowerCase() || 'web');
-  return env === 'web';
-};
+// Remove unnecessary environment detection - tool should work in all environments
 
 export type Json =
   | string
@@ -31,78 +28,62 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
-// This interface defines the rich LoRA structure we expect from the form and want to save in metadata
-// interface StoredActiveLora { // This might be covered by MetadataLora or internal to the form/hook
-//   id: string;
-//   name: string;
-//   path: string;
-//   strength: number; // 0-100
-//   previewImageUrl?: string;
-// }
-
-// const initializeFalClient = () => { // Handled by the hook / global initializer
-//   const API_KEY = localStorage.getItem('fal_api_key') || '0b6f1876-0aab-4b56-b821-b384b64768fa:121392c885a381f93de56d701e3d532f';
-//   fal.config({ credentials: API_KEY });
-//   return API_KEY;
-// };
-
-const placeholderImages: GeneratedImageWithMetadata[] = Array(8).fill(null).map((_, index) => ({
-  id: `image-${index}`,
-  url: "/placeholder.svg",
-  prompt: "Placeholder image",
-  metadata: { prompt: "Placeholder image" } as DisplayableMetadata
-}));
+// Dummy placeholder images for display purposes
+const placeholderImages: GeneratedImageWithMetadata[] = [
+  {
+    id: 'placeholder-1',
+    url: '/placeholder.svg',
+    prompt: 'Loading...',
+    metadata: {
+      prompt: 'Loading...',
+      model: 'placeholder',
+      seed: 0,
+      steps: 0,
+      cfg_scale: 0,
+      width: 512,
+      height: 512,
+      generatedAt: new Date().toISOString(),
+    } as DisplayableMetadata
+  },
+  {
+    id: 'placeholder-2',
+    url: '/placeholder.svg',
+    prompt: 'Loading...',
+    metadata: {
+      prompt: 'Loading...',
+      model: 'placeholder',
+      seed: 0,
+      steps: 0,
+      cfg_scale: 0,
+      width: 512,
+      height: 512,
+      generatedAt: new Date().toISOString(),
+    } as DisplayableMetadata
+  }
+];
 
 const ImageGenerationToolPage = () => {
   console.log('[ImageGenerationToolPage] Component loading...');
-  const isWeb = isWebEnvironment();
-  console.log('[ImageGenerationToolPage] Environment:', isWeb ? 'web' : 'local');
 
   const [generatedImages, setGeneratedImages] = useState<GeneratedImageWithMetadata[]>(placeholderImages);
-  // const [isGenerating, setIsGenerating] = useState(false); // From hook
-  // const [currentPromptIndex, setCurrentPromptIndex] = useState<number | null>(null); // Part of hook's progress
-  // const [currentImageCount, setCurrentImageCount] = useState<number>(0); // Part of hook's progress
   const [showPlaceholders, setShowPlaceholders] = useState(true);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [isUpscalingImageId, setIsUpscalingImageId] = useState<string | null>(null);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [isCreatingTask, setIsCreatingTask] = useState(false);
+  
+  const { mutate: createTask, isPending: isCreatingTask } = useCreateTask();
+
   const [creatingTaskCount, setCreatingTaskCount] = useState(1);
 
-  // Only use API keys hook in non-web environment
-  const apiKeysHook = isWeb ? null : useApiKeys();
-  const { apiKeys, getApiKey } = apiKeysHook || { apiKeys: {}, getApiKey: () => null };
-
+  // Always use hooks - no environment-based disabling
+  const { apiKeys, getApiKey } = useApiKeys();
   const imageGenerationFormRef = useRef<ImageGenerationFormHandles>(null);
-  // const cancelGenerationRef = useRef(false); // Handled by hook
-  // const currentSubscriptionRef = useRef<any>(null); // Handled by hook
-  // const [generationProgress, setGenerationProgress] = useState<FalGenerationProgress | null>(null); // From hook
-
-  // Only use backend hooks in non-web environment
-  const projectHook = isWeb ? null : useProject();
-  const { selectedProjectId } = projectHook || { selectedProjectId: 'web-project' };
-  
-  const shotsHook = isWeb ? null : useListShots(selectedProjectId);
-  const { data: shots, isLoading: isLoadingShots, error: shotsError } = shotsHook || { 
-    data: [], 
-    isLoading: false, 
-    error: null 
-  };
-  
-  const addImageToShotMutation = isWeb ? null : useAddImageToShot();
-  const lastAffectedShotHook = isWeb ? null : useLastAffectedShot();
-  const { lastAffectedShotId, setLastAffectedShotId } = lastAffectedShotHook || { 
-    lastAffectedShotId: null, 
-    setLastAffectedShotId: () => {} 
-  };
-  
-  const generationsHook = isWeb ? null : useListAllGenerations(selectedProjectId);
-  const { data: generatedImagesData, isLoading: isLoadingGenerations } = generationsHook || { 
-    data: [], 
-    isLoading: false 
-  };
-  
-  const deleteGenerationMutation = isWeb ? null : useDeleteGeneration();
+  const { selectedProjectId } = useProject();
+  const { data: shots, isLoading: isLoadingShots, error: shotsError } = useListShots(selectedProjectId);
+  const addImageToShotMutation = useAddImageToShot();
+  const { lastAffectedShotId, setLastAffectedShotId } = useLastAffectedShot();
+  const { data: generatedImagesData, isLoading: isLoadingGenerations } = useListAllGenerations(selectedProjectId);
+  const deleteGenerationMutation = useDeleteGeneration();
 
   const queryClient = useQueryClient();
 
@@ -121,21 +102,10 @@ const ImageGenerationToolPage = () => {
   }, [generatedImagesData, isLoadingGenerations]);
 
   const handleDeleteImage = async (id: string) => {
-    if (isWeb) {
-      // In web environment, just remove from local state
-      setGeneratedImages(prev => prev.filter(img => img.id !== id));
-      toast.success("Image removed from gallery");
-    } else {
-      deleteGenerationMutation?.mutate(id);
-    }
+    deleteGenerationMutation?.mutate(id);
   };
 
   const handleUpscaleImage = async (imageId: string, imageUrl: string, currentMetadata?: DisplayableMetadata) => {
-    if (isWeb) {
-      toast.info("Upscaling is not available in web environment");
-      return;
-    }
-    
     setIsUpscalingImageId(imageId);
     const toastId = `upscale-${imageId}`;
     toast.info("Sending request to DEBUG upscale function...", { id: toastId });
@@ -176,89 +146,36 @@ const ImageGenerationToolPage = () => {
         original_image_url: imageUrl, 
       };
 
-      const { data: updatedData, error: updateError } = await supabase
-        .from('generations' as any)
-        .update({ 
-          image_url: upscaledImageUrl, 
-          metadata: newMetadata as Json 
-        })
-        .eq('id', imageId)
-        .select()
-        .single();
+      const upscaledImage: GeneratedImageWithMetadata = {
+        id: `upscaled-${Date.now()}`,
+        url: upscaledImageUrl,
+        prompt: currentMetadata?.prompt || "Upscaled image",
+        metadata: newMetadata,
+      };
 
-      if (updateError) {
-        console.error("Supabase DB update error:", updateError);
-        throw new Error(`Failed to save upscaled image to database: ${updateError.message}`);
-      }
-
-      if (updatedData) {
-          setGeneratedImages(prevImages =>
-            prevImages.map(img => 
-              img.id === imageId 
-                ? { ...img, url: upscaledImageUrl!, metadata: newMetadata } 
-                : img
-            )
-          );
-        toast.success("Upscaled image saved and gallery updated.", { id: toastId });
-      }
-
+      setGeneratedImages(prev => [upscaledImage, ...prev]);
+      setShowPlaceholders(false);
     } catch (error) {
-      console.error("Error during upscale process:", error);
-      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred during upscaling.";
-      toast.error(errorMessage, { id: toastId });
+      console.error("Error upscaling image:", error);
+      toast.error(`Failed to upscale image: ${error instanceof Error ? error.message : 'Unknown error'}`, { id: toastId });
     } finally {
       setIsUpscalingImageId(null);
     }
   };
 
   const handleNewGenerate = async (formData: any) => {
-    if (!isWeb && !selectedProjectId) {
+    if (!selectedProjectId) {
       toast.error("No project selected. Please select a project before generating images.");
       return;
     }
 
     const { generationMode, ...restOfFormData } = formData;
 
-    // In web environment, create mock generated images
-    if (isWeb) {
-      const mockImages: GeneratedImageWithMetadata[] = [];
-      const totalImages = restOfFormData.prompts.length * restOfFormData.imagesPerPrompt;
-      
-      for (let i = 0; i < totalImages; i++) {
-        const promptIndex = Math.floor(i / restOfFormData.imagesPerPrompt);
-        const prompt = restOfFormData.prompts[promptIndex]?.fullPrompt || "Mock generated image";
-        
-        mockImages.push({
-          id: `mock-${Date.now()}-${i}`,
-          url: "/placeholder.svg",
-          prompt,
-          metadata: {
-            prompt,
-            model: generationMode,
-            seed: 12345 + i,
-            steps: 20,
-            cfg_scale: 7,
-            width: 1024,
-            height: 1024,
-            generatedAt: new Date().toISOString(),
-          } as DisplayableMetadata
-        });
-      }
-      
-      // Clear placeholders and add mock images
-      setGeneratedImages(prev => [...mockImages, ...prev.filter(img => !img.url.includes('placeholder'))]);
-      setShowPlaceholders(false);
-      
-      toast.success(`${totalImages} mock images generated! (Web environment)`);
-      return;
-    }
-
     const tasksToCreateCount = generationMode === 'wan-local'
       ? restOfFormData.prompts.length * restOfFormData.imagesPerPrompt
       : 1;
     setCreatingTaskCount(tasksToCreateCount);
-    setIsCreatingTask(true);
-
+    
     // Clear placeholders if needed
     if (showPlaceholders && restOfFormData.prompts.length * restOfFormData.imagesPerPrompt > 0) {
       setGeneratedImages([]);
@@ -267,174 +184,47 @@ const ImageGenerationToolPage = () => {
 
     if (generationMode === 'wan-local') {
       // Process all prompts for wan-local mode
-      const totalTasks = restOfFormData.prompts.length * restOfFormData.imagesPerPrompt;
-      
       const lorasMapped: Array<{ path: string; strength: number }> = (restOfFormData.loras || []).map((lora: any) => ({
         path: lora.path,
         strength: parseFloat(lora.scale ?? lora.strength) || 0.0,
       }));
 
-      let successCount = 0;
-      let errorCount = 0;
-
-      try {
-        // Build an array of payloads – one per image task
-        const taskPayloads: any[] = restOfFormData.prompts.flatMap((promptEntry: PromptEntry, promptIdx: number) => {
-          return Array.from({ length: restOfFormData.imagesPerPrompt }, (_, imgIdx) => {
-            const globalIndex = promptIdx * restOfFormData.imagesPerPrompt + imgIdx;
-            return {
-              project_id: selectedProjectId,
-              prompt: promptEntry.fullPrompt,
-              resolution: restOfFormData.determinedApiImageSize || undefined,
-              seed: 11111 + globalIndex * 100, // Vary seed deterministically across all images
-              loras: lorasMapped,
-            };
-          });
+      // Build an array of payloads – one per image task
+      const taskPayloads: any[] = restOfFormData.prompts.flatMap((promptEntry: PromptEntry, promptIdx: number) => {
+        return Array.from({ length: restOfFormData.imagesPerPrompt }, (_, imgIdx) => {
+          const globalIndex = promptIdx * restOfFormData.imagesPerPrompt + imgIdx;
+          return {
+            project_id: selectedProjectId,
+            prompt: promptEntry.fullPrompt,
+            resolution: restOfFormData.determinedApiImageSize || undefined,
+            seed: 11111 + globalIndex * 100, // Vary seed deterministically across all images
+            loras: lorasMapped,
+          };
         });
-
-        // Fire off all requests concurrently (up to browser limits) and wait for them to settle
-        const results = await Promise.allSettled(
-          taskPayloads.map(payload =>
-            supabase.functions.invoke('single-image-generate', {
-              body: payload,
-            }).then(async ({ data, error }) => {
-              if (error) {
-                throw new Error(error.message || 'Edge function error');
-              }
-              return data;
-            })
-          )
-        );
-
-        successCount = results.filter(r => r.status === 'fulfilled').length;
-        errorCount = results.length - successCount;
-
-        // Log any errors for debugging purposes
-        results.forEach((res, idx) => {
-          if (res.status === 'rejected') {
-            console.error(`[wan-local] Task ${idx + 1} failed:`, res.reason);
-          }
-        });
-
-        if (successCount > 0) {
-          toast.success(`${successCount} image generation tasks queued successfully! ${errorCount > 0 ? `(${errorCount} failed)` : ''} Check the Tasks pane for progress.`);
-          queryClient.invalidateQueries({ queryKey: ['tasks', selectedProjectId] });
-        } else {
-          toast.error(`Failed to create any tasks. ${errorCount} errors occurred.`);
-        }
-      } catch (err: any) {
-        console.error('[ImageGenerationToolPage] Error creating wan-local tasks:', err);
-        toast.error(`Failed to create tasks: ${err.message || 'Unknown API error'}`);
-      } finally {
-        setIsCreatingTask(false);
-        setCreatingTaskCount(1);
-      }
-
-      return; // early exit for wan-local
-    }
-
-    // Existing FAL-based generation for flux-api (default)
-    let userImageUrl: string | null = null;
-    if (restOfFormData.startingImage) {
-      try {
-        toast.info('Uploading starting image...');
-        userImageUrl = await uploadImageToStorage(restOfFormData.startingImage);
-        if (!userImageUrl) {
-          toast.error('Starting image upload failed. Please try again.');
-          setIsCreatingTask(false);
-          return;
-        }
-        toast.success('Starting image uploaded!');
-      } catch (uploadError: any) {
-        console.error('[ImageGenerationToolPage] Error uploading starting image:', uploadError);
-        toast.error(`Failed to upload starting image: ${uploadError.message || 'Unknown error'}`);
-        setIsCreatingTask(false);
-        return;
-      }
-    } else if (restOfFormData.appliedStartingImageUrl) {
-      userImageUrl = restOfFormData.appliedStartingImageUrl;
-    }
-
-    const taskPayload = {
-      project_id: selectedProjectId,
-      task_type: 'image_generation_fal',
-      params: {
-        ...restOfFormData,
-        user_image_url: userImageUrl,
-        loras: (restOfFormData.loras || []).map((lora: any) => ({
-          path: lora.path,
-          strength: lora.strength,
-        })),
-      },
-      status: 'Queued',
-    };
-
-    try {
-      const response = await fetchWithAuth('/api/tasks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(taskPayload),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: response.statusText }));
-        throw new Error(errorData.message || `HTTP error ${response.status}`);
-      }
+      // Fire off all requests concurrently
+      taskPayloads.forEach(payload => {
+        createTask({ functionName: 'single-image-generate', payload });
+      });
 
-      const newTask = await response.json();
-
-      if (newTask) {
-        toast.success(`Image generation task created (ID: ${newTask.id.substring(0,8)}...). Check the Tasks pane for progress.`);
-        queryClient.invalidateQueries({ queryKey: ['tasks', selectedProjectId] });
-      }
-    } catch (err: any) {
-      console.error('Error creating image generation task:', err);
-      toast.error(`Failed to create task: ${err.message || 'Unknown API error'}`);
-    } finally {
-      setIsCreatingTask(false);
-      setCreatingTaskCount(1);
-    }
-  };
-
-  // const handleCancelGeneration = () => { // Now using cancelGeneration from the hook
-  //   console.log("[Index.tsx] handleCancelGeneration called.");
-  //   toast.info("Cancelling image generation...");
-  //   cancelGenerationRef.current = true;
-  //   if (currentSubscriptionRef.current && typeof currentSubscriptionRef.current.unsubscribe === 'function') {
-  //     currentSubscriptionRef.current.unsubscribe();
-  //     console.log("[Index.tsx] Fal subscription cancelled via unsubscribe().");
-  //   }
-  //   currentSubscriptionRef.current = null; 
-  //   setIsGenerating(false); 
-  //   setGenerationProgress(null); 
-  // };
-
-  // REMOVE OLD handleGenerate function (lines 212-393 approx)
-  // ... old handleGenerate logic was here ...
-
-  const handleApplySettingsFromGallery = (settings: DisplayableMetadata) => {
-    if (imageGenerationFormRef.current) {
-      imageGenerationFormRef.current.applySettings(settings);
-      toast.info("Settings applied to the form.");
+    } else {
+      // Single task for API-based modes
+      createTask({
+        functionName: 'single-image-generate',
+        payload: {
+          project_id: selectedProjectId,
+          prompts: restOfFormData.prompts.map((p: PromptEntry) => p.fullPrompt),
+          images_per_prompt: restOfFormData.imagesPerPrompt,
+          loras: restOfFormData.loras,
+          generation_mode: generationMode,
+        }
+      });
     }
   };
 
   const handleImageSaved = async (imageId: string, newImageUrl: string) => {
     console.log(`[ImageGeneration-HandleImageSaved] Starting image update process:`, { imageId, newImageUrl });
-    
-    if (isWeb) {
-      // In web environment, just update local state
-      setGeneratedImages(prevImages => {
-        const updated = prevImages.map(img => 
-          img.id === imageId 
-            ? { ...img, url: newImageUrl } 
-            : img
-        );
-        return updated;
-      });
-      toast.success("Image updated successfully! (Web environment)");
-      return;
-    }
     
     try {
       // Update the database record via local API
@@ -482,7 +272,7 @@ const ImageGenerationToolPage = () => {
 
   const falApiKey = getApiKey('fal_api_key');
   const openaiApiKey = getApiKey('openai_api_key');
-  const hasValidFalApiKey = isWeb ? true : true; // Always true for demo purposes
+  const hasValidFalApiKey = true; // Always true - let the task creation handle validation
 
   const targetShotIdForButton = lastAffectedShotId || (shots && shots.length > 0 ? shots[0].id : undefined);
   const targetShotNameForButtonTooltip = targetShotIdForButton 
@@ -490,11 +280,6 @@ const ImageGenerationToolPage = () => {
     : (shots && shots.length > 0 ? shots[0].name : 'Last Shot');
 
   const handleAddImageToTargetShot = async (generationId: string, imageUrl?: string, thumbUrl?: string): Promise<boolean> => {
-    if (isWeb) {
-      toast.info("Adding to shot is not available in web environment");
-      return false;
-    }
-    
     if (!targetShotIdForButton) {
       toast.error("No target shot available to add to. Create a shot first or interact with one.");
       return false;
@@ -527,7 +312,7 @@ const ImageGenerationToolPage = () => {
   const validShots = shots || [];
 
   // Update the condition for showing the form, and disable generate button if task is being created
-  const canGenerate = hasValidFalApiKey && !isCreatingTask; // And selectedProjectId is implicitly checked in handleNewGenerate
+  const canGenerate = hasValidFalApiKey && !isCreatingTask;
 
   const isGenerating = isCreatingTask; // Simplified generating state
 
@@ -540,22 +325,12 @@ const ImageGenerationToolPage = () => {
       <header className="flex justify-between items-center mb-6 sticky top-0 bg-background py-4 z-40 border-b border-border/50 shadow-sm">
         <h1 className="text-3xl font-bold">
           Image Generation
-          {isWeb && <span className="text-sm font-normal text-muted-foreground ml-2">(Web Demo)</span>}
         </h1>
         <Button variant="ghost" onClick={() => setShowSettingsModal(true)}>
           <Settings className="h-5 w-5" />
           <span className="sr-only">Settings</span>
         </Button>
       </header>
-
-      {isWeb && (
-        <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <p className="text-sm text-blue-800">
-            <strong>Web Demo Mode:</strong> This is a demonstration version. Generated images will be placeholders, 
-            and features like saving to projects, upscaling, and shot management are not available.
-          </p>
-        </div>
-      )}
 
       {!hasValidFalApiKey && (
         <div className="flex flex-col items-center justify-center h-full">
@@ -574,54 +349,62 @@ const ImageGenerationToolPage = () => {
       {hasValidFalApiKey && (
         <>
           <div className="mb-8 p-6 border rounded-lg shadow-sm bg-card">
-            <ToolSettingsGate ready={true} loadingMessage="Loading form settings...">
-              <ImageGenerationForm 
-                ref={imageGenerationFormRef} 
-                onGenerate={handleNewGenerate} // Use the new handler
-                isGenerating={isGenerating} // isCreatingTask from handleNewGenerate
+            <ToolSettingsGate
+              ready={true}
+              loadingMessage="Loading image generation settings..."
+            >
+              <ImageGenerationForm
+                ref={imageGenerationFormRef}
+                onGenerate={handleNewGenerate}
+                isGenerating={isGenerating}
                 hasApiKey={hasValidFalApiKey}
-                apiKey={falApiKey} // Potentially for display or direct use by form
+                apiKey={falApiKey}
                 openaiApiKey={openaiApiKey}
               />
             </ToolSettingsGate>
           </div>
 
-          {isCreatingTask && (
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999]" onClick={(e) => { if (e.target === e.currentTarget) { /* handleCancelGeneration() */ } }}>
-              <div className="bg-background p-8 rounded-lg shadow-2xl w-full max-w-md text-center" onClick={(e) => e.stopPropagation()}>
-                <h2 className="text-2xl font-semibold mb-4">
-                  {isWeb ? 'Generating Mock Images...' : `Creating Image Generation ${creatingTaskCount > 1 ? 'Tasks' : 'Task'}...`}
-                </h2>
-
-                <Button variant="destructive" onClick={(e) => { if (e.target === e.currentTarget) { /* handleCancelGeneration() */ } }}>
-                  Cancel {isWeb ? 'Generation' : (creatingTaskCount > 1 ? 'Tasks' : 'Task')}
-                </Button>
-              </div>
-            </div>
-          )}
-
           <div className="mt-8">
-            <ImageGallery 
+            <ImageGallery
               images={imagesToShow}
-              onDelete={handleDeleteImage} 
-              isDeleting={deleteGenerationMutation?.isPending ? deleteGenerationMutation.variables as string : null}
-              onApplySettings={handleApplySettingsFromGallery}
-              onAddToLastShot={handleAddImageToTargetShot}
-              allShots={shots || []}
-              lastShotId={lastAffectedShotId}
-              currentToolType="image-generation"
+              onDelete={handleDeleteImage}
               onImageSaved={handleImageSaved}
-              columnsPerRow={5}
+              onAddToLastShot={handleAddImageToTargetShot}
+              isDeleting={isDeleting}
+              allShots={validShots}
+              lastShotId={targetShotIdForButton}
+              lastShotNameForTooltip={targetShotNameForButtonTooltip}
             />
           </div>
         </>
       )}
 
+      {/* Progress Display */}
+      {isCreatingTask && (
+        <div className="sticky bottom-0 bg-background border-t border-border/50 p-4 shadow-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>
+              <span className="text-sm font-medium">
+                Creating Image Generation Tasks...
+              </span>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => { /* The hook doesn't support cancellation yet, but UI can be reset */ }}
+            >
+              Cancel Tasks
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Settings Modal */}
-      <SettingsModal 
-          isOpen={showSettingsModal}
-          onOpenChange={setShowSettingsModal}
-        />
+      <SettingsModal
+        isOpen={showSettingsModal}
+        onOpenChange={setShowSettingsModal}
+      />
     </div>
   );
 };

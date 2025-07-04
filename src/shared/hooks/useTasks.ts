@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Task, TaskStatus } from '@/types/tasks';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { useProject } from '../contexts/ProjectContext';
 
 const TASKS_QUERY_KEY = 'tasks';
 
@@ -37,32 +38,45 @@ const mapDbTaskToTask = (row: any): Task => ({
   projectId: row.project_id,
 });
 
-// Hook to create a task
+/**
+ * A generalized hook for creating any type of task via a Supabase Edge Function.
+ * It handles loading states, toast notifications, and automatically invalidates
+ * the tasks query to refresh the UI upon successful creation.
+ */
 export const useCreateTask = () => {
   const queryClient = useQueryClient();
-  
+  const { selectedProjectId } = useProject();
+
   return useMutation({
-    mutationFn: async (task: Partial<Task>) => {
-      const { data, error } = await supabase
-        .from('tasks')
-        .insert({
-          project_id: task.projectId,
-          task_type: task.taskType,
-          params: task.params || {},
-          status: task.status || 'Queued',
-        })
-        .select()
-        .single();
+    mutationFn: async ({ functionName, payload }: { functionName: string, payload: object }) => {
+      const { data, error } = await supabase.functions.invoke(functionName, {
+        body: payload,
+      });
+
+      if (error) {
+        // Throw an error that react-query will catch in onError
+        throw new Error(error.message || `An unknown error occurred with function: ${functionName}`);
+      }
       
-      if (error) throw error;
       return data;
     },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: [TASKS_QUERY_KEY] });
-      toast.success('Task created successfully');
+    onSuccess: (data, variables) => {
+      // This will run after a successful mutation
+      toast.success(`Task created successfully!`);
+      
+      // Invalidate the tasks query to trigger a refetch
+      // This ensures the TasksPane updates automatically
+      if (selectedProjectId) {
+        queryClient.invalidateQueries({ queryKey: ['tasks', selectedProjectId] });
+      } else {
+        // If there's no project context, invalidate the generic 'tasks' query
+        // which might be used in other parts of the app
+        queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      }
     },
-    onError: (error: Error) => {
-      console.error('Error creating task:', error);
+    onError: (error: Error, variables) => {
+      // This will run if the mutationFn throws an error
+      console.error(`[useCreateTask] Error creating task with function '${variables.functionName}':`, error);
       toast.error(`Failed to create task: ${error.message}`);
     },
   });
@@ -139,7 +153,7 @@ interface CancelAllPendingTasksResponse {
 }
 
 // Hook to cancel a task
-export const useCancelTask = () => {
+export const useCancelTask = (projectId: string | null) => {
   const queryClient = useQueryClient();
   
   return useMutation({
@@ -162,7 +176,6 @@ export const useCancelTask = () => {
       toast.success('Task cancelled successfully');
     },
     onError: (error: Error) => {
-      console.error('Error cancelling task:', error);
       toast.error(`Failed to cancel task: ${error.message}`);
     },
   });
