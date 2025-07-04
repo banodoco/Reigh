@@ -154,8 +154,6 @@ export interface ShotEditorProps {
   onUpdateShotName?: (newName: string) => void;
 }
 
-const baseUrl = import.meta.env.VITE_API_TARGET_URL || window.location.origin;
-
 const DEFAULT_RESOLUTION = '840x552';
 
 const getDimensions = (url: string): Promise<{ width: number; height: number }> => {
@@ -393,7 +391,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         const finalImageUrl = croppedImageUrl ? getDisplayUrl(imageUrl) : imageUrl;
 
         const promptForGeneration = `External image: ${file.name || 'untitled'}`;
-        const genResponse = await fetchWithAuth(`${baseUrl}/api/generations`, {
+        const genResponse = await fetchWithAuth('/api/generations', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -760,7 +758,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const handleApplySettingsFromTaskNew = async (taskId: string, replaceImages: boolean, inputImages: string[]) => {
     try {
       // Fetch the settings from the task
-      const response = await fetchWithAuth(`${baseUrl}/api/tool-settings/from-task/${taskId}`);
+      const response = await fetchWithAuth(`/api/tool-settings/from-task/${taskId}`);
       if (!response.ok) {
         throw new Error('Failed to fetch settings from task');
       }
@@ -904,7 +902,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         
         // Create a generation record for the input image
         const promptForGeneration = `Input image from task ${i + 1}`;
-        const genResponse = await fetchWithAuth(`${baseUrl}/api/generations`, {
+        const genResponse = await fetchWithAuth('/api/generations', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
