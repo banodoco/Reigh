@@ -35,7 +35,14 @@ if (typeof window !== 'undefined') {
     const pool = new Pool({
       connectionString,
     });
-    
+
+    // Handle unexpected errors on idle clients so they don't crash the process
+    pool.on('error', (err) => {
+      console.error('[DB] Unexpected error on idle PostgreSQL client', err);
+      // The pool will automatically remove the broken client and will create a new one
+      // for the next query, so we just log here instead of letting the error bubble up.
+    });
+
     // Pass the imported schema to Drizzle for relational queries
     db = drizzle(pool, { schema });
     console.log('[DB] Node.js environment: Initialized Drizzle with PostgreSQL and schema.');

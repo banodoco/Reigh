@@ -331,22 +331,8 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
   }));
 
   useEffect(() => {
-    // Fetches LoRA models for Wan mode
-    const fetchLoras = async () => {
-      try {
-        const response = await fetch('/api/loras/wan');
-        if (!response.ok) {
-          throw new Error(`Failed to fetch LoRA models: ${response.statusText}`);
-        }
-        const data: LoraData = await response.json();
-        setAvailableLoras(data.models);
-      } catch (error) {
-        console.error("Error fetching LoRA models:", error);
-        toast.error("Failed to load LoRA models.");
-      }
-    };
-
-    fetchLoras();
+    // LoRA support has been removed – ensure no network request is made on mount
+    setAvailableLoras([]);
   }, []);
 
   useEffect(() => { 
@@ -462,7 +448,8 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();    
 
-    const lorasForApi = selectedLoras.map(lora => ({ path: lora.path, strength: lora.strength }));    
+    // LoRA support removed – always submit an empty list
+    const lorasForApi: [] = [];
     
     const activePrompts = prompts.filter(p => p.fullPrompt.trim() !== "");
     if (activePrompts.length === 0) {
