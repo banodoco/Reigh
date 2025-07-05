@@ -167,53 +167,7 @@ export default function HomePage() {
             
             {/* Subtitle */}
             <p className="font-inter text-xl md:text-2xl text-muted-foreground leading-relaxed tracking-wide mb-8">
-              Reigh is an{' '}
-              <a 
-                href="https://github.com/peteromalley/reigh" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-wes-vintage-gold hover:text-wes-coral transition-colors duration-200 underline decoration-wes-vintage-gold/30 hover:decoration-wes-coral/50 underline-offset-2"
-              >
-                open tool
-              </a>
-              , built on{' '}
-              <a 
-                href="https://github.com/Wan-Video/Wan2.1" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-wes-vintage-gold hover:text-wes-coral transition-colors duration-200 underline decoration-wes-vintage-gold/30 hover:decoration-wes-coral/50 underline-offset-2"
-              >
-                open models
-              </a>
-              , that you can run{' '}
-              <button
-                onClick={() => {
-                  setIsCreativePartnerButtonAnimating(true);
-                  setShowPhilosophy(false);
-                  setTimeout(() => {
-                    setShowCreativePartner(true);
-                    setTimeout(() => setIsCreativePartnerButtonAnimating(false), 300);
-                  }, 150);
-                }}
-                className="text-wes-vintage-gold hover:text-wes-coral transition-colors duration-200 underline decoration-wes-vintage-gold/30 hover:decoration-wes-coral/50 underline-offset-2 bg-transparent border-0 p-0 font-inter text-xl md:text-2xl cursor-pointer"
-              >
-                for free
-              </button>
-              {' '}on your computer or on the cloud for convenience. In addition to a tool, we're also creating{' '}
-              <button
-                onClick={() => {
-                  setIsPhilosophyButtonAnimating(true);
-                  setShowCreativePartner(false);
-                  setTimeout(() => {
-                    setShowPhilosophy(true);
-                    setTimeout(() => setIsPhilosophyButtonAnimating(false), 300);
-                  }, 150);
-                }}
-                className="text-wes-vintage-gold hover:text-wes-coral transition-colors duration-200 underline decoration-wes-vintage-gold/30 hover:decoration-wes-coral/50 underline-offset-2 bg-transparent border-0 p-0 font-inter text-xl md:text-2xl cursor-pointer"
-              >
-                a community
-              </button>
-              {' '}to explore and unlock this new artform.
+            Let's explore the emerging artform of image-guided video!
             </p>
             
             {/* Ornamental elements */}
@@ -259,8 +213,56 @@ export default function HomePage() {
                       </div>
                     </div>
                   </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Reigh is an open tool — <a href="https://github.com/peteromalley/reigh" className="underline text-wes-vintage-gold hover:text-wes-coral transition-colors">view on GitHub</a></p>
+                  <TooltipContent className="max-w-md p-4">
+                    <p className="text-sm leading-relaxed">
+                      Reigh is an{' '}
+                      <a 
+                        href="https://github.com/peteromalley/reigh" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="underline text-wes-vintage-gold hover:text-wes-coral transition-colors font-medium"
+                      >
+                        open tool
+                      </a>
+                      , built on{' '}
+                      <a 
+                        href="https://github.com/Wan-Video/Wan2.1" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="underline text-wes-vintage-gold hover:text-wes-coral transition-colors font-medium"
+                      >
+                        open models
+                      </a>
+                      , that you can run{' '}
+                      <button 
+                        onClick={() => {
+                          setIsCreativePartnerButtonAnimating(true);
+                          setShowPhilosophy(false);
+                          setTimeout(() => {
+                            setShowCreativePartner(true);
+                            setTimeout(() => setIsCreativePartnerButtonAnimating(false), 300);
+                          }, 150);
+                        }}
+                        className="underline text-wes-vintage-gold hover:text-wes-coral transition-colors font-medium"
+                      >
+                        for free
+                      </button>
+                      {' '}on your computer or on the cloud for convenience. In addition to a tool, we're also creating{' '}
+                      <button 
+                        onClick={() => {
+                          setIsPhilosophyButtonAnimating(true);
+                          setShowCreativePartner(false);
+                          setTimeout(() => {
+                            setShowPhilosophy(true);
+                            setTimeout(() => setIsPhilosophyButtonAnimating(false), 300);
+                          }, 150);
+                        }}
+                        className="underline text-wes-vintage-gold hover:text-wes-coral transition-colors font-medium"
+                      >
+                        a community
+                      </button>
+                      {' '}to explore and unlock this new artform.
+                    </p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
