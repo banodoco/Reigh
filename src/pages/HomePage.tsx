@@ -167,7 +167,7 @@ export default function HomePage() {
             
             {/* Subtitle */}
             <p className="font-inter text-xl md:text-2xl text-muted-foreground leading-relaxed tracking-wide mb-8">
-            Let's explore the emerging artform of image-guided video!
+            A tool and community for exploring the emerging artform of image-guided video
             </p>
             
             {/* Ornamental elements */}
@@ -261,7 +261,7 @@ export default function HomePage() {
                       >
                         a community
                       </button>
-                      {' '}to explore and unlock this new artform.
+                      {' '}for artists who wish to explore this new artform.
                     </p>
                   </TooltipContent>
                 </Tooltip>
@@ -299,10 +299,10 @@ export default function HomePage() {
         )}
 
         {/* Creative Partner Programme Side Pane */}
-        <div className={`fixed top-0 right-0 h-full w-96 bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out ${
+        <div className={`fixed top-0 right-0 h-full w-full max-w-sm sm:w-96 bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out ${
           showCreativePartner ? 'translate-x-0' : 'translate-x-full'
         }`}>
-          <div className="p-8 h-full overflow-y-auto">
+          <div className="p-4 sm:p-8 h-full overflow-y-auto">
             {/* Close Button */}
             <button
               onClick={() => {
@@ -317,7 +317,7 @@ export default function HomePage() {
             </button>
             
             <div className="mb-6">
-              <h2 className="font-playfair text-3xl font-bold text-primary mb-4">Creative Partner Programme</h2>
+              <h2 className="font-playfair text-2xl sm:text-3xl font-bold text-primary mb-4">Creative Partner Programme</h2>
               <div className="w-16 h-1 bg-gradient-to-r from-wes-coral to-wes-pink rounded-full mb-6"></div>
             </div>
             
@@ -358,10 +358,10 @@ export default function HomePage() {
         </div>
 
         {/* Philosophy Side Pane */}
-        <div className={`fixed top-0 left-0 h-full w-96 bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out ${
+        <div className={`fixed top-0 left-0 h-full w-full max-w-sm sm:w-96 bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out ${
           showPhilosophy ? 'translate-x-0' : '-translate-x-full'
         }`}>
-          <div className="p-8 h-full overflow-y-auto">
+          <div className="p-4 sm:p-8 h-full overflow-y-auto">
             {/* Close Button */}
             <button
               onClick={() => {
@@ -376,7 +376,7 @@ export default function HomePage() {
             </button>
             
             <div className="mb-6">
-              <h2 className="font-playfair text-3xl font-bold text-primary mb-4">Our Philosophy</h2>
+              <h2 className="font-playfair text-2xl sm:text-3xl font-bold text-primary mb-4">Our Philosophy</h2>
               <div className="w-16 h-1 bg-gradient-to-r from-wes-vintage-gold to-wes-mint rounded-full mb-6"></div>
             </div>
             
