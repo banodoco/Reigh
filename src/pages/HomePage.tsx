@@ -165,7 +165,7 @@ export default function HomePage() {
             
             {/* Subtitle */}
             <p className="font-inter text-xl md:text-2xl text-muted-foreground leading-relaxed tracking-wide mb-8">
-              A tool for the found art of travelling between images
+            Let's explore the emerging artform of image-guided video!
             </p>
             
             {/* Ornamental elements */}
