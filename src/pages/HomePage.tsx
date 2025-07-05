@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, Sparkles, Image as ImageIcon, Video, UserPlus, Users, FileText, ChevronDown, ChevronUp, GitBranch, X } from 'lucide-react';
+import { ArrowRight, Sparkles, Image as ImageIcon, Video, UserPlus, Users, FileText, ChevronDown, ChevronUp, GitBranch, X, HandHeart, Brain } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import type { Session } from '@supabase/supabase-js';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -140,12 +140,12 @@ export default function HomePage() {
               setTimeout(() => setIsPhilosophyButtonAnimating(false), 300);
             }, 150);
           }}
-          className={`group flex items-center space-x-2 px-4 py-2 bg-white/80 backdrop-blur-sm rounded-full border-2 border-wes-vintage-gold/20 hover:border-wes-vintage-gold/40 transition-all duration-300 hover:shadow-wes-ornate ${
+          className={`group flex items-center sm:space-x-2 px-3 py-3 sm:px-4 sm:py-2 bg-white/80 backdrop-blur-sm rounded-full border-2 border-wes-vintage-gold/20 hover:border-wes-vintage-gold/40 transition-all duration-300 hover:shadow-wes-ornate ${
             isPhilosophyButtonAnimating ? 'animate-spin-left-fade' : ''
           } ${showPhilosophy || isPhilosophyPaneClosing || isPhilosophyButtonAnimating ? 'opacity-0 pointer-events-none z-10' : 'opacity-100 pointer-events-auto z-20'}`}
         >
-          <FileText className="w-4 h-4 text-wes-vintage-gold" />
-          <span className="font-inter text-sm font-medium text-primary group-hover:text-primary/80">Philosophy</span>
+          <Brain className="w-4 h-4 text-wes-vintage-gold" />
+          <span className="font-inter text-sm font-medium text-primary group-hover:text-primary/80 hidden sm:inline">Philosophy</span>
         </button>
       </div>
         
@@ -161,12 +161,12 @@ export default function HomePage() {
               setTimeout(() => setIsCreativePartnerButtonAnimating(false), 300);
             }, 150);
           }}
-          className={`group flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-wes-coral/90 to-wes-pink/90 backdrop-blur-sm rounded-full border-2 border-wes-coral/30 hover:border-wes-coral/50 transition-all duration-300 hover:shadow-wes-ornate text-white hover:from-wes-coral hover:to-wes-pink ${
+          className={`group flex items-center sm:space-x-2 px-3 py-3 sm:px-4 sm:py-2 bg-gradient-to-r from-wes-coral/90 to-wes-pink/90 backdrop-blur-sm rounded-full border-2 border-wes-coral/30 hover:border-wes-coral/50 transition-all duration-300 hover:shadow-wes-ornate text-white hover:from-wes-coral hover:to-wes-pink ${
             isCreativePartnerButtonAnimating ? 'animate-spin-right-fade' : ''
           } ${showCreativePartner || isCreativePartnerPaneClosing || isCreativePartnerButtonAnimating ? 'opacity-0 pointer-events-none z-10' : 'opacity-100 pointer-events-auto z-20'}`}
         >
-          <Users className="w-4 h-4 group-hover:scale-110 transition-transform" />
-          <span className="font-inter text-sm font-medium">Open Creative Partner Programme</span>
+          <HandHeart className="w-4 h-4 group-hover:scale-110 transition-transform" />
+          <span className="font-inter text-sm font-medium hidden sm:inline">Open Creative Partner Programme</span>
         </button>
       </div>
 
