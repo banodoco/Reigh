@@ -199,7 +199,7 @@ export default function HomePage() {
               >
                 for free
               </button>
-              {' '}on your computer. In addition to a tool, we're building{' '}
+              {' '}on your computer or on the cloud for convenience. In addition to a tool, we're also creating{' '}
               <button
                 onClick={() => {
                   setIsPhilosophyButtonAnimating(true);
