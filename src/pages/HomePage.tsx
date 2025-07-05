@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, Sparkles, Image as ImageIcon, Video, UserPlus, Users, FileText, ChevronDown, ChevronUp, GitBranch } from 'lucide-react';
+import { ArrowRight, Sparkles, Image as ImageIcon, Video, UserPlus, Users, FileText, ChevronDown, ChevronUp, GitBranch, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import type { Session } from '@supabase/supabase-js';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -16,6 +16,8 @@ export default function HomePage() {
   const navigate = useNavigate();
   const [showCreativePartner, setShowCreativePartner] = useState(false);
   const [showPhilosophy, setShowPhilosophy] = useState(false);
+  const [isPhilosophyButtonAnimating, setIsPhilosophyButtonAnimating] = useState(false);
+  const [isCreativePartnerButtonAnimating, setIsCreativePartnerButtonAnimating] = useState(false);
 
   // Show toast if redirected from protected page
   useEffect(() => {
@@ -127,8 +129,14 @@ export default function HomePage() {
       <div className="fixed top-12 left-12 z-20 flex items-center space-x-6">
         {/* Philosophy Link */}
         <button
-          onClick={() => setShowPhilosophy(true)}
-          className="group flex items-center space-x-2 px-4 py-2 bg-white/80 backdrop-blur-sm rounded-full border-2 border-wes-vintage-gold/20 hover:border-wes-vintage-gold/40 transition-all duration-300 hover:shadow-wes-ornate"
+          onClick={() => {
+            setIsPhilosophyButtonAnimating(true);
+            setShowCreativePartner(false);
+            setTimeout(() => setShowPhilosophy(true), 150);
+          }}
+          className={`group flex items-center space-x-2 px-4 py-2 bg-white/80 backdrop-blur-sm rounded-full border-2 border-wes-vintage-gold/20 hover:border-wes-vintage-gold/40 transition-all duration-300 hover:shadow-wes-ornate ${
+            isPhilosophyButtonAnimating ? 'animate-spin-left-fade' : ''
+          } ${showPhilosophy ? 'opacity-0 pointer-events-none z-0' : 'opacity-100 pointer-events-auto z-20'}`}
         >
           <FileText className="w-4 h-4 text-wes-vintage-gold" />
           <span className="font-inter text-sm font-medium text-primary group-hover:text-primary/80">Philosophy</span>
@@ -138,8 +146,14 @@ export default function HomePage() {
       <div className="fixed top-12 right-12 z-20 flex items-center">
         {/* Creative Partner Programme */}
         <button
-          onClick={() => setShowCreativePartner(true)}
-          className="group flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-wes-coral/90 to-wes-pink/90 backdrop-blur-sm rounded-full border-2 border-wes-coral/30 hover:border-wes-coral/50 transition-all duration-300 hover:shadow-wes-ornate text-white hover:from-wes-coral hover:to-wes-pink"
+          onClick={() => {
+            setIsCreativePartnerButtonAnimating(true);
+            setShowPhilosophy(false);
+            setTimeout(() => setShowCreativePartner(true), 150);
+          }}
+          className={`group flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-wes-coral/90 to-wes-pink/90 backdrop-blur-sm rounded-full border-2 border-wes-coral/30 hover:border-wes-coral/50 transition-all duration-300 hover:shadow-wes-ornate text-white hover:from-wes-coral hover:to-wes-pink ${
+            isCreativePartnerButtonAnimating ? 'animate-spin-right-fade' : ''
+          } ${showCreativePartner ? 'opacity-0 pointer-events-none z-0' : 'opacity-100 pointer-events-auto z-20'}`}
         >
           <Users className="w-4 h-4 group-hover:scale-110 transition-transform" />
           <span className="font-inter text-sm font-medium">Open Creative Partner Programme</span>
@@ -234,6 +248,8 @@ export default function HomePage() {
             onClick={() => {
               setShowCreativePartner(false);
               setShowPhilosophy(false);
+              setIsPhilosophyButtonAnimating(false);
+              setIsCreativePartnerButtonAnimating(false);
             }}
           />
         )}
@@ -243,6 +259,17 @@ export default function HomePage() {
           showCreativePartner ? 'translate-x-0' : 'translate-x-full'
         }`}>
           <div className="p-8 h-full overflow-y-auto">
+            {/* Close Button */}
+            <button
+              onClick={() => {
+                setShowCreativePartner(false);
+                setIsCreativePartnerButtonAnimating(false);
+              }}
+              className="absolute top-4 right-4 p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors duration-200"
+            >
+              <X className="w-4 h-4 text-gray-600" />
+            </button>
+            
             <div className="mb-6">
               <h2 className="font-playfair text-3xl font-bold text-primary mb-4">Creative Partner Programme</h2>
               <div className="w-16 h-1 bg-gradient-to-r from-wes-coral to-wes-pink rounded-full mb-6"></div>
@@ -289,6 +316,17 @@ export default function HomePage() {
           showPhilosophy ? 'translate-x-0' : '-translate-x-full'
         }`}>
           <div className="p-8 h-full overflow-y-auto">
+            {/* Close Button */}
+            <button
+              onClick={() => {
+                setShowPhilosophy(false);
+                setIsPhilosophyButtonAnimating(false);
+              }}
+              className="absolute top-4 right-4 p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors duration-200"
+            >
+              <X className="w-4 h-4 text-gray-600" />
+            </button>
+            
             <div className="mb-6">
               <h2 className="font-playfair text-3xl font-bold text-primary mb-4">Our Philosophy</h2>
               <div className="w-16 h-1 bg-gradient-to-r from-wes-vintage-gold to-wes-mint rounded-full mb-6"></div>

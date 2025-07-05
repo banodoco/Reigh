@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   DndContext,
   closestCenter,
@@ -160,7 +161,11 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
   const activeImage = activeId ? images.find((img) => img.shotImageEntryId === activeId) : null;
 
   if (!images || images.length === 0) {
-    return <p className="text-sm text-muted-foreground">No images to display.</p>;
+    return (
+      <p className="text-sm text-muted-foreground">
+        No images to display - <Link to="/tools/image-generation" className="text-primary hover:underline">generate images</Link>
+      </p>
+    );
   }
 
   if (generationMode === 'by-pair') {
