@@ -27,7 +27,7 @@ export interface VideoTravelSettings {
 }
 
 export const videoTravelSettings = {
-  id: 'video-travel',
+  id: 'travel-between-images',
   scope: ['shot'], // Video travel settings are per-shot
   defaults: {
     videoControlMode: 'batch' as const,

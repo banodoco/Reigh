@@ -18,11 +18,11 @@ import {
   rectSortingStrategy,
 } from '@dnd-kit/sortable';
 import { GenerationRow } from '@/types/shots';
-import { SortableImageItem } from '@/tools/video-travel/components/SortableImageItem'; // Adjust path as needed
+import { SortableImageItem } from '@/tools/travel-between-images/components/SortableImageItem'; // Adjust path as needed
 import MediaLightbox from './MediaLightbox';
 import { cn } from '@/shared/lib/utils';
 import { MultiImagePreview, SingleImagePreview } from './ImageDragPreview';
-import { PairConfig } from '@/tools/video-travel/components/ShotEditor';
+import { PairConfig } from '@/tools/travel-between-images/components/ShotEditor';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';

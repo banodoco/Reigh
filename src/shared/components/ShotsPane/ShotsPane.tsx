@@ -9,7 +9,7 @@ import { Button } from '@/shared/components/ui/button';
 import { ArrowRightIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { usePanes } from '@/shared/contexts/PanesContext';
-import CreateShotModal from '@/tools/video-travel/components/CreateShotModal';
+import CreateShotModal from '@/tools/travel-between-images/components/CreateShotModal';
 import { useCreateShot, useHandleExternalImageDrop } from '@/shared/hooks/useShots';
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 import PaneControlTab from '../PaneControlTab';
@@ -83,7 +83,7 @@ const ShotsPane: React.FC = () => {
 
     if (createdShotId) {
       setCurrentShotId(createdShotId);
-      navigate('/tools/video-travel', { state: { fromShotClick: true } });
+      navigate('/tools/travel-between-images', { state: { fromShotClick: true } });
     }
   };
 
@@ -133,7 +133,7 @@ const ShotsPane: React.FC = () => {
                 onClick={() => {
                   toggleLock(false);
                   setCurrentShotId(null);
-                  navigate('/tools/video-travel');
+                  navigate('/tools/travel-between-images');
 
                   if (isMobile) {
                     window.dispatchEvent(new CustomEvent('mobilePaneOpen', { detail: { side: null } }));

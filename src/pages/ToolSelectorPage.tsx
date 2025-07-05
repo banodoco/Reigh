@@ -17,10 +17,10 @@ const processTools = [
     accent: 'wes-pink',
   },
   {
-    id: 'video-travel',
+    id: 'travel-between-images',
     name: 'Travel Between Images',
     description: 'Transform static images into video sequences with controllable transitions.',
-    tool: toolsUIManifest.find(t => t.id === 'video-travel'),
+    tool: toolsUIManifest.find(t => t.id === 'travel-between-images'),
     icon: Video,
     gradient: 'from-wes-mint via-wes-sage to-wes-dusty-blue',
     accent: 'wes-mint',

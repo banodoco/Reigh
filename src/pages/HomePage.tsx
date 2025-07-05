@@ -3,7 +3,7 @@ import { ArrowRight, Sparkles, Image as ImageIcon, Video, UserPlus, Users, FileT
 import { supabase } from '@/integrations/supabase/client';
 import type { Session } from '@supabase/supabase-js';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/shared/components/ui/dialog';
+
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
 import { toast } from '@/shared/components/ui/use-toast';
 import { PageFadeIn } from '@/shared/components/transitions';
@@ -226,28 +226,111 @@ export default function HomePage() {
           has been commented out for a simplified hero-only layout.
         */}
 
-        {/* Pop-ups */}
-        <Dialog open={showCreativePartner} onOpenChange={setShowCreativePartner}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Creative Partner Programme</DialogTitle>
-              <DialogDescription>
-                Coming soon — join our wait-list to collaborate on experimental visual journeys.
-              </DialogDescription>
-            </DialogHeader>
-          </DialogContent>
-        </Dialog>
+        {/* Side Panes */}
+        {/* Overlay */}
+        {(showCreativePartner || showPhilosophy) && (
+          <div 
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 transition-all duration-300"
+            onClick={() => {
+              setShowCreativePartner(false);
+              setShowPhilosophy(false);
+            }}
+          />
+        )}
 
-        <Dialog open={showPhilosophy} onOpenChange={setShowPhilosophy}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Our Philosophy</DialogTitle>
-              <DialogDescription>
+        {/* Creative Partner Programme Side Pane */}
+        <div className={`fixed top-0 right-0 h-full w-96 bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out ${
+          showCreativePartner ? 'translate-x-0' : 'translate-x-full'
+        }`}>
+          <div className="p-8 h-full overflow-y-auto">
+            <div className="mb-6">
+              <h2 className="font-playfair text-3xl font-bold text-primary mb-4">Creative Partner Programme</h2>
+              <div className="w-16 h-1 bg-gradient-to-r from-wes-coral to-wes-pink rounded-full mb-6"></div>
+            </div>
+            
+            <div className="space-y-6 text-muted-foreground">
+              <p className="text-lg leading-relaxed">
+                Coming soon — join our wait-list to collaborate on experimental visual journeys.
+              </p>
+              
+              <div className="space-y-4">
+                <h3 className="font-semibold text-primary text-lg">What to expect:</h3>
+                <ul className="space-y-3 text-sm">
+                  <li className="flex items-start space-x-3">
+                    <div className="w-1.5 h-1.5 bg-wes-coral rounded-full mt-2 flex-shrink-0"></div>
+                    <span>Early access to experimental features</span>
+                  </li>
+                  <li className="flex items-start space-x-3">
+                    <div className="w-1.5 h-1.5 bg-wes-coral rounded-full mt-2 flex-shrink-0"></div>
+                    <span>Collaborative art creation opportunities</span>
+                  </li>
+                  <li className="flex items-start space-x-3">
+                    <div className="w-1.5 h-1.5 bg-wes-coral rounded-full mt-2 flex-shrink-0"></div>
+                    <span>Community showcases and exhibitions</span>
+                  </li>
+                  <li className="flex items-start space-x-3">
+                    <div className="w-1.5 h-1.5 bg-wes-coral rounded-full mt-2 flex-shrink-0"></div>
+                    <span>Direct feedback channels with the development team</span>
+                  </li>
+                </ul>
+              </div>
+              
+              <div className="pt-4 border-t border-gray-200">
+                <p className="text-sm text-muted-foreground/80">
+                  Join our growing community of visual storytellers and help shape the future of image-guided video art.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Philosophy Side Pane */}
+        <div className={`fixed top-0 left-0 h-full w-96 bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out ${
+          showPhilosophy ? 'translate-x-0' : '-translate-x-full'
+        }`}>
+          <div className="p-8 h-full overflow-y-auto">
+            <div className="mb-6">
+              <h2 className="font-playfair text-3xl font-bold text-primary mb-4">Our Philosophy</h2>
+              <div className="w-16 h-1 bg-gradient-to-r from-wes-vintage-gold to-wes-mint rounded-full mb-6"></div>
+            </div>
+            
+            <div className="space-y-6 text-muted-foreground">
+              <p className="text-lg leading-relaxed font-medium text-primary">
                 Reigh celebrates the "found art of travelling between images": embracing randomness, transformation, and narrative to kindle creativity.
-              </DialogDescription>
-            </DialogHeader>
-          </DialogContent>
-        </Dialog>
+              </p>
+              
+              <div className="space-y-6">
+                <div>
+                  <h3 className="font-semibold text-primary text-lg mb-3">The Journey Between</h3>
+                  <p className="text-sm leading-relaxed">
+                    Every image contains infinite possibilities. The magic happens not in the destination, but in the journey—the transformation, the unexpected turns, the serendipitous discoveries that emerge when we let go of control.
+                  </p>
+                </div>
+                
+                <div>
+                  <h3 className="font-semibold text-primary text-lg mb-3">Embracing Randomness</h3>
+                  <p className="text-sm leading-relaxed">
+                    We believe that the most compelling art often emerges from the interplay between intention and accident, between what we plan and what we discover. Our tools are designed to be collaborators, not mere instruments.
+                  </p>
+                </div>
+                
+                <div>
+                  <h3 className="font-semibold text-primary text-lg mb-3">Visual Storytelling</h3>
+                  <p className="text-sm leading-relaxed">
+                    Images are not static—they're moments in time that contain entire narratives. By traveling between them, we unlock those stories and create new ones, building bridges between different realities and perspectives.
+                  </p>
+                </div>
+                
+                <div>
+                  <h3 className="font-semibold text-primary text-lg mb-3">Community & Creativity</h3>
+                  <p className="text-sm leading-relaxed">
+                    Art is a conversation. We're building tools that facilitate creative dialogue—between artist and AI, between different artistic visions, and between creators across the globe.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
 

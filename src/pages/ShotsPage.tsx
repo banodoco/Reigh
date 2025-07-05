@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { useListShots, useRemoveImageFromShot, useUpdateShotImageOrder } from '@/shared/hooks/useShots';
 import { Shot, GenerationRow } from '@/types/shots';
-import ShotListDisplay from '@/tools/video-travel/components/ShotListDisplay';
+import ShotListDisplay from '@/tools/travel-between-images/components/ShotListDisplay';
 import ShotImageManager from '@/shared/components/ShotImageManager';
 import { Button } from '@/shared/components/ui/button';
 import { useQueryClient } from '@tanstack/react-query';

@@ -190,7 +190,7 @@ const ShotGroup: React.FC<ShotGroupProps> = ({ shot }) => {
       return;
     }
     setCurrentShotId(shot.id);
-    navigate('/tools/video-travel', { state: { fromShotClick: true } });
+    navigate('/tools/travel-between-images', { state: { fromShotClick: true } });
 
     // On mobile, close any open pane after selecting a shot
     if (isMobile) {

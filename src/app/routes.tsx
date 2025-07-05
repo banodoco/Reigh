@@ -5,7 +5,7 @@ import HomePage from '@/pages/HomePage';
 import ArtPage from '@/pages/ArtPage';
 // Lazy load tool pages for better performance
 const ImageGenerationToolPage = React.lazy(() => import('@/tools/image-generation/pages/ImageGenerationToolPage'));
-const VideoTravelToolPage = React.lazy(() => import('@/tools/video-travel/pages/VideoTravelToolPage'));
+const VideoTravelToolPage = React.lazy(() => import('@/tools/travel-between-images/pages/VideoTravelToolPage'));
 const EditTravelToolPage = React.lazy(() => import('@/tools/edit-travel/pages/EditTravelToolPage'));
 import NotFoundPage from '@/pages/NotFoundPage'; // Assuming NotFoundPage will be moved here or created
 import { LastAffectedShotProvider } from '@/shared/contexts/LastAffectedShotContext';
@@ -63,7 +63,7 @@ const router = createBrowserRouter([
         ),
       },
       {
-        path: '/tools/video-travel',
+        path: '/tools/travel-between-images',
         element: (
           <Suspense fallback={<LazyLoadingFallback />}>
             <VideoTravelToolPage />

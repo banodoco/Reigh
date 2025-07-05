@@ -201,8 +201,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({ side, isLocked, isOpen,
         size="icon"
         onClick={() => openPane()}
         className={cn(
-          'text-zinc-300 hover:text-white hover:bg-zinc-700',
-          side === 'bottom' ? 'h-8 w-16' : 'h-16 w-8'
+          'text-zinc-300 hover:text-white hover:bg-zinc-700 h-8 w-8'
         )}
         aria-label="Open pane"
       >

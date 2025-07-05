@@ -5,7 +5,7 @@ import { fetchToolSettings } from './useToolSettings';
 // Central list of tool IDs we want to preload. Update when you add more tools.
 const TOOL_IDS = [
   'image-generation',
-  'video-travel',
+  'travel-between-images',
   'edit-travel',
 ];
 

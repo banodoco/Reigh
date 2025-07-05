@@ -53,7 +53,7 @@ const VideoTravelToolPage: React.FC = () => {
 
   // Use tool settings for the selected shot - no need to pass userId, server knows it from auth
   const { settings, update: updateSettings, isLoading: isLoadingSettings, isUpdating } = useToolSettings<VideoTravelSettings>(
-    'video-travel',
+    'travel-between-images',
     { shotId: selectedShot?.id, enabled: !!selectedShot }
   );
 
@@ -529,7 +529,7 @@ const VideoTravelToolPage: React.FC = () => {
       {!shouldShowShotEditor ? (
         <>
           <div className="flex justify-between items-center mb-6">
-            <h1 className="text-3xl font-bold">Video Travel Tool</h1>
+            <h1 className="text-3xl font-bold">Travel Between Images</h1>
             <Button onClick={() => setIsCreateShotModalOpen(true)}>Create New Shot</Button>
           </div>
           {isLoading ? (

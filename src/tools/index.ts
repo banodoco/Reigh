@@ -1,11 +1,11 @@
 // Centralized tool settings exports - automatically registers defaults in toolSettingsService
-export { videoTravelSettings } from './video-travel/settings';
+export { videoTravelSettings } from './travel-between-images/settings';
 export { imageGenerationSettings } from './image-generation/settings';
 export { editTravelSettings } from './edit-travel/settings';
 export { userPreferencesSettings } from '../shared/settings/userPreferences';
 
 // Tool manifest for UI discovery and automatic registration
-import { videoTravelSettings } from './video-travel/settings';
+import { videoTravelSettings } from './travel-between-images/settings';
 import { imageGenerationSettings } from './image-generation/settings';
 import { editTravelSettings } from './edit-travel/settings';
 import { userPreferencesSettings } from '../shared/settings/userPreferences';
@@ -49,7 +49,7 @@ export const toolsUIManifest: ToolUIDefinition[] = [
   {
     id: videoTravelSettings.id,
     name: 'Travel Between Images',
-    path: '/tools/video-travel',
+    path: '/tools/travel-between-images',
     description: 'Create mesmerizing video sequences by defining elegant paths between existing images, weaving stories through visual transitions.',
     environments: [AppEnv.LOCAL, AppEnv.WEB],
     icon: Video,

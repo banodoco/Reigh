@@ -143,7 +143,7 @@ export function getTaskTypeDisplayName(taskType: string): string {
     case 'travel_stitch':
       return 'Video Generation';
     case 'travel_orchestrator':
-      return 'Video Travel';
+      return 'Travel Between Images';
     case 'image_upscale':
       return 'Image Upscaling';
     case 'image_edit':
