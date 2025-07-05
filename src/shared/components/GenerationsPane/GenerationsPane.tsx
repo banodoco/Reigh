@@ -51,8 +51,8 @@ const GenerationsPane: React.FC = () => {
 
   const { isLocked, isOpen, toggleLock, openPane, paneProps, transformClass, handlePaneEnter, handlePaneLeave } = useSlidingPane({
     side: 'bottom',
-    onLockStateChange: setIsGenerationsPaneLocked,
-    isInitiallyLocked: isGenerationsPaneLocked,
+    isLocked: isGenerationsPaneLocked,
+    onToggleLock: () => setIsGenerationsPaneLocked(!isGenerationsPaneLocked),
   });
 
   useEffect(() => {

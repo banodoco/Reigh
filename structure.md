@@ -245,6 +245,7 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
 - **useVideoScrubbing.ts**: Video scrubbing functionality
 - **useWebSocket.ts**: Supabase Realtime channel connection for real-time updates
 - **useAIInteractionService.ts**: AI interaction service for generating prompts and editing
+- **useUserUIState.ts**: Generic helper for persisting lightweight UI preferences (stored in `users.settings.ui` JSON). Debounced Supabase client update. Currently used by `PanesContext` to store `paneLocks`. Replaces `useToolSettings('pane-locks')` flow and removes the need for the `/api/tool-settings` round-trip for pane locks.
 
 ##### Contexts
 - **LastAffectedShotContext.tsx**: Remembers last modified shot

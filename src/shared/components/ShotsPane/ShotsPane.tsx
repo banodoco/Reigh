@@ -45,8 +45,8 @@ const ShotsPane: React.FC = () => {
 
   const { isLocked, isOpen, toggleLock, openPane, paneProps, transformClass, handlePaneEnter, handlePaneLeave } = useSlidingPane({
     side: 'left',
-    onLockStateChange: setIsShotsPaneLocked,
-    isInitiallyLocked: isShotsPaneLocked,
+    isLocked: isShotsPaneLocked,
+    onToggleLock: () => setIsShotsPaneLocked(!isShotsPaneLocked),
   });
 
   const handleCreateShot = async (shotName: string, files: File[]) => {

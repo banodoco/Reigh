@@ -57,8 +57,8 @@ const TasksPane: React.FC = () => {
 
   const { isLocked, isOpen, toggleLock, openPane, paneProps, transformClass, handlePaneEnter, handlePaneLeave } = useSlidingPane({
     side: 'right',
-    onLockStateChange: setIsTasksPaneLocked,
-    isInitiallyLocked: isTasksPaneLocked,
+    isLocked: isTasksPaneLocked,
+    onToggleLock: () => setIsTasksPaneLocked(!isTasksPaneLocked),
   });
 
   const bottomOffset = isGenerationsPaneLocked ? generationsPaneHeight : 0;

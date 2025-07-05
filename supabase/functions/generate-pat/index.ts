@@ -118,10 +118,10 @@ serve(async (req) => {
       phone_verified: user.phone_confirmed_at ? true : false,
     };
 
-    // Get JWT secret
-    const jwtSecret = Deno.env.get('JWT_SECRET');
+    // Get JWT secret (prefer SUPABASE_JWT_SECRET if set, fallback to JWT_SECRET)
+    const jwtSecret = Deno.env.get('SUPABASE_JWT_SECRET') ?? Deno.env.get('JWT_SECRET');
     if (!jwtSecret) {
-      throw new Error('JWT_SECRET env var not set in Edge Function secrets');
+      throw new Error('SUPABASE_JWT_SECRET (or JWT_SECRET) env var not set in Edge Function secrets');
     }
 
     // Create JWT using manual implementation

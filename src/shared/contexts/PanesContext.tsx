@@ -1,12 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, useRef, ReactNode, useCallback, useMemo } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { useToolSettings } from '@/shared/hooks/useToolSettings';
-
-interface PaneLockSettings {
-  isGenerationsPaneLocked?: boolean;
-  isShotsPaneLocked?: boolean;
-  isTasksPaneLocked?: boolean;
-}
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
+import { useUserUIState } from '@/shared/hooks/useUserUIState';
 
 interface PanesContextType {
   isGenerationsPaneLocked: boolean;
@@ -28,111 +21,79 @@ interface PanesContextType {
 const PanesContext = createContext<PanesContextType | undefined>(undefined);
 
 export const PanesProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [isGenerationsPaneLocked, setIsGenerationsPaneLockedState] = useState(false);
+  // Load pane locks from user settings
+  const { value: paneLocks, update: savePaneLocks, isLoading } = useUserUIState('paneLocks', {
+    shots: false,
+    tasks: false,
+    gens: false,
+  });
+
+  // Local state for lock status (source of truth for UI)
+  const [locks, setLocks] = useState(paneLocks);
+
+  // Pane dimensions (not persisted)
   const [generationsPaneHeight, setGenerationsPaneHeightState] = useState(350);
-
-  const [isShotsPaneLocked, setIsShotsPaneLockedState] = useState(false);
   const [shotsPaneWidth, setShotsPaneWidthState] = useState(300);
-
-  const [isTasksPaneLocked, setIsTasksPaneLockedState] = useState(false);
   const [tasksPaneWidth, setTasksPaneWidthState] = useState(300);
 
-  const [userId, setUserId] = useState<string | undefined>(undefined);
-
+  // Hydrate local state once when settings load
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUserId(session?.user?.id);
-    });
-
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUserId(session?.user?.id);
-    });
-
-    return () => {
-      listener.subscription.unsubscribe();
-    };
-  }, []);
-
-  const { settings: persistedSettings, isLoading: isLoadingSettings, update } = useToolSettings<PaneLockSettings>('pane-locks');
-
-  useEffect(() => {
-    if (!isLoadingSettings && persistedSettings) {
-      if (persistedSettings.isGenerationsPaneLocked !== undefined) {
-        setIsGenerationsPaneLockedState(persistedSettings.isGenerationsPaneLocked);
-      }
-      if (persistedSettings.isShotsPaneLocked !== undefined) {
-        setIsShotsPaneLockedState(persistedSettings.isShotsPaneLocked);
-      }
-      if (persistedSettings.isTasksPaneLocked !== undefined) {
-        setIsTasksPaneLockedState(persistedSettings.isTasksPaneLocked);
-      }
+    if (!isLoading) {
+      console.log('[PanesContext] Hydrating pane locks from server:', paneLocks);
+      setLocks(paneLocks);
     }
-  }, [isLoadingSettings, persistedSettings]);
+  }, [isLoading, paneLocks]);
 
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // Lock toggle functions
+  const toggleLock = useCallback((pane: 'shots' | 'tasks' | 'gens') => {
+    setLocks(prev => {
+      const newValue = !prev[pane];
+      const newLocks = { ...prev, [pane]: newValue };
+      
+      console.log(`[PanesContext] Toggling ${pane} lock to ${newValue}`);
+      
+      // Save to database (debounced)
+      savePaneLocks({ [pane]: newValue });
+      
+      return newLocks;
+    });
+  }, [savePaneLocks]);
 
-  useEffect(() => {
-    // Wait until settings are loaded and we have a user before attempting to persist anything
-    if (isLoadingSettings || !userId) return;
-
-    // Build the patch that reflects current local state
-    const patch: PaneLockSettings = {
-      isGenerationsPaneLocked,
-      isShotsPaneLocked,
-      isTasksPaneLocked,
-    };
-
-    // If nothing has actually changed compared with what we already fetched from the server, bail out early.
-    const hasChanges =
-      persistedSettings?.isGenerationsPaneLocked !== patch.isGenerationsPaneLocked ||
-      persistedSettings?.isShotsPaneLocked !== patch.isShotsPaneLocked ||
-      persistedSettings?.isTasksPaneLocked !== patch.isTasksPaneLocked;
-
-    if (!hasChanges) return;
-
-    // Debounce remote writes to avoid flooding the backend while the user is quickly toggling locks
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
-
-    saveTimeoutRef.current = setTimeout(() => {
-      update('user', patch);
-    }, 500);
-
-    return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-    };
-  }, [
-    isGenerationsPaneLocked,
-    isShotsPaneLocked,
-    isTasksPaneLocked,
-    isLoadingSettings,
-    userId,
-    update,
-    persistedSettings,
-  ]);
-
-  // Memoize setters to prevent re-creation on every render
+  // Individual setters for backward compatibility
   const setIsGenerationsPaneLocked = useCallback((isLocked: boolean) => {
-    setIsGenerationsPaneLockedState(isLocked);
-  }, []);
+    setLocks(prev => {
+      if (prev.gens === isLocked) return prev;
+      const newLocks = { ...prev, gens: isLocked };
+      savePaneLocks({ gens: isLocked });
+      return newLocks;
+    });
+  }, [savePaneLocks]);
 
+  const setIsShotsPaneLocked = useCallback((isLocked: boolean) => {
+    setLocks(prev => {
+      if (prev.shots === isLocked) return prev;
+      const newLocks = { ...prev, shots: isLocked };
+      savePaneLocks({ shots: isLocked });
+      return newLocks;
+    });
+  }, [savePaneLocks]);
+
+  const setIsTasksPaneLocked = useCallback((isLocked: boolean) => {
+    setLocks(prev => {
+      if (prev.tasks === isLocked) return prev;
+      const newLocks = { ...prev, tasks: isLocked };
+      savePaneLocks({ tasks: isLocked });
+      return newLocks;
+    });
+  }, [savePaneLocks]);
+
+  // Dimension setters
   const setGenerationsPaneHeight = useCallback((height: number) => {
     setGenerationsPaneHeightState(height);
   }, []);
 
-  const setIsShotsPaneLocked = useCallback((isLocked: boolean) => {
-    setIsShotsPaneLockedState(isLocked);
-  }, []);
-
   const setShotsPaneWidth = useCallback((width: number) => {
     setShotsPaneWidthState(width);
-  }, []);
-
-  const setIsTasksPaneLocked = useCallback((isLocked: boolean) => {
-    setIsTasksPaneLockedState(isLocked);
   }, []);
 
   const setTasksPaneWidth = useCallback((width: number) => {
@@ -141,30 +102,30 @@ export const PanesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const value = useMemo(
     () => ({
-      isGenerationsPaneLocked,
+      isGenerationsPaneLocked: locks.gens,
       setIsGenerationsPaneLocked,
       generationsPaneHeight,
       setGenerationsPaneHeight,
-      isShotsPaneLocked,
+      isShotsPaneLocked: locks.shots,
       setIsShotsPaneLocked,
       shotsPaneWidth,
       setShotsPaneWidth,
-      isTasksPaneLocked,
+      isTasksPaneLocked: locks.tasks,
       setIsTasksPaneLocked,
       tasksPaneWidth,
       setTasksPaneWidth,
     }),
     [
-      isGenerationsPaneLocked,
+      locks.gens,
+      locks.shots,
+      locks.tasks,
       setIsGenerationsPaneLocked,
+      setIsShotsPaneLocked,
+      setIsTasksPaneLocked,
       generationsPaneHeight,
       setGenerationsPaneHeight,
-      isShotsPaneLocked,
-      setIsShotsPaneLocked,
       shotsPaneWidth,
       setShotsPaneWidth,
-      isTasksPaneLocked,
-      setIsTasksPaneLocked,
       tasksPaneWidth,
       setTasksPaneWidth,
     ]

@@ -1,39 +1,39 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 
 interface UseSlidingPaneOptions {
-  onLockStateChange?: (isLocked: boolean) => void;
   side: 'left' | 'right' | 'bottom';
-  isInitiallyLocked?: boolean;
+  isLocked: boolean;
+  onToggleLock: () => void;
 }
 
-export const useSlidingPane = ({ onLockStateChange, side, isInitiallyLocked = false }: UseSlidingPaneOptions) => {
-  const [isOpen, setIsOpen] = useState(isInitiallyLocked);
-  const [isLocked, setIsLocked] = useState(isInitiallyLocked);
+export const useSlidingPane = ({ side, isLocked, onToggleLock }: UseSlidingPaneOptions) => {
+  const [isOpen, setIsOpen] = useState(isLocked);
   const leaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const setOpen = useCallback((open: boolean) => {
     if (isLocked && !open) {
-      // If locked, don't allow programmatic close via hover (unless unlocking)
+      // If locked, don't allow programmatic close via hover
       return;
     }
+    console.log(`[PaneLockDebug] [${side}] setOpen(${open}) called (isLocked: ${isLocked})`);
     setIsOpen(open);
+  }, [isLocked, side]);
+
+  // Sync open state with lock state
+  useEffect(() => {
+    if (isLocked) {
+      setIsOpen(true); // Locked panes are always open
+    } else {
+      setIsOpen(false); // Unlocked panes should close immediately
+    }
   }, [isLocked]);
-
-  useEffect(() => {
-    onLockStateChange?.(isLocked);
-  }, [isLocked, onLockStateChange]);
-
-  // Sync internal state when external default changes (e.g., after settings hydration)
-  useEffect(() => {
-    setIsLocked(isInitiallyLocked);
-    setIsOpen(isInitiallyLocked);
-  }, [isInitiallyLocked]);
 
   const openPane = () => {
     if (leaveTimeoutRef.current) {
         clearTimeout(leaveTimeoutRef.current);
         leaveTimeoutRef.current = null;
     }
+    console.log(`[PaneLockDebug] [${side}] openPane()`);
     setOpen(true);
   }
 
@@ -53,12 +53,16 @@ export const useSlidingPane = ({ onLockStateChange, side, isInitiallyLocked = fa
   };
 
   const toggleLock = (force?: boolean) => {
-    const newLockState = force !== undefined ? force : !isLocked;
-    setIsLocked(newLockState);
-    if (newLockState) {
-      setOpen(true); // Ensure pane is open when locked
+    if (force !== undefined) {
+      // Force to specific state - used by UI buttons
+      if (force !== isLocked) {
+        console.log(`[PaneLockDebug] [${side}] toggleLock -> ${force}`);
+        onToggleLock();
+      }
     } else {
-      setIsOpen(false); // Directly close pane when unlocked (bypass setOpen guard)
+      // Toggle current state
+      console.log(`[PaneLockDebug] [${side}] toggleLock -> ${!isLocked}`);
+      onToggleLock();
     }
   };
   
