@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Settings, Key, Copy, Trash2, AlertCircle, Terminal, Coins } from "lucide-react";
+import { Settings, Key, Copy, Trash2, AlertCircle, Terminal, Coins, Monitor } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -298,7 +298,10 @@ python headless.py --db-type supabase \\
           updateSettingsModalState({ activeTab: value });
         }} className="w-full">
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="generate-locally">Local Generation</TabsTrigger>
+            <TabsTrigger value="generate-locally">
+              <Monitor className="w-4 h-4 mr-2" />
+              Local Generation
+            </TabsTrigger>
             {/* <TabsTrigger value="api-keys">API Keys</TabsTrigger> */}
             <TabsTrigger value="credits-management">
               <Coins className="w-4 h-4 mr-2" />

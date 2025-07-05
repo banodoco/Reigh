@@ -907,11 +907,11 @@
 }
 
 .animate-spin-left-fade {
-  animation: spinLeftFade 0.3s ease-out forwards;
+  animation: spinLeftFade 0.6s ease-out forwards;
 }
 
 .animate-spin-right-fade {
-  animation: spinRightFade 0.3s ease-out forwards;
+  animation: spinRightFade 0.6s ease-out forwards;
 }
 
 /* Custom utility overrides for tool selector page */
