@@ -18,6 +18,8 @@ import { toast } from "sonner";
 import { useApiKeys } from "@/shared/hooks/useApiKeys";
 import { useApiTokens } from "@/shared/hooks/useApiTokens";
 import usePersistentState from "@/shared/hooks/usePersistentState";
+import { useUserUIState } from "@/shared/hooks/useUserUIState";
+import { useCredits } from "@/shared/hooks/useCredits";
 import { 
   Select,
   SelectContent,
@@ -52,6 +54,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     refreshToken,
     isRefreshing,
   } = useApiTokens();
+  const { balance, formatCurrency } = useCredits();
   
   const [falApiKey, setFalApiKey] = useState<string>("");
   const [openaiApiKey, setOpenaiApiKey] = useState<string>("");
@@ -60,14 +63,22 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const [isOpenAIKeyMasked, setIsOpenAIKeyMasked] = useState(false);
   const [isReplicateKeyMasked, setIsReplicateKeyMasked] = useState(false);
   
-  // Main tab state
-  const [activeMainTab, setActiveMainTab] = useState<string>(initialTab);
+  // Main tab state - persistent across sessions
+  const { value: settingsModalState, update: updateSettingsModalState, isLoading: isLoadingSettingsState } = useUserUIState('settingsModal', {
+    activeTab: 'generate-locally',
+  });
+
+  // Use persistent state for active tab, but allow initialTab to override when modal opens
+  const [activeMainTab, setActiveMainTab] = useState<string>(settingsModalState.activeTab);
 
   useEffect(() => {
     if (isOpen) {
-      setActiveMainTab(initialTab);
+      // If initialTab is provided and different from stored, use initialTab
+      // Otherwise use the stored value
+      const tabToUse = initialTab !== 'generate-locally' ? initialTab : settingsModalState.activeTab;
+      setActiveMainTab(tabToUse);
     }
-  }, [isOpen, initialTab]);
+  }, [isOpen, initialTab, settingsModalState.activeTab]);
   
   // Installation tab preference (persistent)
   const [activeInstallTab, setActiveInstallTab] = usePersistentState<string>("settings-install-tab", "need-install");
@@ -211,80 +222,92 @@ python headless.py --db-type supabase \\
   --supabase-access-token ${token}`;
   };
 
+  const handleCreditsClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setActiveMainTab('credits-management');
+    updateSettingsModalState({ activeTab: 'credits-management' });
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-2xl">App Settings</DialogTitle>
-          <DialogDescription>
-            Configure local generation and manage your API keys.
-          </DialogDescription>
+
         </DialogHeader>
         
-        <Tabs value={activeMainTab} onValueChange={setActiveMainTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+        {/* Generation Method Selection - Shown for all tabs */}
+        <div className="mb-4">
+          <div className="grid grid-cols-2 gap-6 items-start">
+            {/* Left column: options */}
+            <div className="space-y-4">
+              <h3 className="font-semibold">How would you like to generate?</h3>
+              
+              <div className="space-y-3">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="on-computer"
+                    checked={onComputerChecked}
+                    onCheckedChange={(checked) => setOnComputerChecked(checked === true)}
+                  />
+                  <label
+                    htmlFor="on-computer"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    On my computer {activeInstallTab !== "already-installed" && "(requires setup - below)"}
+                  </label>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="in-cloud"
+                    checked={inCloudChecked}
+                    onCheckedChange={(checked) => setInCloudChecked(checked === true)}
+                  />
+                  <label
+                    htmlFor="in-cloud"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    In the cloud{" "}
+                    <span className="text-gray-600">
+                      (you have {balance ? formatCurrency(balance.currentBalance) : '$0.00'}{" "}
+                      <a href="#" onClick={handleCreditsClick} className="text-blue-600 hover:text-blue-800">
+                        credits
+                      </a>)
+                    </span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            {/* Right column: GIF */}
+            <div className="flex justify-start items-start">
+              {!onComputerChecked && !inCloudChecked && (
+                <img
+                  src="https://wczysqzxlwdndgxitrvc.supabase.co/storage/v1/object/public/image_uploads/files/ds.gif"
+                  alt="Choose generation method"
+                  className="w-[120px] h-[120px] object-contain transform scale-x-[-1]"
+                />
+              )}
+            </div>
+          </div>
+        </div>
+        
+        <Tabs value={activeMainTab} onValueChange={(value) => {
+          setActiveMainTab(value);
+          updateSettingsModalState({ activeTab: value });
+        }} className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="generate-locally">Local Generation</TabsTrigger>
-            <TabsTrigger value="api-keys">API Keys</TabsTrigger>
+            {/* <TabsTrigger value="api-keys">API Keys</TabsTrigger> */}
             <TabsTrigger value="credits-management">
               <Coins className="w-4 h-4 mr-2" />
-              Credits Management
+              Credit Management
             </TabsTrigger>
           </TabsList>
 
                     <TabsContent value="generate-locally" className="space-y-4">
             <div className="space-y-4">
-              {/* Generation Method Selection */}
-              <div className="grid grid-cols-2 gap-6 items-start">
-                {/* Left column: options */}
-                <div className="space-y-4">
-                  <h3 className="font-semibold">How would you like to generate?</h3>
-                  
-                  <div className="space-y-3">
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="on-computer"
-                        checked={onComputerChecked}
-                        onCheckedChange={(checked) => setOnComputerChecked(checked === true)}
-                      />
-                      <label
-                        htmlFor="on-computer"
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                      >
-                        On my computer {activeInstallTab !== "already-installed" && "(requires setup - below)"}
-                      </label>
-                    </div>
-                    
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="in-cloud"
-                        checked={inCloudChecked}
-                        onCheckedChange={(checked) => setInCloudChecked(checked === true)}
-                      />
-                      <label
-                        htmlFor="in-cloud"
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                      >
-                        In the cloud{" "}
-                        <a href="#" className="text-blue-600 hover:text-blue-800">
-                          (requires credits - link)
-                        </a>
-                      </label>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Right column: GIF */}
-                <div className="flex justify-start items-start">
-                  {!onComputerChecked && !inCloudChecked && (
-                    <img
-                      src="https://wczysqzxlwdndgxitrvc.supabase.co/storage/v1/object/public/image_uploads/files/ds.gif"
-                      alt="Choose generation method"
-                      className="w-[120px] h-[120px] object-contain transform scale-x-[-1]"
-                    />
-                  )}
-                </div>
-              </div>
-
               {/* Local Generation Setup - Only show when "On my computer" is checked */}
               {onComputerChecked && (
                 <div className="space-y-4">
@@ -476,7 +499,7 @@ python headless.py --db-type supabase \\
             </div>
           </TabsContent>
 
-          <TabsContent value="api-keys" className="space-y-4">
+          {/* <TabsContent value="api-keys" className="space-y-4">
             <div className="space-y-4">
               <div>
                 <h3 className="text-xl font-semibold mb-2">Service API Keys</h3>
@@ -544,7 +567,7 @@ python headless.py --db-type supabase \\
                 </Button>
               </div>
             </div>
-          </TabsContent>
+          </TabsContent> */}
 
           <TabsContent value="credits-management">
             <CreditsManagement />

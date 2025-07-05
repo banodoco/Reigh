@@ -1,8 +1,8 @@
-// Credit cost estimation for different task types
-// This determines how many credits each operation costs
+// Cost estimation for different task types in cents (so $1.00 = 100 cents)
+// This determines how much each operation costs in dollars
 
 export interface TaskCostConfig {
-  baseCredits: number;
+  baseCents: number; // Base cost in cents
   costFactors?: {
     resolution?: Record<string, number>;
     frameCount?: number;
@@ -11,11 +11,11 @@ export interface TaskCostConfig {
   };
 }
 
-// Credit costs for different task types
-export const TASK_CREDIT_COSTS: Record<string, TaskCostConfig> = {
+// Costs for different task types (in cents)
+export const TASK_COSTS: Record<string, TaskCostConfig> = {
   // Single image generation
   single_image: {
-    baseCredits: 1,
+    baseCents: 10, // $0.10
     costFactors: {
       resolution: {
         '512x512': 1,
@@ -34,9 +34,9 @@ export const TASK_CREDIT_COSTS: Record<string, TaskCostConfig> = {
 
   // Video generation tasks
   travel_stitch: {
-    baseCredits: 5,
+    baseCents: 50, // $0.50
     costFactors: {
-      frameCount: 0.2, // 0.2 credits per frame
+      frameCount: 2, // 2 cents per frame
       resolution: {
         '512x512': 1,
         '768x768': 1.5,
@@ -47,15 +47,15 @@ export const TASK_CREDIT_COSTS: Record<string, TaskCostConfig> = {
 
   // Video travel orchestrator
   travel_orchestrator: {
-    baseCredits: 3,
+    baseCents: 30, // $0.30
     costFactors: {
-      frameCount: 0.1, // 0.1 credits per frame
+      frameCount: 1, // 1 cent per frame
     },
   },
 
   // Image upscaling
   image_upscale: {
-    baseCredits: 2,
+    baseCents: 20, // $0.20
     costFactors: {
       resolution: {
         '2x': 1,
@@ -67,7 +67,7 @@ export const TASK_CREDIT_COSTS: Record<string, TaskCostConfig> = {
 
   // Image editing
   image_edit: {
-    baseCredits: 2,
+    baseCents: 20, // $0.20
     costFactors: {
       resolution: {
         '512x512': 1,
@@ -80,7 +80,7 @@ export const TASK_CREDIT_COSTS: Record<string, TaskCostConfig> = {
 
   // Lora training
   lora_training: {
-    baseCredits: 50,
+    baseCents: 500, // $5.00
     costFactors: {
       modelType: {
         'flux-dev': 1,
@@ -91,17 +91,17 @@ export const TASK_CREDIT_COSTS: Record<string, TaskCostConfig> = {
 };
 
 /**
- * Estimate the credit cost for a task based on its type and parameters
+ * Estimate the cost for a task based on its type and parameters (in cents)
  */
 export function estimateTaskCost(taskType: string, params: Record<string, any>): number {
-  const costConfig = TASK_CREDIT_COSTS[taskType];
+  const costConfig = TASK_COSTS[taskType];
   
   if (!costConfig) {
     // Default cost for unknown task types
-    return 1;
+    return 10; // $0.10
   }
 
-  let totalCost = costConfig.baseCredits;
+  let totalCost = costConfig.baseCents;
 
   if (costConfig.costFactors) {
     const { resolution, frameCount, duration, modelType } = costConfig.costFactors;
@@ -129,7 +129,7 @@ export function estimateTaskCost(taskType: string, params: Record<string, any>):
     }
   }
 
-  // Round up to nearest whole credit
+  // Round up to nearest cent
   return Math.ceil(totalCost);
 }
 
@@ -156,34 +156,34 @@ export function getTaskTypeDisplayName(taskType: string): string {
 }
 
 /**
- * Check if a user has enough credits for a task
+ * Check if a user has enough budget for a task
  */
 export function canAffordTask(
-  userCredits: number,
+  userBudgetCents: number,
   taskType: string,
   params: Record<string, any>
 ): boolean {
   const cost = estimateTaskCost(taskType, params);
-  return userCredits >= cost;
+  return userBudgetCents >= cost;
 }
 
 /**
- * Get credit cost breakdown for display
+ * Get cost breakdown for display
  */
 export function getCostBreakdown(
   taskType: string,
   params: Record<string, any>
 ): { totalCost: number; breakdown: Array<{ item: string; cost: number }> } {
-  const costConfig = TASK_CREDIT_COSTS[taskType];
+  const costConfig = TASK_COSTS[taskType];
   
   if (!costConfig) {
-    return { totalCost: 1, breakdown: [{ item: 'Base cost', cost: 1 }] };
+    return { totalCost: 10, breakdown: [{ item: 'Base cost', cost: 10 }] };
   }
 
   const breakdown: Array<{ item: string; cost: number }> = [];
-  let totalCost = costConfig.baseCredits;
+  let totalCost = costConfig.baseCents;
 
-  breakdown.push({ item: 'Base cost', cost: costConfig.baseCredits });
+  breakdown.push({ item: 'Base cost', cost: costConfig.baseCents });
 
   if (costConfig.costFactors) {
     const { resolution, frameCount, duration, modelType } = costConfig.costFactors;
@@ -192,7 +192,7 @@ export function getCostBreakdown(
     if (resolution && params.resolution) {
       const resolutionMultiplier = resolution[params.resolution] || 1;
       if (resolutionMultiplier !== 1) {
-        const additionalCost = costConfig.baseCredits * (resolutionMultiplier - 1);
+        const additionalCost = costConfig.baseCents * (resolutionMultiplier - 1);
         breakdown.push({ item: `Resolution (${params.resolution})`, cost: additionalCost });
         totalCost *= resolutionMultiplier;
       }
@@ -200,15 +200,15 @@ export function getCostBreakdown(
 
     // Frame count-based cost
     if (frameCount && params.frame_count) {
-      const frameCost = frameCount * params.frame_count;
-      breakdown.push({ item: `${params.frame_count} frames`, cost: frameCost });
-      totalCost += frameCost;
+      const frameCountCost = frameCount * params.frame_count;
+      breakdown.push({ item: `Frame count (${params.frame_count})`, cost: frameCountCost });
+      totalCost += frameCountCost;
     }
 
     // Duration-based cost
     if (duration && params.duration) {
       const durationCost = duration * params.duration;
-      breakdown.push({ item: `${params.duration}s duration`, cost: durationCost });
+      breakdown.push({ item: `Duration (${params.duration}s)`, cost: durationCost });
       totalCost += durationCost;
     }
 
@@ -216,7 +216,7 @@ export function getCostBreakdown(
     if (modelType && params.model_type) {
       const modelMultiplier = modelType[params.model_type] || 1;
       if (modelMultiplier !== 1) {
-        const additionalCost = (totalCost - costConfig.baseCredits) * (modelMultiplier - 1);
+        const additionalCost = costConfig.baseCents * (modelMultiplier - 1);
         breakdown.push({ item: `Model (${params.model_type})`, cost: additionalCost });
         totalCost *= modelMultiplier;
       }
@@ -224,4 +224,14 @@ export function getCostBreakdown(
   }
 
   return { totalCost: Math.ceil(totalCost), breakdown };
+}
+
+/**
+ * Format cost in cents as currency string
+ */
+export function formatCostAsCurrency(cents: number): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+  }).format(cents / 100);
 } 

@@ -386,10 +386,10 @@ const ImageGenerationToolPage = () => {
         <h1 className="text-3xl font-bold">
           Image Generation
         </h1>
-        <Button variant="ghost" onClick={() => setShowSettingsModal(true)}>
+        {/* <Button variant="ghost" onClick={() => setShowSettingsModal(true)}>
           <Settings className="h-5 w-5" />
           <span className="sr-only">Settings</span>
-        </Button>
+        </Button> */}
       </header>
 
       {!hasValidFalApiKey && (

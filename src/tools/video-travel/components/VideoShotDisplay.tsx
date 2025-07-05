@@ -6,6 +6,7 @@ import { Button } from '@/shared/components/ui/button';
 import { Pencil, Trash2, Check, X, Copy } from 'lucide-react'; // Icons
 import { toast } from 'sonner';
 import { getDisplayUrl } from '@/shared/lib/utils';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/shared/components/ui/alert-dialog';
 
 interface VideoShotDisplayProps {
   shot: Shot;
@@ -16,6 +17,7 @@ interface VideoShotDisplayProps {
 const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot, currentProjectId }) => {
   const [isEditingName, setIsEditingName] = useState(false);
   const [editableName, setEditableName] = useState(shot.name);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   const updateShotNameMutation = useUpdateShotName();
   const deleteShotMutation = useDeleteShot();
@@ -73,25 +75,35 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
       toast.error('Cannot delete shot: Project ID is missing.');
       return;
     }
-    // Simple confirm, can be replaced with a nicer modal
-    if (window.confirm(`Are you sure you want to delete shot "${shot.name}"?`)) {
-      try {
-        await deleteShotMutation.mutateAsync(
-          { shotId: shot.id, projectId: currentProjectId }, // Pass projectId
-          {
-            onSuccess: () => {
-              toast.success(`Shot "${shot.name}" deleted.`);
-              // Optimistic update or query invalidation handles UI removal
-            },
-            onError: (error) => {
-              toast.error(`Failed to delete shot: ${error.message}`);
-            },
-          }
-        );
-      } catch (error) {
-        // This catch is likely redundant if mutation's onError is used, but good for safety
-        console.error("Error during deleteShotMutation call:", error);
-      }
+    // Open the delete confirmation dialog
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!currentProjectId) {
+      toast.error('Cannot delete shot: Project ID is missing.');
+      setIsDeleteDialogOpen(false);
+      return;
+    }
+    
+    try {
+      await deleteShotMutation.mutateAsync(
+        { shotId: shot.id, projectId: currentProjectId }, // Pass projectId
+        {
+          onSuccess: () => {
+            toast.success(`Shot "${shot.name}" deleted.`);
+            // Optimistic update or query invalidation handles UI removal
+          },
+          onError: (error) => {
+            toast.error(`Failed to delete shot: ${error.message}`);
+          },
+        }
+      );
+    } catch (error) {
+      // This catch is likely redundant if mutation's onError is used, but good for safety
+      console.error("Error during deleteShotMutation call:", error);
+    } finally {
+      setIsDeleteDialogOpen(false);
     }
   };
 
@@ -115,89 +127,113 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
   const imagesToShow: GenerationRow[] = imagesOnly.slice(0, 5);
 
   return (
-    <div 
-      key={shot.id} 
-      className="mb-6 p-4 border rounded-lg hover:shadow-lg transition-shadow duration-200 relative cursor-pointer"
-      onClick={() => onSelectShot(shot.id)}
-    >
-      <div className="flex justify-between items-start mb-3">
-        {isEditingName ? (
-          <div className="flex items-center gap-2 flex-grow" onClick={(e) => e.stopPropagation()}>
-            <Input 
-              value={editableName}
-              onChange={(e) => setEditableName(e.target.value)}
-              onBlur={handleSaveName} // Save on blur
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleSaveName();
-                if (e.key === 'Escape') {
-                  setEditableName(shot.name);
-                  setIsEditingName(false);
-                }
-              }}
-              className="text-xl font-medium h-9"
-              autoFocus
-            />
-            <Button variant="ghost" size="icon" onClick={handleSaveName} className="h-9 w-9">
-              <Check className="h-4 w-4" />
+    <>
+      <div 
+        key={shot.id} 
+        className="mb-6 p-4 border rounded-lg hover:shadow-lg transition-shadow duration-200 relative cursor-pointer"
+        onClick={() => onSelectShot(shot.id)}
+      >
+        <div className="flex justify-between items-start mb-3">
+          {isEditingName ? (
+            <div className="flex items-center gap-2 flex-grow" onClick={(e) => e.stopPropagation()}>
+              <Input 
+                value={editableName}
+                onChange={(e) => setEditableName(e.target.value)}
+                onBlur={handleSaveName} // Save on blur
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSaveName();
+                  if (e.key === 'Escape') {
+                    setEditableName(shot.name);
+                    setIsEditingName(false);
+                  }
+                }}
+                className="text-xl font-medium h-9"
+                autoFocus
+              />
+              <Button variant="ghost" size="icon" onClick={handleSaveName} className="h-9 w-9">
+                <Check className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="icon" onClick={handleNameEditToggle} className="h-9 w-9">
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          ) : (
+            <h3 
+              className="text-xl font-medium hover:text-primary flex-grow mr-2"
+            >
+              {shot.name}
+            </h3>
+          )}
+          <div className="flex items-center space-x-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+            {!isEditingName && (
+               <Button variant="ghost" size="icon" onClick={handleNameEditToggle} className="h-8 w-8">
+                  <Pencil className="h-4 w-4" />
+              </Button>
+            )}
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={handleDuplicateShot} 
+              className="h-8 w-8" 
+              disabled={duplicateShotMutation.isPending}
+              title="Duplicate shot"
+            >
+              <Copy className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon" onClick={handleNameEditToggle} className="h-9 w-9">
-              <X className="h-4 w-4" />
+            <Button variant="ghost" size="icon" onClick={handleDeleteShot} className="text-destructive hover:text-destructive-foreground hover:bg-destructive h-8 w-8">
+              <Trash2 className="h-4 w-4" />
             </Button>
           </div>
-        ) : (
-          <h3 
-            className="text-xl font-medium hover:text-primary flex-grow mr-2"
-          >
-            {shot.name}
-          </h3>
-        )}
-        <div className="flex items-center space-x-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-          {!isEditingName && (
-             <Button variant="ghost" size="icon" onClick={handleNameEditToggle} className="h-8 w-8">
-                <Pencil className="h-4 w-4" />
-            </Button>
+        </div>
+        
+        <div className="flex space-x-2 overflow-x-auto pb-2">
+          {imagesToShow.length > 0 ? (
+            imagesToShow.map((image, index) => (
+              <div 
+                key={image.shotImageEntryId || `img-${index}`} 
+                className="flex-shrink-0 w-32 h-32 rounded overflow-hidden border animate-in fade-in-up"
+                style={{ animationDelay: `${index * 0.1}s` }}
+              >
+                <img 
+                  src={getDisplayUrl(image.thumbUrl || image.imageUrl)} 
+                  alt={`Shot image ${index + 1} for ${shot.name}`}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            ))
+          ) : (
+            <p className="text-sm text-muted-foreground italic">No images in this shot yet.</p>
           )}
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={handleDuplicateShot} 
-            className="h-8 w-8" 
-            disabled={duplicateShotMutation.isPending}
-            title="Duplicate shot"
-          >
-            <Copy className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="icon" onClick={handleDeleteShot} className="text-destructive hover:text-destructive-foreground hover:bg-destructive h-8 w-8">
-            <Trash2 className="h-4 w-4" />
-          </Button>
+          {imagesOnly.length > 5 && (
+            <div className="flex-shrink-0 w-32 h-32 rounded border bg-muted flex items-center justify-center">
+              <p className="text-sm text-muted-foreground text-center">+{imagesOnly.length - 5} more</p>
+            </div>
+          )}
         </div>
       </div>
-      
-      <div className="flex space-x-2 overflow-x-auto pb-2">
-        {imagesToShow.length > 0 ? (
-          imagesToShow.map((image, index) => (
-            <div 
-              key={image.shotImageEntryId || `img-${index}`} 
-              className="flex-shrink-0 w-32 h-32 rounded overflow-hidden border animate-in fade-in-up"
-              style={{ animationDelay: `${index * 0.1}s` }}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Shot</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete shot "{shot.name}"? This will permanently remove the shot and all its associated data. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleConfirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteShotMutation.isPending}
             >
-              <img 
-                src={getDisplayUrl(image.thumbUrl || image.imageUrl)} 
-                alt={`Shot image ${index + 1} for ${shot.name}`}
-                className="w-full h-full object-cover"
-              />
-            </div>
-          ))
-        ) : (
-          <p className="text-sm text-muted-foreground italic">No images in this shot yet.</p>
-        )}
-        {imagesOnly.length > 5 && (
-          <div className="flex-shrink-0 w-32 h-32 rounded border bg-muted flex items-center justify-center">
-            <p className="text-sm text-muted-foreground text-center">+{imagesOnly.length - 5} more</p>
-          </div>
-        )}
-      </div>
-    </div>
+              {deleteShotMutation.isPending ? 'Deleting...' : 'Delete Shot'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 };
 

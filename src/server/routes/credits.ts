@@ -10,7 +10,7 @@ router.use(authenticate);
 
 // Validation schemas
 const checkoutSchema = z.object({
-  packageId: z.string().min(1),
+  amount: z.number().min(10).max(100), // $10 to $100
 });
 
 const grantSchema = z.object({
@@ -24,14 +24,7 @@ const ledgerQuerySchema = z.object({
   offset: z.coerce.number().min(0).default(0),
 });
 
-// Credit packages configuration
-const CREDIT_PACKAGES = {
-  'starter': { credits: 100, priceId: process.env.STRIPE_PRICE_ID_STARTER, amount: 999 }, // $9.99
-  'professional': { credits: 500, priceId: process.env.STRIPE_PRICE_ID_PROFESSIONAL, amount: 3999 }, // $39.99
-  'enterprise': { credits: 1500, priceId: process.env.STRIPE_PRICE_ID_ENTERPRISE, amount: 9999 }, // $99.99
-};
-
-// GET /api/credits/balance - Get user's credit balance
+// GET /api/credits/balance - Get user's budget balance
 router.get('/balance', async (req: Request, res: Response) => {
   try {
     const userId = req.userId;
@@ -47,8 +40,8 @@ router.get('/balance', async (req: Request, res: Response) => {
       .single();
 
     if (balanceError) {
-      console.error('Error fetching credit balance:', balanceError);
-      return res.status(500).json({ error: 'Failed to fetch credit balance' });
+      console.error('Error fetching budget balance:', balanceError);
+      return res.status(500).json({ error: 'Failed to fetch budget balance' });
     }
 
     res.json({
@@ -63,7 +56,7 @@ router.get('/balance', async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/credits/ledger - Get user's credit transaction history
+// GET /api/credits/ledger - Get user's budget transaction history
 router.get('/ledger', async (req: Request, res: Response) => {
   try {
     const userId = req.userId;
@@ -74,7 +67,7 @@ router.get('/ledger', async (req: Request, res: Response) => {
     // Validate query parameters
     const { limit, offset } = ledgerQuerySchema.parse(req.query);
 
-    // Get user's credit ledger with pagination
+    // Get user's budget ledger with pagination
     const { data: ledgerData, error: ledgerError, count } = await supabaseAdmin
       .from('credits_ledger')
       .select('*', { count: 'exact' })
@@ -83,8 +76,8 @@ router.get('/ledger', async (req: Request, res: Response) => {
       .range(offset, offset + limit - 1);
 
     if (ledgerError) {
-      console.error('Error fetching credit ledger:', ledgerError);
-      return res.status(500).json({ error: 'Failed to fetch credit ledger' });
+      console.error('Error fetching budget ledger:', ledgerError);
+      return res.status(500).json({ error: 'Failed to fetch budget ledger' });
     }
 
     res.json({
@@ -99,19 +92,21 @@ router.get('/ledger', async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/credits/checkout - Create Stripe checkout session
+// POST /api/credits/checkout - Create Stripe checkout session for dollar amount
 router.post('/checkout', async (req: Request, res: Response) => {
   try {
     const userId = req.userId;
-    
     if (!userId) {
       return res.status(401).json({ error: 'User not authenticated' });
     }
 
-    // For now, return a placeholder response since Stripe integration will be configured later
+    // Validate request body
+    const { amount } = checkoutSchema.parse(req.body);
+
+    // For now, return a placeholder response since Stripe integration needs to be set up
     res.json({
       error: 'Stripe integration not yet configured',
-      message: 'Please complete Stripe setup first',
+      message: `Would create checkout session for $${amount}`,
     });
   } catch (error) {
     console.error('Error in POST /api/credits/checkout:', error);
@@ -119,19 +114,7 @@ router.post('/checkout', async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/credits/packages - Get available credit packages
-router.get('/packages', (req: Request, res: Response) => {
-  const packages = Object.entries(CREDIT_PACKAGES).map(([id, config]) => ({
-    id,
-    credits: config.credits,
-    amount: config.amount,
-    pricePerCredit: Math.round(config.amount / config.credits),
-  }));
-
-  res.json({ packages });
-});
-
-// POST /api/credits/grant - Grant credits to user (admin only)
+// POST /api/credits/grant - Grant budget to user (admin only)
 router.post('/grant', async (req: Request, res: Response) => {
   try {
     const adminUserId = req.userId;
@@ -149,12 +132,12 @@ router.post('/grant', async (req: Request, res: Response) => {
     // Validate request body
     const { userId, amount, reason } = grantSchema.parse(req.body);
 
-    // Insert credit grant into ledger using service role
+    // Insert budget grant into ledger using service role
     const { data: ledgerEntry, error: ledgerError } = await supabaseAdmin
       .from('credits_ledger')
       .insert({
         user_id: userId,
-        amount,
+        amount: amount * 100, // Convert dollars to cents
         type: 'manual',
         metadata: {
           reason: reason || 'Admin grant',
@@ -165,8 +148,8 @@ router.post('/grant', async (req: Request, res: Response) => {
       .single();
 
     if (ledgerError) {
-      console.error('Error granting credits:', ledgerError);
-      return res.status(500).json({ error: 'Failed to grant credits' });
+      console.error('Error granting budget:', ledgerError);
+      return res.status(500).json({ error: 'Failed to grant budget' });
     }
 
     res.json({

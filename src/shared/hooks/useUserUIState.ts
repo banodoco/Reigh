@@ -7,6 +7,9 @@ interface UISettings {
     tasks: boolean;
     gens: boolean;
   };
+  settingsModal: {
+    activeTab: string;
+  };
 }
 
 export function useUserUIState<K extends keyof UISettings>(

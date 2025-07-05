@@ -45,13 +45,6 @@ async function verifyStripeSignature(payload: string, signature: string, secret:
   return signatures.some(sig => sig.split('=')[1] === signature_hex);
 }
 
-// Credit packages configuration (must match the backend)
-const CREDIT_PACKAGES = {
-  'starter': { credits: 100, amount: 999 },
-  'professional': { credits: 500, amount: 3999 },
-  'enterprise': { credits: 1500, amount: 9999 },
-};
-
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -103,53 +96,48 @@ serve(async (req) => {
         const session = event.data.object;
         
         // Extract metadata from the session
-        const { userId, packageId, credits } = session.metadata || {};
+        const { userId, amount } = session.metadata || {};
         
-        if (!userId || !packageId || !credits) {
+        if (!userId || !amount) {
           console.error('Missing required metadata in checkout session:', session.metadata);
           return jsonResponse({ error: 'Missing required metadata' }, 400);
         }
 
-        // Get package configuration to validate
-        const packageConfig = CREDIT_PACKAGES[packageId as keyof typeof CREDIT_PACKAGES];
-        if (!packageConfig) {
-          console.error('Invalid package ID:', packageId);
-          return jsonResponse({ error: 'Invalid package ID' }, 400);
+        // Validate amount matches what was paid
+        const dollarAmount = parseFloat(amount);
+        const expectedCents = dollarAmount * 100;
+        
+        if (session.amount_total !== expectedCents) {
+          console.error(`Amount mismatch: expected ${expectedCents} cents, got ${session.amount_total} cents`);
+          return jsonResponse({ error: 'Amount mismatch' }, 400);
         }
 
-        // Validate credits amount
-        const creditsAmount = parseInt(credits, 10);
-        if (creditsAmount !== packageConfig.credits) {
-          console.error(`Credits mismatch: expected ${packageConfig.credits}, got ${creditsAmount}`);
-          return jsonResponse({ error: 'Credits amount mismatch' }, 400);
-        }
-
-        // Insert credit purchase into ledger
+        // Insert budget purchase into ledger
         const { data: ledgerEntry, error: ledgerError } = await supabaseAdmin
           .from('credits_ledger')
           .insert({
             user_id: userId,
-            amount: creditsAmount,
+            amount: session.amount_total, // Amount in cents
             type: 'stripe',
             metadata: {
               stripe_session_id: session.id,
-              package_id: packageId,
               amount_paid: session.amount_total,
               currency: session.currency,
+              dollar_amount: dollarAmount,
             },
           })
           .select()
           .single();
 
         if (ledgerError) {
-          console.error('Error creating credit ledger entry:', ledgerError);
-          return jsonResponse({ error: 'Failed to create credit ledger entry' }, 500);
+          console.error('Error creating budget ledger entry:', ledgerError);
+          return jsonResponse({ error: 'Failed to create budget ledger entry' }, 500);
         }
 
-        console.log('Successfully processed credit purchase:', {
+        console.log('Successfully processed budget purchase:', {
           userId,
-          credits: creditsAmount,
-          packageId,
+          amountCents: session.amount_total,
+          dollarAmount,
           sessionId: session.id,
         });
 

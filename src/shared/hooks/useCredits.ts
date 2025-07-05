@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { fetchWithAuth } from '@/lib/api';
 
 interface CreditBalance {
   currentBalance: number;
@@ -26,17 +27,6 @@ interface CreditLedgerResponse {
   offset: number;
 }
 
-interface CreditPackage {
-  id: string;
-  credits: number;
-  amount: number;
-  pricePerCredit: number;
-}
-
-interface CreditPackagesResponse {
-  packages: CreditPackage[];
-}
-
 interface CheckoutResponse {
   checkoutUrl?: string;
   sessionId?: string;
@@ -55,35 +45,14 @@ export function useCredits() {
   } = useQuery<CreditBalance>({
     queryKey: ['credits', 'balance'],
     queryFn: async () => {
-      // Placeholder implementation - will be implemented with proper API
-      return {
-        currentBalance: 0,
-        totalPurchased: 0,
-        totalSpent: 0,
-        totalRefunded: 0,
-      };
+      const response = await fetchWithAuth('/api/credits/balance');
+      if (!response.ok) {
+        throw new Error('Failed to fetch balance');
+      }
+      return response.json();
     },
     staleTime: 1000 * 60 * 5, // 5 minutes
     gcTime: 1000 * 60 * 10, // 10 minutes
-  });
-
-  // Fetch credit packages
-  const {
-    data: packages,
-    isLoading: isLoadingPackages,
-  } = useQuery<CreditPackagesResponse>({
-    queryKey: ['credits', 'packages'],
-    queryFn: async () => {
-      // Placeholder implementation - will be implemented with proper API
-      return {
-        packages: [
-          { id: 'starter', credits: 100, amount: 999, pricePerCredit: 10 },
-          { id: 'professional', credits: 500, amount: 3999, pricePerCredit: 8 },
-          { id: 'enterprise', credits: 1500, amount: 9999, pricePerCredit: 7 },
-        ],
-      };
-    },
-    staleTime: 1000 * 60 * 60, // 1 hour
   });
 
   // Fetch credit ledger with pagination
@@ -91,26 +60,32 @@ export function useCredits() {
     return useQuery<CreditLedgerResponse>({
       queryKey: ['credits', 'ledger', limit, offset],
       queryFn: async () => {
-        // Placeholder implementation - will be implemented with proper API
-        return {
-          transactions: [],
-          total: 0,
-          limit,
-          offset,
-        };
+        const response = await fetchWithAuth(`/api/credits/ledger?limit=${limit}&offset=${offset}`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch ledger');
+        }
+        return response.json();
       },
       staleTime: 1000 * 60 * 2, // 2 minutes
     });
   };
 
   // Create checkout session
-  const createCheckoutMutation = useMutation<CheckoutResponse, Error, string>({
-    mutationFn: async (packageId: string) => {
-      // For now, return placeholder response since we need to set up fetch function
-      return {
-        error: 'API integration not yet configured',
-        message: 'Please complete API setup first',
-      };
+  const createCheckoutMutation = useMutation<CheckoutResponse, Error, number>({
+    mutationFn: async (dollarAmount: number) => {
+      const response = await fetchWithAuth('/api/credits/checkout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ amount: dollarAmount }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to create checkout session');
+      }
+      
+      return response.json();
     },
     onSuccess: (data) => {
       if (data.checkoutUrl) {
@@ -132,11 +107,19 @@ export function useCredits() {
     { userId: string; amount: number; reason?: string }
   >({
     mutationFn: async ({ userId, amount, reason }) => {
-      // For now, return placeholder response since we need to set up fetch function
-      return {
-        success: false,
-        transaction: {} as CreditTransaction,
-      };
+      const response = await fetchWithAuth('/api/credits/grant', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId, amount, reason }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to grant credits');
+      }
+      
+      return response.json();
     },
     onSuccess: () => {
       // Invalidate and refetch balance
@@ -154,9 +137,9 @@ export function useCredits() {
     queryClient.invalidateQueries({ queryKey: ['credits', 'balance'] });
   };
 
-  // Utility function to check if user has enough credits
-  const hasEnoughCredits = (requiredCredits: number) => {
-    return (balance?.currentBalance || 0) >= requiredCredits;
+  // Utility function to check if user has enough budget
+  const hasEnoughBudget = (requiredAmount: number) => {
+    return (balance?.currentBalance || 0) >= requiredAmount;
   };
 
   // Utility function to format currency
@@ -186,11 +169,9 @@ export function useCredits() {
   return {
     // Data
     balance,
-    packages: packages?.packages || [],
     
     // Loading states
     isLoadingBalance,
-    isLoadingPackages,
     isCreatingCheckout: createCheckoutMutation.isPending,
     isGrantingCredits: grantCreditsMutation.isPending,
     
@@ -202,7 +183,7 @@ export function useCredits() {
     createCheckout: createCheckoutMutation.mutate,
     grantCredits: grantCreditsMutation.mutate,
     refreshBalance,
-    hasEnoughCredits,
+    hasEnoughBudget,
     formatCurrency,
     formatTransactionType,
   };
