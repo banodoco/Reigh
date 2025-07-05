@@ -28,8 +28,7 @@ const Layout: React.FC = () => {
     isShotsPaneLocked, 
     shotsPaneWidth, 
     isGenerationsPaneLocked, 
-    generationsPaneHeight,
-    isLoading: panesLoading
+    generationsPaneHeight 
   } = usePanes();
 
   // Auth guard state
@@ -63,9 +62,9 @@ const Layout: React.FC = () => {
   }
 
   const mainContentStyle = {
-    marginRight: (!panesLoading && isTasksPaneLocked) ? `${tasksPaneWidth}px` : '0px',
-    marginLeft: (!panesLoading && isShotsPaneLocked) ? `${shotsPaneWidth}px` : '0px',
-    paddingBottom: (!panesLoading && isGenerationsPaneLocked) ? `${generationsPaneHeight}px` : '0px',
+    marginRight: isTasksPaneLocked ? `${tasksPaneWidth}px` : '0px',
+    marginLeft: isShotsPaneLocked ? `${shotsPaneWidth}px` : '0px',
+    paddingBottom: isGenerationsPaneLocked ? `${generationsPaneHeight}px` : '0px',
   };
 
   return (
@@ -75,8 +74,8 @@ const Layout: React.FC = () => {
       <div className="fixed inset-0 bg-gradient-to-br from-wes-cream via-white to-wes-mint/10 opacity-60 pointer-events-none"></div>
       
       <GlobalHeader 
-        contentOffsetRight={(!panesLoading && isTasksPaneLocked) ? tasksPaneWidth + 16 : 0} 
-        contentOffsetLeft={(!panesLoading && isShotsPaneLocked) ? shotsPaneWidth : 0}
+        contentOffsetRight={isTasksPaneLocked ? tasksPaneWidth + 16 : 0} 
+        contentOffsetLeft={isShotsPaneLocked ? shotsPaneWidth : 0}
       />
       
       <div

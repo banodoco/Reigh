@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
+import { Loading } from '@/shared/components/ui/loading';
 
 interface PanesContextType {
   isGenerationsPaneLocked: boolean;
@@ -16,8 +17,6 @@ interface PanesContextType {
   setIsTasksPaneLocked: (isLocked: boolean) => void;
   tasksPaneWidth: number;
   setTasksPaneWidth: (width: number) => void;
-
-  isLoading: boolean;
 }
 
 const PanesContext = createContext<PanesContextType | undefined>(undefined);
@@ -116,7 +115,6 @@ export const PanesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       setIsTasksPaneLocked,
       tasksPaneWidth,
       setTasksPaneWidth,
-      isLoading,
     }),
     [
       locks.gens,
@@ -131,11 +129,20 @@ export const PanesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       setShotsPaneWidth,
       tasksPaneWidth,
       setTasksPaneWidth,
-      isLoading,
     ]
   );
 
-  return <PanesContext.Provider value={value}>{children}</PanesContext.Provider>;
+  return (
+    <PanesContext.Provider value={value}>
+      {isLoading ? (
+        <div className="fixed inset-0 flex items-center justify-center z-50">
+          <Loading size="lg" />
+        </div>
+      ) : (
+        children
+      )}
+    </PanesContext.Provider>
+  );
 };
 
 export const usePanes = () => {

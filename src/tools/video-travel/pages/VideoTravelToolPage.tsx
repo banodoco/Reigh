@@ -247,6 +247,16 @@ const VideoTravelToolPage: React.FC = () => {
     }
   }, [currentShotId, shots, viaShotClick]); // Removed selectedShot from deps to avoid loops
 
+  // NEW: Immediately select shot on mount if we have the data
+  useEffect(() => {
+    if (viaShotClick && currentShotId && shots && !selectedShot) {
+      const shotToSelect = shots.find(shot => shot.id === currentShotId);
+      if (shotToSelect) {
+        setSelectedShot(shotToSelect);
+      }
+    }
+  }, [viaShotClick, currentShotId, shots, selectedShot]);
+
   const handleShotSelect = (shot: Shot) => {
     setSelectedShot(shot);
     setCurrentShotId(shot.id);
@@ -302,6 +312,17 @@ const VideoTravelToolPage: React.FC = () => {
       });
     }
   };
+
+  // Determine what to show based on navigation state and shot selection
+  const shouldShowShotEditor = selectedShot || (viaShotClick && currentShotId && shots?.some(s => s.id === currentShotId));
+  const shotToEdit = selectedShot || (viaShotClick && currentShotId ? shots?.find(s => s.id === currentShotId) : null);
+
+  // Ensure selectedShot is set when shotToEdit is available
+  useEffect(() => {
+    if (shotToEdit && (!selectedShot || selectedShot.id !== shotToEdit.id)) {
+      setSelectedShot(shotToEdit);
+    }
+  }, [shotToEdit, selectedShot]);
 
   const handleModalSubmitCreateShot = async (name: string, files: File[]) => {
     if (!selectedProjectId) {
@@ -500,31 +521,40 @@ const VideoTravelToolPage: React.FC = () => {
   }
 
   return (
-    <PageFadeIn className="container mx-auto p-4">
-      {!selectedShot ? (
+    <div className="container mx-auto p-4">
+      {!shouldShowShotEditor ? (
         <>
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-3xl font-bold">Video Travel Tool</h1>
             <Button onClick={() => setIsCreateShotModalOpen(true)}>Create New Shot</Button>
           </div>
-          <ShotListDisplay
-            shots={shots || []}
-            onSelectShot={handleShotSelect}
-            currentProjectId={selectedProjectId}
-          />
+          {isLoading ? (
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+              {Array.from({ length: 8 }).map((_, idx) => (
+                <Skeleton key={idx} className="h-40 rounded-lg" />
+              ))}
+            </div>
+          ) : (
+            <ShotListDisplay
+              shots={shots || []}
+              onSelectShot={handleShotSelect}
+              currentProjectId={selectedProjectId}
+            />
+          )}
         </>
       ) : (
         // Show a loading state while settings are being fetched
         isLoadingSettings ? (
-          <ShotEditor
-              selectedShot={selectedShot}
+          <PageFadeIn>
+            <ShotEditor
+              selectedShot={shotToEdit}
               projectId={selectedProjectId}
               videoPairConfigs={videoPairConfigs}
               videoControlMode={'batch'}
               batchVideoPrompt={''}
               batchVideoFrames={30}
               batchVideoContext={10}
-              orderedShotImages={selectedShot.images || []}
+              orderedShotImages={shotToEdit?.images || []}
               onShotImagesUpdate={handleShotImagesUpdate}
               onBack={handleBackToShotList}
               onVideoControlModeChange={() => {}}
@@ -576,16 +606,18 @@ const VideoTravelToolPage: React.FC = () => {
               hasNext={hasNext}
               onUpdateShotName={handleUpdateShotName}
             />
+          </PageFadeIn>
         ) : (
-          <ShotEditor
-              selectedShot={selectedShot}
+          <PageFadeIn>
+            <ShotEditor
+              selectedShot={shotToEdit}
               projectId={selectedProjectId}
               videoPairConfigs={videoPairConfigs}
               videoControlMode={videoControlMode}
               batchVideoPrompt={batchVideoPrompt}
               batchVideoFrames={batchVideoFrames}
               batchVideoContext={batchVideoContext}
-              orderedShotImages={selectedShot.images || []}
+              orderedShotImages={shotToEdit?.images || []}
               onShotImagesUpdate={handleShotImagesUpdate}
               onBack={handleBackToShotList}
               onVideoControlModeChange={(mode) => {
@@ -659,6 +691,7 @@ const VideoTravelToolPage: React.FC = () => {
               hasNext={hasNext}
               onUpdateShotName={handleUpdateShotName}
             />
+          </PageFadeIn>
         )
       )}
 
@@ -669,7 +702,7 @@ const VideoTravelToolPage: React.FC = () => {
         isLoading={createShotMutation.isPending || handleExternalImageDropMutation.isPending}
         defaultShotName={`Shot ${(shots?.length ?? 0) + 1}`}
       />
-    </PageFadeIn>
+    </div>
   );
 };
 
