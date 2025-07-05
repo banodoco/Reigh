@@ -17,6 +17,7 @@ import { useApiKeys } from '@/shared/hooks/useApiKeys';
 import { useQueryClient } from '@tanstack/react-query';
 import { fetchWithAuth } from '@/lib/api';
 import { useCreateTask, useListTasks } from "@/shared/hooks/useTasks";
+import { PageFadeIn } from '@/shared/components/transitions';
 
 // Remove unnecessary environment detection - tool should work in all environments
 
@@ -380,7 +381,7 @@ const ImageGenerationToolPage = () => {
     : [...(generatedImagesData || [])];
 
   return (
-    <div className="flex flex-col h-screen">
+    <PageFadeIn className="flex flex-col h-screen">
       <header className="flex justify-between items-center mb-6 sticky top-0 bg-background py-4 z-40 border-b border-border/50 shadow-sm">
         <h1 className="text-3xl font-bold">
           Image Generation
@@ -444,7 +445,7 @@ const ImageGenerationToolPage = () => {
         isOpen={showSettingsModal}
         onOpenChange={setShowSettingsModal}
       />
-    </div>
+    </PageFadeIn>
   );
 };
 

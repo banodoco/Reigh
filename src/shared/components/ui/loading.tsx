@@ -72,7 +72,7 @@ const Loading = React.forwardRef<HTMLDivElement, LoadingProps>(
             </div>
           </div>
           {text && (
-            <p className="font-inter text-sm text-muted-foreground tracking-widest uppercase animate-fade-in-up">
+            <p className="font-inter text-sm text-muted-foreground tracking-widest uppercase animate-fade-in">
               {text}
             </p>
           )}

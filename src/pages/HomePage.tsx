@@ -6,6 +6,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/shared/components/ui/dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
 import { toast } from '@/shared/components/ui/use-toast';
+import { PageFadeIn } from '@/shared/components/transitions';
 
 export default function HomePage() {
   const [isHovered, setIsHovered] = useState(false);
@@ -111,7 +112,7 @@ export default function HomePage() {
   ];
 
   return (
-    <div className="min-h-screen wes-texture relative overflow-hidden">
+    <PageFadeIn className="min-h-screen wes-texture relative overflow-hidden">
       {/* Background decorative elements */}
       <div className="absolute inset-0 bg-gradient-to-br from-wes-cream via-white to-wes-mint/20 opacity-60"></div>
       <div className="absolute inset-0 wes-chevron-pattern opacity-30"></div>
@@ -250,6 +251,6 @@ export default function HomePage() {
       </div>
 
 
-    </div>
+    </PageFadeIn>
   );
 } 

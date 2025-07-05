@@ -104,7 +104,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({ videoOutputs,
             {paginatedVideos.map((video, index) => (
               <div
                 key={video.id}
-                className="animate-in fade-in zoom-in-95 duration-500 ease-out"
+                className="animate-in fade-in duration-300 ease-out"
                 style={{ animationDelay: `${index * 150}ms` }}
               >
                 <VideoOutputItem

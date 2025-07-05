@@ -20,6 +20,7 @@ import ShotsPane from '@/shared/components/ShotsPane/ShotsPane';
 import EditTravelForm from "../components/EditTravelForm";
 import usePersistentState from "@/shared/hooks/usePersistentState";
 import { useApiKeys } from '@/shared/hooks/useApiKeys';
+import { PageFadeIn } from '@/shared/components/transitions';
 
 // Local definition for Json type
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
@@ -266,7 +267,7 @@ const EditTravelToolPage = () => {
     : [...(generatedImages || [])].reverse();
 
   return (
-    <div className="container mx-auto p-4 relative">
+    <PageFadeIn className="container mx-auto p-4 relative">
       <header className="flex justify-between items-center mb-6 sticky top-0 bg-background/90 backdrop-blur-md py-4 z-10">
         <h1 className="text-3xl font-bold">Edit Travel Tool</h1>
         <Button variant="ghost" size="icon" onClick={() => setIsSettingsModalOpen(true)} className="h-10 w-10" title="Settings">
@@ -356,7 +357,7 @@ const EditTravelToolPage = () => {
         isOpen={isSettingsModalOpen}
         onOpenChange={setIsSettingsModalOpen}
       />
-    </div>
+    </PageFadeIn>
   );
 };
 

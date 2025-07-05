@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { Video, Heart, Eye, Calendar } from 'lucide-react';
+import { PageFadeIn, FadeInSection } from '@/shared/components/transitions';
 
 export default function ArtPage() {
   // Scroll to top when component mounts
@@ -71,7 +72,7 @@ export default function ArtPage() {
   ];
 
   return (
-    <div className="min-h-screen wes-texture relative overflow-hidden">
+    <PageFadeIn className="min-h-screen wes-texture relative overflow-hidden">
       {/* Background decorative elements */}
       <div className="absolute inset-0 bg-gradient-to-br from-wes-cream via-white to-wes-mint/20 opacity-60"></div>
       <div className="absolute inset-0 wes-chevron-pattern opacity-30"></div>
@@ -83,7 +84,7 @@ export default function ArtPage() {
       
       <div className="container mx-auto px-4 py-16 relative z-10">
         {/* Header */}
-        <div className="text-center mb-16 animate-fade-in-up">
+        <FadeInSection className="text-center mb-16">
           <h1 className="font-playfair text-5xl md:text-7xl font-bold text-primary mb-8 text-shadow-vintage">
             Community Art Gallery
           </h1>
@@ -91,16 +92,16 @@ export default function ArtPage() {
           <p className="font-inter text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
             A curated collection of visual journeys created by our community of artists and dreamers
           </p>
-        </div>
+        </FadeInSection>
 
         {/* Art Grid */}
         <div className="max-w-6xl mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {artPieces.map((piece, index) => (
-              <div 
+              <FadeInSection 
                 key={piece.id} 
-                className="wes-vintage-card group animate-fade-in-up"
-                style={{ animationDelay: `${0.2 + index * 0.1}s` }}
+                delayMs={(0.2 + index * 0.1) * 1000}
+                className="wes-vintage-card group"
               >
                 {/* Video Placeholder */}
                 <div className={`aspect-video bg-gradient-to-br from-${piece.color}/20 to-${piece.color}/30 rounded-lg border-2 border-${piece.color}/20 flex items-center justify-center mb-4 overflow-hidden group-hover:border-${piece.color}/40 transition-all duration-300`}>
@@ -145,13 +146,13 @@ export default function ArtPage() {
 
                 {/* Hover overlay */}
                 <div className="absolute inset-0 bg-gradient-to-t from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-lg"></div>
-              </div>
+              </FadeInSection>
             ))}
           </div>
         </div>
 
         {/* Call to Action */}
-        <div className="text-center mt-16 animate-fade-in-up" style={{ animationDelay: '0.8s' }}>
+        <FadeInSection className="text-center mt-16" delayMs={800}>
           <div className="wes-ornate-frame p-8 max-w-2xl mx-auto">
             <h2 className="font-playfair text-2xl font-semibold text-primary mb-4">
               Share Your Journey
@@ -166,12 +167,12 @@ export default function ArtPage() {
               <span>Start Creating</span>
             </a>
           </div>
-        </div>
+        </FadeInSection>
       </div>
       
       {/* Vintage film strips */}
       <div className="absolute left-0 top-1/4 w-8 h-64 wes-filmstrip opacity-20"></div>
       <div className="absolute right-0 bottom-1/4 w-8 h-64 wes-filmstrip opacity-20"></div>
-    </div>
+    </PageFadeIn>
   );
 } 

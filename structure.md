@@ -367,3 +367,28 @@ To add a new tool to the system, follow these steps (most registration is now au
 **Migration considerations:**
 - Add database migrations in `/db/migrations/` if new tables/columns needed
 - Update `taskConfig.ts` if your tool creates background tasks
+
+## Motion Guidelines
+
+**Standard Transitions**: Use `<PageFadeIn>` for page/component entry. Keep duration 300 ms. Use `<FadeInSection>` for staggered lists (40 ms incremental delay). Do **not** introduce new zoom/slide/rotate animations without design review.
+
+**Components Available**:
+- `PageFadeIn`: Wraps entire page content with consistent 300ms fade-in
+- `FadeInSection`: For staggered animations with configurable delay
+
+**Usage Examples**:
+```tsx
+// Page-level fade
+return (
+  <PageFadeIn className="container mx-auto p-4">
+    {/* page content */}
+  </PageFadeIn>
+);
+
+// Staggered list items
+{items.map((item, index) => (
+  <FadeInSection key={item.id} delayMs={index * 100}>
+    <ItemComponent item={item} />
+  </FadeInSection>
+))}
+```

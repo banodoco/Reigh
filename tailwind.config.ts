@@ -243,6 +243,10 @@ export default {
 					'0%, 100%': { transform: 'rotate(-3deg)' },
 					'50%': { transform: 'rotate(3deg)' }
 				},
+				'fade-in': {
+					'0%': { opacity: '0' },
+					'100%': { opacity: '1' }
+				},
 				'fade-in-up': {
 					'0%': {
 						opacity: '0',
@@ -327,6 +331,7 @@ export default {
 				'rotate-slow': 'rotate-slow 20s linear infinite',
 				'bounce-gentle': 'bounce-gentle 3s infinite',
 				'sway': 'sway 4s ease-in-out infinite',
+				'fade-in': 'fade-in 0.3s ease-out both',
 				'fade-in-up': 'fade-in-up 0.6s ease-out',
 				'fade-in-down': 'fade-in-down 0.6s ease-out',
 				'slide-in-left': 'slide-in-left 0.5s ease-out',

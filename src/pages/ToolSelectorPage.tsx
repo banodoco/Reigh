@@ -3,6 +3,7 @@ import { AppEnv, type AppEnvValue } from '../types/env';
 import { Camera, Palette, Zap, Star, Crown, Gem, Paintbrush, Video, Edit, Sparkles, Film, Maximize2, Wand2, Layers, Eye } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toolsUIManifest, type ToolUIDefinition } from '../tools';
+import { PageFadeIn, FadeInSection } from '@/shared/components/transitions';
 
 // Define process tools (main workflow)
 const processTools = [
@@ -187,7 +188,7 @@ const ToolCard = ({ item, isSquare = false, index, isVisible }: { item: any, isS
         <div className="absolute inset-0 -m-4 z-0 pointer-events-none" />
         <button
           type="button"
-          className="block animate-fade-in-up wes-corners cursor-pointer relative z-10 w-full text-left"
+          className="block wes-corners cursor-pointer relative z-10 w-full text-left"
           onClick={handleComingSoonClick}
         >
           {content}
@@ -207,7 +208,7 @@ const ToolCard = ({ item, isSquare = false, index, isVisible }: { item: any, isS
     >
       {/* Stable hover area to prevent flicker */}
       <div className="absolute inset-0 -m-4 z-0 pointer-events-none" />
-      <div className="block animate-fade-in-up wes-corners relative z-10">
+      <div className="block wes-corners relative z-10">
         {content}
       </div>
     </div>
@@ -229,7 +230,7 @@ export default function ToolSelectorPage() {
   };
 
   return (
-    <div className="min-h-screen wes-texture relative overflow-hidden">
+    <PageFadeIn className="min-h-screen wes-texture relative overflow-hidden">
       {/* Enhanced background decorative elements */}
       <div className="absolute inset-0 bg-gradient-to-br from-wes-cream via-white to-wes-mint/20 opacity-60"></div>
       <div className="absolute inset-0 wes-chevron-pattern opacity-30"></div>
@@ -247,9 +248,9 @@ export default function ToolSelectorPage() {
           <div className="lg:w-2/3">
             <div className="flex flex-col gap-4 mt-4">
               {processTools.map((tool, index) => (
-                <div key={tool.id} style={{ animationDelay: `${index * 100}ms` }}>
+                <FadeInSection key={tool.id} delayMs={index * 100}>
                   <ToolCard item={tool} index={index} isVisible={isToolVisible(tool.tool)} />
-                </div>
+                </FadeInSection>
               ))}
             </div>
           </div>
@@ -258,9 +259,9 @@ export default function ToolSelectorPage() {
           <div className="lg:w-1/3">
             <div className="grid grid-cols-2 gap-4 mt-4">
               {assistantTools.map((tool, index) => (
-                <div key={tool.id} style={{ animationDelay: `${(index + 4) * 100}ms` }}>
+                <FadeInSection key={tool.id} delayMs={(index + 4) * 100}>
                   <ToolCard item={tool} isSquare isVisible={isToolVisible(tool.tool)} />
-                </div>
+                </FadeInSection>
               ))}
             </div>
           </div>
@@ -283,6 +284,6 @@ export default function ToolSelectorPage() {
           </div>
         </div>
       </div>
-    </div>
+    </PageFadeIn>
   );
 } 

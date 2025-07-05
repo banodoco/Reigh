@@ -15,6 +15,7 @@ import { VideoTravelSettings } from '../settings';
 import { deepEqual, sanitizeSettings } from '@/shared/lib/deepEqual';
 import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/shared/components/ui/skeleton';
+import { PageFadeIn } from '@/shared/components/transitions';
 // import { useLastAffectedShot } from '@/shared/hooks/useLastAffectedShot';
 
 // Placeholder data or logic to fetch actual data for VideoEditLayout
@@ -515,7 +516,7 @@ const VideoTravelToolPage: React.FC = () => {
       ) : (
         // Show a loading state while settings are being fetched
         isLoadingSettings ? (
-          <div className="animate-in fade-in duration-300">
+          <PageFadeIn>
             <ShotEditor
               selectedShot={selectedShot}
               projectId={selectedProjectId}
@@ -576,9 +577,9 @@ const VideoTravelToolPage: React.FC = () => {
               hasNext={hasNext}
               onUpdateShotName={handleUpdateShotName}
             />
-          </div>
+          </PageFadeIn>
         ) : (
-          <div className="animate-in fade-in duration-300">
+          <PageFadeIn>
             <ShotEditor
               selectedShot={selectedShot}
               projectId={selectedProjectId}
@@ -661,7 +662,7 @@ const VideoTravelToolPage: React.FC = () => {
               hasNext={hasNext}
               onUpdateShotName={handleUpdateShotName}
             />
-          </div>
+          </PageFadeIn>
         )
       )}
 
