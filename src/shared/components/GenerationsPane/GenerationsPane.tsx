@@ -123,7 +123,7 @@ const GenerationsPane: React.FC = () => {
       <div
         {...paneProps}
         style={{
-          height: `${generationsPaneHeight}px`,
+          height: isOpen || isLocked ? `${generationsPaneHeight}px` : '0px',
           left: isShotsPaneLocked ? `${shotsPaneWidth}px` : 0,
           right: isTasksPaneLocked ? `${tasksPaneWidth}px` : 0,
         }}

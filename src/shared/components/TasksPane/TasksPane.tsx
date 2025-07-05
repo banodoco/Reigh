@@ -83,7 +83,7 @@ const TasksPane: React.FC = () => {
           right: 0,
           top: 0,
           bottom: 0,
-          width: `${tasksPaneWidth}px`,
+          width: isOpen || isLocked ? `${tasksPaneWidth}px` : '0px',
           zIndex: 60, // On top of header (z-50)
         }}
       >

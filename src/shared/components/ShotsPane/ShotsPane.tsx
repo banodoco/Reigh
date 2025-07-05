@@ -106,7 +106,7 @@ const ShotsPane: React.FC = () => {
           left: 0,
           top: 0,
           bottom: 0,
-          width: `${shotsPaneWidth}px`,
+          width: isOpen || isLocked ? `${shotsPaneWidth}px` : '0px',
           zIndex: 60,
         }}
       >
