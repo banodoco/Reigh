@@ -135,7 +135,25 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps> = ({ loras, onAddLora,
     })) || [];
     const localLoras = localWanLoras.filter(l => l.lora_type === lora_type);
     
-    return [...communityLoras, ...savedLoras, ...localLoras];
+    // Create a map to deduplicate by Model ID, prioritizing saved LoRAs (which have _resourceId)
+    const loraMap = new Map<string, LoraModel>();
+    
+    // Add community LoRAs first
+    communityLoras.forEach(lora => {
+      loraMap.set(lora["Model ID"], lora);
+    });
+    
+    // Add local LoRAs (will overwrite community if same ID)
+    localLoras.forEach(lora => {
+      loraMap.set(lora["Model ID"], lora);
+    });
+    
+    // Add saved LoRAs last (will overwrite community/local if same ID, and these have _resourceId for deletion)
+    savedLoras.forEach(lora => {
+      loraMap.set(lora["Model ID"], lora);
+    });
+    
+    return Array.from(loraMap.values());
   }, [loras, myLorasResource.data, localWanLoras, lora_type]);
 
   const processedLoras = useMemo(() => {

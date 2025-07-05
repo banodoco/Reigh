@@ -16,6 +16,7 @@ import { deepEqual, sanitizeSettings } from '@/shared/lib/deepEqual';
 import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/shared/components/ui/skeleton';
 import { PageFadeIn } from '@/shared/components/transitions';
+import { useListPublicResources } from '@/shared/hooks/useResources';
 // import { useLastAffectedShot } from '@/shared/hooks/useLastAffectedShot';
 
 // Placeholder data or logic to fetch actual data for VideoEditLayout
@@ -44,8 +45,11 @@ const VideoTravelToolPage: React.FC = () => {
   const queryClient = useQueryClient();
   // const { lastAffectedShotId, setLastAffectedShotId } = useLastAffectedShot(); // Keep for later if needed
   const [isLoraModalOpen, setIsLoraModalOpen] = useState(false);
-  const [availableLoras, setAvailableLoras] = useState<LoraModel[]>([]);
   const [selectedLoras, setSelectedLoras] = useState<ActiveLora[]>([]);
+
+  // Fetch public LoRAs from all users
+  const { data: publicLorasData } = useListPublicResources('lora');
+  const availableLoras: LoraModel[] = publicLorasData?.map(resource => resource.metadata) || [];
 
   // Use tool settings for the selected shot - no need to pass userId, server knows it from auth
   const { settings, update: updateSettings, isLoading: isLoadingSettings, isUpdating } = useToolSettings<VideoTravelSettings>(

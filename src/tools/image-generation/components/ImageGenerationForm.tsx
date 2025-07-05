@@ -23,6 +23,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useProject } from "@/shared/contexts/ProjectContext";
 import { usePersistentToolState } from "@/shared/hooks/usePersistentToolState";
 import { ImageGenerationSettings } from "../settings";
+import { useListPublicResources } from '@/shared/hooks/useResources';
 
 type GenerationMode = 'wan-local'; // Only wan-local is supported now
 
@@ -268,7 +269,6 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
   const [imagesPerPrompt, setImagesPerPrompt] = useState(1);
   const [selectedLoras, setSelectedLoras] = useState<ActiveLora[]>([]);
   const [isLoraModalOpen, setIsLoraModalOpen] = useState(false);
-  const [availableLoras, setAvailableLoras] = useState<LoraModel[]>([]);
   const defaultsApplied = useRef(false);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [directFormActivePromptId, setDirectFormActivePromptId] = useState<string | null>(null);
@@ -279,6 +279,10 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
   const [afterEachPromptText, setAfterEachPromptText] = useState("");
 
   const { selectedProjectId } = useProject();
+
+  // Fetch public LoRAs from all users
+  const { data: publicLorasData } = useListPublicResources('lora');
+  const availableLoras: LoraModel[] = publicLorasData?.map(resource => resource.metadata) || [];
 
   const { ready, isSaving, markAsInteracted } = usePersistentToolState<PersistedFormSettings>(
     'image-generation',
@@ -329,11 +333,6 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
       if (settings.afterEachPromptText !== undefined) setAfterEachPromptText(settings.afterEachPromptText);
     }
   }));
-
-  useEffect(() => {
-    // LoRA support has been removed – ensure no network request is made on mount
-    setAvailableLoras([]);
-  }, []);
 
   useEffect(() => { 
     if (

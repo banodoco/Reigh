@@ -6,14 +6,43 @@ import { authenticate } from '../middleware/auth';
 
 const resourcesRouter = express.Router();
 
-// Apply authentication middleware to all routes
-resourcesRouter.use(authenticate);
-
-const asyncHandler = (fn: (req: Request, res: Response, next: NextFunction) => Promise<unknown>) => {
+function asyncHandler(fn: (req: Request, res: Response, next: NextFunction) => Promise<any>) {
   return (req: Request, res: Response, next: NextFunction) => {
-    fn(req, res, next).catch(next);
+    Promise.resolve(fn(req, res, next)).catch(next);
   };
-};
+}
+
+// GET /api/resources/public - No authentication required for public resources
+resourcesRouter.get('/public', asyncHandler(async (req: Request, res: Response) => {
+  const { type } = req.query;
+
+  if (!type || typeof type !== 'string') {
+    return res.status(400).json({ message: 'Resource type is required' });
+  }
+
+  try {
+    // Fetch all public resources of the specified type
+    const publicResources = await db.select()
+      .from(resourcesTable)
+      .where(eq(resourcesTable.type, type));
+    
+    // Filter to only include resources marked as public
+    const filteredResources = publicResources.filter(resource => 
+      resource.metadata && 
+      typeof resource.metadata === 'object' && 
+      'is_public' in resource.metadata && 
+      resource.metadata.is_public === true
+    );
+    
+    res.status(200).json(filteredResources);
+  } catch (error) {
+    console.error(`[API] Error fetching public resources of type ${type}:`, error);
+    res.status(500).json({ message: 'Failed to fetch public resources' });
+  }
+}));
+
+// Apply authentication middleware to all other routes
+resourcesRouter.use(authenticate);
 
 // GET /api/resources
 resourcesRouter.get('/', asyncHandler(async (req: Request, res: Response) => {
