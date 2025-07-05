@@ -247,22 +247,26 @@ export default function ToolSelectorPage() {
           {/* Process Column (2/3 width) */}
           <div className="lg:w-2/3">
             <div className="flex flex-col gap-4 mt-4">
-              {processTools.map((tool, index) => (
-                <FadeInSection key={tool.id} delayMs={index * 100}>
-                  <ToolCard item={tool} index={index} isVisible={isToolVisible(tool.tool)} />
-                </FadeInSection>
-              ))}
+              {processTools
+                .filter(tool => tool.comingSoon || !tool.tool || isToolVisible(tool.tool))
+                .map((tool, index) => (
+                  <FadeInSection key={tool.id} delayMs={index * 100}>
+                    <ToolCard item={tool} index={index} isVisible={isToolVisible(tool.tool)} />
+                  </FadeInSection>
+                ))}
             </div>
           </div>
 
           {/* Assistant Tools Column (1/3 width) */}
           <div className="lg:w-1/3">
             <div className="grid grid-cols-2 gap-4 mt-4">
-              {assistantTools.map((tool, index) => (
-                <FadeInSection key={tool.id} delayMs={(index + 4) * 100}>
-                  <ToolCard item={tool} isSquare isVisible={isToolVisible(tool.tool)} />
-                </FadeInSection>
-              ))}
+              {assistantTools
+                .filter(tool => tool.comingSoon || !tool.tool || isToolVisible(tool.tool))
+                .map((tool, index) => (
+                  <FadeInSection key={tool.id} delayMs={(index + 4) * 100}>
+                    <ToolCard item={tool} isSquare isVisible={isToolVisible(tool.tool)} />
+                  </FadeInSection>
+                ))}
             </div>
           </div>
         </div>

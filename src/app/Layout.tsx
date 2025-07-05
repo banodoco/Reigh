@@ -9,7 +9,6 @@ import { usePanes } from '@/shared/contexts/PanesContext';
 import { supabase } from '@/integrations/supabase/client';
 import type { Session } from '@supabase/supabase-js';
 import { Loading } from '@/shared/components/ui/loading';
-import { PaneLoadingGate } from '@/shared/components/PaneLoadingGate';
 
 // Scroll to top component
 function ScrollToTop() {
@@ -29,7 +28,8 @@ const Layout: React.FC = () => {
     isShotsPaneLocked, 
     shotsPaneWidth, 
     isGenerationsPaneLocked, 
-    generationsPaneHeight 
+    generationsPaneHeight,
+    isLoading: panesLoading
   } = usePanes();
 
   // Auth guard state
@@ -63,42 +63,40 @@ const Layout: React.FC = () => {
   }
 
   const mainContentStyle = {
-    marginRight: isTasksPaneLocked ? `${tasksPaneWidth}px` : '0px',
-    marginLeft: isShotsPaneLocked ? `${shotsPaneWidth}px` : '0px',
-    paddingBottom: isGenerationsPaneLocked ? `${generationsPaneHeight}px` : '0px',
+    marginRight: (!panesLoading && isTasksPaneLocked) ? `${tasksPaneWidth}px` : '0px',
+    marginLeft: (!panesLoading && isShotsPaneLocked) ? `${shotsPaneWidth}px` : '0px',
+    paddingBottom: (!panesLoading && isGenerationsPaneLocked) ? `${generationsPaneHeight}px` : '0px',
   };
 
   return (
-    <PaneLoadingGate>
-      <div className="flex flex-col min-h-screen wes-texture">
-        <ScrollToTop />
-        {/* Subtle background gradient */}
-        <div className="fixed inset-0 bg-gradient-to-br from-wes-cream via-white to-wes-mint/10 opacity-60 pointer-events-none"></div>
-        
-        <GlobalHeader 
-          contentOffsetRight={isTasksPaneLocked ? tasksPaneWidth + 16 : 0} 
-          contentOffsetLeft={isShotsPaneLocked ? shotsPaneWidth : 0}
-        />
-        
-        <div
-          className="flex-grow relative z-10 transition-all duration-300 ease-in-out"
-          style={mainContentStyle}
-        >
-          <main className="container mx-auto py-8 px-4 md:px-6 h-full overflow-y-auto">
-            <div className="min-h-full">
-              <Outlet /> 
-            </div>
-          </main>
-        </div>
-        
-        <TasksPane />
-        <ShotsPane />
-        <GenerationsPane />
-        
-        {/* Decorative footer line */}
-        <div className="h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent relative z-10"></div>
+    <div className="flex flex-col min-h-screen wes-texture">
+      <ScrollToTop />
+      {/* Subtle background gradient */}
+      <div className="fixed inset-0 bg-gradient-to-br from-wes-cream via-white to-wes-mint/10 opacity-60 pointer-events-none"></div>
+      
+      <GlobalHeader 
+        contentOffsetRight={(!panesLoading && isTasksPaneLocked) ? tasksPaneWidth + 16 : 0} 
+        contentOffsetLeft={(!panesLoading && isShotsPaneLocked) ? shotsPaneWidth : 0}
+      />
+      
+      <div
+        className="flex-grow relative z-10 transition-all duration-300 ease-in-out"
+        style={mainContentStyle}
+      >
+        <main className="container mx-auto py-8 px-4 md:px-6 h-full overflow-y-auto">
+          <div className="min-h-full">
+            <Outlet /> 
+          </div>
+        </main>
       </div>
-    </PaneLoadingGate>
+      
+      <TasksPane />
+      <ShotsPane />
+      <GenerationsPane />
+      
+      {/* Decorative footer line */}
+      <div className="h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent relative z-10"></div>
+    </div>
   );
 };
 

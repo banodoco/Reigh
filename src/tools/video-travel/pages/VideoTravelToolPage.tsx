@@ -517,148 +517,148 @@ const VideoTravelToolPage: React.FC = () => {
         // Show a loading state while settings are being fetched
         isLoadingSettings ? (
           <ShotEditor
-            selectedShot={selectedShot}
-            projectId={selectedProjectId}
-            videoPairConfigs={videoPairConfigs}
-            videoControlMode={'batch'}
-            batchVideoPrompt={''}
-            batchVideoFrames={30}
-            batchVideoContext={10}
-            orderedShotImages={selectedShot.images || []}
-            onShotImagesUpdate={handleShotImagesUpdate}
-            onBack={handleBackToShotList}
-            onVideoControlModeChange={() => {}}
-            onPairConfigChange={() => {}}
-            onBatchVideoPromptChange={() => {}}
-            onBatchVideoFramesChange={() => {}}
-            onBatchVideoContextChange={() => {}}
-            batchVideoSteps={4}
-            onBatchVideoStepsChange={() => {}}
-            dimensionSource={'firstImage'}
-            onDimensionSourceChange={() => {}}
-            customWidth={undefined}
-            onCustomWidthChange={() => {}}
-            customHeight={undefined}
-            onCustomHeightChange={() => {}}
-            steerableMotionSettings={{
-              negative_prompt: '',
-              model_name: 'vace_14B',
-              seed: 789,
-              debug: true,
-              apply_reward_lora: false,
-              colour_match_videos: true,
-              apply_causvid: true,
-              use_lighti2x_lora: false,
-              fade_in_duration: '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
-              fade_out_duration: '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
-              after_first_post_generation_saturation: 1,
-              after_first_post_generation_brightness: 0,
-              show_input_images: false,
-            }}
-            onSteerableMotionSettingsChange={() => {}}
-            onGenerateAllSegments={() => {}}
-            selectedLoras={[]}
-            onAddLora={() => {}}
-            onRemoveLora={() => {}}
-            onLoraStrengthChange={() => {}}
-            availableLoras={availableLoras}
-            isLoraModalOpen={false}
-            setIsLoraModalOpen={() => {}}
-            enhancePrompt={false}
-            onEnhancePromptChange={() => {}}
-            generationMode={'batch'}
-            onGenerationModeChange={() => {}}
-            pairConfigs={[]}
-            onPairConfigsChange={() => {}}
-            onPreviousShot={handlePreviousShot}
-            onNextShot={handleNextShot}
-            hasPrevious={hasPrevious}
-            hasNext={hasNext}
-            onUpdateShotName={handleUpdateShotName}
-          />
+              selectedShot={selectedShot}
+              projectId={selectedProjectId}
+              videoPairConfigs={videoPairConfigs}
+              videoControlMode={'batch'}
+              batchVideoPrompt={''}
+              batchVideoFrames={30}
+              batchVideoContext={10}
+              orderedShotImages={selectedShot.images || []}
+              onShotImagesUpdate={handleShotImagesUpdate}
+              onBack={handleBackToShotList}
+              onVideoControlModeChange={() => {}}
+              onPairConfigChange={() => {}}
+              onBatchVideoPromptChange={() => {}}
+              onBatchVideoFramesChange={() => {}}
+              onBatchVideoContextChange={() => {}}
+              batchVideoSteps={4}
+              onBatchVideoStepsChange={() => {}}
+              dimensionSource={'firstImage'}
+              onDimensionSourceChange={() => {}}
+              customWidth={undefined}
+              onCustomWidthChange={() => {}}
+              customHeight={undefined}
+              onCustomHeightChange={() => {}}
+              steerableMotionSettings={{
+                negative_prompt: '',
+                model_name: 'vace_14B',
+                seed: 789,
+                debug: true,
+                apply_reward_lora: false,
+                colour_match_videos: true,
+                apply_causvid: true,
+                use_lighti2x_lora: false,
+                fade_in_duration: '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
+                fade_out_duration: '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
+                after_first_post_generation_saturation: 1,
+                after_first_post_generation_brightness: 0,
+                show_input_images: false,
+              }}
+              onSteerableMotionSettingsChange={() => {}}
+              onGenerateAllSegments={() => {}}
+              selectedLoras={[]}
+              onAddLora={() => {}}
+              onRemoveLora={() => {}}
+              onLoraStrengthChange={() => {}}
+              availableLoras={availableLoras}
+              isLoraModalOpen={false}
+              setIsLoraModalOpen={() => {}}
+              enhancePrompt={false}
+              onEnhancePromptChange={() => {}}
+              generationMode={'batch'}
+              onGenerationModeChange={() => {}}
+              pairConfigs={[]}
+              onPairConfigsChange={() => {}}
+              onPreviousShot={handlePreviousShot}
+              onNextShot={handleNextShot}
+              hasPrevious={hasPrevious}
+              hasNext={hasNext}
+              onUpdateShotName={handleUpdateShotName}
+            />
         ) : (
           <ShotEditor
-            selectedShot={selectedShot}
-            projectId={selectedProjectId}
-            videoPairConfigs={videoPairConfigs}
-            videoControlMode={videoControlMode}
-            batchVideoPrompt={batchVideoPrompt}
-            batchVideoFrames={batchVideoFrames}
-            batchVideoContext={batchVideoContext}
-            orderedShotImages={selectedShot.images || []}
-            onShotImagesUpdate={handleShotImagesUpdate}
-            onBack={handleBackToShotList}
-            onVideoControlModeChange={(mode) => {
-              userHasInteracted.current = true;
-              setVideoControlMode(mode);
-            }}
-            onPairConfigChange={(pairId, field, value) => {
-              userHasInteracted.current = true;
-              setVideoPairConfigs(prev => prev.map(p => p.id === pairId ? { ...p, [field]: value } : p));
-            }}
-            onBatchVideoPromptChange={(prompt) => {
-              userHasInteracted.current = true;
-              setBatchVideoPrompt(prompt);
-            }}
-            onBatchVideoFramesChange={(frames) => {
-              userHasInteracted.current = true;
-              setBatchVideoFrames(frames);
-            }}
-            onBatchVideoContextChange={(context) => {
-              userHasInteracted.current = true;
-              setBatchVideoContext(context);
-            }}
-            batchVideoSteps={batchVideoSteps}
-            onBatchVideoStepsChange={(steps) => {
-              userHasInteracted.current = true;
-              setBatchVideoSteps(steps);
-            }}
-            dimensionSource={dimensionSource}
-            onDimensionSourceChange={(source) => {
-              userHasInteracted.current = true;
-              setDimensionSource(source);
-            }}
-            customWidth={customWidth}
-            onCustomWidthChange={(width) => {
-              userHasInteracted.current = true;
-              setCustomWidth(width);
-            }}
-            customHeight={customHeight}
-            onCustomHeightChange={(height) => {
-              userHasInteracted.current = true;
-              setCustomHeight(height);
-            }}
-            steerableMotionSettings={steerableMotionSettings}
-            onSteerableMotionSettingsChange={handleSteerableMotionSettingsChange}
-            onGenerateAllSegments={() => {}}
-            selectedLoras={selectedLoras}
-            onAddLora={handleAddLora}
-            onRemoveLora={handleRemoveLora}
-            onLoraStrengthChange={handleLoraStrengthChange}
-            availableLoras={availableLoras}
-            isLoraModalOpen={isLoraModalOpen}
-            setIsLoraModalOpen={setIsLoraModalOpen}
-            enhancePrompt={enhancePrompt}
-            onEnhancePromptChange={(enhance) => {
-              userHasInteracted.current = true;
-              setEnhancePrompt(enhance);
-            }}
-            generationMode={generationMode}
-            onGenerationModeChange={(mode) => {
-              userHasInteracted.current = true;
-              setGenerationMode(mode);
-            }}
-            pairConfigs={pairConfigs}
-            onPairConfigsChange={(configs) => {
-              userHasInteracted.current = true;
-              setPairConfigs(configs);
-            }}
-            onPreviousShot={handlePreviousShot}
-            onNextShot={handleNextShot}
-            hasPrevious={hasPrevious}
-            hasNext={hasNext}
-            onUpdateShotName={handleUpdateShotName}
-          />
+              selectedShot={selectedShot}
+              projectId={selectedProjectId}
+              videoPairConfigs={videoPairConfigs}
+              videoControlMode={videoControlMode}
+              batchVideoPrompt={batchVideoPrompt}
+              batchVideoFrames={batchVideoFrames}
+              batchVideoContext={batchVideoContext}
+              orderedShotImages={selectedShot.images || []}
+              onShotImagesUpdate={handleShotImagesUpdate}
+              onBack={handleBackToShotList}
+              onVideoControlModeChange={(mode) => {
+                userHasInteracted.current = true;
+                setVideoControlMode(mode);
+              }}
+              onPairConfigChange={(pairId, field, value) => {
+                userHasInteracted.current = true;
+                setVideoPairConfigs(prev => prev.map(p => p.id === pairId ? { ...p, [field]: value } : p));
+              }}
+              onBatchVideoPromptChange={(prompt) => {
+                userHasInteracted.current = true;
+                setBatchVideoPrompt(prompt);
+              }}
+              onBatchVideoFramesChange={(frames) => {
+                userHasInteracted.current = true;
+                setBatchVideoFrames(frames);
+              }}
+              onBatchVideoContextChange={(context) => {
+                userHasInteracted.current = true;
+                setBatchVideoContext(context);
+              }}
+              batchVideoSteps={batchVideoSteps}
+              onBatchVideoStepsChange={(steps) => {
+                userHasInteracted.current = true;
+                setBatchVideoSteps(steps);
+              }}
+              dimensionSource={dimensionSource}
+              onDimensionSourceChange={(source) => {
+                userHasInteracted.current = true;
+                setDimensionSource(source);
+              }}
+              customWidth={customWidth}
+              onCustomWidthChange={(width) => {
+                userHasInteracted.current = true;
+                setCustomWidth(width);
+              }}
+              customHeight={customHeight}
+              onCustomHeightChange={(height) => {
+                userHasInteracted.current = true;
+                setCustomHeight(height);
+              }}
+              steerableMotionSettings={steerableMotionSettings}
+              onSteerableMotionSettingsChange={handleSteerableMotionSettingsChange}
+              onGenerateAllSegments={() => {}}
+              selectedLoras={selectedLoras}
+              onAddLora={handleAddLora}
+              onRemoveLora={handleRemoveLora}
+              onLoraStrengthChange={handleLoraStrengthChange}
+              availableLoras={availableLoras}
+              isLoraModalOpen={isLoraModalOpen}
+              setIsLoraModalOpen={setIsLoraModalOpen}
+              enhancePrompt={enhancePrompt}
+              onEnhancePromptChange={(enhance) => {
+                userHasInteracted.current = true;
+                setEnhancePrompt(enhance);
+              }}
+              generationMode={generationMode}
+              onGenerationModeChange={(mode) => {
+                userHasInteracted.current = true;
+                setGenerationMode(mode);
+              }}
+              pairConfigs={pairConfigs}
+              onPairConfigsChange={(configs) => {
+                userHasInteracted.current = true;
+                setPairConfigs(configs);
+              }}
+              onPreviousShot={handlePreviousShot}
+              onNextShot={handleNextShot}
+              hasPrevious={hasPrevious}
+              hasNext={hasNext}
+              onUpdateShotName={handleUpdateShotName}
+            />
         )
       )}
 

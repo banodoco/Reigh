@@ -16,6 +16,8 @@ interface PanesContextType {
   setIsTasksPaneLocked: (isLocked: boolean) => void;
   tasksPaneWidth: number;
   setTasksPaneWidth: (width: number) => void;
+
+  isLoading: boolean;
 }
 
 const PanesContext = createContext<PanesContextType | undefined>(undefined);
@@ -114,6 +116,7 @@ export const PanesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       setIsTasksPaneLocked,
       tasksPaneWidth,
       setTasksPaneWidth,
+      isLoading,
     }),
     [
       locks.gens,
@@ -128,6 +131,7 @@ export const PanesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       setShotsPaneWidth,
       tasksPaneWidth,
       setTasksPaneWidth,
+      isLoading,
     ]
   );
 

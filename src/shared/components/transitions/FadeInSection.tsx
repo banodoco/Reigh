@@ -9,7 +9,7 @@ interface FadeInSectionProps {
 
 export const FadeInSection: React.FC<FadeInSectionProps> = ({ children, className, delayMs = 0 }) => (
   <div 
-    className={cn('opacity-0 animate-in fade-in duration-300 ease-out', className)}
+    className={cn('animate-in fade-in duration-300 ease-out', className)}
     style={{ animationDelay: `${delayMs}ms` }}
   >
     {children}
