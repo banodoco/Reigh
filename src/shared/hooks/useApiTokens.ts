@@ -110,12 +110,35 @@ export const useApiTokens = () => {
     },
   });
 
+  const refreshTokenMutation = useMutation({
+    mutationFn: async (tokenToRefresh: ApiToken) => {
+      await revokeApiToken(tokenToRefresh.id);
+      return generateApiToken({
+        label: tokenToRefresh.label || "Local Generator",
+        expiresInDays: 180,
+      });
+    },
+    onSuccess: (data) => {
+      setGeneratedToken(data.token);
+      queryClient.invalidateQueries({ queryKey: ['apiTokens'] });
+      toast.success('API Token refreshed');
+    },
+    onError: (error: Error) => {
+      console.error('Error refreshing token:', error);
+      toast.error(`Failed to refresh token: ${error.message}`);
+    },
+  });
+
   const generateToken = (label: string, expiresInDays: number = 90) => {
     generateMutation.mutate({ label, expiresInDays });
   };
 
   const revokeToken = (tokenId: string) => {
     revokeMutation.mutate(tokenId);
+  };
+
+  const refreshToken = (token: ApiToken) => {
+    refreshTokenMutation.mutate(token);
   };
 
   const clearGeneratedToken = () => {
@@ -128,9 +151,11 @@ export const useApiTokens = () => {
     error,
     generateToken,
     revokeToken,
+    refreshToken,
     isGenerating,
     generatedToken,
     clearGeneratedToken,
     isRevoking: revokeMutation.isPending,
+    isRefreshing: refreshTokenMutation.isPending,
   };
 }; 

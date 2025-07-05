@@ -3,7 +3,6 @@
 // deno-lint-ignore-file
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { create, getNumericDate } from "https://deno.land/x/djwt@v2.2/mod.ts";
 
 // Helper for standard JSON responses with CORS headers
 function jsonResponse(body: any, status = 200) {
@@ -16,6 +15,46 @@ function jsonResponse(body: any, status = 200) {
       "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
     },
   });
+}
+
+// Base64 URL encode function
+function base64UrlEncode(str: string): string {
+  return btoa(str)
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=/g, '');
+}
+
+// Create JWT manually using Web Crypto API
+async function createJWT(payload: any, secret: string): Promise<string> {
+  const header = {
+    alg: "HS256",
+    typ: "JWT"
+  };
+
+  const encodedHeader = base64UrlEncode(JSON.stringify(header));
+  const encodedPayload = base64UrlEncode(JSON.stringify(payload));
+  const unsignedToken = `${encodedHeader}.${encodedPayload}`;
+
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+
+  const signature = await crypto.subtle.sign(
+    'HMAC',
+    key,
+    new TextEncoder().encode(unsignedToken)
+  );
+
+  const encodedSignature = base64UrlEncode(
+    String.fromCharCode(...new Uint8Array(signature))
+  );
+
+  return `${unsignedToken}.${encodedSignature}`;
 }
 
 serve(async (req) => {
@@ -54,44 +93,42 @@ serve(async (req) => {
 
     const { label, expiresInDays = 90 } = await req.json();
 
-    // Debug: List all environment variables
-    console.log('Available environment variables:', Object.keys(Deno.env.toObject()));
-    
-    const jwtSecret = Deno.env.get('JWT_SECRET');
-    console.log('JWT_SECRET value:', jwtSecret ? 'SET' : 'NOT SET');
-    
-    if (!jwtSecret) {
-      throw new Error('JWT_SECRET is not set in Edge Function secrets.');
-    }
+    const now = Math.floor(Date.now() / 1000);
+    const exp = now + expiresInDays * 24 * 60 * 60;
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const sessionId = crypto.randomUUID();
 
-    const jti = crypto.randomUUID();
-    const now = new Date();
-    const expiryDate = new Date(now.getTime() + expiresInDays * 24 * 60 * 60 * 1000);
-    const exp = getNumericDate(expiryDate);
-
-    const key = await crypto.subtle.importKey(
-      "raw",
-      new TextEncoder().encode(jwtSecret),
-      { name: "HMAC", hash: "SHA-256" },
-      false,
-      ["sign"]
-    );
-
+    // Create JWT payload that exactly matches Supabase's format
     const payload = {
-      sub: user.id,
-      role: 'authenticated',
-      aud: 'authenticated',
-      jti: jti,
+      aud: "authenticated",
       exp: exp,
-      iss: 'supabase',
-      iat: getNumericDate(now),
+      iat: now,
+      iss: `${supabaseUrl}/auth/v1`,
+      sub: user.id,
       email: user.email,
+      phone: user.phone || "",
       app_metadata: user.app_metadata || {},
-      user_metadata: user.user_metadata || {}
+      user_metadata: user.user_metadata || {},
+      role: "authenticated",
+      aal: "aal1",
+      amr: [{ method: "password", timestamp: now }],
+      session_id: sessionId,
+      is_anonymous: false,
+      email_verified: user.email_confirmed_at ? true : false,
+      phone_verified: user.phone_confirmed_at ? true : false,
     };
 
-    const jwt = await create({ alg: "HS256", typ: "JWT" }, payload, key);
+    // Get JWT secret
+    const jwtSecret = Deno.env.get('JWT_SECRET');
+    if (!jwtSecret) {
+      throw new Error('JWT_SECRET env var not set in Edge Function secrets');
+    }
 
+    // Create JWT using manual implementation
+    const jwt = await createJWT(payload, jwtSecret.trim());
+
+    // Store token metadata
+    const jti = crypto.randomUUID();
     const encoder = new TextEncoder();
     const jtiHashBuffer = await crypto.subtle.digest(
       'SHA-256',
@@ -108,7 +145,7 @@ serve(async (req) => {
         jti_hash: jtiHash,
         token: jwt,
         label: label || 'API Token',
-        expires_at: expiryDate.toISOString()
+        expires_at: new Date(exp * 1000).toISOString()
       });
 
     if (insertError) {
@@ -118,7 +155,7 @@ serve(async (req) => {
 
     return jsonResponse({ 
       token: jwt,
-      expires_at: expiryDate.toISOString(),
+      expires_at: new Date(exp * 1000).toISOString(),
     });
 
   } catch (error) {

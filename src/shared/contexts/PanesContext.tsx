@@ -72,18 +72,30 @@ export const PanesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
+    // Wait until settings are loaded and we have a user before attempting to persist anything
     if (isLoadingSettings || !userId) return;
 
+    // Build the patch that reflects current local state
+    const patch: PaneLockSettings = {
+      isGenerationsPaneLocked,
+      isShotsPaneLocked,
+      isTasksPaneLocked,
+    };
+
+    // If nothing has actually changed compared with what we already fetched from the server, bail out early.
+    const hasChanges =
+      persistedSettings?.isGenerationsPaneLocked !== patch.isGenerationsPaneLocked ||
+      persistedSettings?.isShotsPaneLocked !== patch.isShotsPaneLocked ||
+      persistedSettings?.isTasksPaneLocked !== patch.isTasksPaneLocked;
+
+    if (!hasChanges) return;
+
+    // Debounce remote writes to avoid flooding the backend while the user is quickly toggling locks
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
 
     saveTimeoutRef.current = setTimeout(() => {
-      const patch: PaneLockSettings = {
-        isGenerationsPaneLocked,
-        isShotsPaneLocked,
-        isTasksPaneLocked,
-      };
       update('user', patch);
     }, 500);
 
@@ -92,7 +104,15 @@ export const PanesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [isGenerationsPaneLocked, isShotsPaneLocked, isTasksPaneLocked, isLoadingSettings, userId, update]);
+  }, [
+    isGenerationsPaneLocked,
+    isShotsPaneLocked,
+    isTasksPaneLocked,
+    isLoadingSettings,
+    userId,
+    update,
+    persistedSettings,
+  ]);
 
   // Memoize setters to prevent re-creation on every render
   const setIsGenerationsPaneLocked = useCallback((isLocked: boolean) => {

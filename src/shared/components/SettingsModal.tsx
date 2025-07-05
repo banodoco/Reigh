@@ -45,7 +45,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     isGenerating,
     generatedToken,
     clearGeneratedToken,
-    isRevoking
+    isRevoking,
+    refreshToken,
+    isRefreshing,
   } = useApiTokens();
   
   const [falApiKey, setFalApiKey] = useState<string>("");
@@ -219,18 +221,8 @@ python headless.py --db-type supabase \\
                     <TabsContent value="generate-locally" className="space-y-4">
             <div className="space-y-4">
               {/* Generation Method Selection */}
-              <div className="grid grid-cols-[120px,1fr] gap-6 items-start">
-                {/* Show GIF when neither option is selected */}
-                <div className="flex justify-start">
-                  {!onComputerChecked && !inCloudChecked && (
-                    <img 
-                      src="https://wczysqzxlwdndgxitrvc.supabase.co/storage/v1/object/public/image_uploads/files/ds.gif" 
-                      alt="Choose generation method" 
-                      className="w-[120px] h-[120px] object-contain transform scale-x-[-1]"
-                    />
-                  )}
-                </div>
-
+              <div className="grid grid-cols-2 gap-6 items-start">
+                {/* Left column: options */}
                 <div className="space-y-4">
                   <h3 className="font-semibold">How would you like to generate?</h3>
                   
@@ -267,8 +259,17 @@ python headless.py --db-type supabase \\
                     </div>
                   </div>
                 </div>
-                
-                {/* End GIF column */}
+
+                {/* Right column: GIF */}
+                <div className="flex justify-start items-start">
+                  {!onComputerChecked && !inCloudChecked && (
+                    <img
+                      src="https://wczysqzxlwdndgxitrvc.supabase.co/storage/v1/object/public/image_uploads/files/ds.gif"
+                      alt="Choose generation method"
+                      className="w-[120px] h-[120px] object-contain transform scale-x-[-1]"
+                    />
+                  )}
+                </div>
               </div>
 
               {/* Local Generation Setup - Only show when "On my computer" is checked */}
@@ -305,6 +306,36 @@ python headless.py --db-type supabase \\
                     </div>
                   ) : (
                     <div className="space-y-4">
+                      {/* Token Display and Management */}
+                      <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h4 className="font-semibold text-gray-800">Active API Token</h4>
+                            <p className="text-sm text-gray-600">
+                              Expires {formatDistanceToNow(new Date(getActiveToken()?.expires_at || 0), { addSuffix: true })}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => refreshToken(getActiveToken()!)}
+                              disabled={isRefreshing || isRevoking || !getActiveToken()}
+                            >
+                              {isRefreshing ? "Refreshing..." : "Refresh"}
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => revokeToken(getActiveToken()!.id)}
+                              disabled={isRevoking || isRefreshing || !getActiveToken()}
+                            >
+                              {isRevoking ? "Revoking..." : "Revoke"}
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+
                       {/* Installation section */}
                       <div className="space-y-4">
                         <h4 className="font-semibold">Run on your computer:</h4>

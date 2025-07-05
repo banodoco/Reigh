@@ -130,7 +130,7 @@ shotsRouter.put('/:shotId', asyncHandler(async (req: Request, res: Response) => 
 
   try {
     const updatedShotArray = await db.update(shotsTable)
-      .set({ name: newName.trim(), updatedAt: new Date().toISOString() }) // Also update updatedAt timestamp
+      .set({ name: newName.trim(), updatedAt: new Date() }) // Also update updatedAt timestamp
       .where(eq(shotsTable.id, shotId))
       .returning();
 
