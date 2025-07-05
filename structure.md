@@ -242,8 +242,6 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
   - Includes React Query caching (5 min stale time, 10 min cache time)
   - Single database query instead of 3 parallel queries
   - Prevents double-fetching on initial load
-- **usePrefetchToolSettings.ts**: Prefetches tool settings for all tools at project & shot scope on login so tool pages hydrate instantly.
-- **usePrefetchProjectData.ts**: Prefetches heavy project data (shots & generations) in the background to speed up first visits to Video-Travel & Image-Generation tools.
 - **useVideoScrubbing.ts**: Video scrubbing functionality
 - **useWebSocket.ts**: Supabase Realtime channel connection for real-time updates
 - **useAIInteractionService.ts**: AI interaction service for generating prompts and editing
