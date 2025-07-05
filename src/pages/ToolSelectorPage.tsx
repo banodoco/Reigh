@@ -120,10 +120,10 @@ const ToolCard = ({ item, isSquare = false, index, isVisible }: { item: any, isS
 
       {/* Horizontal layout for Process tools */}
       {!isSquare ? (
-        <div className="flex items-center h-full p-6 relative">
+        <div className="flex items-center h-full p-4 sm:p-6 relative">
           {/* Large subtle number in background */}
           {index !== undefined && (
-            <div className="absolute right-6 top-1/2 -translate-y-1/2 -translate-y-5">
+            <div className="absolute right-6 top-1/2 -translate-y-1/2 -translate-y-5 hidden sm:block">
               <span className="font-playfair text-[10.5rem] font-bold text-wes-vintage-gold/50 select-none block w-24 text-center">
                 {index + 1}
               </span>
@@ -131,15 +131,15 @@ const ToolCard = ({ item, isSquare = false, index, isVisible }: { item: any, isS
           )}
           
           {/* Icon */}
-          <div className="flex-shrink-0 mr-6 relative z-10">
-            <div className={`w-20 h-20 bg-gradient-to-br ${item.gradient} rounded-2xl flex items-center justify-center shadow-wes-deep ${!isComingSoon ? 'group-hover:shadow-wes-hover group-hover:scale-110' : ''} transition-all duration-700`}>
-              <item.icon className="w-10 h-10 text-white drop-shadow-lg" />
+          <div className="flex-shrink-0 mr-4 sm:mr-6 relative z-10">
+            <div className={`w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br ${item.gradient} rounded-2xl flex items-center justify-center shadow-wes-deep ${!isComingSoon ? 'group-hover:shadow-wes-hover group-hover:scale-110' : ''} transition-all duration-700`}>
+              <item.icon className="w-8 h-8 sm:w-10 sm:h-10 text-white drop-shadow-lg" />
             </div>
           </div>
           
           {/* Text content */}
           <div className="flex-1 relative z-10">
-            <h3 className={`font-playfair text-2xl font-bold text-primary mb-1 ${!isComingSoon ? 'group-hover:text-primary/80' : ''} transition-colors duration-300`}>
+            <h3 className={`font-playfair text-xl sm:text-2xl font-bold text-primary mb-1 ${!isComingSoon ? 'group-hover:text-primary/80' : ''} transition-colors duration-300`}>
               {item.name}
             </h3>
             <p className="font-inter text-sm text-muted-foreground leading-relaxed">

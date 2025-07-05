@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
 import { Loading } from '@/shared/components/ui/loading';
+import { useIsMobile } from '@/shared/hooks/use-mobile';
 
 interface PanesContextType {
   isGenerationsPaneLocked: boolean;
@@ -22,7 +23,9 @@ interface PanesContextType {
 const PanesContext = createContext<PanesContextType | undefined>(undefined);
 
 export const PanesProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // Load pane locks from user settings
+  const isMobile = useIsMobile();
+  
+  // Load pane locks from user settings (desktop only)
   const { value: paneLocks, update: savePaneLocks, isLoading } = useUserUIState('paneLocks', {
     shots: false,
     tasks: false,
@@ -37,13 +40,23 @@ export const PanesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [shotsPaneWidth, setShotsPaneWidthState] = useState(300);
   const [tasksPaneWidth, setTasksPaneWidthState] = useState(300);
 
-  // Hydrate local state once when settings load
+  // Hydrate local state once when settings load (desktop only)
   useEffect(() => {
+    if (isMobile) {
+      // On mobile, always start with unlocked state
+      setLocks({
+        shots: false,
+        tasks: false,
+        gens: false,
+      });
+      return;
+    }
+
     if (!isLoading) {
       console.log('[PanesContext] Hydrating pane locks from server:', paneLocks);
       setLocks(paneLocks);
     }
-  }, [isLoading, paneLocks]);
+  }, [isLoading, paneLocks, isMobile]);
 
   // Lock toggle functions
   const toggleLock = useCallback((pane: 'shots' | 'tasks' | 'gens') => {
@@ -53,40 +66,57 @@ export const PanesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       
       console.log(`[PanesContext] Toggling ${pane} lock to ${newValue}`);
       
-      // Save to database (debounced)
-      savePaneLocks({ [pane]: newValue });
+      // Save to database only on desktop
+      if (!isMobile) {
+        savePaneLocks({ [pane]: newValue });
+      }
       
       return newLocks;
     });
-  }, [savePaneLocks]);
+  }, [savePaneLocks, isMobile]);
 
   // Individual setters for backward compatibility
   const setIsGenerationsPaneLocked = useCallback((isLocked: boolean) => {
     setLocks(prev => {
       if (prev.gens === isLocked) return prev;
       const newLocks = { ...prev, gens: isLocked };
-      savePaneLocks({ gens: isLocked });
+      
+      // Save to database only on desktop
+      if (!isMobile) {
+        savePaneLocks({ gens: isLocked });
+      }
+      
       return newLocks;
     });
-  }, [savePaneLocks]);
+  }, [savePaneLocks, isMobile]);
 
   const setIsShotsPaneLocked = useCallback((isLocked: boolean) => {
     setLocks(prev => {
       if (prev.shots === isLocked) return prev;
       const newLocks = { ...prev, shots: isLocked };
-      savePaneLocks({ shots: isLocked });
+      
+      // Save to database only on desktop
+      if (!isMobile) {
+        savePaneLocks({ shots: isLocked });
+      }
+      
       return newLocks;
     });
-  }, [savePaneLocks]);
+  }, [savePaneLocks, isMobile]);
 
   const setIsTasksPaneLocked = useCallback((isLocked: boolean) => {
     setLocks(prev => {
       if (prev.tasks === isLocked) return prev;
       const newLocks = { ...prev, tasks: isLocked };
-      savePaneLocks({ tasks: isLocked });
+      
+      // Save to database only on desktop
+      if (!isMobile) {
+        savePaneLocks({ tasks: isLocked });
+      }
+      
       return newLocks;
     });
-  }, [savePaneLocks]);
+  }, [savePaneLocks, isMobile]);
 
   // Dimension setters
   const setGenerationsPaneHeight = useCallback((height: number) => {
@@ -103,20 +133,22 @@ export const PanesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const value = useMemo(
     () => ({
-      isGenerationsPaneLocked: locks.gens,
+      // On mobile, always return false for locks
+      isGenerationsPaneLocked: isMobile ? false : locks.gens,
       setIsGenerationsPaneLocked,
       generationsPaneHeight,
       setGenerationsPaneHeight,
-      isShotsPaneLocked: locks.shots,
+      isShotsPaneLocked: isMobile ? false : locks.shots,
       setIsShotsPaneLocked,
       shotsPaneWidth,
       setShotsPaneWidth,
-      isTasksPaneLocked: locks.tasks,
+      isTasksPaneLocked: isMobile ? false : locks.tasks,
       setIsTasksPaneLocked,
       tasksPaneWidth,
       setTasksPaneWidth,
     }),
     [
+      isMobile,
       locks.gens,
       locks.shots,
       locks.tasks,
@@ -134,7 +166,7 @@ export const PanesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   return (
     <PanesContext.Provider value={value}>
-      {isLoading ? (
+      {(isLoading && !isMobile) ? (
         <div className="fixed inset-0 flex items-center justify-center z-50">
           <Loading size="lg" />
         </div>

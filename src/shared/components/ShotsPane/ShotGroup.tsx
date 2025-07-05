@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 import { getDisplayUrl } from '@/shared/lib/utils';
 import { ChevronDown, ChevronUp } from 'lucide-react';
+import { useIsMobile } from '@/shared/hooks/use-mobile';
 
 interface ShotGroupProps {
   shot: Shot;
@@ -32,6 +33,7 @@ const ShotGroup: React.FC<ShotGroupProps> = ({ shot }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { setCurrentShotId } = useCurrentShot();
+  const isMobile = useIsMobile();
 
   const isGenerationVideo = (gen: GenerationRow): boolean => {
     return gen.type === 'video_travel_output' ||
@@ -189,6 +191,11 @@ const ShotGroup: React.FC<ShotGroupProps> = ({ shot }) => {
     }
     setCurrentShotId(shot.id);
     navigate('/tools/video-travel', { state: { fromShotClick: true } });
+
+    // On mobile, close any open pane after selecting a shot
+    if (isMobile) {
+      window.dispatchEvent(new CustomEvent('mobilePaneOpen', { detail: { side: null } }));
+    }
   };
 
   return (

@@ -241,7 +241,7 @@ const ImageGenerationToolPage = () => {
       await queryClient.refetchQueries({ queryKey: ['tasks', selectedProjectId] });
 
       setIsCreatingTasks(false);
-      toast.success(`${successfulCreations} tasks added`);
+      
       setPendingTasksInfo(null);
 
     } else {

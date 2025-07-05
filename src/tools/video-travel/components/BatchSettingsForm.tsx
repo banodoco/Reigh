@@ -291,7 +291,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                     }
                   }
                 }}
-                className="flex space-x-4"
+                className="flex flex-wrap gap-x-4 gap-y-2"
               >
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="firstImage" id="r_firstImage" />

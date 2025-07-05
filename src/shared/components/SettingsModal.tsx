@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Settings, Key, Copy, Trash2, AlertCircle, Terminal } from "lucide-react";
+import { Settings, Key, Copy, Trash2, AlertCircle, Terminal, Coins } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -26,15 +26,18 @@ import {
   SelectValue,
 } from "@/shared/components/ui/select";
 import { formatDistanceToNow } from "date-fns";
+import CreditsManagement from "./CreditsManagement";
 
 interface SettingsModalProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
+  initialTab?: string;
 }
 
 const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
   onOpenChange,
+  initialTab = "generate-locally",
 }) => {
   const { apiKeys, isLoading: isLoadingKeys, saveApiKeys, isUpdating } = useApiKeys();
   const { 
@@ -58,7 +61,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const [isReplicateKeyMasked, setIsReplicateKeyMasked] = useState(false);
   
   // Main tab state
-  const [activeMainTab, setActiveMainTab] = useState<string>("generate-locally");
+  const [activeMainTab, setActiveMainTab] = useState<string>(initialTab);
+
+  useEffect(() => {
+    if (isOpen) {
+      setActiveMainTab(initialTab);
+    }
+  }, [isOpen, initialTab]);
   
   // Installation tab preference (persistent)
   const [activeInstallTab, setActiveInstallTab] = usePersistentState<string>("settings-install-tab", "need-install");
@@ -213,9 +222,13 @@ python headless.py --db-type supabase \\
         </DialogHeader>
         
         <Tabs value={activeMainTab} onValueChange={setActiveMainTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="generate-locally">Local Generation</TabsTrigger>
             <TabsTrigger value="api-keys">API Keys</TabsTrigger>
+            <TabsTrigger value="credits-management">
+              <Coins className="w-4 h-4 mr-2" />
+              Credits Management
+            </TabsTrigger>
           </TabsList>
 
                     <TabsContent value="generate-locally" className="space-y-4">
@@ -531,6 +544,10 @@ python headless.py --db-type supabase \\
                 </Button>
               </div>
             </div>
+          </TabsContent>
+
+          <TabsContent value="credits-management">
+            <CreditsManagement />
           </TabsContent>
         </Tabs>
       </DialogContent>

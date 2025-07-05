@@ -14,6 +14,7 @@ import { useCreateShot, useHandleExternalImageDrop } from '@/shared/hooks/useSho
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 import PaneControlTab from '../PaneControlTab';
 import { Skeleton } from '@/shared/components/ui/skeleton';
+import { useIsMobile } from '@/shared/hooks/use-mobile';
 
 const ShotsPane: React.FC = () => {
   const { selectedProjectId } = useProject();
@@ -35,6 +36,7 @@ const ShotsPane: React.FC = () => {
   const handleExternalImageDropMutation = useHandleExternalImageDrop();
   const navigate = useNavigate();
   const { setCurrentShotId } = useCurrentShot();
+  const isMobile = useIsMobile();
 
   const {
     isGenerationsPaneLocked,
@@ -132,6 +134,10 @@ const ShotsPane: React.FC = () => {
                   toggleLock(false);
                   setCurrentShotId(null);
                   navigate('/tools/video-travel');
+
+                  if (isMobile) {
+                    window.dispatchEvent(new CustomEvent('mobilePaneOpen', { detail: { side: null } }));
+                  }
                 }}
               >
                 See All

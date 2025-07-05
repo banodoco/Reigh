@@ -20,6 +20,7 @@ import steerableMotionRouter from './routes/steerableMotion';
 import resourcesRouter from './routes/resources';
 import apiKeysRouter from './routes/apiKeys';
 import toolSettingsRouter from './routes/toolSettings';
+import creditsRouter from './routes/credits';
 import dotenv from 'dotenv';
 import multer from 'multer';
 import path from 'path';
@@ -55,6 +56,7 @@ app.use('/api/steerable-motion', steerableMotionRouter);
 app.use('/api/resources', resourcesRouter);
 app.use('/api/api-keys', apiKeysRouter);
 app.use('/api/tool-settings', toolSettingsRouter);
+app.use('/api/credits', creditsRouter);
 app.use('/api/single-image', singleImageRouter);
 
 const startServer = async () => {

@@ -2,6 +2,7 @@ import React from 'react';
 import { Button } from '@/shared/components/ui/button';
 import { LockIcon, UnlockIcon, ChevronLeft, ChevronRight, ChevronUp } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
+import { useIsMobile } from '@/shared/hooks/use-mobile';
 
 interface PaneControlTabProps {
   side: 'left' | 'right' | 'bottom';
@@ -16,6 +17,8 @@ interface PaneControlTabProps {
 }
 
 const PaneControlTab: React.FC<PaneControlTabProps> = ({ side, isLocked, isOpen, toggleLock, openPane, paneDimension, bottomOffset = 0, handlePaneEnter, handlePaneLeave }) => {
+  const isMobile = useIsMobile();
+  
   const getDynamicStyle = (): React.CSSProperties => {
     const style: React.CSSProperties = {};
     if (side === 'left' || side === 'right') {
@@ -35,6 +38,60 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({ side, isLocked, isOpen,
     return style;
   };
 
+  // Mobile: Only show button when pane is closed
+  if (isMobile) {
+    // Don't show control when pane is open on mobile
+    if (isOpen) return null;
+    
+    const getPositionClasses = () => {
+      switch (side) {
+        case 'left':
+          return 'left-0 flex-col';
+        case 'right':
+          return 'right-0 flex-col';
+        case 'bottom':
+          return 'left-1/2 -translate-x-1/2 bottom-0 flex-row';
+        default:
+          return '';
+      }
+    };
+
+    const getIcon = () => {
+      switch (side) {
+          case 'left': return <ChevronRight className="h-4 w-4" />;
+          case 'right': return <ChevronLeft className="h-4 w-4" />;
+          case 'bottom': return <ChevronUp className="h-4 w-4" />;
+          default: return null;
+      }
+    };
+
+    return (
+      <div
+        data-pane-control
+        style={getDynamicStyle()}
+        className={cn(
+          'fixed z-[102] flex items-center p-1 bg-zinc-800/80 backdrop-blur-sm border border-zinc-700 rounded-md gap-1 transition-opacity duration-200',
+          getPositionClasses(),
+          'opacity-100'
+        )}
+      >
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => openPane()}
+          className={cn(
+            'text-zinc-300 hover:text-white hover:bg-zinc-700',
+            side === 'bottom' ? 'h-8 w-16' : 'h-16 w-8'
+          )}
+          aria-label="Open pane"
+        >
+          {getIcon()}
+        </Button>
+      </div>
+    );
+  }
+
+  // Desktop behavior (original)
   // Show lock button at edge when pane is open but not locked
   if (isOpen && !isLocked) {
     let positionClass = '';
@@ -50,6 +107,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({ side, isLocked, isOpen,
 
     return (
       <div
+        data-pane-control
         style={getDynamicStyle()}
         className={cn(
           'fixed z-[101] flex items-center p-1 bg-zinc-800/90 backdrop-blur-sm border border-zinc-700 rounded-md transition-all duration-200',
@@ -85,6 +143,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({ side, isLocked, isOpen,
 
     return (
       <div
+        data-pane-control
         style={getDynamicStyle()}
         className={cn(
           'fixed z-[101] flex items-center p-1 bg-zinc-800/90 backdrop-blur-sm border border-zinc-700 rounded-md transition-all duration-200',
@@ -104,7 +163,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({ side, isLocked, isOpen,
     );
   }
 
-  // Pane is closed
+  // Pane is closed (desktop)
   const getPositionClasses = () => {
     switch (side) {
       case 'left':
@@ -129,6 +188,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({ side, isLocked, isOpen,
 
   return (
     <div
+      data-pane-control
       style={getDynamicStyle()}
       className={cn(
         'fixed z-[102] flex items-center p-1 bg-zinc-800/80 backdrop-blur-sm border border-zinc-700 rounded-md gap-1 transition-opacity duration-200',
@@ -140,7 +200,10 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({ side, isLocked, isOpen,
         variant="ghost"
         size="icon"
         onClick={() => openPane()}
-        className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
+        className={cn(
+          'text-zinc-300 hover:text-white hover:bg-zinc-700',
+          side === 'bottom' ? 'h-8 w-16' : 'h-16 w-8'
+        )}
         aria-label="Open pane"
       >
         {getIcon()}

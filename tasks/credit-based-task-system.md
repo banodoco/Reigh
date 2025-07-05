@@ -12,40 +12,14 @@ Key requirements:
 4. Protection against double-spending and race conditions.
 5. Transparent ledger for auditing / refunds.
 
-## 2  High-Level Flow
-```mermaid
-sequenceDiagram
-    autonumber
-    User->>+Stripe: Purchase credits
-    Stripe-->>-Webhook (Supabase Edge Fn): checkout.session.completed
-    Edge Fn->>DB (credits_ledger): +<amount>
-    Admin->>DB: INSERT credits_ledger (manual grant)
-
-    Worker Server->>DB: BEGIN;
-    Worker Server->>DB: SELECT balance FOR UPDATE;
-    alt balance ≥ cost
-        Worker Server->>DB: INSERT credits_ledger (-cost, task_id)
-        Worker Server->>DB: UPDATE tasks SET status='processing'
-        Worker Server->>DB: COMMIT;
-    else insufficient
-        Worker Server->>DB: ROLLBACK;
-    end
-```
-
-## 3  Data Model (Drizzle)
+## 2  Data Model (Drizzle)
 ```ts
-// accounts table (one per customer/org)
-accounts = pgTable('accounts', {
-  id: uuid().primaryKey(),
-  userId: uuid().notNull(),   // owner
-  // cached running total – keeps balance() calculation cheap
-  credits: integer().default(0).notNull(),
-  createdAt: timestamp().defaultNow(),
-});
+// users table already exists in the schema.  We add a cached `credits` column
+// (migration: `ALTER TABLE users ADD COLUMN credits integer NOT NULL DEFAULT 0`)
 
 creditsLedger = pgTable('credits_ledger', {
   id: uuid().primaryKey(),
-  accountId: uuid().references(() => accounts.id).notNull(),
+  userId: uuid().references(() => users.id).notNull(),
   taskId: uuid(),                 // nullable for top-ups
   amount: integer().notNull(),    // positive = top-up, negative = spend
   type: varchar().notNull(),      // 'stripe' | 'manual' | 'spend'
@@ -53,22 +27,22 @@ creditsLedger = pgTable('credits_ledger', {
   createdAt: timestamp().defaultNow(),
 });
 ```
-**Balance** = `sum(amount)` for an account.  We maintain a cached `accounts.credits` via triggers for quick checks.
+**Balance** = `sum(amount)` for a user.  We maintain a cached `users.credits` via triggers for quick checks.
 
 ### DB Trigger (Postgres / Supabase)
 ```sql
-CREATE FUNCTION refresh_account_balance() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION refresh_user_balance() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
-  UPDATE accounts SET credits = (
-    SELECT COALESCE(SUM(amount),0) FROM credits_ledger WHERE account_id = NEW.account_id
-  ) WHERE id = NEW.account_id;
+  UPDATE users SET credits = (
+    SELECT COALESCE(SUM(amount),0) FROM credits_ledger WHERE user_id = NEW.user_id
+  ) WHERE id = NEW.user_id;
   RETURN NEW;
 END;
 $$;
 
 CREATE TRIGGER credits_ledger_after_ins
 AFTER INSERT ON credits_ledger
-FOR EACH ROW EXECUTE FUNCTION refresh_account_balance();
+FOR EACH ROW EXECUTE FUNCTION refresh_user_balance();
 ```
 The same trigger can be reused for updates/deletes if ever needed.
 
@@ -90,15 +64,15 @@ The worker that dequeues tasks is **the single authority** for deduction.
 
 ```ts
 await db.transaction(async (tx) => {
-  const acct = await tx.query.accounts.findFirst({
-    where: eq(accounts.id, accountId),
+  const user = await tx.query.users.findFirst({
+    where: eq(users.id, userId),
     locking: { strength: 'update' }, // FOR UPDATE
   });
   const cost = estimateCost(task); // deterministic function
-  if ((acct?.credits ?? 0) < cost) throw new InsufficientCreditsError();
+  if ((user?.credits ?? 0) < cost) throw new InsufficientCreditsError();
 
   await tx.insert(creditsLedger).values({
-    accountId, taskId: task.id, amount: -cost, type: 'spend',
+    userId, taskId: task.id, amount: -cost, type: 'spend',
   });
   await tx.update(tasks).set({ status: 'processing' }).where(eq(tasks.id, task.id));
 });
@@ -115,7 +89,7 @@ The React app does **not** deduct credits directly.  It needs only:
 * `GET /api/credits/ledger?limit=100` → for history UI.
 * `POST /api/credits/checkout { packageId }` → returns Stripe Checkout URL.
 Admin-only:
-* `POST /api/credits/grant { accountId, amount, reason }`.
+* `POST /api/credits/grant { userId, amount, reason }`.
 
 ## 7  Security & RLS
 * All ledger operations use service-role key or run inside Edge Functions.
@@ -129,7 +103,7 @@ Admin-only:
 The mapping lives inside the worker repo so it evolves alongside algorithms.
 
 ## 9  Implementation Plan
-1. **DB Migration** – create `accounts`, `credits_ledger`, trigger.
+1. **DB Migration** – add `credits` column to `users`, create `credits_ledger`, trigger.
 2. **Stripe Products** – define credit SKUs; store Stripe `price_id` ↔ credit amount mapping.
 3. **Edge Function** – Stripe webhook inserts ledger row.
 4. **Worker Update** – wrap dequeue logic in transactional deduction.
@@ -138,7 +112,7 @@ The mapping lives inside the worker repo so it evolves alongside algorithms.
    * Show remaining credits in header.
    * Checkout dialog.
    * Ledger history table.
-7. **Monitoring** – add Prometheus metric `credits_balance{account}` and alert on low credits.
+7. **Monitoring** – add Prometheus metric `credits_balance{user}` and alert on low credits.
 
 ## 10  Open Questions
 * Multi-tenant accounts vs per-user balances?

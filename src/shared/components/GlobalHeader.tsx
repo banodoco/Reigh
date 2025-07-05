@@ -39,6 +39,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
   const [isCreateProjectModalOpen, setIsCreateProjectModalOpen] = useState(false);
   const [isProjectSettingsModalOpen, setIsProjectSettingsModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [settingsInitialTab, setSettingsInitialTab] = useState('generate-locally');
 
   const handleProjectChange = (projectId: string) => {
     setSelectedProjectId(projectId);
@@ -64,14 +65,15 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
         <div className="absolute top-2 right-4 text-wes-coral text-xs animate-sway" style={{ animationDelay: '1s' }}>◆</div>
         
         <div 
-          className="container flex h-24 max-w-screen-2xl items-center justify-between transition-all duration-300 ease-in-out relative z-10"
+          className="container flex items-center justify-between transition-all duration-300 ease-in-out relative z-10 h-24"
           style={{
             paddingRight: contentOffsetRight ? `${contentOffsetRight}px` : undefined,
             paddingLeft: contentOffsetLeft ? `${contentOffsetLeft}px` : undefined,
           }}
         >
-          <div className="flex items-center space-x-8">
-            {/* Enhanced Left side - Brand */}
+          {/* Left side - Brand + Project Selector */}
+          <div className="flex items-center space-x-6">
+            {/* Brand */}
             <Link to={session ? "/tools" : "/"} className="group flex items-center space-x-4 wes-nav-item relative">
               <div className="relative">
                 <div className="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-wes-pink via-wes-lavender to-wes-dusty-blue rounded-2xl border-3 border-wes-vintage-gold/40 shadow-wes-vintage group-hover:shadow-wes-hover transition-all duration-500 wes-badge">
@@ -84,7 +86,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
               </div>
               
               <div className="wes-symmetry relative">
-                <span className="font-playfair text-3xl font-bold tracking-wide text-primary text-shadow-vintage group-hover:animate-vintage-glow transition-all duration-300">
+                <span className="hidden sm:inline font-playfair text-3xl font-bold tracking-wide text-primary text-shadow-vintage group-hover:animate-vintage-glow transition-all duration-300">
                   Reigh
                 </span>
                 <div className="absolute -top-1 -right-2">
@@ -94,7 +96,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
             </Link>
 
             {/* Project Management */}
-            <div className="wes-symmetry flex items-center space-x-6 relative">
+            <div className="wes-symmetry flex items-center space-x-4 relative">
               {/* Decorative frame around project selector */}
               <div className="absolute -inset-4 border border-wes-vintage-gold/20 rounded-2xl wes-corners opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
               
@@ -192,29 +194,32 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
             </div>
           </div>
 
-          {/* Right side - Overall Settings */}
+          {/* Right side - App Settings */}
           <div className="flex items-center">
-             <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsSettingsModalOpen(true)}
-                className="h-14 w-14 wes-button no-sweep bg-gradient-to-br from-wes-dusty-blue to-wes-lavender border-3 border-wes-vintage-gold/40 hover:from-wes-dusty-blue-dark hover:to-wes-lavender-dark shadow-wes-vintage hover:shadow-wes-hover wes-viewfinder group relative overflow-hidden"
-                title="Overall Settings"
-              >
-                {/* Animated background pattern */}
-                <div className="absolute inset-0 bg-film-grain opacity-20 animate-film-grain"></div>
-                
-                {/* Main settings icon */}
-                <Settings className="h-6 w-6 text-white relative z-10 transition-transform group-hover:animate-spin" />
-                
-                {/* Decorative corner elements */}
-                <div className="absolute -top-1 -right-1">
-                  <Crown className="w-3 h-3 text-wes-vintage-gold animate-bounce-gentle opacity-80" />
-                </div>
-                <div className="absolute -bottom-1 -left-1">
-                  <Star className="w-2 h-2 text-wes-coral animate-rotate-slow opacity-60" />
-                </div>
-              </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => {
+                setSettingsInitialTab('generate-locally');
+                setIsSettingsModalOpen(true);
+              }}
+              className="h-14 w-14 wes-button no-sweep bg-gradient-to-br from-wes-dusty-blue to-wes-lavender border-3 border-wes-vintage-gold/40 hover:from-wes-dusty-blue-dark hover:to-wes-lavender-dark shadow-wes-vintage hover:shadow-wes-hover wes-viewfinder group relative overflow-hidden"
+              title="App Settings"
+            >
+              {/* Animated background pattern */}
+              <div className="absolute inset-0 bg-film-grain opacity-20 animate-film-grain"></div>
+              
+              {/* Main settings icon */}
+              <Settings className="h-6 w-6 text-white relative z-10 transition-transform group-hover:animate-spin" />
+              
+              {/* Decorative corner elements */}
+              <div className="absolute -top-1 -right-1">
+                <Crown className="w-3 h-3 text-wes-vintage-gold animate-bounce-gentle opacity-80" />
+              </div>
+              <div className="absolute -bottom-1 -left-1">
+                <Star className="w-2 h-2 text-wes-coral animate-rotate-slow opacity-60" />
+              </div>
+            </Button>
           </div>
         </div>
         
@@ -246,6 +251,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
        <SettingsModal
         isOpen={isSettingsModalOpen}
         onOpenChange={setIsSettingsModalOpen}
+        initialTab={settingsInitialTab}
       />
     </>
   );

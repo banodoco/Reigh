@@ -990,10 +990,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   return (
     <div className="flex flex-col h-full space-y-4">
       {/* Header */}
-      <div className="flex-shrink-0 flex justify-between items-center">
+      <div className="flex-shrink-0 flex flex-wrap justify-between items-center gap-y-2">
         <Button onClick={onBack}>&larr; Back to Shot List</Button>
         <div className="flex items-center space-x-2 min-w-0 flex-1 justify-center px-4">
-          <span className="text-2xl font-bold">Editing Shot:</span>
+          <span className="hidden sm:inline text-2xl font-bold">Editing Shot:</span>
           {isEditingName ? (
             <div className="flex items-center space-x-2">
               <Input
@@ -1021,7 +1021,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             </span>
           )}
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
           {(hasPrevious || hasNext) && (
             <>
               <Button 

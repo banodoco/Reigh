@@ -34,6 +34,12 @@ if (typeof window !== 'undefined') {
     
     const pool = new Pool({
       connectionString,
+      // Connection pool configuration for Supabase
+      max: 5, // Maximum number of connections in the pool
+      min: 1, // Minimum number of connections in the pool
+      idleTimeoutMillis: 30000, // Close idle connections after 30 seconds
+      connectionTimeoutMillis: 10000, // Timeout for new connections
+      allowExitOnIdle: true, // Allow the process to exit when all connections are idle
     });
 
     // Handle unexpected errors on idle clients so they don't crash the process

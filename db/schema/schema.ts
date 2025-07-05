@@ -5,6 +5,7 @@ import { relations, sql } from 'drizzle-orm';
 
 // --- ENUMS ---
 export const taskStatusEnum = pgEnum('task_status', ['Queued', 'In Progress', 'Complete', 'Failed', 'Cancelled']);
+export const creditLedgerTypeEnum = pgEnum('credit_ledger_type', ['stripe', 'manual', 'spend', 'refund']);
 
 // --- Canonical Schema for PostgreSQL ---
 
@@ -14,7 +15,23 @@ export const users = pgTable('users', {
   email: text('email'),
   apiKeys: jsonb('api_keys'), // Store API keys as JSONB
   settings: jsonb('settings'), // Store tool settings as JSONB
+  credits: integer('credits').default(0).notNull(), // Cached credit balance
 });
+
+export const creditsLedger = pgTable('credits_ledger', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  taskId: uuid('task_id'), // nullable for top-ups
+  amount: integer('amount').notNull(), // positive = top-up, negative = spend
+  type: creditLedgerTypeEnum('type').notNull(),
+  metadata: jsonb('metadata'), // Store additional data (stripe session, reason, etc.)
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  // Indexes for better query performance
+  userIdIdx: index('idx_credits_ledger_user_id').on(table.userId),
+  typeIdx: index('idx_credits_ledger_type').on(table.type),
+  createdAtIdx: index('idx_credits_ledger_created_at').on(table.createdAt),
+}));
 
 export const projects = pgTable('projects', {
   id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
@@ -89,6 +106,7 @@ export const resources = pgTable('resources', {
 export const usersRelations = relations(users, ({ many }) => ({
   projects: many(projects),
   resources: many(resources),
+  creditsLedger: many(creditsLedger),
 }));
 
 export const projectsRelations = relations(projects, ({ one, many }) => ({
@@ -139,6 +157,17 @@ export const resourcesRelations = relations(resources, ({ one }) => ({
   user: one(users, {
     fields: [resources.userId],
     references: [users.id],
+  }),
+}));
+
+export const creditsLedgerRelations = relations(creditsLedger, ({ one }) => ({
+  user: one(users, {
+    fields: [creditsLedger.userId],
+    references: [users.id],
+  }),
+  task: one(tasks, {
+    fields: [creditsLedger.taskId],
+    references: [tasks.id],
   }),
 }));
 
