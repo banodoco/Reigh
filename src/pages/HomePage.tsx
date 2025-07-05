@@ -134,11 +134,15 @@ export default function HomePage() {
           onClick={() => {
             setIsPhilosophyButtonAnimating(true);
             setShowCreativePartner(false);
-            setTimeout(() => setShowPhilosophy(true), 150);
+            setTimeout(() => {
+              setShowPhilosophy(true);
+              // Reset animation state after pane is fully open
+              setTimeout(() => setIsPhilosophyButtonAnimating(false), 300);
+            }, 150);
           }}
           className={`group flex items-center space-x-2 px-4 py-2 bg-white/80 backdrop-blur-sm rounded-full border-2 border-wes-vintage-gold/20 hover:border-wes-vintage-gold/40 transition-all duration-300 hover:shadow-wes-ornate ${
             isPhilosophyButtonAnimating ? 'animate-spin-left-fade' : ''
-          } ${showPhilosophy || isPhilosophyPaneClosing ? 'opacity-0 pointer-events-none z-10' : 'opacity-100 pointer-events-auto z-20'}`}
+          } ${showPhilosophy || isPhilosophyPaneClosing || isPhilosophyButtonAnimating ? 'opacity-0 pointer-events-none z-10' : 'opacity-100 pointer-events-auto z-20'}`}
         >
           <FileText className="w-4 h-4 text-wes-vintage-gold" />
           <span className="font-inter text-sm font-medium text-primary group-hover:text-primary/80">Philosophy</span>
@@ -151,11 +155,15 @@ export default function HomePage() {
           onClick={() => {
             setIsCreativePartnerButtonAnimating(true);
             setShowPhilosophy(false);
-            setTimeout(() => setShowCreativePartner(true), 150);
+            setTimeout(() => {
+              setShowCreativePartner(true);
+              // Reset animation state after pane is fully open
+              setTimeout(() => setIsCreativePartnerButtonAnimating(false), 300);
+            }, 150);
           }}
           className={`group flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-wes-coral/90 to-wes-pink/90 backdrop-blur-sm rounded-full border-2 border-wes-coral/30 hover:border-wes-coral/50 transition-all duration-300 hover:shadow-wes-ornate text-white hover:from-wes-coral hover:to-wes-pink ${
             isCreativePartnerButtonAnimating ? 'animate-spin-right-fade' : ''
-          } ${showCreativePartner || isCreativePartnerPaneClosing ? 'opacity-0 pointer-events-none z-10' : 'opacity-100 pointer-events-auto z-20'}`}
+          } ${showCreativePartner || isCreativePartnerPaneClosing || isCreativePartnerButtonAnimating ? 'opacity-0 pointer-events-none z-10' : 'opacity-100 pointer-events-auto z-20'}`}
         >
           <Users className="w-4 h-4 group-hover:scale-110 transition-transform" />
           <span className="font-inter text-sm font-medium">Open Creative Partner Programme</span>
