@@ -224,7 +224,7 @@ export default function HomePage() {
                       >
                         open tool
                       </a>
-                      , built on{' '}
+                      . Because it's built on{' '}
                       <a 
                         href="https://github.com/Wan-Video/Wan2.1" 
                         target="_blank" 
@@ -233,7 +233,7 @@ export default function HomePage() {
                       >
                         open models
                       </a>
-                      , that you can run{' '}
+                      , you can run it{' '}
                       <button 
                         onClick={() => {
                           setIsCreativePartnerButtonAnimating(true);
@@ -247,7 +247,7 @@ export default function HomePage() {
                       >
                         for free
                       </button>
-                      {' '}on your computer or on the cloud for convenience. In addition to a tool, we're also creating{' '}
+                      {' '}on your computer. You can also run it on the cloud for convenience. In addition to a tool, we're also creating{' '}
                       <button 
                         onClick={() => {
                           setIsPhilosophyButtonAnimating(true);
@@ -311,12 +311,12 @@ export default function HomePage() {
                 setShowCreativePartner(false);
                 setIsCreativePartnerButtonAnimating(false);
               }}
-              className="absolute top-4 right-4 p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors duration-200"
+              className="absolute top-2 right-2 sm:top-4 sm:right-4 p-2 sm:p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors duration-200 z-10"
             >
-              <X className="w-4 h-4 text-gray-600" />
+              <X className="w-5 h-5 sm:w-4 sm:h-4 text-gray-600" />
             </button>
             
-            <div className="mb-6">
+            <div className="mb-6 pr-12 sm:pr-0">
               <h2 className="font-playfair text-2xl sm:text-3xl font-bold text-primary mb-4">Creative Partner Programme</h2>
               <div className="w-16 h-1 bg-gradient-to-r from-wes-coral to-wes-pink rounded-full mb-6"></div>
             </div>
@@ -370,12 +370,12 @@ export default function HomePage() {
                 setShowPhilosophy(false);
                 setIsPhilosophyButtonAnimating(false);
               }}
-              className="absolute top-4 right-4 p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors duration-200"
+              className="absolute top-2 right-2 sm:top-4 sm:right-4 p-2 sm:p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors duration-200 z-10"
             >
-              <X className="w-4 h-4 text-gray-600" />
+              <X className="w-5 h-5 sm:w-4 sm:h-4 text-gray-600" />
             </button>
             
-            <div className="mb-6">
+            <div className="mb-6 pr-12 sm:pr-0">
               <h2 className="font-playfair text-2xl sm:text-3xl font-bold text-primary mb-4">Our Philosophy</h2>
               <div className="w-16 h-1 bg-gradient-to-r from-wes-vintage-gold to-wes-mint rounded-full mb-6"></div>
             </div>
