@@ -1,6 +1,7 @@
 import React, { createContext, useState, useContext, ReactNode, useEffect, useRef, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { usePrefetchProjectData } from '@/shared/hooks/usePrefetchProjectData';
 import { Project } from '@/types/project'; // Added import
 import { ProjectUpdate } from '../../../db/schema/schema';
 import { UserPreferences } from '@/shared/settings/userPreferences';
@@ -66,6 +67,9 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
   // Prefetch all tool settings for the currently selected project so that
   // tool pages hydrate instantly without an extra round-trip.
   usePrefetchToolSettings(selectedProjectId);
+
+  // NEW: Prefetch shots & generations to speed up first visits to heavy tools
+  usePrefetchProjectData(selectedProjectId);
 
   // Set up auth state tracking
   useEffect(() => {
