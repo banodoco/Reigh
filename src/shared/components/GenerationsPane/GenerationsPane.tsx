@@ -12,6 +12,7 @@ import { useListShots, useAddImageToShot } from '@/shared/hooks/useShots';
 import { toast } from 'sonner';
 import { usePanes } from '@/shared/contexts/PanesContext';
 import PaneControlTab from '../PaneControlTab';
+import { Skeleton } from '@/shared/components/ui/skeleton';
 
 const DEFAULT_PANE_HEIGHT = 350;
 const GENERATIONS_PER_PAGE = 24;
@@ -162,7 +163,13 @@ const GenerationsPane: React.FC = () => {
             </div>
         </div>
         <div className="flex-grow p-3 overflow-y-auto">
-            {isLoading && <p className="text-white text-center">Loading generations...</p>}
+            {isLoading && (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                    {Array.from({ length: 12 }).map((_, idx) => (
+                        <Skeleton key={idx} className="w-full aspect-square rounded-lg bg-zinc-700/60" />
+                    ))}
+                </div>
+            )}
             {error && <p className="text-red-500 text-center">Error: {error.message}</p>}
             {paginatedData.items.length > 0 && (
                 <ImageGallery

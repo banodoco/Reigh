@@ -507,7 +507,7 @@ const VideoTravelToolPage: React.FC = () => {
         <Skeleton className="h-9 w-40" />
 
         {/* List skeleton – resembles shot tiles */}
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 8 }).map((_, idx) => (
             <Skeleton key={idx} className="h-40 rounded-lg" />
           ))}
@@ -529,7 +529,7 @@ const VideoTravelToolPage: React.FC = () => {
             <Button onClick={() => setIsCreateShotModalOpen(true)}>Create New Shot</Button>
           </div>
           {isLoading ? (
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
               {Array.from({ length: 8 }).map((_, idx) => (
                 <Skeleton key={idx} className="h-40 rounded-lg" />
               ))}

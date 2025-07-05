@@ -16,6 +16,7 @@ import {
 import { ScrollArea } from "@/shared/components/ui/scroll-area"
 import { filterVisibleTasks } from '@/shared/lib/taskConfig';
 import { RefreshCw } from 'lucide-react';
+import { Skeleton } from '@/shared/components/ui/skeleton';
 
 // Define the status values as an array (matching the enum values in the schema)
 const ALL_POSSIBLE_STATUSES: TaskStatus[] = ['Queued', 'In Progress', 'Complete', 'Failed', 'Cancelled'];
@@ -170,7 +171,13 @@ const TaskList: React.FC = () => {
         </div>
       </div>
 
-      {isLoading && <p className="text-zinc-400">Loading tasks...</p>}
+      {isLoading && (
+        <div className="space-y-4">
+          {Array.from({ length: 4 }).map((_, idx) => (
+            <Skeleton key={idx} className="h-24 rounded-lg bg-zinc-700/60" />
+          ))}
+        </div>
+      )}
       {error && <p className="text-red-500">Error loading tasks: {error.message}</p>}
       
       {!isLoading && !error && filteredTasks.length === 0 && (

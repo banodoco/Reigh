@@ -13,6 +13,7 @@ import CreateShotModal from '@/tools/video-travel/components/CreateShotModal';
 import { useCreateShot, useHandleExternalImageDrop } from '@/shared/hooks/useShots';
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 import PaneControlTab from '../PaneControlTab';
+import { Skeleton } from '@/shared/components/ui/skeleton';
 
 const ShotsPane: React.FC = () => {
   const { selectedProjectId } = useProject();
@@ -140,7 +141,11 @@ const ShotsPane: React.FC = () => {
           </div>
           <div className="flex flex-col gap-4 px-3 py-4 flex-grow overflow-y-auto scrollbar-hide">
             <NewGroupDropZone onZoneClick={() => setIsCreateModalOpen(true)} />
-            {isLoading && <p className="text-white">Loading shots...</p>}
+            {isLoading && (
+              Array.from({ length: pageSize }).map((_, idx) => (
+                <Skeleton key={idx} className="h-24 rounded-lg bg-zinc-700/60" />
+              ))
+            )}
             {error && <p className="text-red-500">Error loading shots: {error.message}</p>}
             {shots && shots
               .slice((currentPage - 1) * pageSize, currentPage * pageSize)

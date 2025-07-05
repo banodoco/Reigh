@@ -1,5 +1,5 @@
 import React, { Suspense } from 'react';
-import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider, redirect } from 'react-router-dom';
 import ToolSelectorPage from '@/pages/ToolSelectorPage';
 import HomePage from '@/pages/HomePage';
 import ArtPage from '@/pages/ArtPage';
@@ -14,6 +14,7 @@ import GenerationsPage from "@/pages/GenerationsPage"; // Import the new Generat
 import Layout from './Layout'; // Import the new Layout component
 import { AppEnv } from '@/types/env';
 import { Loading } from '@/shared/components/ui/loading';
+import { supabase } from '@/integrations/supabase/client';
 
 // Determine the environment
 const currentEnv = (import.meta.env.VITE_APP_ENV?.toLowerCase() || AppEnv.WEB);
@@ -29,6 +30,13 @@ const router = createBrowserRouter([
   // HomePage route without Layout (no header) when in web environment
   ...(currentEnv === AppEnv.WEB ? [{
     path: '/',
+    loader: async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        return redirect('/tools');
+      }
+      return null;
+    },
     element: <HomePage />,
     errorElement: <NotFoundPage />,
   }] : []),
