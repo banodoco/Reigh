@@ -9,7 +9,6 @@ import { toast } from '@/shared/components/ui/use-toast';
 import { PageFadeIn } from '@/shared/components/transitions';
 
 export default function HomePage() {
-  const [isHovered, setIsHovered] = useState(false);
   const [expandedFAQ, setExpandedFAQ] = useState<number | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const location = useLocation();
@@ -20,8 +19,7 @@ export default function HomePage() {
   const [isCreativePartnerButtonAnimating, setIsCreativePartnerButtonAnimating] = useState(false);
   const [isPhilosophyPaneClosing, setIsPhilosophyPaneClosing] = useState(false);
   const [isCreativePartnerPaneClosing, setIsCreativePartnerPaneClosing] = useState(false);
-  const [isAnimating, setIsAnimating] = useState(false);
-  const [animationPhase, setAnimationPhase] = useState(0);
+
 
   // Show toast if redirected from protected page
   useEffect(() => {
@@ -65,132 +63,7 @@ export default function HomePage() {
     await supabase.auth.signOut();
   };
 
-  const ImageTravelAnimation = () => {
-    const [clickCount, setClickCount] = useState(0);
-    
-    const handleSquareClick = () => {
-      if (isAnimating) return;
-      
-      setIsAnimating(true);
-      setAnimationPhase(0);
-      setClickCount(prev => prev + 1);
-      
-      // Phase 1: Spreading rectangle appears
-      setTimeout(() => setAnimationPhase(1), 100);
-      
-      // Phase 2: Rectangle spreads to cover all squares
-      setTimeout(() => setAnimationPhase(2), 300);
-      
-      // Phase 3: Color transformation
-      setTimeout(() => setAnimationPhase(3), 700);
-      
-      // Phase 4: Reset with new colors
-      setTimeout(() => setAnimationPhase(4), 1200);
-      
-      // Complete animation
-      setTimeout(() => {
-        setIsAnimating(false);
-        setAnimationPhase(0);
-      }, 1800);
-    };
 
-    const getColorVariation = () => {
-      const variations = [
-        'bg-gradient-to-r from-wes-coral via-wes-pink to-wes-lavender',
-        'bg-gradient-to-r from-wes-mint via-wes-sage to-wes-vintage-gold',
-        'bg-gradient-to-r from-wes-vintage-gold via-wes-coral to-wes-mint',
-        'bg-gradient-to-r from-wes-pink via-wes-lavender to-wes-coral'
-      ];
-      return variations[clickCount % variations.length];
-    };
-
-    const getFinalSquareColors = () => {
-      const finalColors = [
-        'bg-gradient-to-br from-wes-mint to-wes-sage',
-        'bg-gradient-to-br from-wes-coral to-wes-pink',
-        'bg-gradient-to-br from-wes-vintage-gold to-wes-coral',
-        'bg-gradient-to-br from-wes-lavender to-wes-mint'
-      ];
-      return finalColors[clickCount % finalColors.length];
-    };
-
-    return (
-      <div className="flex flex-col items-center justify-center mb-12">
-        <div 
-          className="flex items-center justify-center cursor-pointer group"
-          onMouseEnter={() => setIsHovered(true)}
-          onMouseLeave={() => setIsHovered(false)}
-          onClick={handleSquareClick}
-        >
-          <div className="relative flex items-center space-x-3">
-            {/* Spreading rectangle overlay */}
-            <div 
-              className={`absolute left-0 top-0 h-16 rounded-lg border-2 shadow-2xl transition-all duration-500 ease-out z-10 ${
-                animationPhase >= 1 ? 'opacity-100' : 'opacity-0'
-              } ${
-                animationPhase >= 2 ? `w-full ${getColorVariation()} border-white/60` : 'w-16 bg-wes-coral border-wes-coral/40'
-              } ${
-                animationPhase >= 3 ? 'shadow-wes-ornate scale-105' : 'shadow-lg scale-100'
-              }`}
-            >
-              <div className="absolute inset-2 bg-white/30 rounded-md"></div>
-              {/* Sparkle effects */}
-              {animationPhase >= 3 && (
-                <>
-                  <div className="absolute top-1 left-4 w-1 h-1 bg-white rounded-full animate-ping"></div>
-                  <div className="absolute bottom-2 right-6 w-0.5 h-0.5 bg-white rounded-full animate-ping" style={{ animationDelay: '0.3s' }}></div>
-                  <div className="absolute top-3 right-2 w-1 h-1 bg-white rounded-full animate-ping" style={{ animationDelay: '0.6s' }}></div>
-                  <div className="absolute bottom-1 left-8 w-0.5 h-0.5 bg-white rounded-full animate-ping" style={{ animationDelay: '0.9s' }}></div>
-                </>
-              )}
-            </div>
-
-            {/* Three squares */}
-            {[0, 1, 2].map((index) => (
-              <div
-                key={index}
-                className={`w-16 h-16 rounded-lg border-2 shadow-lg transition-all duration-500 ease-in-out relative ${
-                  isHovered && !isAnimating
-                    ? 'border-white/50 scale-110 shadow-wes-ornate' 
-                    : 'border-wes-vintage-gold/30 scale-100'
-                } ${
-                  animationPhase >= 4 
-                    ? getFinalSquareColors()
-                    : isHovered && !isAnimating
-                    ? 'bg-wes-vintage-gold'
-                    : 'bg-wes-vintage-gold/80'
-                } ${
-                  animationPhase >= 2 && animationPhase < 4 ? 'opacity-30' : 'opacity-100'
-                }`}
-              >
-                <div className="absolute inset-2 bg-white/20 rounded-md"></div>
-                
-                {/* Individual square sparkles after animation */}
-                {animationPhase >= 4 && (
-                  <div 
-                    className="absolute top-1 right-1 w-1 h-1 bg-white rounded-full animate-ping"
-                    style={{ animationDelay: `${index * 0.2}s` }}
-                  ></div>
-                )}
-                
-                {/* Subtle hover indicator */}
-                {isHovered && !isAnimating && (
-                  <div className="absolute -top-1 -right-1 w-2 h-2 bg-white rounded-full animate-pulse"></div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-        
-        {/* Subtle instruction text */}
-        <div className={`mt-4 text-xs text-muted-foreground/60 font-inter tracking-wide transition-opacity duration-300 ${
-          isHovered && !isAnimating ? 'opacity-100' : 'opacity-0'
-        }`}>
-          Click to travel between forms
-        </div>
-      </div>
-    );
-  };
 
   const examples = [
     {
@@ -232,7 +105,9 @@ export default function HomePage() {
       <div className="absolute bottom-20 left-1/4 w-40 h-40 bg-wes-lavender/10 rounded-full blur-3xl animate-parallax-float" style={{ animationDelay: '4s' }}></div>
       
       {/* Top Navigation Links */}
-      <div className="fixed top-12 left-12 z-20 flex items-center space-x-6">
+      <div className={`fixed top-6 left-6 sm:top-12 sm:left-12 flex items-center space-x-6 ${
+        (showCreativePartner || showPhilosophy) ? 'z-10' : 'z-20'
+      }`}>
         {/* Philosophy Link */}
         <button
           onClick={() => {
@@ -244,16 +119,18 @@ export default function HomePage() {
               setTimeout(() => setIsPhilosophyButtonAnimating(false), 300);
             }, 150);
           }}
-          className={`group flex items-center sm:space-x-2 px-3 py-3 sm:px-4 sm:py-2 bg-white/80 backdrop-blur-sm rounded-full border-2 border-wes-vintage-gold/20 hover:border-wes-vintage-gold/40 transition-all duration-300 hover:shadow-wes-ornate ${
+          className={`group flex items-center sm:space-x-2 px-4 py-4 sm:px-4 sm:py-2 bg-white/80 backdrop-blur-sm rounded-full border-2 border-wes-vintage-gold/20 hover:border-wes-vintage-gold/40 transition-all duration-300 hover:shadow-wes-ornate ${
             isPhilosophyButtonAnimating ? 'animate-spin-left-fade' : ''
-          } ${showPhilosophy || isPhilosophyPaneClosing || isPhilosophyButtonAnimating ? 'opacity-0 pointer-events-none z-10' : 'opacity-100 pointer-events-auto z-20'}`}
+          } ${showPhilosophy || isPhilosophyPaneClosing || isPhilosophyButtonAnimating ? 'opacity-0 pointer-events-none' : 'opacity-100 pointer-events-auto'}`}
         >
-          <Brain className="w-4 h-4 text-wes-vintage-gold" />
+          <Brain className="w-6 h-6 sm:w-4 sm:h-4 text-wes-vintage-gold" />
           <span className="font-inter text-sm font-medium text-primary group-hover:text-primary/80 hidden sm:inline">Philosophy</span>
         </button>
       </div>
         
-      <div className="fixed top-12 right-12 z-20 flex items-center">
+      <div className={`fixed top-6 right-6 sm:top-12 sm:right-12 flex items-center ${
+        (showCreativePartner || showPhilosophy) ? 'z-10' : 'z-20'
+      }`}>
         {/* Creative Partner Programme */}
         <button
           onClick={() => {
@@ -265,11 +142,11 @@ export default function HomePage() {
               setTimeout(() => setIsCreativePartnerButtonAnimating(false), 300);
             }, 150);
           }}
-          className={`group flex items-center sm:space-x-2 px-3 py-3 sm:px-4 sm:py-2 bg-gradient-to-r from-wes-coral/90 to-wes-pink/90 backdrop-blur-sm rounded-full border-2 border-wes-coral/30 hover:border-wes-coral/50 transition-all duration-300 hover:shadow-wes-ornate text-white hover:from-wes-coral hover:to-wes-pink ${
+          className={`group flex items-center sm:space-x-2 px-4 py-4 sm:px-4 sm:py-2 bg-gradient-to-r from-wes-coral/90 to-wes-pink/90 backdrop-blur-sm rounded-full border-2 border-wes-coral/30 hover:border-wes-coral/50 transition-all duration-300 hover:shadow-wes-ornate text-white hover:from-wes-coral hover:to-wes-pink ${
             isCreativePartnerButtonAnimating ? 'animate-spin-right-fade' : ''
-          } ${showCreativePartner || isCreativePartnerPaneClosing || isCreativePartnerButtonAnimating ? 'opacity-0 pointer-events-none z-10' : 'opacity-100 pointer-events-auto z-20'}`}
+          } ${showCreativePartner || isCreativePartnerPaneClosing || isCreativePartnerButtonAnimating ? 'opacity-0 pointer-events-none' : 'opacity-100 pointer-events-auto'}`}
         >
-          <HandHeart className="w-4 h-4 group-hover:scale-110 transition-transform" />
+          <HandHeart className="w-6 h-6 sm:w-4 sm:h-4 group-hover:scale-110 transition-transform" />
           <span className="font-inter text-sm font-medium hidden sm:inline">Open Creative Partner Programme</span>
         </button>
       </div>
@@ -278,10 +155,7 @@ export default function HomePage() {
         {/* Hero Section */}
         <div className="text-center w-full">
           <div className="max-w-4xl mx-auto">
-            {/* Image Travel Animation */}
-            <div className="mb-8">
-              <ImageTravelAnimation />
-            </div>
+
 
             {/* Main title */}
             <h1 className="font-playfair text-6xl md:text-8xl font-bold text-primary mb-8 text-shadow-vintage">
