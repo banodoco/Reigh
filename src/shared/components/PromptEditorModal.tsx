@@ -166,7 +166,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
   };
 
   const handleGenerateAndAddPrompts = async (params: GeneratePromptsParams) => {
-    if (!actualCanUseAI) { toast.error("API Key required for AI generation."); return; }
+    // API key is no longer mandatory for generating prompts (server-side edge function handles it)
     console.log("[PromptEditorModal] AI Generation: Attempting to generate prompts. Params:", JSON.stringify(params));
     
     // Store whether summaries were requested initially to decide if we need to auto-generate them later
@@ -386,7 +386,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
                 )}
                 <Tabs value={activeTab} onValueChange={(value) => { markAsInteracted(); setActiveTab(value as EditorMode); }}>
                   <TabsList className="grid w-full grid-cols-2 mb-4">
-                    <TabsTrigger value="generate" disabled={!actualCanUseAI}><Wand2Icon className="mr-2 h-4 w-4" />Generate New</TabsTrigger>
+                    <TabsTrigger value="generate"><Wand2Icon className="mr-2 h-4 w-4" />Generate New</TabsTrigger>
                     <TabsTrigger value="bulk-edit" disabled={!actualCanUseAI}><Edit className="mr-2 h-4 w-4" />Bulk Edit All</TabsTrigger>
                   </TabsList>
                   <TabsContent value="generate">
@@ -395,7 +395,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
                       isGenerating={isAIGenerating}
                       initialValues={generationControlValues}
                       onValuesChange={handleGenerationValuesChange}
-                      hasApiKey={actualCanUseAI}
+                      hasApiKey={true}
                       existingPromptsForContext={internalPrompts.map(p => ({ id: p.id, text: p.fullPrompt, shortText: p.shortPrompt, hidden: false}))}
                     />
                   </TabsContent>
