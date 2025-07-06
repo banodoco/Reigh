@@ -148,6 +148,7 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
 ##### Active Edge Functions:
 - `single-image-generate`: Handles wan-local image generation tasks
 - `steerable-motion`: Handles video travel generation tasks
+- `generate-prompts`: Generates prompt suggestions via OpenAI server-side, logging token usage and cost
 
 ##### Remaining Express Endpoints (to be migrated):
 - `/api/tasks/*` - Task management (list, update status, cancel)

@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import OpenAI from 'openai';
 import {
   AIPromptItem,
@@ -31,69 +32,57 @@ export const useAIInteractionService = ({
   const [isEditing, setIsEditing] = useState(false);
   const [isSummarizing, setIsSummarizing] = useState(false);
 
+  // === New implementation: delegate prompt generation to Supabase Edge Function ===
   const generatePrompts = useCallback(
     async (params: GeneratePromptsParams): Promise<AIPromptItem[]> => {
-      if (!apiKey) {
-        console.error('AI Service: API key is missing for generatePrompts.');
-        return [];
-      }
       setIsGenerating(true);
-      const openai = getOpenAIClient(apiKey);
-
-      let systemMessageContent = `You are a helpful assistant that generates a list of prompts based on user input.\nOverall goal: ${params.overallPromptText}\nRules to remember: ${params.rulesToRememberText}`;
-      if (params.includeExistingContext && params.existingPrompts && params.existingPrompts.length > 0) {
-        const existingPromptsText = params.existingPrompts.map(p => `- ${p.text}`).join('\n');
-        systemMessageContent += `\n\nExisting Prompts for Context (do not repeat these, but use them as inspiration for new, distinct ideas):\n${existingPromptsText}`;
-      }
-
-      const userMessageContent = params.specificPromptsText || "Please generate general prompts based on the overall goal and rules.";
-      // The instruction about the output format should be part of the system or user message for chat models.
-      const instructionMessage = `Instruction: Generate ${params.numberToGenerate} distinct prompts as a plain text list, each on a new line. Do not number them or add any other formatting. Ensure they are different from any provided context prompts.`;
 
       try {
-        // Changed from openai.completions.create to openai.chat.completions.create
-        const response = await openai.chat.completions.create({
-          model: 'o3-mini', // As specified
-          messages: [
-            { role: 'system', content: systemMessageContent },
-            { role: 'user', content: `${userMessageContent}\n\n${instructionMessage}` }, // Combined user content and instruction
-          ],
-          // Parameters for o3-mini: the doc mentions "reasoning: { effort: 'medium' }"
-          // This is still not a standard parameter for chat.completions.create.
-          // It might be a tag or a behavior influenced by the model name itself or specific prompt phrasing.
-          // If there's a specific way to pass this, it would need to be added here, e.g. in metadata or custom fields if supported.
-          // For now, relying on model's default behavior or that this is handled implicitly.
-          // max_tokens can be used if needed, but o3-mini might have its own way of handling output length based on prompt.
+        // Invoke the new edge function. We pass the full params object so the server can replicate previous behaviour.
+        const { data, error } = await supabase.functions.invoke('generate-prompts', {
+          body: {
+            overallPromptText: params.overallPromptText,
+            specificPromptsText: params.specificPromptsText,
+            rulesToRememberText: params.rulesToRememberText,
+            numberToGenerate: params.numberToGenerate,
+            existingPrompts: params.includeExistingContext ? params.existingPrompts ?? [] : [],
+          },
         });
 
-        const outputText = response.choices[0]?.message?.content?.trim() || '';
-        const generatedTexts = outputText.split('\n').filter(text => text.trim() !== '');
-        
+        if (error) {
+          console.error('AI Service: Edge function error generating prompts:', error);
+          return [];
+        }
+
+        const generatedTexts: string[] = (data as any)?.prompts ?? [];
+
         const newPrompts: AIPromptItem[] = [];
         for (const text of generatedTexts) {
           const newId = generatePromptId();
           let shortText = '';
 
-          if (params.addSummaryForNewPrompts) {
+          // Optionally generate summaries client-side if requested and we have an API key available.
+          if (params.addSummaryForNewPrompts && apiKey) {
             const summary = await generateSummaryForPromptInternal(text, apiKey);
             shortText = summary || '';
           }
+
           newPrompts.push({
             id: newId,
             text: text.trim(),
-            shortText: shortText,
+            shortText,
             hidden: false,
           });
         }
         return newPrompts;
-      } catch (error) {
-        console.error('AI Service: Error generating prompts:', error);
+      } catch (err) {
+        console.error('AI Service: Unexpected error calling generate-prompts:', err);
         return [];
       } finally {
         setIsGenerating(false);
       }
     },
-    [apiKey, generatePromptId]
+    [generatePromptId, apiKey]
   );
 
   const generateSummaryForPromptInternal = useCallback(
