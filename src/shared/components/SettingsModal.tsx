@@ -418,25 +418,44 @@ python headless.py --db-type supabase \\
                               </p>
                             </div>
 
-                            <div className="bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm overflow-x-auto">
-                              <pre className="whitespace-pre-wrap break-all">
-                                {showFullInstallCommand
-                                  ? getInstallationCommand()
-                                  : `${getInstallationCommand()
-                                      .split("\n")
-                                      .slice(0, 3)
-                                      .join("\n")}\n...`}
-                              </pre>
+                            <div className="relative">
+                              <div 
+                                className={`bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm overflow-hidden ${
+                                  showFullInstallCommand ? 'overflow-x-auto' : ''
+                                }`}
+                                style={{
+                                  height: showFullInstallCommand ? 'auto' : '30px'
+                                }}
+                              >
+                                <pre className="whitespace-pre-wrap break-all">
+                                  {getInstallationCommand()}
+                                </pre>
+                              </div>
+                              
+                              {!showFullInstallCommand && (
+                                <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/50 to-transparent pointer-events-none rounded-lg">
+                                  <div className="absolute bottom-2 left-4 right-4 flex justify-center">
+                                    <Button
+                                      variant="secondary"
+                                      size="sm"
+                                      onClick={() => setShowFullInstallCommand(true)}
+                                      className="pointer-events-auto text-xs px-3 py-1 bg-gray-700 hover:bg-gray-600 text-gray-200 border-gray-600"
+                                    >
+                                      Reveal full command
+                                    </Button>
+                                  </div>
+                                </div>
+                              )}
                             </div>
 
-                            {getInstallationCommand().split("\n").length > 3 && (
+                            {showFullInstallCommand && (
                               <Button
                                 variant="link"
                                 size="sm"
-                                onClick={() => setShowFullInstallCommand(!showFullInstallCommand)}
+                                onClick={() => setShowFullInstallCommand(false)}
                                 className="px-0"
                               >
-                                {showFullInstallCommand ? "Hide command" : "Reveal full command"}
+                                Hide command
                               </Button>
                             )}
 
@@ -455,6 +474,10 @@ python headless.py --db-type supabase \\
                                 </>
                               )}
                             </Button>
+                            
+                            <p className="text-xs text-red-600 text-center">
+                              ⚠️ Don't share this command with non-trusted third parties
+                            </p>
                           </div>
                         </TabsContent>
 
@@ -466,25 +489,44 @@ python headless.py --db-type supabase \\
                               </p>
                             </div>
 
-                            <div className="bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm overflow-x-auto">
-                              <pre className="whitespace-pre-wrap break-all">
-                                {showFullRunCommand
-                                  ? getRunCommand()
-                                  : `${getRunCommand()
-                                      .split("\n")
-                                      .slice(0, 3)
-                                      .join("\n")}\n...`}
-                              </pre>
+                            <div className="relative">
+                              <div 
+                                className={`bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm overflow-hidden ${
+                                  showFullRunCommand ? 'overflow-x-auto' : ''
+                                }`}
+                                style={{
+                                  height: showFullRunCommand ? 'auto' : '30px'
+                                }}
+                              >
+                                <pre className="whitespace-pre-wrap break-all">
+                                  {getRunCommand()}
+                                </pre>
+                              </div>
+                              
+                              {!showFullRunCommand && (
+                                <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/50 to-transparent pointer-events-none rounded-lg">
+                                  <div className="absolute bottom-2 left-4 right-4 flex justify-center">
+                                    <Button
+                                      variant="secondary"
+                                      size="sm"
+                                      onClick={() => setShowFullRunCommand(true)}
+                                      className="pointer-events-auto text-xs px-3 py-1 bg-gray-700 hover:bg-gray-600 text-gray-200 border-gray-600"
+                                    >
+                                      Reveal full command
+                                    </Button>
+                                  </div>
+                                </div>
+                              )}
                             </div>
 
-                            {getRunCommand().split("\n").length > 3 && (
+                            {showFullRunCommand && (
                               <Button
                                 variant="link"
                                 size="sm"
-                                onClick={() => setShowFullRunCommand(!showFullRunCommand)}
+                                onClick={() => setShowFullRunCommand(false)}
                                 className="px-0"
                               >
-                                {showFullRunCommand ? "Hide command" : "Reveal full command"}
+                                Hide command
                               </Button>
                             )}
 
@@ -503,6 +545,10 @@ python headless.py --db-type supabase \\
                                 </>
                               )}
                             </Button>
+                            
+                            <p className="text-xs text-red-600 text-center">
+                              ⚠️ Don't share this command with non-trusted third parties
+                            </p>
                           </div>
                         </TabsContent>
                       </Tabs>
