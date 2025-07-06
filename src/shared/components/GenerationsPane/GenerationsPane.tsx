@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useMemo, useContext } from 'react';
 import { useProject } from "@/shared/contexts/ProjectContext";
-import { useListAllGenerations, useDeleteGeneration } from '@/shared/hooks/useGenerations';
+import { useGenerations, useDeleteGeneration } from '@/shared/hooks/useGenerations';
 import { useSlidingPane } from '@/shared/hooks/useSlidingPane';
 import { cn } from '@/shared/lib/utils';
 import { Button } from '@/shared/components/ui/button';
 import { LockIcon, UnlockIcon, ArrowUpIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import ImageGallery from '@/shared/components/ImageGallery';
+import { ImageGallery } from '@/shared/components/ImageGallery';
 import { LastAffectedShotContext } from '@/shared/contexts/LastAffectedShotContext';
 import { useListShots, useAddImageToShot } from '@/shared/hooks/useShots';
 import { toast } from 'sonner';
@@ -17,11 +17,11 @@ import { Skeleton } from '@/shared/components/ui/skeleton';
 const DEFAULT_PANE_HEIGHT = 350;
 const GENERATIONS_PER_PAGE = 24;
 
-const GenerationsPane: React.FC = () => {
+export const GenerationsPane: React.FC = () => {
   const { selectedProjectId } = useProject();
   const navigate = useNavigate();
   const [page, setPage] = useState(1);
-  const { data: allGenerations, isLoading, error } = useListAllGenerations(selectedProjectId);
+  const { data: allGenerations, isLoading, error } = useGenerations(selectedProjectId);
   const { data: shotsData } = useListShots(selectedProjectId);
   const lastAffectedShotContext = useContext(LastAffectedShotContext);
   const { lastAffectedShotId = null, setLastAffectedShotId = () => {} } = lastAffectedShotContext || {};
@@ -196,4 +196,4 @@ const GenerationsPane: React.FC = () => {
   );
 };
 
-export default GenerationsPane; 
+export default React.memo(GenerationsPane); 

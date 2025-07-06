@@ -178,7 +178,7 @@ const InfoPopover: React.FC<{ metadata: DisplayableMetadata | undefined; metadat
   );
 };
 
-const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, isDeleting, onApplySettings, allShots, lastShotId, onAddToLastShot, currentToolType, initialFilterState = true, onImageSaved, offset = 0, totalCount, whiteText = false, columnsPerRow = 5 }) => {
+export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, isDeleting, onApplySettings, allShots, lastShotId, onAddToLastShot, currentToolType, initialFilterState = true, onImageSaved, offset = 0, totalCount, whiteText = false, columnsPerRow = 5 }) => {
   const [lightboxImageUrl, setLightboxImageUrl] = useState<string | null>(null);
   const [lightboxImageAlt, setLightboxImageAlt] = useState<string>("Fullscreen view");
   const [lightboxImageId, setLightboxImageId] = useState<string | undefined>(undefined);
@@ -706,6 +706,4 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, isDeletin
       )}
     </TooltipProvider>
   );
-};
-
-export default ImageGallery; 
+}; 

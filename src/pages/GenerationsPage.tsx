@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useContext } from 'react';
 import { useProject } from '@/shared/contexts/ProjectContext';
-import { useListAllGenerations, useDeleteGeneration } from '@/shared/hooks/useGenerations';
-import ImageGallery from '@/shared/components/ImageGallery';
+import { useGenerations, useDeleteGeneration } from '@/shared/hooks/useGenerations';
+import { ImageGallery } from '@/shared/components/ImageGallery';
 import { useListShots, useAddImageToShot } from '@/shared/hooks/useShots';
 import { LastAffectedShotContext } from '@/shared/contexts/LastAffectedShotContext';
 import { Button } from '@/shared/components/ui/button';
@@ -14,7 +14,7 @@ const GENERATIONS_PER_PAGE = 48; // Show more on the full page
 const GenerationsPage: React.FC = () => {
   const { selectedProjectId } = useProject();
   const [page, setPage] = useState(1);
-  const { data: allGenerations, isLoading, isError, error } = useListAllGenerations(selectedProjectId);
+  const { data: allGenerations, isLoading, isError, error } = useGenerations(selectedProjectId);
   const { data: shotsData } = useListShots(selectedProjectId);
   const lastAffectedShotContext = useContext(LastAffectedShotContext);
   const { lastAffectedShotId = null, setLastAffectedShotId = () => {} } = lastAffectedShotContext || {};

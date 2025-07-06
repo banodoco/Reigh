@@ -4,6 +4,7 @@ import { Camera, Palette, Zap, Star, Crown, Gem, Paintbrush, Video, Edit, Sparkl
 import { useEffect, useState } from 'react';
 import { toolsUIManifest, type ToolUIDefinition } from '../tools';
 import { PageFadeIn, FadeInSection } from '@/shared/components/transitions';
+import React from 'react';
 
 // Define process tools (main workflow)
 const processTools = [
@@ -215,7 +216,7 @@ const ToolCard = ({ item, isSquare = false, index, isVisible }: { item: any, isS
   );
 };
 
-export default function ToolSelectorPage() {
+const ToolSelectorPage: React.FC = () => {
   const currentEnv = (import.meta.env.VITE_APP_ENV?.toLowerCase() || AppEnv.WEB) as AppEnvValue;
 
   // Scroll to top when component mounts
@@ -292,4 +293,6 @@ export default function ToolSelectorPage() {
       </div>
     </PageFadeIn>
   );
-} 
+};
+
+export default ToolSelectorPage; 

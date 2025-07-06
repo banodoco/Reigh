@@ -24,7 +24,7 @@ interface ActiveLoRAsDisplayProps {
   className?: string;
 }
 
-export const ActiveLoRAsDisplay: React.FC<ActiveLoRAsDisplayProps> = ({
+const ActiveLoRAsDisplayComponent: React.FC<ActiveLoRAsDisplayProps> = ({
   selectedLoras,
   onRemoveLora,
   onLoraStrengthChange,
@@ -122,4 +122,19 @@ export const ActiveLoRAsDisplay: React.FC<ActiveLoRAsDisplayProps> = ({
       </div>
     </TooltipProvider>
   );
-}; 
+};
+
+export const ActiveLoRAsDisplay = React.memo(
+  ActiveLoRAsDisplayComponent,
+  (prev, next) => {
+    // Re-render only if selected loras, isGenerating flag, or availableLoras length changed
+    return (
+      prev.isGenerating === next.isGenerating &&
+      prev.availableLoras?.length === next.availableLoras?.length &&
+      prev.selectedLoras.length === next.selectedLoras.length &&
+      prev.selectedLoras.every((l, idx) =>
+        l.id === next.selectedLoras[idx]?.id && l.strength === next.selectedLoras[idx]?.strength
+      )
+    );
+  }
+);

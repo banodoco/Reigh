@@ -5,6 +5,7 @@ import { Database } from '@/integrations/supabase/types';
 import { uploadImageToStorage } from '@/shared/lib/imageUploader';
 import { toast } from 'sonner';
 import { fetchWithAuth } from '@/lib/api';
+import React from 'react';
 
 // Define the type for the new shot data returned by Supabase
 // This should align with your 'shots' table structure from `supabase/types.ts`
@@ -200,6 +201,8 @@ export const useDuplicateShot = () => {
 export const useListShots = (projectId: string | null): UseQueryResult<Shot[], Error> => {
   return useQuery({
     queryKey: ['shots', projectId],
+    enabled: !!projectId,
+    staleTime: 30 * 1000, // consider data fresh for 30 seconds to prevent repeated immediate refetches
     queryFn: async () => {
       if (!projectId) return [];
       
@@ -254,7 +257,6 @@ export const useListShots = (projectId: string | null): UseQueryResult<Shot[], E
         images: generationsByShot[shot.id] || []
       }));
     },
-    enabled: !!projectId,
     refetchOnWindowFocus: false,
   });
 };

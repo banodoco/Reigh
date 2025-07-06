@@ -16,7 +16,7 @@ import PaneControlTab from '../PaneControlTab';
 import { Skeleton } from '@/shared/components/ui/skeleton';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 
-const ShotsPane: React.FC = () => {
+export const ShotsPane: React.FC = () => {
   const { selectedProjectId } = useProject();
   const { data: shots, isLoading, error } = useListShots(selectedProjectId);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -194,4 +194,4 @@ const ShotsPane: React.FC = () => {
   );
 };
 
-export default ShotsPane; 
+export default React.memo(ShotsPane); 

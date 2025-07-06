@@ -17,12 +17,14 @@ const queryClient = new QueryClient();
 
 // New inner component that uses the context
 const AppInternalContent = () => {
-  useWebSocket(); // Initialize WebSocket connection and listeners
+  const { selectedProjectId } = useProject();
+  // Initialize WebSocket connection and listeners, scoped to the active project
+  useWebSocket(selectedProjectId);
+
   const context = useContext(LastAffectedShotContext);
   if (!context) throw new Error("useLastAffectedShot must be used within a LastAffectedShotProvider");
   const { setLastAffectedShotId } = context;
 
-  const { selectedProjectId } = useProject();
   const { data: shotsFromHook, isLoading: isLoadingShots } = useListShots(selectedProjectId);
 
   const sensors = useSensors(
@@ -61,10 +63,6 @@ const AppInternalContent = () => {
   };
 
   const handleDragEnd = async (event: DragEndEvent) => {
-    console.log('handleDragEnd triggered.', {
-      activeId: event.active?.id,
-      overId: event.over?.id,
-    });
     const { active, over } = event;
 
     if (!selectedProjectId) {
@@ -191,6 +189,11 @@ const AppInternalContent = () => {
 };
 
 function App() {
+  React.useEffect(() => {
+    return () => {
+    };
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <ProjectProvider>

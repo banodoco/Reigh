@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback, useContext } from "react";
 import { Button } from "@/shared/components/ui/button";
-import ImageGallery, { GeneratedImageWithMetadata, DisplayableMetadata } from "@/shared/components/ImageGallery";
+import { ImageGallery, GeneratedImageWithMetadata, DisplayableMetadata } from "@/shared/components/ImageGallery";
 import SettingsModal from "@/shared/components/SettingsModal";
 import { PromptEntry } from "@/tools/image-generation/components/ImageGenerationForm";
 import PromptEditorModal from "@/shared/components/PromptEditorModal";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useListShots, useAddImageToShot } from "@/shared/hooks/useShots";
-import { useListAllGenerations, useDeleteGeneration } from "@/shared/hooks/useGenerations";
+import { useGenerations, useDeleteGeneration } from "@/shared/hooks/useGenerations";
 import { LastAffectedShotContext } from "@/shared/contexts/LastAffectedShotContext";
 import { nanoid } from "nanoid";
 import { AlertTriangle, Settings } from "lucide-react";
@@ -35,7 +35,7 @@ const EDIT_TRAVEL_FLUX_SOFT_EDGE_STRENGTH_KEY = 'editTravelFluxSoftEdgeStrength'
 const EDIT_TRAVEL_FLUX_DEPTH_STRENGTH_KEY = 'editTravelFluxDepthStrength';
 const EDIT_TRAVEL_RECONSTRUCT_VIDEO_KEY = 'editTravelReconstructVideo';
 
-const EditTravelToolPage = () => {
+const EditTravelToolPage: React.FC = () => {
   const [prompts, setPrompts] = usePersistentState<PromptEntry[]>('editTravelPrompts', []);
   const [imagesPerPrompt, setImagesPerPrompt] = usePersistentState<number>('editTravelImagesPerPrompt', 1);
   const [generationMode, setGenerationMode] = usePersistentState<'kontext' | 'flux'>('editTravelGenerationMode', 'kontext');
@@ -63,7 +63,7 @@ const EditTravelToolPage = () => {
   const queryClient = useQueryClient();
 
   const { data: shots } = useListShots(selectedProjectId);
-  const { data: generatedImages, isLoading: isLoadingGenerations } = useListAllGenerations(selectedProjectId);
+  const { data: generatedImages, isLoading: isLoadingGenerations } = useGenerations(selectedProjectId);
   const addImageToShotMutation = useAddImageToShot();
   const deleteGenerationMutation = useDeleteGeneration();
   

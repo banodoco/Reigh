@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { ToolSettingsGate } from "@/shared/components/ToolSettingsGate";
 import ImageGenerationForm, { ImageGenerationFormHandles, PromptEntry } from "../components/ImageGenerationForm";
-import ImageGallery, { GeneratedImageWithMetadata, DisplayableMetadata, MetadataLora } from "@/shared/components/ImageGallery";
+import { ImageGallery, GeneratedImageWithMetadata, DisplayableMetadata, MetadataLora } from "@/shared/components/ImageGallery";
 import SettingsModal from "@/shared/components/SettingsModal";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,7 +11,7 @@ import { useLastAffectedShot } from "@/shared/hooks/useLastAffectedShot";
 import { useProject } from "@/shared/contexts/ProjectContext";
 import { uploadImageToStorage } from '@/shared/lib/imageUploader';
 import { nanoid } from 'nanoid';
-import { useListAllGenerations, useDeleteGeneration } from "@/shared/hooks/useGenerations";
+import { useGenerations, useDeleteGeneration } from "@/shared/hooks/useGenerations";
 import { Settings } from "lucide-react";
 import { useApiKeys } from '@/shared/hooks/useApiKeys';
 import { useQueryClient } from '@tanstack/react-query';
@@ -63,9 +63,7 @@ const placeholderImages: GeneratedImageWithMetadata[] = [
   }
 ];
 
-const ImageGenerationToolPage = () => {
-  console.log('[ImageGenerationToolPage] Component loading...');
-
+const ImageGenerationToolPage: React.FC = () => {
   const [generatedImages, setGeneratedImages] = useState<GeneratedImageWithMetadata[]>(placeholderImages);
   const [showPlaceholders, setShowPlaceholders] = useState(true);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
@@ -88,7 +86,7 @@ const ImageGenerationToolPage = () => {
   const { data: shots, isLoading: isLoadingShots, error: shotsError } = useListShots(selectedProjectId);
   const addImageToShotMutation = useAddImageToShot();
   const { lastAffectedShotId, setLastAffectedShotId } = useLastAffectedShot();
-  const { data: generatedImagesData, isLoading: isLoadingGenerations } = useListAllGenerations(selectedProjectId);
+  const { data: generatedImagesData, isLoading: isLoadingGenerations } = useGenerations(selectedProjectId);
   const deleteGenerationMutation = useDeleteGeneration();
 
   const queryClient = useQueryClient();

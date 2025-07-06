@@ -3,6 +3,7 @@ import { GeneratedImageWithMetadata } from '@/shared/components/ImageGallery';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { fetchWithAuth } from '@/lib/api';
+import React from 'react';
 
 // Fetch generations from the API server
 const fetchGenerations = async (projectId: string | null, limit?: number): Promise<GeneratedImageWithMetadata[]> => {
@@ -31,9 +32,10 @@ const fetchGenerations = async (projectId: string | null, limit?: number): Promi
   }));
 };
 
-export const useListAllGenerations = (projectId: string | null) => {
+export function useGenerations(projectId: string | null, page: number = 1, limit: number = 24) {
   return useQuery<GeneratedImageWithMetadata[], Error>({
     queryKey: ['generations', projectId],
+    staleTime: 30 * 1000,
     queryFn: async () => {
       if (!projectId) return [];
       
@@ -69,7 +71,7 @@ const deleteGeneration = async (generationId: string) => {
   // For this hook, we don't need to return anything on success.
 };
 
-export const useDeleteGeneration = () => {
+export function useDeleteGeneration() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: deleteGeneration,
@@ -108,7 +110,7 @@ const createGeneration = async ({ projectId, imageUrl, prompt, metadata }: Creat
     return data;
 }
 
-export const useCreateGeneration = () => {
+export function useCreateGeneration() {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: createGeneration,

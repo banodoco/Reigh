@@ -11,7 +11,7 @@ import { useCancelAllPendingTasks, useListTasks } from '@/shared/hooks/useTasks'
 import { useToast } from '@/shared/hooks/use-toast';
 import { filterVisibleTasks } from '@/shared/lib/taskConfig';
 
-const TasksPane: React.FC = () => {
+export const TasksPane: React.FC = () => {
   const {
     isGenerationsPaneLocked,
     generationsPaneHeight,
@@ -117,4 +117,4 @@ const TasksPane: React.FC = () => {
   );
 };
 
-export default TasksPane; 
+export default React.memo(TasksPane); 

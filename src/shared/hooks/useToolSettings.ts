@@ -5,6 +5,7 @@ import { deepMerge } from '../lib/deepEqual';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { fetchWithAuth } from '@/lib/api';
 import { supabase } from '@/integrations/supabase/client';
+import React from 'react';
 
 // Removed baseUrl - using relative URLs with fetchWithAuth
 

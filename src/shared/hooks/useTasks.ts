@@ -3,6 +3,7 @@ import { Task, TaskStatus } from '@/types/tasks';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useProject } from '../contexts/ProjectContext';
+import React from 'react';
 
 const TASKS_QUERY_KEY = 'tasks';
 
