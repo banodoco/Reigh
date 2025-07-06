@@ -315,7 +315,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
     }
   };
 
-  if (!isOpen) return null;
+  // Keep hook order stable - don't return early
 
   const toggleFullView = (promptId: string) => {
     setActivePromptIdForFullView(currentId => currentId === promptId ? null : promptId);
