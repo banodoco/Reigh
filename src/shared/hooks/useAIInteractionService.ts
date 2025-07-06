@@ -27,8 +27,9 @@ export const useAIInteractionService = ({
 
       try {
         // Invoke the new edge function. We pass the full params object so the server can replicate previous behaviour.
-        const { data, error } = await supabase.functions.invoke('generate-prompts', {
+        const { data, error } = await supabase.functions.invoke('ai-prompt', {
           body: {
+            task: 'generate_prompts',
             overallPromptText: params.overallPromptText,
             specificPromptsText: params.specificPromptsText,
             rulesToRememberText: params.rulesToRememberText,
@@ -79,8 +80,10 @@ export const useAIInteractionService = ({
 
       try {
         // Invoke the new edge function
-        const { data, error } = await supabase.functions.invoke('generate-summary', {
-          body: { promptText },
+        const { data, error } = await supabase.functions.invoke('ai-prompt', {
+          body: {
+            task: 'generate_summary',
+            promptText },
         });
 
         if (error) {
@@ -105,8 +108,9 @@ export const useAIInteractionService = ({
       
       try {
         // Invoke the new edge function
-        const { data, error } = await supabase.functions.invoke('edit-prompt', {
+        const { data, error } = await supabase.functions.invoke('ai-prompt', {
           body: {
+            task: 'edit_prompt',
             originalPromptText: params.originalPromptText,
             editInstructions: params.editInstructions,
             modelType: params.modelType === 'smart' ? 'smart' : 'fast',
