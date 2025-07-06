@@ -21,6 +21,32 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/shar
 import { Info } from 'lucide-react';
 import HoverScrubVideo from '@/shared/components/HoverScrubVideo';
 
+// Description Modal Component
+const DescriptionModal: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  title: string;
+  description: string;
+}> = ({ isOpen, onClose, title, description }) => {
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="text-lg font-semibold">{title}</DialogTitle>
+          <DialogDescription>Full description</DialogDescription>
+        </DialogHeader>
+        <ScrollArea className="flex-1 pr-4">
+          <div className="py-4">
+            <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+              {description}
+            </p>
+          </div>
+        </ScrollArea>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
 interface LoraModelImage {
   alt_text: string;
   url: string;
@@ -94,32 +120,20 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps> = ({ loras, onAddLora,
   const [searchTerm, setSearchTerm] = useState("");
   const [sortOption, setSortOption] = useState<SortOption>('downloads');
   const [showMyLorasOnly, setShowMyLorasOnly] = useState(false);
+  const [showAddedLorasOnly, setShowAddedLorasOnly] = useState(false);
   const [page, setPage] = useState(0);
   const ITEMS_PER_PAGE = 20;
 
-  // Confirmation dialog state
-  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
-  const [loraToDelete, setLoraToDelete] = useState<{ resourceId: string; name: string } | null>(null);
+  // Description modal state
+  const [descriptionModalOpen, setDescriptionModalOpen] = useState(false);
+  const [selectedDescription, setSelectedDescription] = useState<{ title: string; description: string }>({ title: '', description: '' });
 
   const myLoraModelIds = useMemo(() => myLorasResource.data?.map(r => r.metadata["Model ID"]) || [], [myLorasResource.data]);
 
-  // Handle confirmation dialog
-  const handleDeleteClick = (resourceId: string, loraName: string) => {
-    setLoraToDelete({ resourceId, name: loraName });
-    setConfirmDeleteOpen(true);
-  };
-
-  const handleConfirmDelete = () => {
-    if (loraToDelete) {
-      deleteResource.mutate({ id: loraToDelete.resourceId, type: 'lora' });
-    }
-    setConfirmDeleteOpen(false);
-    setLoraToDelete(null);
-  };
-
-  const handleCancelDelete = () => {
-    setConfirmDeleteOpen(false);
-    setLoraToDelete(null);
+  // Handle description modal
+  const handleShowFullDescription = (title: string, description: string) => {
+    setSelectedDescription({ title, description });
+    setDescriptionModalOpen(true);
   };
   
   // Local Wan LoRAs (files dropped into Headless-Wan2GP/loras)
@@ -169,6 +183,13 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps> = ({ loras, onAddLora,
       });
     }
     
+    // Filter by "Added LoRAs Only" if enabled
+    if (showAddedLorasOnly) {
+      filtered = filtered.filter(lora => {
+        return selectedLoraIds.includes(lora["Model ID"]);
+      });
+    }
+    
     // Search filter
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
@@ -214,10 +235,10 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps> = ({ loras, onAddLora,
         break;
     }
     return sorted;
-  }, [allLoras, searchTerm, sortOption, showMyLorasOnly, myLoraModelIds]);
+  }, [allLoras, searchTerm, sortOption, showMyLorasOnly, showAddedLorasOnly, myLoraModelIds, selectedLoraIds]);
 
   // Reset page when filter/sort changes
-  React.useEffect(() => { setPage(0); }, [searchTerm, sortOption, showMyLorasOnly]);
+  React.useEffect(() => { setPage(0); }, [searchTerm, sortOption, showMyLorasOnly, showAddedLorasOnly]);
 
   const totalPages = Math.ceil(processedLoras.length / ITEMS_PER_PAGE);
   const paginatedLoras = useMemo(() => processedLoras.slice(page * ITEMS_PER_PAGE, (page + 1) * ITEMS_PER_PAGE), [processedLoras, page]);
@@ -231,7 +252,7 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps> = ({ loras, onAddLora,
 
   return (
     <div>
-      {/* My LoRAs Filter */}
+      {/* LoRAs Filter */}
       <div className="mb-6 p-4 bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-xl shadow-sm">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
@@ -246,15 +267,35 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps> = ({ loras, onAddLora,
                 Show only my LoRAs
               </Label>
             </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="show-added-loras-only" 
+                checked={showAddedLorasOnly}
+                onCheckedChange={(checked) => setShowAddedLorasOnly(!!checked)}
+                className="data-[state=checked]:bg-green-600 data-[state=checked]:border-green-600"
+              />
+              <Label htmlFor="show-added-loras-only" className="text-base font-medium text-slate-900 cursor-pointer">
+                Show only added LoRAs
+              </Label>
+            </div>
             {myLorasCount > 0 && (
               <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
                 {myLorasCount} saved
               </span>
             )}
+            {selectedLoraIds.length > 0 && (
+              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
+                {selectedLoraIds.length} added
+              </span>
+            )}
           </div>
           <div className="text-sm text-slate-600 font-medium">
-            {showMyLorasOnly ? (
+            {showMyLorasOnly && showAddedLorasOnly ? (
+              <span className="text-purple-700">Showing {processedLoras.length} of your added LoRAs</span>
+            ) : showMyLorasOnly ? (
               <span className="text-blue-700">Showing {processedLoras.length} of your LoRAs</span>
+            ) : showAddedLorasOnly ? (
+              <span className="text-green-700">Showing {processedLoras.length} added LoRAs</span>
             ) : (
               <span>Showing all {processedLoras.length} LoRAs</span>
             )}
@@ -322,7 +363,7 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps> = ({ loras, onAddLora,
                         <div className="flex justify-between items-start gap-2">
                             <div className="flex-grow">
                                 <div className="flex items-center gap-2">
-                                  <CardTitle className="text-lg" title={lora.Name !== "N/A" ? lora.Name : lora["Model ID"]}>
+                                  <CardTitle className="text-xl" title={lora.Name !== "N/A" ? lora.Name : lora["Model ID"]}>
                                       {lora.Name !== "N/A" ? lora.Name : lora["Model ID"]}
                                   </CardTitle>
                                   {isSelectedOnGenerator && (
@@ -349,16 +390,6 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps> = ({ loras, onAddLora,
                                     {isInSavedLoras ? 'Saved' : 'Save'}
                                 </Button>
                               )}
-                              {isMyLora && resourceId && !isLocalLora && (
-                                <Button
-                                    variant="destructive"
-                                    size="sm"
-                                    onClick={() => handleDeleteClick(resourceId, lora.Name)}
-                                    disabled={deleteResource.isPending}
-                                >
-                                    Delete
-                                </Button>
-                              )}
                             </div>
                         </div>
                         <div className="text-xs text-muted-foreground pt-1">
@@ -369,9 +400,21 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps> = ({ loras, onAddLora,
                     </CardHeader>
                     <CardContent className="space-y-3 pt-0">
                       {lora.Description && (
-                        <p className="text-xs text-muted-foreground max-h-10 overflow-y-auto" title={lora.Description}>
-                          {lora.Description}
-                        </p>
+                        <div className="space-y-2">
+                          <p className="text-xs text-muted-foreground max-h-10 overflow-y-auto" title={lora.Description}>
+                            {lora.Description}
+                          </p>
+                          {lora.Description.length > 100 && (
+                            <Button
+                              variant="link"
+                              size="sm"
+                              className="p-0 h-auto text-xs"
+                              onClick={() => handleShowFullDescription(lora.Name, lora.Description)}
+                            >
+                              Read all
+                            </Button>
+                          )}
+                        </div>
                       )}
                       {lora.Images && lora.Images.length > 0 ? (
                         <div className="flex space-x-2 overflow-x-auto pb-2 pt-1">
@@ -445,28 +488,13 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps> = ({ loras, onAddLora,
         </div>
       </ScrollArea>
 
-      {/* Confirmation Dialog */}
-      <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Remove LoRA</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to remove "{loraToDelete?.name}"? 
-              <br /><br />
-              <strong>This will remove it for you and everyone else.</strong> This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={handleCancelDelete}>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={handleConfirmDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Remove for Everyone
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Description Modal */}
+      <DescriptionModal 
+        isOpen={descriptionModalOpen}
+        onClose={() => setDescriptionModalOpen(false)}
+        title={selectedDescription.title}
+        description={selectedDescription.description}
+      />
     </div>
   )
 };
@@ -481,9 +509,11 @@ interface MyLorasTabProps {
   createResource: UseMutationResult<Resource, Error, { type: 'lora'; metadata: LoraModel; }, unknown>;
   /** The LoRA type currently being viewed/edited */
   lora_type: string;
+  /** Callback to switch to the browse tab */
+  onSwitchToBrowse: () => void;
 }
 
-const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onRemoveLora, selectedLoraIds, deleteResource, createResource, lora_type }) => {
+const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onRemoveLora, selectedLoraIds, deleteResource, createResource, lora_type, onSwitchToBrowse }) => {
     const [addForm, setAddForm] = useState({
         name: '',
         description: '',
@@ -680,6 +710,9 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
             setFileInputKey(prev => prev + 1); // Reset file input
 
             toast.success("LoRA added successfully!");
+            
+            // Switch to browse tab to show the newly added LoRA
+            onSwitchToBrowse();
         } catch (error) {
             console.error("Error adding LoRA:", error);
             toast.error("Failed to add LoRA: " + (error instanceof Error ? error.message : String(error)));
@@ -807,8 +840,7 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
                         )}
                     </div>
 
-                    <div className="space-y-2">
-                        <Label>Sample Generations</Label>
+                    <div className="space-y-2">                        
                         <FileInput
                             key={fileInputKey} // Reset component when key changes
                             onFileChange={(newFiles) => {
@@ -901,7 +933,7 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
                             checked={addForm.is_public}
                             onCheckedChange={(checked) => handleFormChange('is_public', checked)}
                         />
-                        <Label htmlFor="is-public">Available to others/Public</Label>
+                        <Label htmlFor="is-public">Available to others</Label>
                     </div>
                 </CardContent>
                 <ItemCardFooter>
@@ -931,6 +963,9 @@ export const LoraSelectorModal: React.FC<LoraSelectorModalProps> = ({
   const myLorasResource = useListResources('lora');
   const createResource = useCreateResource();
   const deleteResource = useDeleteResource();
+  
+  // Tab state management
+  const [activeTab, setActiveTab] = useState<string>('browse');
 
   if (!isOpen) {
     return null;
@@ -948,7 +983,7 @@ export const LoraSelectorModal: React.FC<LoraSelectorModalProps> = ({
             Browse all LoRAs, filter by your collection, or add new ones.
           </DialogDescription>
         </DialogHeader>
-        <Tabs defaultValue="browse" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="browse">Browse All LoRAs</TabsTrigger>
                 <TabsTrigger value="add-new">Add New LoRA</TabsTrigger>
@@ -974,6 +1009,7 @@ export const LoraSelectorModal: React.FC<LoraSelectorModalProps> = ({
                     deleteResource={deleteResource}
                     createResource={createResource}
                     lora_type={lora_type}
+                    onSwitchToBrowse={() => setActiveTab('browse')}
                 />
             </TabsContent>
         </Tabs>

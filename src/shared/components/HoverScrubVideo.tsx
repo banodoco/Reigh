@@ -80,11 +80,18 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
       <video
         ref={videoRef}
         src={getDisplayUrl(src)}
-        poster={poster ? getDisplayUrl(poster) : getDisplayUrl('/placeholder.svg')}
+        poster={poster ? getDisplayUrl(poster) : undefined}
         preload="metadata"
-        onLoadedData={(e) => {
-          // Remove poster once we have first frame to avoid flash.
-          e.currentTarget.removeAttribute('poster');
+        onLoadedMetadata={(e) => {
+          // Ensure we can see the first frame by seeking to the start
+          if (e.currentTarget && e.currentTarget.currentTime === 0) {
+            e.currentTarget.currentTime = 0.1;
+            setTimeout(() => {
+              if (e.currentTarget) {
+                e.currentTarget.currentTime = 0;
+              }
+            }, 100);
+          }
         }}
         loop={loop}
         muted={muted}

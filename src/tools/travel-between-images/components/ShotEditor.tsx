@@ -23,10 +23,8 @@ import { RadioGroup, RadioGroupItem } from "@/shared/components/ui/radio-group";
 import { ASPECT_RATIO_TO_RESOLUTION, findClosestAspectRatio } from '@/shared/lib/aspectRatios';
 import VideoOutputsGallery from "./VideoOutputsGallery";
 import BatchSettingsForm from "./BatchSettingsForm";
-import { ActiveLora } from '../pages/VideoTravelToolPage';
 import { LoraModel, LoraSelectorModal } from '@/shared/components/LoraSelectorModal';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
-import { SliderWithValue } from '@/shared/components/ui/slider-with-value';
+import { ActiveLoRAsDisplay, ActiveLora } from '@/shared/components/ActiveLoRAsDisplay';
 import { useApiKeys } from '@/shared/hooks/useApiKeys';
 import { cropImageToProjectAspectRatio } from '@/shared/lib/imageCropper';
 import { parseRatio } from '@/shared/lib/aspectRatios';
@@ -1141,49 +1139,13 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                      Add or Manage LoRAs
                     </Button>
                     
-                    {selectedLoras.length > 0 && (
-                      <TooltipProvider>
-                        <div className="mt-4 space-y-4">
-                          <h3 className="text-md font-semibold">Active LoRAs:</h3>
-                          {selectedLoras.map((lora) => (
-                            <div key={lora.id} className="p-3 border rounded-md shadow-sm bg-slate-50/50 dark:bg-slate-800/30">
-                              <div className="flex items-start gap-3">
-                                {lora.previewImageUrl && (
-                                  <img 
-                                    src={lora.previewImageUrl} 
-                                    alt={`Preview for ${lora.name}`} 
-                                    className="h-16 w-16 object-cover rounded-md border flex-shrink-0"
-                                  />
-                                )}
-                                <div className="flex-grow min-w-0">
-                                  <div className="flex justify-between items-start mb-1">
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <Label htmlFor={`lora-strength-${lora.id}`} className="text-sm font-medium truncate pr-2 cursor-help">
-                                          {lora.name}
-                                        </Label>
-                                      </TooltipTrigger>
-                                      <TooltipContent side="top">
-                                        <p>{lora.name}</p>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                    <Button variant="ghost" size="icon" onClick={() => onRemoveLora(lora.id)} className="text-destructive hover:bg-destructive/10 h-7 w-7 flex-shrink-0">
-                                      <X className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                  <SliderWithValue 
-                                    label={`Strength`}
-                                    value={lora.strength}
-                                    onChange={(newStrength) => onLoraStrengthChange(lora.id, newStrength)}
-                                    min={0} max={2} step={0.05}
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </TooltipProvider>
-                    )}
+                    <ActiveLoRAsDisplay
+                      selectedLoras={selectedLoras}
+                      onRemoveLora={onRemoveLora}
+                      onLoraStrengthChange={onLoraStrengthChange}
+                      availableLoras={availableLoras}
+                      className="mt-4"
+                    />
                 </div>
                 
                 <div className="mt-0 pt-6 border-t">

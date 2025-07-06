@@ -904,17 +904,17 @@
 
 /* Custom utility overrides for tool selector page */
 @layer utilities {
-  .text-lg {
+  .tool-selector-text-lg {
     font-size: 0.725rem;
     line-height: 1.75rem;
   }
 
-  .py-3 {
+  .tool-selector-py-3 {
     padding-top: 0.25rem;
     padding-bottom: 0.25rem;
   }
 
-  .py-8 {
+  .tool-selector-py-8 {
     padding-top: 0rem;
   }
 }

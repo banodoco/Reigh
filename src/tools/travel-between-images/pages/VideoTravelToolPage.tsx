@@ -17,18 +17,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/shared/components/ui/skeleton';
 import { PageFadeIn } from '@/shared/components/transitions';
 import { useListPublicResources } from '@/shared/hooks/useResources';
+import { ActiveLora } from '@/shared/components/ActiveLoRAsDisplay';
 // import { useLastAffectedShot } from '@/shared/hooks/useLastAffectedShot';
-
-// Placeholder data or logic to fetch actual data for VideoEditLayout
-// This will need to be fleshed out based on VideoEditLayout's requirements
-export interface ActiveLora {
-  id: string;
-  name: string;
-  path: string;
-  strength: number;
-  previewImageUrl?: string;
-  trigger_word?: string;
-}
 
 const VideoTravelToolPage: React.FC = () => {
   const navigate = useNavigate();

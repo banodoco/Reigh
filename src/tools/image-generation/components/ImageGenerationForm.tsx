@@ -3,10 +3,10 @@ import { Input } from "@/shared/components/ui/input";
 import { Button } from "@/shared/components/ui/button";
 import { Label } from "@/shared/components/ui/label";
 import { Textarea } from "@/shared/components/ui/textarea";
-import { SliderWithValue } from "@/shared/components/ui/slider-with-value";
 import { LoraSelectorModal, LoraModel } from "@/shared/components/LoraSelectorModal";
 import { DisplayableMetadata } from "@/shared/components/ImageGallery";
-import { X, UploadCloud, PlusCircle, Trash2, Edit3 } from "lucide-react";
+import { UploadCloud, PlusCircle, Edit3, Trash2 } from "lucide-react";
+import { ActiveLoRAsDisplay, ActiveLora } from "@/shared/components/ActiveLoRAsDisplay";
 import { toast } from "sonner";
 import { cropImageToClosestAspectRatio, CropResult } from "@/shared/lib/imageCropper";
 import PromptEditorModal from "@/shared/components/PromptEditorModal";
@@ -20,6 +20,7 @@ import { useToast } from "@/shared/hooks/use-toast";
 import FileInput from "@/shared/components/FileInput";
 import { fileToDataURL, dataURLtoFile } from "@/shared/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/components/ui/select";
+import { SliderWithValue } from "@/shared/components/ui/slider-with-value";
 import { useProject } from "@/shared/contexts/ProjectContext";
 import { usePersistentToolState } from "@/shared/hooks/usePersistentToolState";
 import { ImageGenerationSettings } from "../settings";
@@ -67,13 +68,7 @@ interface LoraData {
   models: LoraDataEntry[];
 }
 
-interface ActiveLora {
-  id: string;
-  name: string;
-  path: string;
-  strength: number;
-  previewImageUrl?: string;
-}
+// ActiveLora interface now imported from shared component
 
 interface PersistedFormSettings {
   prompts?: PromptEntry[];
@@ -352,6 +347,7 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
             path: foundLora["Model Files"][0].url, 
             strength: defaultConfig.strength,
             previewImageUrl: foundLora.Images && foundLora.Images.length > 0 ? foundLora.Images[0].url : undefined,
+            trigger_word: foundLora.trigger_word,
           });
         }
       }
@@ -372,6 +368,7 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
         path: loraToAdd["Model Files"][0].url, 
         strength: 1.0, 
         previewImageUrl: loraToAdd.Images && loraToAdd.Images.length > 0 ? loraToAdd.Images[0].url : undefined,
+        trigger_word: loraToAdd.trigger_word,
       };
       const updatedLoras = [...selectedLoras, newLora];
       setSelectedLoras(updatedLoras);
@@ -670,48 +667,14 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
               Add or Manage LoRA Models
             </Button>
             
-            {selectedLoras.length > 0 && (
-              <TooltipProvider>
-                <div className="mt-4 space-y-4 pt-2">
-                  <h3 className="text-md font-semibold">Active LoRAs:</h3>
-                  {selectedLoras.map((lora) => (
-                    <div key={lora.id} className="p-3 border rounded-md shadow-sm bg-slate-50">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                          {lora.previewImageUrl && (
-                            <img src={lora.previewImageUrl} alt={lora.name} className="w-12 h-12 rounded object-cover" />
-                          )}
-                          <div className="flex flex-col">
-                            <span className="font-semibold text-sm">{lora.name}</span>
-                            <span className="text-xs text-muted-foreground">{lora.id}</span>
-                          </div>
-                        </div>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="text-destructive hover:bg-destructive/10" 
-                          onClick={() => handleRemoveLora(lora.id)}
-                          disabled={isGenerating}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <div className="mt-3">
-                        <SliderWithValue
-                          label="Strength"
-                          value={lora.strength}
-                          onChange={(newStrength) => handleLoraStrengthChange(lora.id, newStrength)}
-                          min={0}
-                          max={2.0}
-                          step={0.01}
-                          disabled={isGenerating}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </TooltipProvider>
-            )}
+            <ActiveLoRAsDisplay
+              selectedLoras={selectedLoras}
+              onRemoveLora={handleRemoveLora}
+              onLoraStrengthChange={handleLoraStrengthChange}
+              isGenerating={isGenerating}
+              availableLoras={availableLoras}
+              className="mt-4"
+            />
           </div>
         </div>
 

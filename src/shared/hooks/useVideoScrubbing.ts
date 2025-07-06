@@ -53,12 +53,13 @@ export const useVideoScrubbing = () => {
       newTime = newTime - video.duration;
     }
     
-    if (isFinite(newTime)) {
+    // Additional safety check before setting currentTime
+    if (isFinite(newTime) && video && videoRef.current) {
         video.currentTime = newTime;
     }
     
     // Also update progress bar during scrub
-    if(video.duration > 0 && isFinite(video.duration)){
+    if(video && video.duration > 0 && isFinite(video.duration) && videoRef.current){
         setProgress((video.currentTime / video.duration) * 100);
     } else {
         setProgress(0);
@@ -181,7 +182,7 @@ export const useVideoScrubbing = () => {
     
     // This listener updates the progress bar during normal playback.
     const handleProgress = () => {
-        if (video && video.duration > 0 && animationFrameRef.current === null) {
+        if (video && video.duration > 0 && animationFrameRef.current === null && videoRef.current) {
             setProgress((video.currentTime / video.duration) * 100);
         }
     };

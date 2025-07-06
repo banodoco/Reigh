@@ -108,32 +108,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                       className="min-h-[70px] text-sm"
                       rows={3}
                     />
-                    {selectedLoras && selectedLoras.length > 0 && availableLoras && (() => {
-                      // Check if any selected LoRA has a trigger word
-                      const lorasWithTriggerWords = selectedLoras.filter((lora) => {
-                        const loraData = availableLoras.find(l => l["Model ID"] === lora.id);
-                        return loraData?.trigger_word;
-                      });
-                      
-                      if (lorasWithTriggerWords.length === 0) return null;
-                      
-                      return (
-                        <div className="mt-2 p-2 bg-muted/50 rounded-md">
-                          <p className="text-xs font-medium text-muted-foreground mb-1">Trigger words:</p>
-                          <div className="space-y-0.5">
-                            {lorasWithTriggerWords.map((lora) => {
-                              const loraData = availableLoras.find(l => l["Model ID"] === lora.id);
-                              const triggerWord = loraData?.trigger_word;
-                              return (
-                                <p key={lora.id} className="text-xs text-muted-foreground">
-                                  <span className="font-medium">{lora.name}:</span> <span className="font-mono text-foreground">"{triggerWord}"</span>
-                                </p>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      );
-                    })()}
+
                     <div className="flex items-center space-x-2 mt-2">
                       <Label htmlFor="enhancePrompt" className="text-sm font-medium">
                         Enhance Prompts
