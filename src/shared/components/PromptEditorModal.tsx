@@ -87,9 +87,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
   // -------------------------------------------------------------
   // New persistent settings wiring
   // -------------------------------------------------------------
-  const { selectedProjectId } = useProject();
-
-  const { ready, markAsInteracted } = usePersistentToolState<PersistedEditorControlsSettings>(
+  const { markAsInteracted } = usePersistentToolState<PersistedEditorControlsSettings>(
     'prompt-editor-controls',
     { projectId: null },
     {
