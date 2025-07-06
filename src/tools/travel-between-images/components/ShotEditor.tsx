@@ -707,7 +707,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     };
 
     if (selectedLoras && selectedLoras.length > 0) {
-      requestBody.loras = selectedLoras.map(l => ({ path: l.path, strength: l.strength }));
+      requestBody.loras = selectedLoras.map(l => ({ 
+        path: l.path, 
+        strength: parseFloat(l.strength?.toString() ?? '0') || 0.0 
+      }));
     }
 
     if (resolution) {

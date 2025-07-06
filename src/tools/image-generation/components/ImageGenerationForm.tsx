@@ -444,8 +444,11 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();    
 
-    // LoRA support removed – always submit an empty list
-    const lorasForApi: [] = [];
+    // Map selected LoRAs to the format expected by the task creation
+    const lorasForApi = selectedLoras.map(lora => ({
+      path: lora.path,
+      strength: parseFloat(lora.strength?.toString() ?? '0') || 0.0
+    }));
     
     const activePrompts = prompts.filter(p => p.fullPrompt.trim() !== "");
     if (activePrompts.length === 0) {

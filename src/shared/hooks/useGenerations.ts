@@ -47,6 +47,21 @@ export function useGenerations(projectId: string | null, page: number = 1, limit
         .limit(1000);
       
       if (error) throw error;
+
+      // [ImageDuplicationIssue] Debug duplicate IDs in fetched data
+      if (data) {
+        const ids = data.map((item: any) => item.id);
+        const urls = data.map((item: any) => item.location);
+        const duplicateIds = ids.filter((id: string, idx: number) => ids.indexOf(id) !== idx);
+        const duplicateUrls = urls.filter((url: string, idx: number) => url && urls.indexOf(url) !== idx);
+        console.log('[ImageDuplicationIssue][useGenerations] Raw rows:', data.length, 'Duplicate IDs:', duplicateIds.length, 'Duplicate URLs:', duplicateUrls.length);
+        if (duplicateIds.length > 0) {
+          console.warn('[ImageDuplicationIssue][useGenerations] Duplicate generation IDs:', duplicateIds);
+        }
+        if (duplicateUrls.length > 0) {
+          console.warn('[ImageDuplicationIssue][useGenerations] Duplicate image URLs:', duplicateUrls.slice(0, 10));
+        }
+      }
       
       return data?.map((item: any) => ({
         id: item.id,

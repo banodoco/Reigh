@@ -367,6 +367,24 @@ export async function processCompletedSingleImageTask(task: Task): Promise<void>
 
   console.log(`[SingleImageGenDebug] Processing completed single_image task ${task.id}.`);
 
+  /* --- NEW: Claim the task atomically to avoid double processing --- */
+  try {
+    // Attempt to set generationProcessedAt; if another worker already did it first, rowsAffected will be 0
+    const claimResult = await db
+      .update(tasksSchema)
+      .set({ generationProcessedAt: new Date() })
+      .where(and(eq(tasksSchema.id, task.id), isNull(tasksSchema.generationProcessedAt)))
+      .returning();
+
+    if (claimResult.length === 0) {
+      console.warn(`[SingleImageGenDebugDup] Task ${task.id} was already claimed by another worker. Skipping duplicate generation insert.`);
+      return;
+    }
+  } catch (claimErr) {
+    console.error(`[SingleImageGenDebugDup] Error claiming task ${task.id}:`, claimErr);
+    return;
+  }
+
   // Determine the output image location. Prefer the dedicated column, but also fallback to common param locations
   let outputLocation: string | undefined = task.outputLocation;
 
@@ -387,6 +405,33 @@ export async function processCompletedSingleImageTask(task: Task): Promise<void>
   outputLocation = normalizeImagePath(outputLocation);
 
   try {
+    // Check if generation with same location already exists for this project to avoid duplicates
+    const existingGenerations = await db
+      .select()
+      .from(generationsSchema)
+      .where(
+        and(
+          eq(generationsSchema.projectId, task.projectId),
+          eq(generationsSchema.location, outputLocation)
+        )
+      );
+
+    if (existingGenerations.length > 0) {
+      console.warn(`[SingleImageGenDebugDup] Generation with same location already exists (id: ${existingGenerations[0].id}) for task ${task.id}. Skipping duplicate insertion.`);
+      // Still mark as processed to prevent further duplicates
+      await db.update(tasksSchema)
+        .set({ generationProcessedAt: new Date() })
+        .where(eq(tasksSchema.id, task.id));
+
+      // Notify client of update
+      await broadcast({
+        type: 'TASK_COMPLETED',
+        payload: { taskId: task.id, projectId: task.projectId },
+      });
+      await broadcast({ type: 'GENERATIONS_UPDATED', payload: { projectId: task.projectId } });
+      return;
+    }
+
     const newGenerationId = randomUUID();
     const insertedGenerations = await db.insert(generationsSchema).values({
       id: newGenerationId,

@@ -105,6 +105,22 @@ const ImageGenerationToolPage: React.FC = () => {
     setShowPlaceholders(!isLoadingGenerations && (!generatedImagesData || generatedImagesData.length === 0));
   }, [generatedImagesData, isLoadingGenerations]);
 
+  useEffect(() => {
+    if (generatedImagesData) {
+      const ids = generatedImagesData.map(img => img.id);
+      const urls = generatedImagesData.map(img => img.url);
+      const duplicateIds = ids.filter((id, idx) => ids.indexOf(id) !== idx);
+      const duplicateUrls = urls.filter((url, idx) => url && urls.indexOf(url) !== idx);
+      console.log('[ImageDuplicationIssue][ImageGenerationToolPage] Rows:', generatedImagesData.length, 'Dup IDs:', duplicateIds.length, 'Dup URLs:', duplicateUrls.length);
+      if (duplicateIds.length > 0) {
+        console.warn('[ImageDuplicationIssue][ImageGenerationToolPage] Duplicate IDs:', duplicateIds);
+      }
+      if (duplicateUrls.length > 0) {
+        console.warn('[ImageDuplicationIssue][ImageGenerationToolPage] Duplicate URLs:', duplicateUrls.slice(0, 10));
+      }
+    }
+  }, [generatedImagesData]);
+
   const handleDeleteImage = async (id: string) => {
     deleteGenerationMutation?.mutate(id);
   };
@@ -206,7 +222,8 @@ const ImageGenerationToolPage: React.FC = () => {
             project_id: selectedProjectId,
             prompt: promptEntry.fullPrompt,
             resolution: restOfFormData.determinedApiImageSize || undefined,
-            seed: 11111 + globalIndex * 100, // Vary seed deterministically across all images
+            // Generate a random seed for each task to ensure diverse outputs (32-bit signed integer range)
+            seed: Math.floor(Math.random() * 0x7fffffff),
             loras: lorasMapped,
           };
         });
