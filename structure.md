@@ -149,6 +149,8 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
 - `single-image-generate`: Handles wan-local image generation tasks
 - `steerable-motion`: Handles video travel generation tasks
 - `generate-prompts`: Generates prompt suggestions via OpenAI server-side, logging token usage and cost
+- `edit-prompt`: Edits prompts with AI instructions server-side, supports smart/fast models
+- `generate-summary`: Generates short summaries for prompts server-side
 
 ##### Remaining Express Endpoints (to be migrated):
 - `/api/tasks/*` - Task management (list, update status, cancel)
