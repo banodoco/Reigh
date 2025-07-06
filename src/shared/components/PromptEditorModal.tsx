@@ -53,7 +53,6 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
 }) => {
   const [internalPrompts, setInternalPrompts] = useState<PromptEntry[]>([]);
   const [promptToEdit, setPromptToEdit] = useState<PromptToEditState | null>(null);
-  const actualCanUseAI = !!apiKey;
   const [activeTab, setActiveTab] = useState<EditorMode>('generate');
   const [activePromptIdForFullView, setActivePromptIdForFullView] = useState<string | null>(null);
   const modalStyle = usePaneAwareModalStyle();
@@ -90,16 +89,15 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
   // -------------------------------------------------------------
   const { selectedProjectId } = useProject();
 
-  const { markAsInteracted } = usePersistentToolState<PersistedEditorControlsSettings>(
-    'prompt-editor', // isolated settings bucket for this modal
-    { projectId: selectedProjectId || undefined },
+  const { ready, markAsInteracted } = usePersistentToolState<PersistedEditorControlsSettings>(
+    'prompt-editor-controls',
+    { projectId: null },
     {
       generationSettings: [generationControlValues, setGenerationControlValues],
       bulkEditSettings: [bulkEditControlValues, setBulkEditControlValues],
       activeTab: [activeTab, setActiveTab],
       isAIPromptSectionExpanded: [isAIPromptSectionExpanded, setIsAIPromptSectionExpanded],
-    },
-    { debounceMs: 1000, scope: 'project' }
+    }
   );
 
   // Effect to initialize modal state (prompts) on open – persistence handled by hook
@@ -115,14 +113,18 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
     }
   }, [isOpen, initialPrompts]);
 
-  const { 
-    generatePrompts: aiGeneratePrompts, 
-    editPromptWithAI: aiEditPrompt, 
+  const {
+    generatePrompts: aiGeneratePrompts,
+    editPromptWithAI: aiEditPrompt,
     generateSummary: aiGenerateSummary,
-    isLoading: isAILoading, 
-    isGenerating: isAIGenerating, 
-    isEditing: isAIEditing 
-  } = useAIInteractionService({ apiKey, generatePromptId });
+    isGenerating: isAIGenerating,
+    isEditing: isAIEditing,
+    isSummarizing: isAISummarizing,
+    isLoading: isAILoading,
+  } = useAIInteractionService({
+    apiKey,
+    generatePromptId,
+  });
 
   const handleFinalSaveAndClose = () => {
     console.log(`[PromptEditorModal] 'Close' button clicked. Saving prompts. Count: ${internalPrompts.length}`, JSON.stringify(internalPrompts.map(p => ({id: p.id, text: p.fullPrompt.substring(0,30)+'...'}))));
@@ -231,7 +233,6 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
   
 
   const handleBulkEditPrompts = async (params: BEC_BulkEditParams) => {
-    if (!actualCanUseAI) { toast.error("API Key required for AI editing."); return; }
     if (internalPrompts.length === 0) { toast.info("No prompts to edit."); return; }
     console.log("[PromptEditorModal] AI Bulk Edit: Starting bulk edit. Params:", JSON.stringify(params));
     
@@ -280,8 +281,8 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
   };
 
   const handleConfirmEditWithAI = async () => {
-    if (!promptToEdit || !actualCanUseAI) {
-      toast.error("Cannot perform AI edit. Missing data or API key.");
+    if (!promptToEdit) {
+      toast.error("Cannot perform AI edit. Missing data.");
       return;
     }
     console.log(`[PromptEditorModal] AI Individual Edit: Attempting to edit prompt ID: ${promptToEdit.id}. Instructions: "${promptToEdit.instructions}"`);
@@ -314,7 +315,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
     }
   };
 
-  // if (!isOpen) return null;  // Commented out to keep hook order stable
+  if (!isOpen) return null;
 
   const toggleFullView = (promptId: string) => {
     setActivePromptIdForFullView(currentId => currentId === promptId ? null : promptId);
@@ -364,7 +365,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
                     {!isAIPromptSectionExpanded && <Sparkles className="h-3 w-3 text-pink-400 animate-pulse" />}
                   </span>
                   <span className="text-sm text-muted-foreground">
-                    {actualCanUseAI ? "(Generate new or bulk edit existing prompts)" : "(Editing prompts requires API key)"}
+                    (Generate new or bulk edit existing prompts)
                   </span>
                 </div>
                 {isAIPromptSectionExpanded ? (
@@ -376,18 +377,10 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
             </CollapsibleTrigger>
             <CollapsibleContent>
               <div className="bg-accent/30 border border-accent-foreground/10 rounded-lg p-4 mb-4">
-                {!actualCanUseAI && (
-                  <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 text-yellow-900 rounded-md text-sm">
-                    <div className="flex items-center gap-2">
-                      <AlertTriangle className="h-4 w-4 text-yellow-600" />
-                      <span>Editing prompts with AI requires an OpenAI API key. Prompt generation works without it.</span>
-                    </div>
-                  </div>
-                )}
                 <Tabs value={activeTab} onValueChange={(value) => { markAsInteracted(); setActiveTab(value as EditorMode); }}>
                   <TabsList className="grid w-full grid-cols-2 mb-4">
                     <TabsTrigger value="generate"><Wand2Icon className="mr-2 h-4 w-4" />Generate New</TabsTrigger>
-                    <TabsTrigger value="bulk-edit" disabled={!actualCanUseAI}><Edit className="mr-2 h-4 w-4" />Bulk Edit All</TabsTrigger>
+                    <TabsTrigger value="bulk-edit"><Edit className="mr-2 h-4 w-4" />Bulk Edit All</TabsTrigger>
                   </TabsList>
                   <TabsContent value="generate">
                     <PromptGenerationControls 
@@ -405,7 +398,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
                       isEditing={isAIEditing}
                       initialValues={bulkEditControlValues}
                       onValuesChange={handleBulkEditValuesChange}
-                      hasApiKey={actualCanUseAI}
+                      hasApiKey={true}
                       numberOfPromptsToEdit={internalPrompts.length}
                     />
                   </TabsContent>
