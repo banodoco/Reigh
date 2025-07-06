@@ -325,9 +325,8 @@ python headless.py --db-type supabase \\
 
                     <TabsContent value="generate-locally" className="space-y-4">
             <div className="space-y-4">
-              {/* Local Generation Setup - Only show when "On my computer" is checked */}
-              {onComputerChecked && (
-                <div className="space-y-4">
+              {/* Local Generation Setup */}
+              <div className="space-y-4">
                   {!hasValidToken ? (
                     <div className="space-y-4">
                       <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
@@ -424,7 +423,7 @@ python headless.py --db-type supabase \\
                                   showFullInstallCommand ? 'overflow-x-auto' : ''
                                 }`}
                                 style={{
-                                  height: showFullInstallCommand ? 'auto' : '30px'
+                                  height: showFullInstallCommand ? 'auto' : '100px'
                                 }}
                               >
                                 <pre className="whitespace-pre-wrap break-all">
@@ -495,7 +494,7 @@ python headless.py --db-type supabase \\
                                   showFullRunCommand ? 'overflow-x-auto' : ''
                                 }`}
                                 style={{
-                                  height: showFullRunCommand ? 'auto' : '30px'
+                                  height: showFullRunCommand ? 'auto' : '100px'
                                 }}
                               >
                                 <pre className="whitespace-pre-wrap break-all">
@@ -558,7 +557,6 @@ python headless.py --db-type supabase \\
 
 
                 </div>
-              )}
             </div>
           </TabsContent>
 
