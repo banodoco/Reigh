@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Settings, Key, Copy, Trash2, AlertCircle, Terminal, Coins, Monitor } from "lucide-react";
+import { Settings, Key, Copy, Trash2, AlertCircle, Terminal, Coins, Monitor, LogOut } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -20,6 +20,7 @@ import { useApiTokens } from "@/shared/hooks/useApiTokens";
 import usePersistentState from "@/shared/hooks/usePersistentState";
 import { useUserUIState } from "@/shared/hooks/useUserUIState";
 import { useCredits } from "@/shared/hooks/useCredits";
+import { supabase } from "@/integrations/supabase/client";
 import { 
   Select,
   SelectContent,
@@ -228,12 +229,25 @@ python headless.py --db-type supabase \\
     updateSettingsModalState({ activeTab: 'credits-management' });
   };
 
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    onOpenChange(false); // Close the modal after signing out
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+        <DialogHeader className="relative">
           <DialogTitle className="text-2xl">App Settings</DialogTitle>
-
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleSignOut}
+            className="absolute top-0 right-0 flex items-center gap-2 text-muted-foreground hover:text-foreground"
+          >
+            <LogOut className="h-4 w-4" />
+            Sign out
+          </Button>
         </DialogHeader>
         
         {/* Generation Method Selection - Shown for all tabs */}
