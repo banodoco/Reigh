@@ -364,7 +364,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
                     {!isAIPromptSectionExpanded && <Sparkles className="h-3 w-3 text-pink-400 animate-pulse" />}
                   </span>
                   <span className="text-sm text-muted-foreground">
-                    {actualCanUseAI ? "(Generate new or bulk edit existing prompts)" : "(API key required)"}
+                    {actualCanUseAI ? "(Generate new or bulk edit existing prompts)" : "(Editing prompts requires API key)"}
                   </span>
                 </div>
                 {isAIPromptSectionExpanded ? (
@@ -377,10 +377,10 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
             <CollapsibleContent>
               <div className="bg-accent/30 border border-accent-foreground/10 rounded-lg p-4 mb-4">
                 {!actualCanUseAI && (
-                  <div className="mb-4 p-3 bg-yellow-100 border border-yellow-300 text-yellow-800 rounded-md">
-                    <div className="flex items-center">
-                      <AlertTriangle className="h-5 w-5 text-yellow-600 mr-2" />
-                      <span>AI features are disabled. Please enter an API key in settings.</span>
+                  <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 text-yellow-900 rounded-md text-sm">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                      <span>Editing prompts with AI requires an OpenAI API key. Prompt generation works without it.</span>
                     </div>
                   </div>
                 )}
