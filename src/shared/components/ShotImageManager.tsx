@@ -323,6 +323,10 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
           onNext={handleNext}
           onPrevious={handlePrevious}
           onImageSaved={onImageSaved ? (newImageUrl: string) => onImageSaved(images[lightboxIndex].id, newImageUrl) : undefined}
+          showNavigation={true}
+          showImageEditTools={true}
+          showDownload={true}
+          videoPlayerComponent="hover-scrub"
         />
       )}
     </DndContext>

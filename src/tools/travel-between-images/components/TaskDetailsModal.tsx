@@ -54,7 +54,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
   const [isOpen, setIsOpen] = useState(false);
   const [task, setTask] = useState<Task | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [replaceImages, setReplaceImages] = useState(false);
+  const [replaceImages, setReplaceImages] = useState(true);
   const [taskId, setTaskId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -219,78 +219,79 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
   const resolution = getResolution();
 
   const handleApplySettings = () => {
-    // Use the new approach if available, otherwise fall back to the old one
+    // Use the working approach with extracted settings
+    if (onApplySettings && task) {
+      const settings: any = {
+        // Pass the full arrays for by-pair mode handling
+        prompts: orchestratorDetails?.base_prompts_expanded ?? [],
+        frames: orchestratorDetails?.segment_frames_expanded ?? [],
+        negativePrompts: orchestratorDetails?.negative_prompts_expanded ?? [],
+        contexts: orchestratorDetails?.frame_overlap_expanded ?? [],
+      };
+      
+      // Include image replacement data if checkbox is checked
+      if (replaceImages && inputImages.length > 0) {
+        settings.replaceImages = true;
+        settings.inputImages = inputImages;
+      }
+      
+      // Extract single values for fallback or batch-like application
+      const prompt = getPrompt();
+      if (prompt && prompt !== 'N/A') {
+        settings.prompt = prompt;
+      }
+      
+      const negativePrompt = getNegativePrompt();
+      if (negativePrompt && negativePrompt !== 'N/A') {
+        settings.negativePrompt = negativePrompt;
+      }
+      
+      const steps = getSteps();
+      if (steps && steps !== 'N/A') {
+        const stepsNum = typeof steps === 'number' ? steps : parseInt(steps.toString(), 10);
+        if (!isNaN(stepsNum)) {
+          settings.steps = stepsNum;
+        }
+      }
+
+      const resolution = getResolution();
+      if (resolution && resolution !== 'N/A') {
+        if (typeof resolution === 'string' && resolution.includes('x')) {
+          const [width, height] = resolution.split('x').map(n => parseInt(n, 10));
+          if (!isNaN(width) && !isNaN(height)) {
+            settings.width = width;
+            settings.height = height;
+          }
+        } else if (Array.isArray(resolution) && resolution.length === 2) {
+          const [width, height] = resolution;
+          if (typeof width === 'number' && typeof height === 'number') {
+            settings.width = width;
+            settings.height = height;
+          }
+        }
+      }
+      
+      // Add single frame and context for batch mode
+      if (settings.frames.length > 0) {
+          settings.frame = settings.frames[0];
+      }
+      if (settings.contexts.length > 0) {
+          settings.context = settings.contexts[0];
+      }
+
+      onApplySettings(settings);
+      setIsOpen(false);
+      // Toast will be shown by parent handler
+      return; // Exit early to prevent fallback
+    }
+    
+    // Fallback to the new approach if the old one isn't available
     if (onApplySettingsFromTask && taskId) {
       onApplySettingsFromTask(taskId, replaceImages, inputImages);
       setIsOpen(false);
-      toast.success('Settings applied successfully!');
+      // Toast will be shown by parent handler
       return;
     }
-    
-    // Fall back to the old approach for backwards compatibility
-    if (!onApplySettings || !task) return;
-
-    const settings: any = {
-      // Pass the full arrays for by-pair mode handling
-      prompts: orchestratorDetails?.base_prompts_expanded ?? [],
-      frames: orchestratorDetails?.segment_frames_expanded ?? [],
-      negativePrompts: orchestratorDetails?.negative_prompts_expanded ?? [],
-      contexts: orchestratorDetails?.frame_overlap_expanded ?? [],
-    };
-    
-    // Include image replacement data if checkbox is checked
-    if (replaceImages && inputImages.length > 0) {
-      settings.replaceImages = true;
-      settings.inputImages = inputImages;
-    }
-    
-    // Extract single values for fallback or batch-like application
-    const prompt = getPrompt();
-    if (prompt && prompt !== 'N/A') {
-      settings.prompt = prompt;
-    }
-    
-    const negativePrompt = getNegativePrompt();
-    if (negativePrompt && negativePrompt !== 'N/A') {
-      settings.negativePrompt = negativePrompt;
-    }
-    
-    const steps = getSteps();
-    if (steps && steps !== 'N/A') {
-      const stepsNum = typeof steps === 'number' ? steps : parseInt(steps.toString(), 10);
-      if (!isNaN(stepsNum)) {
-        settings.steps = stepsNum;
-      }
-    }
-
-    const resolution = getResolution();
-    if (resolution && resolution !== 'N/A') {
-      if (typeof resolution === 'string' && resolution.includes('x')) {
-        const [width, height] = resolution.split('x').map(n => parseInt(n, 10));
-        if (!isNaN(width) && !isNaN(height)) {
-          settings.width = width;
-          settings.height = height;
-        }
-      } else if (Array.isArray(resolution) && resolution.length === 2) {
-        const [width, height] = resolution;
-        if (typeof width === 'number' && typeof height === 'number') {
-          settings.width = width;
-          settings.height = height;
-        }
-      }
-    }
-    
-    // Add single frame and context for batch mode
-    if (settings.frames.length > 0) {
-        settings.frame = settings.frames[0];
-    }
-    if (settings.contexts.length > 0) {
-        settings.context = settings.contexts[0];
-    }
-
-    onApplySettings(settings);
-    setIsOpen(false);
-    toast.success('Settings applied successfully!');
   };
 
   return (
@@ -444,25 +445,27 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
         <DialogFooter className="flex-shrink-0 pt-4 border-t">
           <div className="flex justify-between w-full items-center">
             <div className="flex items-center space-x-4">
-              {onApplySettings && task && (
-                <Button 
-                  variant="default" 
-                  onClick={handleApplySettings}
-                  className="text-sm"
-                >
-                  Use These Settings
-                </Button>
-              )}
               {inputImages.length > 0 && (
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="replaceImages"
-                    checked={replaceImages}
-                    onCheckedChange={(checked) => setReplaceImages(checked as boolean)}
-                  />
-                  <Label htmlFor="replaceImages" className="text-sm font-medium">
-                    Replace these images
-                  </Label>
+                <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="replaceImages"
+                      checked={replaceImages}
+                      onCheckedChange={(checked) => setReplaceImages(checked as boolean)}
+                    />
+                    <Label htmlFor="replaceImages" className="text-sm font-medium">
+                      Replace these images
+                    </Label>
+                  </div>
+                  {onApplySettings && task && (
+                    <Button 
+                      variant="default" 
+                      onClick={handleApplySettings}
+                      className="text-sm"
+                    >
+                      Apply These Settings
+                    </Button>
+                  )}
                 </div>
               )}
             </div>

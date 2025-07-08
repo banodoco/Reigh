@@ -426,7 +426,7 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps> = ({ loras, onAddLora,
                                 src={image.url}
                                 className="h-28 w-auto rounded border p-0.5 hover:opacity-80 transition-opacity cursor-pointer"
                                 videoClassName="object-contain"
-                                enableScrubbing={false}
+                                
                                 loop
                                 muted
                               />

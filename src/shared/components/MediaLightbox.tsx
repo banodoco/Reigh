@@ -1,270 +1,365 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
-import ReactDOM from 'react-dom';
-import { X, ChevronLeft, ChevronRight, FlipHorizontal, Save } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { ChevronLeft, ChevronRight, X, FlipHorizontal, Save, Download, Trash2, Settings, PlusCircle, CheckCircle } from 'lucide-react';
 import { GenerationRow } from '@/types/shots';
-import HoverScrubVideo from '@/shared/components/HoverScrubVideo';
-import { getDisplayUrl } from '../lib/utils';
-import { usePanes } from '@/shared/contexts/PanesContext';
+import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Button } from '@/shared/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
-import { useToast } from '@/shared/hooks/use-toast';
-import { uploadImageToStorage } from '@/shared/lib/imageUploader';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
+import { getDisplayUrl, cn } from '@/shared/lib/utils';
+import HoverScrubVideo from '@/shared/components/HoverScrubVideo';
+import SimpleVideoPlayer from '@/tools/travel-between-images/components/SimpleVideoPlayer';
+
+interface Shot {
+  id: string;
+  name: string;
+}
 
 interface MediaLightboxProps {
   media: GenerationRow;
   onClose: () => void;
-  onNext: () => void;
-  onPrevious: () => void;
-  onImageSaved?: (newImageUrl: string) => void; // Callback when image is saved with changes
+  onNext?: () => void;
+  onPrevious?: () => void;
+  onImageSaved?: (newImageUrl: string) => void;
+  // Configuration props to control features
+  showNavigation?: boolean;
+  showImageEditTools?: boolean;
+  showDownload?: boolean;
+  videoPlayerComponent?: 'hover-scrub' | 'simple-player';
+  // Workflow-specific props
+  allShots?: Shot[];
+  selectedShotId?: string;
+  onShotChange?: (shotId: string) => void;
+  onAddToShot?: (generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
+  onDelete?: (id: string) => void;
+  isDeleting?: string | null;
+  onApplySettings?: (metadata: any) => void;
+  showTickForImageId?: string | null;
+  onShowTick?: (imageId: string) => void;
 }
 
-const isVideo = (media: GenerationRow): boolean => {
-  const url = media.location || media.imageUrl;
-  return url ? (url.toLowerCase().endsWith('.webm') || url.toLowerCase().endsWith('.mp4') || url.toLowerCase().endsWith('.mov')) : false;
-};
-
-const MediaLightbox: React.FC<MediaLightboxProps> = ({ media, onClose, onNext, onPrevious, onImageSaved }) => {
+const MediaLightbox: React.FC<MediaLightboxProps> = ({ 
+  media, 
+  onClose, 
+  onNext, 
+  onPrevious, 
+  onImageSaved,
+  showNavigation = true,
+  showImageEditTools = true,
+  showDownload = true,
+  videoPlayerComponent = 'hover-scrub',
+  // Workflow-specific props
+  allShots = [],
+  selectedShotId,
+  onShotChange,
+  onAddToShot,
+  onDelete,
+  isDeleting,
+  onApplySettings,
+  showTickForImageId,
+  onShowTick
+}) => {
   const [isFlippedHorizontally, setIsFlippedHorizontally] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const imgRef = useRef<HTMLImageElement>(null);
-  const { toast } = useToast();
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  
+  const isVideo = media.type === 'video_travel_output' || media.location?.endsWith('.mp4');
+  const displayUrl = getDisplayUrl(media.location || media.imageUrl);
 
-  const { 
-    isTasksPaneLocked, 
-    tasksPaneWidth, 
-    isShotsPaneLocked, 
-    shotsPaneWidth, 
-    isGenerationsPaneLocked, 
-    generationsPaneHeight 
-  } = usePanes();
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-      if (e.key === 'ArrowRight') onNext();
-      if (e.key === 'ArrowLeft') onPrevious();
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose, onNext, onPrevious]);
-
-  // Function to create a canvas with the flipped image
-  const createFlippedCanvas = useCallback(async (): Promise<HTMLCanvasElement> => {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          reject(new Error('Could not get canvas context'));
-          return;
-        }
-
-        canvas.width = img.width;
-        canvas.height = img.height;
-
-        // Apply horizontal flip if needed
-        if (isFlippedHorizontally) {
-          ctx.scale(-1, 1);
-          ctx.drawImage(img, -img.width, 0);
-        } else {
-          ctx.drawImage(img, 0, 0);
-        }
-
-        resolve(canvas);
-      };
-      img.onerror = () => reject(new Error('Failed to load image'));
-      img.src = getDisplayUrl(media.imageUrl);
-    });
-  }, [media.imageUrl, isFlippedHorizontally]);
-
-  const handleFlipHorizontal = () => {
+  const handleFlip = () => {
     setIsFlippedHorizontally(!isFlippedHorizontally);
     setHasChanges(true);
   };
 
   const handleSave = async () => {
-    if (!hasChanges) return;
-    
-    console.log(`[MediaLightbox-FlipSave] Starting save process for media:`, { mediaId: media.id, mediaUrl: getDisplayUrl(media.imageUrl || ''), isFlippedHorizontally });
-    
-    setIsSaving(true);
+    if (!hasChanges || !canvasRef.current) return;
+
     try {
-      console.log(`[MediaLightbox-FlipSave] Creating flipped canvas...`);
-      const canvas = await createFlippedCanvas();
-      console.log(`[MediaLightbox-FlipSave] Canvas created:`, { width: canvas.width, height: canvas.height });
-      
-      // Convert canvas to blob
-      canvas.toBlob(async (blob) => {
-        if (!blob) {
-          console.error(`[MediaLightbox-FlipSave] ERROR: Failed to create image blob from canvas`);
-          throw new Error('Failed to create image blob');
-        }
-
-        console.log(`[MediaLightbox-FlipSave] Blob created:`, { size: blob.size, type: blob.type });
-
-        const fileName = `flipped_${media.id || 'image'}_${Date.now()}.png`;
-        const file = new File([blob], fileName, { type: 'image/png' });
-
-        console.log(`[MediaLightbox-FlipSave] Uploading file to Supabase:`, { fileName, fileSize: file.size, fileType: file.type });
-
-        try {
-          // Upload directly to Supabase Storage and get the public URL
-          const newImageUrl = await uploadImageToStorage(file);
-          console.log(`[MediaLightbox-FlipSave] New image URL:`, newImageUrl);
-
-          if (newImageUrl && onImageSaved) {
-            console.log(`[MediaLightbox-FlipSave] Calling onImageSaved callback with:`, { mediaId: media.id, newImageUrl });
-            onImageSaved(newImageUrl);
-          } else {
-            console.warn(`[MediaLightbox-FlipSave] WARNING: No newImageUrl or onImageSaved callback`, { newImageUrl, hasCallback: !!onImageSaved });
-          }
-
+      const canvas = canvasRef.current;
+      canvas.toBlob((blob) => {
+        if (blob && onImageSaved) {
+          const url = URL.createObjectURL(blob);
+          onImageSaved(url);
           setHasChanges(false);
-          console.log(`[MediaLightbox-FlipSave] Save process completed successfully`);
-          toast({ 
-            title: "Image Saved", 
-            description: "Flipped image has been saved successfully",
-          });
-        } catch (error) {
-          console.error('[MediaLightbox-FlipSave] ERROR during upload to Supabase:', error);
-          toast({ 
-            title: "Save Failed", 
-            description: "Could not save the flipped image",
-            variant: "destructive"
-          });
         }
       }, 'image/png');
     } catch (error) {
-      console.error('[MediaLightbox-FlipSave] ERROR creating flipped image:', error);
-      toast({ 
-        title: "Save Failed", 
-        description: "Could not process the image",
-        variant: "destructive"
-      });
-    } finally {
-      setIsSaving(false);
+      console.error('Error saving image:', error);
     }
   };
 
-  const modalStyle = {
-    left: isShotsPaneLocked ? `${shotsPaneWidth}px` : '0px',
-    right: isTasksPaneLocked ? `${tasksPaneWidth}px` : '0px',
-    bottom: isGenerationsPaneLocked ? `${generationsPaneHeight}px` : '0px',
-    top: '0px',
-    transition: 'left 300ms ease-in-out, right 300ms ease-in-out, bottom 300ms ease-in-out',
+  const handleDownload = () => {
+    const link = document.createElement('a');
+    link.href = displayUrl;
+    link.download = `media_${media.id}.${isVideo ? 'mp4' : 'png'}`;
+    link.click();
   };
 
-  const mediaIsVideo = isVideo(media);
+  const handleAddToShot = async () => {
+    if (!onAddToShot || !selectedShotId) return;
+    
+    const success = await onAddToShot(media.id, media.imageUrl, media.thumbUrl);
+    if (success && onShowTick) {
+      onShowTick(media.id);
+    }
+  };
 
-  return ReactDOM.createPortal(
+  const handleDelete = () => {
+    if (onDelete) {
+      onDelete(media.id);
+    }
+  };
+
+  const handleApplySettings = () => {
+    if (onApplySettings && media.metadata) {
+      onApplySettings(media.metadata);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowLeft' && onPrevious) {
+      onPrevious();
+    } else if (e.key === 'ArrowRight' && onNext) {
+      onNext();
+    } else if (e.key === 'Escape') {
+      onClose();
+    }
+  };
+
+  return (
     <TooltipProvider>
-      <div 
-        className="fixed bg-black/80 flex items-center justify-center z-[99999] animate-in fade-in isolate"
-        style={modalStyle}
-        onClick={onClose}
-      >
-        <button 
-          onClick={(e) => { e.stopPropagation(); onPrevious(); }} 
-          className="absolute left-4 top-1/2 -translate-y-1/2 text-white/70 hover:text-white transition-colors z-10 p-2 rounded-full bg-black/20 hover:bg-black/40"
-          aria-label="Previous image"
-        >
-          <ChevronLeft size={40} />
-        </button>
+      <DialogPrimitive.Root open={true} onOpenChange={(open) => !open && onClose()}>
+        <DialogPrimitive.Portal>
+          <DialogPrimitive.Overlay 
+            className="fixed inset-0 z-[10000] bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+          />
+          <DialogPrimitive.Content
+            className={cn(
+              "fixed left-[50%] top-[50%] z-[10000] translate-x-[-50%] translate-y-[-50%] duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]",
+              "w-auto h-auto p-0 border-none bg-transparent shadow-none"
+            )}
+            onKeyDown={handleKeyDown}
+            onPointerDownOutside={onClose}
+          >
+            <div 
+              className="relative flex items-center justify-center" 
+              style={{
+                maxHeight: '90vh',
+                maxWidth: '90vw'
+              }}
+            >
+              {/* Media Content */}
+              <div className="relative">
+                {isVideo ? (
+                  videoPlayerComponent === 'simple-player' ? (
+                    <SimpleVideoPlayer
+                      src={displayUrl}
+                      poster={media.thumbUrl}
+                      className="w-full h-full max-h-[80vh] object-contain"
+                    />
+                  ) : (
+                    <HoverScrubVideo
+                      src={displayUrl}
+                      poster={media.thumbUrl}
+                      className="w-full h-full max-h-[80vh] object-contain"
+                    />
+                  )
+                ) : (
+                  <div className="relative">
+                    <img 
+                      src={displayUrl} 
+                      alt="Media content"
+                      className={`w-full h-full object-contain ${
+                        isFlippedHorizontally ? 'scale-x-[-1]' : ''
+                      }`}
+                      style={{ 
+                        maxHeight: '80vh',
+                        maxWidth: '80vw',
+                        transform: isFlippedHorizontally ? 'scaleX(-1)' : 'none'
+                      }}
+                    />
+                    {/* Hidden canvas for image processing */}
+                    <canvas 
+                      ref={canvasRef}
+                      className="hidden"
+                      width={800}
+                      height={600}
+                    />
+                  </div>
+                )}
+              </div>
 
-        <div 
-          className="relative w-full max-w-5xl h-auto"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {mediaIsVideo ? (
-              <HoverScrubVideo
-                  src={getDisplayUrl(media.location || media.imageUrl)}
-                  poster={getDisplayUrl(media.thumbUrl)}
-                  className="w-full h-full object-contain"
-              />
-          ) : (
-              <img 
-                  ref={imgRef}
-                  src={getDisplayUrl(media.imageUrl)} 
-                  alt={media.metadata?.prompt || 'Lightbox image'} 
-                  className={`max-h-[90vh] w-full object-contain transition-transform duration-200 ${
-                    isFlippedHorizontally ? 'scale-x-[-1]' : ''
-                  }`}
-              />
-          )}
+              {/* Top Controls */}
+              <div className="absolute top-4 right-4 flex items-center space-x-2 z-10">
+                {!isVideo && showImageEditTools && (
+                  <>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={handleFlip}
+                          className="bg-black/50 hover:bg-black/70 text-white"
+                        >
+                          <FlipHorizontal className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Flip horizontally</TooltipContent>
+                    </Tooltip>
 
-          {/* Image controls (only show for images, not videos) */}
-          {!mediaIsVideo && (
-            <div className="absolute bottom-4 left-4 flex items-center space-x-2">
-              {/* Flip Horizontal Button */}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className={`bg-black/50 hover:bg-black/70 text-white border-white/20 ${
-                      isFlippedHorizontally ? 'bg-blue-600 border-blue-400' : ''
-                    }`}
-                    onClick={handleFlipHorizontal}
-                  >
-                    <FlipHorizontal className="h-4 w-4 mr-2" />
-                    Flip
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="top"><p>Flip Horizontally</p></TooltipContent>
-              </Tooltip>
+                    {hasChanges && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={handleSave}
+                            className="bg-green-600/80 hover:bg-green-600 text-white"
+                          >
+                            <Save className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Save changes</TooltipContent>
+                      </Tooltip>
+                    )}
+                  </>
+                )}
 
-              {/* Save Button (only show when there are changes) */}
-              {hasChanges && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
+                {showDownload && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={handleDownload}
+                        className="bg-black/50 hover:bg-black/70 text-white"
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Download {isVideo ? 'video' : 'image'}</TooltipContent>
+                  </Tooltip>
+                )}
+
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={onClose}
+                  className="bg-black/50 hover:bg-black/70 text-white"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+
+              {/* Bottom Workflow Controls */}
+              {(onAddToShot || onDelete || onApplySettings) && (
+                <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex items-center space-x-2 z-10">
+                  <div className="bg-black/80 backdrop-blur-sm rounded-lg p-2 flex items-center space-x-2">
+                    {/* Shot Selection and Add to Shot */}
+                    {onAddToShot && allShots.length > 0 && (
+                      <>
+                        <Select value={selectedShotId} onValueChange={onShotChange}>
+                          <SelectTrigger className="w-32 h-8 bg-black/50 border-white/20 text-white text-xs">
+                            <SelectValue placeholder="Select shot" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {allShots.map((shot) => (
+                              <SelectItem key={shot.id} value={shot.id}>
+                                {shot.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={handleAddToShot}
+                              disabled={!selectedShotId}
+                              className="bg-blue-600/80 hover:bg-blue-600 text-white h-8 px-3"
+                            >
+                              {showTickForImageId === media.id ? (
+                                <CheckCircle className="h-4 w-4" />
+                              ) : (
+                                <PlusCircle className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Add to shot</TooltipContent>
+                        </Tooltip>
+                      </>
+                    )}
+
+                    {/* Apply Settings */}
+                    {onApplySettings && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={handleApplySettings}
+                            className="bg-purple-600/80 hover:bg-purple-600 text-white h-8 px-3"
+                          >
+                            <Settings className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Apply settings</TooltipContent>
+                      </Tooltip>
+                    )}
+
+                    {/* Delete */}
+                    {onDelete && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={handleDelete}
+                            disabled={isDeleting === media.id}
+                            className="bg-red-600/80 hover:bg-red-600 text-white h-8 px-3"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Delete image</TooltipContent>
+                      </Tooltip>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Navigation Controls - Fixed to center vertically */}
+              {showNavigation && (onPrevious || onNext) && (
+                <>
+                  {onPrevious && (
                     <Button
-                      variant="default"
+                      variant="secondary"
                       size="sm"
-                      className="bg-blue-600 hover:bg-blue-700 text-white"
-                      onClick={handleSave}
-                      disabled={isSaving}
+                      onClick={onPrevious}
+                      className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white z-10"
                     >
-                      {isSaving ? (
-                        <>
-                          <div className="h-4 w-4 mr-2 animate-spin rounded-full border-b-2 border-current"></div>
-                          Saving...
-                        </>
-                      ) : (
-                        <>
-                          <Save className="h-4 w-4 mr-2" />
-                          Save
-                        </>
-                      )}
+                      <ChevronLeft className="h-6 w-6" />
                     </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top"><p>Save Changes</p></TooltipContent>
-                </Tooltip>
+                  )}
+                  
+                  {onNext && (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={onNext}
+                      className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white z-10"
+                    >
+                      <ChevronRight className="h-6 w-6" />
+                    </Button>
+                  )}
+                </>
               )}
             </div>
-          )}
-        </div>
-
-        <button 
-          onClick={(e) => { e.stopPropagation(); onNext(); }} 
-          className="absolute right-4 top-1/2 -translate-y-1/2 text-white/70 hover:text-white transition-colors z-10 p-2 rounded-full bg-black/20 hover:bg-black/40"
-          aria-label="Next image"
-        >
-          <ChevronRight size={40} />
-        </button>
-
-        <button 
-          onClick={onClose} 
-          className="absolute top-4 right-4 text-white/70 hover:text-white transition-colors"
-          aria-label="Close lightbox"
-        >
-          <X size={32} />
-        </button>
-      </div>
-    </TooltipProvider>,
-    document.body
+          </DialogPrimitive.Content>
+        </DialogPrimitive.Portal>
+      </DialogPrimitive.Root>
+    </TooltipProvider>
   );
 };
 

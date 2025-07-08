@@ -179,7 +179,7 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
 - **components/BatchSettingsForm.tsx**: Form for batch video gen settings (prompts, frames, etc.). Includes "Enhance prompt" checkbox that requires OpenAI API key for AI-powered prompt improvement. Features mutually exclusive LoRA toggles: "Apply Causvid" and "Use LightI2X LoRA" where only one can be enabled at a time.
 - **components/VideoOutputsGallery.tsx**: Displays generated videos for a shot (pagination, lightbox). Updated to show 3 videos per row consistently across screen sizes.
 - **components/SimpleVideoPlayer.tsx**: Clean video player with speed controls (-2x, -1x, 1x, 2x). Replaces complex HoverScrubVideo functionality in lightbox for simplified playback experience.
-- **components/VideoLightbox.tsx**: Modal video player using SimpleVideoPlayer for clean viewing experience.
+<!-- Removed VideoLightbox component: functionality replaced by MediaLightbox -->
 - **components/TaskDetailsModal.tsx**: Dialog for detailed task parameters (fetches by generation ID). Features "Use These Settings" button that extracts and applies generation parameters (prompt, negative prompt, steps, frames, context, resolution) to BatchSettingsForm. Automatically deduplicates repeated prompts and handles expanded parameter arrays.
 - **components/VideoShotDisplay.tsx**: Displays shot's images & name. Allows selection. Inline name edit, delete (API). Used by ShotListDisplay.
 - **components/ShotListDisplay.tsx**: Renders list of shots using VideoShotDisplay.
@@ -224,7 +224,7 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
 - **FileInput.tsx**: Reusable file input (image/video) with drag-and-drop, preview
 - **MediaLightbox.tsx**: Reusable lightbox for images/videos. Keyboard/button navigation. Now includes horizontal flip functionality for images with canvas-based save capability using local SQLite API
 - **ShotImageManager.tsx**: Manages images in a shot (D&D reorder, delete via callbacks). Used by ShotEditor, ShotsPage.tsx
-- **HoverScrubVideo.tsx**: Wrapper for useVideoScrubbing (hover-play, scrub, progress, rate overlay). Reused by VideoOutputItem, MediaLightbox
+- **HoverScrubVideo.tsx**: Wrapper for useVideoScrubbing (hover-play, scrub, progress, rate overlay). Reused by MediaLightbox
 - **ui/FullscreenImageModal.tsx**: Enhanced fullscreen image modal with horizontal flip, save functionality, navigation between images, and gallery overlay buttons. Features flip button, save button (appears when changes made), canvas-based image processing for accurate flipping, keyboard navigation (arrow keys, ESC), previous/next navigation buttons, and all gallery overlay buttons (shot selector, add to shot, info popover, delete button, timestamp) positioned exactly as in the gallery view. Uses ReactDOM.createPortal for proper z-index layering and local SQLite API for database updates
 
 ##### Hooks

@@ -1,6 +1,5 @@
 // Placeholder: Adjust this type according to your actual GenerationRow structure
 export interface GenerationRow {
-  shotImageEntryId: string; // Unique ID for the shot_images table entry
   id: string; // Assuming generation_id is a string, adjust if it's a number or other type
   // Add other relevant properties from your generations table
   imageUrl?: string; // May specifically be for image previews

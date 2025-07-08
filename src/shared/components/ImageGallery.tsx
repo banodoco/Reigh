@@ -8,9 +8,9 @@ import {
   TooltipTrigger 
 } from "@/shared/components/ui/tooltip";
 import { Popover, PopoverTrigger, PopoverContent } from "@/shared/components/ui/popover";
-import FullscreenImageModal from "@/shared/components/ui/FullscreenImageModal";
+import MediaLightbox from "@/shared/components/MediaLightbox";
 import { useToast } from "@/shared/hooks/use-toast";
-import { Shot } from "@/types/shots";
+import { Shot, GenerationRow } from "@/types/shots";
 import { useLastAffectedShot } from "@/shared/hooks/useLastAffectedShot";
 import { 
   Select,
@@ -181,10 +181,7 @@ const InfoPopover: React.FC<{ metadata: DisplayableMetadata | undefined; metadat
 };
 
 export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, isDeleting, onApplySettings, allShots, lastShotId, onAddToLastShot, currentToolType, initialFilterState = true, onImageSaved, offset = 0, totalCount, whiteText = false, columnsPerRow = 5, initialMediaTypeFilter = 'all' }) => {
-  const [lightboxImageUrl, setLightboxImageUrl] = useState<string | null>(null);
-  const [lightboxImageAlt, setLightboxImageAlt] = useState<string>("Fullscreen view");
-  const [lightboxImageId, setLightboxImageId] = useState<string | undefined>(undefined);
-  const [lightboxImageIndex, setLightboxImageIndex] = useState<number>(-1); // Track current image index for navigation
+  const [activeLightboxMedia, setActiveLightboxMedia] = useState<GenerationRow | null>(null);
   const [downloadingImageId, setDownloadingImageId] = useState<string | null>(null);
   const { toast } = useToast();
   const { setLastAffectedShotId } = useLastAffectedShot();
@@ -234,50 +231,58 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
   }, []);
 
   const handleOpenLightbox = (image: GeneratedImageWithMetadata) => {
-    setLightboxImageUrl(getDisplayUrl(image.url));
-    setLightboxImageAlt(image.prompt || `Generated image with ID ${image.id}`);
-    setLightboxImageId(image.id);
-    setLightboxImageIndex(filteredImages.findIndex(img => img.id === image.id)); // Use filteredImages for correct index
+    // We need to map the partial `GeneratedImageWithMetadata` to a `GenerationRow` for the lightbox
+    const mediaRow: GenerationRow = {
+      id: image.id,
+      imageUrl: image.url,
+      location: image.url, // Assuming url is the location
+      type: image.isVideo ? 'video_travel_output' : 'single_image', // Infer type
+      createdAt: image.createdAt || new Date().toISOString(),
+      metadata: image.metadata,
+      thumbUrl: image.isVideo ? image.url : undefined, // simple fallback
+    };
+    setActiveLightboxMedia(mediaRow);
   };
 
   const handleCloseLightbox = () => {
-    setLightboxImageUrl(null);
-    setLightboxImageAlt("Fullscreen view");
-    setLightboxImageId(undefined);
-    setLightboxImageIndex(-1); // Reset index
+    setActiveLightboxMedia(null);
   };
 
   const handleImageSaved = (newImageUrl: string) => {
-    // Update the lightbox to display the newly saved image immediately
-    setLightboxImageUrl(getDisplayUrl(newImageUrl));
-
-    // Propagate the event to parent if a callback is provided
-    if (lightboxImageId && onImageSaved) {
-      onImageSaved(lightboxImageId, newImageUrl);
+    if (activeLightboxMedia?.id && onImageSaved) {
+      onImageSaved(activeLightboxMedia.id, newImageUrl);
     }
   };
-
+  
   const handleNextImage = () => {
-    if (lightboxImageIndex < filteredImages.length - 1) {
-      const nextIndex = lightboxImageIndex + 1;
-      const nextImage = filteredImages[nextIndex];
-      setLightboxImageUrl(getDisplayUrl(nextImage.url));
-      setLightboxImageAlt(nextImage.prompt || `Generated image with ID ${nextImage.id}`);
-      setLightboxImageId(nextImage.id);
-      setLightboxImageIndex(nextIndex);
+    if (!activeLightboxMedia) return;
+    const currentIndex = filteredImages.findIndex(img => img.id === activeLightboxMedia.id);
+    if (currentIndex < filteredImages.length - 1) {
+      handleOpenLightbox(filteredImages[currentIndex + 1]);
     }
   };
 
   const handlePreviousImage = () => {
-    if (lightboxImageIndex > 0) {
-      const prevIndex = lightboxImageIndex - 1;
-      const prevImage = filteredImages[prevIndex];
-      setLightboxImageUrl(getDisplayUrl(prevImage.url));
-      setLightboxImageAlt(prevImage.prompt || `Generated image with ID ${prevImage.id}`);
-      setLightboxImageId(prevImage.id);
-      setLightboxImageIndex(prevIndex);
+    if (!activeLightboxMedia) return;
+    const currentIndex = filteredImages.findIndex(img => img.id === activeLightboxMedia.id);
+    if (currentIndex > 0) {
+      handleOpenLightbox(filteredImages[currentIndex - 1]);
     }
   };
+
+  const handleShotChange = (shotId: string) => {
+    setSelectedShotIdLocal(shotId);
+    setLastAffectedShotId(shotId);
+  };
+
+  const handleShowTick = (imageId: string) => {
+    setShowTickForImageId(imageId);
+    if (tickTimeoutRef.current) clearTimeout(tickTimeoutRef.current);
+    tickTimeoutRef.current = setTimeout(() => {
+      setShowTickForImageId(null);
+    }, 2000);
+  };
+
 
   const handleDownloadImage = async (rawUrl: string, filename: string, imageId?: string, isVideo?: boolean, originalContentType?: string) => {
     const currentDownloadId = imageId || filename;
@@ -722,42 +727,53 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
         )}
       </div>
       
-      {lightboxImageUrl && (
-        <FullscreenImageModal
-          imageUrl={lightboxImageUrl}
-          imageAlt={lightboxImageAlt}
+      {/* Lightbox Modal */}
+      {activeLightboxMedia && (
+        <MediaLightbox
+          media={activeLightboxMedia}
           onClose={handleCloseLightbox}
-          imageId={lightboxImageId}
-          onImageSaved={handleImageSaved}
           onNext={handleNextImage}
           onPrevious={handlePreviousImage}
-          hasNext={lightboxImageIndex < filteredImages.length - 1}
-          hasPrevious={lightboxImageIndex > 0}
-          currentImage={lightboxImageIndex >= 0 ? {
-            id: filteredImages[lightboxImageIndex].id,
-            url: filteredImages[lightboxImageIndex].url,
-            metadata: filteredImages[lightboxImageIndex].metadata,
-            createdAt: filteredImages[lightboxImageIndex].createdAt
-          } : undefined}
-          allShots={allShots}
+          onImageSaved={handleImageSaved}
+          showNavigation={true}
+          showImageEditTools={!activeLightboxMedia.type.includes('video')}
+          showDownload={true}
+          videoPlayerComponent="simple-player"
+          allShots={simplifiedShotOptions}
           selectedShotId={selectedShotIdLocal}
-          onShotChange={(shotId) => {
-            setSelectedShotIdLocal(shotId);
-            setLastAffectedShotId(shotId);
-          }}
+          onShotChange={handleShotChange}
           onAddToShot={onAddToLastShot}
           onDelete={onDelete}
           isDeleting={isDeleting}
           onApplySettings={onApplySettings}
           showTickForImageId={showTickForImageId}
-          onShowTick={(imageId) => {
-            setShowTickForImageId(imageId);
-            if (tickTimeoutRef.current) clearTimeout(tickTimeoutRef.current);
-            tickTimeoutRef.current = setTimeout(() => {
-              setShowTickForImageId(null);
-            }, 2000);
-          }}
+          onShowTick={handleShowTick}
         />
+      )}
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className={`flex justify-center items-center mt-6 ${whiteText ? 'text-white' : 'text-gray-600'}`}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPage((p) => Math.max(0, p - 1))}
+            disabled={page === 0}
+          >
+            Prev
+          </Button>
+          <span className={`text-sm ${whiteText ? 'text-white' : 'text-muted-foreground'} whitespace-nowrap`}>
+            Showing {rangeStart}-{rangeEnd} (out of {totalFilteredItems})
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+            disabled={page >= totalPages - 1}
+          >
+            Next
+          </Button>
+        </div>
       )}
     </TooltipProvider>
   );

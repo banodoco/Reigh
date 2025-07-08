@@ -1,156 +1,203 @@
-import React, { useState, useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/card";
-import { GenerationRow } from "@/types/shots";
-import VideoLightbox from "./VideoLightbox.tsx";
-import { VideoOutputItem } from './VideoOutputItem';
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/shared/components/ui/pagination";
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { GenerationRow } from '@/types/shots';
+import { Button } from '@/shared/components/ui/button';
+import { Trash2, Info } from 'lucide-react';
+import { Card } from '@/shared/components/ui/card';
+import { Separator } from '@/shared/components/ui/separator';
+import HoverScrubVideo from '@/shared/components/HoverScrubVideo';
+import { getDisplayUrl } from '@/shared/lib/utils';
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/shared/components/ui/pagination';
+import MediaLightbox from '@/shared/components/MediaLightbox';
+import TaskDetailsModal from '@/tools/travel-between-images/components/TaskDetailsModal';
 
 interface VideoOutputsGalleryProps {
   videoOutputs: GenerationRow[];
   onDelete: (generationId: string) => void;
   deletingVideoId: string | null;
-  onApplySettings?: (settings: {
-    prompt?: string;
-    prompts?: string[];
-    negativePrompt?: string;
-    negativePrompts?: string[];
-    steps?: number;
-    frame?: number;
-    frames?: number[];
-    context?: number;
-    contexts?: number[];
-    width?: number;
-    height?: number;
-    replaceImages?: boolean;
-    inputImages?: string[];
-  }) => void;
-  onApplySettingsFromTask?: (taskId: string, replaceImages: boolean, inputImages: string[]) => void;
+  onApplySettings: (generationId: string) => void;
+  onApplySettingsFromTask: (generationId: string) => void;
   onImageSaved?: (newImageUrl: string) => void;
 }
 
-const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({ videoOutputs, onDelete, deletingVideoId, onApplySettings, onApplySettingsFromTask, onImageSaved }) => {
-  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
+  videoOutputs,
+  onDelete,
+  deletingVideoId,
+  onApplySettings,
+  onApplySettingsFromTask,
+  onImageSaved,
+}) => {
   const [currentPage, setCurrentPage] = useState(1);
-  const videosPerPage = 6;
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [selectedVideoForDetails, setSelectedVideoForDetails] = useState<GenerationRow | null>(null);
+  const itemsPerPage = 6;
+  const taskDetailsButtonRef = useRef<HTMLButtonElement>(null);
 
-  /**
-   * NOTE: We previously used a map of setTimeout callbacks (one per video
-   * output) to create a staggered fade-in effect. Chrome surfaced this as
-   * '[Violation] "setTimeout" handler took <N> ms' warnings because mounting
-   * each <VideoOutputItem/>—especially when videos are heavy—can take 50 ms+
-   * of main-thread time, and running that work inside a timer blocks the event
-   * loop.
-   *
-   * The animation is now fully delegated to CSS.  We still want the items to
-   * fade & zoom in sequentially, so we pass `animationDelay` based on the
-   * list index.  No JavaScript timers are needed and the main thread remains
-   * free, eliminating the warning.
-   */
-  // Removed animatedVideoOutputs state – we now render everything immediately.
+  useEffect(() => {
+    if (selectedVideoForDetails && taskDetailsButtonRef.current) {
+      taskDetailsButtonRef.current.click();
+    }
+  }, [selectedVideoForDetails]);
 
-  // Helper to get a comparable timestamp from the GenerationRow.
-  // Accepts both camelCase (createdAt) and snake_case (created_at).
-  const getCreatedTime = (g: GenerationRow & { created_at?: string }) => {
-    const dateStr = g.createdAt ?? g.created_at;
-    return dateStr ? new Date(dateStr).getTime() : 0;
-  };
-
-  // Sort videos by creation date (newest first). We fall back gracefully when
-  // the timestamp is missing so the array order remains stable.
   const sortedVideoOutputs = useMemo(() => {
-    return [...videoOutputs].sort((a, b) => getCreatedTime(b) - getCreatedTime(a));
+    return [...videoOutputs].sort((a, b) => {
+      const aTime = new Date(a.createdAt || 0).getTime();
+      const bTime = new Date(b.createdAt || 0).getTime();
+      return bTime - aTime;
+    });
   }, [videoOutputs]);
 
-  // Pagination logic
-  const pageCount = Math.ceil(sortedVideoOutputs.length / videosPerPage);
-  const paginatedVideos = useMemo(() => {
-    const startIndex = (currentPage - 1) * videosPerPage;
-    const endIndex = startIndex + videosPerPage;
-    return sortedVideoOutputs.slice(startIndex, endIndex);
-  }, [sortedVideoOutputs, currentPage]);
+  const totalPages = Math.ceil(sortedVideoOutputs.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentVideoOutputs = sortedVideoOutputs.slice(startIndex, endIndex);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const handleNext = () => {
+    if (lightboxIndex !== null) {
+      setLightboxIndex((lightboxIndex + 1) % sortedVideoOutputs.length);
+    }
+  };
+
+  const handlePrevious = () => {
+    if (lightboxIndex !== null) {
+      setLightboxIndex((lightboxIndex - 1 + sortedVideoOutputs.length) % sortedVideoOutputs.length);
+    }
+  };
 
   if (sortedVideoOutputs.length === 0) {
-    return null;
+    return (
+      <Card className="p-6">
+        <div className="text-center text-muted-foreground">
+          <p>No video outputs yet. Generate some videos to see them here.</p>
+        </div>
+      </Card>
+    );
   }
 
   return (
-    <>
-      {lightboxIndex !== null && sortedVideoOutputs[lightboxIndex] && (
-        <VideoLightbox
-          video={sortedVideoOutputs[lightboxIndex]}
-          onClose={() => setLightboxIndex(null)}
-          onImageSaved={onImageSaved}
-        />
-      )}
+    <Card className="p-6">
+      <div className="flex flex-col space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold">Output Videos ({sortedVideoOutputs.length})</h3>
+          {totalPages > 1 && (
+            <div className="flex items-center space-x-2">
+              <span className="text-sm text-muted-foreground">
+                Page {currentPage} of {totalPages}
+              </span>
+            </div>
+          )}
+        </div>
 
-      <Card className="mb-8">
-        <CardHeader>
-          <CardTitle>Output Videos</CardTitle>
-          <p className="text-sm text-muted-foreground pt-1">
-            Generated videos for this shot.
-          </p>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {paginatedVideos.map((video, index) => (
-              <div
-                key={video.id}
-                className="animate-in fade-in duration-300 ease-out"
-                style={{ animationDelay: `${index * 150}ms` }}
-              >
-                <VideoOutputItem
-                  video={video}
-                  onDoubleClick={() => {
-                    const originalIndex = sortedVideoOutputs.findIndex(v => v.id === video.id);
-                    setLightboxIndex(originalIndex);
-                  }}
-                  onDelete={onDelete}
-                  isDeleting={deletingVideoId === video.id}
-                  onApplySettings={onApplySettings}
-                  onApplySettingsFromTask={onApplySettingsFromTask}
-                />
-              </div>
-            ))}
-          </div>
-          {pageCount > 1 && (
-            <Pagination className="mt-8">
-              <PaginationContent>
-                <PaginationItem>
-                  <PaginationPrevious 
-                    href="#" 
-                    onClick={(e) => { e.preventDefault(); setCurrentPage(p => Math.max(p - 1, 1)); }} 
-                    className={currentPage === 1 ? "pointer-events-none opacity-50" : undefined}
-                    size="default"
+        <Separator />
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {currentVideoOutputs.map((video, index) => {
+            const originalIndex = startIndex + index;
+            return (
+              <div key={video.id} className="relative group">
+                <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden shadow-sm border">
+                  <HoverScrubVideo
+                    src={getDisplayUrl(video.location || video.imageUrl)}
+                    poster={video.thumbUrl}
+                    className="w-full h-full object-cover cursor-pointer"
+                    onDoubleClick={() => {
+                      setLightboxIndex(originalIndex);
+                    }}
                   />
-                </PaginationItem>
+                </div>
                 
-                <PaginationItem>
-                  <PaginationLink href="#" isActive size="default">
-                    Page {currentPage} of {pageCount}
+                <div className="absolute top-2 right-2 flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setSelectedVideoForDetails(video)}
+                    className="bg-green-600/90 hover:bg-green-700 text-white shadow-sm"
+                    title="View details"
+                  >
+                    <Info className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => onDelete(video.id)}
+                    disabled={deletingVideoId === video.id}
+                    className="shadow-sm"
+                    title="Delete video"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {totalPages > 1 && (
+          <Pagination className="mt-6">
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+                  className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                />
+              </PaginationItem>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                <PaginationItem key={page}>
+                  <PaginationLink
+                    onClick={() => handlePageChange(page)}
+                    isActive={currentPage === page}
+                    className="cursor-pointer"
+                  >
+                    {page}
                   </PaginationLink>
                 </PaginationItem>
+              ))}
+              <PaginationItem>
+                <PaginationNext
+                  onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
+                  className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        )}
 
-                <PaginationItem>
-                  <PaginationNext 
-                    href="#" 
-                    onClick={(e) => { e.preventDefault(); setCurrentPage(p => Math.min(p + 1, pageCount)); }}
-                    className={currentPage === pageCount ? "pointer-events-none opacity-50" : undefined}
-                    size="default"
-                  />
-                </PaginationItem>
-              </PaginationContent>
-            </Pagination>
-          )}
-        </CardContent>
-      </Card>
-    </>
+        {lightboxIndex !== null && (
+          <MediaLightbox
+            media={sortedVideoOutputs[lightboxIndex]}
+            onClose={() => setLightboxIndex(null)}
+            onNext={handleNext}
+            onPrevious={handlePrevious}
+            onImageSaved={onImageSaved}
+            showNavigation={true}
+            showImageEditTools={false}
+            showDownload={true}
+            videoPlayerComponent="simple-player"
+          />
+        )}
+
+        {selectedVideoForDetails && (
+          <TaskDetailsModal
+            generationId={selectedVideoForDetails.id}
+            onApplySettings={(settings) => {
+              onApplySettings(selectedVideoForDetails.id);
+              setSelectedVideoForDetails(null);
+            }}
+          >
+            <Button 
+              ref={taskDetailsButtonRef}
+              className="hidden"
+            >
+              Open Details
+            </Button>
+          </TaskDetailsModal>
+        )}
+      </div>
+    </Card>
   );
 };
 

@@ -54,7 +54,8 @@ const SimpleVideoPlayer: React.FC<SimpleVideoPlayerProps> = ({
   };
 
   return (
-    <div className={`flex flex-col items-center space-y-4 ${className}`}>
+    <div className={`flex flex-col items-center space-y-2 ${className}`} style={{ maxHeight: '80vh' }}>
+      {/* Video element */}
       <video
         ref={videoRef}
         src={getDisplayUrl(src)}
@@ -65,19 +66,21 @@ const SimpleVideoPlayer: React.FC<SimpleVideoPlayerProps> = ({
         playsInline
         autoPlay
         preload="auto"
-        className="w-full h-full object-contain"
+        className="w-full object-contain"
+        style={{ maxHeight: 'calc(80vh - 40px)' }}
       >
         Your browser does not support the video tag.
       </video>
-      
-      <div className="flex items-center space-x-2">
+
+      {/* Playback speed controls below the video */}
+      <div className="flex items-center space-x-2 bg-black/60 rounded-md px-2 py-1 backdrop-blur-sm">
         {speedOptions.map((speed) => (
           <Button
             key={speed}
-            variant={playbackRate === speed ? "default" : "outline"}
+            variant={playbackRate === speed ? "default" : "secondary"}
             size="sm"
             onClick={() => handleSpeedChange(speed)}
-            className="min-w-[60px]"
+            className="h-6 min-w-[48px] px-2 text-xs text-white"
           >
             {speed}x
           </Button>

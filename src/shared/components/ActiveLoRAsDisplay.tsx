@@ -57,7 +57,7 @@ const ActiveLoRAsDisplayComponent: React.FC<ActiveLoRAsDisplayProps> = ({
                         src={lora.previewImageUrl}
                         className="h-16 w-16 object-cover rounded-md border"
                         videoClassName="object-cover"
-                        enableScrubbing={false}
+                        
                         loop
                         muted
                       />
