@@ -35,7 +35,7 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
 | Config files | vite.config.ts, tailwind.config.ts, tsconfig*.json, ESLint, etc. |
 | `drizzle.config.ts` | Drizzle Kit config (PostgreSQL/Supabase). For PG migrations |
 | `drizzle-sqlite.config.ts` | Drizzle Kit config (SQLite). For local SQLite migrations |
-| `/db/schema/schema.ts` | Canonical DB schema (Drizzle ORM, PG-first). Users table includes api_keys JSON column for storing FAL/OpenAI/Replicate keys. Users, projects, and shots tables include settings JSON column for tool-specific settings |
+| `/db/schema/schema.ts` | Canonical DB schema (Drizzle ORM, PG-first). Users table includes api_keys JSON column for storing FAL/OpenAI/Replicate keys. Users, projects, and shots tables include settings JSON column for tool-specific settings. Includes training_data and training_data_segments tables for training data management |
 | `/db/migrations/` | PostgreSQL migration files |
 | `/db/migrations-sqlite/` | SQLite migration files |
 | `/db/seed.ts` | Seeds local SQLite DB for development |
@@ -74,7 +74,7 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
 - **Supabase migrations** (`/supabase/migrations/`) for Supabase-specific features (RLS policies, storage bucket setup, triggers, functions)
 
 **Row Level Security (RLS) Status**: ✅ **ACTIVE**
-- All 8 main tables (`users`, `projects`, `shots`, `shot_generations`, `generations`, `resources`, `tasks`, `user_api_tokens`) have RLS enabled
+- All 10 main tables (`users`, `projects`, `shots`, `shot_generations`, `generations`, `resources`, `tasks`, `user_api_tokens`, `training_data`, `training_data_segments`) have RLS enabled
 - 18 security policies enforce strict data isolation:
   - Users can only access their own data
   - Task creation restricted to `service_role` (Edge Functions only)
@@ -189,6 +189,13 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
 ##### Edit Travel (`src/tools/edit-travel/`)
 - **pages/EditTravelToolPage.tsx**: Main UI for image editing with text. Upload input image. Uses PromptEditorModal. Inputs: images/prompt, aspect ratio. Triggers Fal API (fal-ai/flux-pro/kontext). Displays results in ImageGallery. Saves edits to generations table.
 - **components/EditTravelForm.tsx**: Form for managing prompts, input file, generation mode, and other settings for the Edit Travel tool.
+
+##### Training Data Helper (`src/tools/training-data-helper/`)
+- **pages/TrainingDataHelperPage.tsx**: Main UI for managing training data videos and segments. Allows video upload to Supabase storage, video selection, and segment creation/management. Only accessible via direct link (`/tools/training-data-helper`).
+- **components/VideoUploadList.tsx**: Displays uploaded videos in a grid layout with thumbnails, metadata, and selection/deletion functionality. 
+- **components/VideoSegmentEditor.tsx**: Comprehensive video player with segment creation tools. Features custom video controls, timeline with segment markers, segment preview, and segment management (create, edit, delete).
+- **hooks/useTrainingData.ts**: React hook for managing training data and segments. Handles video upload to Supabase storage, CRUD operations for videos and segments, and provides video URLs for playback.
+- **settings.ts**: Tool settings for user preferences (auto-play segments, default durations, etc.).
 
 #### 3.4. Shared Elements (`src/shared/`)
 

@@ -101,12 +101,36 @@ export const resources = pgTable('resources', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+export const trainingData = pgTable('training_data', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  originalFilename: text('original_filename').notNull(),
+  storageLocation: text('storage_location').notNull(),
+  duration: integer('duration'), // Duration in seconds
+  metadata: jsonb('metadata'), // Store additional video metadata
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }),
+});
+
+export const trainingDataSegments = pgTable('training_data_segments', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  trainingDataId: uuid('training_data_id').notNull().references(() => trainingData.id, { onDelete: 'cascade' }),
+  startTime: integer('start_time').notNull(), // Start time in milliseconds
+  endTime: integer('end_time').notNull(), // End time in milliseconds
+  segmentLocation: text('segment_location'), // Path to extracted segment (if generated)
+  description: text('description'), // Optional description
+  metadata: jsonb('metadata'), // Store additional segment metadata
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }),
+});
+
 // --- Relations ---
 
 export const usersRelations = relations(users, ({ many }) => ({
   projects: many(projects),
   resources: many(resources),
   creditsLedger: many(creditsLedger),
+  trainingData: many(trainingData),
 }));
 
 export const projectsRelations = relations(projects, ({ one, many }) => ({
@@ -168,6 +192,21 @@ export const creditsLedgerRelations = relations(creditsLedger, ({ one }) => ({
   task: one(tasks, {
     fields: [creditsLedger.taskId],
     references: [tasks.id],
+  }),
+}));
+
+export const trainingDataRelations = relations(trainingData, ({ one, many }) => ({
+  user: one(users, {
+    fields: [trainingData.userId],
+    references: [users.id],
+  }),
+  segments: many(trainingDataSegments),
+}));
+
+export const trainingDataSegmentsRelations = relations(trainingDataSegments, ({ one }) => ({
+  trainingData: one(trainingData, {
+    fields: [trainingDataSegments.trainingDataId],
+    references: [trainingData.id],
   }),
 }));
 

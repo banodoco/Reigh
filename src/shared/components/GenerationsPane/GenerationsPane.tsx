@@ -154,7 +154,7 @@ export const GenerationsPane: React.FC = () => {
                   className="text-white hover:text-white/80"
                   onClick={() => {
                     toggleLock(false); // Unlock the pane
-                    navigate('/generations'); // Navigate to generations page
+                    navigate('/tools/image-generation?scrollToGallery=true'); // Navigate to image generation tool page and scroll to gallery
                   }}
                 >
                   View All
@@ -183,6 +183,7 @@ export const GenerationsPane: React.FC = () => {
                     totalCount={allGenerations?.length || paginatedData.items.length}
                     whiteText
                     columnsPerRow={6}
+                    initialMediaTypeFilter="image"
                 />
             )}
             {paginatedData.items.length === 0 && !isLoading && (

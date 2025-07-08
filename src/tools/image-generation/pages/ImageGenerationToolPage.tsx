@@ -18,6 +18,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { fetchWithAuth } from '@/lib/api';
 import { useCreateTask, useListTasks } from "@/shared/hooks/useTasks";
 import { PageFadeIn } from '@/shared/components/transitions';
+import { useSearchParams } from 'react-router-dom';
 
 // Remove unnecessary environment detection - tool should work in all environments
 
@@ -79,7 +80,9 @@ const ImageGenerationToolPage: React.FC = () => {
   // Always use hooks - no environment-based disabling
   const { apiKeys, getApiKey } = useApiKeys();
   const imageGenerationFormRef = useRef<ImageGenerationFormHandles>(null);
+  const galleryRef = useRef<HTMLDivElement>(null);
   const { selectedProjectId } = useProject();
+  const [searchParams] = useSearchParams();
 
   // Track project tasks to know when they appear in the TasksPane (must be after selectedProjectId)
   const { data: projectTasks } = useListTasks({ projectId: selectedProjectId });
@@ -108,6 +111,16 @@ const ImageGenerationToolPage: React.FC = () => {
   useEffect(() => {
     // Effect removed
   }, [generatedImagesData]);
+
+  // Handle scrolling to gallery when coming from "View All" in GenerationsPane
+  useEffect(() => {
+    if (searchParams.get('scrollToGallery') === 'true' && galleryRef.current) {
+      // Small delay to ensure the page has rendered
+      setTimeout(() => {
+        galleryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    }
+  }, [searchParams, generatedImagesData]);
 
   const handleDeleteImage = async (id: string) => {
     deleteGenerationMutation?.mutate(id);
@@ -427,7 +440,7 @@ const ImageGenerationToolPage: React.FC = () => {
             </ToolSettingsGate>
           </div>
 
-          <div className="mt-8">
+          <div ref={galleryRef} className="mt-8">
             <ImageGallery
               images={imagesToShow}
               onDelete={handleDeleteImage}

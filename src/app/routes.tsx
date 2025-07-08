@@ -7,6 +7,7 @@ import ArtPage from '@/pages/ArtPage';
 const ImageGenerationToolPage = React.lazy(() => import('@/tools/image-generation/pages/ImageGenerationToolPage'));
 const VideoTravelToolPage = React.lazy(() => import('@/tools/travel-between-images/pages/VideoTravelToolPage'));
 const EditTravelToolPage = React.lazy(() => import('@/tools/edit-travel/pages/EditTravelToolPage'));
+const TrainingDataHelperPage = React.lazy(() => import('@/tools/training-data-helper/pages/TrainingDataHelperPage'));
 import NotFoundPage from '@/pages/NotFoundPage'; // Assuming NotFoundPage will be moved here or created
 import { LastAffectedShotProvider } from '@/shared/contexts/LastAffectedShotContext';
 import ShotsPage from "@/pages/ShotsPage";
@@ -75,6 +76,14 @@ const router = createBrowserRouter([
         element: (
           <Suspense fallback={<LazyLoadingFallback />}>
             <EditTravelToolPage />
+          </Suspense>
+        ),
+      },
+      {
+        path: '/tools/training-data-helper',
+        element: (
+          <Suspense fallback={<LazyLoadingFallback />}>
+            <TrainingDataHelperPage />
           </Suspense>
         ),
       },
