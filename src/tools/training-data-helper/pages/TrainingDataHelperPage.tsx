@@ -5,12 +5,24 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/sha
 import FileInput from '@/shared/components/FileInput';
 import { VideoUploadList } from '../components/VideoUploadList';
 import { VideoSegmentEditor } from '../components/VideoSegmentEditor';
+import { BatchSelector } from '../components/BatchSelector';
 import { useTrainingData } from '../hooks/useTrainingData';
 import { Upload, Video, Scissors } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function TrainingDataHelperPage() {
-  const { videos, uploadVideo, isUploading, segments, createSegment, deleteSegment } = useTrainingData();
+  const { 
+    videos, 
+    uploadVideo, 
+    isUploading, 
+    segments, 
+    createSegment, 
+    deleteSegment, 
+    batches, 
+    selectedBatchId, 
+    createBatch, 
+    setSelectedBatchId 
+  } = useTrainingData();
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
   const [files, setFiles] = useState<File[]>([]);
 
@@ -21,6 +33,11 @@ export default function TrainingDataHelperPage() {
   const handleUpload = async () => {
     if (files.length === 0) {
       toast.error('Please select at least one video file');
+      return;
+    }
+
+    if (!selectedBatchId) {
+      toast.error('Please select or create a batch first');
       return;
     }
 
@@ -37,7 +54,7 @@ export default function TrainingDataHelperPage() {
   };
 
   const selectedVideoData = selectedVideo ? videos.find(v => v.id === selectedVideo) : null;
-  const videoSegments = selectedVideo ? segments.filter(s => s.training_data_id === selectedVideo) : [];
+  const videoSegments = selectedVideo ? segments.filter(s => s.trainingDataId === selectedVideo) : [];
 
   return (
     <PageFadeIn className="container mx-auto p-6 max-w-7xl">
@@ -49,6 +66,14 @@ export default function TrainingDataHelperPage() {
             Upload videos and extract training segments for AI model development
           </p>
         </div>
+
+        {/* Batch Selector */}
+        <BatchSelector
+          batches={batches}
+          selectedBatchId={selectedBatchId}
+          onSelectBatch={setSelectedBatchId}
+          onCreateBatch={createBatch}
+        />
 
         {/* Upload Section */}
         <Card>

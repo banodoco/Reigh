@@ -3,6 +3,16 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 // Database types (snake_case)
+interface TrainingDataBatchDB {
+  id: string;
+  user_id: string;
+  name: string;
+  description: string | null;
+  metadata: any;
+  created_at: string;
+  updated_at: string | null;
+}
+
 interface TrainingDataVideoDB {
   id: string;
   original_filename: string;
@@ -12,6 +22,7 @@ interface TrainingDataVideoDB {
   created_at: string;
   updated_at: string | null;
   user_id: string;
+  batch_id: string;
 }
 
 interface TrainingDataSegmentDB {
@@ -27,6 +38,16 @@ interface TrainingDataSegmentDB {
 }
 
 // Client types (camelCase)
+export interface TrainingDataBatch {
+  id: string;
+  userId: string;
+  name: string;
+  description: string | null;
+  metadata: any;
+  createdAt: string;
+  updatedAt: string | null;
+}
+
 export interface TrainingDataVideo {
   id: string;
   originalFilename: string;
@@ -36,6 +57,7 @@ export interface TrainingDataVideo {
   createdAt: string;
   updatedAt: string | null;
   userId: string;
+  batchId: string;
 }
 
 export interface TrainingDataSegment {
@@ -51,6 +73,16 @@ export interface TrainingDataSegment {
 }
 
 // Transform functions
+const transformBatch = (batch: TrainingDataBatchDB): TrainingDataBatch => ({
+  id: batch.id,
+  userId: batch.user_id,
+  name: batch.name,
+  description: batch.description,
+  metadata: batch.metadata,
+  createdAt: batch.created_at,
+  updatedAt: batch.updated_at,
+});
+
 const transformVideo = (video: TrainingDataVideoDB): TrainingDataVideo => ({
   id: video.id,
   originalFilename: video.original_filename,
@@ -60,6 +92,7 @@ const transformVideo = (video: TrainingDataVideoDB): TrainingDataVideo => ({
   createdAt: video.created_at,
   updatedAt: video.updated_at,
   userId: video.user_id,
+  batchId: video.batch_id,
 });
 
 const transformSegment = (segment: TrainingDataSegmentDB): TrainingDataSegment => ({
@@ -77,21 +110,37 @@ const transformSegment = (segment: TrainingDataSegmentDB): TrainingDataSegment =
 export function useTrainingData() {
   const [videos, setVideos] = useState<TrainingDataVideo[]>([]);
   const [segments, setSegments] = useState<TrainingDataSegment[]>([]);
+  const [batches, setBatches] = useState<TrainingDataBatch[]>([]);
+  const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   // Fetch videos on mount
   useEffect(() => {
-    fetchVideos();
+    fetchBatches();
     fetchSegments();
   }, []);
 
+  // Refetch videos when selected batch changes
+  useEffect(() => {
+    if (selectedBatchId) {
+      fetchVideos();
+    }
+  }, [selectedBatchId]);
+
   const fetchVideos = async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('training_data')
         .select('*')
         .order('created_at', { ascending: false });
+
+      // Filter by selected batch if one is selected
+      if (selectedBatchId) {
+        query = query.eq('batch_id', selectedBatchId);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       setVideos((data || []).map(transformVideo));
@@ -118,11 +167,66 @@ export function useTrainingData() {
     }
   };
 
+  const fetchBatches = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('training_data_batches')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      const batchesData = (data || []).map(transformBatch);
+      setBatches(batchesData);
+      
+      // Set the first batch as selected if none is selected
+      if (!selectedBatchId && batchesData.length > 0) {
+        setSelectedBatchId(batchesData[0].id);
+      }
+    } catch (error) {
+      console.error('Error fetching batches:', error);
+      toast.error('Failed to load batches');
+    }
+  };
+
+  const createBatch = async (name: string, description?: string): Promise<string> => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      const { data, error } = await supabase
+        .from('training_data_batches')
+        .insert({
+          user_id: user.id,
+          name,
+          description,
+          metadata: {},
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      const newBatch = transformBatch(data);
+      setBatches(prev => [newBatch, ...prev]);
+      setSelectedBatchId(newBatch.id);
+      toast.success('Batch created successfully!');
+      return newBatch.id;
+    } catch (error) {
+      console.error('Error creating batch:', error);
+      toast.error('Failed to create batch');
+      throw error;
+    }
+  };
+
   const uploadVideo = async (file: File): Promise<string> => {
     setIsUploading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
+
+      if (!selectedBatchId) {
+        throw new Error('Please select a batch first');
+      }
 
       // Upload file to storage
       const fileExt = file.name.split('.').pop();
@@ -151,6 +255,7 @@ export function useTrainingData() {
         .from('training_data')
         .insert({
           user_id: user.id,
+          batch_id: selectedBatchId,
           original_filename: file.name,
           storage_location: fileName,
           metadata: {
@@ -369,6 +474,8 @@ export function useTrainingData() {
   return {
     videos,
     segments,
+    batches,
+    selectedBatchId,
     isUploading,
     isLoading,
     uploadVideo,
@@ -377,5 +484,7 @@ export function useTrainingData() {
     updateSegment,
     deleteSegment,
     getVideoUrl,
+    createBatch,
+    setSelectedBatchId,
   };
 } 

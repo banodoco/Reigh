@@ -101,9 +101,20 @@ export const resources = pgTable('resources', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+export const trainingDataBatches = pgTable('training_data_batches', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  description: text('description'),
+  metadata: jsonb('metadata'), // Store additional batch metadata
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }),
+});
+
 export const trainingData = pgTable('training_data', {
   id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  batchId: uuid('batch_id').notNull().references(() => trainingDataBatches.id, { onDelete: 'cascade' }),
   originalFilename: text('original_filename').notNull(),
   storageLocation: text('storage_location').notNull(),
   duration: integer('duration'), // Duration in seconds
@@ -131,6 +142,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   resources: many(resources),
   creditsLedger: many(creditsLedger),
   trainingData: many(trainingData),
+  trainingDataBatches: many(trainingDataBatches),
 }));
 
 export const projectsRelations = relations(projects, ({ one, many }) => ({
@@ -195,10 +207,22 @@ export const creditsLedgerRelations = relations(creditsLedger, ({ one }) => ({
   }),
 }));
 
+export const trainingDataBatchesRelations = relations(trainingDataBatches, ({ one, many }) => ({
+  user: one(users, {
+    fields: [trainingDataBatches.userId],
+    references: [users.id],
+  }),
+  trainingData: many(trainingData),
+}));
+
 export const trainingDataRelations = relations(trainingData, ({ one, many }) => ({
   user: one(users, {
     fields: [trainingData.userId],
     references: [users.id],
+  }),
+  batch: one(trainingDataBatches, {
+    fields: [trainingData.batchId],
+    references: [trainingDataBatches.id],
   }),
   segments: many(trainingDataSegments),
 }));
