@@ -754,6 +754,40 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       if (settings.steerableMotionSettings) {
         onSteerableMotionSettingsChange(settings.steerableMotionSettings);
       }
+
+      // Apply LoRAs if provided in settings
+      if (settings.loras && Array.isArray(settings.loras) && settings.loras.length > 0) {
+        settings.loras.forEach((l: any) => {
+          const url: string = l.url || l.path;
+          const strength: number = parseFloat(l.strength?.toString() || '0') || 0;
+
+          // Try to find matching LoRA in availableLoras by matching any file URL or huggingface URL
+          const matching = availableLoras.find(av =>
+            av["Model Files"].some((f: any) => f.url === url || f.path === url) ||
+            av.huggingface_url === url
+          );
+
+          if (matching) {
+            onAddLora(matching);
+            // Wait a tick so it's added before updating strength
+            setTimeout(() => onLoraStrengthChange(matching["Model ID"], strength), 0);
+          } else {
+            // Fallback: derive a name from filename and add a minimal LoraModel-like object
+            const fileName = url.split('/').pop() || url;
+            const derivedId = fileName.replace(/\.(safetensors|ckpt|pt)$/i, '');
+            onAddLora({
+              "Model ID": derivedId,
+              Name: derivedId,
+              Author: 'Imported',
+              Images: [],
+              "Model Files": [{ path: url, url }],
+              huggingface_url: url,
+              lora_type: 'motion',
+            } as any);
+            setTimeout(() => onLoraStrengthChange(derivedId, strength), 0);
+          }
+        });
+      }
       
       // Handle image replacement if requested
       if (replaceImages && inputImages && inputImages.length > 0) {

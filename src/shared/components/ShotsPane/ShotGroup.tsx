@@ -192,6 +192,11 @@ const ShotGroup: React.FC<ShotGroupProps> = ({ shot }) => {
     setCurrentShotId(shot.id);
     navigate('/tools/travel-between-images', { state: { fromShotClick: true } });
 
+    // Scroll to top when navigating to a shot
+    setTimeout(() => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, 100); // Small delay to ensure navigation has completed
+
     // On mobile, close any open pane after selecting a shot
     if (isMobile) {
       window.dispatchEvent(new CustomEvent('mobilePaneOpen', { detail: { side: null } }));

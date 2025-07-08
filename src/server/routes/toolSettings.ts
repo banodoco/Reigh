@@ -63,9 +63,18 @@ router.get('/from-task/:taskId', authenticate, asyncHandler(async (req: Request,
       return res.status(400).json({ error: 'taskId is required' });
     }
 
-    // Fetch the task details
-    const taskResponse = await fetch(`http://localhost:${process.env.PORT || 8085}/api/tasks/by-task-id/${taskId}`);
+    // Fetch the task details using the database ID – forward the client's auth header so the request is authorised
+    const taskResponse = await fetch(`http://localhost:${process.env.PORT || 8085}/api/tasks/${taskId}`, {
+      headers: {
+        ...(req.headers.authorization ? { Authorization: req.headers.authorization } : {}),
+      },
+    });
+
     if (!taskResponse.ok) {
+      // Preserve the original status code if it's an auth error, otherwise fall back to 404
+      if (taskResponse.status === 401) {
+        return res.status(401).json({ error: 'Unauthorized to access task' });
+      }
       return res.status(404).json({ error: 'Task not found' });
     }
     
@@ -80,12 +89,45 @@ router.get('/from-task/:taskId', authenticate, asyncHandler(async (req: Request,
       batchVideoPrompt: orchestratorDetails?.base_prompts?.[0] || params?.prompt || '',
       batchVideoFrames: orchestratorDetails?.segment_frames?.[0] || params?.frames || 24,
       batchVideoContext: orchestratorDetails?.frame_overlap?.[0] || params?.context || 16,
-      batchVideoSteps: params?.steps || 20,
+      batchVideoSteps: (() => {
+        // Priority: explicit params.steps, override JSON, orchestratorDetails fields, fallback 20
+        if (typeof params?.steps === 'number') return params.steps;
+
+        // Parse params_json_str_override if present to extract steps
+        let overrideSteps: number | undefined;
+        const overrideStr = orchestratorDetails?.params_json_str_override ?? params?.params_json_str_override;
+        if (overrideStr && typeof overrideStr === 'string') {
+          try {
+            const parsed = JSON.parse(overrideStr);
+            if (typeof parsed?.steps === 'number') overrideSteps = parsed.steps;
+          } catch { /* ignore JSON parse errors */ }
+        }
+
+        if (overrideSteps) return overrideSteps;
+
+        if (typeof orchestratorDetails?.steps === 'number') return orchestratorDetails.steps;
+        if (typeof orchestratorDetails?.num_inference_steps === 'number') return orchestratorDetails.num_inference_steps;
+
+        return 20;
+      })(),
       dimensionSource: 'custom' as const,
-      customWidth: orchestratorDetails?.parsed_resolution_wh?.[0] || params?.width,
-      customHeight: orchestratorDetails?.parsed_resolution_wh?.[1] || params?.height,
+      ...(() => {
+        // Parse resolution (e.g., "902x508") into width & height numbers
+        const res = orchestratorDetails?.parsed_resolution_wh ?? params?.parsed_resolution_wh;
+        if (typeof res === 'string' && res.includes('x')) {
+          const [w, h] = res.split('x').map((n: string) => parseInt(n, 10));
+          return { customWidth: w, customHeight: h };
+        }
+        if (Array.isArray(res) && res.length === 2) {
+          const [w, h] = res;
+          return { customWidth: w, customHeight: h };
+        }
+        return { customWidth: params?.width, customHeight: params?.height };
+      })(),
       enhancePrompt: params?.enhance_prompt || false,
       generationMode: 'batch' as const,
+      // Expose the LoRAs (url + strength) so the client can attach them
+      loras: Object.entries(orchestratorDetails?.additional_loras || {}).map(([url, strength]) => ({ url, strength })),
       steerableMotionSettings: {
         negative_prompt: orchestratorDetails?.negative_prompt || params?.negative_prompt || '',
         model_name: params?.model_name || 'vace_14B',

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/shared/components/ui/button';
 import { Info, Trash2 } from 'lucide-react';
 import { formatDistanceToNow, isValid } from 'date-fns';
@@ -29,6 +29,23 @@ interface VideoOutputItemProps {
   onApplySettingsFromTask?: (taskId: string, replaceImages: boolean, inputImages: string[]) => void;
 }
 
+// Helper to abbreviate distance strings (e.g., "5 minutes ago" -> "5 mins ago")
+const abbreviateDistance = (str: string) => {
+  if (str.includes('less than a minute')) {
+    return '<1 min ago';
+  }
+
+  return str
+    .replace(/1 minutes ago/, '1 min ago')
+    .replace(/1 hours ago/, '1 hr ago')
+    .replace(/1 seconds ago/, '1 sec ago')
+    .replace(/1 days ago/, '1 day ago')
+    .replace(/minutes?/, 'mins')
+    .replace(/hours?/, 'hrs')
+    .replace(/seconds?/, 'secs')
+    .replace(/days?/, 'days');
+};
+
 export const VideoOutputItem: React.FC<VideoOutputItemProps> = ({
   video,
   onDoubleClick,
@@ -37,6 +54,22 @@ export const VideoOutputItem: React.FC<VideoOutputItemProps> = ({
   onApplySettings,
   onApplySettingsFromTask,
 }) => {
+  // Accept both camelCase (createdAt) and snake_case (created_at) for
+  // backwards-compatibility with data coming directly from Supabase.
+  const creationDateStr: string | undefined = (video as any).createdAt ?? (video as any).created_at;
+  
+  // State to force re-render of time display
+  const [currentTime, setCurrentTime] = useState(Date.now());
+  
+  // Update current time every minute to refresh relative timestamps
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 60000); // Update every minute
+    
+    return () => clearInterval(interval);
+  }, []);
+
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation(); // prevent lightbox from opening on delete
     onDelete(video.id);
@@ -58,9 +91,9 @@ export const VideoOutputItem: React.FC<VideoOutputItemProps> = ({
             <Info className="h-5 w-5 text-white" />
           </Button>
         </TaskDetailsModal>
-        {video.createdAt && isValid(new Date(video.createdAt)) && (
+        {creationDateStr && isValid(new Date(creationDateStr)) && (
           <span className="text-xs text-white bg-black/50 px-1.5 py-0.5 rounded-md">
-            {formatDistanceToNow(new Date(video.createdAt), { addSuffix: true })}
+            {abbreviateDistance(formatDistanceToNow(new Date(creationDateStr), { addSuffix: true }))}
           </span>
         )}
       </div>

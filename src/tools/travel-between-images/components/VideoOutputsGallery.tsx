@@ -38,7 +38,7 @@ interface VideoOutputsGalleryProps {
 const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({ videoOutputs, onDelete, deletingVideoId, onApplySettings, onApplySettingsFromTask, onImageSaved }) => {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const videosPerPage = 9;
+  const videosPerPage = 6;
 
   /**
    * NOTE: We previously used a map of setTimeout callbacks (one per video
@@ -55,19 +55,17 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({ videoOutputs,
    */
   // Removed animatedVideoOutputs state – we now render everything immediately.
 
-  // Sort videos by creation date (newest first)
+  // Helper to get a comparable timestamp from the GenerationRow.
+  // Accepts both camelCase (createdAt) and snake_case (created_at).
+  const getCreatedTime = (g: GenerationRow & { created_at?: string }) => {
+    const dateStr = g.createdAt ?? g.created_at;
+    return dateStr ? new Date(dateStr).getTime() : 0;
+  };
+
+  // Sort videos by creation date (newest first). We fall back gracefully when
+  // the timestamp is missing so the array order remains stable.
   const sortedVideoOutputs = useMemo(() => {
-    return [...videoOutputs].sort((a, b) => {
-      // If both have createdAt, sort by date (newest first)
-      if (a.createdAt && b.createdAt) {
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-      }
-      // If only one has createdAt, prioritize the one with date
-      if (a.createdAt && !b.createdAt) return -1;
-      if (!a.createdAt && b.createdAt) return 1;
-      // If neither has createdAt, maintain original order
-      return 0;
-    });
+    return [...videoOutputs].sort((a, b) => getCreatedTime(b) - getCreatedTime(a));
   }, [videoOutputs]);
 
   // Pagination logic

@@ -13,6 +13,7 @@ import { Info } from 'lucide-react';
 import { getDisplayUrl } from '@/shared/lib/utils';
 import { Checkbox } from '@/shared/components/ui/checkbox';
 import { Label } from '@/shared/components/ui/label';
+import { fetchWithAuth } from '@/lib/api';
 
 // Local definition for Json type to remove dependency on supabase client types
 export type Json =
@@ -62,8 +63,8 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
 
       setIsLoading(true);
       try {
-        // Step 1: Fetch the task ID from the generation
-        const taskIdResponse = await fetch(`/api/generations/${generationId}/task-id`);
+        // Step 1: Get the task ID from the generation using the existing endpoint
+        const taskIdResponse = await fetchWithAuth(`/api/generations/${generationId}/task-id`);
         if (!taskIdResponse.ok) {
           const errorData = await taskIdResponse.json().catch(() => ({ message: `Generation not found or has no task.` }));
           throw new Error(errorData.message);
@@ -79,8 +80,8 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
         
         setTaskId(fetchedTaskId);
 
-        // Step 2: Fetch the task details using the task ID
-        const taskDetailsResponse = await fetch(`/api/tasks/by-task-id/${fetchedTaskId}`);
+        // Step 2: Fetch the task details using the database ID (not the task_id in params)
+        const taskDetailsResponse = await fetchWithAuth(`/api/tasks/${fetchedTaskId}`);
         if (!taskDetailsResponse.ok) {
             const errorData = await taskDetailsResponse.json().catch(() => ({ message: `Task with ID ${fetchedTaskId} not found.` }));
             throw new Error(errorData.message);
@@ -132,32 +133,55 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
   const parsedParams = getParsedParams();
 
   const getPrompt = () => {
-    const prompts = orchestratorDetails?.base_prompts ?? orchestratorDetails?.base_prompts_expanded;
-    if (prompts) {
-      if (Array.isArray(prompts)) {
-        // Deduplicate prompts to avoid repetition
-        const uniquePrompts = [...new Set(prompts.filter(p => p && p.trim()))];
-        return uniquePrompts.join('; ');
+    const promptsRaw = orchestratorDetails?.base_prompts ?? orchestratorDetails?.base_prompts_expanded;
+    let promptValue: string | undefined;
+
+    if (promptsRaw) {
+      if (Array.isArray(promptsRaw)) {
+        // Deduplicate prompts to avoid repetition and remove empty strings
+        const uniquePrompts = [...new Set(promptsRaw.filter(p => p && p.trim()))];
+        promptValue = uniquePrompts.join('; ');
+      } else {
+        promptValue = promptsRaw as string;
       }
-      return prompts;
     }
-    return parsedParams.prompt ?? 'N/A';
+
+    if (!promptValue || promptValue.trim() === '') {
+      // Fallback to params.prompt if available
+      promptValue = typeof parsedParams.prompt === 'string' ? parsedParams.prompt : '';
+    }
+
+    return promptValue && promptValue.trim() !== '' ? promptValue : 'N/A';
   };
 
   const getNegativePrompt = () => {
-    const negPrompts = orchestratorDetails?.negative_prompt ?? orchestratorDetails?.negative_prompts_expanded;
-    if (negPrompts) {
-      if (Array.isArray(negPrompts)) {
-        // Deduplicate negative prompts to avoid repetition
-        const uniqueNegPrompts = [...new Set(negPrompts.filter(p => p && p.trim()))];
-        const joined = uniqueNegPrompts.join('; ');
-        return joined || 'N/A';
+    const negPromptsRaw = orchestratorDetails?.negative_prompt ?? orchestratorDetails?.negative_prompts_expanded;
+    let negValue: string | undefined;
+
+    if (negPromptsRaw) {
+      if (Array.isArray(negPromptsRaw)) {
+        const uniqueNeg = [...new Set(negPromptsRaw.filter(p => p && p.trim()))];
+        negValue = uniqueNeg.join('; ');
+      } else {
+        negValue = negPromptsRaw as string;
       }
-      const joined = negPrompts;
-      return joined || 'N/A';
     }
-    return parsedParams.negative_prompt ?? 'N/A';
+
+    if (!negValue || negValue.trim() === '') {
+      negValue = typeof parsedParams.negative_prompt === 'string' ? parsedParams.negative_prompt : '';
+    }
+
+    return negValue && negValue.trim() !== '' ? negValue : 'N/A';
   };
+
+  // Frames per segment array (one entry per generated segment)
+  const framesArray: number[] = orchestratorDetails?.segment_frames_expanded ?? [];
+  const framesDisplay = framesArray.length === 0
+    ? 'N/A'
+    : (() => {
+        const unique = [...new Set(framesArray)];
+        return unique.length === 1 ? unique[0].toString() : framesArray.join(', ');
+      })();
 
   const getSteps = () => {
     if (parsedParams.steps) return parsedParams.steps;
@@ -165,6 +189,23 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
     if (orchestratorDetails?.num_inference_steps) return orchestratorDetails.num_inference_steps;
     return parsedParams.num_inference_steps ?? 'N/A';
   };
+
+  // Context/overlap array
+  const contextArray: number[] = orchestratorDetails?.frame_overlap_expanded ?? orchestratorDetails?.frame_overlap_settings_expanded ?? [];
+  const contextDisplay = contextArray.length === 0
+    ? 'N/A'
+    : (() => {
+        const unique = [...new Set(contextArray)];
+        return unique.length === 1 ? unique[0].toString() : contextArray.join(', ');
+      })();
+
+  // LoRAs used in task
+  const additionalLoras = orchestratorDetails?.additional_loras || {};
+  const lorasList = Object.entries(additionalLoras).map(([url, strength]) => ({
+    url: url as string,
+    strength: strength as number,
+    name: 'Unknown LoRA', // Default fallback
+  }));
 
   const getResolution = () => {
     if (orchestratorDetails?.parsed_resolution_wh) return orchestratorDetails.parsed_resolution_wh;
@@ -255,9 +296,12 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="sm:max-w-[700px] max-h-[80vh] flex flex-col">
+      <DialogContent className="sm:max-w-[700px] max-h-[80vh] flex flex-col" aria-describedby="task-details-description">
         <DialogHeader className="flex-shrink-0">
           <DialogTitle className="text-xl font-semibold">Generation Task Details</DialogTitle>
+          <p id="task-details-description" className="sr-only">
+            View details about the task that generated this video, including input images, settings, and parameters.
+          </p>
         </DialogHeader>
         
         <div className="flex-1 overflow-hidden">
@@ -298,28 +342,74 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
                 </div>
               )}
 
+              {/* Generation Summary Section */}
               <div className="space-y-3">
                 <div className="flex items-center space-x-2">
                   <div className="w-2 h-2 bg-primary rounded-full"></div>
                   <h3 className="text-lg font-semibold text-foreground">Generation Summary</h3>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-muted/30 rounded-lg border">
-                  <div className="space-y-1 md:col-span-2">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Prompt</p>
-                    <p className="text-sm font-medium break-words whitespace-pre-wrap">{prompt}</p>
+                <div className="space-y-4 p-4 bg-muted/30 rounded-lg border">
+                  {/* Prompts Section */}
+                  <div className="grid grid-cols-1 gap-4">
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Prompt</p>
+                      <p className="text-sm font-medium break-words whitespace-pre-wrap">{prompt}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Negative Prompt</p>
+                      <p className="text-sm font-medium break-words whitespace-pre-wrap">{negativePrompt}</p>
+                    </div>
                   </div>
-                  <div className="space-y-1 md:col-span-2">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Negative Prompt</p>
-                    <p className="text-sm font-medium break-words whitespace-pre-wrap">{negativePrompt}</p>
+                  
+                  {/* Technical Settings */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-3 border-t border-muted-foreground/20">
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Steps</p>
+                      <p className="text-sm font-medium">{steps}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Resolution</p>
+                      <p className="text-sm font-medium">{resolution}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Frames / Segment</p>
+                      <p className="text-sm font-medium">{framesDisplay}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Context Frames</p>
+                      <p className="text-sm font-medium">{contextDisplay}</p>
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Steps</p>
-                    <p className="text-sm font-medium">{steps}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Resolution</p>
-                    <p className="text-sm font-medium">{resolution}</p>
-                  </div>
+
+                  {/* LoRAs Section */}
+                  {lorasList.length > 0 && (
+                    <div className="pt-3 border-t border-muted-foreground/20">
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">LoRAs Used</p>
+                        <div className="space-y-2">
+                          {lorasList.map((lora, index) => {
+                            const fileName = lora.url.split('/').pop() || 'Unknown';
+                            const displayName = fileName.replace(/\.(safetensors|ckpt|pt)$/, '');
+                            return (
+                              <div key={index} className="flex items-center justify-between p-2 bg-background/50 rounded border">
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium truncate" title={displayName}>
+                                    {displayName}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground truncate" title={lora.url}>
+                                    {lora.url}
+                                  </p>
+                                </div>
+                                <div className="text-sm font-medium text-muted-foreground ml-2">
+                                  {lora.strength}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
               

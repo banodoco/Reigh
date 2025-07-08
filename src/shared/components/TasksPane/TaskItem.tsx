@@ -5,9 +5,10 @@ import { useCancelTask, useListTasks } from '@/shared/hooks/useTasks';
 import { useToast } from '@/shared/hooks/use-toast'; // For user feedback
 import { formatDistanceToNow, isValid } from 'date-fns';
 import { useProject } from '@/shared/contexts/ProjectContext';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { cn } from '@/shared/lib/utils';
 import { getTaskDisplayName, taskSupportsProgress } from '@/shared/lib/taskConfig';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
 
 interface TaskItemProps {
   task: Task;
@@ -34,10 +35,14 @@ const abbreviateDistance = (str: string) => {
 
 const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
   const { toast } = useToast();
-  const cancelTaskMutation = useCancelTask();
+
+  // Access project context early so it can be used in other hooks
+  const { selectedProjectId } = useProject();
+
+  // Mutations
+  const cancelTaskMutation = useCancelTask(selectedProjectId);
 
   // Access all tasks for project (used for orchestrator logic)
-  const { selectedProjectId } = useProject();
   const { data: allProjectTasks, refetch: refetchAllTasks } = useListTasks({ projectId: selectedProjectId });
 
   // Map certain task types to more user-friendly names for display purposes
@@ -128,9 +133,13 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
       toast({ title: 'Progress', description: 'No subtasks found yet.', variant: 'default' });
       return;
     }
+    // Progress is based on the ratio of completed subtasks to (total subtasks - 1)
     const completed = subtasks.filter((t) => t.status === 'Complete').length;
-    const percent = Math.round((completed / subtasks.length) * 100);
-    console.log('[TravelProgressIssue] Completed:', completed, 'Total:', subtasks.length, 'Percent:', percent);
+    const denominator = Math.max(subtasks.length - 1, 1); // Avoid divide-by-zero and remove the final stitch task
+
+    const rawPercent = (completed / denominator) * 100;
+    const percent = Math.round(Math.min(rawPercent, 100));
+    console.log('[TravelProgressIssue] Completed:', completed, 'Total:', subtasks.length, 'Denominator:', denominator, 'Percent:', percent);
     toast({ title: 'Progress', description: `${percent}% Complete`, variant: 'default' });
 
     // Show inline for 5s
@@ -146,7 +155,16 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
   return (
     <div className={containerClass}>
       <div className="flex justify-between items-center mb-1">
-        <span className="text-sm font-semibold text-zinc-200">{displayTaskType}</span>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="text-sm font-semibold text-zinc-200 flex-1 whitespace-nowrap overflow-hidden text-ellipsis pr-2 cursor-default">{displayTaskType}</span>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>{displayTaskType}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
         <span
           className={`px-2 py-0.5 text-xs rounded-full ${
             task.status === 'In Progress' ? 'bg-blue-500 text-blue-100' :
@@ -185,8 +203,8 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
           </div>
         </div>
       )}
-      <div className="flex items-center justify-between text-xs text-zinc-400">
-        <span>
+      <div className="flex items-center text-xs text-zinc-400">
+        <span className="flex-1">
           Created: {(() => {
             // Handle both createdAt and created_at field names from database
             const dateStr = task.createdAt || (task as any).created_at;
@@ -199,20 +217,17 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
           })()}
         </span>
         {(task.status === 'Queued' || task.status === 'In Progress') && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0">
             {taskSupportsProgress(task.taskType) && task.status === 'In Progress' && (
-              progressPercent === null ? (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleCheckProgress}
-                  className="px-2 py-0.5 text-blue-400 hover:bg-blue-900/20 hover:text-blue-300"
-                >
-                  Check Progress
-                </Button>
-              ) : (
-                <span className="text-blue-300 text-xs">{progressPercent}% Complete</span>
-              )
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleCheckProgress}
+                disabled={progressPercent !== null}
+                className="px-2 py-0.5 min-w-[120px] text-blue-400 hover:bg-blue-900/20 hover:text-blue-300"
+              >
+                {progressPercent === null ? 'Check Progress' : `${progressPercent}% Complete`}
+              </Button>
             )}
             <Button
               variant="ghost"

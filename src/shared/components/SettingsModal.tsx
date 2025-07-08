@@ -64,23 +64,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const [isOpenAIKeyMasked, setIsOpenAIKeyMasked] = useState(false);
   const [isReplicateKeyMasked, setIsReplicateKeyMasked] = useState(false);
   
-  // Main tab state - persistent across sessions
-  const { value: settingsModalState, update: updateSettingsModalState, isLoading: isLoadingSettingsState } = useUserUIState('settingsModal', {
-    activeTab: 'generate-locally',
-  });
-
-  // Use persistent state for active tab, but allow initialTab to override when modal opens
-  const [activeMainTab, setActiveMainTab] = useState<string>(settingsModalState.activeTab);
-
-  useEffect(() => {
-    if (isOpen) {
-      // If initialTab is provided and different from stored, use initialTab
-      // Otherwise use the stored value
-      const tabToUse = initialTab !== 'generate-locally' ? initialTab : settingsModalState.activeTab;
-      setActiveMainTab(tabToUse);
-    }
-  }, [isOpen, initialTab, settingsModalState.activeTab]);
-  
   // Installation tab preference (persistent)
   const [activeInstallTab, setActiveInstallTab] = usePersistentState<string>("settings-install-tab", "need-install");
   
@@ -223,12 +206,6 @@ python headless.py --db-type supabase \\
   --supabase-access-token ${token}`;
   };
 
-  const handleCreditsClick = (e: React.MouseEvent) => {
-    e.preventDefault();
-    setActiveMainTab('credits-management');
-    updateSettingsModalState({ activeTab: 'credits-management' });
-  };
-
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     onOpenChange(false); // Close the modal after signing out
@@ -250,28 +227,14 @@ python headless.py --db-type supabase \\
           </Button>
         </DialogHeader>
         
-        {/* Generation Method Selection - Shown for all tabs */}
-        <div className="mb-4">
+        {/* Generation Method Selection */}
+        <div className="mb-6">
           <div className="grid grid-cols-2 gap-6 items-start">
             {/* Left column: options */}
             <div className="space-y-4">
               <h3 className="font-semibold">How would you like to generate?</h3>
               
               <div className="space-y-3">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="on-computer"
-                    checked={onComputerChecked}
-                    onCheckedChange={(checked) => setOnComputerChecked(checked === true)}
-                  />
-                  <label
-                    htmlFor="on-computer"
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                  >
-                    On my computer {activeInstallTab !== "already-installed" && "(requires setup - below)"}
-                  </label>
-                </div>
-                
                 <div className="flex items-center space-x-2">
                   <Checkbox
                     id="in-cloud"
@@ -284,11 +247,22 @@ python headless.py --db-type supabase \\
                   >
                     In the cloud{" "}
                     <span className="text-gray-600">
-                      (you have {balance ? formatCurrency(balance.currentBalance) : '$0.00'}{" "}
-                      <a href="#" onClick={handleCreditsClick} className="text-blue-600 hover:text-blue-800">
-                        credits
-                      </a>)
+                      (you have {balance ? formatCurrency(balance.currentBalance) : '$0.00'} credits)
                     </span>
+                  </label>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="on-computer"
+                    checked={onComputerChecked}
+                    onCheckedChange={(checked) => setOnComputerChecked(checked === true)}
+                  />
+                  <label
+                    htmlFor="on-computer"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    On my computer {activeInstallTab !== "already-installed" && "(requires setup)"}
                   </label>
                 </div>
               </div>
@@ -306,334 +280,256 @@ python headless.py --db-type supabase \\
             </div>
           </div>
         </div>
-        
-        <Tabs value={activeMainTab} onValueChange={(value) => {
-          setActiveMainTab(value);
-          updateSettingsModalState({ activeTab: value });
-        }} className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="generate-locally">
-              <Monitor className="w-4 h-4 mr-2" />
-              Local Generation
-            </TabsTrigger>
-            {/* <TabsTrigger value="api-keys">API Keys</TabsTrigger> */}
-            <TabsTrigger value="credits-management">
-              <Coins className="w-4 h-4 mr-2" />
-              Credit Management
-            </TabsTrigger>
-          </TabsList>
 
-                    <TabsContent value="generate-locally" className="space-y-4">
+        <div className="space-y-8">
+          {/* Credits Management Section */}
+          {inCloudChecked && (
             <div className="space-y-4">
-              {/* Local Generation Setup */}
-              <div className="space-y-4">
-                  {!hasValidToken ? (
-                    <div className="space-y-4">
-                      <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Key className="h-5 w-5 text-blue-600" />
-                          <h4 className="font-semibold text-blue-900">Generate an API Key</h4>
-                        </div>
-                        <p className="text-sm text-blue-700 mb-4">
-                          You'll need an API key to authenticate your local worker with our servers.
+              <div className="flex items-center gap-2">
+                <Coins className="w-5 h-5 text-blue-600" />
+                <h3 className="text-lg font-semibold">Credit Management</h3>
+              </div>
+              <CreditsManagement />
+            </div>
+          )}
+
+          {/* Local Generation Section */}
+          {onComputerChecked && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Monitor className="w-5 h-5 text-green-600" />
+                <h3 className="text-lg font-semibold">Local Generation</h3>
+              </div>
+              
+              {!hasValidToken ? (
+                <div className="space-y-4">
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Key className="h-5 w-5 text-blue-600" />
+                      <h4 className="font-semibold text-blue-900">Generate an API Key</h4>
+                    </div>
+                    <p className="text-sm text-blue-700 mb-4">
+                      You'll need an API key to authenticate your local worker with our servers.
+                    </p>
+                    <Button 
+                      onClick={handleGenerateToken} 
+                      disabled={isGenerating}
+                      className="w-full"
+                    >
+                      {isGenerating ? "Generating..." : "Generate API Key"}
+                    </Button>
+                  </div>
+
+                  {/* Show expired tokens if any */}
+                  {tokens.some(token => isTokenExpired(token.expires_at)) && (
+                    <Alert className="border-orange-200 bg-orange-50">
+                      <AlertCircle className="h-4 w-4 text-orange-600" />
+                      <AlertDescription className="text-orange-800">
+                        Your API token has expired. Please generate a new one to continue using local generation.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Token Display and Management */}
+                  <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="font-semibold text-gray-800">Active API Token</h4>
+                        <p className="text-sm text-gray-600">
+                          Expires {formatDistanceToNow(new Date(getActiveToken()?.expires_at || 0), { addSuffix: true })}
                         </p>
-                        <Button 
-                          onClick={handleGenerateToken} 
-                          disabled={isGenerating}
-                          className="w-full"
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => refreshToken(getActiveToken()!)}
+                          disabled={isRefreshing || isRevoking || !getActiveToken()}
                         >
-                          {isGenerating ? "Generating..." : "Generate API Key"}
+                          {isRefreshing ? "Refreshing..." : "Refresh"}
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => revokeToken(getActiveToken()!.id)}
+                          disabled={isRevoking || isRefreshing || !getActiveToken()}
+                        >
+                          {isRevoking ? "Revoking..." : "Revoke"}
                         </Button>
                       </div>
-
-                      {/* Show expired tokens if any */}
-                      {tokens.some(token => isTokenExpired(token.expires_at)) && (
-                        <Alert className="border-orange-200 bg-orange-50">
-                          <AlertCircle className="h-4 w-4 text-orange-600" />
-                          <AlertDescription className="text-orange-800">
-                            Your API token has expired. Please generate a new one to continue using local generation.
-                          </AlertDescription>
-                        </Alert>
-                      )}
                     </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {/* Token Display and Management */}
-                      <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
-                        <div className="flex items-center justify-between">
+                  </div>
+
+                  {/* Installation section */}
+                  <div className="space-y-4">
+                    <h4 className="font-semibold">Run on your computer:</h4>
+                    
+                    <Tabs value={activeInstallTab} onValueChange={setActiveInstallTab} className="w-full">
+                      <TabsList className="grid w-full grid-cols-2 bg-gray-100 border border-gray-200">
+                        <TabsTrigger 
+                          value="need-install"
+                          className="data-[state=active]:bg-white data-[state=active]:shadow-sm"
+                        >
+                          I need to install
+                        </TabsTrigger>
+                        <TabsTrigger 
+                          value="already-installed"
+                          className="data-[state=active]:bg-white data-[state=active]:shadow-sm"
+                        >
+                          I've already installed
+                        </TabsTrigger>
+                      </TabsList>
+
+                      <TabsContent value="need-install" className="space-y-4">
+                        <div className="space-y-4">
                           <div>
-                            <h4 className="font-semibold text-gray-800">Active API Token</h4>
-                            <p className="text-sm text-gray-600">
-                              Expires {formatDistanceToNow(new Date(getActiveToken()?.expires_at || 0), { addSuffix: true })}
+                            <p className="text-sm text-gray-600 mb-4">
+                              Run this command to install and start the local worker:
                             </p>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => refreshToken(getActiveToken()!)}
-                              disabled={isRefreshing || isRevoking || !getActiveToken()}
+
+                          <div className="relative">
+                            <div 
+                              className={`bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm overflow-hidden ${
+                                showFullInstallCommand ? 'overflow-x-auto' : ''
+                              }`}
+                              style={{
+                                height: showFullInstallCommand ? 'auto' : '100px'
+                              }}
                             >
-                              {isRefreshing ? "Refreshing..." : "Refresh"}
-                            </Button>
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              onClick={() => revokeToken(getActiveToken()!.id)}
-                              disabled={isRevoking || isRefreshing || !getActiveToken()}
-                            >
-                              {isRevoking ? "Revoking..." : "Revoke"}
-                            </Button>
+                              <pre className="whitespace-pre-wrap break-all">
+                                {getInstallationCommand()}
+                              </pre>
+                            </div>
+                            
+                            {!showFullInstallCommand && (
+                              <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/50 to-transparent pointer-events-none rounded-lg">
+                                <div className="absolute bottom-2 left-4 right-4 flex justify-center">
+                                  <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={() => setShowFullInstallCommand(true)}
+                                    className="pointer-events-auto text-xs px-3 py-1 bg-gray-700 hover:bg-gray-600 text-gray-200 border-gray-600"
+                                  >
+                                    Reveal full command
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
                           </div>
+
+                          {showFullInstallCommand && (
+                            <Button
+                              variant="link"
+                              size="sm"
+                              onClick={() => setShowFullInstallCommand(false)}
+                              className="px-0"
+                            >
+                              Hide command
+                            </Button>
+                          )}
+
+                          <Button 
+                            onClick={handleCopyInstallCommand}
+                            variant="wes"
+                            size="wes-default"
+                            className="w-full"
+                          >
+                            {copiedInstallCommand ? (
+                              "Copied!"
+                            ) : (
+                              <>
+                                <Copy className="h-4 w-4 mr-2" />
+                                Copy Installation Command
+                              </>
+                            )}
+                          </Button>
+                          
+                          <p className="text-xs text-red-600 text-center">
+                            ⚠️ Don't share this command with non-trusted third parties
+                          </p>
                         </div>
-                      </div>
+                      </TabsContent>
 
-                      {/* Installation section */}
-                      <div className="space-y-4">
-                        <h4 className="font-semibold">Run on your computer:</h4>
-                        
-                        <Tabs value={activeInstallTab} onValueChange={setActiveInstallTab} className="w-full">
-                          <TabsList className="grid w-full grid-cols-2 bg-gray-100 border border-gray-200">
-                            <TabsTrigger 
-                              value="need-install"
-                              className="data-[state=active]:bg-white data-[state=active]:shadow-sm"
-                            >
-                              I need to install
-                            </TabsTrigger>
-                            <TabsTrigger 
-                              value="already-installed"
-                              className="data-[state=active]:bg-white data-[state=active]:shadow-sm"
-                            >
-                              I've already installed
-                            </TabsTrigger>
-                          </TabsList>
-
-                        <TabsContent value="need-install" className="space-y-4">
-                          <div className="space-y-4">
-                            <div>
-                              
-                              <p className="text-sm text-gray-600 mb-4">
-                                Run this command to install and start the local worker:
-                              </p>
-                            </div>
-
-                            <div className="relative">
-                              <div 
-                                className={`bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm overflow-hidden ${
-                                  showFullInstallCommand ? 'overflow-x-auto' : ''
-                                }`}
-                                style={{
-                                  height: showFullInstallCommand ? 'auto' : '100px'
-                                }}
-                              >
-                                <pre className="whitespace-pre-wrap break-all">
-                                  {getInstallationCommand()}
-                                </pre>
-                              </div>
-                              
-                              {!showFullInstallCommand && (
-                                <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/50 to-transparent pointer-events-none rounded-lg">
-                                  <div className="absolute bottom-2 left-4 right-4 flex justify-center">
-                                    <Button
-                                      variant="secondary"
-                                      size="sm"
-                                      onClick={() => setShowFullInstallCommand(true)}
-                                      className="pointer-events-auto text-xs px-3 py-1 bg-gray-700 hover:bg-gray-600 text-gray-200 border-gray-600"
-                                    >
-                                      Reveal full command
-                                    </Button>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-
-                            {showFullInstallCommand && (
-                              <Button
-                                variant="link"
-                                size="sm"
-                                onClick={() => setShowFullInstallCommand(false)}
-                                className="px-0"
-                              >
-                                Hide command
-                              </Button>
-                            )}
-
-                            <Button 
-                              onClick={handleCopyInstallCommand}
-                              variant="wes"
-                              size="wes-default"
-                              className="w-full"
-                            >
-                              {copiedInstallCommand ? (
-                                "Copied!"
-                              ) : (
-                                <>
-                                  <Copy className="h-4 w-4 mr-2" />
-                                  Copy Installation Command
-                                </>
-                              )}
-                            </Button>
-                            
-                            <p className="text-xs text-red-600 text-center">
-                              ⚠️ Don't share this command with non-trusted third parties
+                      <TabsContent value="already-installed" className="space-y-4">
+                        <div className="space-y-4">
+                          <div>                              
+                            <p className="text-sm text-gray-600 mb-4">
+                              Use this command to start your local worker:
                             </p>
                           </div>
-                        </TabsContent>
 
-                        <TabsContent value="already-installed" className="space-y-4">
-                          <div className="space-y-4">
-                            <div>                              
-                              <p className="text-sm text-gray-600 mb-4">
-                                Use this command to start your local worker:
-                              </p>
-                            </div>
-
-                            <div className="relative">
-                              <div 
-                                className={`bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm overflow-hidden ${
-                                  showFullRunCommand ? 'overflow-x-auto' : ''
-                                }`}
-                                style={{
-                                  height: showFullRunCommand ? 'auto' : '100px'
-                                }}
-                              >
-                                <pre className="whitespace-pre-wrap break-all">
-                                  {getRunCommand()}
-                                </pre>
-                              </div>
-                              
-                              {!showFullRunCommand && (
-                                <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/50 to-transparent pointer-events-none rounded-lg">
-                                  <div className="absolute bottom-2 left-4 right-4 flex justify-center">
-                                    <Button
-                                      variant="secondary"
-                                      size="sm"
-                                      onClick={() => setShowFullRunCommand(true)}
-                                      className="pointer-events-auto text-xs px-3 py-1 bg-gray-700 hover:bg-gray-600 text-gray-200 border-gray-600"
-                                    >
-                                      Reveal full command
-                                    </Button>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-
-                            {showFullRunCommand && (
-                              <Button
-                                variant="link"
-                                size="sm"
-                                onClick={() => setShowFullRunCommand(false)}
-                                className="px-0"
-                              >
-                                Hide command
-                              </Button>
-                            )}
-
-                            <Button 
-                              onClick={handleCopyRunCommand}
-                              variant="wes"
-                              size="wes-default"
-                              className="w-full"
+                          <div className="relative">
+                            <div 
+                              className={`bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm overflow-hidden ${
+                                showFullRunCommand ? 'overflow-x-auto' : ''
+                              }`}
+                              style={{
+                                height: showFullRunCommand ? 'auto' : '100px'
+                              }}
                             >
-                              {copiedRunCommand ? (
-                                "Copied!"
-                              ) : (
-                                <>
-                                  <Copy className="h-4 w-4 mr-2" />
-                                  Copy Run Command
-                                </>
-                              )}
-                            </Button>
+                              <pre className="whitespace-pre-wrap break-all">
+                                {getRunCommand()}
+                              </pre>
+                            </div>
                             
-                            <p className="text-xs text-red-600 text-center">
-                              ⚠️ Don't share this command with non-trusted third parties
-                            </p>
+                            {!showFullRunCommand && (
+                              <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/50 to-transparent pointer-events-none rounded-lg">
+                                <div className="absolute bottom-2 left-4 right-4 flex justify-center">
+                                  <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={() => setShowFullRunCommand(true)}
+                                    className="pointer-events-auto text-xs px-3 py-1 bg-gray-700 hover:bg-gray-600 text-gray-200 border-gray-600"
+                                  >
+                                    Reveal full command
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
                           </div>
-                        </TabsContent>
-                      </Tabs>
-                      </div>
-                    </div>
-                  )}
 
+                          {showFullRunCommand && (
+                            <Button
+                              variant="link"
+                              size="sm"
+                              onClick={() => setShowFullRunCommand(false)}
+                              className="px-0"
+                            >
+                              Hide command
+                            </Button>
+                          )}
 
+                          <Button 
+                            onClick={handleCopyRunCommand}
+                            variant="wes"
+                            size="wes-default"
+                            className="w-full"
+                          >
+                            {copiedRunCommand ? (
+                              "Copied!"
+                            ) : (
+                              <>
+                                <Copy className="h-4 w-4 mr-2" />
+                                Copy Run Command
+                              </>
+                            )}
+                          </Button>
+                          
+                          <p className="text-xs text-red-600 text-center">
+                            ⚠️ Don't share this command with non-trusted third parties
+                          </p>
+                        </div>
+                      </TabsContent>
+                    </Tabs>
+                  </div>
                 </div>
+              )}
             </div>
-          </TabsContent>
-
-          {/* <TabsContent value="api-keys" className="space-y-4">
-            <div className="space-y-4">
-              <div>
-                <h3 className="text-xl font-semibold mb-2">Service API Keys</h3>
-                <p className="text-sm text-gray-500 mb-4">
-                  API keys for external services used by the application.
-                </p>
-              </div>
-              
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="fal-api-key">Fal.ai API Key</Label>
-                  <Input
-                    id="fal-api-key"
-                    type="text"
-                    value={isFalKeyMasked ? "••••••••••••••••••••••" : falApiKey}
-                    onChange={handleFalKeyChange}
-                    placeholder="Enter your Fal.ai API key"
-                    className="w-full"
-                    disabled={isLoadingKeys}
-                  />
-                  <p className="text-xs text-gray-500">
-                    Used for image generation with Fal.ai services.
-                  </p>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="openai-api-key">OpenAI API Key</Label>
-                  <Input
-                    id="openai-api-key"
-                    type="text"
-                    value={isOpenAIKeyMasked ? "••••••••••••••••••••••" : openaiApiKey}
-                    onChange={handleOpenAIKeyChange}
-                    placeholder="Enter your OpenAI API key"
-                    className="w-full"
-                    disabled={isLoadingKeys}
-                  />
-                  <p className="text-xs text-gray-500">
-                    Used for prompt enhancement and AI features.
-                  </p>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="replicate-api-key">Replicate API Key</Label>
-                  <Input
-                    id="replicate-api-key"
-                    type="text"
-                    value={isReplicateKeyMasked ? "••••••••••••••••••••••" : replicateApiKey}
-                    onChange={handleReplicateKeyChange}
-                    placeholder="Enter your Replicate API key"
-                    className="w-full"
-                    disabled={isLoadingKeys}
-                  />
-                  <p className="text-xs text-gray-500">
-                    Used for upscaling images with Replicate.
-                  </p>
-                </div>
-              </div>
-              
-              <div className="flex justify-end">
-                <Button 
-                  onClick={handleSaveKeys} 
-                  disabled={isLoadingKeys || isUpdating}
-                >
-                  {isUpdating ? "Saving..." : "Save API Keys"}
-                </Button>
-              </div>
-            </div>
-          </TabsContent> */}
-
-          <TabsContent value="credits-management">
-            <CreditsManagement />
-          </TabsContent>
-        </Tabs>
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   );

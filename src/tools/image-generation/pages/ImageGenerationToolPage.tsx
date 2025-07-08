@@ -106,19 +106,7 @@ const ImageGenerationToolPage: React.FC = () => {
   }, [generatedImagesData, isLoadingGenerations]);
 
   useEffect(() => {
-    if (generatedImagesData) {
-      const ids = generatedImagesData.map(img => img.id);
-      const urls = generatedImagesData.map(img => img.url);
-      const duplicateIds = ids.filter((id, idx) => ids.indexOf(id) !== idx);
-      const duplicateUrls = urls.filter((url, idx) => url && urls.indexOf(url) !== idx);
-      console.log('[ImageDuplicationIssue][ImageGenerationToolPage] Rows:', generatedImagesData.length, 'Dup IDs:', duplicateIds.length, 'Dup URLs:', duplicateUrls.length);
-      if (duplicateIds.length > 0) {
-        console.warn('[ImageDuplicationIssue][ImageGenerationToolPage] Duplicate IDs:', duplicateIds);
-      }
-      if (duplicateUrls.length > 0) {
-        console.warn('[ImageDuplicationIssue][ImageGenerationToolPage] Duplicate URLs:', duplicateUrls.slice(0, 10));
-      }
-    }
+    // Effect removed
   }, [generatedImagesData]);
 
   const handleDeleteImage = async (id: string) => {
