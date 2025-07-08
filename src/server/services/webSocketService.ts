@@ -14,15 +14,26 @@ export function initializeWebSocketServer(): void {
   console.log('[WebSocket] Supabase Realtime broadcast service initialized');
 }
 
-export const broadcast = async (message: object) => {
+interface BroadcastMessage {
+  type: string;
+  payload: {
+    projectId: string;
+    [key: string]: any;
+  };
+}
+
+export const broadcast = async (message: BroadcastMessage) => {
   if (!supabaseUrl || !supabaseServiceKey) {
     console.error('[WebSocket] Cannot broadcast message: Supabase configuration missing');
     return;
   }
 
   try {
+    // Always use project-specific channel
+    const channelName = `task-updates:${message.payload.projectId}`;
+    
     const response = await supabase
-      .channel('task-updates')
+      .channel(channelName)
       .send({
         type: 'broadcast',
         event: 'task-update',
@@ -30,7 +41,7 @@ export const broadcast = async (message: object) => {
       });
 
     if (response === 'ok') {
-      // console.log(`[WebSocket] Broadcasting message via Supabase Realtime: ${JSON.stringify(message)}`);
+      // console.log(`[WebSocket] Broadcasting message via Supabase Realtime on channel ${channelName}`);
     } else {
       console.error('[WebSocket] Error broadcasting message via Supabase Realtime:', response);
     }

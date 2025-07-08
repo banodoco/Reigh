@@ -162,7 +162,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({ media, onClose, onNext, o
   return ReactDOM.createPortal(
     <TooltipProvider>
       <div 
-        className="fixed bg-black/80 flex items-center justify-center z-[9999] animate-in fade-in"
+        className="fixed bg-black/80 flex items-center justify-center z-[99999] animate-in fade-in isolate"
         style={modalStyle}
         onClick={onClose}
       >

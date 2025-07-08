@@ -94,6 +94,8 @@ interface ImageGalleryProps {
   whiteText?: boolean;
   /** Number of columns per row for the grid layout (default 5) */
   columnsPerRow?: number;
+  /** Initial media type filter state ('all' | 'image' | 'video') */
+  initialMediaTypeFilter?: 'all' | 'image' | 'video';
 }
 
 // Helper to format metadata for display
@@ -178,10 +180,11 @@ const InfoPopover: React.FC<{ metadata: DisplayableMetadata | undefined; metadat
   );
 };
 
-export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, isDeleting, onApplySettings, allShots, lastShotId, onAddToLastShot, currentToolType, initialFilterState = true, onImageSaved, offset = 0, totalCount, whiteText = false, columnsPerRow = 5 }) => {
+export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, isDeleting, onApplySettings, allShots, lastShotId, onAddToLastShot, currentToolType, initialFilterState = true, onImageSaved, offset = 0, totalCount, whiteText = false, columnsPerRow = 5, initialMediaTypeFilter = 'all' }) => {
   const [lightboxImageUrl, setLightboxImageUrl] = useState<string | null>(null);
   const [lightboxImageAlt, setLightboxImageAlt] = useState<string>("Fullscreen view");
   const [lightboxImageId, setLightboxImageId] = useState<string | undefined>(undefined);
+  const [lightboxImageIndex, setLightboxImageIndex] = useState<number>(-1); // Track current image index for navigation
   const [downloadingImageId, setDownloadingImageId] = useState<string | null>(null);
   const { toast } = useToast();
   const { setLastAffectedShotId } = useLastAffectedShot();
@@ -196,7 +199,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
   // State for the filter checkbox
   const [filterByToolType, setFilterByToolType] = useState<boolean>(initialFilterState);
   // State for the new media type filter
-  const [mediaTypeFilter, setMediaTypeFilter] = useState<'all' | 'image' | 'video'>('all');
+  const [mediaTypeFilter, setMediaTypeFilter] = useState<'all' | 'image' | 'video'>(initialMediaTypeFilter);
 
   // Pagination state (48 items per page)
   const ITEMS_PER_PAGE = 48;
@@ -234,12 +237,14 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
     setLightboxImageUrl(getDisplayUrl(image.url));
     setLightboxImageAlt(image.prompt || `Generated image with ID ${image.id}`);
     setLightboxImageId(image.id);
+    setLightboxImageIndex(filteredImages.findIndex(img => img.id === image.id)); // Use filteredImages for correct index
   };
 
   const handleCloseLightbox = () => {
     setLightboxImageUrl(null);
     setLightboxImageAlt("Fullscreen view");
     setLightboxImageId(undefined);
+    setLightboxImageIndex(-1); // Reset index
   };
 
   const handleImageSaved = (newImageUrl: string) => {
@@ -249,6 +254,28 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
     // Propagate the event to parent if a callback is provided
     if (lightboxImageId && onImageSaved) {
       onImageSaved(lightboxImageId, newImageUrl);
+    }
+  };
+
+  const handleNextImage = () => {
+    if (lightboxImageIndex < filteredImages.length - 1) {
+      const nextIndex = lightboxImageIndex + 1;
+      const nextImage = filteredImages[nextIndex];
+      setLightboxImageUrl(getDisplayUrl(nextImage.url));
+      setLightboxImageAlt(nextImage.prompt || `Generated image with ID ${nextImage.id}`);
+      setLightboxImageId(nextImage.id);
+      setLightboxImageIndex(nextIndex);
+    }
+  };
+
+  const handlePreviousImage = () => {
+    if (lightboxImageIndex > 0) {
+      const prevIndex = lightboxImageIndex - 1;
+      const prevImage = filteredImages[prevIndex];
+      setLightboxImageUrl(getDisplayUrl(prevImage.url));
+      setLightboxImageAlt(prevImage.prompt || `Generated image with ID ${prevImage.id}`);
+      setLightboxImageId(prevImage.id);
+      setLightboxImageIndex(prevIndex);
     }
   };
 
@@ -702,6 +729,34 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
           onClose={handleCloseLightbox}
           imageId={lightboxImageId}
           onImageSaved={handleImageSaved}
+          onNext={handleNextImage}
+          onPrevious={handlePreviousImage}
+          hasNext={lightboxImageIndex < filteredImages.length - 1}
+          hasPrevious={lightboxImageIndex > 0}
+          currentImage={lightboxImageIndex >= 0 ? {
+            id: filteredImages[lightboxImageIndex].id,
+            url: filteredImages[lightboxImageIndex].url,
+            metadata: filteredImages[lightboxImageIndex].metadata,
+            createdAt: filteredImages[lightboxImageIndex].createdAt
+          } : undefined}
+          allShots={allShots}
+          selectedShotId={selectedShotIdLocal}
+          onShotChange={(shotId) => {
+            setSelectedShotIdLocal(shotId);
+            setLastAffectedShotId(shotId);
+          }}
+          onAddToShot={onAddToLastShot}
+          onDelete={onDelete}
+          isDeleting={isDeleting}
+          onApplySettings={onApplySettings}
+          showTickForImageId={showTickForImageId}
+          onShowTick={(imageId) => {
+            setShowTickForImageId(imageId);
+            if (tickTimeoutRef.current) clearTimeout(tickTimeoutRef.current);
+            tickTimeoutRef.current = setTimeout(() => {
+              setShowTickForImageId(null);
+            }, 2000);
+          }}
         />
       )}
     </TooltipProvider>

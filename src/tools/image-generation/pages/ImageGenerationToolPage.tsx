@@ -437,6 +437,8 @@ const ImageGenerationToolPage: React.FC = () => {
               allShots={validShots}
               lastShotId={targetShotIdForButton}
               lastShotNameForTooltip={targetShotNameForButtonTooltip}
+              currentToolType="image-generation"
+              initialMediaTypeFilter="image"
             />
           </div>
         </>

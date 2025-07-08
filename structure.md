@@ -198,7 +198,9 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
 **Z-Index Hierarchy**: The app uses a layered z-index system:
 - Header: `z-50`
 - Panes: `z-60` (shots/tasks), `z-[100]` (generations), `z-[101/102]` (pane controls)  
-- Modals/Lightboxes: `z-[9999]` (ensures they appear above all panes)
+- Body pseudo-elements: `z-999` and `z-1000` (film grain effects)
+- Modals/Lightboxes: `z-[99999]` (ensures they appear above everything, rendered via portal)
+- Select dropdowns: `z-[10000]` (ensures they appear above modals)
 - Drag overlays: `z-[10000]` (above everything during drag operations)
 - **ShotsPane/**:
   - `ShotsPane.tsx`: Left slide-out panel for shots
@@ -209,10 +211,10 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
   - `TasksPane.tsx`: Right slide-out panel for tasks
   - `TaskList.tsx`: Lists tasks, filters, real-time updates via Supabase Realtime
   - `TaskItem.tsx**: Displays task details, cancel button
-- **ui/**: 50+ re-exports/variants of shadcn components. All modal components (Dialog, Sheet, Drawer) use `z-[9999]` to ensure they appear above sliding panes (which use z-60 to z-102)
+- **ui/**: 50+ re-exports/variants of shadcn components. All modal components (Dialog, Sheet, Drawer) use `z-[10000]` to ensure they appear above sliding panes (which use z-60 to z-102) and the header
 - **loading.tsx**: Wes Anderson-inspired loading indicators
 - **DraggableImage.tsx**: Makes gallery images draggable
-- **ImageGallery.tsx**: Displays generated images; supports delete, upscale, "apply settings", drag-to-shot
+- **ImageGallery.tsx**: Displays generated images; supports delete, upscale, "apply settings", drag-to-shot, and navigation between images in fullscreen modal
 - **ImageDragPreview.tsx**: Renders the visual preview for single or multiple images being dragged from the ShotImageManager
 - **SettingsModal.tsx**: Modal for API key entry/saving to database (uses useApiKeys hook). Replaces localStorage-based approach
 - **PromptEditorModal.tsx**: Modal for bulk prompt editing, AI-assisted generation/refinement
@@ -223,7 +225,7 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
 - **MediaLightbox.tsx**: Reusable lightbox for images/videos. Keyboard/button navigation. Now includes horizontal flip functionality for images with canvas-based save capability using local SQLite API
 - **ShotImageManager.tsx**: Manages images in a shot (D&D reorder, delete via callbacks). Used by ShotEditor, ShotsPage.tsx
 - **HoverScrubVideo.tsx**: Wrapper for useVideoScrubbing (hover-play, scrub, progress, rate overlay). Reused by VideoOutputItem, MediaLightbox
-- **ui/FullscreenImageModal.tsx**: Enhanced fullscreen image modal with horizontal flip and save functionality. Features flip button, save button (appears when changes made), canvas-based image processing for accurate flipping. Uses local SQLite API for database updates
+- **ui/FullscreenImageModal.tsx**: Enhanced fullscreen image modal with horizontal flip, save functionality, navigation between images, and gallery overlay buttons. Features flip button, save button (appears when changes made), canvas-based image processing for accurate flipping, keyboard navigation (arrow keys, ESC), previous/next navigation buttons, and all gallery overlay buttons (shot selector, add to shot, info popover, delete button, timestamp) positioned exactly as in the gallery view. Uses ReactDOM.createPortal for proper z-index layering and local SQLite API for database updates
 
 ##### Hooks
 - **useApiKeys.ts**: Manages API keys for external services

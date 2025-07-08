@@ -33,7 +33,7 @@ const VideoLightbox: React.FC<VideoLightboxProps> = ({ video, onClose, onImageSa
 
   return ReactDOM.createPortal(
     <div 
-      className="fixed bg-black/80 flex items-center justify-center z-[9999] p-8"
+      className="fixed bg-black/80 flex items-center justify-center z-[99999] p-8 isolate"
       style={modalStyle}
       onClick={onClose}
     >

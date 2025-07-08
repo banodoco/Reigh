@@ -7,27 +7,34 @@ import { RealtimeChannel } from '@supabase/supabase-js';
 export function useWebSocket(projectId: string | null) {
   const queryClient = useQueryClient();
   const channelRef = useRef<RealtimeChannel | null>(null);
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const reconnectAttemptsRef = useRef(0);
-  const authListenerRef = useRef<{ subscription: { unsubscribe: () => void } } | null>(null);
+  const setupTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    // Clear any existing reconnect timeout
-    if (reconnectTimeoutRef.current) {
-      clearTimeout(reconnectTimeoutRef.current);
-      reconnectTimeoutRef.current = null;
+    // Don't create a channel if we don't have a projectId
+    if (!projectId) {
+      return;
     }
 
-    // Clean up existing channel before creating new one
+    // Clear any pending setup
+    if (setupTimerRef.current) {
+      clearTimeout(setupTimerRef.current);
+      setupTimerRef.current = null;
+    }
+
+    // Clean up any existing channel before creating a new one
     if (channelRef.current) {
-      channelRef.current.unsubscribe();
+      supabase.removeChannel(channelRef.current);
       channelRef.current = null;
     }
 
-    const setupChannel = () => {
+    // Small delay to prevent race conditions when switching projects rapidly
+    setupTimerRef.current = setTimeout(() => {
+      // Create a project-specific channel topic
+      const channelTopic = `task-updates:${projectId}`;
+      
       // Create a Supabase Realtime channel for task updates
-      channelRef.current = supabase
-        .channel('task-updates', {
+      const channel = supabase
+        .channel(channelTopic, {
           config: {
             broadcast: {
               self: false, // Don't receive own messages
@@ -39,29 +46,27 @@ export function useWebSocket(projectId: string | null) {
           try {
             const message = payload.payload;
             
+            // No need to check projectId - we're already subscribed to the right channel!
             switch (message.type) {
-              case 'TASK_CREATED': {
-                const { projectId } = message.payload;
+              case 'TASK_CREATED':
                 console.log(`[WebSocket] Task created for project ${projectId}, invalidating task queries.`);
                 queryClient.invalidateQueries({ queryKey: ['tasks', { projectId }] });
                 break;
-              }
-              case 'TASK_COMPLETED': {
-                const { projectId } = message.payload;
+
+              case 'TASK_COMPLETED':
                 console.log(`[WebSocket] Task completed for project ${projectId}. Invalidating task & generation queries.`);
                 queryClient.invalidateQueries({ queryKey: ['tasks', { projectId }] });
                 queryClient.invalidateQueries({ queryKey: ['tasks'] }); // General task list
                 queryClient.invalidateQueries({ queryKey: ['generations', projectId] });
                 break;
-              }
-              case 'TASKS_STATUS_UPDATE': {
-                const { projectId } = message.payload;
+
+              case 'TASKS_STATUS_UPDATE':
                 // console.log(`[WebSocket] Invalidating task queries for project ${projectId} due to status update.`);
                 queryClient.invalidateQueries({ queryKey: ['tasks', { projectId }] });
                 break;
-              }
-              case 'GENERATIONS_UPDATED': {
-                const { projectId, shotId } = message.payload;
+
+              case 'GENERATIONS_UPDATED':
+                const { shotId } = message.payload;
                 console.log(`[WebSocket] Invalidating generation/shot queries for project: ${projectId}, shot: ${shotId}`);
                 queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
                 queryClient.invalidateQueries({ queryKey: ['generations', projectId] });
@@ -69,7 +74,7 @@ export function useWebSocket(projectId: string | null) {
                   queryClient.invalidateQueries({ queryKey: ['shots', shotId] });
                 }
                 break;
-              }
+
               default:
                 console.warn('[WebSocket] Received unknown message type:', message.type);
                 break;
@@ -80,97 +85,30 @@ export function useWebSocket(projectId: string | null) {
         })
         .subscribe((status, err) => {
           if (status === 'SUBSCRIBED') {
-            console.log('[WebSocket] Connected to Supabase Realtime');
-            reconnectAttemptsRef.current = 0; // Reset reconnect attempts on successful connection
-          } else if (status === 'CHANNEL_ERROR') {
+            console.log(`[WebSocket] Connected to Supabase Realtime for project ${projectId}`);
+          } else if (status === 'CHANNEL_ERROR' && err) {
             console.error('[WebSocket] Supabase Realtime channel error:', err);
-            
-            // Implement exponential backoff for reconnection
-            const attemptReconnect = () => {
-              if (reconnectAttemptsRef.current < 5) { // Max 5 reconnect attempts
-                reconnectAttemptsRef.current++;
-                const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 30000); // Max 30s delay
-                
-                console.log(`[WebSocket] Attempting reconnect in ${delay}ms (attempt ${reconnectAttemptsRef.current})`);
-                
-                reconnectTimeoutRef.current = setTimeout(() => {
-                  if (channelRef.current) {
-                    channelRef.current.unsubscribe();
-                    channelRef.current = null;
-                  }
-                  setupChannel();
-                }, delay);
-              } else {
-                console.error('[WebSocket] Max reconnection attempts reached. Please refresh the page.');
-              }
-            };
-            
-            attemptReconnect();
           } else if (status === 'TIMED_OUT') {
             console.error('[WebSocket] Supabase Realtime connection timed out');
-            // Also attempt reconnect on timeout
-            if (reconnectAttemptsRef.current < 5) {
-              reconnectAttemptsRef.current++;
-              reconnectTimeoutRef.current = setTimeout(setupChannel, 5000);
-            }
           } else if (status === 'CLOSED') {
             console.log('[WebSocket] Disconnected from Supabase Realtime');
           }
         });
-    };
 
-    // Track authentication state
-    let isAuthenticated = false;
-
-    // Listen for auth state changes
-    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-      const wasAuthenticated = isAuthenticated;
-      isAuthenticated = !!session;
-
-      console.log(`[WebSocket] Auth state changed: ${event}, authenticated: ${isAuthenticated}`);
-
-      // Clean up channel on sign out or token refresh
-      if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
-        if (channelRef.current) {
-          channelRef.current.unsubscribe();
-          channelRef.current = null;
-        }
-        reconnectAttemptsRef.current = 0;
-      }
-
-      // Create channel when needed (only once)
-      if (isAuthenticated && !channelRef.current) {
-        const shouldCreateChannel = 
-          event === 'SIGNED_IN' || 
-          event === 'TOKEN_REFRESHED' || 
-          (event === 'INITIAL_SESSION' && !wasAuthenticated);
-
-        if (shouldCreateChannel) {
-          console.log(`[WebSocket] Creating channel for auth event: ${event}`);
-          setupChannel();
-        }
-      }
-    });
-    
-    authListenerRef.current = authListener;
-
-    // Trigger initial session check (will fire INITIAL_SESSION event)
-    supabase.auth.getSession();
+      channelRef.current = channel;
+    }, 50); // 50ms delay to let any pending channel cleanup complete
 
     return () => {
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-        reconnectTimeoutRef.current = null;
+      // Clear any pending setup
+      if (setupTimerRef.current) {
+        clearTimeout(setupTimerRef.current);
+        setupTimerRef.current = null;
       }
+      // Clean up the channel when the component unmounts or projectId changes
       if (channelRef.current) {
-        channelRef.current.unsubscribe();
+        supabase.removeChannel(channelRef.current);
         channelRef.current = null;
       }
-      if (authListenerRef.current) {
-        authListenerRef.current.subscription.unsubscribe();
-        authListenerRef.current = null;
-      }
-      reconnectAttemptsRef.current = 0;
     };
   }, [queryClient, projectId]);
 } 

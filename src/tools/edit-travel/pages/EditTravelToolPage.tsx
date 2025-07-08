@@ -312,7 +312,7 @@ const EditTravelToolPage: React.FC = () => {
       />
 
       {(isOverallGenerating) && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999]">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[10000]">
             <div className="bg-background p-8 rounded-lg shadow-2xl w-full max-w-md text-center">
               <h2 className="text-2xl font-semibold mb-4">
                 {isClientSideReconstructing ? "Reconstructing Video..." : "Generating..."}

@@ -189,7 +189,7 @@ export async function cascadeTaskStatus(
     // Find tasks that depend on the current task.
     // Drizzle stores array as string, so we use LIKE. This is not ideal but works for now.
     const dependentTasks = await db
-      .select({ id: tasksSchema.id })
+      .select({ id: tasksSchema.id, projectId: tasksSchema.projectId })
       .from(tasksSchema)
       .where(like(tasksSchema.dependantOn, `%"${taskId}"%`));
 
@@ -209,17 +209,25 @@ export async function cascadeTaskStatus(
 
     console.log(`[TaskCascader] Updated status to '${status}' for tasks:`, dependentTaskIds);
     
-    // Notify clients about the update
-    await broadcast({
-      type: 'TASKS_STATUS_UPDATE',
-      payload: {
-        // We don't have projectId here easily without another query,
-        // so we might need a broader client-side refetch trigger or fetch it.
-        // For now, client will refetch on TASK_COMPLETED style messages.
-        // A generic TASKS_CHANGED message could be better.
-        // Let's assume for now the client will get updates via the poller.
-      },
-    });
+    // Notify each affected project separately
+    const uniqueProjectIds: string[] = Array.from(
+      new Set(
+        dependentTasks
+          .map((t) => t.projectId)
+          .filter((p): p is string => typeof p === 'string' && p.length > 0)
+      )
+    );
+
+    for (const projectId of uniqueProjectIds) {
+      if (projectId) {
+        await broadcast({
+          type: 'TASKS_STATUS_UPDATE',
+          payload: {
+            projectId,
+          },
+        });
+      }
+    }
 
 
     // Recursively cascade the status change for each dependent task.
