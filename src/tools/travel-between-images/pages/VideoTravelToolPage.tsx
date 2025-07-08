@@ -40,14 +40,11 @@ const VideoTravelToolPage: React.FC = () => {
   // Add ref for main container to enable scroll-to-top functionality
   const mainContainerRef = useRef<HTMLDivElement>(null);
 
-  // Function to scroll to top of the main container
+  // Function to smoothly scroll the window all the way to the very top.
+  // Using window.scrollTo guarantees we align with the absolute top of the page,
+  // eliminating the slight offset seen with scrollIntoView.
   const scrollToTop = () => {
-    if (mainContainerRef.current) {
-      mainContainerRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    } else {
-      // Fallback to window scroll if ref is not available
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   // Fetch public LoRAs from all users
@@ -293,7 +290,7 @@ const VideoTravelToolPage: React.FC = () => {
       const previousShot = shots[currentIndex - 1];
       setSelectedShot(previousShot);
       setCurrentShotId(previousShot.id);
-      // Scroll to top when navigating to previous shot
+      // Scroll to the very top of the page
       scrollToTop();
     }
   };
@@ -305,7 +302,7 @@ const VideoTravelToolPage: React.FC = () => {
       const nextShot = shots[currentIndex + 1];
       setSelectedShot(nextShot);
       setCurrentShotId(nextShot.id);
-      // Scroll to top when navigating to next shot
+      // Scroll to the very top of the page
       scrollToTop();
     }
   };

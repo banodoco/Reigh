@@ -92,10 +92,12 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
       const orchestratorDetails = pRoot.orchestrator_details || {};
       const orchestratorId = orchestratorDetails.orchestrator_task_id || pRoot.orchestrator_task_id || pRoot.task_id || task.id;
       const orchestratorRunId = orchestratorDetails.run_id || pRoot.orchestrator_run_id;
+      
       const subtasks = allProjectTasks.filter((t) => {
         const p: any = typeof t.params === 'string' ? JSON.parse(t.params) : t.params || {};
         return (p.orchestrator_task_id_ref === orchestratorId || p.orchestrator_task_id === orchestratorId) && ['Queued', 'In Progress'].includes(t.status);
       });
+      
       subtasks.forEach((sub) => {
         cancelTaskMutation.mutate(sub.id);
       });

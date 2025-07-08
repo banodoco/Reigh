@@ -81,10 +81,17 @@ export const ShotsPane: React.FC = () => {
 
     setIsCreateModalOpen(false);
 
-    if (createdShotId) {
-      setCurrentShotId(createdShotId);
-      navigate('/tools/travel-between-images', { state: { fromShotClick: true } });
-    }
+    // If a shot was successfully created, we purposely *do not* auto-navigate or
+    // switch the current shot here. This keeps the user in their current
+    // context (e.g. continuing to work on another shot or different tool)
+    // and simply lets the list refresh to show the new shot.
+    //
+    // NOTE: Users can still click the new shot manually or use the "See All"
+    // button to jump to the full Travel Between Images editor when they
+    // actually want to open it.
+    //
+    // setCurrentShotId(createdShotId);
+    // navigate('/tools/travel-between-images', { state: { fromShotClick: true } });
   };
 
   const bottomOffset = isGenerationsPaneLocked ? generationsPaneHeight : 0;

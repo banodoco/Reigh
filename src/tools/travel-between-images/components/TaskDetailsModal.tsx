@@ -43,6 +43,11 @@ interface TaskDetailsModalProps {
     inputImages?: string[];
   }) => void;
   onApplySettingsFromTask?: (taskId: string, replaceImages: boolean, inputImages: string[]) => void;
+  /**
+   * Called when the modal is closed (either via the close button or external interaction).
+   * Useful for parent components that need to reset state so the modal can be reopened for the same task.
+   */
+  onClose?: () => void;
 }
 
 interface Task {
@@ -50,7 +55,7 @@ interface Task {
   params: Json;
 }
 
-const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, children, onApplySettings, onApplySettingsFromTask }) => {
+const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, children, onApplySettings, onApplySettingsFromTask, onClose }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [task, setTask] = useState<Task | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -295,7 +300,16 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        setIsOpen(open);
+        // If the dialog is transitioning from open -> closed, notify parent
+        if (!open && onClose) {
+          onClose();
+        }
+      }}
+    >
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent className="sm:max-w-[700px] max-h-[80vh] flex flex-col" aria-describedby="task-details-description">
         <DialogHeader className="flex-shrink-0">
@@ -469,7 +483,11 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
                 </div>
               )}
             </div>
-            <Button variant="outline" onClick={() => setIsOpen(false)} className="text-sm">
+            <Button
+              variant="outline"
+              onClick={() => setIsOpen(false)}
+              className="text-sm"
+            >
               Close
             </Button>
           </div>

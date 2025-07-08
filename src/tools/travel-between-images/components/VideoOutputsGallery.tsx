@@ -14,8 +14,28 @@ interface VideoOutputsGalleryProps {
   videoOutputs: GenerationRow[];
   onDelete: (generationId: string) => void;
   deletingVideoId: string | null;
-  onApplySettings: (generationId: string) => void;
-  onApplySettingsFromTask: (generationId: string) => void;
+  /**
+   * Apply settings extracted from a task/generation directly.
+   */
+  onApplySettings: (settings: {
+    prompt?: string;
+    prompts?: string[];
+    negativePrompt?: string;
+    negativePrompts?: string[];
+    steps?: number;
+    frame?: number;
+    frames?: number[];
+    context?: number;
+    contexts?: number[];
+    width?: number;
+    height?: number;
+    replaceImages?: boolean;
+    inputImages?: string[];
+  }) => void;
+  /**
+   * Alternative apply handler that operates using the original task id (server-side extraction).
+   */
+  onApplySettingsFromTask: (taskId: string, replaceImages: boolean, inputImages: string[]) => void;
   onImageSaved?: (newImageUrl: string) => void;
 }
 
@@ -110,25 +130,26 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
                   />
                 </div>
                 
-                <div className="absolute top-2 right-2 flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                {/* Action buttons – styled to match ImageGallery overlays */}
+                <div className="absolute top-2 right-2 flex flex-col items-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <Button
                     variant="secondary"
-                    size="sm"
+                    size="icon"
                     onClick={() => setSelectedVideoForDetails(video)}
-                    className="bg-green-600/90 hover:bg-green-700 text-white shadow-sm"
+                    className="h-7 w-7 p-0 rounded-full bg-black/50 hover:bg-black/70 text-white"
                     title="View details"
                   >
-                    <Info className="h-4 w-4" />
+                    <Info className="h-3.5 w-3.5" />
                   </Button>
                   <Button
                     variant="destructive"
-                    size="sm"
+                    size="icon"
                     onClick={() => onDelete(video.id)}
                     disabled={deletingVideoId === video.id}
-                    className="shadow-sm"
+                    className="h-7 w-7 p-0 rounded-full"
                     title="Delete video"
                   >
-                    <Trash2 className="h-4 w-4" />
+                    <Trash2 className="h-3.5 w-3.5" />
                   </Button>
                 </div>
               </div>
@@ -184,9 +205,14 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
           <TaskDetailsModal
             generationId={selectedVideoForDetails.id}
             onApplySettings={(settings) => {
-              onApplySettings(selectedVideoForDetails.id);
+              onApplySettings(settings);
               setSelectedVideoForDetails(null);
             }}
+            onApplySettingsFromTask={(taskId, replaceImages, inputImages) => {
+              onApplySettingsFromTask(taskId, replaceImages, inputImages);
+              setSelectedVideoForDetails(null);
+            }}
+            onClose={() => setSelectedVideoForDetails(null)}
           >
             <Button 
               ref={taskDetailsButtonRef}

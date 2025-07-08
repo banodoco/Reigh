@@ -150,7 +150,9 @@ router.patch('/:taskId/cancel', async (req: Request, res: Response) => {
     }
 
     // Don't await, let it run in the background
-    cascadeTaskStatus(taskId, 'Cancelled', 'Task cancelled by user via API');
+    cascadeTaskStatus(taskId, 'Cancelled', 'Task cancelled by user via API').catch(err => {
+      console.error(`[Tasks] Error cascading cancel for task ${taskId}:`, err);
+    });
 
     return res.status(200).json(updatedTasks[0]);
   } catch (error: any) {
@@ -251,8 +253,6 @@ router.post('/cancel-pending', async (req: Request, res: Response) => {
       .returning({ id: tasksSchema.id });
 
     const cancelledCount = result.length;
-
-    console.log(`[Tasks] Cancelled ${cancelledCount} tasks for project ${projectId}`);
 
     // Cascade status update for each cancelled task (fire-and-forget)
     for (const row of result) {

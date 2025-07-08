@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Task, TaskStatus } from '@/types/tasks';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { fetchWithAuth } from '@/lib/api';
 import { useProject } from '../contexts/ProjectContext';
 import React from 'react';
 
@@ -163,18 +164,16 @@ export const useCancelTask = (projectId: string | null) => {
   
   return useMutation({
     mutationFn: async (taskId: string) => {
-      const { data, error } = await supabase
-        .from('tasks')
-        .update({ 
-          status: 'Cancelled',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', taskId)
-        .select()
-        .single();
-      
-      if (error) throw error;
-      return data;
+      const response = await fetchWithAuth(`/api/tasks/${taskId}/cancel`, {
+        method: 'PATCH',
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.message || 'Failed to cancel task');
+      }
+
+      return await response.json();
     },
     onSuccess: (_, taskId) => {
       queryClient.invalidateQueries({ queryKey: [TASKS_QUERY_KEY] });
@@ -192,17 +191,20 @@ export const useCancelPendingTasks = () => {
   
   return useMutation({
     mutationFn: async (projectId: string) => {
-      const { data, error } = await supabase
-        .from('tasks')
-        .update({ 
-          status: 'Cancelled',
-          updated_at: new Date().toISOString()
-        })
-        .eq('project_id', projectId)
-        .in('status', ['Queued', 'In Progress'])
-        .select();
-      
-      if (error) throw error;
+      const response = await fetchWithAuth(`/api/tasks/cancel-pending`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ projectId }),
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.message || 'Failed to cancel pending tasks');
+      }
+
+      const data = await response.json() as CancelAllPendingTasksResponse;
       return data;
     },
     onSuccess: (_, projectId) => {

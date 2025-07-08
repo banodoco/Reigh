@@ -187,19 +187,26 @@ export async function cascadeTaskStatus(
 
   try {
     // Find tasks that depend on the current task.
-    // Drizzle stores array as string, so we use LIKE. This is not ideal but works for now.
+    // dependantOn is a UUID column, so we use direct equality
     const dependentTasks = await db
       .select({ id: tasksSchema.id, projectId: tasksSchema.projectId })
       .from(tasksSchema)
-      .where(like(tasksSchema.dependantOn, `%"${taskId}"%`));
+      .where(eq(tasksSchema.dependantOn, taskId));
 
-    if (dependentTasks.length === 0) {
+    // NEW: Also find tasks that reference this task via orchestrator_task_id_ref inside the params JSON.
+    // This covers travel_segment and travel_stitch tasks that belong to a travel_orchestrator run.
+    const orchestratorRefTasks = await db
+      .select({ id: tasksSchema.id, projectId: tasksSchema.projectId })
+      .from(tasksSchema)
+      .where(sql`params ->> 'orchestrator_task_id_ref' = ${taskId}`);
+
+    const allDependentTasks = [...dependentTasks, ...orchestratorRefTasks];
+    if (allDependentTasks.length === 0) {
       console.log(`[TaskCascader] No dependent tasks found for ${taskId}.`);
       return;
     }
 
-    const dependentTaskIds = dependentTasks.map((t) => t.id);
-    console.log(`[TaskCascader] Found dependent tasks for ${taskId}:`, dependentTaskIds);
+    const dependentTaskIds = allDependentTasks.map((t) => t.id);
 
     // Update the status of all dependent tasks.
     await db
@@ -212,7 +219,7 @@ export async function cascadeTaskStatus(
     // Notify each affected project separately
     const uniqueProjectIds: string[] = Array.from(
       new Set(
-        dependentTasks
+        allDependentTasks
           .map((t) => t.projectId)
           .filter((p): p is string => typeof p === 'string' && p.length > 0)
       )
@@ -229,9 +236,8 @@ export async function cascadeTaskStatus(
       }
     }
 
-
     // Recursively cascade the status change for each dependent task.
-    for (const dependentTask of dependentTasks) {
+    for (const dependentTask of allDependentTasks) {
       const cascadeReason = `Cascaded from upstream task ${taskId} which was set to ${status}.`;
       await cascadeTaskStatus(dependentTask.id, status, cascadeReason, processedIds);
     }
