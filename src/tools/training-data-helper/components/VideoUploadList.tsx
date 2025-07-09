@@ -61,13 +61,6 @@ export function VideoUploadList({ videos, selectedVideo, onVideoSelect, segments
   };
 
   const handleVideoError = (videoId: string, video: TrainingDataVideo) => {
-    console.error('[VideoUploadList] Video load error:', {
-      videoId: video.id,
-      originalFilename: video.originalFilename,
-      storageLocation: video.storageLocation,
-      url: getVideoUrl(video),
-    });
-    
     // Mark the video as having an error
     setVideoErrors(prev => new Set([...prev, videoId]));
     
@@ -124,19 +117,7 @@ export function VideoUploadList({ videos, selectedVideo, onVideoSelect, segments
                     onError={() => {
                       handleVideoError(video.id, video);
                     }}
-                    onLoadStart={() => {
-                      console.log('[VideoUploadList] Video load started:', {
-                        videoId: video.id,
-                        originalFilename: video.originalFilename,
-                        url: getVideoUrl(video)
-                      });
-                    }}
-                    onLoadedMetadata={() => {
-                      console.log('[VideoUploadList] Video metadata loaded:', {
-                        videoId: video.id,
-                        originalFilename: video.originalFilename
-                      });
-                    }}
+
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center bg-muted">

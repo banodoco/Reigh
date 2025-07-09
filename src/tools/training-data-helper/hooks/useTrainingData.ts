@@ -330,13 +330,6 @@ export function useTrainingData() {
 
       console.log('[Upload] Database record created:', data);
 
-      // Test public URL generation
-      const { data: publicUrlData } = supabase.storage
-        .from('training-data')
-        .getPublicUrl(fileName);
-      
-      console.log('[Upload] Generated public URL for uploaded video:', publicUrlData.publicUrl);
-
       // Update local state
       setVideos(prev => [transformVideo(data), ...prev]);
       return data.id;
@@ -426,14 +419,7 @@ export function useTrainingData() {
     const fileExt = file.name.split('.').pop();
     const fileName = `${userId}/${Date.now()}.${fileExt}`;
     
-    console.log('[Upload] Starting upload:', {
-      originalFilename: file.name,
-      storageFileName: fileName,
-      fileSize: file.size,
-      fileType: file.type,
-      duration,
-      userId
-    });
+
 
     const { error: uploadError, data: uploadData } = await supabase.storage
       .from('training-data')
@@ -713,14 +699,11 @@ export function useTrainingData() {
         const batch = videosNeedingUrls.slice(i, i + batchSize);
         
         batch.forEach((video) => {
-          console.log(`[VideoURL] Processing video ${video.id} with storage location: ${video.storageLocation}`);
-          
           // Generate public URL since bucket is now public
           const { data: publicData } = supabase.storage
             .from('training-data')
             .getPublicUrl(video.storageLocation);
           
-          console.log(`[VideoURL] Generated public URL for ${video.id}: ${publicData.publicUrl}`);
           newUrls[video.id] = publicData.publicUrl;
         });
         
@@ -742,13 +725,11 @@ export function useTrainingData() {
   const getVideoUrl = (video: TrainingDataVideo): string => {
     // Check if this video is known to be invalid
     if (invalidVideos.has(video.id)) {
-      console.log(`[getVideoUrl] Video ${video.id} is marked as invalid`);
       return '';
     }
     
     // Return cached URL if available
     if (videoUrls[video.id]) {
-      console.log(`[getVideoUrl] Using cached URL for video ${video.id}: ${videoUrls[video.id]}`);
       return videoUrls[video.id];
     }
     
@@ -757,7 +738,6 @@ export function useTrainingData() {
       .from('training-data')
       .getPublicUrl(video.storageLocation);
     
-    console.log(`[getVideoUrl] Generated public URL for video ${video.id}: ${data.publicUrl}`);
     return data.publicUrl;
   };
 
