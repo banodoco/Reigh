@@ -24,7 +24,6 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@fal-ai/client": "^1.4.0",
     "@ffmpeg/core": "^0.12.10",
-    "@ffmpeg/ffmpeg": "^0.12.15",
     "@hookform/resolvers": "^3.9.0",
     "@radix-ui/react-accordion": "^1.2.0",
     "@radix-ui/react-alert-dialog": "^1.1.1",
@@ -56,6 +55,7 @@
     "@radix-ui/react-tooltip": "^1.1.4",
     "@supabase/supabase-js": "^2.49.4",
     "@tanstack/react-query": "^5.56.2",
+    "@types/jszip": "^3.4.0",
     "@types/uuid": "^10.0.0",
     "@types/ws": "^8.18.1",
     "axios": "^1.9.0",
@@ -69,6 +69,7 @@
     "embla-carousel-react": "^8.3.0",
     "express": "^5.1.0",
     "input-otp": "^1.2.4",
+    "jszip": "^3.10.1",
     "lucide-react": "^0.462.0",
     "multer": "^2.0.0",
     "next-themes": "^0.3.0",
@@ -89,6 +90,7 @@
     "uuid": "^11.1.0",
     "vaul": "^0.9.3",
     "ws": "^8.18.2",
+    "yt-dlp-wrap": "^2.3.12",
     "zod": "^3.23.8"
   },
   "devDependencies": {

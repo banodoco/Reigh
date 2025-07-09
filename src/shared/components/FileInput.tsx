@@ -4,6 +4,7 @@ import { Button } from "@/shared/components/ui/button";
 import { Label } from "@/shared/components/ui/label";
 import { X, UploadCloud, ImagePlus, VideoIcon, FileText } from "lucide-react";
 import { toast } from "sonner";
+import { cropFilename } from "@/shared/lib/utils";
 
 interface FileInputProps {
   onFileChange: (files: File[]) => void;
@@ -167,7 +168,7 @@ const FileInput: React.FC<FileInputProps> = ({
           <div className="relative group space-y-2">
             {displayFiles.length > 1 && (
                 <div className="text-sm text-muted-foreground p-2 border rounded-md bg-background">
-                    {displayFiles.length} files selected. First file: {displayFiles[0].name}
+                    {displayFiles.length} files selected. First file: {cropFilename(displayFiles[0].name)}
                 </div>
             )}
             {displayFiles.length === 1 && displayPreviewUrls[0] && (
@@ -188,7 +189,9 @@ const FileInput: React.FC<FileInputProps> = ({
                 ) : (
                     <div className="mt-2 border rounded-md p-2 h-32 flex items-center justify-center bg-muted max-w-xs mx-auto">
                         <FileText className="h-8 w-8 text-muted-foreground mr-2" />
-                        <p className="text-xs text-muted-foreground truncate">{displayFiles[0].name}</p> 
+                        <p className="text-xs text-muted-foreground truncate" title={displayFiles[0].name}>
+                          {cropFilename(displayFiles[0].name)}
+                        </p> 
                     </div>
                 )
             )}
@@ -209,7 +212,7 @@ const FileInput: React.FC<FileInputProps> = ({
             )}
              {displayFiles.length === 1 && displayFiles[0].name && (
               <p className="text-xs text-muted-foreground mt-1 truncate" title={displayFiles[0].name}>
-                {displayFiles[0].name}
+                {cropFilename(displayFiles[0].name)}
               </p>
             )}
           </div>

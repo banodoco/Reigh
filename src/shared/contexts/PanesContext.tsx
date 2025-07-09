@@ -53,7 +53,7 @@ export const PanesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }
 
     if (!isLoading) {
-      console.log('[PanesContext] Hydrating pane locks from server:', paneLocks);
+      // Hydrating pane locks from server
       setLocks(paneLocks);
     }
   }, [isLoading, paneLocks, isMobile]);
@@ -64,7 +64,7 @@ export const PanesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       const newValue = !prev[pane];
       const newLocks = { ...prev, [pane]: newValue };
       
-      console.log(`[PanesContext] Toggling ${pane} lock to ${newValue}`);
+      // Toggling pane lock
       
       // Save to database only on desktop
       if (!isMobile) {

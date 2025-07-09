@@ -1,19 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { PageFadeIn } from '@/shared/components/transitions';
-import { Button } from '@/shared/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
-import FileInput from '@/shared/components/FileInput';
 import { VideoUploadList } from '../components/VideoUploadList';
 import { VideoSegmentEditor } from '../components/VideoSegmentEditor';
 import { BatchSelector } from '../components/BatchSelector';
+import { MultiVideoUploader } from '../components/MultiVideoUploader';
 import { useTrainingData } from '../hooks/useTrainingData';
-import { Upload, Video, Scissors } from 'lucide-react';
+import { Video, Scissors } from 'lucide-react';
 import { toast } from 'sonner';
+import { cropFilename } from '@/shared/lib/utils';
 
 export default function TrainingDataHelperPage() {
   const { 
     videos, 
     uploadVideo, 
+    uploadVideosWithSplitModes,
     isUploading, 
     segments, 
     createSegment, 
@@ -21,32 +22,43 @@ export default function TrainingDataHelperPage() {
     batches, 
     selectedBatchId, 
     createBatch, 
-    setSelectedBatchId 
+    updateBatch,
+    deleteBatch,
+    setSelectedBatchId,
+    getVideoUrl,
+    markVideoAsInvalid
   } = useTrainingData();
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
-  const [files, setFiles] = useState<File[]>([]);
+  const segmentEditorRef = useRef<HTMLDivElement>(null);
 
-  const handleFileSelect = (selectedFiles: File[]) => {
-    setFiles(selectedFiles);
-  };
-
-  const handleUpload = async () => {
-    if (files.length === 0) {
-      toast.error('Please select at least one video file');
-      return;
+  // Clear selection if the selected video no longer exists
+  useEffect(() => {
+    if (selectedVideo && !videos.find(v => v.id === selectedVideo)) {
+      console.log(`[TrainingDataHelperPage] Selected video ${selectedVideo} no longer exists, clearing selection`);
+      setSelectedVideo(null);
     }
+  }, [videos, selectedVideo]);
 
-    if (!selectedBatchId) {
-      toast.error('Please select or create a batch first');
-      return;
+  // Scroll to segment editor when a video is selected
+  useEffect(() => {
+    if (selectedVideo && segmentEditorRef.current) {
+      // Small delay to ensure the element is rendered
+      setTimeout(() => {
+        segmentEditorRef.current?.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'start' 
+        });
+      }, 100);
     }
+  }, [selectedVideo]);
 
+  const handleMultiVideoUpload = async (videoFiles: Array<{
+    file: File;
+    splitMode: 'take-all' | 'manual' | 'auto-scene';
+    detectedScenes?: number[];
+  }>) => {
     try {
-      for (const file of files) {
-        await uploadVideo(file);
-      }
-      setFiles([]);
-      toast.success(`Successfully uploaded ${files.length} video(s)`);
+      await uploadVideosWithSplitModes(videoFiles);
     } catch (error) {
       console.error('Upload failed:', error);
       toast.error('Failed to upload videos');
@@ -73,49 +85,19 @@ export default function TrainingDataHelperPage() {
           selectedBatchId={selectedBatchId}
           onSelectBatch={setSelectedBatchId}
           onCreateBatch={createBatch}
+          onUpdateBatch={updateBatch}
+          onDeleteBatch={deleteBatch}
+          videos={videos}
+          segments={segments}
+          getVideoUrl={getVideoUrl}
         />
 
         {/* Upload Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Upload className="h-5 w-5" />
-              Upload Videos
-            </CardTitle>
-            <CardDescription>
-              Upload video files to extract training segments from
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <FileInput
-              acceptTypes={['video']}
-              multiple
-              onFileChange={handleFileSelect}
-              label="Select video files to upload"
-            />
-            {files.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">
-                  {files.length} file(s) selected
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {files.map((file, index) => (
-                    <div key={index} className="bg-secondary px-3 py-1 rounded-md text-sm">
-                      {file.name}
-                    </div>
-                  ))}
-                </div>
-                <Button 
-                  onClick={handleUpload} 
-                  disabled={isUploading}
-                  className="w-full"
-                >
-                  {isUploading ? 'Uploading...' : 'Upload Videos'}
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <MultiVideoUploader
+          onUpload={handleMultiVideoUpload}
+          isUploading={isUploading}
+          selectedBatchId={selectedBatchId}
+        />
 
         {/* Video Library */}
         <Card>
@@ -133,17 +115,18 @@ export default function TrainingDataHelperPage() {
               videos={videos}
               selectedVideo={selectedVideo}
               onVideoSelect={setSelectedVideo}
+              segments={segments}
             />
           </CardContent>
         </Card>
 
         {/* Segment Editor */}
         {selectedVideoData && (
-          <Card>
+          <Card ref={segmentEditorRef}>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Scissors className="h-5 w-5" />
-                Segment Editor - {selectedVideoData.originalFilename}
+                Segment Editor - {cropFilename(selectedVideoData.originalFilename)}
               </CardTitle>
               <CardDescription>
                 Create and manage training segments from the selected video

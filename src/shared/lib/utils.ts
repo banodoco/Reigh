@@ -5,6 +5,22 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+export function cropFilename(filename: string, maxLength: number = 24): string {
+  if (filename.length <= maxLength) {
+    return filename;
+  }
+  
+  const extension = filename.split('.').pop() || '';
+  const nameWithoutExtension = filename.substring(0, filename.length - extension.length - 1);
+  const croppedLength = maxLength - extension.length - 4; // -4 for "..." and "."
+  
+  if (croppedLength <= 0) {
+    return `...${extension}`;
+  }
+  
+  return `${nameWithoutExtension.substring(0, croppedLength)}...${extension}`;
+}
+
 export const fileToDataURL = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();

@@ -1,26 +1,61 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/shared/components/ui/button';
 import { Card, CardContent } from '@/shared/components/ui/card';
 import { Badge } from '@/shared/components/ui/badge';
-import { Video, Trash2, Clock, FileText } from 'lucide-react';
-import { TrainingDataVideo } from '../hooks/useTrainingData';
+import { Video, Trash2, Clock, FileText, Scissors } from 'lucide-react';
+import { TrainingDataVideo, TrainingDataSegment } from '../hooks/useTrainingData';
 import { useTrainingData } from '../hooks/useTrainingData';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/shared/components/ui/alert-dialog';
+import { cropFilename } from '@/shared/lib/utils';
+import { formatDistanceToNow, isValid } from 'date-fns';
+
+// Helper to abbreviate distance strings (e.g., "5 minutes ago" -> "5 mins ago")
+const abbreviateDistance = (str: string) => {
+  // Handle "less than a minute ago" special case
+  if (str.includes('less than a minute')) {
+    return '<1 min ago';
+  }
+  
+  return str
+    .replace(/1 minutes ago/, '1 min ago')
+    .replace(/1 hours ago/, '1 hr ago')
+    .replace(/1 seconds ago/, '1 sec ago')
+    .replace(/1 days ago/, '1 day ago')
+    .replace(/minutes?/, 'mins')
+    .replace(/hours?/, 'hrs')
+    .replace(/seconds?/, 'secs')
+    .replace(/days?/, 'days');
+};
 
 interface VideoUploadListProps {
   videos: TrainingDataVideo[];
   selectedVideo: string | null;
   onVideoSelect: (videoId: string) => void;
+  segments: TrainingDataSegment[];
 }
 
-export function VideoUploadList({ videos, selectedVideo, onVideoSelect }: VideoUploadListProps) {
+export function VideoUploadList({ videos, selectedVideo, onVideoSelect, segments }: VideoUploadListProps) {
   const { deleteVideo, getVideoUrl } = useTrainingData();
   const [deletingVideo, setDeletingVideo] = useState<string | null>(null);
+
+
+
+  // Helper function to get segment count for a video
+  const getSegmentCount = (videoId: string) => {
+    return segments.filter(segment => segment.trainingDataId === videoId).length;
+  };
 
   const handleDeleteVideo = async (videoId: string) => {
     setDeletingVideo(videoId);
     try {
       await deleteVideo(videoId);
+      // The video should disappear immediately due to optimistic updates in useTrainingData
+      // If the selected video was deleted, clear the selection
+      if (selectedVideo === videoId) {
+        onVideoSelect('');
+      }
+    } catch (error) {
+      console.error('Failed to delete video:', error);
     } finally {
       setDeletingVideo(null);
     }
@@ -52,7 +87,7 @@ export function VideoUploadList({ videos, selectedVideo, onVideoSelect }: VideoU
   }
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+    <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
       {videos.map((video) => (
         <Card
           key={video.id}
@@ -74,38 +109,23 @@ export function VideoUploadList({ videos, selectedVideo, onVideoSelect }: VideoU
                     preload="metadata"
                     onError={(e) => {
                       const videoElement = e.target as HTMLVideoElement;
-                      console.error('[VideoUploadList] Video load error:', {
-                        videoId: video.id,
-                        filename: video.originalFilename,
-                        src: videoElement.src,
-                        error: e,
-                        networkState: videoElement.networkState,
-                        readyState: videoElement.readyState,
-                        currentSrc: videoElement.currentSrc
-                      });
-                      // Fallback to placeholder
+                      // Hide failed video element
                       videoElement.style.display = 'none';
                     }}
-                    onLoadStart={(e) => {
-                      console.log('[VideoUploadList] Video load started:', {
-                        videoId: video.id,
-                        filename: video.originalFilename,
-                        src: (e.target as HTMLVideoElement).src
-                      });
+                    onLoadStart={() => {
+                      // Video loading started
                     }}
-                    onLoadedMetadata={(e) => {
-                      console.log('[VideoUploadList] Video metadata loaded:', {
-                        videoId: video.id,
-                        filename: video.originalFilename,
-                        duration: (e.target as HTMLVideoElement).duration
-                      });
+                    onLoadedMetadata={() => {
+                      // Video metadata loaded
                     }}
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center bg-muted">
                     <div className="text-center">
                       <Video className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                      <p className="text-xs text-muted-foreground">Loading...</p>
+                      <p className="text-xs text-muted-foreground">
+                        {getVideoUrl(video) === '' ? 'Video not available' : 'Loading...'}
+                      </p>
                     </div>
                   </div>
                 )}
@@ -120,7 +140,7 @@ export function VideoUploadList({ videos, selectedVideo, onVideoSelect }: VideoU
               {/* Video info */}
               <div className="space-y-2">
                 <h3 className="font-medium text-sm truncate" title={video.originalFilename}>
-                  {video.originalFilename}
+                  {cropFilename(video.originalFilename)}
                 </h3>
                 
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -137,7 +157,16 @@ export function VideoUploadList({ videos, selectedVideo, onVideoSelect }: VideoU
                 </div>
 
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <span>Uploaded: {new Date(video.createdAt).toLocaleDateString()}</span>
+                  <span>Uploaded: {(() => {
+                    const date = new Date(video.createdAt);
+                    if (!isValid(date)) return 'Unknown';
+                    return abbreviateDistance(formatDistanceToNow(date, { addSuffix: true }));
+                  })()}</span>
+                </div>
+
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Scissors className="h-3 w-3" />
+                  <span>{getSegmentCount(video.id)} segment{getSegmentCount(video.id) !== 1 ? 's' : ''}</span>
                 </div>
               </div>
 
@@ -164,7 +193,7 @@ export function VideoUploadList({ videos, selectedVideo, onVideoSelect }: VideoU
                     <AlertDialogHeader>
                       <AlertDialogTitle>Delete Video</AlertDialogTitle>
                       <AlertDialogDescription>
-                        Are you sure you want to delete "{video.originalFilename}"? 
+                        Are you sure you want to delete "{cropFilename(video.originalFilename)}"? 
                         This will also delete all associated segments and cannot be undone.
                       </AlertDialogDescription>
                     </AlertDialogHeader>

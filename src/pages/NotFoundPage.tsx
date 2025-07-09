@@ -32,8 +32,8 @@ export default function NotFoundPage() {
             <div className="w-24 h-1 bg-wes-pink rounded-full mx-auto mb-6"></div>
             
             <p className="font-inter text-lg text-muted-foreground leading-relaxed mb-4">
-              It seems you've wandered into uncharted artistic territory. 
-              The page you're looking for has taken a different creative path.
+              It seems you've wandered into uncharted territory. 
+              The page you're looking for has taken a different creative journey.
             </p>
             
             {error?.statusText || error?.message ? (
