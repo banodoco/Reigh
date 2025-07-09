@@ -33,3 +33,6 @@ dist-ssr
 public/files/
 public/uploads/
 local.db
+
+# Temporary files
+temp/
