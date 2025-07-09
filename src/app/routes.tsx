@@ -42,6 +42,13 @@ const router = createBrowserRouter([
     errorElement: <NotFoundPage />,
   }] : []),
   
+  // Add /home route that also leads to HomePage
+  {
+    path: '/home',
+    element: <HomePage />,
+    errorElement: <NotFoundPage />,
+  },
+  
   {
     element: <Layout />,
     errorElement: <NotFoundPage />,

@@ -41,14 +41,10 @@ export default function HomePage() {
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
     });
-    // Redirect signed-in users straight to the app
-    if (session) {
-      navigate('/tools');
-    }
     return () => {
       listener.subscription.unsubscribe();
     };
-  }, [navigate, session]);
+  }, []);
 
   const handleDiscordSignIn = async () => {
     await supabase.auth.signInWithOAuth({
@@ -117,7 +113,7 @@ export default function HomePage() {
               setShowPhilosophy(true);
               // Reset animation state after pane is fully open
               setTimeout(() => setIsPhilosophyButtonAnimating(false), 300);
-            }, 150);
+            }, 50);
           }}
           className={`group flex items-center sm:space-x-2 px-4 py-4 sm:px-4 sm:py-2 bg-white/80 backdrop-blur-sm rounded-full border-2 border-wes-vintage-gold/20 hover:border-wes-vintage-gold/40 transition-all duration-300 hover:shadow-wes-ornate ${
             isPhilosophyButtonAnimating ? 'animate-spin-left-fade' : ''
@@ -140,7 +136,7 @@ export default function HomePage() {
               setShowCreativePartner(true);
               // Reset animation state after pane is fully open
               setTimeout(() => setIsCreativePartnerButtonAnimating(false), 300);
-            }, 150);
+            }, 50);
           }}
           className={`group flex items-center sm:space-x-2 px-4 py-4 sm:px-4 sm:py-2 bg-gradient-to-r from-wes-coral/90 to-wes-pink/90 backdrop-blur-sm rounded-full border-2 border-wes-coral/30 hover:border-wes-coral/50 transition-all duration-300 hover:shadow-wes-ornate text-white hover:from-wes-coral hover:to-wes-pink ${
             isCreativePartnerButtonAnimating ? 'animate-spin-right-fade' : ''
@@ -178,13 +174,21 @@ export default function HomePage() {
         </div>
 
             {/* Sign-in button below hero */}
-            {!session && (
+            {!session ? (
               <button
                 onClick={handleDiscordSignIn}
                 className="group flex items-center space-x-2 px-6 py-4 bg-gradient-to-r from-wes-vintage-gold to-wes-coral rounded-full border-2 border-wes-vintage-gold/40 hover:border-wes-vintage-gold/60 transition-all duration-300 shadow-wes-vintage hover:shadow-wes-hover text-white text-lg font-medium mx-auto"
               >
                 <UserPlus className="w-5 h-5" />
                 <span>Sign in with Discord</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => navigate('/tools')}
+                className="group flex items-center space-x-2 px-6 py-4 bg-gradient-to-r from-wes-mint to-wes-vintage-gold rounded-full border-2 border-wes-mint/40 hover:border-wes-mint/60 transition-all duration-300 shadow-wes-vintage hover:shadow-wes-hover text-white text-lg font-medium mx-auto"
+              >
+                <Sparkles className="w-5 h-5" />
+                <span>Go to Tools</span>
               </button>
             )}
 
@@ -241,7 +245,7 @@ export default function HomePage() {
                           setTimeout(() => {
                             setShowCreativePartner(true);
                             setTimeout(() => setIsCreativePartnerButtonAnimating(false), 300);
-                          }, 150);
+                          }, 50);
                         }}
                         className="underline text-wes-vintage-gold hover:text-wes-coral transition-colors font-medium"
                       >
@@ -255,7 +259,7 @@ export default function HomePage() {
                           setTimeout(() => {
                             setShowPhilosophy(true);
                             setTimeout(() => setIsPhilosophyButtonAnimating(false), 300);
-                          }, 150);
+                          }, 50);
                         }}
                         className="underline text-wes-vintage-gold hover:text-wes-coral transition-colors font-medium"
                       >
