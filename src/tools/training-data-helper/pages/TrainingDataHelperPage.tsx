@@ -92,55 +92,60 @@ export default function TrainingDataHelperPage() {
           getVideoUrl={getVideoUrl}
         />
 
-        {/* Upload Section */}
-        <MultiVideoUploader
-          onUpload={handleMultiVideoUpload}
-          isUploading={isUploading}
-          selectedBatchId={selectedBatchId}
-        />
-
-        {/* Video Library */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Video className="h-5 w-5" />
-              Video Library ({videos.length})
-            </CardTitle>
-            <CardDescription>
-              Your uploaded videos. Click on a video to extract segments.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <VideoUploadList 
-              videos={videos}
-              selectedVideo={selectedVideo}
-              onVideoSelect={setSelectedVideo}
-              segments={segments}
+        {/* Only show upload and video sections when a batch is selected */}
+        {selectedBatchId && (
+          <>
+            {/* Upload Section */}
+            <MultiVideoUploader
+              onUpload={handleMultiVideoUpload}
+              isUploading={isUploading}
+              selectedBatchId={selectedBatchId}
             />
-          </CardContent>
-        </Card>
 
-        {/* Segment Editor */}
-        {selectedVideoData && (
-          <Card ref={segmentEditorRef}>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Scissors className="h-5 w-5" />
-                Segment Editor - {cropFilename(selectedVideoData.originalFilename)}
-              </CardTitle>
-              <CardDescription>
-                Create and manage training segments from the selected video
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <VideoSegmentEditor
-                video={selectedVideoData}
-                segments={videoSegments}
-                onCreateSegment={createSegment}
-                onDeleteSegment={deleteSegment}
-              />
-            </CardContent>
-          </Card>
+            {/* Video Library */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Video className="h-5 w-5" />
+                  Video Library ({videos.length})
+                </CardTitle>
+                <CardDescription>
+                  Your uploaded videos. Click on a video to extract segments.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <VideoUploadList 
+                  videos={videos}
+                  selectedVideo={selectedVideo}
+                  onVideoSelect={setSelectedVideo}
+                  segments={segments}
+                />
+              </CardContent>
+            </Card>
+
+            {/* Segment Editor */}
+            {selectedVideoData && (
+              <Card ref={segmentEditorRef}>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Scissors className="h-5 w-5" />
+                    Segment Editor - {cropFilename(selectedVideoData.originalFilename)}
+                  </CardTitle>
+                  <CardDescription>
+                    Create and manage training segments from the selected video
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <VideoSegmentEditor
+                    video={selectedVideoData}
+                    segments={videoSegments}
+                    onCreateSegment={createSegment}
+                    onDeleteSegment={deleteSegment}
+                  />
+                </CardContent>
+              </Card>
+            )}
+          </>
         )}
       </div>
     </PageFadeIn>
