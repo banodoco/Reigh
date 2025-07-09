@@ -81,6 +81,7 @@ const ImageGenerationToolPage: React.FC = () => {
   const { apiKeys, getApiKey } = useApiKeys();
   const imageGenerationFormRef = useRef<ImageGenerationFormHandles>(null);
   const galleryRef = useRef<HTMLDivElement>(null);
+  const formContainerRef = useRef<HTMLDivElement>(null);
   const { selectedProjectId } = useProject();
   const [searchParams] = useSearchParams();
 
@@ -114,13 +115,22 @@ const ImageGenerationToolPage: React.FC = () => {
 
   // Handle scrolling to gallery when coming from "View All" in GenerationsPane
   useEffect(() => {
-    if (searchParams.get('scrollToGallery') === 'true' && galleryRef.current) {
-      // Small delay to ensure the page has rendered
-      setTimeout(() => {
-        galleryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 100);
+    if (searchParams.get('scrollToGallery') === 'true') {
+      // Wait for the form container to be loaded and then scroll to it
+      const checkAndScroll = () => {
+        if (formContainerRef.current && !isLoadingGenerations) {
+          // Scroll to the form container (above the gallery) instead of the gallery itself
+          formContainerRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } else {
+          // If not ready yet, try again in a bit
+          setTimeout(checkAndScroll, 100);
+        }
+      };
+      
+      // Start checking after a small initial delay
+      setTimeout(checkAndScroll, 150);
     }
-  }, [searchParams, generatedImagesData]);
+  }, [searchParams, generatedImagesData, isLoadingGenerations]);
 
   const handleDeleteImage = async (id: string) => {
     deleteGenerationMutation?.mutate(id);
@@ -424,7 +434,7 @@ const ImageGenerationToolPage: React.FC = () => {
       {/* Render only if API key is valid */}
       {hasValidFalApiKey && (
         <>
-          <div className="mb-8 p-6 border rounded-lg shadow-sm bg-card">
+          <div ref={formContainerRef} className="mb-8 p-6 border rounded-lg shadow-sm bg-card">
             <ToolSettingsGate
               ready={true}
               loadingMessage="Loading image generation settings..."

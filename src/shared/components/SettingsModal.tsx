@@ -137,10 +137,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const handleGenerateToken = () => {
-    // Default label and 6 months expiry
+    // Default label
     const defaultLabel = "Local Generator";
-    const expiresInDays = 180; // 6 months
-    generateToken(defaultLabel, expiresInDays);
+    generateToken(defaultLabel);
   };
 
   const handleCopyToken = () => {
@@ -150,19 +149,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
-  const formatExpiryDate = (expiresAt: string) => {
-    const date = new Date(expiresAt);
-    return formatDistanceToNow(date, { addSuffix: true });
-  };
-
-  const isTokenExpired = (expiresAt: string) => {
-    return new Date(expiresAt) < new Date();
-  };
-
-  const hasValidToken = tokens.some(token => !isTokenExpired(token.expires_at));
+  const hasValidToken = tokens.length > 0;
 
   const getActiveToken = () => {
-    return tokens.find(token => !isTokenExpired(token.expires_at));
+    return tokens[0]; // Just return the first token since we no longer have expiry
   };
 
   // Handle copying commands and provide inline visual feedback instead of a toast
@@ -182,7 +172,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const getInstallationCommand = () => {
     // Use the actual token from database or freshly generated one
-    const token = generatedToken || getActiveToken()?.token || 'your-jwt-token';
+    const token = generatedToken || getActiveToken()?.token || 'your-api-token';
     return `git clone https://github.com/peteromallet/Headless-Wan2GP && \\
 cd /workspace/Headless-Wan2GP && \\
 apt-get update && apt-get install -y python3.10-venv ffmpeg && \\
@@ -199,7 +189,7 @@ python headless.py --db-type supabase \\
 
   const getRunCommand = () => {
     // Use the actual token from database or freshly generated one
-    const token = generatedToken || getActiveToken()?.token || 'your-jwt-token';
+    const token = generatedToken || getActiveToken()?.token || 'your-api-token';
     return `python headless.py --db-type supabase \\
   --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
   --supabase-anon-key ${SUPABASE_ANON_KEY} \
@@ -319,16 +309,6 @@ python headless.py --db-type supabase \\
                       {isGenerating ? "Generating..." : "Generate API Key"}
                     </Button>
                   </div>
-
-                  {/* Show expired tokens if any */}
-                  {tokens.some(token => isTokenExpired(token.expires_at)) && (
-                    <Alert className="border-orange-200 bg-orange-50">
-                      <AlertCircle className="h-4 w-4 text-orange-600" />
-                      <AlertDescription className="text-orange-800">
-                        Your API token has expired. Please generate a new one to continue using local generation.
-                      </AlertDescription>
-                    </Alert>
-                  )}
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -338,7 +318,7 @@ python headless.py --db-type supabase \\
                       <div>
                         <h4 className="font-semibold text-gray-800">Active API Token</h4>
                         <p className="text-sm text-gray-600">
-                          Expires {formatDistanceToNow(new Date(getActiveToken()?.expires_at || 0), { addSuffix: true })}
+                          Created {formatDistanceToNow(new Date(getActiveToken()?.created_at || 0), { addSuffix: true })}
                         </p>
                       </div>
                       <div className="flex items-center gap-2">

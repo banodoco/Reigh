@@ -17,44 +17,17 @@ function jsonResponse(body: any, status = 200) {
   });
 }
 
-// Base64 URL encode function
-function base64UrlEncode(str: string): string {
-  return btoa(str)
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=/g, '');
-}
-
-// Create JWT manually using Web Crypto API
-async function createJWT(payload: any, secret: string): Promise<string> {
-  const header = {
-    alg: "HS256",
-    typ: "JWT"
-  };
-
-  const encodedHeader = base64UrlEncode(JSON.stringify(header));
-  const encodedPayload = base64UrlEncode(JSON.stringify(payload));
-  const unsignedToken = `${encodedHeader}.${encodedPayload}`;
-
-  const key = await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
-
-  const signature = await crypto.subtle.sign(
-    'HMAC',
-    key,
-    new TextEncoder().encode(unsignedToken)
-  );
-
-  const encodedSignature = base64UrlEncode(
-    String.fromCharCode(...new Uint8Array(signature))
-  );
-
-  return `${unsignedToken}.${encodedSignature}`;
+// Generate a random 24-character token
+function generateToken(): string {
+  const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let token = '';
+  
+  for (let i = 0; i < 24; i++) {
+    const randomIndex = Math.floor(Math.random() * charset.length);
+    token += charset[randomIndex];
+  }
+  
+  return token;
 }
 
 serve(async (req) => {
@@ -91,61 +64,18 @@ serve(async (req) => {
       return jsonResponse({ error: 'Invalid authentication token' }, 401);
     }
 
-    const { label, expiresInDays = 90 } = await req.json();
+    const { label } = await req.json();
 
-    const now = Math.floor(Date.now() / 1000);
-    const exp = now + expiresInDays * 24 * 60 * 60;
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-    const sessionId = crypto.randomUUID();
-
-    // Create JWT payload that exactly matches Supabase's format
-    const payload = {
-      aud: "authenticated",
-      exp: exp,
-      iat: now,
-      iss: `${supabaseUrl}/auth/v1`,
-      sub: user.id,
-      email: user.email,
-      phone: user.phone || "",
-      app_metadata: user.app_metadata || {},
-      user_metadata: user.user_metadata || {},
-      role: "authenticated",
-      aal: "aal1",
-      amr: [{ method: "password", timestamp: now }],
-      session_id: sessionId,
-      is_anonymous: false,
-      email_verified: user.email_confirmed_at ? true : false,
-      phone_verified: user.phone_confirmed_at ? true : false,
-    };
-
-    // Get JWT secret (prefer SUPABASE_JWT_SECRET if set, fallback to JWT_SECRET)
-    const jwtSecret = Deno.env.get('SUPABASE_JWT_SECRET') ?? Deno.env.get('JWT_SECRET');
-    if (!jwtSecret) {
-      throw new Error('SUPABASE_JWT_SECRET (or JWT_SECRET) env var not set in Edge Function secrets');
-    }
-
-    // Create JWT using manual implementation
-    const jwt = await createJWT(payload, jwtSecret.trim());
+    // Generate a simple 24-character token
+    const apiToken = generateToken();
 
     // Store token metadata
-    const jti = crypto.randomUUID();
-    const encoder = new TextEncoder();
-    const jtiHashBuffer = await crypto.subtle.digest(
-      'SHA-256',
-      encoder.encode(jti)
-    );
-    const jtiHash = Array.from(new Uint8Array(jtiHashBuffer))
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('');
-
     const { error: insertError } = await supabaseAdmin
       .from('user_api_tokens')
       .insert({
         user_id: user.id,
-        jti_hash: jtiHash,
-        token: jwt,
+        token: apiToken,
         label: label || 'API Token',
-        expires_at: new Date(exp * 1000).toISOString()
       });
 
     if (insertError) {
@@ -154,8 +84,7 @@ serve(async (req) => {
     }
 
     return jsonResponse({ 
-      token: jwt,
-      expires_at: new Date(exp * 1000).toISOString(),
+      token: apiToken,
     });
 
   } catch (error) {

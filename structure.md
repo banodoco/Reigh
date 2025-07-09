@@ -81,20 +81,19 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
   - Credit validation enforced at database level
   - API tokens can only be viewed by their owner
 
-**Personal Access Tokens (PAT) System**: ✅ **IMPLEMENTED**
+**Personal Access Tokens (PAT) System**: ✅ **IMPLEMENTED & SIMPLIFIED**
 - **Purpose**: Allow users to run local worker scripts that process tasks without exposing elevated privileges
-- **Architecture**: Long-lived JWTs signed with service role key that impersonate the user
+- **Architecture**: Simple 24-character tokens (no more JWT complexity)
 - **Security**: 
   - Tokens honor all existing RLS policies
-  - JTI hash stored for revocation
-  - Expiry dates enforced
-  - Last-used tracking
+  - Direct token storage for instant validation
+  - No expiry dates (permanent until revoked)
 - **Components**:
-  - `user_api_tokens` table: Stores token metadata (hash, label, expiry)
-  - `generate-pat` Edge Function: Creates new tokens by signing JWTs with the project's JWT secret
+  - `user_api_tokens` table: Stores simplified token metadata (id, user_id, token, label, created_at)
+  - `generate-pat` Edge Function: Creates new 24-character tokens using cryptographically secure random generation
   - `revoke-pat` Edge Function: Revokes existing tokens
-  - `verify_api_token()` PostgreSQL function: Validates tokens at database level
-  - `useApiTokens` hook: Client-side token management
+  - `verify_api_token()` PostgreSQL function: Validates tokens at database level with direct token lookup
+  - `useApiTokens` hook: Client-side token management (simplified without expiry handling)
   - Updated Settings Modal: Primary section for token management
 
 **Migration Workflow**:

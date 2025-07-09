@@ -6,18 +6,13 @@ import { supabase } from '@/integrations/supabase/client';
 interface ApiToken {
   id: string;
   user_id: string;
-  jti_hash: string;
   token: string;
   label: string;
   created_at: string;
-  expires_at: string;
-  last_used: string | null;
 }
 
 interface GenerateTokenResponse {
   token: string;
-  expires_at: string;
-  jti: string;
 }
 
 // Fetch user's API tokens
@@ -37,7 +32,7 @@ const fetchApiTokens = async (): Promise<ApiToken[]> => {
 };
 
 // Generate a new API token
-const generateApiToken = async (params: { label: string; expiresInDays: number }): Promise<GenerateTokenResponse> => {
+const generateApiToken = async (params: { label: string }): Promise<GenerateTokenResponse> => {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error('Not authenticated');
   
@@ -115,7 +110,6 @@ export const useApiTokens = () => {
       await revokeApiToken(tokenToRefresh.id);
       return generateApiToken({
         label: tokenToRefresh.label || "Local Generator",
-        expiresInDays: 180,
       });
     },
     onSuccess: (data) => {
@@ -129,8 +123,8 @@ export const useApiTokens = () => {
     },
   });
 
-  const generateToken = (label: string, expiresInDays: number = 90) => {
-    generateMutation.mutate({ label, expiresInDays });
+  const generateToken = (label: string) => {
+    generateMutation.mutate({ label });
   };
 
   const revokeToken = (tokenId: string) => {
