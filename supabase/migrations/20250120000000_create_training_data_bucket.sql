@@ -1,6 +1,6 @@
--- Create training-data storage bucket (private, using signed URLs)
+-- Create training-data storage bucket (public, using public URLs)
 INSERT INTO storage.buckets (id, name, public)
-VALUES ('training-data', 'training-data', false);
+VALUES ('training-data', 'training-data', true);
 
 -- Create RLS policy for training-data bucket - users can only access their own files
 CREATE POLICY "Users can upload their own training data files"

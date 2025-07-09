@@ -68,6 +68,16 @@ export default function TrainingDataHelperPage() {
   const selectedVideoData = selectedVideo ? videos.find(v => v.id === selectedVideo) : null;
   const videoSegments = selectedVideo ? segments.filter(s => s.trainingDataId === selectedVideo) : [];
 
+  // Debug logging with unique tag
+  useEffect(() => {
+    console.log('[VideoLoadIssue] Current state:', {
+      totalVideos: videos.length,
+      selectedVideo,
+      selectedVideoData,
+      videoUrls: videos.map(v => ({ id: v.id, url: getVideoUrl(v), storageLocation: v.storageLocation }))
+    });
+  }, [videos, selectedVideo, selectedVideoData]);
+
   return (
     <PageFadeIn className="container mx-auto p-6 max-w-7xl">
       <div className="space-y-6">

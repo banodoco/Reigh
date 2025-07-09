@@ -1,4 +1,4 @@
--- Update training-data storage bucket to be private (works better with signed URLs and RLS)
+-- Update training-data storage bucket to be public (for easier access)
 UPDATE storage.buckets 
-SET public = false 
+SET public = true 
 WHERE id = 'training-data'; 

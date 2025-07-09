@@ -330,22 +330,12 @@ export function useTrainingData() {
 
       console.log('[Upload] Database record created:', data);
 
-      // Test both URL generation methods immediately
+      // Test public URL generation
       const { data: publicUrlData } = supabase.storage
         .from('training-data')
         .getPublicUrl(fileName);
       
       console.log('[Upload] Generated public URL for uploaded video:', publicUrlData.publicUrl);
-
-      const { data: signedUrlData, error: signedUrlError } = await supabase.storage
-        .from('training-data')
-        .createSignedUrl(fileName, 3600);
-      
-      if (signedUrlError) {
-        console.error('[Upload] Failed to create signed URL:', signedUrlError);
-      } else {
-        console.log('[Upload] Generated signed URL for uploaded video:', signedUrlData.signedUrl);
-      }
 
       // Update local state
       setVideos(prev => [transformVideo(data), ...prev]);
@@ -441,7 +431,8 @@ export function useTrainingData() {
       storageFileName: fileName,
       fileSize: file.size,
       fileType: file.type,
-      duration
+      duration,
+      userId
     });
 
     const { error: uploadError, data: uploadData } = await supabase.storage
@@ -717,52 +708,21 @@ export function useTrainingData() {
       const newUrls: Record<string, string> = {};
       
       // Process videos in batches to avoid overwhelming the API
-      const batchSize = 5;
+      const batchSize = 10;
       for (let i = 0; i < videosNeedingUrls.length; i += batchSize) {
         const batch = videosNeedingUrls.slice(i, i + batchSize);
         
-        await Promise.all(batch.map(async (video) => {
-          try {
-            // Try signed URL first (works better with RLS policies)
-            const { data: signedData, error: signedError } = await supabase.storage
-              .from('training-data')
-              .createSignedUrl(video.storageLocation, 3600); // 1 hour expiry
-
-            if (signedError) {
-              // Check if it's a 400 error (file doesn't exist)
-              if (signedError.message?.includes('400') || signedError.message?.includes('not found')) {
-                console.warn(`[VideoURL] File not found in storage: ${video.storageLocation}`);
-                // Mark this video as invalid
-                setInvalidVideos(prev => new Set([...prev, video.id]));
-                return;
-              }
-              
-              // For other errors, fallback to public URL
-              const { data: publicData } = supabase.storage
-                .from('training-data')
-                .getPublicUrl(video.storageLocation);
-              
-              newUrls[video.id] = publicData.publicUrl;
-            } else {
-              newUrls[video.id] = signedData.signedUrl;
-            }
-          } catch (error: any) {
-            // Handle network errors and missing files
-            if (error?.message?.includes('400') || error?.status === 400) {
-              console.warn(`[VideoURL] File not found in storage: ${video.storageLocation}`);
-              // Mark this video as invalid
-              setInvalidVideos(prev => new Set([...prev, video.id]));
-              return;
-            }
-            
-            console.error('[VideoURL] Error generating URL for video:', video.id, error);
-            // For other errors, try public URL as fallback
-            const { data: publicData } = supabase.storage
-              .from('training-data')
-              .getPublicUrl(video.storageLocation);
-            newUrls[video.id] = publicData.publicUrl;
-          }
-        }));
+        batch.forEach((video) => {
+          console.log(`[VideoURL] Processing video ${video.id} with storage location: ${video.storageLocation}`);
+          
+          // Generate public URL since bucket is now public
+          const { data: publicData } = supabase.storage
+            .from('training-data')
+            .getPublicUrl(video.storageLocation);
+          
+          console.log(`[VideoURL] Generated public URL for ${video.id}: ${publicData.publicUrl}`);
+          newUrls[video.id] = publicData.publicUrl;
+        });
         
         // Update URLs after each batch
         if (Object.keys(newUrls).length > 0) {
@@ -770,11 +730,6 @@ export function useTrainingData() {
             ...prev,
             ...newUrls
           }));
-        }
-        
-        // Small delay between batches
-        if (i + batchSize < videosNeedingUrls.length) {
-          await new Promise(resolve => setTimeout(resolve, 100));
         }
       }
     };
@@ -787,17 +742,23 @@ export function useTrainingData() {
   const getVideoUrl = (video: TrainingDataVideo): string => {
     // Check if this video is known to be invalid
     if (invalidVideos.has(video.id)) {
+      console.log(`[getVideoUrl] Video ${video.id} is marked as invalid`);
       return '';
     }
     
-    // If we don't have a cached URL, generate a public URL immediately as fallback
-    if (!videoUrls[video.id]) {
-      const { data } = supabase.storage
-        .from('training-data')
-        .getPublicUrl(video.storageLocation);
-      return data.publicUrl;
+    // Return cached URL if available
+    if (videoUrls[video.id]) {
+      console.log(`[getVideoUrl] Using cached URL for video ${video.id}: ${videoUrls[video.id]}`);
+      return videoUrls[video.id];
     }
-    return videoUrls[video.id];
+    
+    // Generate public URL immediately since bucket is public
+    const { data } = supabase.storage
+      .from('training-data')
+      .getPublicUrl(video.storageLocation);
+    
+    console.log(`[getVideoUrl] Generated public URL for video ${video.id}: ${data.publicUrl}`);
+    return data.publicUrl;
   };
 
   const markVideoAsInvalid = (videoId: string) => {

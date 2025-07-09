@@ -35,10 +35,9 @@ interface VideoUploadListProps {
 }
 
 export function VideoUploadList({ videos, selectedVideo, onVideoSelect, segments }: VideoUploadListProps) {
-  const { deleteVideo, getVideoUrl } = useTrainingData();
+  const { deleteVideo, getVideoUrl, markVideoAsInvalid } = useTrainingData();
   const [deletingVideo, setDeletingVideo] = useState<string | null>(null);
-
-
+  const [videoErrors, setVideoErrors] = useState<Set<string>>(new Set());
 
   // Helper function to get segment count for a video
   const getSegmentCount = (videoId: string) => {
@@ -59,6 +58,21 @@ export function VideoUploadList({ videos, selectedVideo, onVideoSelect, segments
     } finally {
       setDeletingVideo(null);
     }
+  };
+
+  const handleVideoError = (videoId: string, video: TrainingDataVideo) => {
+    console.error('[VideoUploadList] Video load error:', {
+      videoId: video.id,
+      originalFilename: video.originalFilename,
+      storageLocation: video.storageLocation,
+      url: getVideoUrl(video),
+    });
+    
+    // Mark the video as having an error
+    setVideoErrors(prev => new Set([...prev, videoId]));
+    
+    // Try to mark the video as invalid
+    markVideoAsInvalid(video.id);
   };
 
   const formatDuration = (seconds: number | null) => {
@@ -102,21 +116,26 @@ export function VideoUploadList({ videos, selectedVideo, onVideoSelect, segments
             <div className="space-y-3">
               {/* Video thumbnail/preview */}
               <div className="relative aspect-video bg-muted rounded-lg overflow-hidden">
-                {getVideoUrl(video) ? (
+                {getVideoUrl(video) && !videoErrors.has(video.id) ? (
                   <video
                     src={getVideoUrl(video)}
                     className="w-full h-full object-cover"
                     preload="metadata"
-                    onError={(e) => {
-                      const videoElement = e.target as HTMLVideoElement;
-                      // Hide failed video element
-                      videoElement.style.display = 'none';
+                    onError={() => {
+                      handleVideoError(video.id, video);
                     }}
                     onLoadStart={() => {
-                      // Video loading started
+                      console.log('[VideoUploadList] Video load started:', {
+                        videoId: video.id,
+                        originalFilename: video.originalFilename,
+                        url: getVideoUrl(video)
+                      });
                     }}
                     onLoadedMetadata={() => {
-                      // Video metadata loaded
+                      console.log('[VideoUploadList] Video metadata loaded:', {
+                        videoId: video.id,
+                        originalFilename: video.originalFilename
+                      });
                     }}
                   />
                 ) : (
@@ -124,13 +143,16 @@ export function VideoUploadList({ videos, selectedVideo, onVideoSelect, segments
                     <div className="text-center">
                       <Video className="h-8 w-8 mx-auto mb-2 opacity-50" />
                       <p className="text-xs text-muted-foreground">
-                        {getVideoUrl(video) === '' ? 'Video not available' : 'Loading...'}
+                        Video file not available
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        The video file "{video.originalFilename}" could not be loaded. It may have been moved or deleted from storage.
                       </p>
                     </div>
                   </div>
                 )}
                 {/* Play icon overlay */}
-                {getVideoUrl(video) && (
+                {getVideoUrl(video) && !videoErrors.has(video.id) && (
                   <div className="absolute inset-0 flex items-center justify-center bg-black/20">
                     <Video className="h-8 w-8 text-white opacity-80" />
                   </div>
