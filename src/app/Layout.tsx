@@ -88,12 +88,12 @@ const Layout: React.FC = () => {
         onOpenSettings={handleOpenSettings}
       />
       
-      <GlobalProcessingWarning onOpenSettings={handleOpenSettings} />
-      
       <div
         className="flex-grow relative z-10 transition-all duration-300 ease-in-out"
         style={mainContentStyle}
       >
+        <GlobalProcessingWarning onOpenSettings={handleOpenSettings} />
+        
         <main className="container mx-auto py-8 px-4 md:px-6 h-full overflow-y-auto">
           <div className="min-h-full">
             <Outlet /> 
