@@ -332,132 +332,189 @@ File Size: ${segmentBlob.size} bytes`;
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <FolderOpen className="h-5 w-5" />
-          Training Data Batch
-        </CardTitle>
+        <CardTitle className="text-lg">Training Data Batches</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="flex items-center gap-2">
-          <div className="flex-1">
-            <Select value={selectedBatchId || ''} onValueChange={onSelectBatch}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a batch..." />
-              </SelectTrigger>
-              <SelectContent>
-                {batches.map((batch) => (
-                  <SelectItem key={batch.id} value={batch.id}>
-                    {batch.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        {/* If no batch is selected, only show the New Batch button */}
+        {!selectedBatchId ? (
+          <div className="text-center py-8">
+            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="flex items-center gap-1">
+                  <Plus className="h-4 w-4" />
+                  New Batch
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Create New Batch</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="batch-name">Batch Name</Label>
+                    <Input
+                      id="batch-name"
+                      value={newBatchName}
+                      onChange={(e) => setNewBatchName(e.target.value)}
+                      placeholder="Enter batch name..."
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="batch-description">Description (optional)</Label>
+                    <Textarea
+                      id="batch-description"
+                      value={newBatchDescription}
+                      onChange={(e) => setNewBatchDescription(e.target.value)}
+                      placeholder="Describe this batch..."
+                      rows={3}
+                    />
+                  </div>
+                  
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsCreateDialogOpen(false)}
+                      disabled={isCreating}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={handleCreateBatch}
+                      disabled={!newBatchName.trim() || isCreating}
+                    >
+                      {isCreating ? 'Creating...' : 'Create Batch'}
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
-          
-          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline" className="flex items-center gap-1">
-                <Plus className="h-4 w-4" />
-                New Batch
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Create New Batch</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="batch-name">Batch Name</Label>
-                  <Input
-                    id="batch-name"
-                    value={newBatchName}
-                    onChange={(e) => setNewBatchName(e.target.value)}
-                    placeholder="Enter batch name..."
-                  />
-                </div>
-                
-                <div>
-                  <Label htmlFor="batch-description">Description (optional)</Label>
-                  <Textarea
-                    id="batch-description"
-                    value={newBatchDescription}
-                    onChange={(e) => setNewBatchDescription(e.target.value)}
-                    placeholder="Describe this batch..."
-                    rows={3}
-                  />
-                </div>
-                
-                <div className="flex justify-end gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => setIsCreateDialogOpen(false)}
-                    disabled={isCreating}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={handleCreateBatch}
-                    disabled={!newBatchName.trim() || isCreating}
-                  >
-                    {isCreating ? 'Creating...' : 'Create Batch'}
-                  </Button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
-        </div>
-        
-        {selectedBatch && (
-          <div className="mt-3 p-3 bg-muted rounded-lg">
-            <div className="flex items-start justify-between">
+        ) : (
+          /* Show full interface when a batch is selected */
+          <>
+            <div className="flex items-center gap-2">
               <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <h4 className="font-medium text-sm">{selectedBatch.name}</h4>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleEditBatch(selectedBatch)}
-                    className="h-6 w-6 p-0"
-                  >
-                    <Edit3 className="h-3 w-3" />
+                <Select value={selectedBatchId} onValueChange={onSelectBatch}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a batch..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {batches.map((batch) => (
+                      <SelectItem key={batch.id} value={batch.id}>
+                        {batch.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" className="flex items-center gap-1">
+                    <Plus className="h-4 w-4" />
+                    New Batch
                   </Button>
-                </div>
-                {selectedBatch.description && (
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {selectedBatch.description}
-                  </p>
-                )}
-                <p className="text-xs text-muted-foreground mt-2">
-                  Created {abbreviateDistance(formatDistanceToNow(new Date(selectedBatch.createdAt), { addSuffix: true }))}
-                </p>
-                <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                  <span>{videos.filter(v => v.batchId === selectedBatchId).length} videos</span>
-                  <span>{segments.filter(s => videos.some(v => v.id === s.trainingDataId && v.batchId === selectedBatchId)).length} segments</span>
-                </div>
-              </div>
-              <div className="flex flex-col gap-2 ml-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handlePrepareDownload}
-                  disabled={isDownloading}
-                  className="flex items-center gap-1"
-                >
-                  <Download className="h-4 w-4" />
-                  {isDownloading ? 'Preparing...' : 'Prepare Download'}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => openDeleteDialog(selectedBatch)}
-                  className="flex items-center gap-1 text-destructive hover:text-destructive"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  Delete Batch
-                </Button>
-              </div>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Create New Batch</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="batch-name">Batch Name</Label>
+                      <Input
+                        id="batch-name"
+                        value={newBatchName}
+                        onChange={(e) => setNewBatchName(e.target.value)}
+                        placeholder="Enter batch name..."
+                      />
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="batch-description">Description (optional)</Label>
+                      <Textarea
+                        id="batch-description"
+                        value={newBatchDescription}
+                        onChange={(e) => setNewBatchDescription(e.target.value)}
+                        placeholder="Describe this batch..."
+                        rows={3}
+                      />
+                    </div>
+                    
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => setIsCreateDialogOpen(false)}
+                        disabled={isCreating}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={handleCreateBatch}
+                        disabled={!newBatchName.trim() || isCreating}
+                      >
+                        {isCreating ? 'Creating...' : 'Create Batch'}
+                      </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
             </div>
-          </div>
+            
+            {selectedBatch && (
+              <div className="mt-3 p-3 bg-muted rounded-lg">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-medium text-sm">{selectedBatch.name}</h4>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEditBatch(selectedBatch)}
+                        className="h-6 w-6 p-0"
+                      >
+                        <Edit3 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                    {selectedBatch.description && (
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {selectedBatch.description}
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Created {abbreviateDistance(formatDistanceToNow(new Date(selectedBatch.createdAt), { addSuffix: true }))}
+                    </p>
+                    <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                      <span>{videos.filter(v => v.batchId === selectedBatchId).length} videos</span>
+                      <span>{segments.filter(s => videos.some(v => v.id === s.trainingDataId && v.batchId === selectedBatchId)).length} segments</span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-2 ml-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handlePrepareDownload}
+                      disabled={isDownloading}
+                      className="flex items-center gap-1"
+                    >
+                      <Download className="h-4 w-4" />
+                      {isDownloading ? 'Preparing...' : 'Prepare Download'}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openDeleteDialog(selectedBatch)}
+                      className="flex items-center gap-1 text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Delete Batch
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         {/* Edit Batch Dialog */}
