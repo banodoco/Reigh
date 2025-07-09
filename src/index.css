@@ -916,5 +916,12 @@
 
   .tool-selector-py-8 {
     padding-top: 0rem;
+    padding-bottom: 0rem;
+  }
+
+  /* Override Tailwind's py-8 class */
+  .py-8 {
+    padding-top: 0rem !important;
+    padding-bottom: 0rem !important;
   }
 }

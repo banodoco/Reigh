@@ -15,9 +15,10 @@ import { toast } from "sonner";
 interface GlobalHeaderProps {
   contentOffsetRight?: number;
   contentOffsetLeft?: number;
+  onOpenSettings?: () => void;
 }
 
-export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight = 0, contentOffsetLeft = 0 }) => {
+export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight = 0, contentOffsetLeft = 0, onOpenSettings }) => {
   const { projects, selectedProjectId, setSelectedProjectId, isLoadingProjects } = useProject();
 
   // Track authentication state to conditionally change the logo destination
@@ -202,6 +203,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
               onClick={() => {
                 setSettingsInitialTab('generate-locally');
                 setIsSettingsModalOpen(true);
+                onOpenSettings?.();
               }}
               className="h-14 w-14 wes-button no-sweep bg-gradient-to-br from-wes-dusty-blue to-wes-lavender border-3 border-wes-vintage-gold/40 hover:from-wes-dusty-blue-dark hover:to-wes-lavender-dark shadow-wes-vintage hover:shadow-wes-hover wes-viewfinder group relative overflow-hidden"
               title="App Settings"

@@ -9,6 +9,8 @@ import { usePanes } from '@/shared/contexts/PanesContext';
 import { supabase } from '@/integrations/supabase/client';
 import type { Session } from '@supabase/supabase-js';
 import { Loading } from '@/shared/components/ui/loading';
+import { GlobalProcessingWarning } from '@/shared/components/ProcessingWarnings';
+import SettingsModal from '@/shared/components/SettingsModal';
 
 // Scroll to top component
 function ScrollToTop() {
@@ -33,6 +35,13 @@ const Layout: React.FC = () => {
 
   // Auth guard state
   const [session, setSession] = useState<Session | null | undefined>(undefined);
+  
+  // Settings modal state
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  
+  const handleOpenSettings = () => {
+    setIsSettingsModalOpen(true);
+  };
 
   // Initialize session and subscribe to changes
   useEffect(() => {
@@ -76,7 +85,10 @@ const Layout: React.FC = () => {
       <GlobalHeader 
         contentOffsetRight={isTasksPaneLocked ? tasksPaneWidth + 16 : 0} 
         contentOffsetLeft={isShotsPaneLocked ? shotsPaneWidth : 0}
+        onOpenSettings={handleOpenSettings}
       />
+      
+      <GlobalProcessingWarning onOpenSettings={handleOpenSettings} />
       
       <div
         className="flex-grow relative z-10 transition-all duration-300 ease-in-out"
@@ -95,6 +107,11 @@ const Layout: React.FC = () => {
       
       {/* Decorative footer line */}
       <div className="h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent relative z-10"></div>
+      
+      <SettingsModal
+        isOpen={isSettingsModalOpen}
+        onOpenChange={setIsSettingsModalOpen}
+      />
     </div>
   );
 };

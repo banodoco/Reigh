@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import TaskList from './TaskList';
 import { cn } from '@/shared/lib/utils'; // For conditional classnames
 import { Button } from '@/shared/components/ui/button'; // For the lock button
@@ -10,6 +10,8 @@ import { useProject } from '@/shared/contexts/ProjectContext';
 import { useCancelAllPendingTasks, useListTasks } from '@/shared/hooks/useTasks';
 import { useToast } from '@/shared/hooks/use-toast';
 import { filterVisibleTasks } from '@/shared/lib/taskConfig';
+import { TasksPaneProcessingWarning } from '../ProcessingWarnings';
+import SettingsModal from '../SettingsModal';
 
 export const TasksPane: React.FC = () => {
   const {
@@ -29,6 +31,13 @@ export const TasksPane: React.FC = () => {
 
   const cancelAllPendingMutation = useCancelAllPendingTasks();
   const { toast } = useToast();
+  
+  // Settings modal state
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  
+  const handleOpenSettings = () => {
+    setIsSettingsModalOpen(true);
+  };
 
   const handleCancelAllPending = () => {
     if (!selectedProjectId) {
@@ -40,7 +49,7 @@ export const TasksPane: React.FC = () => {
       onSuccess: (data) => {
         toast({
           title: 'Tasks Cancellation Initiated',
-          description: `Cancelled ${data?.length || 0} pending tasks.`,
+          description: `Cancelled ${Array.isArray(data) ? data.length : 0} pending tasks.`,
           variant: 'default',
         });
       },
@@ -108,11 +117,17 @@ export const TasksPane: React.FC = () => {
                 </Button>
               )}
           </div>
+          <TasksPaneProcessingWarning onOpenSettings={handleOpenSettings} />
           <div className="flex-grow overflow-y-auto">
             <TaskList />
           </div>
         </div>
       </div>
+      
+      <SettingsModal
+        isOpen={isSettingsModalOpen}
+        onOpenChange={setIsSettingsModalOpen}
+      />
     </>
   );
 };
