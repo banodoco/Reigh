@@ -7,7 +7,7 @@ import { Badge } from '@/shared/components/ui/badge';
 import { Textarea } from '@/shared/components/ui/textarea';
 import { TrainingDataVideo, TrainingDataSegment } from '../hooks/useTrainingData';
 import { useTrainingData } from '../hooks/useTrainingData';
-import { Play, Pause, RotateCcw, Scissors, Trash2, Clock, Plus, Video, SkipBack } from 'lucide-react';
+import { Play, Pause, RotateCcw, Scissors, Trash2, Clock, Plus, Video, SkipBack, SkipForward } from 'lucide-react';
 import { toast } from 'sonner';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/shared/components/ui/alert-dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
@@ -266,28 +266,131 @@ export function VideoSegmentEditor({ video, segments, onCreateSegment, onDeleteS
 
   useEffect(() => {
     const videoElement = videoRef.current;
-    if (!videoElement) return;
+     if (!videoElement || !videoReady) return;
 
     const handleTimeUpdate = () => {
       setCurrentTime(videoElement.currentTime);
     };
 
+    const handlePlay = () => {
+      setIsPlaying(true);
+    };
+
+    const handlePause = () => {
+      setIsPlaying(false);
+    };
+
     videoElement.addEventListener('timeupdate', handleTimeUpdate);
+    videoElement.addEventListener('play', handlePlay);
+    videoElement.addEventListener('pause', handlePause);
 
     return () => {
       videoElement.removeEventListener('timeupdate', handleTimeUpdate);
+      videoElement.removeEventListener('play', handlePlay);
+      videoElement.removeEventListener('pause', handlePause);
     };
-  }, []);
+  }, [videoReady]); // Re-run when video becomes ready
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger shortcuts if user is typing in an input field
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+
+      // Prevent default for all our shortcuts to avoid conflicts
+      switch (e.key) {
+        case '1':
+          e.preventDefault();
+          e.stopPropagation();
+          jumpBackQuarterSecond();
+          break;
+        case '2':
+          e.preventDefault();
+          e.stopPropagation();
+          setVideoPlaybackRate(0.25);
+          break;
+        case '3':
+          e.preventDefault();
+          e.stopPropagation();
+          setVideoPlaybackRate(0.5);
+          break;
+        case '4':
+          e.preventDefault();
+          e.stopPropagation();
+          jumpForwardQuarterSecond();
+          break;
+        case '0':
+          e.preventDefault();
+          e.stopPropagation();
+          setVideoPlaybackRate(1);
+          break;
+        case ' ':
+          e.preventDefault();
+          e.stopPropagation();
+          togglePlayPause();
+          break;
+        case 's':
+        case 'S':
+        case '5':
+          e.preventDefault();
+          e.stopPropagation();
+          if (segmentStartTime === null) {
+            handleStartSegment();
+          } else {
+            handleEndSegment();
+          }
+          break;
+        case 'Enter':
+          e.preventDefault();
+          e.stopPropagation();
+          if (segmentStartTime !== null && segmentEndTime !== null && !isCreating) {
+            handleCreateSegment();
+          }
+          break;
+        case 'd':
+        case 'D':
+          e.preventDefault();
+          e.stopPropagation();
+          handleDeleteLastSegment();
+          break;
+      }
+    };
+
+    // Use capture phase to ensure we get the event before other handlers
+    document.addEventListener('keydown', handleKeyDown, true);
+    
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown, true);
+    };
+  }, [segmentStartTime, segmentEndTime, isCreating]); // Dependencies for the handlers
 
   const togglePlayPause = () => {
     if (!videoRef.current) return;
 
-    if (isPlaying) {
-      videoRef.current.pause();
-    } else {
-      videoRef.current.play();
+    try {
+      // Check the actual video state, not our React state
+      const actuallyPlaying = !videoRef.current.paused;
+      
+      if (actuallyPlaying) {
+        videoRef.current.pause();
+        setIsPlaying(false);
+      } else {
+        const playPromise = videoRef.current.play();
+        setIsPlaying(true);
+        // Handle the promise if browser supports it
+        if (playPromise !== undefined) {
+          playPromise.catch((error) => {
+            console.error('Error playing video:', error);
+            setIsPlaying(false);
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error toggling play/pause:', error);
+      setIsPlaying(false);
     }
-    setIsPlaying(!isPlaying);
   };
 
   const seekTo = (time: number) => {
@@ -312,29 +415,60 @@ export function VideoSegmentEditor({ video, segments, onCreateSegment, onDeleteS
     const current = videoRef.current ? videoRef.current.currentTime : currentTime;
     const newTime = Math.max(0, current - 0.25);
     seekTo(newTime);
-    toast.success(`Jumped back 0.25s to ${formatTime(newTime)}`);
+  };
+
+  // Jump forward by exactly 0.25 seconds using the *live* video time to avoid stale state
+  const jumpForwardQuarterSecond = () => {
+    const current = videoRef.current ? videoRef.current.currentTime : currentTime;
+    const newTime = Math.min(duration, current + 0.25);
+    seekTo(newTime);
   };
 
   const handleStartSegment = () => {
-    setSegmentStartTime(currentTime);
-    setSegmentEndTime(null);
-    setDescription('');
-    setEndFrameImage(null);
+    // Use the actual video time instead of React state to avoid timing issues
+    const actualTime = videoRef.current ? videoRef.current.currentTime : currentTime;
     
-    // Capture start frame (non-blocking)
-    try {
-      const frameImage = captureCurrentFrame();
-      setStartFrameImage(frameImage);
+    // If there's already a start time and current time is before it,
+    // make current time the new start and old start becomes the end
+    if (segmentStartTime !== null && actualTime < segmentStartTime) {
+      setSegmentEndTime(segmentStartTime);
+      setSegmentStartTime(actualTime);
+      setDescription('');
       
-      if (frameImage) {
-        toast.success('Segment start time set to ' + formatTime(currentTime));
-      } else {
-        toast.success('Segment start time set to ' + formatTime(currentTime) + ' (frame preview unavailable)');
+      // Capture new start frame
+      try {
+        const frameImage = captureCurrentFrame();
+        setStartFrameImage(frameImage);
+        // Keep the existing end frame image since the old start becomes the end
+        
+        toast.success(`Reordered markers: new start at ${formatTime(actualTime)}, end at ${formatTime(segmentStartTime)}`);
+      } catch (error) {
+        console.error('Error capturing start frame:', error);
+        setStartFrameImage(null);
+        toast.success(`Reordered markers: new start at ${formatTime(actualTime)}, end at ${formatTime(segmentStartTime)} (frame preview unavailable)`);
       }
-    } catch (error) {
-      console.error('Error capturing start frame:', error);
-      setStartFrameImage(null);
-      toast.success('Segment start time set to ' + formatTime(currentTime) + ' (frame preview unavailable)');
+    } else {
+      // Normal behavior: set start time
+      setSegmentStartTime(actualTime);
+      setSegmentEndTime(null);
+      setDescription('');
+      setEndFrameImage(null);
+      
+      // Capture start frame (non-blocking)
+      try {
+        const frameImage = captureCurrentFrame();
+        setStartFrameImage(frameImage);
+        
+        if (frameImage) {
+          toast.success('Segment start time set to ' + formatTime(actualTime));
+        } else {
+          toast.success('Segment start time set to ' + formatTime(actualTime) + ' (frame preview unavailable)');
+        }
+      } catch (error) {
+        console.error('Error capturing start frame:', error);
+        setStartFrameImage(null);
+        toast.success('Segment start time set to ' + formatTime(actualTime) + ' (frame preview unavailable)');
+      }
     }
   };
 
@@ -343,26 +477,50 @@ export function VideoSegmentEditor({ video, segments, onCreateSegment, onDeleteS
       toast.error('Please set start time first');
       return;
     }
-    if (currentTime <= segmentStartTime) {
+    
+    // Use the actual video time instead of React state to avoid timing issues
+    const actualTime = videoRef.current ? videoRef.current.currentTime : currentTime;
+    
+    // If current time is before start time, swap them
+    if (actualTime < segmentStartTime) {
+      const oldStart = segmentStartTime;
+      setSegmentStartTime(actualTime);
+      setSegmentEndTime(oldStart);
+      
+      // Capture new start frame
+      try {
+        const frameImage = captureCurrentFrame();
+        setStartFrameImage(frameImage);
+        // Keep existing end frame image since old start becomes end
+        
+        toast.success(`Reordered markers: start at ${formatTime(actualTime)}, end at ${formatTime(oldStart)}`);
+      } catch (error) {
+        console.error('Error capturing start frame:', error);
+        setStartFrameImage(null);
+        toast.success(`Reordered markers: start at ${formatTime(actualTime)}, end at ${formatTime(oldStart)} (frame preview unavailable)`);
+      }
+    } else if (actualTime <= segmentStartTime + 0.001) { // Add small tolerance for floating point comparison
       toast.error('End time must be after start time');
       return;
-    }
-    setSegmentEndTime(currentTime);
-    
-    // Capture end frame (non-blocking)
-    try {
-      const frameImage = captureCurrentFrame();
-      setEndFrameImage(frameImage);
+    } else {
+      // Normal behavior: set end time
+      setSegmentEndTime(actualTime);
       
-      if (frameImage) {
-        toast.success('Segment end time set to ' + formatTime(currentTime));
-      } else {
-        toast.success('Segment end time set to ' + formatTime(currentTime) + ' (frame preview unavailable)');
+      // Capture end frame (non-blocking)
+      try {
+        const frameImage = captureCurrentFrame();
+        setEndFrameImage(frameImage);
+        
+        if (frameImage) {
+          toast.success('Segment end time set to ' + formatTime(actualTime));
+        } else {
+          toast.success('Segment end time set to ' + formatTime(actualTime) + ' (frame preview unavailable)');
+        }
+      } catch (error) {
+        console.error('Error capturing end frame:', error);
+        setEndFrameImage(null);
+        toast.success('Segment end time set to ' + formatTime(actualTime) + ' (frame preview unavailable)');
       }
-    } catch (error) {
-      console.error('Error capturing end frame:', error);
-      setEndFrameImage(null);
-      toast.success('Segment end time set to ' + formatTime(currentTime) + ' (frame preview unavailable)');
     }
   };
 
@@ -436,6 +594,23 @@ export function VideoSegmentEditor({ video, segments, onCreateSegment, onDeleteS
   const handleDeleteSegment = (segmentId: string) => {
     onDeleteSegment(segmentId);
     toast.success('Segment deleted');
+  };
+
+  const handleDeleteLastSegment = () => {
+    // Remove the last mark (end time first, then start time)
+    if (segmentEndTime !== null) {
+      // Remove end time
+      setSegmentEndTime(null);
+      setEndFrameImage(null);
+      toast.success('Removed end time mark');
+    } else if (segmentStartTime !== null) {
+      // Remove start time
+      setSegmentStartTime(null);
+      setStartFrameImage(null);
+      toast.success('Removed start time mark');
+    } else {
+      toast.error('No marks to remove');
+    }
   };
 
   const handleEditSegment = (segment: TrainingDataSegment) => {
@@ -521,6 +696,10 @@ export function VideoSegmentEditor({ video, segments, onCreateSegment, onDeleteS
                     onCanPlay={() => {
                       setVideoReady(true);
                     }}
+                    onTimeUpdate={(e) => {
+                      const videoElement = e.target as HTMLVideoElement;
+                      setCurrentTime(videoElement.currentTime);
+                    }}
                     controls={false}
                   />
                 ) : (
@@ -546,9 +725,21 @@ export function VideoSegmentEditor({ video, segments, onCreateSegment, onDeleteS
                     size="sm"
                     onClick={jumpBackQuarterSecond}
                     className="flex items-center gap-1 text-xs px-2"
+                    title="Press '1' to jump back 0.25 seconds"
                   >
                     <SkipBack className="h-3 w-3" />
                     -0.25s
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={jumpForwardQuarterSecond}
+                    className="flex items-center gap-1 text-xs px-2"
+                    title="Press '4' to jump forward 0.25 seconds"
+                  >
+                    <SkipForward className="h-3 w-3" />
+                    +0.25s
                   </Button>
 
                   {/* Playback Speed Controls */}
@@ -557,6 +748,7 @@ export function VideoSegmentEditor({ video, segments, onCreateSegment, onDeleteS
                     size="sm"
                     onClick={() => setVideoPlaybackRate(0.25)}
                     className="text-xs px-2"
+                    title="Press '2' for 1/4x speed"
                   >
                     1/4×
                   </Button>
@@ -566,6 +758,7 @@ export function VideoSegmentEditor({ video, segments, onCreateSegment, onDeleteS
                     size="sm"
                     onClick={() => setVideoPlaybackRate(0.5)}
                     className="text-xs px-2"
+                    title="Press '3' for 1/2x speed"
                   >
                     1/2×
                   </Button>
@@ -575,6 +768,7 @@ export function VideoSegmentEditor({ video, segments, onCreateSegment, onDeleteS
                     size="sm"
                     onClick={() => setVideoPlaybackRate(1)}
                     className="text-xs px-2"
+                    title="Press '0' for normal speed"
                   >
                     1×
                   </Button>
@@ -584,6 +778,7 @@ export function VideoSegmentEditor({ video, segments, onCreateSegment, onDeleteS
                     size="sm"
                     onClick={togglePlayPause}
                     className="flex items-center gap-1 min-w-[200px] px-6"
+                    title="Press Space to play/pause"
                   >
                     {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
                     {isPlaying ? 'Pause' : 'Play'}
@@ -739,6 +934,7 @@ export function VideoSegmentEditor({ video, segments, onCreateSegment, onDeleteS
                     size="sm"
                     onClick={handleStartSegment}
                     className="flex items-center gap-1 w-full"
+                    title="Press 'S' or '5' to start segment"
                   >
                     <Scissors className="h-4 w-4" />
                     Start Segment
@@ -776,6 +972,7 @@ export function VideoSegmentEditor({ video, segments, onCreateSegment, onDeleteS
                             onClick={handleCreateSegment}
                             disabled={isCreating}
                             className="flex items-center gap-1 w-full"
+                            title="Press Enter to create segment"
                           >
                             <Plus className="h-4 w-4" />
                             {isCreating ? 'Creating...' : 'Create Segment'}
@@ -862,6 +1059,7 @@ export function VideoSegmentEditor({ video, segments, onCreateSegment, onDeleteS
                               size="sm"
                               onClick={handleEndSegment}
                               className="flex items-center gap-1 flex-1"
+                              title="Press 'S' or '5' to end segment"
                             >
                               <Scissors className="h-4 w-4" />
                               End Here
