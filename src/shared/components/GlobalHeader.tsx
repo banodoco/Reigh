@@ -9,7 +9,6 @@ import { CreateProjectModal } from '@/shared/components/CreateProjectModal';
 import { PlusCircle, Settings, Palette, Sparkles, Crown, Star, Gem, Wrench } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { ProjectSettingsModal } from '@/shared/components/ProjectSettingsModal';
-import SettingsModal from '@/shared/components/SettingsModal';
 import { toast } from "sonner";
 
 interface GlobalHeaderProps {
@@ -39,8 +38,6 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
   }, []);
   const [isCreateProjectModalOpen, setIsCreateProjectModalOpen] = useState(false);
   const [isProjectSettingsModalOpen, setIsProjectSettingsModalOpen] = useState(false);
-  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-  const [settingsInitialTab, setSettingsInitialTab] = useState('generate-locally');
 
   const handleProjectChange = (projectId: string) => {
     setSelectedProjectId(projectId);
@@ -200,11 +197,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => {
-                setSettingsInitialTab('generate-locally');
-                setIsSettingsModalOpen(true);
-                onOpenSettings?.();
-              }}
+              onClick={onOpenSettings}
               className="h-14 w-14 wes-button no-sweep bg-gradient-to-br from-wes-dusty-blue to-wes-lavender border-3 border-wes-vintage-gold/40 hover:from-wes-dusty-blue-dark hover:to-wes-lavender-dark shadow-wes-vintage hover:shadow-wes-hover wes-viewfinder group relative overflow-hidden"
               title="App Settings"
             >
@@ -250,11 +243,6 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
           project={selectedProject}
         />
       )}
-       <SettingsModal
-        isOpen={isSettingsModalOpen}
-        onOpenChange={setIsSettingsModalOpen}
-        initialTab={settingsInitialTab}
-      />
     </>
   );
 }; 

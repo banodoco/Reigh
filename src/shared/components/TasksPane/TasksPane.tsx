@@ -11,9 +11,12 @@ import { useCancelAllPendingTasks, useListTasks } from '@/shared/hooks/useTasks'
 import { useToast } from '@/shared/hooks/use-toast';
 import { filterVisibleTasks } from '@/shared/lib/taskConfig';
 import { TasksPaneProcessingWarning } from '../ProcessingWarnings';
-import SettingsModal from '../SettingsModal';
 
-export const TasksPane: React.FC = () => {
+interface TasksPaneProps {
+  onOpenSettings: () => void;
+}
+
+export const TasksPane: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
   const {
     isGenerationsPaneLocked,
     generationsPaneHeight,
@@ -31,13 +34,6 @@ export const TasksPane: React.FC = () => {
 
   const cancelAllPendingMutation = useCancelAllPendingTasks();
   const { toast } = useToast();
-  
-  // Settings modal state
-  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-  
-  const handleOpenSettings = () => {
-    setIsSettingsModalOpen(true);
-  };
 
   const handleCancelAllPending = () => {
     if (!selectedProjectId) {
@@ -117,17 +113,12 @@ export const TasksPane: React.FC = () => {
                 </Button>
               )}
           </div>
-          <TasksPaneProcessingWarning onOpenSettings={handleOpenSettings} />
+          <TasksPaneProcessingWarning onOpenSettings={onOpenSettings} />
           <div className="flex-grow overflow-y-auto">
             <TaskList />
           </div>
         </div>
       </div>
-      
-      <SettingsModal
-        isOpen={isSettingsModalOpen}
-        onOpenChange={setIsSettingsModalOpen}
-      />
     </>
   );
 };

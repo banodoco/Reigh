@@ -101,7 +101,7 @@ const Layout: React.FC = () => {
         </main>
       </div>
       
-      <TasksPane />
+      <TasksPane onOpenSettings={handleOpenSettings} />
       <ShotsPane />
       <GenerationsPane />
       

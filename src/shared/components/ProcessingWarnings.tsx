@@ -29,7 +29,7 @@ export const GlobalProcessingWarning: React.FC<ProcessingWarningsProps> = ({ onO
         <AlertTriangle className="h-4 w-4" />
         <AlertDescription className="flex items-center justify-between">
           <span>
-            You don't have credits and don't have local processing setup.
+            You don't have credits and haven't set up local processing.
           </span>
           <Button
             variant="outline"
@@ -57,25 +57,29 @@ export const TasksPaneProcessingWarning: React.FC<ProcessingWarningsProps> = ({ 
   }
   
   return (
-    <Alert className="mx-2 mb-2 border-orange-200 bg-orange-50 text-orange-900">
-      <AlertTriangle className="h-4 w-4 flex-shrink-0" />
-      <AlertDescription className="text-xs leading-relaxed">
-        <div className="space-y-1">
-          <div>Cloud processing enabled but no credits.</div>
-          <div>
-            Turn off cloud processing or{' '}
-            <Button
-              variant="link"
-              size="sm"
-              onClick={onOpenSettings}
-              className="p-0 h-auto text-orange-700 underline hover:text-orange-800 text-xs"
-            >
-              buy credits
-            </Button>
-            {' '}to dismiss.
-          </div>
-        </div>
-      </AlertDescription>
-    </Alert>
+    <div className="-mr-4">
+      <div className="pr-4">
+        <Alert className="mb-2 border-orange-200 bg-orange-50 text-orange-900">
+          <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+          <AlertDescription className="text-xs leading-relaxed">
+            <div className="space-y-1">
+              <div>Cloud processing enabled but no credits.</div>
+              <div>
+                Turn off cloud processing or{' '}
+                <Button
+                  variant="link"
+                  size="sm"
+                  onClick={onOpenSettings}
+                  className="p-0 h-auto text-orange-700 underline hover:text-orange-800 text-xs"
+                >
+                  buy credits
+                </Button>
+                {' '}to dismiss.
+              </div>
+            </div>
+          </AlertDescription>
+        </Alert>
+      </div>
+    </div>
   );
 }; 
