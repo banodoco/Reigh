@@ -647,7 +647,8 @@ export function VideoSegmentEditor({ video, segments, onCreateSegment, onDeleteS
   };
 
   return (
-    <div className="space-y-6">
+    <TooltipProvider>
+      <div className="space-y-6">
       {/* Video Player and Segment Controls */}
       <Card>
         <CardHeader>
@@ -720,70 +721,106 @@ export function VideoSegmentEditor({ video, segments, onCreateSegment, onDeleteS
               <div className="space-y-2">
                 <div className="flex items-center gap-2 flex-wrap">
                   {/* Jump Back Control */}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={jumpBackQuarterSecond}
-                    className="flex items-center gap-1 text-xs px-2"
-                    title="Press '1' to jump back 0.25 seconds"
-                  >
-                    <SkipBack className="h-3 w-3" />
-                    -0.25s
-                  </Button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={jumpBackQuarterSecond}
+                        className="flex items-center gap-1 text-xs px-2"
+                      >
+                        <SkipBack className="h-3 w-3" />
+                        -0.25s
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Press '1' to jump back 0.25 seconds</p>
+                    </TooltipContent>
+                  </Tooltip>
 
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={jumpForwardQuarterSecond}
-                    className="flex items-center gap-1 text-xs px-2"
-                    title="Press '4' to jump forward 0.25 seconds"
-                  >
-                    <SkipForward className="h-3 w-3" />
-                    +0.25s
-                  </Button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={jumpForwardQuarterSecond}
+                        className="flex items-center gap-1 text-xs px-2"
+                      >
+                        <SkipForward className="h-3 w-3" />
+                        +0.25s
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Press '4' to jump forward 0.25 seconds</p>
+                    </TooltipContent>
+                  </Tooltip>
 
                   {/* Playback Speed Controls */}
-                  <Button
-                    variant={playbackRate === 0.25 ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setVideoPlaybackRate(0.25)}
-                    className="text-xs px-2"
-                    title="Press '2' for 1/4x speed"
-                  >
-                    1/4×
-                  </Button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant={playbackRate === 0.25 ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setVideoPlaybackRate(0.25)}
+                        className="text-xs px-2"
+                      >
+                        1/4×
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Press '2' for 1/4x speed</p>
+                    </TooltipContent>
+                  </Tooltip>
                   
-                  <Button
-                    variant={playbackRate === 0.5 ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setVideoPlaybackRate(0.5)}
-                    className="text-xs px-2"
-                    title="Press '3' for 1/2x speed"
-                  >
-                    1/2×
-                  </Button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant={playbackRate === 0.5 ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setVideoPlaybackRate(0.5)}
+                        className="text-xs px-2"
+                      >
+                        1/2×
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Press '3' for 1/2x speed</p>
+                    </TooltipContent>
+                  </Tooltip>
 
-                  <Button
-                    variant={playbackRate === 1 ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setVideoPlaybackRate(1)}
-                    className="text-xs px-2"
-                    title="Press '0' for normal speed"
-                  >
-                    1×
-                  </Button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant={playbackRate === 1 ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setVideoPlaybackRate(1)}
+                        className="text-xs px-2"
+                      >
+                        1×
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Press '0' for normal speed</p>
+                    </TooltipContent>
+                  </Tooltip>
 
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={togglePlayPause}
-                    className="flex items-center gap-1 min-w-[200px] px-6"
-                    title="Press Space to play/pause"
-                  >
-                    {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                    {isPlaying ? 'Pause' : 'Play'}
-                    {playbackRate !== 1 && <span className="text-xs ml-1">({playbackRate}×)</span>}
-                  </Button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={togglePlayPause}
+                        className="flex items-center gap-1 min-w-[200px] px-6"
+                      >
+                        {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                        {isPlaying ? 'Pause' : 'Play'}
+                        {playbackRate !== 1 && <span className="text-xs ml-1">({playbackRate}×)</span>}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Press Space to play/pause</p>
+                    </TooltipContent>
+                  </Tooltip>
                   
                   <Button
                     variant="outline"
@@ -929,16 +966,22 @@ export function VideoSegmentEditor({ video, segments, onCreateSegment, onDeleteS
               {/* Segment Creation Controls */}
               <div className="space-y-3 bg-muted p-3 rounded">
                 {segmentStartTime === null ? (
-                  <Button
-                    variant="default"
-                    size="sm"
-                    onClick={handleStartSegment}
-                    className="flex items-center gap-1 w-full"
-                    title="Press 'S' or '5' to start segment"
-                  >
-                    <Scissors className="h-4 w-4" />
-                    Start Segment
-                  </Button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={handleStartSegment}
+                        className="flex items-center gap-1 w-full"
+                      >
+                        <Scissors className="h-4 w-4" />
+                        Start Segment
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Press 'S' or '5' to start segment</p>
+                    </TooltipContent>
+                  </Tooltip>
                 ) : (
                   <div className="space-y-2">
                     {/* Live preview when dragging */}
@@ -968,15 +1011,21 @@ export function VideoSegmentEditor({ video, segments, onCreateSegment, onDeleteS
                           />
                         </div>
                         <div className="flex flex-col gap-2">
-                          <Button
-                            onClick={handleCreateSegment}
-                            disabled={isCreating}
-                            className="flex items-center gap-1 w-full"
-                            title="Press Enter to create segment"
-                          >
-                            <Plus className="h-4 w-4" />
-                            {isCreating ? 'Creating...' : 'Create Segment'}
-                          </Button>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                onClick={handleCreateSegment}
+                                disabled={isCreating}
+                                className="flex items-center gap-1 w-full"
+                              >
+                                <Plus className="h-4 w-4" />
+                                {isCreating ? 'Creating...' : 'Create Segment'}
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Press Enter to create segment</p>
+                            </TooltipContent>
+                          </Tooltip>
                           <Button
                             variant="outline"
                             onClick={handleCancelSegment}
@@ -1031,18 +1080,24 @@ export function VideoSegmentEditor({ video, segments, onCreateSegment, onDeleteS
                         >
                           Jump to here
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setSegmentStartTime(null);
-                            setStartFrameImage(null);
-                          }}
-                          className="text-xs px-1 py-1 h-6 text-red-600 hover:text-red-700"
-                          title="Remove start time"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setSegmentStartTime(null);
+                                setStartFrameImage(null);
+                              }}
+                              className="text-xs px-1 py-1 h-6 text-red-600 hover:text-red-700"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Remove start time (Press 'D' to remove last mark)</p>
+                          </TooltipContent>
+                        </Tooltip>
                       </div>
                     </div>
 
@@ -1054,16 +1109,22 @@ export function VideoSegmentEditor({ video, segments, onCreateSegment, onDeleteS
                             End at ({formatTime(currentTime)})
                           </div>
                           <div className="flex gap-1">
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              onClick={handleEndSegment}
-                              className="flex items-center gap-1 flex-1"
-                              title="Press 'S' or '5' to end segment"
-                            >
-                              <Scissors className="h-4 w-4" />
-                              End Here
-                            </Button>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={handleEndSegment}
+                                  className="flex items-center gap-1 flex-1"
+                                >
+                                  <Scissors className="h-4 w-4" />
+                                  End Here
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Press 'S' or '5' to end segment</p>
+                              </TooltipContent>
+                            </Tooltip>
                             <Button
                               variant="outline"
                               size="sm"
@@ -1106,18 +1167,24 @@ export function VideoSegmentEditor({ video, segments, onCreateSegment, onDeleteS
                           >
                             Jump to here
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setSegmentEndTime(null);
-                              setEndFrameImage(null);
-                            }}
-                            className="text-xs px-1 py-1 h-6 text-red-600 hover:text-red-700"
-                            title="Remove end time"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setSegmentEndTime(null);
+                                  setEndFrameImage(null);
+                                }}
+                                className="text-xs px-1 py-1 h-6 text-red-600 hover:text-red-700"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Remove end time (Press 'D' to remove last mark)</p>
+                            </TooltipContent>
+                          </Tooltip>
                         </div>
                       </div>
                     )}
@@ -1232,50 +1299,50 @@ export function VideoSegmentEditor({ video, segments, onCreateSegment, onDeleteS
                       />
                     </div>
                   
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleEditSegment(segment)}
-                    >
-                      Edit
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => previewSegment(segment)}
-                    >
-                      Preview
-                    </Button>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-destructive hover:text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Delete Segment</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Are you sure you want to delete this segment? This action cannot be undone.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => handleDeleteSegment(segment.id)}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleEditSegment(segment)}
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => previewSegment(segment)}
+                      >
+                        Preview
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:text-destructive"
                           >
-                            Delete
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Segment</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure you want to delete this segment? This action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => handleDeleteSegment(segment.id)}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
                   </div>
                   );
                 })}
@@ -1284,5 +1351,6 @@ export function VideoSegmentEditor({ video, segments, onCreateSegment, onDeleteS
         </CardContent>
       </Card>
     </div>
+    </TooltipProvider>
   );
 } 
