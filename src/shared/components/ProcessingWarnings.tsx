@@ -47,12 +47,15 @@ export const GlobalProcessingWarning: React.FC<ProcessingWarningsProps> = ({ onO
 
 export const TasksPaneProcessingWarning: React.FC<ProcessingWarningsProps> = ({ onOpenSettings }) => {
   const { balance } = useCredits();
+  const { tokens } = useApiTokens();
   const [inCloudChecked] = usePersistentState<boolean>("generation-in-cloud", true);
   
   const hasCredits = balance && balance.currentBalance > 0;
+  const hasValidToken = tokens.length > 0;
   
-  // Show warning if they have cloud processing enabled but no credits
-  if (!inCloudChecked || hasCredits) {
+  // Show warning if they have cloud processing enabled but no credits, 
+  // AND they have a valid token (so GlobalProcessingWarning won't show)
+  if (!inCloudChecked || hasCredits || !hasValidToken) {
     return null;
   }
   
@@ -63,8 +66,8 @@ export const TasksPaneProcessingWarning: React.FC<ProcessingWarningsProps> = ({ 
           <div className="flex items-start space-x-2">
             <AlertTriangle className="h-4 w-4 flex-shrink-0 text-orange-700 mt-0.5" />
             <div className="space-y-1">
-              <div>Cloud processing enabled but no credits.</div>
-              <div>
+              <div className="text-sm font-medium">Cloud processing enabled but you have no credits.</div>
+              <div className="text-xs">
                 Turn off cloud processing or{' '}
                 <Button
                   variant="link"

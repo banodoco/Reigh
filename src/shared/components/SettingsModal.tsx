@@ -164,6 +164,25 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     return tokens[0]; // Just return the first token since we no longer have expiry
   };
 
+  const formatTokenAge = (createdAt: string | number) => {
+    const now = new Date();
+    const created = new Date(createdAt);
+    const diffInMs = now.getTime() - created.getTime();
+    const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
+    const diffInHours = Math.floor(diffInMinutes / 60);
+    const diffInDays = Math.floor(diffInHours / 24);
+
+    if (diffInMinutes < 1) {
+      return "< 1 min old token";
+    } else if (diffInMinutes < 60) {
+      return `${diffInMinutes} min old token`;
+    } else if (diffInHours < 24) {
+      return `${diffInHours}h old token`;
+    } else {
+      return `${diffInDays}d old token`;
+    }
+  };
+
   // Handle copying commands and provide inline visual feedback instead of a toast
   const handleCopyInstallCommand = () => {
     navigator.clipboard.writeText(getInstallationCommand());
@@ -316,9 +335,9 @@ python headless.py --db-type supabase \\
           {/* Credits Management Section */}
           {inCloudChecked && (
             <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <Coins className="w-5 h-5 text-blue-600" />
-                <h3 className="text-lg font-semibold">Credit Management</h3>
+              <div className="flex items-center gap-2 mb-2">
+                <Coins className="w-6 h-6 text-blue-600" />
+                <h3 className="text-xl font-bold text-gray-800">Credit Management</h3>
               </div>
               <CreditsManagement />
             </div>
@@ -327,9 +346,9 @@ python headless.py --db-type supabase \\
           {/* Local Generation Section */}
           {onComputerChecked && (
             <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <Monitor className="w-5 h-5 text-green-600" />
-                <h3 className="text-lg font-semibold">Local Generation</h3>
+              <div className="flex items-center gap-2 mb-2">
+                <Monitor className="w-6 h-6 text-green-600" />
+                <h3 className="text-xl font-bold text-gray-800">Local Generation</h3>
               </div>
               
               {!hasValidToken ? (
@@ -399,7 +418,7 @@ python headless.py --db-type supabase \\
                         <div className="flex items-center justify-between">
                           <div>
                             <p className="text-sm text-gray-600">
-                              Created {formatDistanceToNow(new Date(getActiveToken()?.created_at || 0), { addSuffix: true })}
+                              {formatTokenAge(getActiveToken()?.created_at || 0)}
                             </p>
                           </div>
                           <div className="flex items-center gap-2">
