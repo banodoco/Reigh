@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Settings, Key, Copy, Trash2, AlertCircle, Terminal, Coins, Monitor, LogOut } from "lucide-react";
+import { Settings, Key, Copy, Trash2, AlertCircle, Terminal, Coins, Monitor, LogOut, HelpCircle } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -28,6 +28,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/shared/components/ui/select";
+import { 
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/shared/components/ui/tooltip";
 import { formatDistanceToNow } from "date-fns";
 import CreditsManagement from "./CreditsManagement";
 
@@ -66,6 +72,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   
   // Installation tab preference (persistent)
   const [activeInstallTab, setActiveInstallTab] = usePersistentState<string>("settings-install-tab", "need-install");
+  
+  // Computer type preference (persistent)
+  const [computerType, setComputerType] = usePersistentState<string>("computer-type", "linux");
   
   // Generation method preferences (persistent)
   const [onComputerChecked, setOnComputerChecked] = usePersistentState<boolean>("generation-on-computer", true);
@@ -173,7 +182,27 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const getInstallationCommand = () => {
     // Use the actual token from database or freshly generated one
     const token = generatedToken || getActiveToken()?.token || 'your-api-token';
-    return `git clone https://github.com/peteromallet/Headless-Wan2GP && \\
+    
+    if (computerType === "windows") {
+      return `git clone https://github.com/peteromallet/Headless-Wan2GP && \\
+cd Headless-Wan2GP && \\
+python -m venv venv && \\
+venv\\Scripts\\activate && \\
+pip install --no-cache-dir torch==2.6.0 torchvision torchaudio -f https://download.pytorch.org/whl/cu124 && \\
+pip install --no-cache-dir -r Wan2GP/requirements.txt && \\
+pip install --no-cache-dir -r requirements.txt && \\
+python headless.py --db-type supabase \\
+  --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
+  --supabase-anon-key ${SUPABASE_ANON_KEY} \\
+  --supabase-access-token ${token}
+
+REM Prerequisites (install manually if not already installed):
+REM - Python 3.10+ from https://python.org
+REM - Git from https://git-scm.com/download/win
+REM - FFmpeg from https://ffmpeg.org/download.html (add to PATH)`;
+    } else {
+      // Linux command (existing)
+      return `git clone https://github.com/peteromallet/Headless-Wan2GP && \\
 cd /workspace/Headless-Wan2GP && \\
 apt-get update && apt-get install -y python3.10-venv ffmpeg && \\
 python3.10 -m venv venv && \\
@@ -183,17 +212,29 @@ pip install --no-cache-dir -r Wan2GP/requirements.txt && \\
 pip install --no-cache-dir -r requirements.txt && \\
 python headless.py --db-type supabase \\
   --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
-  --supabase-anon-key ${SUPABASE_ANON_KEY} \
+  --supabase-anon-key ${SUPABASE_ANON_KEY} \\
   --supabase-access-token ${token}`;
+    }
   };
 
   const getRunCommand = () => {
     // Use the actual token from database or freshly generated one
     const token = generatedToken || getActiveToken()?.token || 'your-api-token';
-    return `python headless.py --db-type supabase \\
+    
+    if (computerType === "windows") {
+      return `cd /path/to/your/Headless-Wan2GP && \\
+venv\\Scripts\\activate && \\
+python headless.py --db-type supabase \\
   --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
-  --supabase-anon-key ${SUPABASE_ANON_KEY} \
+  --supabase-anon-key ${SUPABASE_ANON_KEY} \\
   --supabase-access-token ${token}`;
+    } else {
+      // Linux command (existing)
+      return `python headless.py --db-type supabase \\
+  --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
+  --supabase-anon-key ${SUPABASE_ANON_KEY} \\
+  --supabase-access-token ${token}`;
+    }
   };
 
   const handleSignOut = async () => {
@@ -312,39 +353,76 @@ python headless.py --db-type supabase \\
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {/* Token Display and Management */}
-                  <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h4 className="font-semibold text-gray-800">Active API Token</h4>
-                        <p className="text-sm text-gray-600">
-                          Created {formatDistanceToNow(new Date(getActiveToken()?.created_at || 0), { addSuffix: true })}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => refreshToken(getActiveToken()!)}
-                          disabled={isRefreshing || isRevoking || !getActiveToken()}
-                        >
-                          {isRefreshing ? "Refreshing..." : "Refresh"}
-                        </Button>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => revokeToken(getActiveToken()!.id)}
-                          disabled={isRevoking || isRefreshing || !getActiveToken()}
-                        >
-                          {isRevoking ? "Revoking..." : "Revoke"}
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
+
 
                   {/* Installation section */}
                   <div className="space-y-4">
-                    <h4 className="font-semibold">Run on your computer:</h4>
+                    {/* Computer Type Selection and API Token Display */}
+                    <div className="grid grid-cols-2 gap-6 items-start">
+                      {/* Left: Computer Type Selection */}
+                      <div className="space-y-3">
+                        <p className="text-sm font-medium">What kind of computer do you have?</p>
+                        <div className="flex gap-4">
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="radio"
+                              id="linux"
+                              name="computer-type"
+                              value="linux"
+                              checked={computerType === "linux"}
+                              onChange={(e) => setComputerType(e.target.value)}
+                              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-2"
+                            />
+                            <label htmlFor="linux" className="text-sm font-medium">
+                              Linux
+                            </label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="radio"
+                              id="windows"
+                              name="computer-type"
+                              value="windows"
+                              checked={computerType === "windows"}
+                              onChange={(e) => setComputerType(e.target.value)}
+                              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-2"
+                            />
+                            <label htmlFor="windows" className="text-sm font-medium">
+                              Windows
+                            </label>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Right: API Token Display */}
+                      <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm text-gray-600">
+                              Created {formatDistanceToNow(new Date(getActiveToken()?.created_at || 0), { addSuffix: true })}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => refreshToken(getActiveToken()!)}
+                              disabled={isRefreshing || isRevoking || !getActiveToken()}
+                            >
+                              {isRefreshing ? "Refreshing..." : "Refresh"}
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => revokeToken(getActiveToken()!.id)}
+                              disabled={isRevoking || isRefreshing || !getActiveToken()}
+                            >
+                              {isRevoking ? "Revoking..." : "Revoke"}
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                     
                     <Tabs value={activeInstallTab} onValueChange={setActiveInstallTab} className="w-full">
                       <TabsList className="grid w-full grid-cols-2 bg-gray-100 border border-gray-200">
@@ -427,9 +505,28 @@ python headless.py --db-type supabase \\
                             )}
                           </Button>
                           
-                          <p className="text-xs text-red-600 text-center">
-                            ⚠️ Don't share this command with non-trusted third parties
-                          </p>
+                          <div className="flex justify-center">
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="link" className="text-sm text-blue-600 hover:text-blue-800 p-0 h-auto">
+                                    <HelpCircle className="h-4 w-4 mr-1" />
+                                    Need help?
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent className="max-w-sm">
+                                  <div className="py-3 space-y-3">
+                                    <p className="font-medium">Troubleshooting steps:</p>
+                                    <ol className="text-sm space-y-2 list-decimal list-inside">
+                                      <li>Try running each line of the commands one-at-a-time</li>
+                                      <li>Feed the command-line log into ChatGPT or your LLM of choice</li>
+                                      <li>Drop into the <a href="https://discord.gg/WXrdkbkj" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 underline">help channel</a> of the Reigh discord</li>
+                                    </ol>
+                                  </div>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </div>
                         </div>
                       </TabsContent>
 
@@ -498,9 +595,28 @@ python headless.py --db-type supabase \\
                             )}
                           </Button>
                           
-                          <p className="text-xs text-red-600 text-center">
-                            ⚠️ Don't share this command with non-trusted third parties
-                          </p>
+                          <div className="flex justify-center">
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="link" className="text-sm text-blue-600 hover:text-blue-800 p-0 h-auto">
+                                    <HelpCircle className="h-4 w-4 mr-1" />
+                                    Need help?
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent className="max-w-sm">
+                                  <div className="py-3 space-y-3">
+                                    <p className="font-medium">Troubleshooting steps:</p>
+                                    <ol className="text-sm space-y-2 list-decimal list-inside">
+                                      <li>Try running each line of the commands one-at-a-time</li>
+                                      <li>Feed the command-line log into ChatGPT or your LLM of choice</li>
+                                      <li>Drop into the <a href="https://discord.gg/WXrdkbkj" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 underline">help channel</a> of the Reigh discord</li>
+                                    </ol>
+                                  </div>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </div>
                         </div>
                       </TabsContent>
                     </Tabs>
