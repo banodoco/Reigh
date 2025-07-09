@@ -35,7 +35,7 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
 | Config files | vite.config.ts, tailwind.config.ts, tsconfig*.json, ESLint, etc. |
 | `drizzle.config.ts` | Drizzle Kit config (PostgreSQL/Supabase). For PG migrations |
 | `drizzle-sqlite.config.ts` | Drizzle Kit config (SQLite). For local SQLite migrations |
-| `/db/schema/schema.ts` | Canonical DB schema (Drizzle ORM, PG-first). Users table includes api_keys JSON column for storing FAL/OpenAI/Replicate keys. Users, projects, and shots tables include settings JSON column for tool-specific settings. Includes training_data_batches, training_data, and training_data_segments tables for organized training data management |
+| `/db/schema/schema.ts` | Canonical DB schema (Drizzle ORM, PG-first). Users table includes api_keys JSON column for storing FAL/OpenAI/Replicate keys. Users, projects, and shots tables include settings JSON column for tool-specific settings. Includes training_data_batches, training_data, and training_data_segments tables for organized training data management. Also includes task_cost_configs table for flexible task cost configuration based on execution time and cost factors |
 | `/db/migrations/` | PostgreSQL migration files |
 | `/db/migrations-sqlite/` | SQLite migration files |
 | `/db/seed.ts` | Seeds local SQLite DB for development |
@@ -46,6 +46,7 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
 | `/supabase/functions/steerable-motion/` | Edge Function replacement for /api/steerable-motion/travel-between-images. Creates `travel_orchestrator` tasks for video generation |
 | `/supabase/functions/generate-pat/` | Edge Function for generating personal access tokens (PAT) for local worker scripts |
 | `/supabase/functions/revoke-pat/` | Edge Function for revoking personal access tokens |
+| `/supabase/functions/calculate-task-cost/` | Edge Function for calculating task costs based on execution time and adding to credit ledger |
 | **API Endpoints** | |
 | `POST /api/local-image-upload` | Upload single image files to server local storage |
 | `POST /api/upload-flipped-image` | Upload processed (flipped) images from lightbox edit functionality |
@@ -95,6 +96,18 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
   - `verify_api_token()` PostgreSQL function: Validates tokens at database level with direct token lookup
   - `useApiTokens` hook: Client-side token management (simplified without expiry handling)
   - Updated Settings Modal: Primary section for token management
+
+**Task Cost System**: ✅ **IMPLEMENTED**
+- **Purpose**: Flexible cost calculation based on task execution time and configurable cost factors
+- **Architecture**: 
+  - `task_cost_configs` table stores per-task-type cost configurations with base cost per second and JSONB cost factors
+  - `calculate-task-cost` Edge Function calculates actual costs based on `generation_started_at` and `generation_processed_at` timestamps
+  - Costs are automatically added to `credits_ledger` as 'spend' entries
+- **Components**:
+  - `task_cost_configs` table: Stores cost configurations with flexible cost factors for resolution, frame count, model type, etc.
+  - `calculate-task-cost` Edge Function: Takes task_id, calculates duration and cost, inserts into credit ledger
+  - Updated `tasks` table: Added `generation_started_at` column for precise timing calculations
+  - Cost factors support complex calculations based on task parameters stored in JSONB format
 
 **Migration Workflow**:
 

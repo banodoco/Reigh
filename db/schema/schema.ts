@@ -1,6 +1,6 @@
 // PostgreSQL schema for Supabase
 
-import { pgTable, text, uuid, timestamp, integer, index, pgEnum, jsonb } from 'drizzle-orm/pg-core';
+import { pgTable, text, uuid, timestamp, integer, index, pgEnum, jsonb, boolean } from 'drizzle-orm/pg-core';
 import { relations, sql } from 'drizzle-orm';
 
 // --- ENUMS ---
@@ -59,6 +59,7 @@ export const tasks = pgTable('tasks', {
   updatedAt: timestamp('updated_at', { withTimezone: true }),
   projectId: uuid('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
   generationProcessedAt: timestamp('generation_processed_at', { withTimezone: true }),
+  generationStartedAt: timestamp('generation_started_at', { withTimezone: true }),
 }, (table) => ({
   // Indexes for better query performance
   statusCreatedIdx: index('idx_status_created').on(table.status, table.createdAt),
@@ -134,6 +135,23 @@ export const trainingDataSegments = pgTable('training_data_segments', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }),
 });
+
+export const taskCostConfigs = pgTable('task_cost_configs', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  taskType: text('task_type').notNull().unique(),
+  category: text('category').notNull(), // 'generation', 'processing', 'orchestration', 'utility'
+  displayName: text('display_name').notNull(),
+  baseCostCentsPerSecond: integer('base_cost_cents_per_second').notNull(), // Base cost per second in cents
+  costFactors: jsonb('cost_factors').default('{}'), // Flexible cost factors configuration
+  isActive: boolean('is_active').default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  // Indexes for better query performance
+  taskTypeIdx: index('idx_task_cost_configs_task_type').on(table.taskType),
+  categoryIdx: index('idx_task_cost_configs_category').on(table.category),
+  activeIdx: index('idx_task_cost_configs_active').on(table.isActive),
+}));
 
 // --- Relations ---
 
