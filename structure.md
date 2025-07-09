@@ -192,9 +192,16 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
 
 ##### Training Data Helper (`src/tools/training-data-helper/`)
 - **pages/TrainingDataHelperPage.tsx**: Main UI for managing training data videos and segments. Features batch selector for organizing videos, video upload to Supabase storage, video selection, and segment creation/management. Only accessible via direct link (`/tools/training-data-helper`).
-- **components/BatchSelector.tsx**: Component for creating and selecting training data batches. Allows users to organize videos into logical groups with names and descriptions.
-- **components/VideoUploadList.tsx**: Displays uploaded videos in a grid layout with thumbnails, metadata, and selection/deletion functionality.
-- **components/VideoSegmentEditor.tsx**: Comprehensive video player with segment creation tools. Features custom video controls, timeline with segment markers, segment preview, and segment management (create, edit, delete).
+- **components/BatchSelector.tsx**: Component for creating and selecting training data batches. Allows users to organize videos into logical groups with names and descriptions. Features editable batch names with pencil icon, abbreviated relative time display ("Created 5 mins ago"), and delete functionality with validation to prevent deletion of batches containing videos.
+- **components/VideoUploadList.tsx**: Displays uploaded videos in a grid layout with thumbnails, metadata, and selection/deletion functionality. Enhanced with error handling for invalid video files (400 Bad Request errors) and `markVideoAsInvalid()` function.
+- **components/VideoSegmentEditor.tsx**: Comprehensive video player with advanced segment creation tools and keyboard shortcuts. Features:
+  - **Keyboard Shortcuts**: 1 (jump back 0.25s), 2 (1/4x speed), 3 (1/2x speed), 4 (jump forward 0.25s), 0 (normal speed), Space (play/pause), S/5 (segment start/end toggle), Enter (create segment), D (remove last mark)
+  - **Smart Marker Reordering**: Intelligent reordering when setting markers out of chronological order with informative toast messages
+  - **Enhanced Video Controls**: Custom timeline with segment markers, playback speed controls, frame-accurate navigation
+  - **Segment Management**: Create, edit, delete segments with frame preview and validation
+  - **Robust Event Handling**: Proper keyboard event handling with capture phase, play/pause state synchronization, and timing conflict prevention
+  - **User Experience**: Tooltips for all controls, enhanced error handling, floating point tolerance for time comparisons
+- **components/MultiVideoUploader.tsx**: Handles multiple video file uploads with progress tracking and error handling.
 - **hooks/useTrainingData.ts**: React hook for managing training data, batches, and segments. Handles batch creation, video upload to Supabase storage, CRUD operations for videos and segments, and provides video URLs for playback.
 - **settings.ts**: Tool settings for user preferences (auto-play segments, default durations, etc.).
 
