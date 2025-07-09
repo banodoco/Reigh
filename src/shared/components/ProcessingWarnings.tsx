@@ -59,22 +59,24 @@ export const TasksPaneProcessingWarning: React.FC<ProcessingWarningsProps> = ({ 
   return (
     <div className="px-3">
       <Alert className="mb-2 border-orange-200 bg-orange-50 text-orange-900 rounded-md">
-        <AlertDescription className="text-xs leading-relaxed flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <AlertTriangle className="h-4 w-4 flex-shrink-0 text-orange-700" />
-            <span>Cloud processing enabled but no credits.</span>
-          </div>
-          <div className="ml-2 whitespace-nowrap">
-            Turn off cloud processing or{' '}
-            <Button
-              variant="link"
-              size="sm"
-              onClick={onOpenSettings}
-              className="p-0 h-auto text-orange-700 underline hover:text-orange-800 text-xs"
-            >
-              buy credits
-            </Button>
-            {' '}to dismiss.
+        <AlertDescription className="text-xs leading-relaxed">
+          <div className="flex items-start space-x-2">
+            <AlertTriangle className="h-4 w-4 flex-shrink-0 text-orange-700 mt-0.5" />
+            <div className="space-y-1">
+              <div>Cloud processing enabled but no credits.</div>
+              <div>
+                Turn off cloud processing or{' '}
+                <Button
+                  variant="link"
+                  size="sm"
+                  onClick={onOpenSettings}
+                  className="p-0 h-auto text-orange-700 underline hover:text-orange-800 text-xs"
+                >
+                  buy credits
+                </Button>
+                {' '}to dismiss.
+              </div>
+            </div>
           </div>
         </AlertDescription>
       </Alert>
