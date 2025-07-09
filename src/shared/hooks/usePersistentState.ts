@@ -3,6 +3,8 @@ import { toast } from 'sonner';
 
 const MAX_LOCAL_STORAGE_ITEM_LENGTH = 4 * 1024 * 1024; // 4MB
 
+const PERSISTENT_STATE_EVENT = 'persistentStateChange';
+
 function usePersistentState<T>(key: string, defaultValue: T): [T, React.Dispatch<React.SetStateAction<T>>] {
   const [state, setState] = useState<T>(() => {
     try {
@@ -16,6 +18,19 @@ function usePersistentState<T>(key: string, defaultValue: T): [T, React.Dispatch
     return defaultValue;
   });
 
+  // Listen for updates from other components using the same key
+  useEffect(() => {
+    function handleExternalUpdate(e: Event) {
+      const customEvt = e as CustomEvent<{ key: string; value: unknown }>;
+      if (customEvt.detail?.key === key) {
+        setState(customEvt.detail.value as T);
+      }
+    }
+
+    window.addEventListener(PERSISTENT_STATE_EVENT, handleExternalUpdate);
+    return () => window.removeEventListener(PERSISTENT_STATE_EVENT, handleExternalUpdate);
+  }, [key]);
+
   useEffect(() => {
     try {
       const serializedState = JSON.stringify(state);
@@ -26,6 +41,13 @@ function usePersistentState<T>(key: string, defaultValue: T): [T, React.Dispatch
         return;
       }
       localStorage.setItem(key, serializedState);
+
+      // Broadcast change to other hook instances in the same tab
+      window.dispatchEvent(
+        new CustomEvent(PERSISTENT_STATE_EVENT, {
+          detail: { key, value: state },
+        })
+      );
     } catch (error) {
       console.error(`Error writing to localStorage key "${key}":`, error);
       toast.error("Could not save settings locally.", {

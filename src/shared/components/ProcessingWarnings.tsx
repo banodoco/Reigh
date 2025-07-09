@@ -25,21 +25,21 @@ export const GlobalProcessingWarning: React.FC<ProcessingWarningsProps> = ({ onO
   
   return (
     <div className="container mx-auto px-4 md:px-6 mt-4">
-      <Alert className="border-orange-200 bg-orange-50 text-orange-900">
-        <AlertTriangle className="h-4 w-4" />
-        <AlertDescription className="flex items-center justify-between">
-          <span>
-            You don't have credits and haven't set up local processing.
+      <Alert className="border-orange-200 bg-orange-50 text-orange-900 flex items-center justify-between py-3 pr-4">
+        <div className="flex items-center space-x-3">
+          <span className="inline-flex items-center">
+            <AlertTriangle className="h-5 w-5 text-orange-700 mr-2" />
+            <span>You don't have credits and haven't set up local processing.</span>
           </span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onOpenSettings}
-            className="ml-4 border-orange-300 hover:bg-orange-100 flex-shrink-0"
-          >
-            Visit Settings
-          </Button>
-        </AlertDescription>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onOpenSettings}
+          className="border-orange-300 hover:bg-orange-100 flex-shrink-0"
+        >
+          Visit Settings
+        </Button>
       </Alert>
     </div>
   );
@@ -57,29 +57,27 @@ export const TasksPaneProcessingWarning: React.FC<ProcessingWarningsProps> = ({ 
   }
   
   return (
-    <div className="-mr-4">
-      <div className="pr-4">
-        <Alert className="mb-2 border-orange-200 bg-orange-50 text-orange-900">
-          <AlertTriangle className="h-4 w-4 flex-shrink-0" />
-          <AlertDescription className="text-xs leading-relaxed">
-            <div className="space-y-1">
-              <div>Cloud processing enabled but no credits.</div>
-              <div>
-                Turn off cloud processing or{' '}
-                <Button
-                  variant="link"
-                  size="sm"
-                  onClick={onOpenSettings}
-                  className="p-0 h-auto text-orange-700 underline hover:text-orange-800 text-xs"
-                >
-                  buy credits
-                </Button>
-                {' '}to dismiss.
-              </div>
-            </div>
-          </AlertDescription>
-        </Alert>
-      </div>
+    <div className="px-3">
+      <Alert className="mb-2 border-orange-200 bg-orange-50 text-orange-900 rounded-md">
+        <AlertDescription className="text-xs leading-relaxed flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <AlertTriangle className="h-4 w-4 flex-shrink-0 text-orange-700" />
+            <span>Cloud processing enabled but no credits.</span>
+          </div>
+          <div className="ml-2 whitespace-nowrap">
+            Turn off cloud processing or{' '}
+            <Button
+              variant="link"
+              size="sm"
+              onClick={onOpenSettings}
+              className="p-0 h-auto text-orange-700 underline hover:text-orange-800 text-xs"
+            >
+              buy credits
+            </Button>
+            {' '}to dismiss.
+          </div>
+        </AlertDescription>
+      </Alert>
     </div>
   );
 }; 
