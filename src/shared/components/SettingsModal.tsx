@@ -295,10 +295,7 @@ python headless.py --db-type supabase \\
                     htmlFor="in-cloud"
                     className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                   >
-                    In the cloud{" "}
-                    <span className="text-gray-600">
-                      (you have {balance ? formatCurrency(balance.currentBalance) : '$0.00'} credits)
-                    </span>
+                    In the cloud
                   </label>
                 </div>
                 
@@ -312,7 +309,7 @@ python headless.py --db-type supabase \\
                     htmlFor="on-computer"
                     className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                   >
-                    On my computer {activeInstallTab !== "already-installed" && "(requires setup)"}
+                    On my computer
                   </label>
                 </div>
               </div>
@@ -356,7 +353,7 @@ python headless.py --db-type supabase \\
                   <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                     <div className="flex items-center gap-2 mb-2">
                       <Key className="h-5 w-5 text-blue-600" />
-                      <h4 className="font-semibold text-blue-900">Generate an API Key</h4>
+                      <h4 className="font-semibold text-blue-900">To process locally, you need an API Key</h4>
                     </div>
                     <p className="text-sm text-blue-700 mb-4">
                       You'll need an API key to authenticate your local worker with our servers.

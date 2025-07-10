@@ -14,7 +14,6 @@ import { useAddImageToShot, useRemoveImageFromShot, useUpdateShotImageOrder, use
 import { useDeleteGeneration } from "@/shared/hooks/useGenerations";
 import ShotImageManager from '@/shared/components/ShotImageManager';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/components/ui/collapsible";
-import { Switch } from "@/shared/components/ui/switch";
 import { Input } from "@/shared/components/ui/input";
 import { ChevronsUpDown, Info, X } from 'lucide-react';
 import { arrayMove } from '@dnd-kit/sortable';
@@ -28,6 +27,10 @@ import { ActiveLoRAsDisplay, ActiveLora } from '@/shared/components/ActiveLoRAsD
 import { useApiKeys } from '@/shared/hooks/useApiKeys';
 import { cropImageToProjectAspectRatio } from '@/shared/lib/imageCropper';
 import { parseRatio } from '@/shared/lib/aspectRatios';
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragOverlay } from '@dnd-kit/core';
+import { sortableKeyboardCoordinates, SortableContext, useSortable, horizontalListSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
 import { useToolSettings } from '@/shared/hooks/useToolSettings';
 import { ToggleGroup, ToggleGroupItem } from "@/shared/components/ui/toggle-group";
 import { useListTasks, useCancelTask, useCreateTask } from "@/shared/hooks/useTasks";
@@ -137,10 +140,11 @@ export interface ShotEditorProps {
   availableLoras: LoraModel[];
   isLoraModalOpen: boolean;
   setIsLoraModalOpen: (isOpen: boolean) => void;
+
+  generationMode: 'batch' | 'by-pair' | 'timeline';
+  onGenerationModeChange: (mode: 'batch' | 'by-pair' | 'timeline') => void;
   enhancePrompt: boolean;
   onEnhancePromptChange: (enhance: boolean) => void;
-  generationMode: 'batch' | 'by-pair';
-  onGenerationModeChange: (mode: 'batch' | 'by-pair') => void;
   pairConfigs: PairConfig[];
   onPairConfigsChange: (configs: PairConfig[]) => void;
   // Navigation props
@@ -231,6 +235,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const queryClient = useQueryClient();
   const skipNextSyncRef = useRef(false);
+
+
   
   // Shot name editing state
   const [isEditingName, setIsEditingName] = useState(false);
@@ -554,11 +560,18 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     const reorderedImages = orderedShotGenerationIds
       .map(id => imageMap.get(id))
       .filter((img): img is GenerationRow => !!img);
-    setLocalOrderedShotImages(reorderedImages);
+
+    // Preserve existing video outputs so they don't disappear during re-order
+    const videoImages = localOrderedShotImages.filter(img => isGenerationVideo(img));
+    const combinedImages = [...reorderedImages, ...videoImages];
+    setLocalOrderedShotImages(combinedImages);
+
+    // Include video images when sending the new order to the backend so their positions remain stable
+    const combinedIds = [...orderedShotGenerationIds, ...videoImages.map(v => v.shotImageEntryId)];
 
     updateShotImageOrderMutation.mutate({
       shotId: selectedShot.id,
-      orderedShotGenerationIds, // Pass the new array of IDs
+      orderedShotGenerationIds: combinedIds,
       projectId: selectedProjectId,
     }, {
       onError: () => {
@@ -670,16 +683,16 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     }
 
     const basePrompts =
-      generationMode === 'batch' ? [batchVideoPrompt] : pairConfigs.map((cfg) => cfg.prompt);
+      generationMode === 'batch' || generationMode === 'timeline' ? [batchVideoPrompt] : pairConfigs.map((cfg) => cfg.prompt);
 
     const segmentFrames =
-      generationMode === 'batch' ? [batchVideoFrames] : pairConfigs.map((cfg) => cfg.frames);
+      generationMode === 'batch' || generationMode === 'timeline' ? [batchVideoFrames] : pairConfigs.map((cfg) => cfg.frames);
 
     const frameOverlap = 
-      generationMode === 'batch' ? [batchVideoContext] : pairConfigs.map((cfg) => cfg.context);
+      generationMode === 'batch' || generationMode === 'timeline' ? [batchVideoContext] : pairConfigs.map((cfg) => cfg.context);
 
     const negativePrompts = 
-      generationMode === 'batch' ? [steerableMotionSettings.negative_prompt] : pairConfigs.map((cfg) => cfg.negativePrompt);
+      generationMode === 'batch' || generationMode === 'timeline' ? [steerableMotionSettings.negative_prompt] : pairConfigs.map((cfg) => cfg.negativePrompt);
 
     const requestBody: any = {
       project_id: projectId,
@@ -844,6 +857,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       }
               onPairConfigsChange(newPairConfigs);
     } else {
+      // Default to batch mode for timeline or single settings
       onGenerationModeChange('batch');
       
       // Apply single values to batch settings
@@ -1092,34 +1106,60 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       </div>
 
       {/* Main Content Area */}
-      <div className="flex flex-col lg:flex-row flex-grow gap-4 min-h-0">
+      <div className="flex flex-col flex-grow gap-4 min-h-0">
         
-        {/* Left Column: Image Manager */}
-        <div className="flex flex-col lg:w-1/2 xl:w-1/2 gap-4 min-h-0">
+        {/* Image Manager */}
+        <div className="flex flex-col w-full gap-4 min-h-0">
           <Card className="flex flex-col">
             <CardHeader>
-              <CardTitle>Manage Shot Images</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle>Manage Shot Images</CardTitle>
+                <div className="flex items-center space-x-2">
+                  <ToggleGroup type="single" value={generationMode} onValueChange={(value: 'batch' | 'by-pair' | 'timeline') => value && onGenerationModeChange(value)} size="sm">
+                    <ToggleGroupItem value="batch" aria-label="Toggle batch">
+                      Batch
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="by-pair" aria-label="Toggle by-pair">
+                      By Pair
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="timeline" aria-label="Toggle timeline">
+                      Timeline
+                    </ToggleGroupItem>
+                  </ToggleGroup>
+                </div>
+              </div>
               {nonVideoImages.length > 0 && (
                 <>
-
                   <p className="text-sm text-muted-foreground pt-1">
-                    Drag to reorder. Cmd+click to select and move multiple images.
+                    {generationMode === 'timeline' 
+                      ? 'Drag images to precise frame positions. Drop on other images to reorder.'
+                      : 'Drag to reorder. Cmd+click to select and move multiple images.'
+                    }
                   </p>
                 </>
               )}
             </CardHeader>
             <CardContent className={nonVideoImages.length > 0 ? "overflow-y-auto" : ""}>
               <div className="p-1">
-                <ShotImageManager
-                  images={nonVideoImages}
-                  onImageDelete={handleDeleteImageFromShot}
-                  onImageReorder={handleReorderImagesInShot}
-                  columns={3}
-                  generationMode={generationMode}
-                  pairConfigs={pairConfigs}
-                  onPairConfigChange={handleUpdatePairConfig}
-                  onImageSaved={handleImageSaved}
-                />
+                {generationMode === 'timeline' ? (
+                  <Timeline
+                    images={nonVideoImages}
+                    frameSpacing={batchVideoFrames}
+                    onImageReorder={handleReorderImagesInShot}
+                    onImageSaved={handleImageSaved}
+                  />
+                ) : (
+                  <ShotImageManager
+                    images={nonVideoImages}
+                    onImageDelete={handleDeleteImageFromShot}
+                    onImageReorder={handleReorderImagesInShot}
+                    columns={5}
+                    generationMode={generationMode}
+                    pairConfigs={pairConfigs}
+                    onPairConfigChange={handleUpdatePairConfig}
+                    onImageSaved={handleImageSaved}
+                  />
+                )}
               </div>
             </CardContent>
             <div className="p-4 border-t space-y-3">
@@ -1135,77 +1175,82 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           </Card>
         </div>
 
-        {/* Right Column: Generation Settings */}
-        <div className="lg:w-1/2 xl:w-1/2">
+        {/* Generation Settings */}
+        <div className="w-full">
           <Card>
             <CardHeader>
                 <CardTitle>Travel Between Images</CardTitle>
                 <p className="text-sm text-muted-foreground pt-1">Configure and generate video segments between the images in this shot.</p>
             </CardHeader>
             <CardContent>
-                <BatchSettingsForm
-                    batchVideoPrompt={batchVideoPrompt}
-                    onBatchVideoPromptChange={onBatchVideoPromptChange}
-                    batchVideoFrames={batchVideoFrames}
-                    onBatchVideoFramesChange={onBatchVideoFramesChange}
-                    batchVideoContext={batchVideoContext}
-                    onBatchVideoContextChange={onBatchVideoContextChange}
-                    batchVideoSteps={batchVideoSteps}
-                    onBatchVideoStepsChange={onBatchVideoStepsChange}
-                    dimensionSource={dimensionSource}
-                    onDimensionSourceChange={onDimensionSourceChange}
-                    customWidth={customWidth}
-                    onCustomWidthChange={onCustomWidthChange}
-                    customHeight={customHeight}
-                    onCustomHeightChange={onCustomHeightChange}
-                    steerableMotionSettings={steerableMotionSettings}
-                    onSteerableMotionSettingsChange={onSteerableMotionSettingsChange}
-                    projects={projects}
-                    selectedProjectId={selectedProjectId}
-                    enhancePrompt={enhancePrompt}
-                    onEnhancePromptChange={onEnhancePromptChange}
-                    generationMode={generationMode}
-                    onGenerationModeChange={onGenerationModeChange}
-                    selectedLoras={selectedLoras}
-                    availableLoras={availableLoras}
-                />
-                
-                <div className="space-y-4 py-6 border-t mt-6">
-                   
-                    <Button type="button" variant="outline" className="w-full" onClick={() => setIsLoraModalOpen(true)}>
-                     Add or Manage LoRAs
-                    </Button>
-                    
-                    <ActiveLoRAsDisplay
-                      selectedLoras={selectedLoras}
-                      onRemoveLora={onRemoveLora}
-                      onLoraStrengthChange={onLoraStrengthChange}
-                      availableLoras={availableLoras}
-                      className="mt-4"
-                    />
-                </div>
-                
-                <div className="mt-0 pt-6 border-t">
-                    <Button 
-                        size="lg" 
-                        className="w-full" 
-                        onClick={handleGenerateBatch} 
-                        disabled={isGenerationDisabled}
-                    >
-                        {isCreatingTask ? 'Creating Tasks...' : 'Generate All Videos'}
-                    </Button>
-                    {nonVideoImages.length < 2 && <p className="text-xs text-center text-muted-foreground mt-2">You need at least two images to generate videos.</p>}
-                    {isGenerationDisabledDueToApiKey && (
-                      <p className="text-xs text-center text-muted-foreground mt-2">
-                        If Enhance Prompt is enabled, you must add an{' '}
-                        <button 
-                          onClick={() => setIsSettingsModalOpen(true)}
-                          className="underline text-blue-600 hover:text-blue-800 cursor-pointer"
-                        >
-                          OpenAI API key
-                        </button>
-                      </p>
-                    )}
+                <div className="flex flex-col lg:flex-row gap-6">
+                    {/* Left Column: Main Settings */}
+                    <div className="flex-1">
+                        <BatchSettingsForm
+                            batchVideoPrompt={batchVideoPrompt}
+                            onBatchVideoPromptChange={onBatchVideoPromptChange}
+                            batchVideoFrames={batchVideoFrames}
+                            onBatchVideoFramesChange={onBatchVideoFramesChange}
+                            batchVideoContext={batchVideoContext}
+                            onBatchVideoContextChange={onBatchVideoContextChange}
+                            batchVideoSteps={batchVideoSteps}
+                            onBatchVideoStepsChange={onBatchVideoStepsChange}
+                            dimensionSource={dimensionSource}
+                            onDimensionSourceChange={onDimensionSourceChange}
+                            customWidth={customWidth}
+                            onCustomWidthChange={onCustomWidthChange}
+                            customHeight={customHeight}
+                            onCustomHeightChange={onCustomHeightChange}
+                            steerableMotionSettings={steerableMotionSettings}
+                            onSteerableMotionSettingsChange={onSteerableMotionSettingsChange}
+                            projects={projects}
+                            selectedProjectId={selectedProjectId}
+                            selectedLoras={selectedLoras}
+                            availableLoras={availableLoras}
+                        />
+                        
+                        <div className="mt-6 pt-6 border-t">
+                            <Button 
+                                size="lg" 
+                                className="w-full" 
+                                onClick={handleGenerateBatch} 
+                                disabled={isGenerationDisabled}
+                            >
+                                {isCreatingTask ? 'Creating Tasks...' : 'Generate All Videos'}
+                            </Button>
+                            {nonVideoImages.length < 2 && <p className="text-xs text-center text-muted-foreground mt-2">You need at least two images to generate videos.</p>}
+                            {isGenerationDisabledDueToApiKey && (
+                              <p className="text-xs text-center text-muted-foreground mt-2">
+                                If Enhance Prompt is enabled, you must add an{' '}
+                                <button 
+                                  onClick={() => setIsSettingsModalOpen(true)}
+                                  className="underline text-blue-600 hover:text-blue-800 cursor-pointer"
+                                >
+                                  OpenAI API key
+                                </button>
+                              </p>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Right Column: LoRA Settings */}
+                    <div className="lg:w-80">
+                        <div className="space-y-4 p-4 border rounded-lg bg-card">
+                            <h3 className="font-semibold text-sm">LoRA Models</h3>
+                            
+                            <Button type="button" variant="outline" className="w-full" onClick={() => setIsLoraModalOpen(true)}>
+                                Add or Manage LoRAs
+                            </Button>
+                            
+                            <ActiveLoRAsDisplay
+                                selectedLoras={selectedLoras}
+                                onRemoveLora={onRemoveLora}
+                                onLoraStrengthChange={onLoraStrengthChange}
+                                availableLoras={availableLoras}
+                                className="mt-4"
+                            />
+                        </div>
+                    </div>
                 </div>
             </CardContent>
           </Card>
@@ -1225,6 +1270,254 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         isOpen={isSettingsModalOpen}
         onOpenChange={setIsSettingsModalOpen}
       />
+    </div>
+  );
+};
+
+// Add Timeline Item component
+interface TimelineItemProps {
+  image: GenerationRow;
+  framePosition: number;
+  maxFrames: number;
+  onImageSaved: (imageId: string, newImageUrl: string) => void;
+}
+
+    const TimelineItem: React.FC<TimelineItemProps> = ({ image, framePosition, maxFrames, onImageSaved }) => {
+    const {
+      attributes,
+      listeners,
+      setNodeRef,
+      transform,
+      transition,
+      isDragging,
+    } = useSortable({ id: image.shotImageEntryId });
+
+    const style = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+      opacity: isDragging ? 0.3 : 1,
+      left: `${(framePosition / maxFrames) * 100}%`,
+      pointerEvents: isDragging ? 'none' as const : 'auto' as const,
+    };
+
+    return (
+      <div
+        ref={setNodeRef}
+        style={style}
+        {...attributes}
+        {...listeners}
+        className={`absolute cursor-move ${isDragging ? 'z-10' : ''}`}
+      >
+        <div className="flex flex-col items-center">
+          <div className={`w-20 h-20 border-2 ${isDragging ? 'border-primary/50' : 'border-primary'} rounded-lg overflow-hidden mb-1`}>
+            <img
+              src={getDisplayUrl(image.imageUrl)}
+              alt={`Frame ${framePosition}`}
+              className="w-full h-full object-cover"
+            />
+          </div>
+          <div className="text-xs text-center bg-background px-2 py-1 rounded border">
+            Frame {framePosition}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+// Add Timeline component
+interface TimelineProps {
+  images: GenerationRow[];
+  frameSpacing: number;
+  onImageReorder: (orderedIds: string[]) => void;
+  onImageSaved: (imageId: string, newImageUrl: string) => void;
+}
+
+const Timeline: React.FC<TimelineProps> = ({ images, frameSpacing, onImageReorder, onImageSaved }) => {
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [dragFramePosition, setDragFramePosition] = useState<number | null>(null);
+  const timelineRef = useRef<HTMLDivElement>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  // Calculate frame positions for each image
+  const imagePositions = images.map((image, index) => ({
+    image,
+    framePosition: index * frameSpacing,
+  }));
+
+  const maxFrames = Math.max(300, (images.length - 1) * frameSpacing + 60); // Add some padding
+
+  const handleDragStart = (event: any) => {
+    setActiveId(event.active.id);
+  };
+
+  const handleDragMove = (event: any) => {
+    if (!timelineRef.current || !activeId) return;
+
+    const timelineRect = timelineRef.current.getBoundingClientRect();
+    const timelineContentRect = timelineRef.current.querySelector('#timeline-container')?.getBoundingClientRect();
+    
+    if (!timelineContentRect) return;
+    
+    // Calculate mouse position relative to the timeline content area
+    const mouseX = event.active.rect.current.translated.left + event.active.rect.current.translated.width / 2;
+    const relativeX = mouseX - timelineContentRect.left;
+    const timelineWidth = timelineContentRect.width;
+    
+    // Calculate frame position based on drag position
+    const framePosition = Math.max(0, Math.min(maxFrames, (relativeX / timelineWidth) * maxFrames));
+    setDragFramePosition(Math.round(framePosition));
+  };
+
+  const handleDragEnd = (event: any) => {
+    const { active, over } = event;
+    
+    if (!activeId || !timelineRef.current) {
+      setActiveId(null);
+      setDragFramePosition(null);
+      return;
+    }
+
+    // Check if we're dropping over another image (for reordering)
+    if (over && over.id !== active.id && over.id !== 'timeline-container') {
+      // Reorder images
+      const oldIndex = images.findIndex(img => img.shotImageEntryId === active.id);
+      const newIndex = images.findIndex(img => img.shotImageEntryId === over.id);
+      
+      const newImages = arrayMove(images, oldIndex, newIndex);
+      onImageReorder(newImages.map(img => img.shotImageEntryId));
+    } else if (dragFramePosition !== null) {
+      // Set precise frame position
+      const draggedImageIndex = images.findIndex(img => img.shotImageEntryId === active.id);
+      const newImages = [...images];
+      
+      // Calculate what the new order should be based on frame position
+      const targetIndex = Math.round(dragFramePosition / frameSpacing);
+      const clampedIndex = Math.max(0, Math.min(images.length - 1, targetIndex));
+      
+      if (clampedIndex !== draggedImageIndex) {
+        const reorderedImages = arrayMove(newImages, draggedImageIndex, clampedIndex);
+        onImageReorder(reorderedImages.map(img => img.shotImageEntryId));
+      }
+    }
+
+    setActiveId(null);
+    setDragFramePosition(null);
+  };
+
+  const activeImage = activeId ? images.find(img => img.shotImageEntryId === activeId) : null;
+  
+  // Calculate distances for drag feedback
+  const getDragDistances = () => {
+    if (!dragFramePosition || !activeImage) return null;
+    
+    const currentIndex = images.findIndex(img => img.shotImageEntryId === activeId);
+    const currentFrame = currentIndex * frameSpacing;
+    
+    const prevImage = currentIndex > 0 ? images[currentIndex - 1] : null;
+    const nextImage = currentIndex < images.length - 1 ? images[currentIndex + 1] : null;
+    
+    const prevFrame = prevImage ? (currentIndex - 1) * frameSpacing : 0;
+    const nextFrame = nextImage ? (currentIndex + 1) * frameSpacing : maxFrames;
+    
+    return {
+      distanceToPrev: prevImage ? dragFramePosition - prevFrame : dragFramePosition,
+      distanceToNext: nextImage ? nextFrame - dragFramePosition : maxFrames - dragFramePosition,
+    };
+  };
+
+  const dragDistances = getDragDistances();
+
+  return (
+    <div className="w-full">
+      <div 
+        ref={timelineRef}
+        className="relative bg-muted/20 border rounded-lg p-4" 
+        style={{ minHeight: '200px' }}
+      >
+        {/* Timeline ruler */}
+        <div className="absolute bottom-0 left-0 right-0 h-8 border-t">
+          <div className="relative h-full">
+            {/* Frame markers */}
+            {Array.from({ length: Math.floor(maxFrames / 30) + 1 }, (_, i) => {
+              const frame = i * 30;
+              const position = (frame / maxFrames) * 100;
+              return (
+                <div
+                  key={frame}
+                  className="absolute flex flex-col items-center"
+                  style={{ left: `${position}%` }}
+                >
+                  <div className="w-px h-4 bg-border"></div>
+                  <span className="text-xs text-muted-foreground mt-1">{frame}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Timeline images */}
+        <div className="relative h-32 mb-8" id="timeline-container">
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragStart={handleDragStart}
+            onDragMove={handleDragMove}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext items={images.map(img => img.shotImageEntryId)} strategy={horizontalListSortingStrategy}>
+              {imagePositions.map(({ image, framePosition }) => (
+                <TimelineItem
+                  key={image.shotImageEntryId}
+                  image={image}
+                  framePosition={framePosition}
+                  maxFrames={maxFrames}
+                  onImageSaved={onImageSaved}
+                />
+              ))}
+            </SortableContext>
+            
+            <DragOverlay>
+              {activeImage && dragFramePosition !== null && (
+                <div className="relative">
+                  {/* Drag preview */}
+                  <div className="flex flex-col items-center">
+                    <div className="w-20 h-20 border-2 border-primary rounded-lg overflow-hidden mb-1 shadow-lg">
+                      <img
+                        src={getDisplayUrl(activeImage.imageUrl)}
+                        alt={`Frame ${dragFramePosition}`}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    
+                    {/* Frame position indicator */}
+                    <div className="bg-primary text-primary-foreground px-2 py-1 rounded text-xs font-medium mb-1">
+                      Frame {dragFramePosition}
+                    </div>
+                    
+                    {/* Distance indicators */}
+                    {dragDistances && (
+                      <div className="flex space-x-2 text-xs text-muted-foreground">
+                        <span className="bg-background/80 px-1 py-0.5 rounded">
+                          ←{Math.round(dragDistances.distanceToPrev)}f
+                        </span>
+                        <span className="bg-background/80 px-1 py-0.5 rounded">
+                          {Math.round(dragDistances.distanceToNext)}f→
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </DragOverlay>
+          </DndContext>
+        </div>
+      </div>
     </div>
   );
 };

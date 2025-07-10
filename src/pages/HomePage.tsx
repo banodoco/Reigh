@@ -221,7 +221,7 @@ export default function HomePage() {
                     <p className="text-sm leading-relaxed">
                       Reigh is an{' '}
                       <a 
-                        href="https://github.com/peteromalley/reigh" 
+                        href="https://github.com/peteromallet/reigh" 
                         target="_blank" 
                         rel="noopener noreferrer"
                         className="underline text-wes-vintage-gold hover:text-wes-coral transition-colors font-medium"

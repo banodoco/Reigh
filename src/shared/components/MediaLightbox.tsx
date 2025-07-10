@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, X, FlipHorizontal, Save, Download, Trash2, Settings, PlusCircle, CheckCircle } from 'lucide-react';
 import { GenerationRow } from '@/types/shots';
 import * as DialogPrimitive from "@radix-ui/react-dialog";
@@ -61,6 +61,38 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   const [isFlippedHorizontally, setIsFlippedHorizontally] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  // Ref for the dialog content so we can programmatically focus it, enabling keyboard shortcuts immediately
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * Global key handler
+   * --------------------------------------------------
+   * We register a window-level keydown listener so that
+   * arrow navigation still works even when an embedded
+   * <video> element (which is focusable) steals keyboard
+   * focus. Without this, users need to press an arrow
+   * key twice: the first keystroke focuses the video and
+   * is consumed by the browser, the second finally
+   * reaches our onKeyDown handler. Capturing the event at
+   * the window level avoids that issue entirely.
+   */
+  useEffect(() => {
+    const handleWindowKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft' && onPrevious) {
+        e.preventDefault();
+        onPrevious();
+      } else if (e.key === 'ArrowRight' && onNext) {
+        e.preventDefault();
+        onNext();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleWindowKeyDown);
+    return () => window.removeEventListener('keydown', handleWindowKeyDown);
+  }, [onNext, onPrevious, onClose]);
   
   const isVideo = media.type === 'video_travel_output' || media.location?.endsWith('.mp4');
   const displayUrl = getDisplayUrl(media.location || media.imageUrl);
@@ -144,10 +176,14 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
             className="fixed inset-0 z-[10000] bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
           />
           <DialogPrimitive.Content
+            ref={contentRef}
+            tabIndex={-1} // Make the content focusable so it can receive key events
             onOpenAutoFocus={(event) => {
               // Prevent initial auto-focus on the first interactive element (e.g., the flip button)
               // which was causing tooltips to appear immediately when the modal opens.
               event.preventDefault();
+              // Manually focus the dialog content so keyboard navigation works right away
+              contentRef.current?.focus();
             }}
             className={cn(
               "fixed left-[50%] top-[50%] z-[10000] translate-x-[-50%] translate-y-[-50%] duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]",
@@ -163,6 +199,18 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                 maxWidth: '90vw'
               }}
             >
+              {/* Navigation Controls - Left Arrow */}
+              {showNavigation && onPrevious && (
+                <Button
+                  variant="secondary"
+                  size="lg"
+                  onClick={onPrevious}
+                  className="bg-black/50 hover:bg-black/70 text-white z-10 mr-4 h-12 w-12"
+                >
+                  <ChevronLeft className="h-8 w-8" />
+                </Button>
+              )}
+
               {/* Media Content */}
               <div className="relative">
                 {isVideo ? (
@@ -202,174 +250,159 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     />
                   </div>
                 )}
-              </div>
 
-              {/* Top Controls */}
-              <div className="absolute top-4 right-4 flex items-center space-x-2 z-10">
-                {!isVideo && showImageEditTools && (
-                  <>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={handleFlip}
-                          className="bg-black/50 hover:bg-black/70 text-white"
-                        >
-                          <FlipHorizontal className="h-4 w-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Flip horizontally</TooltipContent>
-                    </Tooltip>
-
-                    {hasChanges && (
+                {/* Top Controls */}
+                <div className="absolute top-4 right-4 flex items-center space-x-2 z-10">
+                  {!isVideo && showImageEditTools && (
+                    <>
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button
                             variant="secondary"
                             size="sm"
-                            onClick={handleSave}
-                            className="bg-green-600/80 hover:bg-green-600 text-white"
+                            onClick={handleFlip}
+                            className="bg-black/50 hover:bg-black/70 text-white"
                           >
-                            <Save className="h-4 w-4" />
+                            <FlipHorizontal className="h-4 w-4" />
                           </Button>
                         </TooltipTrigger>
-                        <TooltipContent>Save changes</TooltipContent>
+                        <TooltipContent>Flip horizontally</TooltipContent>
                       </Tooltip>
-                    )}
-                  </>
-                )}
 
-                {showDownload && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={handleDownload}
-                        className="bg-black/50 hover:bg-black/70 text-white"
-                      >
-                        <Download className="h-4 w-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Download {isVideo ? 'video' : 'image'}</TooltipContent>
-                  </Tooltip>
-                )}
-
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={onClose}
-                  className="bg-black/50 hover:bg-black/70 text-white"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-
-              {/* Bottom Workflow Controls */}
-              {(onAddToShot || onDelete || onApplySettings) && (
-                <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex items-center space-x-2 z-10">
-                  <div className="bg-black/80 backdrop-blur-sm rounded-lg p-2 flex items-center space-x-2">
-                    {/* Shot Selection and Add to Shot */}
-                    {onAddToShot && allShots.length > 0 && (
-                      <>
-                        <Select value={selectedShotId} onValueChange={onShotChange}>
-                          <SelectTrigger className="w-32 h-8 bg-black/50 border-white/20 text-white text-xs">
-                            <SelectValue placeholder="Select shot" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {allShots.map((shot) => (
-                              <SelectItem key={shot.id} value={shot.id}>
-                                {shot.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-
+                      {hasChanges && (
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button
                               variant="secondary"
                               size="sm"
-                              onClick={handleAddToShot}
-                              disabled={!selectedShotId}
-                              className="bg-blue-600/80 hover:bg-blue-600 text-white h-8 px-3"
+                              onClick={handleSave}
+                              className="bg-green-600/80 hover:bg-green-600 text-white"
                             >
-                              {showTickForImageId === media.id ? (
-                                <CheckCircle className="h-4 w-4" />
-                              ) : (
-                                <PlusCircle className="h-4 w-4" />
-                              )}
+                              <Save className="h-4 w-4" />
                             </Button>
                           </TooltipTrigger>
-                          <TooltipContent>Add to shot</TooltipContent>
+                          <TooltipContent>Save changes</TooltipContent>
                         </Tooltip>
-                      </>
-                    )}
+                      )}
+                    </>
+                  )}
 
-                    {/* Apply Settings */}
-                    {onApplySettings && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={handleApplySettings}
-                            className="bg-purple-600/80 hover:bg-purple-600 text-white h-8 px-3"
-                          >
-                            <Settings className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Apply settings</TooltipContent>
-                      </Tooltip>
-                    )}
+                  {showDownload && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={handleDownload}
+                          className="bg-black/50 hover:bg-black/70 text-white"
+                        >
+                          <Download className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Download {isVideo ? 'video' : 'image'}</TooltipContent>
+                    </Tooltip>
+                  )}
 
-                    {/* Delete */}
-                    {onDelete && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={handleDelete}
-                            disabled={isDeleting === media.id}
-                            className="bg-red-600/80 hover:bg-red-600 text-white h-8 px-3"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Delete image</TooltipContent>
-                      </Tooltip>
-                    )}
-                  </div>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={onClose}
+                    className="bg-black/50 hover:bg-black/70 text-white"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
                 </div>
-              )}
 
-              {/* Navigation Controls - Fixed to center vertically */}
-              {showNavigation && (onPrevious || onNext) && (
-                <>
-                  {onPrevious && (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={onPrevious}
-                      className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white z-10"
-                    >
-                      <ChevronLeft className="h-6 w-6" />
-                    </Button>
-                  )}
-                  
-                  {onNext && (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={onNext}
-                      className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white z-10"
-                    >
-                      <ChevronRight className="h-6 w-6" />
-                    </Button>
-                  )}
-                </>
+                {/* Bottom Workflow Controls */}
+                {(onAddToShot || onDelete || onApplySettings) && (
+                  <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex items-center space-x-2 z-10">
+                    <div className="bg-black/80 backdrop-blur-sm rounded-lg p-2 flex items-center space-x-2">
+                      {/* Shot Selection and Add to Shot */}
+                      {onAddToShot && allShots.length > 0 && (
+                        <>
+                          <Select value={selectedShotId} onValueChange={onShotChange}>
+                            <SelectTrigger className="w-32 h-8 bg-black/50 border-white/20 text-white text-xs">
+                              <SelectValue placeholder="Select shot" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {allShots.map((shot) => (
+                                <SelectItem key={shot.id} value={shot.id}>
+                                  {shot.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={handleAddToShot}
+                                disabled={!selectedShotId}
+                                className="bg-blue-600/80 hover:bg-blue-600 text-white h-8 px-3"
+                              >
+                                {showTickForImageId === media.id ? (
+                                  <CheckCircle className="h-4 w-4" />
+                                ) : (
+                                  <PlusCircle className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Add to shot</TooltipContent>
+                          </Tooltip>
+                        </>
+                      )}
+
+                      {/* Apply Settings */}
+                      {onApplySettings && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={handleApplySettings}
+                              className="bg-purple-600/80 hover:bg-purple-600 text-white h-8 px-3"
+                            >
+                              <Settings className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Apply settings</TooltipContent>
+                        </Tooltip>
+                      )}
+
+                      {/* Delete */}
+                      {onDelete && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={handleDelete}
+                              disabled={isDeleting === media.id}
+                              className="bg-red-600/80 hover:bg-red-600 text-white h-8 px-3"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Delete image</TooltipContent>
+                        </Tooltip>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Navigation Controls - Right Arrow */}
+              {showNavigation && onNext && (
+                <Button
+                  variant="secondary"
+                  size="lg"
+                  onClick={onNext}
+                  className="bg-black/50 hover:bg-black/70 text-white z-10 ml-4 h-12 w-12"
+                >
+                  <ChevronRight className="h-8 w-8" />
+                </Button>
               )}
             </div>
           </DialogPrimitive.Content>

@@ -9,6 +9,7 @@ export interface GenerationRow {
   createdAt?: string;
   metadata?: any; // Added metadata field, consider a more specific type if known
   isOptimistic?: boolean;
+  shotImageEntryId?: string; // ID from the shot_images table linking shot to generation
 }
 
 export interface Shot {

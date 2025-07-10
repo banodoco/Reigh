@@ -1,5 +1,5 @@
 import { SteerableMotionSettings } from './components/ShotEditor';
-import { ActiveLora } from './pages/VideoTravelToolPage';
+import { ActiveLora } from '@/shared/components/ActiveLoRAsDisplay';
 
 export interface VideoTravelSettings {
   videoControlMode: 'individual' | 'batch';
@@ -12,7 +12,7 @@ export interface VideoTravelSettings {
   customHeight?: number;
   steerableMotionSettings: SteerableMotionSettings;
   enhancePrompt: boolean;
-  generationMode: 'batch' | 'by-pair';
+  generationMode: 'batch' | 'by-pair' | 'timeline';
   pairConfigs?: Array<{
     id: string;
     prompt: string;

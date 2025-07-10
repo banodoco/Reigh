@@ -4,7 +4,6 @@ import { toast } from 'sonner';
 import { Project } from '@/types/project'; // Added import
 import { ProjectUpdate } from '../../../db/schema/schema';
 import { UserPreferences } from '@/shared/settings/userPreferences';
-import { fetchWithAuth } from '@/lib/api';
 import { usePrefetchToolSettings } from '@/shared/hooks/usePrefetchToolSettings';
 
 interface ProjectContextType {
@@ -82,71 +81,66 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
 
-  // Fetch user preferences directly without circular dependency
+  // Fetch user preferences (direct Supabase query)
   const fetchUserPreferences = useCallback(async () => {
     if (!userId) return;
-    
-    // Skip user preferences in web environment (no backend server)
-    const currentEnv = import.meta.env.VITE_APP_ENV?.toLowerCase() || 'web';
-    if (currentEnv === 'web') {
-      console.log('[ProjectContext] Skipping user preferences fetch in web environment');
-      setIsLoadingPreferences(false);
-      return;
-    }
-    
+
     setIsLoadingPreferences(true);
     try {
-      const params = new URLSearchParams({ toolId: 'user-preferences' });
-      
-      const response = await fetchWithAuth(`/api/tool-settings/resolve?${params}`, {
-        headers: { 'Content-Type': 'application/json' },
-      });
-      
-      if (response.ok) {
-        const preferences = await response.json();
-        setUserPreferences(preferences);
-        userPreferencesRef.current = preferences;
-      }
+      // Read the settings JSON for the current user
+      const { data, error } = await supabase
+        .from('users')
+        .select('settings')
+        .eq('id', userId)
+        .single();
+
+      if (error) throw error;
+
+      const preferences = (data?.settings as any)?.['user-preferences'] ?? {};
+      setUserPreferences(preferences);
+      userPreferencesRef.current = preferences;
     } catch (error) {
-      console.error('Failed to fetch user preferences:', error);
+      console.error('[ProjectContext] Failed to fetch user preferences:', error);
     } finally {
       setIsLoadingPreferences(false);
     }
   }, [userId]);
 
   // Update user preferences directly
-  const updateUserPreferences = useCallback(async (scope: 'user', patch: Partial<UserPreferences>) => {
+  const updateUserPreferences = useCallback(async (_scope: 'user', patch: Partial<UserPreferences>) => {
     if (!userId) return;
-    
-    // Skip user preferences in web environment (no backend server)
-    const currentEnv = import.meta.env.VITE_APP_ENV?.toLowerCase() || 'web';
-    if (currentEnv === 'web') {
-      console.log('[ProjectContext] Skipping user preferences update in web environment');
-      return;
-    }
-    
+
     try {
-      const response = await fetchWithAuth('/api/tool-settings', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          scope,
-          id: userId,
-          toolId: 'user-preferences',
-          patch,
-        }),
-      });
-      
-      if (response.ok) {
-        // Update local state
-        const newPreferences = { ...userPreferences, ...patch };
-        setUserPreferences(newPreferences);
-        userPreferencesRef.current = newPreferences;
-      }
+      // Fetch current settings so we don't overwrite unrelated keys
+      const { data: currentUser, error: fetchErr } = await supabase
+        .from('users')
+        .select('settings')
+        .eq('id', userId)
+        .single();
+
+      if (fetchErr) throw fetchErr;
+
+      const currentSettings = (currentUser?.settings as any) ?? {};
+      const existingPrefs = currentSettings['user-preferences'] ?? {};
+
+      const updatedPrefs = { ...existingPrefs, ...patch };
+      const newSettings = { ...currentSettings, ['user-preferences']: updatedPrefs };
+
+      const { error: updateErr } = await supabase
+        .from('users')
+        .update({ settings: newSettings })
+        .eq('id', userId);
+
+      if (updateErr) throw updateErr;
+
+      // Update local state if DB update succeeds
+      const merged = { ...existingPrefs, ...patch };
+      setUserPreferences(merged);
+      userPreferencesRef.current = merged;
     } catch (error) {
-      console.error('Failed to update user preferences:', error);
+      console.error('[ProjectContext] Failed to update user preferences:', error);
     }
-  }, [userId, userPreferences]);
+  }, [userId]);
 
   // Fetch preferences when userId changes
   useEffect(() => {

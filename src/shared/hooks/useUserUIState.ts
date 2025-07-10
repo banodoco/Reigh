@@ -10,6 +10,9 @@ interface UISettings {
   settingsModal: {
     activeTab: string;
   };
+  videoTravelWidescreen: {
+    enabled: boolean;
+  };
 }
 
 export function useUserUIState<K extends keyof UISettings>(

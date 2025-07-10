@@ -34,7 +34,7 @@ export interface ShotImageManagerProps {
   onImageDelete: (shotImageEntryId: string) => void;
   onImageReorder: (orderedShotGenerationIds: string[]) => void;
   columns?: 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
-  generationMode: 'batch' | 'by-pair';
+  generationMode: 'batch' | 'by-pair' | 'timeline';
   pairConfigs: PairConfig[];
   onPairConfigChange: (id: string, field: 'prompt' | 'frames' | 'negativePrompt' | 'context', value: string | number) => void;
   onImageSaved?: (imageId: string, newImageUrl: string) => void; // Callback when image is saved with changes
@@ -185,88 +185,159 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
         imageB: nextImage,
         config: config,
         isFirstPair: index === 0,
+        pairNumber: index + 1,
       };
     });
 
+    // Group pairs into rows of 2
+    const pairRows: Array<Array<typeof imagePairs[0]>> = [];
+    for (let i = 0; i < imagePairs.length; i += 2) {
+      pairRows.push(imagePairs.slice(i, i + 2));
+    }
+
     return (
-      <div className="space-y-4">
-        {imagePairs.map(pair => (
-          <div key={pair.id} className="p-4 border rounded-lg bg-card shadow-md">
-            <div className="flex space-x-4">
-              <div className="flex-1">
-                <SortableImageItem
-                  image={pair.imageA}
-                  isSelected={false}
-                  onClick={() => {}}
-                  onDelete={() => onImageDelete(pair.imageA.shotImageEntryId)}
-                  onDoubleClick={() => {}}
-                />
-              </div>
-              <div className="flex-1">
-                <SortableImageItem
-                  image={pair.imageB}
-                  isSelected={false}
-                  onClick={() => {}}
-                  onDelete={() => onImageDelete(pair.imageB.shotImageEntryId)}
-                  onDoubleClick={() => {}}
-                />
-              </div>
-            </div>
-            <div className="mt-4 space-y-3">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor={`prompt-${pair.id}`}>Prompt Per Pair:</Label>
-                  <Textarea
-                    id={`prompt-${pair.id}`}
-                    value={pair.config.prompt}
-                    onChange={e => onPairConfigChange(pair.id, 'prompt', e.target.value)}
-                    placeholder="e.g., cinematic transition"
-                    className="min-h-[70px] text-sm"
-                    rows={3}
-                  />
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext items={images.map((img) => img.shotImageEntryId)} strategy={rectSortingStrategy}>
+          <div className="space-y-6">
+            {pairRows.map((row, rowIndex) => (
+              <div key={rowIndex} className="space-y-4">
+                {/* Row with pairs */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {row.map((pair, pairIndex) => (
+                    <div key={pair.id} className="space-y-3">
+                      {/* Pair Header */}
+                      <div className="flex items-center justify-center">
+                        <h3 className="text-sm font-semibold text-center px-3 py-1 bg-muted rounded-md">
+                          Pair {pair.pairNumber}
+                        </h3>
+                      </div>
+                      
+                      {/* Pair Content */}
+                      <div className="p-4 border rounded-lg bg-card shadow-sm">
+                        <div className="flex space-x-4 mb-4">
+                          <div className="flex-1">
+                            <SortableImageItem
+                              image={pair.imageA}
+                              isSelected={selectedIds.includes(pair.imageA.shotImageEntryId)}
+                              onClick={(e) => handleItemClick(pair.imageA.shotImageEntryId, e)}
+                              onDelete={() => onImageDelete(pair.imageA.shotImageEntryId)}
+                              onDoubleClick={() => {
+                                const imageIndex = images.findIndex(img => img.id === pair.imageA.id);
+                                if (imageIndex >= 0) setLightboxIndex(imageIndex);
+                              }}
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <SortableImageItem
+                              image={pair.imageB}
+                              isSelected={selectedIds.includes(pair.imageB.shotImageEntryId)}
+                              onClick={(e) => handleItemClick(pair.imageB.shotImageEntryId, e)}
+                              onDelete={() => onImageDelete(pair.imageB.shotImageEntryId)}
+                              onDoubleClick={() => {
+                                const imageIndex = images.findIndex(img => img.id === pair.imageB.id);
+                                if (imageIndex >= 0) setLightboxIndex(imageIndex);
+                              }}
+                            />
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-3">
+                          <div className="grid grid-cols-1 gap-4">
+                            <div>
+                              <Label htmlFor={`prompt-${pair.id}`}>Prompt Per Pair:</Label>
+                              <Textarea
+                                id={`prompt-${pair.id}`}
+                                value={pair.config.prompt}
+                                onChange={e => onPairConfigChange(pair.id, 'prompt', e.target.value)}
+                                placeholder="e.g., cinematic transition"
+                                className="min-h-[70px] text-sm"
+                                rows={3}
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor={`negative-prompt-${pair.id}`}>Negative Prompt Per Pair:</Label>
+                              <Textarea
+                                id={`negative-prompt-${pair.id}`}
+                                value={pair.config.negativePrompt}
+                                onChange={e => onPairConfigChange(pair.id, 'negativePrompt', e.target.value)}
+                                placeholder="e.g., blurry, low quality"
+                                className="min-h-[70px] text-sm"
+                                rows={3}
+                              />
+                            </div>
+                          </div>
+                          <div className={pair.isFirstPair ? "grid grid-cols-1 gap-4" : "grid grid-cols-1 md:grid-cols-2 gap-4"}>
+                            <div>
+                              <Label htmlFor={`frames-${pair.id}`}>Frames per pair: {pair.config.frames}</Label>
+                              <Slider
+                                id={`frames-${pair.id}`}
+                                min={10}
+                                max={82}
+                                step={1}
+                                value={[pair.config.frames]}
+                                onValueChange={([value]) => onPairConfigChange(pair.id, 'frames', value)}
+                              />
+                            </div>
+                            {!pair.isFirstPair && (
+                              <div>
+                                <Label htmlFor={`context-${pair.id}`}>Context Frames Per Pair: {pair.config.context}</Label>
+                                <Slider
+                                  id={`context-${pair.id}`}
+                                  min={0}
+                                  max={60}
+                                  step={1}
+                                  value={[pair.config.context]}
+                                  onValueChange={([value]) => onPairConfigChange(pair.id, 'context', value)}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <div>
-                  <Label htmlFor={`negative-prompt-${pair.id}`}>Negative Prompt Per Pair:</Label>
-                  <Textarea
-                    id={`negative-prompt-${pair.id}`}
-                    value={pair.config.negativePrompt}
-                    onChange={e => onPairConfigChange(pair.id, 'negativePrompt', e.target.value)}
-                    placeholder="e.g., blurry, low quality"
-                    className="min-h-[70px] text-sm"
-                    rows={3}
-                  />
-                </div>
-              </div>
-              <div className={pair.isFirstPair ? "grid grid-cols-1 gap-4" : "grid grid-cols-1 md:grid-cols-2 gap-4"}>
-                <div>
-                  <Label htmlFor={`frames-${pair.id}`}>Frames per pair: {pair.config.frames}</Label>
-                  <Slider
-                    id={`frames-${pair.id}`}
-                    min={10}
-                    max={82}
-                    step={1}
-                    value={[pair.config.frames]}
-                    onValueChange={([value]) => onPairConfigChange(pair.id, 'frames', value)}
-                  />
-                </div>
-                {!pair.isFirstPair && (
-                  <div>
-                    <Label htmlFor={`context-${pair.id}`}>Context Frames Per Pair: {pair.config.context}</Label>
-                    <Slider
-                      id={`context-${pair.id}`}
-                      min={0}
-                      max={60}
-                      step={1}
-                      value={[pair.config.context]}
-                      onValueChange={([value]) => onPairConfigChange(pair.id, 'context', value)}
-                    />
+                
+                {/* Vertical separator line between rows (not after the last row) */}
+                {rowIndex < pairRows.length - 1 && (
+                  <div className="flex justify-center">
+                    <div className="w-px h-8 bg-border"></div>
                   </div>
                 )}
               </div>
-            </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </SortableContext>
+        <DragOverlay>
+          {activeId && activeImage ? (
+            <>
+              {selectedIds.length > 1 && selectedIds.includes(activeId) ? (
+                <MultiImagePreview count={selectedIds.length} image={activeImage} />
+              ) : (
+                <SingleImagePreview image={activeImage} />
+              )}
+            </>
+          ) : null}
+        </DragOverlay>
+        {lightboxIndex !== null && (
+          <MediaLightbox
+            media={images[lightboxIndex]}
+            onClose={() => setLightboxIndex(null)}
+            onNext={handleNext}
+            onPrevious={handlePrevious}
+            onImageSaved={onImageSaved ? (newImageUrl: string) => onImageSaved(images[lightboxIndex].id, newImageUrl) : undefined}
+            showNavigation={true}
+            showImageEditTools={true}
+            showDownload={true}
+            videoPlayerComponent="hover-scrub"
+          />
+        )}
+      </DndContext>
     );
   }
 

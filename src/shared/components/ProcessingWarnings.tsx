@@ -11,36 +11,73 @@ interface ProcessingWarningsProps {
 }
 
 export const GlobalProcessingWarning: React.FC<ProcessingWarningsProps> = ({ onOpenSettings }) => {
-  const { balance } = useCredits();
-  const { tokens } = useApiTokens();
+  const { balance, isLoadingBalance } = useCredits();
+  const { tokens, isLoading: isLoadingTokens } = useApiTokens();
   const [inCloudChecked] = usePersistentState<boolean>("generation-in-cloud", true);
+  const [onComputerChecked] = usePersistentState<boolean>("generation-on-computer", true);
   
   const hasCredits = balance && balance.currentBalance > 0;
   const hasValidToken = tokens.length > 0;
-  
-  // Show warning if they don't have credits AND don't have a valid token
+
+  // If both generation methods are disabled, show a dedicated warning.
+  const generationDisabled = !inCloudChecked && !onComputerChecked;
+
+  // Avoid showing any warning while data is loading.
+  if (isLoadingBalance || isLoadingTokens) {
+    return null;
+  }
+
+  // 1. Generation disabled takes top priority.
+  if (generationDisabled) {
+    return (
+      <div className="animate-in slide-in-from-top-2 fade-in duration-300">
+        <div className="container mx-auto px-4 md:px-6 mt-4">
+          <Alert className="border-orange-200 bg-orange-50 text-orange-900 flex items-center justify-between py-3 pr-4">
+            <div className="flex items-center space-x-3">
+              <span className="inline-flex items-center">
+                <AlertTriangle className="h-5 w-5 text-orange-700 mr-2" />
+                <span>You have disabled both cloud and local generation. Enable at least one in Settings.</span>
+              </span>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onOpenSettings}
+              className="border-orange-300 hover:bg-orange-100 flex-shrink-0"
+            >
+              Visit Settings
+            </Button>
+          </Alert>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. Show the existing credits/token warning.
   if (hasCredits || hasValidToken) {
     return null;
   }
   
   return (
-    <div className="container mx-auto px-4 md:px-6 mt-4">
-      <Alert className="border-orange-200 bg-orange-50 text-orange-900 flex items-center justify-between py-3 pr-4">
-        <div className="flex items-center space-x-3">
-          <span className="inline-flex items-center">
-            <AlertTriangle className="h-5 w-5 text-orange-700 mr-2" />
-            <span>You don't have credits and haven't set up local processing.</span>
-          </span>
-        </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onOpenSettings}
-          className="border-orange-300 hover:bg-orange-100 flex-shrink-0"
-        >
-          Visit Settings
-        </Button>
-      </Alert>
+    <div className="animate-in slide-in-from-top-2 fade-in duration-300">
+      <div className="container mx-auto px-4 md:px-6 mt-4">
+        <Alert className="border-orange-200 bg-orange-50 text-orange-900 flex items-center justify-between py-3 pr-4">
+          <div className="flex items-center space-x-3">
+            <span className="inline-flex items-center">
+              <AlertTriangle className="h-5 w-5 text-orange-700 mr-2" />
+              <span>You don't have credits and haven't set up local processing.</span>
+            </span>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onOpenSettings}
+            className="border-orange-300 hover:bg-orange-100 flex-shrink-0"
+          >
+            Visit Settings
+          </Button>
+        </Alert>
+      </div>
     </div>
   );
 };

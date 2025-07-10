@@ -68,7 +68,7 @@ const VideoTravelToolPage: React.FC = () => {
   const [customHeight, setCustomHeight] = useState<number | undefined>(undefined);
   const [enhancePrompt, setEnhancePrompt] = useState<boolean>(false);
   const [videoPairConfigs, setVideoPairConfigs] = useState<any[]>([]);
-  const [generationMode, setGenerationMode] = useState<'batch' | 'by-pair'>('batch');
+  const [generationMode, setGenerationMode] = useState<'batch' | 'by-pair' | 'timeline'>('batch');
   const [pairConfigs, setPairConfigs] = useState<any[]>([]);
   const [steerableMotionSettings, setSteerableMotionSettings] = useState<SteerableMotionSettings>({
     negative_prompt: '',
