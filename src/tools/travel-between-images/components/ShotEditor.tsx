@@ -1344,10 +1344,38 @@ const Timeline: React.FC<TimelineProps> = ({ images, frameSpacing, onImageReorde
     })
   );
 
-  // Calculate frame positions for each image
+  // Track custom frame positions for each image so we can place them exactly where the user drops.
+  const [frameMap, setFrameMap] = useState<Map<string, number>>(() => {
+    const initial = new Map<string, number>();
+    images.forEach((img, idx) => {
+      initial.set(img.shotImageEntryId, idx * frameSpacing);
+    });
+    return initial;
+  });
+
+  // Sync frameMap when images list changes (e.g., image added/removed)
+  useEffect(() => {
+    setFrameMap(prev => {
+      const newMap = new Map(prev);
+      images.forEach((img, idx) => {
+        if (!newMap.has(img.shotImageEntryId)) {
+          newMap.set(img.shotImageEntryId, idx * frameSpacing);
+        }
+      });
+      // Remove entries no longer present
+      [...newMap.keys()].forEach(key => {
+        if (!images.some(img => img.shotImageEntryId === key)) {
+          newMap.delete(key);
+        }
+      });
+      return newMap;
+    });
+  }, [images, frameSpacing]);
+
+  // Calculate frame positions for each image from frameMap (defaulting to index grid)
   const imagePositions = images.map((image, index) => ({
     image,
-    framePosition: index * frameSpacing,
+    framePosition: frameMap.get(image.shotImageEntryId) ?? index * frameSpacing,
   }));
 
   const maxFrames = Math.max(300, (images.length - 1) * frameSpacing + 60); // Add some padding
@@ -1391,25 +1419,23 @@ const Timeline: React.FC<TimelineProps> = ({ images, frameSpacing, onImageReorde
       const newImages = arrayMove(images, oldIndex, newIndex);
       onImageReorder(newImages.map(img => img.shotImageEntryId));
     } else if (dragFramePosition !== null) {
-      // Set precise frame position
-      const draggedImageIndex = images.findIndex(img => img.shotImageEntryId === active.id);
-      const newImages = [...images];
-      
-      // Determine the insertion index based on frame grid. Use floor so that crossing a grid boundary
-      // is required before an image moves to a new slot (prevents "snap-back" issues).
-      let insertionIndex = Math.floor(dragFramePosition / frameSpacing);
+      // Update frameMap with new precise position
+      setFrameMap(prev => {
+        const updated = new Map(prev);
+        updated.set(active.id, dragFramePosition);
+        return updated;
+      });
 
-      // Clamp to valid range
-      insertionIndex = Math.max(0, Math.min(images.length - 1, insertionIndex));
+      // Recompute order based on new frame positions
+      const sorted = [...images].sort((a, b) => {
+        const fa = (frameMap.get(a.shotImageEntryId) ?? 0) + (a.shotImageEntryId === active.id ? dragFramePosition - (frameMap.get(a.shotImageEntryId) ?? 0) : 0);
+        const fb = (frameMap.get(b.shotImageEntryId) ?? 0) + (b.shotImageEntryId === active.id ? dragFramePosition - (frameMap.get(b.shotImageEntryId) ?? 0) : 0);
+        return fa - fb;
+      });
+      onImageReorder(sorted.map(img => img.shotImageEntryId));
 
-      // If the dragged image is moving forward in the array and will be removed first,
-      // adjust the target index accordingly.
-      const adjustedIndex = insertionIndex > draggedImageIndex ? insertionIndex - 1 : insertionIndex;
- 
-      if (adjustedIndex !== draggedImageIndex) {
-        const reorderedImages = arrayMove(newImages, draggedImageIndex, adjustedIndex);
-        onImageReorder(reorderedImages.map(img => img.shotImageEntryId));
-      }
+      // NOTE: No grid snapping; we keep exact frame.
+      console.log('[Timeline] Dropped image', active.id, 'at frame', dragFramePosition);
     }
 
     setActiveId(null);
@@ -1422,13 +1448,19 @@ const Timeline: React.FC<TimelineProps> = ({ images, frameSpacing, onImageReorde
   const getDragDistances = () => {
     if (dragFramePosition === null || !activeId) return null;
 
-    // Determine neighbouring grid slots relative to the dragged frame position
-    const prevSlot = Math.floor(dragFramePosition / frameSpacing) * frameSpacing;
-    const nextSlot = prevSlot + frameSpacing;
+    // Determine previous and next frames from current frameMap
+    const sortedFrames = [...frameMap.values()].sort((a, b) => a - b);
+    let prev = 0;
+    let next = maxFrames;
+    for (let i = 0; i < sortedFrames.length; i++) {
+      const val = sortedFrames[i];
+      if (val < dragFramePosition) prev = val;
+      if (val > dragFramePosition) { next = val; break; }
+    }
 
     return {
-      distanceToPrev: dragFramePosition - prevSlot,
-      distanceToNext: nextSlot > maxFrames ? 0 : nextSlot - dragFramePosition,
+      distanceToPrev: dragFramePosition - prev,
+      distanceToNext: next - dragFramePosition,
     };
   };
 
