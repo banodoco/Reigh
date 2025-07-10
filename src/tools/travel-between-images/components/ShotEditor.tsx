@@ -1472,7 +1472,7 @@ const Timeline: React.FC<TimelineProps> = ({ images, frameSpacing, onImageReorde
     <div className="w-full">
       <div 
         ref={timelineRef}
-        className="relative bg-muted/20 border rounded-lg p-4" 
+        className="relative bg-muted/20 border rounded-lg p-4 px-10" 
         style={{ minHeight: '200px' }}
       >
         {/* Timeline ruler */}
@@ -1497,7 +1497,7 @@ const Timeline: React.FC<TimelineProps> = ({ images, frameSpacing, onImageReorde
         </div>
 
         {/* Timeline images */}
-        <div className="relative h-32 mb-8 px-8" id="timeline-container">
+        <div className="relative h-32 mb-8" id="timeline-container">
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
