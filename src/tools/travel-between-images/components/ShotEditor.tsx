@@ -1378,7 +1378,9 @@ const Timeline: React.FC<TimelineProps> = ({ images, frameSpacing, onImageReorde
     framePosition: frameMap.get(image.shotImageEntryId) ?? index * frameSpacing,
   }));
 
-  const maxFrames = Math.max(300, (images.length - 1) * frameSpacing + 60); // Add some padding
+  // Determine timeline length based on farthest image frame
+  const maxFrameValue = Math.max(...Array.from(frameMap.values()));
+  const maxFrames = Math.max(30, maxFrameValue); // Ensure at least some ruler length
 
   const handleDragStart = (event: any) => {
     setActiveId(event.active.id);
