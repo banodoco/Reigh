@@ -7,6 +7,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
 import { toast } from '@/shared/components/ui/use-toast';
 import { PageFadeIn } from '@/shared/components/transitions';
+import SocialShare from '@/shared/components/SocialShare';
 
 export default function HomePage() {
   const [expandedFAQ, setExpandedFAQ] = useState<number | null>(null);
@@ -272,6 +273,9 @@ export default function HomePage() {
               </TooltipProvider>
             </div>
 
+            {/* Social Share Buttons */}
+            <SocialShare />
+
           </div>
         </div>
 
@@ -327,7 +331,7 @@ export default function HomePage() {
             
             <div className="space-y-6 text-muted-foreground">
               <p className="text-lg leading-relaxed">
-                Coming soon — join our wait-list to collaborate on experimental visual journeys.
+                Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus lacinia odio vitae vestibulum vestibulum.
               </p>
               
               <div className="space-y-4">
@@ -335,26 +339,26 @@ export default function HomePage() {
                 <ul className="space-y-3 text-sm">
                   <li className="flex items-start space-x-3">
                     <div className="w-1.5 h-1.5 bg-wes-coral rounded-full mt-2 flex-shrink-0"></div>
-                    <span>Early access to experimental features</span>
+                    <span>Lorem ipsum dolor sit amet.</span>
                   </li>
                   <li className="flex items-start space-x-3">
                     <div className="w-1.5 h-1.5 bg-wes-coral rounded-full mt-2 flex-shrink-0"></div>
-                    <span>Collaborative art creation opportunities</span>
+                    <span>Consectetur adipiscing elit.</span>
                   </li>
                   <li className="flex items-start space-x-3">
                     <div className="w-1.5 h-1.5 bg-wes-coral rounded-full mt-2 flex-shrink-0"></div>
-                    <span>Community showcases and exhibitions</span>
+                    <span>Sed do eiusmod tempor.</span>
                   </li>
                   <li className="flex items-start space-x-3">
                     <div className="w-1.5 h-1.5 bg-wes-coral rounded-full mt-2 flex-shrink-0"></div>
-                    <span>Direct feedback channels with the development team</span>
+                    <span>Incididunt ut labore.</span>
                   </li>
                 </ul>
               </div>
               
               <div className="pt-4 border-t border-gray-200">
                 <p className="text-sm text-muted-foreground/80">
-                  Join our growing community of visual storytellers and help shape the future of image-guided video art.
+                  Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
                 </p>
               </div>
             </div>
@@ -386,35 +390,35 @@ export default function HomePage() {
             
             <div className="space-y-6 text-muted-foreground">
               <p className="text-lg leading-relaxed font-medium text-primary">
-                Reigh celebrates the "found art of travelling between images": embracing randomness, transformation, and narrative to kindle creativity.
+                Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
               </p>
               
               <div className="space-y-6">
                 <div>
                   <h3 className="font-semibold text-primary text-lg mb-3">The Journey Between</h3>
                   <p className="text-sm leading-relaxed">
-                    Every image contains infinite possibilities. The magic happens not in the destination, but in the journey—the transformation, the unexpected turns, the serendipitous discoveries that emerge when we let go of control.
+                    Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
                   </p>
                 </div>
                 
                 <div>
                   <h3 className="font-semibold text-primary text-lg mb-3">Embracing Randomness</h3>
                   <p className="text-sm leading-relaxed">
-                    We believe that the most compelling art often emerges from the interplay between intention and accident, between what we plan and what we discover. Our tools are designed to be collaborators, not mere instruments.
+                    Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
                   </p>
                 </div>
                 
                 <div>
                   <h3 className="font-semibold text-primary text-lg mb-3">Visual Storytelling</h3>
                   <p className="text-sm leading-relaxed">
-                    Images are not static—they're moments in time that contain entire narratives. By traveling between them, we unlock those stories and create new ones, building bridges between different realities and perspectives.
+                    Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
                   </p>
                 </div>
                 
                 <div>
                   <h3 className="font-semibold text-primary text-lg mb-3">Community & Creativity</h3>
                   <p className="text-sm leading-relaxed">
-                    Art is a conversation. We're building tools that facilitate creative dialogue—between artist and AI, between different artistic visions, and between creators across the globe.
+                    Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
                   </p>
                 </div>
               </div>

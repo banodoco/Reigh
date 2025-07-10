@@ -27,9 +27,7 @@ import { ActiveLoRAsDisplay, ActiveLora } from '@/shared/components/ActiveLoRAsD
 import { useApiKeys } from '@/shared/hooks/useApiKeys';
 import { cropImageToProjectAspectRatio } from '@/shared/lib/imageCropper';
 import { parseRatio } from '@/shared/lib/aspectRatios';
-import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragOverlay } from '@dnd-kit/core';
-import { sortableKeyboardCoordinates, SortableContext, useSortable, horizontalListSortingStrategy } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
+// (Timeline related imports removed – now provided within the Timeline component file)
 
 import { useToolSettings } from '@/shared/hooks/useToolSettings';
 import { ToggleGroup, ToggleGroupItem } from "@/shared/components/ui/toggle-group";
@@ -38,6 +36,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from '@tanstack/react-query';
 import { fetchWithAuth } from '@/lib/api';
 import SettingsModal from '@/shared/components/SettingsModal';
+import Timeline from "@/tools/travel-between-images/components/Timeline";
 
 // Add the missing type definition
 export interface SegmentGenerationParams {
@@ -1119,9 +1118,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                     <ToggleGroupItem value="batch" aria-label="Toggle batch">
                       Batch
                     </ToggleGroupItem>
-                    <ToggleGroupItem value="by-pair" aria-label="Toggle by-pair">
-                      By Pair
-                    </ToggleGroupItem>
+ 
                     <ToggleGroupItem value="timeline" aria-label="Toggle timeline">
                       Timeline
                     </ToggleGroupItem>
@@ -1139,10 +1136,11 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                 </>
               )}
             </CardHeader>
-            <CardContent className={nonVideoImages.length > 0 ? "overflow-y-auto" : ""}>
-              <div className="p-1">
+            <CardContent className={nonVideoImages.length > 0 ? "overflow-y-auto overflow-x-hidden" : "overflow-x-hidden"}>
+              <div className="p-1 overflow-x-hidden">
                 {generationMode === 'timeline' ? (
                   <Timeline
+                    shotId={selectedShot.id}
                     images={nonVideoImages}
                     frameSpacing={batchVideoFrames}
                     onImageReorder={handleReorderImagesInShot}
@@ -1270,289 +1268,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         isOpen={isSettingsModalOpen}
         onOpenChange={setIsSettingsModalOpen}
       />
-    </div>
-  );
-};
-
-// Add Timeline Item component
-interface TimelineItemProps {
-  image: GenerationRow;
-  framePosition: number;
-  maxFrames: number;
-  onImageSaved: (imageId: string, newImageUrl: string) => void;
-}
-
-    const TimelineItem: React.FC<TimelineItemProps> = ({ image, framePosition, maxFrames, onImageSaved }) => {
-    const {
-      attributes,
-      listeners,
-      setNodeRef,
-      transform,
-      transition,
-      isDragging,
-    } = useSortable({ id: image.shotImageEntryId });
-
-    const style = {
-      transform: CSS.Transform.toString(transform),
-      transition,
-      opacity: isDragging ? 0.3 : 1,
-      left: `${(framePosition / maxFrames) * 100}%`,
-      pointerEvents: isDragging ? 'none' as const : 'auto' as const,
-    };
-
-    return (
-      <div
-        ref={setNodeRef}
-        style={style}
-        {...attributes}
-        {...listeners}
-        className={`absolute cursor-move ${isDragging ? 'z-10' : ''}`}
-      >
-        <div className="flex flex-col items-center">
-          <div className={`w-20 h-20 border-2 ${isDragging ? 'border-primary/50' : 'border-primary'} rounded-lg overflow-hidden mb-1`}>
-            <img
-              src={getDisplayUrl(image.imageUrl)}
-              alt={`Frame ${framePosition}`}
-              className="w-full h-full object-cover"
-            />
-          </div>
-          <div className="text-xs text-center bg-background px-2 py-1 rounded border">
-            Frame {framePosition}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-// Add Timeline component
-interface TimelineProps {
-  images: GenerationRow[];
-  frameSpacing: number;
-  onImageReorder: (orderedIds: string[]) => void;
-  onImageSaved: (imageId: string, newImageUrl: string) => void;
-}
-
-const Timeline: React.FC<TimelineProps> = ({ images, frameSpacing, onImageReorder, onImageSaved }) => {
-  const [activeId, setActiveId] = useState<string | null>(null);
-  const [dragFramePosition, setDragFramePosition] = useState<number | null>(null);
-  const timelineRef = useRef<HTMLDivElement>(null);
-
-  const sensors = useSensors(
-    useSensor(PointerSensor),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  );
-
-  // Track custom frame positions for each image so we can place them exactly where the user drops.
-  const [frameMap, setFrameMap] = useState<Map<string, number>>(() => {
-    const initial = new Map<string, number>();
-    images.forEach((img, idx) => {
-      initial.set(img.shotImageEntryId, idx * frameSpacing);
-    });
-    return initial;
-  });
-
-  // Sync frameMap when images list changes (e.g., image added/removed)
-  useEffect(() => {
-    setFrameMap(prev => {
-      const newMap = new Map(prev);
-      images.forEach((img, idx) => {
-        if (!newMap.has(img.shotImageEntryId)) {
-          newMap.set(img.shotImageEntryId, idx * frameSpacing);
-        }
-      });
-      // Remove entries no longer present
-      [...newMap.keys()].forEach(key => {
-        if (!images.some(img => img.shotImageEntryId === key)) {
-          newMap.delete(key);
-        }
-      });
-      return newMap;
-    });
-  }, [images, frameSpacing]);
-
-  // Calculate frame positions for each image from frameMap (defaulting to index grid)
-  const imagePositions = images.map((image, index) => ({
-    image,
-    framePosition: frameMap.get(image.shotImageEntryId) ?? index * frameSpacing,
-  }));
-
-  // Determine timeline length based on farthest image frame
-  const maxFrameValue = Math.max(...Array.from(frameMap.values()));
-  const maxFrames = Math.max(30, maxFrameValue); // Ensure at least some ruler length
-
-  const handleDragStart = (event: any) => {
-    setActiveId(event.active.id);
-  };
-
-  const handleDragMove = (event: any) => {
-    if (!timelineRef.current || !activeId) return;
-
-    const timelineContentRect = timelineRef.current.querySelector('#timeline-container')?.getBoundingClientRect();
-    
-    if (!timelineContentRect) return;
-    
-    // Calculate mouse position relative to the timeline content area
-    const mouseX = event.active.rect.current.translated.left + event.active.rect.current.translated.width / 2;
-    const relativeX = mouseX - timelineContentRect.left;
-    const timelineWidth = timelineContentRect.width;
-    
-    // Calculate frame position based on drag position
-    const framePosition = Math.max(0, Math.min(maxFrames, (relativeX / timelineWidth) * maxFrames));
-    setDragFramePosition(Math.round(framePosition));
-  };
-
-  const handleDragEnd = (event: any) => {
-    const { active, over } = event;
-    
-    if (!activeId || !timelineRef.current) {
-      setActiveId(null);
-      setDragFramePosition(null);
-      return;
-    }
-
-    // Check if we're dropping over another image (for reordering)
-    if (over && over.id !== active.id && over.id !== 'timeline-container') {
-      // Reorder images
-      const oldIndex = images.findIndex(img => img.shotImageEntryId === active.id);
-      const newIndex = images.findIndex(img => img.shotImageEntryId === over.id);
-      
-      const newImages = arrayMove(images, oldIndex, newIndex);
-      onImageReorder(newImages.map(img => img.shotImageEntryId));
-    } else if (dragFramePosition !== null) {
-      // Update frameMap with new precise position
-      setFrameMap(prev => {
-        const updated = new Map(prev);
-        updated.set(active.id, dragFramePosition);
-        return updated;
-      });
-
-      // Recompute order based on new frame positions
-      const sorted = [...images].sort((a, b) => {
-        const fa = (frameMap.get(a.shotImageEntryId) ?? 0) + (a.shotImageEntryId === active.id ? dragFramePosition - (frameMap.get(a.shotImageEntryId) ?? 0) : 0);
-        const fb = (frameMap.get(b.shotImageEntryId) ?? 0) + (b.shotImageEntryId === active.id ? dragFramePosition - (frameMap.get(b.shotImageEntryId) ?? 0) : 0);
-        return fa - fb;
-      });
-      onImageReorder(sorted.map(img => img.shotImageEntryId));
-
-      // NOTE: No grid snapping; we keep exact frame.
-      console.log('[Timeline] Dropped image', active.id, 'at frame', dragFramePosition);
-    }
-
-    setActiveId(null);
-    setDragFramePosition(null);
-  };
-
-  const activeImage = activeId ? images.find(img => img.shotImageEntryId === activeId) : null;
-  
-  // Calculate distances for drag feedback
-  const getDragDistances = () => {
-    if (dragFramePosition === null || !activeId) return null;
-
-    // Determine previous and next frames from current frameMap
-    const sortedFrames = [...frameMap.values()].sort((a, b) => a - b);
-    let prev = 0;
-    let next = maxFrames;
-    for (let i = 0; i < sortedFrames.length; i++) {
-      const val = sortedFrames[i];
-      if (val < dragFramePosition) prev = val;
-      if (val > dragFramePosition) { next = val; break; }
-    }
-
-    return {
-      distanceToPrev: dragFramePosition - prev,
-      distanceToNext: next - dragFramePosition,
-    };
-  };
-
-  const dragDistances = getDragDistances();
-
-  return (
-    <div className="w-full">
-      <div 
-        ref={timelineRef}
-        className="relative bg-muted/20 border rounded-lg p-4 px-10" 
-        style={{ minHeight: '200px' }}
-      >
-        {/* Timeline ruler */}
-        <div className="absolute bottom-0 left-0 right-0 h-8 border-t">
-          <div className="relative h-full">
-            {/* Frame markers */}
-            {Array.from({ length: Math.floor(maxFrames / 30) + 1 }, (_, i) => {
-              const frame = i * 30;
-              const position = (frame / maxFrames) * 100;
-              return (
-                <div
-                  key={frame}
-                  className="absolute flex flex-col items-center"
-                  style={{ left: `${position}%` }}
-                >
-                  <div className="w-px h-4 bg-border"></div>
-                  <span className="text-xs text-muted-foreground mt-1">{frame}</span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Timeline images */}
-        <div className="relative h-32 mb-8" id="timeline-container">
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragStart={handleDragStart}
-            onDragMove={handleDragMove}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext items={images.map(img => img.shotImageEntryId)} strategy={horizontalListSortingStrategy}>
-              {imagePositions.map(({ image, framePosition }) => (
-                <TimelineItem
-                  key={image.shotImageEntryId}
-                  image={image}
-                  framePosition={framePosition}
-                  maxFrames={maxFrames}
-                  onImageSaved={onImageSaved}
-                />
-              ))}
-            </SortableContext>
-            
-            <DragOverlay>
-              {activeImage && dragFramePosition !== null && (
-                <div className="relative">
-                  {/* Drag preview */}
-                  <div className="flex flex-col items-center">
-                    <div className="w-20 h-20 border-2 border-primary rounded-lg overflow-hidden mb-1 shadow-lg">
-                      <img
-                        src={getDisplayUrl(activeImage.imageUrl)}
-                        alt={`Frame ${dragFramePosition}`}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    
-                    {/* Frame position indicator */}
-                    <div className="bg-primary text-primary-foreground px-2 py-1 rounded text-xs font-medium mb-1">
-                      Frame {dragFramePosition}
-                    </div>
-                    
-                    {/* Distance indicators */}
-                    {dragDistances && (
-                      <div className="flex space-x-2 text-xs text-muted-foreground">
-                        <span className="bg-background/80 px-1 py-0.5 rounded">
-                          ←{Math.round(dragDistances.distanceToPrev)}f
-                        </span>
-                        <span className="bg-background/80 px-1 py-0.5 rounded">
-                          {Math.round(dragDistances.distanceToNext)}f→
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </DragOverlay>
-          </DndContext>
-        </div>
-      </div>
     </div>
   );
 };

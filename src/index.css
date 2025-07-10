@@ -925,3 +925,26 @@
     padding-bottom: 0rem !important;
   }
 }
+
+/* Timeline scrollbar always visible and styled */
+.timeline-scroll {
+  scrollbar-gutter: stable;
+}
+
+.timeline-scroll::-webkit-scrollbar {
+  height: 10px;
+}
+
+.timeline-scroll::-webkit-scrollbar-track {
+  background: hsla(var(--muted) / 0.4);
+}
+
+.timeline-scroll::-webkit-scrollbar-thumb {
+  background: hsl(var(--primary));
+  border-radius: 4px;
+}
+
+/* Ensure thumb stands out in dark mode */
+.dark .timeline-scroll::-webkit-scrollbar-thumb {
+  background: hsl(var(--primary-foreground));
+}
