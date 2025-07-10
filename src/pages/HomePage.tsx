@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, Sparkles, Image as ImageIcon, Video, UserPlus, Users, FileText, ChevronDown, ChevronUp, GitBranch, X, HandHeart, Brain } from 'lucide-react';
+import { ArrowRight, Image as ImageIcon, Video, Users, FileText, ChevronDown, ChevronUp, GitBranch, X, HandHeart, Brain } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import type { Session } from '@supabase/supabase-js';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -7,7 +7,6 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
 import { toast } from '@/shared/components/ui/use-toast';
 import { PageFadeIn } from '@/shared/components/transitions';
-import SocialShare from '@/shared/components/SocialShare';
 
 export default function HomePage() {
   const [expandedFAQ, setExpandedFAQ] = useState<number | null>(null);
@@ -167,30 +166,93 @@ export default function HomePage() {
             A tool and community for exploring the emerging artform of image-guided video
             </p>
             
-            {/* Ornamental elements */}
-            <div className="flex justify-center items-center space-x-8 opacity-50">
-              <div className="text-3xl text-wes-vintage-gold animate-rotate-slow">❋</div>
-              <div className="text-2xl text-wes-coral animate-bounce-gentle">◆</div>
-              <div className="text-3xl text-wes-mint animate-sway">✧</div>
-        </div>
-
             {/* Sign-in button below hero */}
             {!session ? (
-              <button
-                onClick={handleDiscordSignIn}
-                className="group flex items-center space-x-2 px-6 py-4 bg-gradient-to-r from-wes-vintage-gold to-wes-coral rounded-full border-2 border-wes-vintage-gold/40 hover:border-wes-vintage-gold/60 transition-all duration-300 shadow-wes-vintage hover:shadow-wes-hover text-white text-lg font-medium mx-auto"
-              >
-                <UserPlus className="w-5 h-5" />
-                <span>Sign in with Discord</span>
-              </button>
+              <div className="group">
+                <button
+                  onClick={handleDiscordSignIn}
+                  className="flex items-center space-x-2 px-6 py-4 bg-gradient-to-r from-wes-vintage-gold to-wes-coral rounded-full border-2 border-wes-vintage-gold/40 hover:border-wes-vintage-gold/60 transition-all duration-300 shadow-wes-vintage hover:shadow-wes-hover text-white text-lg font-medium mx-auto relative overflow-hidden"
+                >
+                  <div className="relative">
+                    {/* Paintbrush SVG */}
+                    <svg 
+                      className="w-5 h-5 transform scale-x-[-1] group-hover:rotate-12 transition-transform duration-300" 
+                      viewBox="0 0 24 24" 
+                      fill="none" 
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path 
+                        d="M18 2L20 4L12 12L10 10L18 2Z" 
+                        fill="currentColor" 
+                        className="opacity-90"
+                      />
+                      <path 
+                        d="M10 10L6 14C5.5 14.5 5.5 15.5 6 16C6.5 16.5 7.5 16.5 8 16L12 12L10 10Z" 
+                        fill="currentColor" 
+                        className="opacity-80"
+                      />
+                      <circle 
+                        cx="4" 
+                        cy="18" 
+                        r="2" 
+                        fill="currentColor" 
+                        className="opacity-70"
+                      />
+                    </svg>
+                    
+                    {/* Paint particles */}
+                    <div className="absolute bottom-1 left-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                      <div className="absolute w-1 h-1 bg-white rounded-full animate-ping" style={{ animationDelay: '0ms' }}></div>
+                      <div className="absolute w-0.5 h-0.5 bg-white/80 rounded-full animate-ping" style={{ animationDelay: '150ms', bottom: '2px', left: '3px' }}></div>
+                      <div className="absolute w-0.5 h-0.5 bg-white/60 rounded-full animate-ping" style={{ animationDelay: '300ms', bottom: '-2px', left: '1px' }}></div>
+                    </div>
+                  </div>
+                  <span>Sign in with Discord</span>
+                </button>
+              </div>
             ) : (
-              <button
-                onClick={() => navigate('/tools')}
-                className="group flex items-center space-x-2 px-6 py-4 bg-gradient-to-r from-wes-mint to-wes-vintage-gold rounded-full border-2 border-wes-mint/40 hover:border-wes-mint/60 transition-all duration-300 shadow-wes-vintage hover:shadow-wes-hover text-white text-lg font-medium mx-auto"
-              >
-                <Sparkles className="w-5 h-5" />
-                <span>Go to Tools</span>
-              </button>
+              <div className="group">
+                <button
+                  onClick={() => navigate('/tools')}
+                  className="flex items-center space-x-2 px-6 py-4 bg-gradient-to-r from-wes-mint to-wes-vintage-gold rounded-full border-2 border-wes-mint/40 hover:border-wes-mint/60 transition-all duration-300 shadow-wes-vintage hover:shadow-wes-hover text-white text-lg font-medium mx-auto relative overflow-hidden"
+                >
+                  <div className="relative">
+                    {/* Paintbrush SVG */}
+                    <svg 
+                      className="w-5 h-5 transform scale-x-[-1] group-hover:rotate-12 transition-transform duration-300" 
+                      viewBox="0 0 24 24" 
+                      fill="none" 
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path 
+                        d="M18 2L20 4L12 12L10 10L18 2Z" 
+                        fill="currentColor" 
+                        className="opacity-90"
+                      />
+                      <path 
+                        d="M10 10L6 14C5.5 14.5 5.5 15.5 6 16C6.5 16.5 7.5 16.5 8 16L12 12L10 10Z" 
+                        fill="currentColor" 
+                        className="opacity-80"
+                      />
+                      <circle 
+                        cx="4" 
+                        cy="18" 
+                        r="2" 
+                        fill="currentColor" 
+                        className="opacity-70"
+                      />
+                    </svg>
+                    
+                    {/* Paint particles */}
+                    <div className="absolute bottom-1 left-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                      <div className="absolute w-1 h-1 bg-white rounded-full animate-ping" style={{ animationDelay: '0ms' }}></div>
+                      <div className="absolute w-0.5 h-0.5 bg-white/80 rounded-full animate-ping" style={{ animationDelay: '150ms', bottom: '2px', left: '3px' }}></div>
+                      <div className="absolute w-0.5 h-0.5 bg-white/60 rounded-full animate-ping" style={{ animationDelay: '300ms', bottom: '-2px', left: '1px' }}></div>
+                    </div>
+                  </div>
+                  <span>Go to Tools</span>
+                </button>
+              </div>
             )}
 
             {/* Open Source Indicator - Same distance from content as top nav is from top */}
@@ -213,8 +275,8 @@ export default function HomePage() {
                       <div className="absolute -inset-2 bg-gradient-to-r from-wes-vintage-gold/10 to-wes-coral/10 rounded-full blur-md opacity-0 group-hover:opacity-100 group-hover:scale-150 transition-all duration-500"></div>
                       
                       {/* Main icon container */}
-                      <div className="relative bg-white/80 backdrop-blur-sm rounded-full p-3 border-2 border-wes-vintage-gold/20 hover:border-wes-vintage-gold/40 transition-all duration-300 hover:shadow-wes-ornate">
-                        <GitBranch className="w-5 h-5 text-wes-vintage-gold group-hover:rotate-12 transition-transform duration-300" />
+                      <div className="relative bg-white/80 backdrop-blur-sm rounded-full p-3 border-2 border-wes-vintage-gold/20 hover:border-wes-vintage-gold/40 transition-all duration-300 hover:shadow-wes-ornate group-hover:scale-110">
+                        <GitBranch className="w-5 h-5 text-wes-vintage-gold group-hover:animate-pulse transition-all duration-300" />
                       </div>
                     </div>
                   </TooltipTrigger>
@@ -273,8 +335,7 @@ export default function HomePage() {
               </TooltipProvider>
             </div>
 
-            {/* Social Share Buttons */}
-            <SocialShare />
+
 
           </div>
         </div>
