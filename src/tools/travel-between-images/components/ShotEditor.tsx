@@ -27,7 +27,7 @@ import { ActiveLoRAsDisplay, ActiveLora } from '@/shared/components/ActiveLoRAsD
 import { useApiKeys } from '@/shared/hooks/useApiKeys';
 import { cropImageToProjectAspectRatio } from '@/shared/lib/imageCropper';
 import { parseRatio } from '@/shared/lib/aspectRatios';
-import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragOverlay, useDroppable } from '@dnd-kit/core';
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragOverlay } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates, SortableContext, useSortable, horizontalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
@@ -1274,19 +1274,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   );
 };
 
-// Add Timeline Container component
-const TimelineContainer: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { setNodeRef } = useDroppable({
-    id: 'timeline-container',
-  });
-
-  return (
-    <div ref={setNodeRef} className="relative h-32 mb-8 w-full">
-      {children}
-    </div>
-  );
-};
-
 // Add Timeline Item component
 interface TimelineItemProps {
   image: GenerationRow;
@@ -1372,7 +1359,6 @@ const Timeline: React.FC<TimelineProps> = ({ images, frameSpacing, onImageReorde
   const handleDragMove = (event: any) => {
     if (!timelineRef.current || !activeId) return;
 
-    const timelineRect = timelineRef.current.getBoundingClientRect();
     const timelineContentRect = timelineRef.current.querySelector('#timeline-container')?.getBoundingClientRect();
     
     if (!timelineContentRect) return;
@@ -1396,40 +1382,33 @@ const Timeline: React.FC<TimelineProps> = ({ images, frameSpacing, onImageReorde
       return;
     }
 
-    const draggedImageIndex = images.findIndex(img => img.shotImageEntryId === active.id);
-    
-    // Check if we're dropping over another image (for direct reordering)
+    // Check if we're dropping over another image (for reordering)
     if (over && over.id !== active.id && over.id !== 'timeline-container') {
-      // Direct reorder when dropping on another image
+      // Reorder images
+      const oldIndex = images.findIndex(img => img.shotImageEntryId === active.id);
       const newIndex = images.findIndex(img => img.shotImageEntryId === over.id);
-      const newImages = arrayMove(images, draggedImageIndex, newIndex);
+      
+      const newImages = arrayMove(images, oldIndex, newIndex);
       onImageReorder(newImages.map(img => img.shotImageEntryId));
     } else if (dragFramePosition !== null) {
-      // Precise positioning - find the best insertion point
-      const targetFramePosition = dragFramePosition;
+      // Set precise frame position
+      const draggedImageIndex = images.findIndex(img => img.shotImageEntryId === active.id);
+      const newImages = [...images];
       
-      // Calculate where this image should be inserted to be closest to the target frame
-      let bestInsertionIndex = 0;
-      let bestDistance = Infinity;
-      
-      // Try inserting at each possible position and see which gives the closest frame position
-      for (let insertIndex = 0; insertIndex < images.length; insertIndex++) {
-        if (insertIndex === draggedImageIndex) continue; // Skip current position
-        
-        // Calculate what the frame position would be at this insertion point
-        const frameAtThisPosition = insertIndex * frameSpacing;
-        const distance = Math.abs(frameAtThisPosition - targetFramePosition);
-        
-        if (distance < bestDistance) {
-          bestDistance = distance;
-          bestInsertionIndex = insertIndex;
-        }
-      }
-      
-      // If the best insertion point is different from current position, move there
-      if (bestInsertionIndex !== draggedImageIndex) {
-        const newImages = arrayMove(images, draggedImageIndex, bestInsertionIndex);
-        onImageReorder(newImages.map(img => img.shotImageEntryId));
+      // Determine the insertion index based on frame grid. Use floor so that crossing a grid boundary
+      // is required before an image moves to a new slot (prevents "snap-back" issues).
+      let insertionIndex = Math.floor(dragFramePosition / frameSpacing);
+
+      // Clamp to valid range
+      insertionIndex = Math.max(0, Math.min(images.length - 1, insertionIndex));
+
+      // If the dragged image is moving forward in the array and will be removed first,
+      // adjust the target index accordingly.
+      const adjustedIndex = insertionIndex > draggedImageIndex ? insertionIndex - 1 : insertionIndex;
+ 
+      if (adjustedIndex !== draggedImageIndex) {
+        const reorderedImages = arrayMove(newImages, draggedImageIndex, adjustedIndex);
+        onImageReorder(reorderedImages.map(img => img.shotImageEntryId));
       }
     }
 
@@ -1441,40 +1420,15 @@ const Timeline: React.FC<TimelineProps> = ({ images, frameSpacing, onImageReorde
   
   // Calculate distances for drag feedback
   const getDragDistances = () => {
-    if (!dragFramePosition || !activeImage) return null;
-    
-    const currentIndex = images.findIndex(img => img.shotImageEntryId === activeId);
-    const targetFramePosition = dragFramePosition;
-    
-    // Calculate what the best insertion point would be
-    let bestInsertionIndex = 0;
-    let bestDistance = Infinity;
-    
-    for (let insertIndex = 0; insertIndex < images.length; insertIndex++) {
-      if (insertIndex === currentIndex) continue;
-      const frameAtThisPosition = insertIndex * frameSpacing;
-      const distance = Math.abs(frameAtThisPosition - targetFramePosition);
-      
-      if (distance < bestDistance) {
-        bestDistance = distance;
-        bestInsertionIndex = insertIndex;
-      }
-    }
-    
-    // Create a hypothetical new order to calculate distances
-    const hypotheticalImages = arrayMove([...images], currentIndex, bestInsertionIndex);
-    const newIndexOfActiveImage = hypotheticalImages.findIndex(img => img.shotImageEntryId === activeId);
-    
-    // Calculate frame positions in the new order
-    const prevImage = newIndexOfActiveImage > 0 ? hypotheticalImages[newIndexOfActiveImage - 1] : null;
-    const nextImage = newIndexOfActiveImage < hypotheticalImages.length - 1 ? hypotheticalImages[newIndexOfActiveImage + 1] : null;
-    
-    const prevFrame = prevImage ? (newIndexOfActiveImage - 1) * frameSpacing : null;
-    const nextFrame = nextImage ? (newIndexOfActiveImage + 1) * frameSpacing : null;
-    
+    if (dragFramePosition === null || !activeId) return null;
+
+    // Determine neighbouring grid slots relative to the dragged frame position
+    const prevSlot = Math.floor(dragFramePosition / frameSpacing) * frameSpacing;
+    const nextSlot = prevSlot + frameSpacing;
+
     return {
-      distanceToPrev: prevFrame !== null ? Math.abs(targetFramePosition - prevFrame) : targetFramePosition,
-      distanceToNext: nextFrame !== null ? Math.abs(nextFrame - targetFramePosition) : Math.abs(maxFrames - targetFramePosition),
+      distanceToPrev: dragFramePosition - prevSlot,
+      distanceToNext: nextSlot > maxFrames ? 0 : nextSlot - dragFramePosition,
     };
   };
 
@@ -1509,14 +1463,14 @@ const Timeline: React.FC<TimelineProps> = ({ images, frameSpacing, onImageReorde
         </div>
 
         {/* Timeline images */}
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragStart={handleDragStart}
-          onDragMove={handleDragMove}
-          onDragEnd={handleDragEnd}
-        >
-          <TimelineContainer>
+        <div className="relative h-32 mb-8" id="timeline-container">
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragStart={handleDragStart}
+            onDragMove={handleDragMove}
+            onDragEnd={handleDragEnd}
+          >
             <SortableContext items={images.map(img => img.shotImageEntryId)} strategy={horizontalListSortingStrategy}>
               {imagePositions.map(({ image, framePosition }) => (
                 <TimelineItem
@@ -1528,68 +1482,42 @@ const Timeline: React.FC<TimelineProps> = ({ images, frameSpacing, onImageReorde
                 />
               ))}
             </SortableContext>
-          </TimelineContainer>
-          
-          <DragOverlay>
-            {activeImage && dragFramePosition !== null && (
-              <div className="relative">
-                {/* Drag preview */}
-                <div className="flex flex-col items-center">
-                  <div className="w-20 h-20 border-2 border-primary rounded-lg overflow-hidden mb-1 shadow-lg">
-                    <img
-                      src={getDisplayUrl(activeImage.imageUrl)}
-                      alt={`Frame ${dragFramePosition}`}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  
-                  {/* Frame position indicator */}
-                  <div className="bg-primary text-primary-foreground px-2 py-1 rounded text-xs font-medium mb-1">
-                    Frame {dragFramePosition}
-                    {(() => {
-                      const currentIndex = images.findIndex(img => img.shotImageEntryId === activeId);
-                      let bestInsertionIndex = 0;
-                      let bestDistance = Infinity;
-                      
-                      for (let insertIndex = 0; insertIndex < images.length; insertIndex++) {
-                        if (insertIndex === currentIndex) continue;
-                        const frameAtThisPosition = insertIndex * frameSpacing;
-                        const distance = Math.abs(frameAtThisPosition - dragFramePosition);
-                        
-                        if (distance < bestDistance) {
-                          bestDistance = distance;
-                          bestInsertionIndex = insertIndex;
-                        }
-                      }
-                      
-                      const actualFramePosition = bestInsertionIndex * frameSpacing;
-                      if (actualFramePosition !== dragFramePosition) {
-                        return (
-                          <div className="text-xs mt-1 opacity-75">
-                            → {actualFramePosition}
-                          </div>
-                        );
-                      }
-                      return null;
-                    })()}
-                  </div>
-                  
-                  {/* Distance indicators */}
-                  {dragDistances && (
-                    <div className="flex space-x-2 text-xs text-muted-foreground">
-                      <span className="bg-background/80 px-1 py-0.5 rounded">
-                        ←{Math.round(dragDistances.distanceToPrev)}f
-                      </span>
-                      <span className="bg-background/80 px-1 py-0.5 rounded">
-                        {Math.round(dragDistances.distanceToNext)}f→
-                      </span>
+            
+            <DragOverlay>
+              {activeImage && dragFramePosition !== null && (
+                <div className="relative">
+                  {/* Drag preview */}
+                  <div className="flex flex-col items-center">
+                    <div className="w-20 h-20 border-2 border-primary rounded-lg overflow-hidden mb-1 shadow-lg">
+                      <img
+                        src={getDisplayUrl(activeImage.imageUrl)}
+                        alt={`Frame ${dragFramePosition}`}
+                        className="w-full h-full object-cover"
+                      />
                     </div>
-                  )}
+                    
+                    {/* Frame position indicator */}
+                    <div className="bg-primary text-primary-foreground px-2 py-1 rounded text-xs font-medium mb-1">
+                      Frame {dragFramePosition}
+                    </div>
+                    
+                    {/* Distance indicators */}
+                    {dragDistances && (
+                      <div className="flex space-x-2 text-xs text-muted-foreground">
+                        <span className="bg-background/80 px-1 py-0.5 rounded">
+                          ←{Math.round(dragDistances.distanceToPrev)}f
+                        </span>
+                        <span className="bg-background/80 px-1 py-0.5 rounded">
+                          {Math.round(dragDistances.distanceToNext)}f→
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
-          </DragOverlay>
-        </DndContext>
+              )}
+            </DragOverlay>
+          </DndContext>
+        </div>
       </div>
     </div>
   );
