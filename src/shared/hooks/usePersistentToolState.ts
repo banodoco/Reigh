@@ -84,14 +84,17 @@ export function usePersistentToolState<T extends Record<string, any>>(
 
   // Hydrate local state from persisted settings
   useEffect(() => {
-    if (settings && !isLoadingSettings && !hasHydratedRef.current && entityKey) {
+    if (!isLoadingSettings && !hasHydratedRef.current && entityKey) {
+      // Use an empty object if settings could not be fetched (e.g. first time or API failure)
+      const effectiveSettings: Partial<T> = (settings as Partial<T>) || {};
+      
       hasHydratedRef.current = true;
       userHasInteractedRef.current = false;
       
       // Apply each setting to its corresponding setter
       Object.entries(stateMapping).forEach(([key, [_, setter]]) => {
-        if (settings[key as keyof T] !== undefined) {
-          setter(settings[key as keyof T] as any);
+        if (effectiveSettings[key as keyof T] !== undefined) {
+          setter(effectiveSettings[key as keyof T] as any);
         }
       });
 

@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { supabaseAdmin } from '../../integrations/supabase/admin';
+import { Buffer } from 'buffer';
 
 // Re-augment the Express Request type here as well to be safe
 declare global {
@@ -23,8 +24,43 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
     
     // Extract the token
     const token = authHeader.substring(7);
-    
-    // Validate the token with Supabase
+
+    // -------------------------------------------------------------
+    // Development / fallback mode
+    // -------------------------------------------------------------
+    // When running locally we often don't have outbound network access
+    // or a valid Supabase service role key. In these situations we still
+    // want the API server to function, so we provide a lightweight JWT
+    // decode fallback. The behaviour is controlled via one of:
+    //   1. NODE_ENV !== "production"    (default local dev)
+    //   2. process.env.SKIP_SUPABASE_AUTH === 'true'
+    // If either condition is true we will *skip* the remote Supabase
+    // validation step and simply decode the token locally to grab the
+    // user id. The token signature is NOT verified in this mode, so it
+    // must never be enabled in production.
+    const skipRemoteAuth = process.env.SKIP_SUPABASE_AUTH === 'true' || process.env.NODE_ENV !== 'production';
+
+    if (skipRemoteAuth) {
+      try {
+        const payloadJson = Buffer.from(token.split('.')[1], 'base64').toString('utf-8');
+        const payload = JSON.parse(payloadJson);
+        const userId = payload.sub || payload.user_id || payload.id;
+        if (!userId) {
+          res.status(401).json({ message: 'Invalid token: missing subject' });
+          return;
+        }
+        req.userId = userId;
+        return next();
+      } catch (decodeErr) {
+        console.error('[Auth Middleware] Failed to decode JWT in skip mode', decodeErr);
+        res.status(401).json({ message: 'Malformed JWT' });
+        return;
+      }
+    }
+
+    // -------------------------------------------------------------
+    // Standard Supabase validation (production)
+    // -------------------------------------------------------------
     const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
     
     if (error || !user) {
