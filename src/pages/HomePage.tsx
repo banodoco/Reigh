@@ -386,7 +386,7 @@ export default function HomePage() {
               
               <div className="rounded-lg overflow-hidden border border-gray-200 shadow-sm">
                 <img 
-                  src="/files/easy.png"
+                  src="https://wczysqzxlwdndgxitrvc.supabase.co/storage/v1/object/public/image_uploads//easy.png"
                   alt="Screenshot showing how easy it is to run Reigh locally"
                   className="w-full h-auto rounded-lg"
                 />
