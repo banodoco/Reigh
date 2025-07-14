@@ -948,3 +948,186 @@
 .dark .timeline-scroll::-webkit-scrollbar-thumb {
   background: hsl(var(--primary-foreground));
 }
+
+/* Elegant background animations */
+@keyframes gradientShift {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 0.8; }
+}
+
+@keyframes pulseSubtle {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.4; }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes floatSlow {
+  0%, 100% { 
+    transform: translateY(0px) translateX(0px); 
+    opacity: 0.8;
+  }
+  33% { 
+    transform: translateY(-20px) translateX(10px); 
+    opacity: 0.6;
+  }
+  66% { 
+    transform: translateY(10px) translateX(-5px); 
+    opacity: 0.9;
+  }
+}
+
+@keyframes floatGentle {
+  0%, 100% { 
+    transform: translateY(0px) translateX(0px) scale(1); 
+    opacity: 0.7;
+  }
+  25% { 
+    transform: translateY(-15px) translateX(8px) scale(1.1); 
+    opacity: 0.5;
+  }
+  50% { 
+    transform: translateY(-8px) translateX(-3px) scale(0.9); 
+    opacity: 0.8;
+  }
+  75% { 
+    transform: translateY(5px) translateX(12px) scale(1.05); 
+    opacity: 0.6;
+  }
+}
+
+@keyframes rotateGentle {
+  0%, 100% { 
+    transform: rotate(0deg) scale(1); 
+    opacity: 0.6;
+  }
+  25% { 
+    transform: rotate(5deg) scale(1.1); 
+    opacity: 0.4;
+  }
+  50% { 
+    transform: rotate(-3deg) scale(0.95); 
+    opacity: 0.7;
+  }
+  75% { 
+    transform: rotate(8deg) scale(1.05); 
+    opacity: 0.5;
+  }
+}
+
+/* Animation utility classes */
+.animate-gradient-shift {
+  animation: gradientShift 12s ease-in-out infinite;
+}
+
+.animate-pulse-subtle {
+  animation: pulseSubtle 8s ease-in-out infinite;
+}
+
+.animate-shimmer {
+  background-size: 200% auto;
+  animation: shimmer 3s linear infinite;
+}
+
+.animate-float-slow {
+  animation: floatSlow 20s ease-in-out infinite;
+}
+
+.animate-float-gentle {
+  animation: floatGentle 15s ease-in-out infinite;
+}
+
+.animate-rotate-gentle {
+  animation: rotateGentle 25s ease-in-out infinite;
+}
+
+/* Paintbrush wiggle animation */
+@keyframes paintbrushWiggle {
+  0%, 100% {
+    transform: rotate(0deg);
+    transform-origin: bottom center;
+  }
+  10% {
+    transform: rotate(-10deg);
+    transform-origin: bottom center;
+  }
+  20% {
+    transform: rotate(10deg);
+    transform-origin: bottom center;
+  }
+  30% {
+    transform: rotate(-8deg);
+    transform-origin: bottom center;
+  }
+  40% {
+    transform: rotate(8deg);
+    transform-origin: bottom center;
+  }
+  50% {
+    transform: rotate(-6deg);
+    transform-origin: bottom center;
+  }
+  60% {
+    transform: rotate(6deg);
+    transform-origin: bottom center;
+  }
+  70% {
+    transform: rotate(-4deg);
+    transform-origin: bottom center;
+  }
+  80% {
+    transform: rotate(4deg);
+    transform-origin: bottom center;
+  }
+  90% {
+    transform: rotate(-2deg);
+    transform-origin: bottom center;
+  }
+}
+
+.animate-paintbrush-wiggle {
+  animation: paintbrushWiggle 0.8s ease-in-out infinite;
+  transform-origin: bottom center;
+}
+
+/* Paint particle sequential animation */
+@keyframes paintParticleSequential {
+  0%, 15% {
+    opacity: 0;
+    transform: scale(1);
+  }
+  20% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(2);
+  }
+  60% {
+    opacity: 0;
+    transform: scale(3.5);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(3.5);
+  }
+}
+
+.animate-paint-particle-1 {
+  animation: paintParticleSequential 1.8s ease-out infinite;
+  animation-delay: 0s;
+}
+
+.animate-paint-particle-2 {
+  animation: paintParticleSequential 1.8s ease-out infinite;
+  animation-delay: 0.3s;
+}
+
+.animate-paint-particle-3 {
+  animation: paintParticleSequential 1.8s ease-out infinite;
+  animation-delay: 0.6s;
+}

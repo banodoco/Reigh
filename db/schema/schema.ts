@@ -48,6 +48,19 @@ export type ProjectUpdate = {
   aspectRatio?: string;
 };
 
+export const workers = pgTable('workers', {
+  id: text('id').primaryKey(),
+  instanceType: text('instance_type').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  lastHeartbeat: timestamp('last_heartbeat', { withTimezone: true }).defaultNow().notNull(),
+  status: text('status').default('active').notNull(),
+  metadata: jsonb('metadata').default('{}'),
+}, (table) => ({
+  // Indexes for better query performance
+  statusIdx: index('idx_workers_status').on(table.status),
+  lastHeartbeatIdx: index('idx_workers_last_heartbeat').on(table.lastHeartbeat),
+}));
+
 export const tasks = pgTable('tasks', {
   id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
   taskType: text('task_type').notNull(),
@@ -60,11 +73,14 @@ export const tasks = pgTable('tasks', {
   projectId: uuid('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
   generationProcessedAt: timestamp('generation_processed_at', { withTimezone: true }),
   generationStartedAt: timestamp('generation_started_at', { withTimezone: true }),
+  workerId: text('worker_id').references(() => workers.id, { onDelete: 'set null' }),
+  generationCreated: boolean('generation_created').default(false).notNull(),
 }, (table) => ({
   // Indexes for better query performance
   statusCreatedIdx: index('idx_status_created').on(table.status, table.createdAt),
   dependantOnIdx: index('idx_dependant_on').on(table.dependantOn),
   projectStatusIdx: index('idx_project_status').on(table.projectId, table.status),
+  workerIdIdx: index('idx_tasks_worker_id').on(table.workerId),
 }));
 
 export const generations = pgTable('generations', {
@@ -173,10 +189,18 @@ export const projectsRelations = relations(projects, ({ one, many }) => ({
   shots: many(shots),
 }));
 
+export const workersRelations = relations(workers, ({ many }) => ({
+  tasks: many(tasks),
+}));
+
 export const tasksRelations = relations(tasks, ({ one }) => ({
   project: one(projects, {
     fields: [tasks.projectId],
     references: [projects.id],
+  }),
+  worker: one(workers, {
+    fields: [tasks.workerId],
+    references: [workers.id],
   }),
 }));
 

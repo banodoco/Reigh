@@ -39,12 +39,16 @@ export function useGenerations(projectId: string | null, page: number = 1, limit
     queryFn: async () => {
       if (!projectId) return [];
       
+      console.log(`[GenerationsFetch] Fetching generations for project ${projectId} (page: ${page}, limit: ${limit})`);
+      
       const { data, error } = await supabase
         .from('generations')
         .select('*')
         .eq('project_id', projectId)
         .order('created_at', { ascending: false })
         .limit(1000);
+      
+      console.log('[GenerationsFetch] Raw data from Supabase:', data);
       
       if (error) throw error;
 

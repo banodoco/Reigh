@@ -24,6 +24,7 @@ export function ToolSettingsGate({
   className 
 }: ToolSettingsGateProps) {
   if (!ready) {
+    console.log('[ImageGenFormVisibilityIssue] ToolSettingsGate: not ready, showing loading');
     return (
       <div className={cn("flex items-center justify-center h-64", className)}>
         <div className="text-center">
@@ -34,6 +35,7 @@ export function ToolSettingsGate({
     );
   }
 
+  console.log('[ImageGenFormVisibilityIssue] ToolSettingsGate: ready, rendering children');
   return (
     <div className={cn("animate-in fade-in duration-300", className)}>
       {children}

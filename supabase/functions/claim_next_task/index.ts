@@ -106,7 +106,23 @@ serve(async (req) => {
   const workerId = `edge_${crypto.randomUUID()}`;
 
   try {
-    // Call the appropriate RPC function based on token type
+    // Register this worker instance
+    const { error: workerError } = await supabaseAdmin
+      .from('workers')
+      .upsert({
+        id: workerId,
+        instance_type: 'edge',
+        last_heartbeat: new Date().toISOString(),
+        status: 'active',
+        metadata: { 'edge_function': 'claim_next_task' }
+      }, { onConflict: 'id' });
+
+    if (workerError) {
+      console.error('Failed to register worker:', workerError);
+      return new Response(`Worker registration failed: ${workerError.message}`, { status: 500 });
+    }
+
+    // Proceed with claiming
     let rpcResponse;
     
     if (isServiceRole) {

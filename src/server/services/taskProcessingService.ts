@@ -1,7 +1,7 @@
 import cron from 'node-cron';
 import { db } from '../../lib/db/index';
 import { tasks as tasksSchema, generations as generationsSchema, shotGenerations as shotGenerationsSchema, taskStatusEnum } from '../../../db/schema/schema';
-import { eq, and, isNull, sql, inArray, notInArray, like } from 'drizzle-orm';
+import { eq, and, isNull, sql, inArray, notInArray, like, isNotNull } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { broadcast } from './webSocketService';
 
@@ -136,12 +136,13 @@ export async function processCompletedStitchTask(task: Task): Promise<void> {
     // Mark the task as processed and update its params with the normalized paths
     await db.update(tasksSchema)
       .set({
-        generationProcessedAt: new Date(),
+        // Don't set generationProcessedAt since it's already set by complete_task edge function
         params: normalizedParams,
+        generationCreated: true,
       })
       .where(eq(tasksSchema.id, task.id));
     
-    console.log(`[VideoStitchGenDebug] Marked task ${task.id} as generation_processed and updated its params.`);
+    console.log(`[VideoStitchGenDebug] Updated task ${task.id} params and marked generation_created.`);
 
     // After creating the generation and shot_generation, notify the client.
     await broadcast({ 
@@ -329,12 +330,13 @@ export function startTaskPoller(): void {
           and(
             eq(tasksSchema.taskType, 'travel_stitch'),
             eq(tasksSchema.status, 'Complete'),
-            isNull(tasksSchema.generationProcessedAt)
+            isNotNull(tasksSchema.generationProcessedAt),
+            eq(tasksSchema.generationCreated, false)
           )
         );
 
       if (tasksToProcess.length > 0) {
-        console.log(`[TaskPoller] Found ${tasksToProcess.length} completed travel_stitch tasks to process.`);
+        console.log(`[TaskPoller] Found ${tasksToProcess.length} completed travel_stitch tasks to process into generations.`);
         for (const task of tasksToProcess) {
           await processCompletedStitchTask(task);
         }
@@ -351,12 +353,13 @@ export function startTaskPoller(): void {
             and(
               eq(tasksSchema.taskType, 'single_image'),
               eq(tasksSchema.status, 'Complete'),
-              isNull(tasksSchema.generationProcessedAt)
+              isNotNull(tasksSchema.generationProcessedAt),
+              eq(tasksSchema.generationCreated, false)
             )
           );
 
         if (imageTasksToProcess.length > 0) {
-          console.log(`[TaskPoller] Found ${imageTasksToProcess.length} completed single_image tasks to process.`);
+          console.log(`[TaskPoller] Found ${imageTasksToProcess.length} completed single_image tasks to process into generations.`);
           for (const task of imageTasksToProcess) {
             await processCompletedSingleImageTask(task);
           }
@@ -380,24 +383,6 @@ export async function processCompletedSingleImageTask(task: Task): Promise<void>
   }
 
   console.log(`[SingleImageGenDebug] Processing completed single_image task ${task.id}.`);
-
-  /* --- NEW: Claim the task atomically to avoid double processing --- */
-  try {
-    // Attempt to set generationProcessedAt; if another worker already did it first, rowsAffected will be 0
-    const claimResult = await db
-      .update(tasksSchema)
-      .set({ generationProcessedAt: new Date() })
-      .where(and(eq(tasksSchema.id, task.id), isNull(tasksSchema.generationProcessedAt)))
-      .returning();
-
-    if (claimResult.length === 0) {
-      console.warn(`[SingleImageGenDebugDup] Task ${task.id} was already claimed by another worker. Skipping duplicate generation insert.`);
-      return;
-    }
-  } catch (claimErr) {
-    console.error(`[SingleImageGenDebugDup] Error claiming task ${task.id}:`, claimErr);
-    return;
-  }
 
   // Determine the output image location. Prefer the dedicated column, but also fallback to common param locations
   let outputLocation: string | undefined = task.outputLocation;
@@ -431,12 +416,13 @@ export async function processCompletedSingleImageTask(task: Task): Promise<void>
       );
 
     if (existingGenerations.length > 0) {
-      console.warn(`[SingleImageGenDebugDup] Generation with same location already exists (id: ${existingGenerations[0].id}) for task ${task.id}. Skipping duplicate insertion.`);
-      // Still mark as processed to prevent further duplicates
+      console.warn(`[SingleImageGenDebugDup] Generation with same location already exists (id: ${existingGenerations[0].id}) for task ${task.id}. Skipping duplicate insertion but marking task as processed.`);
+      
+      // Mark the task as having its generation created even though it's a duplicate
       await db.update(tasksSchema)
-        .set({ generationProcessedAt: new Date() })
+        .set({ generationCreated: true })
         .where(eq(tasksSchema.id, task.id));
-
+      
       // Notify client of update
       await broadcast({
         type: 'TASK_COMPLETED',
@@ -472,12 +458,12 @@ export async function processCompletedSingleImageTask(task: Task): Promise<void>
 
     console.log(`[SingleImageGenDebug] Created generation ${newGenerationId} for task ${task.id} with location: ${outputLocation}.`);
 
-    // Mark task as processed so we do not duplicate work later
+    // Mark the task as having its generation created
     await db.update(tasksSchema)
-      .set({
-        generationProcessedAt: new Date(),
-      })
+      .set({ generationCreated: true })
       .where(eq(tasksSchema.id, task.id));
+
+    // Don't set generation_processed_at since it's already set by complete_task edge function
 
     // Notify clients that tasks/generations changed
     await broadcast({

@@ -75,7 +75,9 @@ const TaskList: React.FC = () => {
   // Filter out travel_segment and travel_stitch tasks so they do not appear in the sidebar
   const filteredTasks = useMemo(() => {
     if (!tasks) return [] as Task[];
+    console.log('[TaskList] Tasks before filtering invisible types:', tasks);
     const visibleTasks = filterVisibleTasks(tasks);
+    console.log('[TaskList] Tasks after filtering invisible types:', visibleTasks);
     // Sort: In Progress first, then by createdAt desc
     return visibleTasks.sort((a, b) => {
       const aInProgress = a.status === 'In Progress';

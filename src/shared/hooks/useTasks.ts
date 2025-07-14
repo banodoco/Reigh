@@ -129,6 +129,8 @@ export const useListTasks = (params: ListTasksParams) => {
         return []; 
       }
       
+      console.log(`[TaskList] Fetching tasks for project ${projectId} with statuses:`, status);
+
       // Build query
       let query = supabase
         .from('tasks')
@@ -143,6 +145,8 @@ export const useListTasks = (params: ListTasksParams) => {
 
       const { data, error } = await query;
       
+      console.log('[TaskList] Raw data from Supabase:', data);
+
       if (error) throw error;
       return (data || []).map(mapDbTaskToTask);
     },

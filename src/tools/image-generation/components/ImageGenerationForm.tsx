@@ -258,6 +258,7 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
   { onGenerate, isGenerating = false, hasApiKey: incomingHasApiKey = true, apiKey, openaiApiKey },
   ref
 ) => {
+  console.log('[ImageGenFormVisibilityIssue] Starting ImageGenerationForm render');
   const [prompts, setPrompts] = useState<PromptEntry[]>([]);
   const promptIdCounter = useRef(1);
   const [isPromptModalOpen, setIsPromptModalOpen] = useState(false);
@@ -290,6 +291,7 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
       afterEachPromptText: [afterEachPromptText, setAfterEachPromptText],
     }
   );
+  console.log('[ImageGenFormVisibilityIssue] usePersistentToolState returned ready:', ready, 'isSaving:', isSaving);
 
   const hasApiKey = true; // Always true for wan-local
 
@@ -526,6 +528,7 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
 
   // Show a minimal skeleton while settings hydrate so the layout is visible immediately
   if (!ready) {
+    console.log('[ImageGenFormVisibilityIssue] Not ready - showing skeleton loader');
     return (
       <div className="animate-pulse space-y-4">
         <div className="h-10 bg-muted rounded" />
@@ -534,6 +537,8 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
       </div>
     );
   }
+
+  console.log('[ImageGenFormVisibilityIssue] Ready - rendering full form. Persisted prompts:', prompts.length, 'loras:', selectedLoras.length);
 
   return (
     <>

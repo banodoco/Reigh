@@ -362,6 +362,7 @@ const ImageGenerationToolPage: React.FC = () => {
   const falApiKey = getApiKey('fal_api_key');
   const openaiApiKey = getApiKey('openai_api_key');
   const hasValidFalApiKey = true; // Always true - let the task creation handle validation
+  console.log('[ImageGenFormVisibilityIssue] hasValidFalApiKey set to:', hasValidFalApiKey);
 
   const targetShotIdForButton = lastAffectedShotId || (shots && shots.length > 0 ? shots[0].id : undefined);
   const targetShotNameForButtonTooltip = targetShotIdForButton 
@@ -420,6 +421,7 @@ const ImageGenerationToolPage: React.FC = () => {
 
       {!hasValidFalApiKey && (
         <div className="flex flex-col items-center justify-center h-full">
+          {console.log('[ImageGenFormVisibilityIssue] Entering no API key branch'), null}
           <p className="text-center text-sm text-muted-foreground">
             You need a valid API key to use this tool.
           </p>
@@ -434,11 +436,13 @@ const ImageGenerationToolPage: React.FC = () => {
       {/* Render only if API key is valid */}
       {hasValidFalApiKey && (
         <>
+          {console.log('[ImageGenFormVisibilityIssue] Entering form rendering branch'), null}
           <div ref={formContainerRef} className="mb-8 p-6 border rounded-lg shadow-sm bg-card">
             <ToolSettingsGate
               ready={true}
               loadingMessage="Loading image generation settings..."
             >
+              {console.log('[ImageGenFormVisibilityIssue] Inside ToolSettingsGate, rendering ImageGenerationForm'), null}
               <ImageGenerationForm
                 ref={imageGenerationFormRef}
                 onGenerate={handleNewGenerate}
