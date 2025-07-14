@@ -90,6 +90,20 @@ export default function HomePage() {
     }
   ];
 
+  // Prevent scrolling on mobile
+  useEffect(() => {
+    const isMobile = window.innerWidth <= 768;
+    if (isMobile) {
+      document.body.style.overflow = 'hidden';
+      document.body.style.height = '100vh';
+    }
+    
+    return () => {
+      document.body.style.overflow = '';
+      document.body.style.height = '';
+    };
+  }, []);
+
   return (
     <PageFadeIn className="min-h-screen wes-texture relative overflow-hidden">
       {/* Animated Background */}
@@ -239,27 +253,30 @@ export default function HomePage() {
               <TooltipProvider>
                 <Tooltip open={isTooltipOpen} onOpenChange={setIsTooltipOpen}>
                   <TooltipTrigger asChild>
-                    <div className="group relative cursor-pointer">
+                    <div 
+                      className="group relative cursor-pointer"
+                      onClick={() => setIsTooltipOpen(!isTooltipOpen)}
+                    >
                       {/* Floating particles */}
-                      <div className="absolute -inset-4 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                      <div className="absolute -inset-4 opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-opacity duration-500">
                         <div className="absolute top-0 left-0 w-1 h-1 bg-wes-vintage-gold rounded-full animate-ping" style={{ animationDelay: '0s' }}></div>
                         <div className="absolute top-2 right-1 w-0.5 h-0.5 bg-wes-coral rounded-full animate-ping" style={{ animationDelay: '0.3s' }}></div>
                         <div className="absolute bottom-1 left-2 w-0.5 h-0.5 bg-wes-mint rounded-full animate-ping" style={{ animationDelay: '0.6s' }}></div>
                       </div>
                       
                       {/* Spinning dashed ring */}
-                      <div className="absolute -inset-3 rounded-full border-2 border-dashed border-wes-vintage-gold/20 opacity-0 group-hover:opacity-100 group-hover:animate-spin transition-all duration-500"></div>
+                      <div className="absolute -inset-3 rounded-full border-2 border-dashed border-wes-vintage-gold/20 opacity-0 group-hover:opacity-100 group-active:opacity-100 group-hover:animate-spin group-active:animate-spin transition-all duration-500"></div>
                       
                       {/* Expanding glow */}
-                      <div className="absolute -inset-2 bg-gradient-to-r from-wes-vintage-gold/10 to-wes-coral/10 rounded-full blur-md opacity-0 group-hover:opacity-100 group-hover:scale-150 transition-all duration-500"></div>
+                      <div className="absolute -inset-2 bg-gradient-to-r from-wes-vintage-gold/10 to-wes-coral/10 rounded-full blur-md opacity-0 group-hover:opacity-100 group-active:opacity-100 group-hover:scale-150 group-active:scale-150 transition-all duration-500"></div>
                       
                       {/* Main icon container */}
-                      <div className="relative bg-white/80 backdrop-blur-sm rounded-full p-3 border-2 border-wes-vintage-gold/20 hover:border-wes-vintage-gold/40 transition-all duration-300 hover:shadow-wes-ornate group-hover:scale-110">
-                        <GitBranch className="w-5 h-5 text-wes-vintage-gold group-hover:animate-pulse transition-all duration-300" />
+                      <div className="relative bg-white/80 backdrop-blur-sm rounded-full p-3 border-2 border-wes-vintage-gold/20 hover:border-wes-vintage-gold/40 active:border-wes-vintage-gold/40 transition-all duration-300 hover:shadow-wes-ornate active:shadow-wes-ornate group-hover:scale-110 group-active:scale-110">
+                        <GitBranch className="w-5 h-5 text-wes-vintage-gold group-hover:animate-pulse group-active:animate-pulse transition-all duration-300" />
                       </div>
                     </div>
                   </TooltipTrigger>
-                  <TooltipContent className="max-w-md p-4">
+                  <TooltipContent className="max-w-xs sm:max-w-md p-3 sm:p-4 mx-2 sm:mx-0">
                     <p className="text-sm leading-relaxed">
                       Reigh is an{' '}
                       <a 
@@ -462,23 +479,6 @@ export default function HomePage() {
                 <p className="text-sm leading-relaxed">
                   Accessible, cheap/free capabilities delivered through great tools = a flourishing ecosystem for all artists.
                 </p>
-                
-                {/* Sign Up Button */}
-                {!session ? (
-                  <button
-                    onClick={handleDiscordSignIn}
-                    className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-gradient-to-r from-wes-coral to-wes-pink rounded-lg border-2 border-wes-coral/40 hover:border-wes-coral/60 transition-all duration-300 shadow-lg hover:shadow-xl text-white text-sm font-medium"
-                  >
-                    <span>Join Open Creative Partner Programme</span>
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => navigate('/tools')}
-                    className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-gradient-to-r from-wes-mint to-wes-vintage-gold rounded-lg border-2 border-wes-mint/40 hover:border-wes-mint/60 transition-all duration-300 shadow-lg hover:shadow-xl text-white text-sm font-medium"
-                  >
-                    <span>Go to Tools</span>
-                  </button>
-                )}
               </div>
             </div>
           </div>
@@ -595,23 +595,6 @@ export default function HomePage() {
                   <p className="text-left mb-6 font-serif text-lg italic transform -rotate-1" style={{ fontFamily: 'cursive' }}>
                     POM
                   </p>
-                  
-                  {/* Sign Up Button */}
-                  {!session ? (
-                    <button
-                      onClick={handleDiscordSignIn}
-                      className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-gradient-to-r from-wes-vintage-gold to-wes-coral rounded-lg border-2 border-wes-vintage-gold/40 hover:border-wes-vintage-gold/60 transition-all duration-300 shadow-lg hover:shadow-xl text-white text-sm font-medium"
-                    >
-                      <span>Sign Up</span>
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => navigate('/tools')}
-                      className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-gradient-to-r from-wes-mint to-wes-vintage-gold rounded-lg border-2 border-wes-mint/40 hover:border-wes-mint/60 transition-all duration-300 shadow-lg hover:shadow-xl text-white text-sm font-medium"
-                    >
-                      <span>Go to Tools</span>
-                    </button>
-                  )}
                 </div>
               </div>
             </div>
