@@ -1,15 +1,38 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { useRef, useCallback } from 'react';
-import { deepMerge } from '../lib/deepEqual';
 import { useProject } from '@/shared/contexts/ProjectContext';
-import { fetchWithAuth } from '@/lib/api';
 import { supabase } from '@/integrations/supabase/client';
-import React from 'react';
-
-// Removed baseUrl - using relative URLs with fetchWithAuth
+import { toolsManifest } from '@/tools';
 
 export type SettingsScope = 'user' | 'project' | 'shot';
+
+// Tool defaults registry - client-side version matching server
+const toolDefaults: Record<string, unknown> = Object.fromEntries(
+  toolsManifest.map(toolSettings => [toolSettings.id, toolSettings.defaults])
+);
+
+// Deep merge helper (client-side version)
+function deepMerge(target: any, ...sources: any[]): any {
+  if (!sources.length) return target;
+  const source = sources.shift();
+
+  if (isObject(target) && isObject(source)) {
+    for (const key in source) {
+      if (isObject(source[key])) {
+        if (!target[key]) Object.assign(target, { [key]: {} });
+        deepMerge(target[key], source[key]);
+      } else {
+        Object.assign(target, { [key]: source[key] });
+      }
+    }
+  }
+
+  return deepMerge(target, ...sources);
+}
+
+function isObject(item: any): boolean {
+  return item && typeof item === 'object' && !Array.isArray(item);
+}
 
 interface ToolSettingsContext {
   projectId?: string;
@@ -23,41 +46,125 @@ interface UpdateToolSettingsParams {
   patch: unknown;
 }
 
-export async function fetchToolSettings(toolId: string, ctx: ToolSettingsContext): Promise<unknown> {
-  const params = new URLSearchParams({ toolId });
-  if (ctx.projectId) params.append('projectId', ctx.projectId);
-  if (ctx.shotId) params.append('shotId', ctx.shotId);
+/**
+ * Fetch and merge tool settings from all scopes using direct Supabase calls
+ * This replaces the Express API approach for better mobile reliability
+ */
+async function fetchToolSettingsSupabase(toolId: string, ctx: ToolSettingsContext): Promise<unknown> {
+  try {
+    // Get current user
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      throw new Error('Authentication required');
+    }
 
-  const response = await fetchWithAuth(`/api/tool-settings/resolve?${params}`, {
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
+    // Fetch all needed data in parallel using Supabase client
+    const [userResult, projectResult, shotResult] = await Promise.all([
+      // User settings
+      supabase
+        .from('users')
+        .select('settings')
+        .eq('id', user.id)
+        .single(),
+      
+      // Project settings (if projectId provided)
+      ctx.projectId ? 
+        supabase
+          .from('projects')
+          .select('settings')
+          .eq('id', ctx.projectId)
+          .single() :
+        Promise.resolve({ data: null, error: null }),
+      
+      // Shot settings (if shotId provided)  
+      ctx.shotId ?
+        supabase
+          .from('shots')
+          .select('settings')
+          .eq('id', ctx.shotId)
+          .single() :
+        Promise.resolve({ data: null, error: null }),
+    ]);
 
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Failed to fetch tool settings' }));
-    throw new Error(error.error || 'Failed to fetch tool settings');
+    // Extract tool-specific settings from each scope
+    const userSettings = (userResult.data?.settings as any)?.[toolId] ?? {};
+    const projectSettings = (projectResult.data?.settings as any)?.[toolId] ?? {};
+    const shotSettings = (shotResult.data?.settings as any)?.[toolId] ?? {};
+
+    // Merge in priority order: defaults → user → project → shot
+    return deepMerge(
+      {},
+      toolDefaults[toolId] ?? {},
+      userSettings,
+      projectSettings,
+      shotSettings
+    );
+
+  } catch (error) {
+    console.error('[fetchToolSettingsSupabase] Error:', error);
+    throw error;
   }
-
-  return response.json();
 }
 
-async function updateToolSettings(params: UpdateToolSettingsParams): Promise<void> {
-  const response = await fetchWithAuth('/api/tool-settings', {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(params),
-  });
+/**
+ * Update tool settings using direct Supabase calls
+ */
+async function updateToolSettingsSupabase(params: UpdateToolSettingsParams): Promise<void> {
+  const { scope, id, toolId, patch } = params;
 
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Failed to update tool settings' }));
-    throw new Error(error.error || 'Failed to update tool settings');
+  try {
+    let tableName: string;
+    switch (scope) {
+      case 'user':
+        tableName = 'users';
+        break;
+      case 'project':
+        tableName = 'projects';
+        break;
+      case 'shot':
+        tableName = 'shots';
+        break;
+      default:
+        throw new Error(`Invalid scope: ${scope}`);
+    }
+
+    // Get current settings for this entity
+    const { data: currentEntity, error: fetchError } = await supabase
+      .from(tableName)
+      .select('settings')
+      .eq('id', id)
+      .single();
+
+    if (fetchError) {
+      throw new Error(`Failed to fetch current ${scope} settings: ${fetchError.message}`);
+    }
+
+    const currentSettings = (currentEntity?.settings as any) ?? {};
+    const currentToolSettings = currentSettings[toolId] ?? {};
+    const updatedToolSettings = deepMerge({}, currentToolSettings, patch);
+
+    // Update the settings
+    const { error: updateError } = await supabase
+      .from(tableName)
+      .update({
+        settings: {
+          ...currentSettings,
+          [toolId]: updatedToolSettings
+        }
+      })
+      .eq('id', id);
+
+    if (updateError) {
+      throw new Error(`Failed to update ${scope} settings: ${updateError.message}`);
+    }
+
+  } catch (error) {
+    console.error('[updateToolSettingsSupabase] Error:', error);
+    throw error;
   }
 }
 
-// Overload type definitions
+// Type overloads
 export function useToolSettings<T>(toolId: string, context?: { projectId?: string; shotId?: string; enabled?: boolean }): {
   settings: T | undefined;
   isLoading: boolean;
@@ -65,7 +172,10 @@ export function useToolSettings<T>(toolId: string, context?: { projectId?: strin
   isUpdating: boolean;
 };
 
-// Unified implementation
+/**
+ * Hook for managing tool settings with direct Supabase integration
+ * This replaces the Express API approach for better mobile reliability
+ */
 export function useToolSettings<T>(
   toolId: string,
   context?: { projectId?: string; shotId?: string; enabled?: boolean }
@@ -74,33 +184,24 @@ export function useToolSettings<T>(
   const queryClient = useQueryClient();
 
   // Determine parameter shapes
-  let projectId: string | undefined = context?.projectId ?? selectedProjectId;
-  let shotId: string | undefined = context?.shotId;
+  const projectId: string | undefined = context?.projectId ?? selectedProjectId;
+  const shotId: string | undefined = context?.shotId;
   const fetchEnabled: boolean = context?.enabled ?? true;
 
-  // Fetch merged settings from API
-  const { data: settings, isLoading } = useQuery({
+  // Fetch merged settings using Supabase
+  const { data: settings, isLoading, error } = useQuery({
     queryKey: ['toolSettings', toolId, projectId, shotId],
-    queryFn: async () => {
-      const params = new URLSearchParams({ toolId });
-      if (projectId) params.append('projectId', projectId);
-      if (shotId) params.append('shotId', shotId);
-      
-      const response = await fetchWithAuth(`/api/tool-settings/resolve?${params}`, {
-        headers: { 'Content-Type': 'application/json' },
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch tool settings');
-      }
-      
-      return response.json() as Promise<T>;
-    },
+    queryFn: () => fetchToolSettingsSupabase(toolId, { projectId, shotId }),
     enabled: !!toolId && fetchEnabled,
     staleTime: 10 * 60 * 1000, // 10 minutes
     gcTime: 15 * 60 * 1000, // 15 minutes
     refetchOnWindowFocus: false,
   });
+
+  // Log errors for debugging
+  if (error) {
+    console.error('[useToolSettings] Query error:', error);
+  }
 
   // Update settings mutation
   const updateMutation = useMutation({
@@ -118,30 +219,25 @@ export function useToolSettings<T>(
       }
       
       if (!idForScope) {
-        throw new Error('Missing identifier for tool settings update');
+        throw new Error(`Missing identifier for ${scope} tool settings update`);
       }
-      const response = await fetchWithAuth('/api/tool-settings', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          scope,
-          id: idForScope,
-          toolId,
-          patch: newSettings,
-        }),
+
+      await updateToolSettingsSupabase({
+        scope,
+        id: idForScope,
+        toolId,
+        patch: newSettings,
       });
-      
-      if (!response.ok) {
-        throw new Error('Failed to update tool settings');
-      }
-      
-      return response.json();
     },
     onSuccess: () => {
       // Invalidate the query to refetch updated settings
       queryClient.invalidateQueries({ 
         queryKey: ['toolSettings', toolId, projectId, shotId] 
       });
+    },
+    onError: (error: Error) => {
+      console.error('[useToolSettings] Update error:', error);
+      toast.error(`Failed to save ${toolId} settings: ${error.message}`);
     },
   });
 
@@ -150,7 +246,7 @@ export function useToolSettings<T>(
   };
 
   return {
-    settings,
+    settings: settings as T | undefined,
     isLoading,
     update,
     isUpdating: updateMutation.isPending,

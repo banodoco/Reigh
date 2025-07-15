@@ -307,7 +307,7 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
 - **deepEqual.ts**: Deep equality comparison utility with `sanitizeSettings()` function to ignore undefined values. Used by tool settings system to detect actual changes vs initialization.
 
 ##### Hooks
-- **useToolSettings.ts**: Manages tool-specific settings stored in database at user/project/shot scopes. Provides `useToolSettings<T>()` hook that fetches merged settings and `update()` function for saving. Settings cascade from app defaults → user → project → shot, with later scopes overriding earlier ones.
+- **useToolSettings.ts**: Manages tool-specific settings stored in database at user/project/shot scopes using **direct Supabase calls** (migrated from Express API for mobile reliability). Provides `useToolSettings<T>()` hook that fetches merged settings and `update()` function for saving. Settings cascade from app defaults → user → project → shot, with later scopes overriding earlier ones.
 
 ##### Services (`src/server/services/`)
 - **taskProcessingService.ts**: Processes task completions and creates generations

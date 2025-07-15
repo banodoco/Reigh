@@ -87,9 +87,18 @@ export function usePersistentToolState<T extends Record<string, any>>(
   // Get a unique key for the current entity (project/shot)
   const entityKey = scope === 'shot' ? context.shotId : context.projectId;
 
+  // Debug logging for mobile troubleshooting
+  useEffect(() => {
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    if (isMobile) {
+      console.log(`[usePersistentToolState] [${toolId}] Mobile detected - entityKey: ${entityKey}, enabled: ${enabled}, ready: ${ready}`);
+    }
+  }, [toolId, entityKey, enabled, ready]);
+
   // Reset hydration when entity changes
   useEffect(() => {
     if (entityKey !== hydratedForEntityRef.current) {
+      console.log(`[usePersistentToolState] [${toolId}] Entity changed: ${hydratedForEntityRef.current} → ${entityKey}`);
       hasHydratedRef.current = false;
       userHasInteractedRef.current = false;
       lastSavedSettingsRef.current = null;
@@ -97,11 +106,13 @@ export function usePersistentToolState<T extends Record<string, any>>(
       setReady(false);
       setHasUserInteracted(false);
     }
-  }, [entityKey]);
+  }, [entityKey, toolId]);
 
   // Hydrate local state from persisted settings
   useEffect(() => {
     if (!isLoadingSettings && !hasHydratedRef.current && entityKey) {
+      console.log(`[usePersistentToolState] [${toolId}] Hydrating settings:`, settings);
+      
       // Use an empty object if settings could not be fetched (e.g. first time or API failure)
       const effectiveSettings: Partial<T> = (settings as Partial<T>) || {};
       
@@ -111,14 +122,16 @@ export function usePersistentToolState<T extends Record<string, any>>(
       // Apply each setting to its corresponding setter
       Object.entries(stateMapping).forEach(([key, [_, setter]]) => {
         if (effectiveSettings[key as keyof T] !== undefined) {
+          console.log(`[usePersistentToolState] [${toolId}] Setting ${key}:`, effectiveSettings[key as keyof T]);
           setter(effectiveSettings[key as keyof T] as any);
         }
       });
 
       // Mark as ready after hydration
       setReady(true);
+      console.log(`[usePersistentToolState] [${toolId}] Hydration complete, ready: true`);
     }
-  }, [settings, isLoadingSettings, stateMapping, entityKey]);
+  }, [settings, isLoadingSettings, stateMapping, entityKey, toolId]);
 
   // Collect current state values from the mapping
   const getCurrentState = useCallback((): T => {
@@ -150,22 +163,36 @@ export function usePersistentToolState<T extends Record<string, any>>(
     saveTimeoutRef.current = setTimeout(async () => {
       const currentState = getCurrentState();
       
+      console.log(`[usePersistentToolState] [${toolId}] Attempting save:`, currentState);
+      
       // Check if we just saved these exact settings
       if (lastSavedSettingsRef.current && 
           deepEqual(sanitizeSettings(currentState), sanitizeSettings(lastSavedSettingsRef.current))) {
+        console.log(`[usePersistentToolState] [${toolId}] Skipping save - no changes detected`);
         return;
       }
 
       // Check if settings actually changed from what's in the database
       if (!isUpdating && !deepEqual(sanitizeSettings(currentState), sanitizeSettings(settings))) {
         try {
+          console.log(`[usePersistentToolState] [${toolId}] Saving to ${scope} scope...`);
           lastSavedSettingsRef.current = currentState;
           await updateSettings(scope, currentState);
           setSaveError(undefined);
+          console.log(`[usePersistentToolState] [${toolId}] Save successful`);
         } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          console.error(`[usePersistentToolState] [${toolId}] Save error:`, error);
           setSaveError(error as Error);
-          console.error('[usePersistentToolState] Save error:', error);
+          
+          // Mobile-specific error handling
+          const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+          if (isMobile) {
+            console.error(`[usePersistentToolState] [${toolId}] Mobile save failed - this should now work with Supabase migration. Error: ${errorMessage}`);
+          }
         }
+      } else {
+        console.log(`[usePersistentToolState] [${toolId}] Skipping save - already updating or no changes`);
       }
     }, debounceMs);
 
@@ -183,6 +210,7 @@ export function usePersistentToolState<T extends Record<string, any>>(
     isUpdating,
     scope,
     debounceMs,
+    toolId,
     // Include all state values to trigger saves on change
     ...Object.entries(stateMapping).map(([_, [value]]) => value)
   ]);
