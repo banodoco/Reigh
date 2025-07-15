@@ -10,9 +10,8 @@ import ShotListDisplay from '../components/ShotListDisplay';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 import { LoraModel } from '@/shared/components/LoraSelectorModal';
-import { usePersistentToolState } from '@/shared/hooks/usePersistentToolState';
-import { videoTravelSettings } from '../settings';
-import { type VideoTravelSettings } from '../settings';
+import { useToolSettings } from '@/shared/hooks/useToolSettings';
+import { VideoTravelSettings } from '../settings';
 import { deepEqual, sanitizeSettings } from '@/shared/lib/deepEqual';
 import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/shared/components/ui/skeleton';
@@ -52,43 +51,40 @@ const VideoTravelToolPage: React.FC = () => {
   const { data: publicLorasData } = useListPublicResources('lora');
   const availableLoras: LoraModel[] = publicLorasData?.map(resource => resource.metadata) || [];
 
-  // Define states
-  const [videoControlMode, setVideoControlMode] = useState(videoTravelSettings.defaults.videoControlMode);
-  const [batchVideoPrompt, setBatchVideoPrompt] = useState(videoTravelSettings.defaults.batchVideoPrompt);
-  const [batchVideoFrames, setBatchVideoFrames] = useState(videoTravelSettings.defaults.batchVideoFrames);
-  const [batchVideoContext, setBatchVideoContext] = useState(videoTravelSettings.defaults.batchVideoContext);
-  const [batchVideoSteps, setBatchVideoSteps] = useState(videoTravelSettings.defaults.batchVideoSteps);
-  const [dimensionSource, setDimensionSource] = useState(videoTravelSettings.defaults.dimensionSource);
-  const [customWidth, setCustomWidth] = useState(videoTravelSettings.defaults.customWidth);
-  const [customHeight, setCustomHeight] = useState(videoTravelSettings.defaults.customHeight);
-  const [steerableMotionSettings, setSteerableMotionSettings] = useState(videoTravelSettings.defaults.steerableMotionSettings);
-  const [enhancePrompt, setEnhancePrompt] = useState(videoTravelSettings.defaults.enhancePrompt);
-  const [generationMode, setGenerationMode] = useState(videoTravelSettings.defaults.generationMode);
-  const [pairConfigs, setPairConfigs] = useState(videoTravelSettings.defaults.pairConfigs || []);
-  const [framePositionsArray, setFramePositionsArray] = useState(videoTravelSettings.defaults.framePositions || []);
-
-  // Then the hook
-  const { ready, markAsInteracted } = usePersistentToolState<VideoTravelSettings>(
+  // Use tool settings for the selected shot - no need to pass userId, server knows it from auth
+  const { settings, update: updateSettings, isLoading: isLoadingSettings, isUpdating } = useToolSettings<VideoTravelSettings>(
     'travel-between-images',
-    { projectId: selectedProjectId, shotId: selectedShot?.id },
-    {
-      videoControlMode: [videoControlMode, setVideoControlMode],
-      batchVideoPrompt: [batchVideoPrompt, setBatchVideoPrompt],
-      batchVideoFrames: [batchVideoFrames, setBatchVideoFrames],
-      batchVideoContext: [batchVideoContext, setBatchVideoContext],
-      batchVideoSteps: [batchVideoSteps, setBatchVideoSteps],
-      dimensionSource: [dimensionSource, setDimensionSource],
-      customWidth: [customWidth, setCustomWidth],
-      customHeight: [customHeight, setCustomHeight],
-      steerableMotionSettings: [steerableMotionSettings, setSteerableMotionSettings],
-      enhancePrompt: [enhancePrompt, setEnhancePrompt],
-      generationMode: [generationMode, setGenerationMode],
-      pairConfigs: [pairConfigs, setPairConfigs],
-      selectedLoras: [selectedLoras, setSelectedLoras],
-      framePositions: [framePositionsArray, setFramePositionsArray],
-    },
-    { scope: 'shot', defaults: videoTravelSettings.defaults }
+    { shotId: selectedShot?.id, enabled: !!selectedShot }
   );
+
+  // Add state for video generation settings - wait for settings to load before initializing
+  const [videoControlMode, setVideoControlMode] = useState<'individual' | 'batch'>('batch');
+  const [batchVideoPrompt, setBatchVideoPrompt] = useState('');
+  const [batchVideoFrames, setBatchVideoFrames] = useState(30);
+  const [batchVideoContext, setBatchVideoContext] = useState(10);
+  const [batchVideoSteps, setBatchVideoSteps] = useState(4);
+  const [dimensionSource, setDimensionSource] = useState<'project' | 'firstImage' | 'custom'>('firstImage');
+  const [customWidth, setCustomWidth] = useState<number | undefined>(undefined);
+  const [customHeight, setCustomHeight] = useState<number | undefined>(undefined);
+  const [enhancePrompt, setEnhancePrompt] = useState<boolean>(false);
+  const [videoPairConfigs, setVideoPairConfigs] = useState<any[]>([]);
+  const [generationMode, setGenerationMode] = useState<'batch' | 'by-pair' | 'timeline'>('batch');
+  const [pairConfigs, setPairConfigs] = useState<any[]>([]);
+  const [steerableMotionSettings, setSteerableMotionSettings] = useState<SteerableMotionSettings>({
+    negative_prompt: '',
+    model_name: 'vace_14B',
+    seed: 789,
+    debug: true,
+    apply_reward_lora: false,
+    colour_match_videos: true,
+    apply_causvid: true,
+    use_lighti2x_lora: false,
+    fade_in_duration: '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
+    fade_out_duration: '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
+    after_first_post_generation_saturation: 1,
+    after_first_post_generation_brightness: 0,
+    show_input_images: false,
+  });
 
   const hasLoadedInitialSettings = useRef(false);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -113,17 +109,41 @@ const VideoTravelToolPage: React.FC = () => {
 
   // Update state when settings are loaded from database
   useEffect(() => {
-    if (ready && !hasLoadedInitialSettings.current) {
+    if (settings && !isLoadingSettings && !hasLoadedInitialSettings.current) {
       hasLoadedInitialSettings.current = true;
       // Reset user interaction flag when loading new settings
       userHasInteracted.current = false;
       
-      // Remove the useEffect for setting states, as hook hydrates them
-      // Remove lines like setVideoControlMode(ready.videoControlMode)
-      // Ensure defaults have all fields
-      // In save effect, compare to lastSaved, not ready.settings
+      setVideoControlMode(settings.videoControlMode || 'batch');
+      setBatchVideoPrompt(settings.batchVideoPrompt || '');
+      setBatchVideoFrames(settings.batchVideoFrames || 30);
+      setBatchVideoContext(settings.batchVideoContext || 10);
+      setBatchVideoSteps(settings.batchVideoSteps || 4);
+      setDimensionSource(settings.dimensionSource || 'firstImage');
+      setCustomWidth(settings.customWidth);
+      setCustomHeight(settings.customHeight);
+      setEnhancePrompt(settings.enhancePrompt || false);
+      setVideoPairConfigs(settings.pairConfigs || []);
+      setGenerationMode(settings.generationMode || 'batch');
+      setPairConfigs(settings.pairConfigs || []);
+      setSelectedLoras(settings.selectedLoras || []);
+      setSteerableMotionSettings(settings.steerableMotionSettings || {
+    negative_prompt: '',
+    model_name: 'vace_14B',
+    seed: 789,
+    debug: true,
+    apply_reward_lora: false,
+    colour_match_videos: true,
+    apply_causvid: true,
+    use_lighti2x_lora: false,
+    fade_in_duration: '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
+    fade_out_duration: '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
+    after_first_post_generation_saturation: 1,
+    after_first_post_generation_brightness: 0,
+    show_input_images: false,
+  });
     }
-  }, [ready, hasLoadedInitialSettings.current]);
+  }, [settings, isLoadingSettings]);
 
   // Reset loaded flag when switching shots
   useEffect(() => {
@@ -386,7 +406,7 @@ const VideoTravelToolPage: React.FC = () => {
 
   // Save settings to database whenever they change
   useEffect(() => {
-    if (selectedShot?.id && ready && userHasInteracted.current) {
+    if (selectedShot?.id && settings && hasLoadedInitialSettings.current && userHasInteracted.current) {
       // Clear any pending save
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
@@ -415,10 +435,10 @@ const VideoTravelToolPage: React.FC = () => {
           return;
         }
 
-        if (!ready.isUpdating && !deepEqual(sanitizeSettings(currentSettings), sanitizeSettings(ready.settings))) {
+        if (!isUpdating && !deepEqual(sanitizeSettings(currentSettings), sanitizeSettings(settings))) {
 
           lastSavedSettingsRef.current = currentSettings;
-          ready.update('shot', currentSettings);
+          updateSettings('shot', currentSettings);
         } else {          
         }
       }, 500); // Wait 500ms before saving
@@ -445,10 +465,9 @@ const VideoTravelToolPage: React.FC = () => {
     generationMode,
     JSON.stringify(pairConfigs),
     JSON.stringify(selectedLoras),
-    ready,
-    ready.update,
-    ready.isUpdating,
-    ready.settings
+    settings,
+    updateSettings,
+    isUpdating
   ]);
 
   const handleAddLora = (loraToAdd: LoraModel) => {
@@ -535,7 +554,7 @@ const VideoTravelToolPage: React.FC = () => {
         </>
       ) : (
         // Show a loading state while settings are being fetched
-        ready.isLoading ? (
+        isLoadingSettings ? (
           <PageFadeIn>
             <ShotEditor
               selectedShot={shotToEdit}

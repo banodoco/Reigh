@@ -6,7 +6,7 @@ import { Button } from '@/shared/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { CreateProjectModal } from '@/shared/components/CreateProjectModal';
-import { PlusCircle, Settings, Palette, Sparkles, Crown, Star, Gem, Wrench } from 'lucide-react';
+import { PlusCircle, Settings, Palette, Sparkles, Crown, Star, Gem, Wrench, ChevronDown } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { ProjectSettingsModal } from '@/shared/components/ProjectSettingsModal';
 import { toast } from "sonner";
@@ -129,12 +129,15 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                     onValueChange={handleProjectChange}
                     disabled={isLoadingProjects || projects.length === 0}
                   >
-                    <SelectTrigger className="w-[280px] wes-select border-3 border-wes-vintage-gold/30 bg-white/95 font-inter text-sm shadow-wes-vintage hover:shadow-wes-hover transition-all duration-500 wes-ornate-frame h-12">
+                    <SelectTrigger className="w-[280px] wes-select border-3 border-wes-vintage-gold/30 bg-white/95 font-inter text-sm shadow-wes-vintage hover:shadow-wes-hover transition-all duration-500 wes-ornate-frame h-12 justify-start">
                       <div className="flex items-center space-x-3 overflow-hidden min-w-0">
                         <div className="w-8 h-8 bg-gradient-to-br from-wes-vintage-gold to-wes-coral rounded-lg flex items-center justify-center">
                           <Palette className="h-4 w-4 text-white" />
                         </div>
-                        <SelectValue placeholder="Select a project" className="font-crimson text-primary block truncate" />
+                        <div className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
+                          <SelectValue placeholder="Select a project" className="font-crimson text-primary" />
+                        </div>
+                        <ChevronDown className="h-4 w-4 opacity-50 ml-2 flex-shrink-0" />
                       </div>
                     </SelectTrigger>
                     <SelectContent className="wes-vintage-card wes-ornate-frame border-3 border-wes-vintage-gold/30 shadow-wes-deep">
@@ -269,12 +272,15 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                   onValueChange={handleProjectChange}
                   disabled={isLoadingProjects || projects.length === 0}
                 >
-                  <SelectTrigger className="w-full wes-select border-2 border-wes-vintage-gold/30 bg-white/95 font-inter text-xs shadow-wes-vintage hover:shadow-wes-hover transition-all duration-500 wes-ornate-frame h-10">
+                  <SelectTrigger className="w-full wes-select border-2 border-wes-vintage-gold/30 bg-white/95 font-inter text-xs shadow-wes-vintage hover:shadow-wes-hover transition-all duration-500 wes-ornate-frame h-10 justify-start">
                     <div className="flex items-center space-x-2 overflow-hidden min-w-0">
                       <div className="w-6 h-6 bg-gradient-to-br from-wes-vintage-gold to-wes-coral rounded-md flex items-center justify-center">
                         <Palette className="h-3 w-3 text-white" />
                       </div>
-                      <SelectValue placeholder="Select project" className="font-crimson text-primary block truncate" />
+                      <div className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
+                        <SelectValue placeholder="Select project" className="font-crimson text-primary" />
+                      </div>
+                      <ChevronDown className="h-3 w-3 opacity-50 ml-1 flex-shrink-0" />
                     </div>
                   </SelectTrigger>
                   <SelectContent className="wes-vintage-card wes-ornate-frame border-2 border-wes-vintage-gold/30 shadow-wes-deep">

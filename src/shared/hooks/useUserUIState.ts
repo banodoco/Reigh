@@ -8,10 +8,7 @@ interface UISettings {
     gens: boolean;
   };
   settingsModal: {
-    activeInstallTab: string;
-    computerType: string;
-    onComputerChecked: boolean;
-    inCloudChecked: boolean;
+    activeTab: string;
   };
   videoTravelWidescreen: {
     enabled: boolean;

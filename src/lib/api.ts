@@ -24,10 +24,20 @@ function getApiUrl(path: string): string {
     return path;
   }
   
-  // In production/preview mode, use the full API server URL
-  const apiBaseUrl = import.meta.env.VITE_API_TARGET_URL || 'http://127.0.0.1:8085';
-  const cleanPath = path.startsWith('/') ? path : `/${path}`;
-  return `${apiBaseUrl}${cleanPath}`;
+  // In production/preview mode, prefer relative URLs unless an explicit target is provided.
+  // This ensures the client works correctly when accessed from mobile devices or
+  // multiple hosts where the absolute API target may differ (e.g. LAN IP vs localhost).
+  const apiBaseUrl = import.meta.env.VITE_API_TARGET_URL;
+
+  // If a custom base URL is configured, use it; otherwise default to a relative path so
+  // requests hit the same origin that served the frontend bundle (which is the most
+  // reliable behaviour across environments, including mobile Safari/PWA contexts).
+  if (apiBaseUrl && apiBaseUrl.trim() !== '') {
+    const cleanPath = path.startsWith('/') ? path : `/${path}`;
+    return `${apiBaseUrl}${cleanPath}`;
+  }
+
+  return path.startsWith('/') ? path : `/${path}`;
 }
 
 /**

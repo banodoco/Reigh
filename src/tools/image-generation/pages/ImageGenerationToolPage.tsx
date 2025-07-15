@@ -19,9 +19,6 @@ import { fetchWithAuth } from '@/lib/api';
 import { useCreateTask, useListTasks } from "@/shared/hooks/useTasks";
 import { PageFadeIn } from '@/shared/components/transitions';
 import { useSearchParams } from 'react-router-dom';
-import { usePersistentToolState } from '@/shared/hooks/usePersistentToolState';
-import { defaultImageGenerationSettings } from '../settings';
-import { type ImageGenerationSettings } from '../settings';
 
 // Remove unnecessary environment detection - tool should work in all environments
 
@@ -87,34 +84,6 @@ const ImageGenerationToolPage: React.FC = () => {
   const formContainerRef = useRef<HTMLDivElement>(null);
   const { selectedProjectId } = useProject();
   const [searchParams] = useSearchParams();
-
-  // Define states before hook
-  const [prompts, setPrompts] = useState(defaultImageGenerationSettings.prompts);
-  const [imagesPerPrompt, setImagesPerPrompt] = useState(defaultImageGenerationSettings.imagesPerPrompt);
-  const [selectedLorasByMode, setSelectedLorasByMode] = useState(defaultImageGenerationSettings.selectedLorasByMode);
-  const [depthStrength, setDepthStrength] = useState(defaultImageGenerationSettings.depthStrength);
-  const [softEdgeStrength, setSoftEdgeStrength] = useState(defaultImageGenerationSettings.softEdgeStrength);
-  const [generationMode, setGenerationMode] = useState(defaultImageGenerationSettings.generationMode);
-  const [beforeEachPromptText, setBeforeEachPromptText] = useState(defaultImageGenerationSettings.beforeEachPromptText);
-  const [afterEachPromptText, setAfterEachPromptText] = useState(defaultImageGenerationSettings.afterEachPromptText);
-
-  // Then the hook with mapping
-  // In handlers like set* add markAsInteracted()
-  const { ready, markAsInteracted } = usePersistentToolState<ImageGenerationSettings>(
-    'image-generation',
-    { projectId: selectedProjectId },
-    {
-      prompts: [prompts, setPrompts],
-      imagesPerPrompt: [imagesPerPrompt, setImagesPerPrompt],
-      selectedLorasByMode: [selectedLorasByMode, setSelectedLorasByMode],
-      depthStrength: [depthStrength, setDepthStrength],
-      softEdgeStrength: [softEdgeStrength, setSoftEdgeStrength],
-      generationMode: [generationMode, setGenerationMode],
-      beforeEachPromptText: [beforeEachPromptText, setBeforeEachPromptText],
-      afterEachPromptText: [afterEachPromptText, setAfterEachPromptText],
-    },
-    { scope: 'project', defaults: defaultImageGenerationSettings }
-  );
 
   // Track project tasks to know when they appear in the TasksPane (must be after selectedProjectId)
   const { data: projectTasks } = useListTasks({ projectId: selectedProjectId });
@@ -439,78 +408,76 @@ const ImageGenerationToolPage: React.FC = () => {
     : [...(generatedImagesData || [])];
 
   return (
-    <>
-      <PageFadeIn className="flex flex-col h-screen">
-        <header className="flex justify-between items-center mb-6 sticky top-0 bg-background py-4 z-40 border-b border-border/50 shadow-sm">
-          <h1 className="text-3xl font-bold">
-            Image Generation
-          </h1>
-          {/* <Button variant="ghost" onClick={() => setShowSettingsModal(true)}>
-            <Settings className="h-5 w-5" />
-            <span className="sr-only">Settings</span>
-          </Button> */}
-        </header>
+    <PageFadeIn className="flex flex-col h-screen">
+      <header className="flex justify-between items-center mb-6 sticky top-0 bg-background py-4 z-40 border-b border-border/50 shadow-sm">
+        <h1 className="text-3xl font-bold">
+          Image Generation
+        </h1>
+        {/* <Button variant="ghost" onClick={() => setShowSettingsModal(true)}>
+          <Settings className="h-5 w-5" />
+          <span className="sr-only">Settings</span>
+        </Button> */}
+      </header>
 
-        {!hasValidFalApiKey && (
-          <div className="flex flex-col items-center justify-center h-full">
-            {console.log('[ImageGenFormVisibilityIssue] Entering no API key branch'), null}
-            <p className="text-center text-sm text-muted-foreground">
-              You need a valid API key to use this tool.
-            </p>
-            <Button className="mt-4">
-              <a href="https://fal.ai/signup" target="_blank" rel="noopener noreferrer">
-                Sign Up for Fal
-              </a>
-            </Button>
-          </div>
-        )}
+      {!hasValidFalApiKey && (
+        <div className="flex flex-col items-center justify-center h-full">
+          {console.log('[ImageGenFormVisibilityIssue] Entering no API key branch'), null}
+          <p className="text-center text-sm text-muted-foreground">
+            You need a valid API key to use this tool.
+          </p>
+          <Button className="mt-4">
+            <a href="https://fal.ai/signup" target="_blank" rel="noopener noreferrer">
+              Sign Up for Fal
+            </a>
+          </Button>
+        </div>
+      )}
 
-        {/* Render only if API key is valid */}
-        {hasValidFalApiKey && (
-          <>
-            {console.log('[ImageGenFormVisibilityIssue] Entering form rendering branch'), null}
-            <div ref={formContainerRef} className="mb-8 p-6 border rounded-lg shadow-sm bg-card">
-              {ready ? (
-                <ImageGenerationForm
-                  ref={imageGenerationFormRef}
-                  onGenerate={handleNewGenerate}
-                  isGenerating={isGenerating}
-                  hasApiKey={hasValidFalApiKey}
-                  apiKey={falApiKey}
-                  openaiApiKey={openaiApiKey}
-                />
-              ) : (
-                <div className="flex items-center justify-center h-full">
-                  <p>Loading image generation settings...</p>
-                </div>
-              )}
-            </div>
-
-            <div ref={galleryRef} className="mt-8">
-              <ImageGallery
-                images={imagesToShow}
-                onDelete={handleDeleteImage}
-                onImageSaved={handleImageSaved}
-                onAddToLastShot={handleAddImageToTargetShot}
-                isDeleting={isDeleting}
-                allShots={validShots}
-                lastShotId={targetShotIdForButton}
-                lastShotNameForTooltip={targetShotNameForButtonTooltip}
-                currentToolType="image-generation"
-                initialMediaTypeFilter="image"
+      {/* Render only if API key is valid */}
+      {hasValidFalApiKey && (
+        <>
+          {console.log('[ImageGenFormVisibilityIssue] Entering form rendering branch'), null}
+          <div ref={formContainerRef} className="mb-8 p-6 border rounded-lg shadow-sm bg-card">
+            <ToolSettingsGate
+              ready={true}
+              loadingMessage="Loading image generation settings..."
+            >
+              {console.log('[ImageGenFormVisibilityIssue] Inside ToolSettingsGate, rendering ImageGenerationForm'), null}
+              <ImageGenerationForm
+                ref={imageGenerationFormRef}
+                onGenerate={handleNewGenerate}
+                isGenerating={isGenerating}
+                hasApiKey={hasValidFalApiKey}
+                apiKey={falApiKey}
+                openaiApiKey={openaiApiKey}
               />
-            </div>
-          </>
-        )}
+            </ToolSettingsGate>
+          </div>
+
+          <div ref={galleryRef} className="mt-8">
+            <ImageGallery
+              images={imagesToShow}
+              onDelete={handleDeleteImage}
+              onImageSaved={handleImageSaved}
+              onAddToLastShot={handleAddImageToTargetShot}
+              isDeleting={isDeleting}
+              allShots={validShots}
+              lastShotId={targetShotIdForButton}
+              lastShotNameForTooltip={targetShotNameForButtonTooltip}
+              currentToolType="image-generation"
+              initialMediaTypeFilter="image"
+            />
+          </div>
+        </>
+      )}
 
 
-        {/* Settings Modal */}
-        <SettingsModal
-          isOpen={showSettingsModal}
-          onOpenChange={setShowSettingsModal}
-        />
-      </PageFadeIn>
-    </>
+      {/* Settings Modal */}
+      <SettingsModal
+        isOpen={showSettingsModal}
+        onOpenChange={setShowSettingsModal}
+      />
+    </PageFadeIn>
   );
 };
 

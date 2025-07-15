@@ -17,6 +17,7 @@ import { Checkbox } from "@/shared/components/ui/checkbox";
 import { toast } from "sonner";
 import { useApiKeys } from "@/shared/hooks/useApiKeys";
 import { useApiTokens } from "@/shared/hooks/useApiTokens";
+import usePersistentState from "@/shared/hooks/usePersistentState";
 import { useUserUIState } from "@/shared/hooks/useUserUIState";
 import { useCredits } from "@/shared/hooks/useCredits";
 import { supabase } from "@/integrations/supabase/client";
@@ -69,19 +70,15 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const [isOpenAIKeyMasked, setIsOpenAIKeyMasked] = useState(false);
   const [isReplicateKeyMasked, setIsReplicateKeyMasked] = useState(false);
   
-  // Replace the incorrect useUserUIState calls:
-  const { value: settingsModalState, update: updateSettingsModal } = useUserUIState('settingsModal', {
-    activeInstallTab: "need-install",
-    computerType: "linux", 
-    onComputerChecked: true,
-    inCloudChecked: true
-  });
-
-  // Extract individual values for convenience:
-  const activeInstallTab = settingsModalState.activeInstallTab;
-  const computerType = settingsModalState.computerType;
-  const onComputerChecked = settingsModalState.onComputerChecked;
-  const inCloudChecked = settingsModalState.inCloudChecked;
+  // Installation tab preference (persistent)
+  const [activeInstallTab, setActiveInstallTab] = usePersistentState<string>("settings-install-tab", "need-install");
+  
+  // Computer type preference (persistent)
+  const [computerType, setComputerType] = usePersistentState<string>("computer-type", "linux");
+  
+  // Generation method preferences (persistent)
+  const [onComputerChecked, setOnComputerChecked] = usePersistentState<boolean>("generation-on-computer", true);
+  const [inCloudChecked, setInCloudChecked] = usePersistentState<boolean>("generation-in-cloud", true);
 
   // Copy command feedback states
   const [copiedInstallCommand, setCopiedInstallCommand] = useState(false);
@@ -292,7 +289,7 @@ python headless.py --db-type supabase \\
                   <Checkbox
                     id="in-cloud"
                     checked={inCloudChecked}
-                    onCheckedChange={(checked) => updateSettingsModal({ inCloudChecked: checked === true })}
+                    onCheckedChange={(checked) => setInCloudChecked(checked === true)}
                   />
                   <label
                     htmlFor="in-cloud"
@@ -306,7 +303,7 @@ python headless.py --db-type supabase \\
                   <Checkbox
                     id="on-computer"
                     checked={onComputerChecked}
-                    onCheckedChange={(checked) => updateSettingsModal({ onComputerChecked: checked === true })}
+                    onCheckedChange={(checked) => setOnComputerChecked(checked === true)}
                   />
                   <label
                     htmlFor="on-computer"
@@ -389,7 +386,7 @@ python headless.py --db-type supabase \\
                               name="computer-type"
                               value="linux"
                               checked={computerType === "linux"}
-                              onChange={(e) => updateSettingsModal({ computerType: e.target.value })}
+                              onChange={(e) => setComputerType(e.target.value)}
                               className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-2"
                             />
                             <label htmlFor="linux" className="text-sm font-medium">
@@ -403,7 +400,7 @@ python headless.py --db-type supabase \\
                               name="computer-type"
                               value="windows"
                               checked={computerType === "windows"}
-                              onChange={(e) => updateSettingsModal({ computerType: e.target.value })}
+                              onChange={(e) => setComputerType(e.target.value)}
                               className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-2"
                             />
                             <label htmlFor="windows" className="text-sm font-medium">
@@ -443,7 +440,7 @@ python headless.py --db-type supabase \\
                       </div>
                     </div>
                     
-                    <Tabs value={activeInstallTab} onValueChange={(value) => updateSettingsModal({ activeInstallTab: value })} className="w-full">
+                    <Tabs value={activeInstallTab} onValueChange={setActiveInstallTab} className="w-full">
                       <TabsList className="grid w-full grid-cols-2 bg-gray-100 border border-gray-200">
                         <TabsTrigger 
                           value="need-install"

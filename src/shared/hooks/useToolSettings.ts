@@ -104,13 +104,28 @@ export function useToolSettings<T>(
 
   // Update settings mutation
   const updateMutation = useMutation({
-    mutationFn: async ({ scope, id, settings: newSettings }: { scope: SettingsScope; id: string; settings: Partial<T> }) => {
+    mutationFn: async ({ scope, settings: newSettings }: { scope: SettingsScope; settings: Partial<T> }) => {
+      let idForScope: string | undefined;
+      
+      if (scope === 'user') {
+        // Get userId from auth for user scope
+        const { data: { user } } = await supabase.auth.getUser();
+        idForScope = user?.id;
+      } else if (scope === 'project') {
+        idForScope = projectId;
+      } else if (scope === 'shot') {
+        idForScope = shotId;
+      }
+      
+      if (!idForScope) {
+        throw new Error('Missing identifier for tool settings update');
+      }
       const response = await fetchWithAuth('/api/tool-settings', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           scope,
-          id,
+          id: idForScope,
           toolId,
           patch: newSettings,
         }),
@@ -130,20 +145,8 @@ export function useToolSettings<T>(
     },
   });
 
-  const update = async (scope: SettingsScope, settings: Partial<T>) => {
-    let idForScope: string | undefined;
-    if (scope === 'user') {
-      const { data: { user } } = await supabase.auth.getUser();
-      idForScope = user?.id;
-    } else if (scope === 'project') {
-      idForScope = projectId;
-    } else if (scope === 'shot') {
-      idForScope = shotId;
-    }
-    if (!idForScope) {
-      throw new Error('Missing identifier for tool settings update');
-    }
-    updateMutation.mutate({ scope, id: idForScope, settings });
+  const update = (scope: SettingsScope, settings: Partial<T>) => {
+    return updateMutation.mutate({ scope, settings });
   };
 
   return {

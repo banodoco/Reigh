@@ -24,7 +24,6 @@ export interface VideoTravelSettings {
   shotImageIds?: string[];
   // Store selected LoRAs
   selectedLoras?: ActiveLora[];
-  framePositions?: [string, number][];
 }
 
 export const videoTravelSettings = {
@@ -54,6 +53,5 @@ export const videoTravelSettings = {
       after_first_post_generation_brightness: 0,
       show_input_images: false,
     },
-    framePositions: [],
   },
 }; 
