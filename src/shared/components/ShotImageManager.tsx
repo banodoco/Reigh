@@ -56,7 +56,7 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [mobileSelectedId, setMobileSelectedId] = useState<string | null>(null);
+  const [mobileSelectedIds, setMobileSelectedIds] = useState<string[]>([]);
   const isMobile = useIsMobile();
   const outerRef = useRef<HTMLDivElement>(null);
 
@@ -65,15 +65,15 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
     if (!isMobile) return;
 
     const handleDocClick = (e: MouseEvent) => {
-      if (!mobileSelectedId) return;
+      if (mobileSelectedIds.length === 0) return;
       if (outerRef.current && !outerRef.current.contains(e.target as Node)) {
-        setMobileSelectedId(null);
+        setMobileSelectedIds([]);
       }
     };
 
     document.addEventListener('click', handleDocClick);
     return () => document.removeEventListener('click', handleDocClick);
-  }, [mobileSelectedId, isMobile]);
+  }, [mobileSelectedIds.length, isMobile]);
 
   const sensors = useSensors(
     useSensor(MouseSensor, {
@@ -161,12 +161,12 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
     
     // Mobile behavior for batch mode
     if (isMobile && generationMode === 'batch') {
-      if (mobileSelectedId === id) {
+      if (mobileSelectedIds.includes(id)) {
         // Clicking on selected image deselects it
-        setMobileSelectedId(null);
+        setMobileSelectedIds(prev => prev.filter(selectedId => selectedId !== id));
       } else {
-        // Select the image
-        setMobileSelectedId(id);
+        // Add to selection
+        setMobileSelectedIds(prev => [...prev, id]);
       }
       return;
     }
@@ -184,25 +184,32 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
   const handleMobileDoubleClick = (index: number) => {
     if (isMobile && generationMode === 'batch') {
       setLightboxIndex(index);
-      setMobileSelectedId(null); // Clear selection when opening lightbox
+      setMobileSelectedIds([]); // Clear selection when opening lightbox
     }
   };
 
   const handleMoveHere = (targetIndex: number) => {
-    if (!mobileSelectedId) return;
+    if (mobileSelectedIds.length === 0) return;
     
-    const selectedIndex = images.findIndex(img => img.shotImageEntryId === mobileSelectedId);
-    if (selectedIndex === -1) return;
+    // Get selected items and remaining items
+    const selectedItems = images.filter(img => mobileSelectedIds.includes(img.shotImageEntryId));
+    const remainingItems = images.filter(img => !mobileSelectedIds.includes(img.shotImageEntryId));
     
-    let newOrder = [...images];
-    const [removed] = newOrder.splice(selectedIndex, 1);
+    // Calculate adjusted target index based on selected items before target
+    const selectedIndicesBefore = mobileSelectedIds
+      .map(id => images.findIndex(img => img.shotImageEntryId === id))
+      .filter(idx => idx < targetIndex).length;
+    const adjustedTargetIndex = Math.max(0, targetIndex - selectedIndicesBefore);
     
-    // Adjust target index if moving from before to after
-    const adjustedIndex = selectedIndex < targetIndex ? targetIndex - 1 : targetIndex;
-    newOrder.splice(adjustedIndex, 0, removed);
+    // Insert selected items at target position
+    const newOrder = [
+      ...remainingItems.slice(0, adjustedTargetIndex),
+      ...selectedItems,
+      ...remainingItems.slice(adjustedTargetIndex)
+    ];
     
     onImageReorder(newOrder.map(img => img.shotImageEntryId));
-    setMobileSelectedId(null); // Clear selection after move
+    setMobileSelectedIds([]); // Clear selection after move
   };
 
   const handleNext = () => {
@@ -424,13 +431,13 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
         onClick={(e)=>{
           const target=e.target as HTMLElement;
           if(!target.closest('[data-mobile-item]')){
-            setMobileSelectedId(null);
+            setMobileSelectedIds([]);
           }
         }}>
         
         <div className={cn("grid gap-3 grid-cols-3")}>
           {images.map((image, index) => {
-            const isSelected = image.shotImageEntryId === mobileSelectedId;
+            const isSelected = mobileSelectedIds.includes(image.shotImageEntryId);
             const isLastItem = index === images.length - 1;
             
             return (
@@ -446,7 +453,7 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
                    />
                    
                   {/* Move button before first image */}
-                  {index === 0 && mobileSelectedId && (
+                  {index === 0 && mobileSelectedIds.length > 0 && (
                     <div className="absolute top-1/2 -left-1 -translate-y-1/2 -translate-x-1/2 z-10">
                       <Button
                         size="icon"
@@ -462,7 +469,7 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
                   )}
 
                   {/* Move here button after this item */}
-                  {mobileSelectedId && (
+                  {mobileSelectedIds.length > 0 && (
                     <div 
                       className="absolute top-1/2 -right-1 -translate-y-1/2 translate-x-1/2 z-10"
                     >
@@ -514,7 +521,7 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
             <SortableImageItem
               key={image.shotImageEntryId}
               image={image}
-              isSelected={isMobile && generationMode === 'batch' ? image.shotImageEntryId === mobileSelectedId : selectedIds.includes(image.shotImageEntryId)}
+              isSelected={isMobile && generationMode === 'batch' ? mobileSelectedIds.includes(image.shotImageEntryId) : selectedIds.includes(image.shotImageEntryId)}
               onClick={(e) => handleItemClick(image.shotImageEntryId, e)}
               onDelete={() => onImageDelete(image.shotImageEntryId)}
               onDoubleClick={() => isMobile && generationMode === 'batch' ? handleMobileDoubleClick(index) : setLightboxIndex(index)}
