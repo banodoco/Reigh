@@ -9,6 +9,11 @@ export interface StateMapping<T> {
 export interface UsePersistentToolStateOptions {
   debounceMs?: number;
   scope?: SettingsScope;
+  /**
+   * If false, the hook will skip fetching/saving settings and immediately report ready=true.
+   * Useful when the relevant entity (e.g. project) has not been selected yet.
+   */
+  enabled?: boolean;
 }
 
 export interface UsePersistentToolStateResult {
@@ -45,15 +50,27 @@ export function usePersistentToolState<T extends Record<string, any>>(
   stateMapping: StateMapping<T>,
   options: UsePersistentToolStateOptions = {}
 ): UsePersistentToolStateResult {
-  const { debounceMs = 500, scope = 'project' } = options;
+  const { debounceMs = 500, scope = 'project', enabled = true } = options;
   
+  // Fast-path: if persistence is disabled, provide a noop implementation so the UI can render immediately.
+  if (!enabled) {
+    const noop = () => {};
+    return {
+      ready: true,
+      isSaving: false,
+      saveError: undefined,
+      hasUserInteracted: false,
+      markAsInteracted: noop,
+    } as UsePersistentToolStateResult;
+  }
+
   // Obtain current settings and mutation helpers
   const {
     settings,
     isLoading: isLoadingSettings,
     update: updateSettings,
     isUpdating,
-  } = useToolSettings<T>(toolId, context);
+  } = useToolSettings<T>(toolId, { ...context, enabled });
 
   // Track hydration and interaction state
   const hasHydratedRef = useRef(false);

@@ -121,7 +121,7 @@ const ToolCard = ({ item, isSquare = false, index, isVisible }: { item: any, isS
 
       {/* Horizontal layout for Process tools */}
       {!isSquare ? (
-        <div className="flex items-center h-full p-3 sm:p-4 lg:p-6 relative">
+        <div className="flex items-center h-full p-2 sm:p-2 lg:p-3 relative">
           {/* Large subtle number in background - hidden on mobile */}
           {index !== undefined && (
             <div className="absolute right-4 lg:right-6 top-1/2 -translate-y-1/2 -translate-y-5 hidden lg:block">
@@ -150,7 +150,7 @@ const ToolCard = ({ item, isSquare = false, index, isVisible }: { item: any, isS
         </div>
       ) : (
         /* Square layout for Assistant tools - Responsive padding and sizing */
-        <div className="p-4 sm:p-5 lg:p-6 h-full flex flex-col">
+        <div className="p-2 sm:p-3 lg:p-4 h-full flex flex-col">
           {/* Tool Header without icon */}
           <div className="wes-symmetry mb-2 sm:mb-3 relative">
             <div className="">
@@ -242,7 +242,7 @@ const ToolSelectorPage: React.FC = () => {
       <div className="absolute top-40 right-20 w-24 h-24 bg-wes-yellow/15 rounded-full blur-2xl animate-parallax-float" style={{ animationDelay: '2s' }}></div>
       <div className="absolute bottom-20 left-1/4 w-40 h-40 bg-wes-lavender/10 rounded-full blur-3xl animate-parallax-float" style={{ animationDelay: '4s' }}></div>
       
-      <div className="container mx-auto px-3 sm:px-4 pt-3 sm:pt-4 pb-12 sm:pb-16 relative z-10">
+      <div className="container mx-auto px-1 sm:px-2 pt-3 sm:pt-4 pb-12 sm:pb-16 relative z-10">
         {/* Responsive Layout */}
         <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 lg:gap-8 max-w-7xl mx-auto">
           {/* Process Column - Full width on mobile, 2/3 on desktop */}

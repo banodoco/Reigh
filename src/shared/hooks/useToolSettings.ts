@@ -97,8 +97,9 @@ export function useToolSettings<T>(
       return response.json() as Promise<T>;
     },
     enabled: !!toolId && fetchEnabled,
-    staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
-    gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
+    staleTime: 10 * 60 * 1000, // 10 minutes
+    gcTime: 15 * 60 * 1000, // 15 minutes
+    refetchOnWindowFocus: false,
   });
 
   // Update settings mutation

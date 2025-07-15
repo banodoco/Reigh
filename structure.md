@@ -12,6 +12,11 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
 - **Backend & DB**: Supabase (Postgres DB, Storage, typed client), Express.js (Node.js API server), Hono (lightweight router for modular routes)
 - **AI**: FAL-AI (image generation API)
 
+### Performance & Optimization
+- **Query Optimization**: TanStack Query configured with extended cache times (10-15 min), disabled window refocus refetching, and retry prevention to avoid observer conflicts
+- **Lazy Loading**: Most tool pages use React.lazy() except ImageGenerationToolPage (removed to prevent TanStack Query v5 observer initialization issues during direct navigation)
+- **Persistent State**: Tools use `usePersistentToolState` with enabled/disabled flag to prevent blocking when dependencies (like projectId) aren't ready
+
 ### Ports
 - Frontend (Vite): `2222`
 - Backend (Express): `8085` (default, configurable via process.env.PORT)

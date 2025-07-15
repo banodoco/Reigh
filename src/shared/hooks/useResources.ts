@@ -27,6 +27,8 @@ export const useListPublicResources = (type: 'lora') => {
             if (error) throw error;
             return data || [];
         },
+        staleTime: 10 * 60 * 1000, // 10 minutes
+        refetchOnWindowFocus: false,
     });
 };
 

@@ -3,8 +3,9 @@ import { createBrowserRouter, RouterProvider, redirect } from 'react-router-dom'
 import ToolSelectorPage from '@/pages/ToolSelectorPage';
 import HomePage from '@/pages/HomePage';
 import ArtPage from '@/pages/ArtPage';
-// Lazy load tool pages for better performance
-const ImageGenerationToolPage = React.lazy(() => import('@/tools/image-generation/pages/ImageGenerationToolPage'));
+// Import ImageGenerationToolPage directly to prevent lazy loading issues with TanStack Query
+import ImageGenerationToolPage from '@/tools/image-generation/pages/ImageGenerationToolPage';
+// Lazy load other tool pages for better performance
 const VideoTravelToolPage = React.lazy(() => import('@/tools/travel-between-images/pages/VideoTravelToolPage'));
 const EditTravelToolPage = React.lazy(() => import('@/tools/edit-travel/pages/EditTravelToolPage'));
 const TrainingDataHelperPage = React.lazy(() => import('@/tools/training-data-helper/pages/TrainingDataHelperPage'));
@@ -64,11 +65,7 @@ const router = createBrowserRouter([
       },
       {
         path: '/tools/image-generation',
-        element: (
-          <Suspense fallback={<LazyLoadingFallback />}>
-            <ImageGenerationToolPage />
-          </Suspense>
-        ),
+        element: <ImageGenerationToolPage />,
       },
       {
         path: '/tools/travel-between-images',

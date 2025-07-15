@@ -13,7 +13,22 @@ import { useWebSocket } from '@/shared/hooks/useWebSocket';
 import { PanesProvider } from '@/shared/contexts/PanesContext';
 import { CurrentShotProvider } from '@/shared/contexts/CurrentShotContext';
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Disable automatic retries to prevent observer issues
+      retry: false,
+      // Ensure queries don't refetch on window focus by default
+      refetchOnWindowFocus: false,
+      // Prevent stale time issues
+      staleTime: 5 * 60 * 1000, // 5 minutes
+    },
+    mutations: {
+      // Disable retries for mutations too
+      retry: false,
+    },
+  },
+});
 
 // New inner component that uses the context
 const AppInternalContent = () => {
