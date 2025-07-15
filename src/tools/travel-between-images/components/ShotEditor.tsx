@@ -34,7 +34,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/shared/components/ui/toggle-grou
 import { useListTasks, useCancelTask, useCreateTask } from "@/shared/hooks/useTasks";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from '@tanstack/react-query';
-import { fetchWithAuth } from '@/lib/api';
+
 import SettingsModal from '@/shared/components/SettingsModal';
 import Timeline from "@/tools/travel-between-images/components/Timeline";
 import { useCreateGeneration, useUpdateGenerationLocation } from '@/shared/hooks/useGenerations';

@@ -4,7 +4,8 @@ import { useApiKeys } from '@/shared/hooks/useApiKeys';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { uploadImageToStorage } from '@/shared/lib/imageUploader';
-import { Json } from '@/integrations/supabase/types';
+// Json type definition for params
+type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 import { GeneratedImageWithMetadata, DisplayableMetadata, MetadataLora } from '@/shared/components/ImageGallery';
 import { PromptEntry } from '@/tools/image-generation/components/ImageGenerationForm'; // Assuming this path, adjust if needed
 import { nanoid } from 'nanoid';
@@ -230,39 +231,31 @@ export const useFalImageGeneration = (): UseFalImageGenerationResult => {
         
         Object.keys(taskDbParamsForApi).forEach(key => (taskDbParamsForApi as any)[key] === undefined && delete (taskDbParamsForApi as any)[key]);
 
-        const apiPayload = {
-            project_id: selectedProjectId,
-            task_type: toolType, // toolType from params is used as task_type for API
-            params: taskDbParamsForApi as unknown as Json,
-            status: 'Queued',
-        };
+        // Generate a unique task ID
+        const taskId = nanoid();
 
-        // Optionally include API key in request headers if backend expects it
-        const falApiKey = getApiKey('fal_api_key');
-        toast.info(`Creating '${toolType}' task via API...`);
+        // Use Supabase Edge Function to create task
+        toast.info(`Creating '${toolType}' task via Supabase...`);
 
-        const response = await fetch('/api/tasks', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', ...(falApiKey ? { 'X-Fal-Key': falApiKey } : {}) },
-            body: JSON.stringify(apiPayload)
+        const { data, error } = await supabase.functions.invoke('create_task', {
+            body: {
+                task_id: taskId,
+                params: taskDbParamsForApi as unknown as Json,
+                task_type: toolType,
+                project_id: selectedProjectId,
+                dependant_on: null
+            }
         });
 
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({ message: response.statusText }));
-            throw new Error(errorData.message || `HTTP error ${response.status}`);
+        if (error) {
+            console.error('[useFalImageGeneration] Task creation error:', error);
+            throw new Error(error.message || 'Failed to create task');
         }
 
-        const newTask = await response.json();
-
-        if (newTask && newTask.id) {
-          const taskIdStr = String(newTask.id);
-          console.log(`[useFalImageGeneration] Task created via API (type: ${toolType}):`, newTask);
-          toast.success(`Task '${toolType}' (ID: ${taskIdStr.substring(0,8)}) created successfully via API.`);
-          return { taskId: taskIdStr };
-        } else {
-          toast.error("Task creation via API returned no data or task ID.");
-          return null;
-        }
+        const taskIdStr = String(taskId);
+        console.log(`[useFalImageGeneration] Task created via Supabase (type: ${toolType}):`, { taskId: taskIdStr });
+        toast.success(`Task '${toolType}' (ID: ${taskIdStr.substring(0,8)}) created successfully via Supabase.`);
+        return { taskId: taskIdStr };
 
       } catch (err: any) {
         console.error(`[useFalImageGeneration] Exception during API task creation (type: ${params.toolType}):`, err);

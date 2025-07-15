@@ -4,7 +4,6 @@ import { Shot, ShotImage, GenerationRow } from '@/types/shots';
 import { Database } from '@/integrations/supabase/types';
 import { uploadImageToStorage } from '@/shared/lib/imageUploader';
 import { toast } from 'sonner';
-import { fetchWithAuth } from '@/lib/api';
 import React from 'react';
 
 // Define the type for the new shot data returned by Supabase

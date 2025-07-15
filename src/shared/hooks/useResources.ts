@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { fetchWithAuth } from '@/lib/api';
 import { LoraModel } from '@/shared/components/LoraSelectorModal';
 import { supabase } from '@/integrations/supabase/client';
 

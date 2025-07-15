@@ -220,11 +220,11 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       width: 'auto',
                       minHeight: '40vh'
                     }}>
-                      <SimpleVideoPlayer
-                        src={displayUrl}
-                        poster={media.thumbUrl}
+                    <SimpleVideoPlayer
+                      src={displayUrl}
+                      poster={media.thumbUrl}
                         className="w-full h-full max-h-[85vh] sm:max-h-[80vh] object-contain"
-                      />
+                    />
                     </div>
                   ) : (
                     <HoverScrubVideo

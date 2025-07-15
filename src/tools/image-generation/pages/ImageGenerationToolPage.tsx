@@ -11,11 +11,11 @@ import { useLastAffectedShot } from "@/shared/hooks/useLastAffectedShot";
 import { useProject } from "@/shared/contexts/ProjectContext";
 import { uploadImageToStorage } from '@/shared/lib/imageUploader';
 import { nanoid } from 'nanoid';
-import { useGenerations, useDeleteGeneration } from "@/shared/hooks/useGenerations";
+import { useGenerations, useDeleteGeneration, useUpdateGenerationLocation } from "@/shared/hooks/useGenerations";
 import { Settings } from "lucide-react";
 import { useApiKeys } from '@/shared/hooks/useApiKeys';
 import { useQueryClient } from '@tanstack/react-query';
-import { fetchWithAuth } from '@/lib/api';
+
 import { useCreateTask, useListTasks } from "@/shared/hooks/useTasks";
 import { PageFadeIn } from '@/shared/components/transitions';
 import { useSearchParams } from 'react-router-dom';
@@ -92,6 +92,7 @@ const ImageGenerationToolPage: React.FC = () => {
   const { lastAffectedShotId, setLastAffectedShotId } = useLastAffectedShot();
   const { data: generatedImagesData, isLoading: isLoadingGenerations } = useGenerations(selectedProjectId);
   const deleteGenerationMutation = useDeleteGeneration();
+  const updateGenerationLocationMutation = useUpdateGenerationLocation();
 
   const queryClient = useQueryClient();
 
@@ -316,22 +317,12 @@ const ImageGenerationToolPage: React.FC = () => {
     console.log(`[ImageGeneration-HandleImageSaved] Starting image update process:`, { imageId, newImageUrl });
     
     try {
-      // Update the database record via local API
+      // Update the database record via Supabase
       console.log(`[ImageGeneration-HandleImageSaved] Updating database record for image:`, imageId);
-      const response = await fetch(`/api/generations/${imageId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ location: newImageUrl }),
+      await updateGenerationLocationMutation.mutateAsync({
+        id: imageId,
+        location: newImageUrl,
       });
-
-      if (!response.ok) {
-        const errorData = await response.text();
-        console.error("[ImageGeneration-HandleImageSaved] Database update error:", errorData);
-        toast.error("Failed to update image in database.");
-        return;
-      }
 
       console.log(`[ImageGeneration-HandleImageSaved] Database update successful for image:`, imageId);
 
@@ -421,7 +412,6 @@ const ImageGenerationToolPage: React.FC = () => {
 
       {!hasValidFalApiKey && (
         <div className="flex flex-col items-center justify-center h-full">
-          {console.log('[ImageGenFormVisibilityIssue] Entering no API key branch'), null}
           <p className="text-center text-sm text-muted-foreground">
             You need a valid API key to use this tool.
           </p>
@@ -436,13 +426,11 @@ const ImageGenerationToolPage: React.FC = () => {
       {/* Render only if API key is valid */}
       {hasValidFalApiKey && (
         <>
-          {console.log('[ImageGenFormVisibilityIssue] Entering form rendering branch'), null}
           <div ref={formContainerRef} className="mb-8 p-6 border rounded-lg shadow-sm bg-card">
             <ToolSettingsGate
               ready={true}
               loadingMessage="Loading image generation settings..."
             >
-              {console.log('[ImageGenFormVisibilityIssue] Inside ToolSettingsGate, rendering ImageGenerationForm'), null}
               <ImageGenerationForm
                 ref={imageGenerationFormRef}
                 onGenerate={handleNewGenerate}

@@ -52,13 +52,15 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
 | `/supabase/functions/generate-pat/` | Edge Function for generating personal access tokens (PAT) for local worker scripts |
 | `/supabase/functions/revoke-pat/` | Edge Function for revoking personal access tokens |
 | `/supabase/functions/calculate-task-cost/` | Edge Function for calculating task costs based on execution time and adding to credit ledger |
-| **API Endpoints** | |
+| **API Endpoints (Remaining)** | |
 | `POST /api/local-image-upload` | Upload single image files to server local storage |
 | `POST /api/upload-flipped-image` | Upload processed (flipped) images from lightbox edit functionality |
-| `PATCH /api/generations/:id` | Update generation location (used by horizontal flip save functionality) |
-| `GET /api/tool-settings/resolve` | Resolve merged tool settings from user/project/shot scopes |
-| `PATCH /api/tool-settings` | Update tool settings at specific scope |
-| `GET /api/tool-settings/from-task/:taskId` | Extract tool settings from task parameters |
+| **Migrated to Supabase** | |
+| `~~PATCH /api/generations/:id~~` | ~~Update generation location~~ → Now uses `useUpdateGenerationLocation` hook |
+| `~~GET /api/tool-settings/*~~` | ~~Tool settings endpoints~~ → Now uses direct Supabase in `useToolSettings` |
+| `~~GET /api/tasks/*~~` | ~~Task management~~ → Now uses `useTasks` hooks with direct Supabase |
+| `~~GET/POST /api/credits/*~~` | ~~Credits system~~ → Now uses `useCredits` with Supabase + Edge Functions |
+| `~~GET/POST/DELETE /api/generations/*~~` | ~~Generation CRUD~~ → Now uses `useGenerations` hooks |
 
 ### DB Workflow (Drizzle ORM - SQLite & PostgreSQL)
 1. **Schema**: `/db/schema/schema.ts` (Drizzle, PG-first)
@@ -167,12 +169,20 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
 - `steerable-motion`: Handles video travel generation tasks
 - `ai-prompt`: Unified prompt generation, editing, and summary tasks via OpenAI server-side
 
-##### Remaining Express Endpoints (to be migrated):
-- `/api/tasks/*` - Task management (list, update status, cancel)
-- `/api/tool-settings/*` - Tool settings resolution and updates
-- `/api/api-keys` - API key storage (to be replaced with direct Supabase)
-- `/api/resources` - User resources management
+##### Remaining Express Endpoints:
+- `/api/projects/*` - Project management (still uses Express but could be migrated)
+- `/api/shots/*` - Shot management (still uses Express but client uses Supabase)
+- `/api/api-keys` - API key storage (still uses Express but client uses Supabase)
+- `/api/resources` - User resources management (still uses Express but client uses Supabase)
+- `/api/steerable-motion` - Video generation (still defined but Edge Function is used)
+- `/api/single-image` - Single image generation (still active)
 - `/api/local-image-upload` - Local file uploads
+
+##### Migrated to Supabase (Express routes deprecated):
+- `~~~/api/tasks/*~~` - Task management → Now uses `useTasks` hooks with direct Supabase
+- `~~~/api/tool-settings/*~~` - Tool settings → Now uses `useToolSettings` with direct Supabase  
+- `~~~/api/credits/*~~` - Credits system → Now uses `useCredits` with Supabase + Edge Functions
+- `~~~/api/generations/*~~` - Generation CRUD → Now uses `useGenerations` hooks with direct Supabase
 
 #### 3.2. Top-Level Pages (`src/pages/`)
 - **ToolSelectorPage.tsx**: Grid of available tools. Accessible at `/tools` in all environments (and at `/` when VITE_APP_ENV is not 'web').

@@ -14,12 +14,9 @@ import express from 'express';
 import cors from 'cors';
 import projectsRouter from './routes/projects';
 import shotsRouter from './routes/shots';
-import generationsRouter from './routes/generations';
-import tasksRouter from './routes/tasks';
 import steerableMotionRouter from './routes/steerableMotion';
 import resourcesRouter from './routes/resources';
 import apiKeysRouter from './routes/apiKeys';
-import creditsRouter from './routes/credits';
 import dotenv from 'dotenv';
 import multer from 'multer';
 import path from 'path';
@@ -49,12 +46,9 @@ app.use(express.json()); // To parse JSON request bodies
 // API Routes
 app.use('/api/projects', projectsRouter);
 app.use('/api/shots', shotsRouter);
-app.use('/api/generations', generationsRouter);
-app.use('/api/tasks', tasksRouter);
 app.use('/api/steerable-motion', steerableMotionRouter);
 app.use('/api/resources', resourcesRouter);
 app.use('/api/api-keys', apiKeysRouter);
-app.use('/api/credits', creditsRouter);
 app.use('/api/single-image', singleImageRouter);
 
 const startServer = async () => {
