@@ -52,7 +52,7 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
-    touchAction: 'none', // Recommended for Sortable with pointer/touch sensors
+    touchAction: isDragDisabled ? 'auto' : 'none',
   };
 
   const handleDeleteClick = (e: React.MouseEvent) => {
@@ -94,6 +94,7 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
       )}
       onDoubleClick={onDoubleClick}
       onClick={onClick}
+      data-mobile-item="true"
     >
       <img
         src={displayUrl}

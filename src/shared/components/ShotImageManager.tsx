@@ -1,4 +1,4 @@
-import React, { useState, Fragment } from 'react';
+import React, { useState, Fragment, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   DndContext,
@@ -30,7 +30,7 @@ import { Label } from './ui/label';
 import { Slider } from './ui/slider';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { Button } from './ui/button';
-import { ArrowRight } from 'lucide-react';
+import { ArrowDown } from 'lucide-react';
 
 export interface ShotImageManagerProps {
   images: GenerationRow[];
@@ -58,6 +58,22 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
   const [activeId, setActiveId] = useState<string | null>(null);
   const [mobileSelectedId, setMobileSelectedId] = useState<string | null>(null);
   const isMobile = useIsMobile();
+  const outerRef = useRef<HTMLDivElement>(null);
+
+  // Deselect when clicking outside the entire image manager area (mobile selection mode)
+  useEffect(() => {
+    if (!isMobile) return;
+
+    const handleDocClick = (e: MouseEvent) => {
+      if (!mobileSelectedId) return;
+      if (outerRef.current && !outerRef.current.contains(e.target as Node)) {
+        setMobileSelectedId(null);
+      }
+    };
+
+    document.addEventListener('click', handleDocClick);
+    return () => document.removeEventListener('click', handleDocClick);
+  }, [mobileSelectedId, isMobile]);
 
   const sensors = useSensors(
     useSensor(MouseSensor, {
@@ -399,12 +415,19 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
   };
 
   // Mobile batch mode with selection
-  if (isMobile && generationMode === 'batch' && mobileSelectedId) {
+  if (isMobile && generationMode === 'batch') {
     const mobileColumns = 3; // Always use 3 columns on mobile
     const itemsPerRow = mobileColumns;
     
     return (
-      <div className="relative">
+      <div ref={outerRef} className="relative"
+        onClick={(e)=>{
+          const target=e.target as HTMLElement;
+          if(!target.closest('[data-mobile-item]')){
+            setMobileSelectedId(null);
+          }
+        }}>
+        
         <div className={cn("grid gap-3 grid-cols-3")}>
           {images.map((image, index) => {
             const isSelected = image.shotImageEntryId === mobileSelectedId;
@@ -412,45 +435,49 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
             
             return (
               <React.Fragment key={image.shotImageEntryId}>
-                {/* Move here button before first item */}
-                {index === 0 && (
-                  <div className="absolute left-0 top-0 -translate-x-1/2 h-full flex items-center z-10">
-                    <Button
-                      size="icon"
-                      variant="secondary"
-                      className="h-6 w-6 rounded-full p-0"
-                      onClick={() => handleMoveHere(0)}
-                      title="Move here"
-                    >
-                      <ArrowRight className="h-3 w-3" />
-                    </Button>
-                  </div>
-                )}
-                
                 <div className="relative">
                   <SortableImageItem
-                    image={image}
-                    isSelected={isSelected}
-                    onClick={(e) => handleItemClick(image.shotImageEntryId, e)}
-                    onDelete={() => onImageDelete(image.shotImageEntryId)}
-                    onDoubleClick={() => handleMobileDoubleClick(index)}
-                    isDragDisabled={true} // Disable drag on mobile when in selection mode
-                  />
-                  
+                     image={image}
+                     isSelected={isSelected}
+                     onClick={(e) => handleItemClick(image.shotImageEntryId, e)}
+                     onDelete={() => onImageDelete(image.shotImageEntryId)}
+                     onDoubleClick={() => handleMobileDoubleClick(index)}
+                     isDragDisabled={true} // Disable drag on mobile when in selection mode
+                   />
+                   
+                  {/* Move button before first image */}
+                  {index === 0 && mobileSelectedId && (
+                    <div className="absolute top-1/2 -left-1 -translate-y-1/2 -translate-x-1/2 z-10">
+                      <Button
+                        size="icon"
+                        variant="secondary"
+                        className="h-6 w-6 rounded-full p-0"
+                        onClick={() => handleMoveHere(0)}
+                        onPointerDown={e=>e.stopPropagation()}
+                        title="Move to beginning"
+                      >
+                        <ArrowDown className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  )}
+
                   {/* Move here button after this item */}
-                  <div 
-                    className="absolute top-1/2 -right-1 -translate-y-1/2 translate-x-1/2 z-10"
-                  >
-                    <Button
-                      size="icon"
-                      variant="secondary"
-                      className="h-6 w-6 rounded-full p-0"
-                      onClick={() => handleMoveHere(index + 1)}
-                      title="Move here"
+                  {mobileSelectedId && (
+                    <div 
+                      className="absolute top-1/2 -right-1 -translate-y-1/2 translate-x-1/2 z-10"
                     >
-                      <ArrowRight className="h-3 w-3" />
-                    </Button>
-                  </div>
+                      <Button
+                        size="icon"
+                        variant="secondary"
+                        className="h-6 w-6 rounded-full p-0"
+                        onClick={() => handleMoveHere(index + 1)}
+                        onPointerDown={e=>e.stopPropagation()}
+                        title="Move here"
+                      >
+                        <ArrowDown className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </React.Fragment>
             );
