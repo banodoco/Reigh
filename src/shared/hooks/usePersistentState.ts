@@ -5,8 +5,26 @@ const MAX_LOCAL_STORAGE_ITEM_LENGTH = 4 * 1024 * 1024; // 4MB
 
 const PERSISTENT_STATE_EVENT = 'persistentStateChange';
 
+// Check if localStorage is available (can fail in iOS Safari private mode)
+function isLocalStorageAvailable(): boolean {
+  try {
+    const test = '__localStorage_test__';
+    localStorage.setItem(test, test);
+    localStorage.removeItem(test);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function usePersistentState<T>(key: string, defaultValue: T): [T, React.Dispatch<React.SetStateAction<T>>] {
   const [state, setState] = useState<T>(() => {
+    // Mobile Safari in private mode can throw on localStorage access
+    if (!isLocalStorageAvailable()) {
+      console.warn(`[usePersistentState] localStorage not available for key "${key}", using default value`);
+      return defaultValue;
+    }
+
     try {
       const storedValue = localStorage.getItem(key);
       if (storedValue) {
@@ -32,6 +50,11 @@ function usePersistentState<T>(key: string, defaultValue: T): [T, React.Dispatch
   }, [key]);
 
   useEffect(() => {
+    // Skip localStorage writes if not available
+    if (!isLocalStorageAvailable()) {
+      return;
+    }
+
     try {
       const serializedState = JSON.stringify(state);
       if (serializedState.length > MAX_LOCAL_STORAGE_ITEM_LENGTH) {
@@ -50,8 +73,14 @@ function usePersistentState<T>(key: string, defaultValue: T): [T, React.Dispatch
       );
     } catch (error) {
       console.error(`Error writing to localStorage key "${key}":`, error);
+      // Different error message for mobile users
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      const errorDescription = isMobile 
+        ? "Local storage may be disabled in private browsing mode. Settings will be lost when the tab is closed."
+        : "There was an error writing to your browser's local storage.";
+      
       toast.error("Could not save settings locally.", {
-        description: "There was an error writing to your browser's local storage."
+        description: errorDescription
       });
     }
   }, [key, state]);

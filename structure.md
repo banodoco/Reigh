@@ -18,8 +18,8 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
 - **Persistent State**: Tools use `usePersistentToolState` with enabled/disabled flag to prevent blocking when dependencies (like projectId) aren't ready
 
 ### Ports
-- Frontend (Vite): `2222`
-- Backend (Express): `8085` (default, configurable via process.env.PORT)
+- Frontend (Vite): `2222` (accessible from LAN for mobile testing)
+- Backend (Express): `8085` (binds to 0.0.0.0 for mobile access, configurable via process.env.PORT)
 
 ## 2. Directory Structure (Top-Level)
 
@@ -267,7 +267,7 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
 - **useGenerations.ts**: Manages generation CRUD operations
 - **useLastAffectedShot.ts**: Tracks the last shot that was affected by an action
 - **usePaneAwareModalStyle.ts**: Provides modal styling that respects pane visibility
-- **usePersistentState.ts**: localStorage-backed state management
+- **usePersistentState.ts**: localStorage-backed state management with mobile-specific error handling for iOS Safari private mode restrictions
 - **usePersistentToolState.ts**: Tool-specific persistent state with debouncing
 - **useResources.ts**: Manages resources (uploaded files)
 - **useShots.ts**: Comprehensive shot management (CRUD, ordering, duplication)
@@ -283,22 +283,6 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
 - **useAIInteractionService.ts**: AI interaction service for generating prompts and editing
 - **useUserUIState.ts**: Generic helper for persisting lightweight UI preferences (stored in `users.settings.ui` JSON). Debounced Supabase client update. Currently used by `PanesContext` to store `paneLocks`. Replaces `useToolSettings('pane-locks')` flow and removes the need for the `/api/tool-settings` round-trip for pane locks.
 
-## Mobile Persistence & Cross-Device Sync
-
-**Fixed 2025-01-14**: Resolved critical mobile persistence issues where settings and user state were not being saved/restored on mobile devices.
-
-### Root Causes
-1. **API URL Resolution**: `fetchWithAuth()` was hard-coding localhost URLs that mobile browsers couldn't reach, causing all database writes to fail silently.
-2. **Mobile UI Exclusions**: `PanesContext` deliberately bypassed all persistence calls on mobile devices (screen width ≤ 768px).
-
-### Solutions Implemented
-- **Smart API URL Resolution**: Enhanced `src/lib/api.ts` to detect when `VITE_API_TARGET_URL` points to localhost but the app is accessed from a different host (e.g., phone on LAN), automatically falling back to `window.location.origin`.
-- **Unified Persistence**: Removed mobile-specific bypasses in `PanesContext` so pane locks and other UI state persist consistently across all devices.
-- **Cross-Device Sync**: All user preferences (project selection, tool settings, pane locks) now save to database from mobile and restore correctly on subsequent sessions.
-
-### Current Status
-✅ **All devices now persist state identically**: Tool settings, pane locks, last-opened project, and user preferences survive page reloads and work seamlessly between desktop and mobile.
-
 ##### Contexts
 - **LastAffectedShotContext.tsx**: Remembers last modified shot
 - **ProjectContext.tsx**: Manages selected project ID using user settings database storage. Fetches projects via Supabase client. Creates "Default Project" if none exist. Provides addNewProject, updateProject, deleteProject & loading states. Automatically saves and restores last opened project across sessions.
@@ -310,8 +294,9 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
 ##### Library (`lib/`)
 - **api.ts**: Authentication utilities:
   - `fetchWithAuth`: Makes authenticated fetch requests with JWT token caching to avoid repeated auth calls
-  - Caches session tokens with 1-minute expiry buffer to reduce latency on mobile
-  - Automatically clears cache on auth state changes
+  - Mobile-optimized: shorter cache times (30s vs 60s), automatic retry on 401 errors, and mobile-aware URL resolution
+  - Automatically detects LAN access and routes API calls to the correct host for mobile devices
+  - Caches session tokens with reduced expiry buffer and clears cache on auth state changes
 - **imageUploader.ts**: Uploads to Supabase storage
 - **utils.ts**: General utilities. Includes `getDisplayUrl()` which safely converts relative storage paths to fully-qualified URLs. If `VITE_API_TARGET_URL` is set to a localhost address but the app is being accessed from another host (e.g. mobile device on LAN), the helper automatically falls back to a relative URL so images and videos still load. **Always use this helper instead of hand-rolling URL logic.**
 - **imageCropper.ts**: Crops images to supported aspect ratios. Includes `cropImageToProjectAspectRatio` function for cropping to specific project dimensions

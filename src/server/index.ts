@@ -66,9 +66,15 @@ const startServer = async () => {
       await seedDatabase();
     }
 
+    // Bind to all network interfaces to allow mobile/LAN access
+    // In production, this should be properly secured with firewall rules
+    const HOST = process.env.HOST || '0.0.0.0';
+
     // The existing server initialization logic
-    const server = app.listen(PORT, () => {
-      console.log(`API Server listening on port ${PORT}`);
+    const server = app.listen(PORT, HOST, () => {
+      console.log(`API Server listening on ${HOST}:${PORT}`);
+      console.log(`For mobile access: Use your computer's IP address (e.g., 192.168.1.100:${PORT})`);
+      console.log(`Local access: http://localhost:${PORT} or http://127.0.0.1:${PORT}`);
       initializeWebSocketServer();
       startTaskPoller(); // Start the background task poller
       startTaskStatusPoller(); // Start the task status poller

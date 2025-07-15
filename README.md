@@ -41,6 +41,40 @@ If you just want to get everything running locally as fast as possible, use the 
    ```
    A small helper that pings the dev servers and tells you whether they are up.
 
+## 📱 Mobile Development
+
+To test your Reigh app on mobile devices (phones, tablets) connected to the same WiFi network:
+
+1. **Find your computer's local IP address**
+   ```bash
+   # On macOS/Linux:
+   ifconfig | grep "inet " | grep -v 127.0.0.1
+   
+   # On Windows:
+   ipconfig | find "IPv4"
+   ```
+   Look for an address like `192.168.1.100` or `10.0.0.50`.
+
+2. **Start the development servers with mobile support**
+   ```bash
+   ./launch.sh
+   ```
+   The servers are automatically configured to accept connections from your LAN.
+
+3. **Access from your mobile device**
+   Open your mobile browser and visit:
+   ```
+   http://YOUR_COMPUTER_IP:2222
+   ```
+   For example: `http://192.168.1.100:2222`
+
+4. **Troubleshooting mobile issues**
+   - **Data not persisting?** Check the browser console for API connection errors
+   - **Images not loading?** The API server must be accessible at port 8085
+   - **Still having issues?** Try disabling any VPN or firewall temporarily
+
+> **Note**: Mobile devices use database persistence just like desktop, but localStorage may be limited in private browsing mode on iOS Safari.
+
 ---
 
 ## 📖 Manual / Detailed Setup
