@@ -21,6 +21,8 @@ export default function HomePage() {
   const [isCreativePartnerButtonAnimating, setIsCreativePartnerButtonAnimating] = useState(false);
   const [isPhilosophyPaneClosing, setIsPhilosophyPaneClosing] = useState(false);
   const [isCreativePartnerPaneClosing, setIsCreativePartnerPaneClosing] = useState(false);
+  const [isPhilosophyPaneOpening, setIsPhilosophyPaneOpening] = useState(false);
+  const [isCreativePartnerPaneOpening, setIsCreativePartnerPaneOpening] = useState(false);
   const [isTooltipOpen, setIsTooltipOpen] = useState(false);
   const [assetsLoaded, setAssetsLoaded] = useState(false);
 
@@ -104,19 +106,8 @@ export default function HomePage() {
     }
   ];
 
-  // Prevent scrolling on mobile
-  useEffect(() => {
-    const isMobile = window.innerWidth <= 768;
-    if (isMobile) {
-      document.body.style.overflow = 'hidden';
-      document.body.style.height = '100vh';
-    }
-    
-    return () => {
-      document.body.style.overflow = '';
-      document.body.style.height = '';
-    };
-  }, []);
+  // Remove aggressive mobile scroll prevention - let content flow naturally
+  // The side panes handle their own overflow, and the main content should be scrollable
 
   // Only render content when assets are loaded
   if (!assetsLoaded) {
@@ -156,22 +147,28 @@ export default function HomePage() {
       
       {/* Top Navigation Links */}
       <div className={`fixed top-6 left-6 sm:top-12 sm:left-12 flex items-center space-x-6 ${
-        (showCreativePartner || showPhilosophy) ? 'z-10' : 'z-20'
+        showCreativePartner || isCreativePartnerPaneClosing || showPhilosophy || isPhilosophyPaneClosing || isCreativePartnerPaneOpening || isPhilosophyPaneOpening ? 'z-30' : 'z-50'
       }`}>
         {/* Philosophy Link */}
         <button
           onClick={() => {
             setIsPhilosophyButtonAnimating(true);
+            setIsPhilosophyPaneOpening(true);
             setShowCreativePartner(false);
-            setTimeout(() => {
-              setShowPhilosophy(true);
-              // Reset animation state after pane is fully open
-              setTimeout(() => setIsPhilosophyButtonAnimating(false), 300);
-            }, 50);
+            setShowPhilosophy(true);
+            // Reset animation state after pane is fully open
+            setTimeout(() => setIsPhilosophyButtonAnimating(false), 350);
+            setTimeout(() => setIsPhilosophyPaneOpening(false), 300);
           }}
           className={`group flex items-center sm:space-x-2 px-4 py-4 sm:px-4 sm:py-2 bg-white/80 backdrop-blur-sm rounded-full border-2 border-wes-vintage-gold/20 hover:border-wes-vintage-gold/40 transition-all duration-300 hover:shadow-wes-ornate ${
             isPhilosophyButtonAnimating ? 'animate-spin-left-fade' : ''
-          } ${showPhilosophy || isPhilosophyPaneClosing || isPhilosophyButtonAnimating ? 'opacity-0 pointer-events-none' : 'opacity-100 pointer-events-auto'}`}
+                     } ${isPhilosophyPaneClosing ? 'animate-spin-left-fade-reverse' : ''} ${
+             showPhilosophy || isPhilosophyButtonAnimating
+               ? 'opacity-0 pointer-events-none'
+               : showCreativePartner
+                 ? 'opacity-40 pointer-events-none brightness-50 transition-all duration-150'
+                 : 'opacity-100 pointer-events-auto transition-all duration-300'
+           }`}
         >
           <Brain className="w-6 h-6 sm:w-4 sm:h-4 text-wes-vintage-gold animate-brain-pulse" />
           <span className="font-inter text-sm font-medium text-primary group-hover:text-primary/80 hidden sm:inline">Philosophy</span>
@@ -179,22 +176,28 @@ export default function HomePage() {
       </div>
         
       <div className={`fixed top-6 right-6 sm:top-12 sm:right-12 flex items-center ${
-        (showCreativePartner || showPhilosophy) ? 'z-10' : 'z-20'
+        showPhilosophy || isPhilosophyPaneClosing || showCreativePartner || isCreativePartnerPaneClosing || isPhilosophyPaneOpening || isCreativePartnerPaneOpening ? 'z-30' : 'z-50'
       }`}>
         {/* Creative Partner Programme */}
         <button
           onClick={() => {
             setIsCreativePartnerButtonAnimating(true);
+            setIsCreativePartnerPaneOpening(true);
             setShowPhilosophy(false);
-            setTimeout(() => {
-              setShowCreativePartner(true);
-              // Reset animation state after pane is fully open
-              setTimeout(() => setIsCreativePartnerButtonAnimating(false), 300);
-            }, 50);
+            setShowCreativePartner(true);
+            // Reset animation state after pane is fully open
+            setTimeout(() => setIsCreativePartnerButtonAnimating(false), 350);
+            setTimeout(() => setIsCreativePartnerPaneOpening(false), 300);
           }}
           className={`group flex items-center sm:space-x-2 px-4 py-4 sm:px-4 sm:py-2 bg-gradient-to-r from-wes-coral/90 to-wes-pink/90 backdrop-blur-sm rounded-full border-2 border-wes-coral/30 hover:border-wes-coral/50 transition-all duration-300 hover:shadow-wes-ornate text-white hover:from-wes-coral hover:to-wes-pink ${
             isCreativePartnerButtonAnimating ? 'animate-spin-right-fade' : ''
-          } ${showCreativePartner || isCreativePartnerPaneClosing || isCreativePartnerButtonAnimating ? 'opacity-0 pointer-events-none' : 'opacity-100 pointer-events-auto'}`}
+                     } ${isCreativePartnerPaneClosing ? 'animate-spin-right-fade-reverse' : ''} ${
+             showCreativePartner || isCreativePartnerButtonAnimating
+               ? 'opacity-0 pointer-events-none'
+               : showPhilosophy
+                 ? 'opacity-40 pointer-events-none brightness-50 transition-all duration-150'
+                 : 'opacity-100 pointer-events-auto transition-all duration-300'
+           }`}
         >
           <HandHeart className="w-6 h-6 sm:w-4 sm:h-4 animate-gifting-motion" />
           <span className="font-inter text-sm font-medium hidden sm:inline">Open Creative Partner Programme</span>
@@ -390,6 +393,10 @@ export default function HomePage() {
                 setIsCreativePartnerPaneClosing(true);
                 setTimeout(() => setIsCreativePartnerPaneClosing(false), 300);
               }
+              // Reset opening states if needed
+              setIsPhilosophyPaneOpening(false);
+              setIsCreativePartnerPaneOpening(false);
+              // Show buttons immediately when starting to close
               setShowCreativePartner(false);
               setShowPhilosophy(false);
               setIsPhilosophyButtonAnimating(false);
@@ -408,6 +415,8 @@ export default function HomePage() {
               onClick={() => {
                 setIsCreativePartnerPaneClosing(true);
                 setTimeout(() => setIsCreativePartnerPaneClosing(false), 300);
+                setIsCreativePartnerPaneOpening(false);
+                // Show buttons immediately when starting to close
                 setShowCreativePartner(false);
                 setIsCreativePartnerButtonAnimating(false);
               }}
@@ -527,6 +536,8 @@ export default function HomePage() {
               onClick={() => {
                 setIsPhilosophyPaneClosing(true);
                 setTimeout(() => setIsPhilosophyPaneClosing(false), 300);
+                setIsPhilosophyPaneOpening(false);
+                // Show buttons immediately when starting to close
                 setShowPhilosophy(false);
                 setIsPhilosophyButtonAnimating(false);
               }}

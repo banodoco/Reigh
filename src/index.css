@@ -888,12 +888,38 @@
   }
 }
 
+@keyframes spinLeftFadeReverse {
+  0% {
+    transform: rotate(-90deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+@keyframes spinRightFadeReverse {
+  0% {
+    transform: rotate(90deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
 .animate-spin-left-fade {
   animation: spinLeftFade 0.6s ease-out forwards;
 }
 
 .animate-spin-right-fade {
   animation: spinRightFade 0.6s ease-out forwards;
+}
+
+.animate-spin-left-fade-reverse {
+  animation: spinLeftFadeReverse 0.3s ease-out forwards;
+}
+
+.animate-spin-right-fade-reverse {
+  animation: spinRightFadeReverse 0.3s ease-out forwards;
 }
 
 /* Custom utility overrides for tool selector page */
@@ -1277,10 +1303,10 @@
 
 @keyframes giftingMotion {
   0%, 100% {
-    transform: translateX(-1px);
+    transform: translateX(1px);
   }
   50% {
-    transform: translateX(1px);
+    transform: translateX(-1px);
   }
 }
 

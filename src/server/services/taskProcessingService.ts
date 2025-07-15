@@ -1,4 +1,3 @@
-import cron from 'node-cron';
 import { db } from '../../lib/db/index';
 import { tasks as tasksSchema, generations as generationsSchema, shotGenerations as shotGenerationsSchema, taskStatusEnum } from '../../../db/schema/schema';
 import { eq, and, isNull, sql, inArray, notInArray, like, isNotNull } from 'drizzle-orm';
@@ -247,12 +246,25 @@ export async function cascadeTaskStatus(
   }
 }
 
+let pollerStarted = false;
+let statusPollerStarted = false;
+let taskPollerRunning = false;
+let statusPollerRunning = false;
+
 /**
  * Polls for active tasks and broadcasts updates.
  */
 export async function pollAndBroadcastTaskUpdates(): Promise<void> {
-  // console.log('[TaskStatusPoller] Checking for active task updates...');
+  // Prevent overlapping executions
+  if (statusPollerRunning) {
+    console.log('[TaskStatusPoller] Previous execution still running, skipping...');
+    return;
+  }
+  
+  statusPollerRunning = true;
+  
   try {
+    // console.log('[TaskStatusPoller] Checking for active task updates...');
     const activeTasks = await db
       .select()
       .from(tasksSchema)
@@ -289,11 +301,10 @@ export async function pollAndBroadcastTaskUpdates(): Promise<void> {
     }
   } catch (error) {
     console.error('[TaskStatusPoller] Error polling for task status updates:', error);
+  } finally {
+    statusPollerRunning = false;
   }
 }
-
-let pollerStarted = false;
-let statusPollerStarted = false;
 
 /**
  * Starts a cron job to poll for task status updates.
@@ -304,8 +315,87 @@ export function startTaskStatusPoller(): void {
     return;
   }
   console.log('[TaskStatusPoller] Started task status poller to run every 5 seconds.');
-  cron.schedule('*/5 * * * * *', pollAndBroadcastTaskUpdates);
+  
+  // Use setImmediate and setTimeout for better performance than cron for frequent tasks
+  const runStatusPoller = async () => {
+    try {
+      await pollAndBroadcastTaskUpdates();
+    } catch (error) {
+      console.error('[TaskStatusPoller] Error in status poller:', error);
+    }
+    
+    // Schedule next execution
+    setTimeout(runStatusPoller, 5000);
+  };
+  
+  // Start the poller
+  setImmediate(runStatusPoller);
   statusPollerStarted = true;
+}
+
+/**
+ * Main task polling function
+ */
+async function pollForCompletedTasks(): Promise<void> {
+  // Prevent overlapping executions
+  if (taskPollerRunning) {
+    console.log('[TaskPoller] Previous execution still running, skipping...');
+    return;
+  }
+  
+  taskPollerRunning = true;
+  
+  try {
+    // console.log('[TaskPoller] Checking for completed travel_stitch tasks...'); // Can be noisy
+    const tasksToProcess = await db
+      .select()
+      .from(tasksSchema)
+      .where(
+        and(
+          eq(tasksSchema.taskType, 'travel_stitch'),
+          eq(tasksSchema.status, 'Complete'),
+          isNotNull(tasksSchema.generationProcessedAt),
+          eq(tasksSchema.generationCreated, false)
+        )
+      );
+
+    if (tasksToProcess.length > 0) {
+      console.log(`[TaskPoller] Found ${tasksToProcess.length} completed travel_stitch tasks to process into generations.`);
+      for (const task of tasksToProcess) {
+        await processCompletedStitchTask(task);
+      }
+    } else {
+      // console.log('[TaskPoller] No new completed travel_stitch tasks found.'); // Can be noisy, enable if needed
+    }
+
+    // Additional processing for completed single_image tasks
+    try {
+      const imageTasksToProcess = await db
+        .select()
+        .from(tasksSchema)
+        .where(
+          and(
+            eq(tasksSchema.taskType, 'single_image'),
+            eq(tasksSchema.status, 'Complete'),
+            isNotNull(tasksSchema.generationProcessedAt),
+            eq(tasksSchema.generationCreated, false)
+          )
+        );
+
+      if (imageTasksToProcess.length > 0) {
+        console.log(`[TaskPoller] Found ${imageTasksToProcess.length} completed single_image tasks to process into generations.`);
+        for (const task of imageTasksToProcess) {
+          await processCompletedSingleImageTask(task);
+        }
+      }
+    } catch (error) {
+      console.error('[TaskPoller] Error querying for single_image tasks to process:', error);
+    }
+  } catch (error) {
+    console.error('[TaskPoller] Error querying for tasks to process:', error);
+  } finally {
+    taskPollerRunning = false;
+  }
 }
 
 /**
@@ -319,59 +409,20 @@ export function startTaskPoller(): void {
 
   console.log('[TaskPoller] Starting task poller to run every 10 seconds.');
   
-  // Schedule a task to run every 10 seconds.
-  cron.schedule('*/10 * * * * *', async () => {
-    // console.log('[TaskPoller] Checking for completed travel_stitch tasks...'); // Can be noisy
+  // Use setImmediate and setTimeout for better performance than cron for frequent tasks
+  const runTaskPoller = async () => {
     try {
-      const tasksToProcess = await db
-        .select()
-        .from(tasksSchema)
-        .where(
-          and(
-            eq(tasksSchema.taskType, 'travel_stitch'),
-            eq(tasksSchema.status, 'Complete'),
-            isNotNull(tasksSchema.generationProcessedAt),
-            eq(tasksSchema.generationCreated, false)
-          )
-        );
-
-      if (tasksToProcess.length > 0) {
-        console.log(`[TaskPoller] Found ${tasksToProcess.length} completed travel_stitch tasks to process into generations.`);
-        for (const task of tasksToProcess) {
-          await processCompletedStitchTask(task);
-        }
-      } else {
-        // console.log('[TaskPoller] No new completed travel_stitch tasks found.'); // Can be noisy, enable if needed
-      }
-
-      // Additional processing for completed single_image tasks
-      try {
-        const imageTasksToProcess = await db
-          .select()
-          .from(tasksSchema)
-          .where(
-            and(
-              eq(tasksSchema.taskType, 'single_image'),
-              eq(tasksSchema.status, 'Complete'),
-              isNotNull(tasksSchema.generationProcessedAt),
-              eq(tasksSchema.generationCreated, false)
-            )
-          );
-
-        if (imageTasksToProcess.length > 0) {
-          console.log(`[TaskPoller] Found ${imageTasksToProcess.length} completed single_image tasks to process into generations.`);
-          for (const task of imageTasksToProcess) {
-            await processCompletedSingleImageTask(task);
-          }
-        }
-      } catch (error) {
-        console.error('[TaskPoller] Error querying for single_image tasks to process:', error);
-      }
+      await pollForCompletedTasks();
     } catch (error) {
-      console.error('[TaskPoller] Error querying for tasks to process:', error);
+      console.error('[TaskPoller] Error in task poller:', error);
     }
-  });
-
+    
+    // Schedule next execution
+    setTimeout(runTaskPoller, 10000);
+  };
+  
+  // Start the poller
+  setImmediate(runTaskPoller);
   pollerStarted = true;
 }
 
