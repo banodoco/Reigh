@@ -27,9 +27,12 @@ export function usePersistentToolState<T extends Record<string, any>>(
   toolId: string,
   context: { projectId?: string; shotId?: string },
   stateMapping: StateMapping<T>,
-  options: UsePersistentToolStateOptions<T>
+  options?: UsePersistentToolStateOptions<T>
 ): UsePersistentToolStateResult {
-  const { debounceMs = 500, scope = 'project', enabled = true, defaults } = options;
+  const { debounceMs = 500, scope = 'project', enabled = true, defaults } = options || {} as UsePersistentToolStateOptions<T>;
+
+  // If defaults is undefined, use an empty object to avoid errors in deepMerge operations later
+  const resolvedDefaults: T = (defaults || ({} as unknown as T));
   const [ready, setReady] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<Error | undefined>();
@@ -70,7 +73,7 @@ export function usePersistentToolState<T extends Record<string, any>>(
         if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found
           console.error('[usePersistentToolState] Failed to fetch settings:', error);
           // Fallback to defaults if fetch fails
-          const effectiveSettings = deepMerge(defaults, {});
+          const effectiveSettings = deepMerge(resolvedDefaults, {});
           Object.entries(stateMapping).forEach(([key, [_, setter]]) => {
             setter(effectiveSettings[key as keyof T] as any);
           });
@@ -79,7 +82,7 @@ export function usePersistentToolState<T extends Record<string, any>>(
           return;
         }
 
-        const effectiveSettings = deepMerge(defaults, (data?.settings as Partial<T>) || {});
+        const effectiveSettings = deepMerge(resolvedDefaults, (data?.settings as Partial<T>) || {});
 
         hasHydratedRef.current = true;
         userHasInteractedRef.current = false;
@@ -97,7 +100,7 @@ export function usePersistentToolState<T extends Record<string, any>>(
 
       fetchSettings();
     }
-  }, [toolId, entityKey, scope, defaults, stateMapping]);
+  }, [toolId, entityKey, scope, resolvedDefaults, stateMapping]);
 
   // Collect current state values from the mapping
   const getCurrentState = useCallback((): T => {
@@ -150,7 +153,7 @@ export function usePersistentToolState<T extends Record<string, any>>(
         return;
       }
 
-      const currentSettings = deepMerge(defaults, (currentSettingsData?.settings as Partial<T>) || {});
+      const currentSettings = deepMerge(resolvedDefaults, (currentSettingsData?.settings as Partial<T>) || {});
 
       // Merge current settings with the new state to create the patch
       const patch = deepMerge(currentSettings, currentState);
@@ -186,7 +189,7 @@ export function usePersistentToolState<T extends Record<string, any>>(
     toolId,
     entityKey,
     scope,
-    defaults,
+    resolvedDefaults,
     getCurrentState,
     debounceMs,
     // Include all state values to trigger saves on change
