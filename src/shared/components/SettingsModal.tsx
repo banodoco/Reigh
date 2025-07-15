@@ -290,23 +290,28 @@ python headless.py --db-type supabase \\
         
         {/* Generation Method Selection */}
         <div className="mb-6">
+          {/* Mobile header with sign out */}
+          {isMobile && (
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold">How would you like to generate?</h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleSignOut}
+                className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
+              >
+                <LogOut className="h-4 w-4" />
+                Sign out
+              </Button>
+            </div>
+          )}
+          
           <div className="grid grid-cols-2 gap-6 items-start">
             {/* Left column: options */}
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
+              {!isMobile && (
                 <h3 className="font-semibold">How would you like to generate?</h3>
-                {isMobile && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleSignOut}
-                    className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
-                  >
-                    <LogOut className="h-4 w-4" />
-                    Sign out
-                  </Button>
-                )}
-              </div>
+              )}
               
               <div className="space-y-3">
                 <div className="flex items-center space-x-2">
