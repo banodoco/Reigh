@@ -21,7 +21,7 @@ import { PageFadeIn } from '@/shared/components/transitions';
 import { useSearchParams } from 'react-router-dom';
 import { usePersistentToolState } from '@/shared/hooks/usePersistentToolState';
 import { defaultImageGenerationSettings } from '../settings';
-import { type ImageGenerationSettings, type GenerationMode, type ActiveLora } from '../settings';
+import { type ImageGenerationSettings } from '../settings';
 
 // Remove unnecessary environment detection - tool should work in all environments
 
@@ -89,14 +89,14 @@ const ImageGenerationToolPage: React.FC = () => {
   const [searchParams] = useSearchParams();
 
   // Define states before hook
-  const [prompts, setPrompts] = useState<PromptEntry[]>(defaultImageGenerationSettings.prompts || []);
-  const [imagesPerPrompt, setImagesPerPrompt] = useState<number>(defaultImageGenerationSettings.imagesPerPrompt || 1);
-  const [selectedLorasByMode, setSelectedLorasByMode] = useState<Record<GenerationMode, ActiveLora[]>>(defaultImageGenerationSettings.selectedLorasByMode || { 'wan-local': [], 'flux-api': [], 'hidream-api': [] });
-  const [depthStrength, setDepthStrength] = useState<number>(defaultImageGenerationSettings.depthStrength || 50);
-  const [softEdgeStrength, setSoftEdgeStrength] = useState<number>(defaultImageGenerationSettings.softEdgeStrength || 20);
-  const [generationMode, setGenerationMode] = useState<GenerationMode>(defaultImageGenerationSettings.generationMode || 'wan-local');
-  const [beforeEachPromptText, setBeforeEachPromptText] = useState<string>(defaultImageGenerationSettings.beforeEachPromptText || '');
-  const [afterEachPromptText, setAfterEachPromptText] = useState<string>(defaultImageGenerationSettings.afterEachPromptText || '');
+  const [prompts, setPrompts] = useState(defaultImageGenerationSettings.prompts);
+  const [imagesPerPrompt, setImagesPerPrompt] = useState(defaultImageGenerationSettings.imagesPerPrompt);
+  const [selectedLorasByMode, setSelectedLorasByMode] = useState(defaultImageGenerationSettings.selectedLorasByMode);
+  const [depthStrength, setDepthStrength] = useState(defaultImageGenerationSettings.depthStrength);
+  const [softEdgeStrength, setSoftEdgeStrength] = useState(defaultImageGenerationSettings.softEdgeStrength);
+  const [generationMode, setGenerationMode] = useState(defaultImageGenerationSettings.generationMode);
+  const [beforeEachPromptText, setBeforeEachPromptText] = useState(defaultImageGenerationSettings.beforeEachPromptText);
+  const [afterEachPromptText, setAfterEachPromptText] = useState(defaultImageGenerationSettings.afterEachPromptText);
 
   // Then the hook with mapping
   // In handlers like set* add markAsInteracted()
@@ -453,6 +453,7 @@ const ImageGenerationToolPage: React.FC = () => {
 
         {!hasValidFalApiKey && (
           <div className="flex flex-col items-center justify-center h-full">
+            {console.log('[ImageGenFormVisibilityIssue] Entering no API key branch'), null}
             <p className="text-center text-sm text-muted-foreground">
               You need a valid API key to use this tool.
             </p>
@@ -467,6 +468,7 @@ const ImageGenerationToolPage: React.FC = () => {
         {/* Render only if API key is valid */}
         {hasValidFalApiKey && (
           <>
+            {console.log('[ImageGenFormVisibilityIssue] Entering form rendering branch'), null}
             <div ref={formContainerRef} className="mb-8 p-6 border rounded-lg shadow-sm bg-card">
               {ready ? (
                 <ImageGenerationForm

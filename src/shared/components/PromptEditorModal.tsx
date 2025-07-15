@@ -95,6 +95,21 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
       bulkEditSettings: [bulkEditControlValues, setBulkEditControlValues],
       activeTab: [activeTab, setActiveTab],
       isAIPromptSectionExpanded: [isAIPromptSectionExpanded, setIsAIPromptSectionExpanded],
+    },
+    {
+      defaults: {
+        generationSettings: { 
+          overallPromptText: '',
+          specificPromptsText: '',
+          rulesToRememberText: '',
+          numberToGenerate: 5,
+          includeExistingContext: true,
+          addSummary: false
+        },
+        bulkEditSettings: { editInstructions: '', modelType: 'smart' },
+        activeTab: 'generate',
+        isAIPromptSectionExpanded: false,
+      }
     }
   );
 

@@ -138,7 +138,12 @@ const Timeline: React.FC<TimelineProps> = ({ images, frameSpacing, onImageReorde
     {
       framePositions: [framePositionsArray, setFramePositionsArray],
     },
-    { scope: 'shot' }
+    { 
+      scope: 'shot',
+      defaults: {
+        framePositions: []
+      }
+    }
   );
 
   // Sync frame positions when image list changes

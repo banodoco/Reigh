@@ -94,7 +94,17 @@ const EditTravelToolPage: React.FC = () => {
       fluxDepthStrength: [fluxDepthStrength, setFluxDepthStrength],
       reconstructVideo: [reconstructVideo, setReconstructVideo],
     },
-    { scope: 'project' }
+    {
+      scope: 'project',
+      defaults: {
+        prompts: [],
+        imagesPerPrompt: 1,
+        generationMode: 'kontext',
+        fluxSoftEdgeStrength: 0.2,
+        fluxDepthStrength: 0.6,
+        reconstructVideo: false,
+      }
+    }
   );
 
   useEffect(() => {

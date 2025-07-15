@@ -289,6 +289,15 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
       selectedLoras: [selectedLoras, setSelectedLoras],
       beforeEachPromptText: [beforeEachPromptText, setBeforeEachPromptText],
       afterEachPromptText: [afterEachPromptText, setAfterEachPromptText],
+    },
+    {
+      defaults: {
+        prompts: [],
+        imagesPerPrompt: 1,
+        selectedLoras: [],
+        beforeEachPromptText: '',
+        afterEachPromptText: '',
+      }
     }
   );
   console.log('[ImageGenFormVisibilityIssue] usePersistentToolState returned ready:', ready, 'isSaving:', isSaving);
