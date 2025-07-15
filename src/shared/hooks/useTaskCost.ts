@@ -1,46 +1,52 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { fetchWithAuth } from '../../lib/api';
-
-interface CalculateTaskCostResponse {
-  success: boolean;
-  cost: number;
-  duration_seconds: number;
-  base_cost_per_second: number;
-  cost_factors?: any;
-  task_type: string;
-  task_id: string;
-  note?: string;
-}
+import { supabase } from '@/integrations/supabase/client';
 
 interface CalculateTaskCostRequest {
   task_id: string;
 }
 
+interface CalculateTaskCostResponse {
+  task_id: string;
+  task_type: string;
+  duration_seconds: number;
+  cost: number;
+  cost_breakdown: Array<{ item: string; cost: number }>;
+}
+
 export function useTaskCost() {
   const queryClient = useQueryClient();
 
-  // Calculate task cost and add to credit ledger
+  // Calculate task cost and add to credit ledger using Supabase Edge Function
   const calculateTaskCostMutation = useMutation<
     CalculateTaskCostResponse,
     Error,
     CalculateTaskCostRequest
   >({
     mutationFn: async ({ task_id }) => {
-      const response = await fetchWithAuth('/functions/v1/calculate-task-cost', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ task_id }),
-      });
+      const { data: { session }, error } = await supabase.auth.getSession();
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to calculate task cost');
+      if (error || !session) {
+        throw new Error('Authentication required');
       }
-      
-      return response.json();
+
+      // Call Supabase Edge Function for task cost calculation
+      const { data, error: functionError } = await supabase.functions.invoke('calculate-task-cost', {
+        body: { task_id },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (functionError) {
+        throw new Error(functionError.message || 'Failed to calculate task cost');
+      }
+
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      return data;
     },
     onSuccess: (data) => {
       // Invalidate credits queries to refresh balance

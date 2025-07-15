@@ -37,6 +37,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { fetchWithAuth } from '@/lib/api';
 import SettingsModal from '@/shared/components/SettingsModal';
 import Timeline from "@/tools/travel-between-images/components/Timeline";
+import { useCreateGeneration, useUpdateGenerationLocation } from '@/shared/hooks/useGenerations';
 
 // Add the missing type definition
 export interface SegmentGenerationParams {
@@ -225,6 +226,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const removeImageFromShotMutation = useRemoveImageFromShot();
   const updateShotImageOrderMutation = useUpdateShotImageOrder();
   const deleteGenerationMutation = useDeleteGeneration();
+  const createGenerationMutation = useCreateGeneration();
+  const updateGenerationLocationMutation = useUpdateGenerationLocation();
   const [fileInputKey, setFileInputKey] = useState<number>(Date.now());
   const [deletingVideoId, setDeletingVideoId] = useState<string | null>(null);
   
@@ -423,21 +426,15 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           if (error || !inserted) throw error || new Error('Failed to create generation');
           newGeneration = inserted;
         } else {
-          const genResponse = await fetchWithAuth('/api/generations', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              imageUrl: finalImageUrl,
-              fileName: file.name,
-              fileType: file.type,
-              fileSize: file.size,
-              projectId: selectedProjectId,
-              prompt: promptForGeneration,
-            }),
+          // Use the new Supabase-based hook for all environments
+          newGeneration = await createGenerationMutation.mutateAsync({
+            imageUrl: finalImageUrl,
+            fileName: file.name,
+            fileType: file.type,
+            fileSize: file.size,
+            projectId: selectedProjectId,
+            prompt: promptForGeneration,
           });
-
-          if (!genResponse.ok) throw new Error(await genResponse.text());
-          newGeneration = await genResponse.json();
         }
 
         // Save link in DB (ignore returned shotImageEntryId for UI key stability)
@@ -586,20 +583,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     try {
       // Update the database record via local API
       console.log(`[ShotEditor-HandleImageSaved] Updating database record for image:`, imageId);
-      const response = await fetchWithAuth(`/api/generations/${imageId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ location: newImageUrl }),
+      await updateGenerationLocationMutation.mutateAsync({
+        id: imageId,
+        location: newImageUrl,
       });
-
-      if (!response.ok) {
-        const errorData = await response.text();
-        console.error("[ShotEditor-HandleImageSaved] Database update error:", errorData);
-        toast.error("Failed to update image in database.");
-        return;
-      }
 
       console.log(`[ShotEditor-HandleImageSaved] Database update successful for image:`, imageId);
 
@@ -743,13 +730,92 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
   const handleApplySettingsFromTaskNew = async (taskId: string, replaceImages: boolean, inputImages: string[]) => {
     try {
-      // Fetch the settings from the task
-      const response = await fetchWithAuth(`/api/tool-settings/from-task/${taskId}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch settings from task');
+      // Fetch the task details directly from Supabase
+      const { data: task, error } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('id', taskId)
+        .single();
+
+      if (error || !task) {
+        throw new Error(`Task not found: ${error?.message || 'Unknown error'}`);
       }
       
-      const settings = await response.json();
+      // Extract settings from task params (same logic as the deprecated Express API)
+      const params = task.params as any;
+      const orchestratorDetails = params?.full_orchestrator_payload ?? params?.orchestrator_details;
+      
+      const settings = {
+        videoControlMode: 'batch' as const,
+        batchVideoPrompt: orchestratorDetails?.base_prompts?.[0] || params?.prompt || '',
+        batchVideoFrames: orchestratorDetails?.segment_frames?.[0] || params?.frames || 24,
+        batchVideoContext: orchestratorDetails?.frame_overlap?.[0] || params?.context || 16,
+        batchVideoSteps: (() => {
+          // Priority: explicit params.steps, override JSON, orchestratorDetails fields, fallback 20
+          if (typeof params?.steps === 'number') return params.steps;
+
+          // Parse params_json_str_override if present to extract steps
+          let overrideSteps: number | undefined;
+          const overrideStr = orchestratorDetails?.params_json_str_override ?? params?.params_json_str_override;
+          if (overrideStr && typeof overrideStr === 'string') {
+            try {
+              const parsed = JSON.parse(overrideStr);
+              if (typeof parsed?.steps === 'number') overrideSteps = parsed.steps;
+            } catch { /* ignore JSON parse errors */ }
+          }
+
+          if (overrideSteps) return overrideSteps;
+
+          if (typeof orchestratorDetails?.steps === 'number') return orchestratorDetails.steps;
+          if (typeof orchestratorDetails?.num_inference_steps === 'number') return orchestratorDetails.num_inference_steps;
+
+          return 20;
+        })(),
+        dimensionSource: 'custom' as const,
+        ...(() => {
+          // Parse resolution (e.g., "902x508") into width & height numbers
+          const res = orchestratorDetails?.parsed_resolution_wh ?? params?.parsed_resolution_wh;
+          if (typeof res === 'string' && res.includes('x')) {
+            const [w, h] = res.split('x').map((n: string) => parseInt(n, 10));
+            return { customWidth: w, customHeight: h };
+          }
+          if (Array.isArray(res) && res.length === 2) {
+            const [w, h] = res;
+            return { customWidth: w, customHeight: h };
+          }
+          return { customWidth: params?.width, customHeight: params?.height };
+        })(),
+        enhancePrompt: params?.enhance_prompt || false,
+        generationMode: 'batch' as const,
+        // Expose the LoRAs (url + strength) so the client can attach them
+        loras: Object.entries(orchestratorDetails?.additional_loras || {}).map(([url, strength]) => ({ url, strength })),
+        steerableMotionSettings: {
+          negative_prompt: orchestratorDetails?.negative_prompt || params?.negative_prompt || '',
+          model_name: params?.model_name || 'vace_14B',
+          seed: params?.seed || 789,
+          debug: params?.debug ?? true,
+          apply_reward_lora: params?.apply_reward_lora ?? false,
+          colour_match_videos: params?.colour_match_videos ?? true,
+          apply_causvid: params?.apply_causvid ?? true,
+          use_lighti2x_lora: params?.use_lighti2x_lora ?? false,
+          fade_in_duration: params?.fade_in_duration || '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
+          fade_out_duration: params?.fade_out_duration || '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
+          after_first_post_generation_saturation: params?.after_first_post_generation_saturation ?? 1,
+          after_first_post_generation_brightness: params?.after_first_post_generation_brightness ?? 0,
+          show_input_images: params?.show_input_images ?? false,
+        },
+        // Check if this is a by-pair generation
+        ...(orchestratorDetails?.base_prompts_expanded && orchestratorDetails.base_prompts_expanded.length > 1 ? {
+          generationMode: 'by-pair' as const,
+          pairConfigs: orchestratorDetails.base_prompts_expanded.map((prompt: string, i: number) => ({
+            id: `pair-${i}`,
+            prompt,
+            frames: orchestratorDetails.segment_frames_expanded?.[i] || 24,
+            negativePrompt: orchestratorDetails.negative_prompts_expanded?.[i] || '',
+            context: orchestratorDetails.frame_overlap_expanded?.[i] || 16,
+          }))
+        } : {})
+      };
       
       // Apply the settings
       onVideoControlModeChange(settings.videoControlMode || 'batch');
@@ -945,21 +1011,15 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           if (error || !inserted) throw error || new Error('Failed to create generation');
           newGeneration = inserted;
         } else {
-          const genResponse = await fetchWithAuth('/api/generations', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              imageUrl: imageUrl,
-              fileName: `input-image-${i + 1}`,
-              fileType: 'image/jpeg', // Placeholder, adjust if needed
-              fileSize: 0, // Placeholder, adjust if needed
-              projectId: projectId,
-              prompt: promptForGeneration,
-            }),
+          // Use the new Supabase-based hook for all environments
+          newGeneration = await createGenerationMutation.mutateAsync({
+            imageUrl: imageUrl,
+            fileName: `input-image-${i + 1}`,
+            fileType: 'image/jpeg', // Placeholder, adjust if needed
+            fileSize: 0, // Placeholder, adjust if needed
+            projectId: projectId,
+            prompt: promptForGeneration,
           });
-
-          if (!genResponse.ok) throw new Error(await genResponse.text());
-          newGeneration = await genResponse.json();
         }
 
         // Add the generation to the shot

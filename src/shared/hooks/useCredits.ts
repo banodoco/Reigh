@@ -1,91 +1,163 @@
-import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { fetchWithAuth } from '@/lib/api';
+import { supabase } from '@/integrations/supabase/client';
 
 interface CreditBalance {
-  currentBalance: number;
-  totalPurchased: number;
-  totalSpent: number;
-  totalRefunded: number;
+  balance: number;
+  currency: string;
 }
 
-interface CreditTransaction {
+interface CreditLedgerEntry {
   id: string;
   user_id: string;
-  task_id?: string;
+  type: 'purchase' | 'spend';
   amount: number;
-  type: 'stripe' | 'manual' | 'spend' | 'refund';
-  metadata?: Record<string, any>;
+  description: string;
   created_at: string;
 }
 
 interface CreditLedgerResponse {
-  transactions: CreditTransaction[];
-  total: number;
-  limit: number;
-  offset: number;
+  entries: CreditLedgerEntry[];
+  pagination: {
+    limit: number;
+    offset: number;
+    total: number;
+    hasMore: boolean;
+  };
 }
 
 interface CheckoutResponse {
   checkoutUrl?: string;
-  sessionId?: string;
-  error?: string;
+  error?: boolean;
   message?: string;
+}
+
+/**
+ * Get credit balance using direct Supabase call
+ */
+async function fetchCreditBalance(): Promise<CreditBalance> {
+  try {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      throw new Error('Authentication required');
+    }
+
+    const { data, error } = await supabase
+      .from('users')
+      .select('credits')
+      .eq('id', user.id)
+      .single();
+
+    if (error) {
+      throw new Error(`Failed to fetch credit balance: ${error.message}`);
+    }
+
+    return {
+      balance: data?.credits || 0,
+      currency: 'USD',
+    };
+  } catch (error) {
+    console.error('[fetchCreditBalance] Error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get credit ledger using direct Supabase call
+ */
+async function fetchCreditLedger(limit: number = 50, offset: number = 0): Promise<CreditLedgerResponse> {
+  try {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      throw new Error('Authentication required');
+    }
+
+    // Get total count first
+    const { count, error: countError } = await supabase
+      .from('credits_ledger')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id);
+
+    if (countError) {
+      throw new Error(`Failed to fetch ledger count: ${countError.message}`);
+    }
+
+    // Get paginated entries
+    const { data, error } = await supabase
+      .from('credits_ledger')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (error) {
+      throw new Error(`Failed to fetch credit ledger: ${error.message}`);
+    }
+
+    const total = count || 0;
+    const hasMore = offset + limit < total;
+
+    return {
+      entries: data || [],
+      pagination: {
+        limit,
+        offset,
+        total,
+        hasMore,
+      },
+    };
+  } catch (error) {
+    console.error('[fetchCreditLedger] Error:', error);
+    throw error;
+  }
 }
 
 export function useCredits() {
   const queryClient = useQueryClient();
 
-  // Fetch credit balance
+  // Fetch credit balance using Supabase
   const {
     data: balance,
     isLoading: isLoadingBalance,
     error: balanceError,
   } = useQuery<CreditBalance>({
     queryKey: ['credits', 'balance'],
-    queryFn: async () => {
-      const response = await fetchWithAuth('/api/credits/balance');
-      if (!response.ok) {
-        throw new Error('Failed to fetch balance');
-      }
-      return response.json();
-    },
+    queryFn: fetchCreditBalance,
     staleTime: 1000 * 60 * 5, // 5 minutes
     gcTime: 1000 * 60 * 10, // 10 minutes
   });
 
-  // Fetch credit ledger with pagination
+  // Fetch credit ledger with pagination using Supabase
   const useCreditLedger = (limit = 50, offset = 0) => {
     return useQuery<CreditLedgerResponse>({
       queryKey: ['credits', 'ledger', limit, offset],
-      queryFn: async () => {
-        const response = await fetchWithAuth(`/api/credits/ledger?limit=${limit}&offset=${offset}`);
-        if (!response.ok) {
-          throw new Error('Failed to fetch ledger');
-        }
-        return response.json();
-      },
+      queryFn: () => fetchCreditLedger(limit, offset),
       staleTime: 1000 * 60 * 2, // 2 minutes
     });
   };
 
-  // Create checkout session
+  // Create checkout session - this still needs to use Supabase Edge Function
   const createCheckoutMutation = useMutation<CheckoutResponse, Error, number>({
     mutationFn: async (dollarAmount: number) => {
-      const response = await fetchWithAuth('/api/credits/checkout', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ amount: dollarAmount }),
-      });
+      const { data: { session }, error } = await supabase.auth.getSession();
       
-      if (!response.ok) {
-        throw new Error('Failed to create checkout session');
+      if (error || !session) {
+        throw new Error('Authentication required');
       }
-      
-      return response.json();
+
+      // Call Supabase Edge Function for Stripe checkout
+      const { data, error: functionError } = await supabase.functions.invoke('stripe-checkout', {
+        body: { amount: dollarAmount },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (functionError) {
+        throw new Error(functionError.message || 'Failed to create checkout session');
+      }
+
+      return data;
     },
     onSuccess: (data) => {
       if (data.checkoutUrl) {
@@ -100,29 +172,31 @@ export function useCredits() {
     },
   });
 
-  // Grant credits (admin only)
-  const grantCreditsMutation = useMutation<
-    { success: boolean; transaction: CreditTransaction },
-    Error,
-    { userId: string; amount: number; reason?: string }
-  >({
-    mutationFn: async ({ userId, amount, reason }) => {
-      const response = await fetchWithAuth('/api/credits/grant', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ userId, amount, reason }),
-      });
+  // Grant credits - for admin use via Edge Function
+  const grantCreditsMutation = useMutation<any, Error, { userId: string; amount: number; description: string }>({
+    mutationFn: async ({ userId, amount, description }) => {
+      const { data: { session }, error } = await supabase.auth.getSession();
       
-      if (!response.ok) {
-        throw new Error('Failed to grant credits');
+      if (error || !session) {
+        throw new Error('Authentication required');
       }
-      
-      return response.json();
+
+      // Call Supabase Edge Function for granting credits
+      const { data, error: functionError } = await supabase.functions.invoke('grant-credits', {
+        body: { userId, amount, description },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (functionError) {
+        throw new Error(functionError.message || 'Failed to grant credits');
+      }
+
+      return data;
     },
     onSuccess: () => {
-      // Invalidate and refetch balance
+      // Invalidate balance and ledger to refresh
       queryClient.invalidateQueries({ queryKey: ['credits', 'balance'] });
       queryClient.invalidateQueries({ queryKey: ['credits', 'ledger'] });
       toast.success('Credits granted successfully');
@@ -132,59 +206,23 @@ export function useCredits() {
     },
   });
 
-  // Utility function to refresh balance
-  const refreshBalance = () => {
-    queryClient.invalidateQueries({ queryKey: ['credits', 'balance'] });
-  };
-
-  // Utility function to check if user has enough budget
-  const hasEnoughBudget = (requiredAmount: number) => {
-    return (balance?.currentBalance || 0) >= requiredAmount;
-  };
-
-  // Utility function to format currency
-  const formatCurrency = (amount: number) => {
+  // Format currency amount
+  const formatCurrency = (cents: number): string => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
-    }).format(amount / 100);
-  };
-
-  // Utility function to format transaction type
-  const formatTransactionType = (type: CreditTransaction['type']) => {
-    switch (type) {
-      case 'stripe':
-        return 'Purchase';
-      case 'manual':
-        return 'Grant';
-      case 'spend':
-        return 'Spend';
-      case 'refund':
-        return 'Refund';
-      default:
-        return type;
-    }
+    }).format(cents / 100);
   };
 
   return {
-    // Data
     balance,
-    
-    // Loading states
     isLoadingBalance,
-    isCreatingCheckout: createCheckoutMutation.isPending,
-    isGrantingCredits: grantCreditsMutation.isPending,
-    
-    // Errors
     balanceError,
-    
-    // Functions
     useCreditLedger,
     createCheckout: createCheckoutMutation.mutate,
+    isCreatingCheckout: createCheckoutMutation.isPending,
     grantCredits: grantCreditsMutation.mutate,
-    refreshBalance,
-    hasEnoughBudget,
+    isGrantingCredits: grantCreditsMutation.isPending,
     formatCurrency,
-    formatTransactionType,
   };
 } 

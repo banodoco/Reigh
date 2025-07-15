@@ -2,132 +2,176 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { GeneratedImageWithMetadata } from '@/shared/components/ImageGallery';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { fetchWithAuth } from '@/lib/api';
-import React from 'react';
 
-// Fetch generations from the API server
-const fetchGenerations = async (projectId: string | null, limit?: number): Promise<GeneratedImageWithMetadata[]> => {
+/**
+ * Fetch generations using direct Supabase call
+ */
+async function fetchGenerations(projectId: string | null, limit?: number): Promise<GeneratedImageWithMetadata[]> {
   if (!projectId) return [];
   
-  const params = new URLSearchParams({ projectId });
-  if (limit) params.append('limit', limit.toString());
+  console.log(`[GenerationsFetch] Fetching generations for project ${projectId} (limit: ${limit})`);
   
-  const response = await fetchWithAuth(`/api/generations?${params}`);
+  const { data, error } = await supabase
+    .from('generations')
+    .select('*')
+    .eq('project_id', projectId)
+    .order('created_at', { ascending: false })
+    .limit(limit || 1000);
   
-  if (!response.ok) {
-    throw new Error('Failed to fetch generations');
-  }
+  console.log('[GenerationsFetch] Raw data from Supabase:', data);
   
-  const data = await response.json();
-  
-  // Convert API response to GeneratedImageWithMetadata format
-  return data.items.map((item: any) => ({
+  if (error) throw error;
+
+  return data?.map((item: any) => ({
     id: item.id,
-    url: item.location || '', // API uses 'location' field
-    prompt: item.params?.prompt || '',
-    seed: item.params?.seed,
-    metadata: item.params || {},
-    createdAt: item.createdAt,
+    url: item.location,
+    prompt: item.params?.prompt || item.metadata?.prompt || 'No prompt',
+    metadata: item.params || item.metadata || {},
+    createdAt: item.created_at,
     isVideo: item.type?.includes('video'),
-  }));
-};
+  })) || [];
+}
+
+/**
+ * Update generation location using direct Supabase call
+ */
+async function updateGenerationLocation(id: string, location: string): Promise<void> {
+  const { error } = await supabase
+    .from('generations')
+    .update({ location })
+    .eq('id', id);
+
+  if (error) {
+    throw new Error(`Failed to update generation: ${error.message}`);
+  }
+}
+
+/**
+ * Get task ID for a generation using direct Supabase call
+ */
+async function getTaskIdForGeneration(generationId: string): Promise<{ taskId: string | null }> {
+  const { data, error } = await supabase
+    .from('generations')
+    .select('task_id')
+    .eq('id', generationId)
+    .single();
+
+  if (error) {
+    throw new Error(`Generation not found or has no task: ${error.message}`);
+  }
+
+  return { taskId: data?.task_id || null };
+}
+
+/**
+ * Create a new generation using direct Supabase call
+ */
+async function createGeneration(params: {
+  imageUrl: string;
+  fileName: string;
+  fileType: string;
+  fileSize: number;
+  projectId: string;
+  prompt: string;
+}): Promise<any> {
+  const { data, error } = await supabase
+    .from('generations')
+    .insert({
+      location: params.imageUrl,
+      type: params.fileType || 'image',
+      project_id: params.projectId,
+      params: {
+        prompt: params.prompt,
+        source: 'external_upload',
+        original_filename: params.fileName,
+        file_type: params.fileType,
+        file_size: params.fileSize,
+      },
+    })
+    .select()
+    .single();
+
+  if (error || !data) {
+    throw new Error(`Failed to create generation: ${error?.message || 'Unknown error'}`);
+  }
+
+  return data;
+}
 
 export function useGenerations(projectId: string | null, page: number = 1, limit: number = 24) {
   return useQuery<GeneratedImageWithMetadata[], Error>({
     queryKey: ['generations', projectId],
     staleTime: 30 * 1000,
-    queryFn: async () => {
-      if (!projectId) return [];
-      
-      console.log(`[GenerationsFetch] Fetching generations for project ${projectId} (page: ${page}, limit: ${limit})`);
-      
-      const { data, error } = await supabase
-        .from('generations')
-        .select('*')
-        .eq('project_id', projectId)
-        .order('created_at', { ascending: false })
-        .limit(1000);
-      
-      console.log('[GenerationsFetch] Raw data from Supabase:', data);
-      
-      if (error) throw error;
-
-
-
-      return data?.map((item: any) => ({
-        id: item.id,
-        url: item.location,
-        prompt: item.params?.prompt || item.metadata?.prompt || 'No prompt',
-        metadata: item.params || item.metadata || {}
-      })) || [];
-    },
+    queryFn: () => fetchGenerations(projectId, limit),
     enabled: !!projectId,
   });
-};
-
-// 2. Delete Generation
-const deleteGeneration = async (generationId: string) => {
-  const { error } = await supabase
-    .from('generations')
-    .delete()
-    .eq('id', generationId);
-  
-  if (error) throw error;
-  // The API might return a confirmation message, which we can use or ignore.
-  // For this hook, we don't need to return anything on success.
-};
+}
 
 export function useDeleteGeneration() {
   const queryClient = useQueryClient();
+
   return useMutation({
-    mutationFn: deleteGeneration,
-    onSuccess: (_, generationId) => {      
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('generations')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        throw new Error(`Failed to delete generation: ${error.message}`);
+      }
+    },
+    onSuccess: () => {
+      // Invalidate the generations query to refetch
+      queryClient.invalidateQueries({ queryKey: ['generations'] });
+      toast.success('Generation deleted successfully');
+    },
+    onError: (error: Error) => {
+      console.error('Error deleting generation:', error);
+      toast.error(error.message || 'Failed to delete generation');
+    },
+  });
+}
+
+export function useUpdateGenerationLocation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, location }: { id: string; location: string }) => {
+      return updateGenerationLocation(id, location);
+    },
+    onSuccess: () => {
+      // Invalidate the generations query to refetch
       queryClient.invalidateQueries({ queryKey: ['generations'] });
     },
     onError: (error: Error) => {
-      toast.error("Failed to delete generation.", {
-        description: error.message,
-      });
+      console.error('Error updating generation location:', error);
+      toast.error(error.message || 'Failed to update generation');
     },
   });
-};
-
-// 3. Create Generation (as part of a task)
-interface CreateGenerationParams {
-    projectId: string;
-    imageUrl: string;
-    prompt: string;
-    metadata?: any;
 }
 
-const createGeneration = async ({ projectId, imageUrl, prompt, metadata }: CreateGenerationParams) => {
-    const { data, error } = await supabase
-        .from('generations')
-        .insert({
-            location: imageUrl,
-            type: 'image',
-            project_id: projectId,
-            params: metadata || {}
-        })
-        .select()
-        .single();
-    
-    if (error) throw error;
-    return data;
+export function useGetTaskIdForGeneration() {
+  return useMutation({
+    mutationFn: getTaskIdForGeneration,
+    onError: (error: Error) => {
+      console.error('Error getting task ID for generation:', error);
+    },
+  });
 }
 
 export function useCreateGeneration() {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn: createGeneration,
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['generations'] });
-            toast.success("New generation record created.");
-        },
-        onError: (error: Error) => {
-            toast.error("Failed to create generation record.", {
-                description: error.message,
-            });
-        }
-    });
-}; 
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: createGeneration,
+    onSuccess: () => {
+      // Invalidate the generations query to refetch
+      queryClient.invalidateQueries({ queryKey: ['generations'] });
+    },
+    onError: (error: Error) => {
+      console.error('Error creating generation:', error);
+      toast.error(error.message || 'Failed to create generation');
+    },
+  });
+} 

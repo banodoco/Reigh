@@ -195,8 +195,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
             <div 
               className="relative flex items-center justify-center" 
               style={{
-                maxHeight: '90vh',
-                maxWidth: '90vw'
+                maxHeight: '95vh',
+                maxWidth: '95vw'
               }}
             >
               {/* Navigation Controls - Left Arrow */}
@@ -205,9 +205,9 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   variant="secondary"
                   size="lg"
                   onClick={onPrevious}
-                  className="bg-black/50 hover:bg-black/70 text-white z-10 mr-4 h-12 w-12"
+                  className="bg-black/50 hover:bg-black/70 text-white z-10 mr-2 sm:mr-4 h-10 w-10 sm:h-12 sm:w-12 hidden sm:flex"
                 >
-                  <ChevronLeft className="h-8 w-8" />
+                  <ChevronLeft className="h-6 w-6 sm:h-8 sm:w-8" />
                 </Button>
               )}
 
@@ -215,16 +215,27 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               <div className="relative">
                 {isVideo ? (
                   videoPlayerComponent === 'simple-player' ? (
-                    <SimpleVideoPlayer
-                      src={displayUrl}
-                      poster={media.thumbUrl}
-                      className="w-full h-full max-h-[80vh] object-contain"
-                    />
+                    <div style={{
+                      maxWidth: '95vw',
+                      width: 'auto',
+                      minHeight: '40vh'
+                    }}>
+                      <SimpleVideoPlayer
+                        src={displayUrl}
+                        poster={media.thumbUrl}
+                        className="w-full h-full max-h-[85vh] sm:max-h-[80vh] object-contain"
+                      />
+                    </div>
                   ) : (
                     <HoverScrubVideo
                       src={displayUrl}
                       poster={media.thumbUrl}
-                      className="w-full h-full max-h-[80vh] object-contain"
+                      className="w-full h-full max-h-[85vh] sm:max-h-[80vh] object-contain"
+                      style={{
+                        maxWidth: '95vw',
+                        width: 'auto',
+                        minHeight: '40vh'
+                      }}
                     />
                   )
                 ) : (
@@ -236,8 +247,11 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         isFlippedHorizontally ? 'scale-x-[-1]' : ''
                       }`}
                       style={{ 
-                        maxHeight: '80vh',
-                        maxWidth: '80vw',
+                        maxHeight: '85vh',
+                        maxWidth: '95vw',
+                        minHeight: '40vh',
+                        width: 'auto',
+                        height: 'auto',
                         transform: isFlippedHorizontally ? 'scaleX(-1)' : 'none'
                       }}
                     />
@@ -252,7 +266,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                 )}
 
                 {/* Top Controls */}
-                <div className="absolute top-4 right-4 flex items-center space-x-2 z-10">
+                <div className="absolute top-2 sm:top-4 right-2 sm:right-4 flex items-center space-x-1 sm:space-x-2 z-10">
                   {!isVideo && showImageEditTools && (
                     <>
                       <Tooltip>
@@ -294,7 +308,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           variant="secondary"
                           size="sm"
                           onClick={handleDownload}
-                          className="bg-black/50 hover:bg-black/70 text-white"
+                          className="bg-black/50 hover:bg-black/70 text-white h-8 w-8 sm:h-auto sm:w-auto"
                         >
                           <Download className="h-4 w-4" />
                         </Button>
@@ -307,7 +321,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     variant="secondary"
                     size="sm"
                     onClick={onClose}
-                    className="bg-black/50 hover:bg-black/70 text-white"
+                    className="bg-black/50 hover:bg-black/70 text-white h-8 w-8 sm:h-auto sm:w-auto"
                   >
                     <X className="h-4 w-4" />
                   </Button>
@@ -315,13 +329,13 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
                 {/* Bottom Workflow Controls */}
                 {(onAddToShot || onDelete || onApplySettings) && (
-                  <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex items-center space-x-2 z-10">
-                    <div className="bg-black/80 backdrop-blur-sm rounded-lg p-2 flex items-center space-x-2">
+                  <div className="absolute bottom-2 sm:bottom-4 left-1/2 transform -translate-x-1/2 flex items-center space-x-1 sm:space-x-2 z-10">
+                    <div className="bg-black/80 backdrop-blur-sm rounded-lg p-1 sm:p-2 flex items-center space-x-1 sm:space-x-2">
                       {/* Shot Selection and Add to Shot */}
                       {onAddToShot && allShots.length > 0 && (
                         <>
                           <Select value={selectedShotId} onValueChange={onShotChange}>
-                            <SelectTrigger className="w-32 h-8 bg-black/50 border-white/20 text-white text-xs">
+                            <SelectTrigger className="w-24 sm:w-32 h-7 sm:h-8 bg-black/50 border-white/20 text-white text-xs">
                               <SelectValue placeholder="Select shot" />
                             </SelectTrigger>
                             <SelectContent>
@@ -340,12 +354,12 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                                 size="sm"
                                 onClick={handleAddToShot}
                                 disabled={!selectedShotId}
-                                className="bg-blue-600/80 hover:bg-blue-600 text-white h-8 px-3"
+                                className="bg-blue-600/80 hover:bg-blue-600 text-white h-7 sm:h-8 px-2 sm:px-3"
                               >
                                 {showTickForImageId === media.id ? (
-                                  <CheckCircle className="h-4 w-4" />
+                                  <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4" />
                                 ) : (
-                                  <PlusCircle className="h-4 w-4" />
+                                  <PlusCircle className="h-3 w-3 sm:h-4 sm:w-4" />
                                 )}
                               </Button>
                             </TooltipTrigger>
@@ -362,9 +376,9 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                               variant="secondary"
                               size="sm"
                               onClick={handleApplySettings}
-                              className="bg-purple-600/80 hover:bg-purple-600 text-white h-8 px-3"
+                              className="bg-purple-600/80 hover:bg-purple-600 text-white h-7 sm:h-8 px-2 sm:px-3"
                             >
-                              <Settings className="h-4 w-4" />
+                              <Settings className="h-3 w-3 sm:h-4 sm:w-4" />
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent>Apply settings</TooltipContent>
@@ -380,9 +394,9 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                               size="sm"
                               onClick={handleDelete}
                               disabled={isDeleting === media.id}
-                              className="bg-red-600/80 hover:bg-red-600 text-white h-8 px-3"
+                              className="bg-red-600/80 hover:bg-red-600 text-white h-7 sm:h-8 px-2 sm:px-3"
                             >
-                              <Trash2 className="h-4 w-4" />
+                              <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent>Delete image</TooltipContent>
@@ -391,17 +405,42 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     </div>
                   </div>
                 )}
+
+                {/* Mobile Navigation Controls */}
+                <div className="sm:hidden">
+                  {showNavigation && onPrevious && (
+                    <Button
+                      variant="secondary"
+                      size="lg"
+                      onClick={onPrevious}
+                      className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white z-10 h-12 w-12"
+                    >
+                      <ChevronLeft className="h-6 w-6" />
+                    </Button>
+                  )}
+                  
+                  {showNavigation && onNext && (
+                    <Button
+                      variant="secondary"
+                      size="lg"
+                      onClick={onNext}
+                      className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white z-10 h-12 w-12"
+                    >
+                      <ChevronRight className="h-6 w-6" />
+                    </Button>
+                  )}
+                </div>
               </div>
 
-              {/* Navigation Controls - Right Arrow */}
+              {/* Navigation Controls - Right Arrow (Desktop Only) */}
               {showNavigation && onNext && (
                 <Button
                   variant="secondary"
                   size="lg"
                   onClick={onNext}
-                  className="bg-black/50 hover:bg-black/70 text-white z-10 ml-4 h-12 w-12"
+                  className="bg-black/50 hover:bg-black/70 text-white z-10 ml-2 sm:ml-4 h-10 w-10 sm:h-12 sm:w-12 hidden sm:flex"
                 >
-                  <ChevronRight className="h-8 w-8" />
+                  <ChevronRight className="h-6 w-6 sm:h-8 sm:w-8" />
                 </Button>
               )}
             </div>

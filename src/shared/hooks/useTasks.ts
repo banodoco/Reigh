@@ -2,9 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Task, TaskStatus } from '@/types/tasks';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { fetchWithAuth } from '@/lib/api';
 import { useProject } from '../contexts/ProjectContext';
-import React from 'react';
 
 const TASKS_QUERY_KEY = 'tasks';
 
@@ -22,9 +20,9 @@ interface CreateTaskParams {
   params: any;
 }
 
-interface UpdateTaskStatusParams {
-  taskId: string;
-  status: TaskStatus;
+interface CancelAllPendingTasksResponse {
+  cancelledCount: number;
+  message: string;
 }
 
 // Helper to convert DB row (snake_case) to Task interface (camelCase)
@@ -118,6 +116,27 @@ export const useUpdateTaskStatus = () => {
   });
 };
 
+// Hook to get a single task by ID
+export const useGetTask = (taskId: string) => {
+  return useQuery<Task, Error>({
+    queryKey: [TASKS_QUERY_KEY, 'single', taskId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('id', taskId)
+        .single();
+
+      if (error) {
+        throw new Error(`Task with ID ${taskId} not found: ${error.message}`);
+      }
+
+      return mapDbTaskToTask(data);
+    },
+    enabled: !!taskId,
+  });
+};
+
 // Hook to list tasks
 export const useListTasks = (params: ListTasksParams) => {
   const { projectId, status } = params;
@@ -154,68 +173,77 @@ export const useListTasks = (params: ListTasksParams) => {
   });
 };
 
-// Types for API responses and request bodies for cancel operations
-interface CancelTaskResponse extends Task { }
+/**
+ * Cancel a task using direct Supabase call
+ */
+async function cancelTask(taskId: string): Promise<void> {
+  const { error } = await supabase
+    .from('tasks')
+    .update({ 
+      status: 'Cancelled',
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', taskId);
 
-interface CancelAllPendingTasksResponse {
-  message: string;
-  cancelledCount: number;
+  if (error) {
+    throw new Error(`Failed to cancel task: ${error.message}`);
+  }
 }
 
-// Hook to cancel a task
+/**
+ * Cancel all pending tasks for a project using direct Supabase call
+ */
+async function cancelPendingTasks(projectId: string): Promise<CancelAllPendingTasksResponse> {
+  const { data, error } = await supabase
+    .from('tasks')
+    .update({ 
+      status: 'Cancelled',
+      updated_at: new Date().toISOString()
+    })
+    .eq('project_id', projectId)
+    .eq('status', 'Queued')
+    .select('id');
+
+  if (error) {
+    throw new Error(`Failed to cancel pending tasks: ${error.message}`);
+  }
+
+  const cancelledCount = data?.length || 0;
+  
+  return {
+    cancelledCount,
+    message: `${cancelledCount} pending tasks cancelled`,
+  };
+}
+
+// Hook to cancel a task using Supabase
 export const useCancelTask = (projectId: string | null) => {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async (taskId: string) => {
-      const response = await fetchWithAuth(`/api/tasks/${taskId}/cancel`, {
-        method: 'PATCH',
-      });
-
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(err.message || 'Failed to cancel task');
-      }
-
-      return await response.json();
-    },
+    mutationFn: cancelTask,
     onSuccess: (_, taskId) => {
       queryClient.invalidateQueries({ queryKey: [TASKS_QUERY_KEY] });
       toast.success('Task cancelled successfully');
     },
     onError: (error: Error) => {
+      console.error('Error cancelling task:', error);
       toast.error(`Failed to cancel task: ${error.message}`);
     },
   });
 };
 
-// Hook to cancel pending tasks
+// Hook to cancel pending tasks using Supabase
 export const useCancelPendingTasks = () => {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async (projectId: string) => {
-      const response = await fetchWithAuth(`/api/tasks/cancel-pending`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ projectId }),
-      });
-
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(err.message || 'Failed to cancel pending tasks');
-      }
-
-      const data = await response.json() as CancelAllPendingTasksResponse;
-      return data;
-    },
-    onSuccess: (_, projectId) => {
+    mutationFn: cancelPendingTasks,
+    onSuccess: (data, projectId) => {
       queryClient.invalidateQueries({ queryKey: [TASKS_QUERY_KEY, projectId] });
       queryClient.invalidateQueries({ queryKey: [TASKS_QUERY_KEY, projectId, ['Queued']] });
       queryClient.invalidateQueries({ queryKey: [TASKS_QUERY_KEY, projectId, ['Cancelled']] });
-      toast.success('Pending tasks cancelled successfully');
+      toast.success(`${data.cancelledCount} pending tasks cancelled successfully`);
     },
     onError: (error: Error) => {
       console.error('Error cancelling pending tasks:', error);
