@@ -451,12 +451,12 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
                       <Button
                         size="icon"
                         variant="secondary"
-                        className="h-6 w-6 rounded-full p-0"
+                        className="h-12 w-6 rounded-full p-0"
                         onClick={() => handleMoveHere(0)}
                         onPointerDown={e=>e.stopPropagation()}
                         title="Move to beginning"
                       >
-                        <ArrowDown className="h-3 w-3" />
+                        <ArrowDown className="h-4 w-4" />
                       </Button>
                     </div>
                   )}
