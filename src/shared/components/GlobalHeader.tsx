@@ -130,11 +130,11 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                     disabled={isLoadingProjects || projects.length === 0}
                   >
                     <SelectTrigger className="w-[280px] wes-select border-3 border-wes-vintage-gold/30 bg-white/95 font-inter text-sm shadow-wes-vintage hover:shadow-wes-hover transition-all duration-500 wes-ornate-frame h-12">
-                      <div className="flex items-center space-x-3">
+                      <div className="flex items-center space-x-3 overflow-hidden">
                         <div className="w-8 h-8 bg-gradient-to-br from-wes-vintage-gold to-wes-coral rounded-lg flex items-center justify-center">
                           <Palette className="h-4 w-4 text-white" />
                         </div>
-                        <SelectValue placeholder="Select a project" className="font-crimson text-primary" />
+                        <SelectValue placeholder="Select a project" className="font-crimson text-primary truncate" />
                       </div>
                     </SelectTrigger>
                     <SelectContent className="wes-vintage-card wes-ornate-frame border-3 border-wes-vintage-gold/30 shadow-wes-deep">
@@ -270,11 +270,11 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                   disabled={isLoadingProjects || projects.length === 0}
                 >
                   <SelectTrigger className="w-full wes-select border-2 border-wes-vintage-gold/30 bg-white/95 font-inter text-xs shadow-wes-vintage hover:shadow-wes-hover transition-all duration-500 wes-ornate-frame h-10">
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-2 overflow-hidden">
                       <div className="w-6 h-6 bg-gradient-to-br from-wes-vintage-gold to-wes-coral rounded-md flex items-center justify-center">
                         <Palette className="h-3 w-3 text-white" />
                       </div>
-                      <SelectValue placeholder="Select project" className="font-crimson text-primary" />
+                      <SelectValue placeholder="Select project" className="font-crimson text-primary truncate" />
                     </div>
                   </SelectTrigger>
                   <SelectContent className="wes-vintage-card wes-ornate-frame border-2 border-wes-vintage-gold/30 shadow-wes-deep">
