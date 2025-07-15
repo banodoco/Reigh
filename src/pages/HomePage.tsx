@@ -22,7 +22,20 @@ export default function HomePage() {
   const [isPhilosophyPaneClosing, setIsPhilosophyPaneClosing] = useState(false);
   const [isCreativePartnerPaneClosing, setIsCreativePartnerPaneClosing] = useState(false);
   const [isTooltipOpen, setIsTooltipOpen] = useState(false);
+  const [assetsLoaded, setAssetsLoaded] = useState(false);
 
+  // Preload assets
+  useEffect(() => {
+    const img = new Image();
+    img.src = '/brush-paintbrush-icon.webp';
+    img.onload = () => {
+      setAssetsLoaded(true);
+    };
+    img.onerror = () => {
+      // If image fails to load, we'll still show the content
+      setAssetsLoaded(true);
+    };
+  }, []);
 
   // Show toast if redirected from protected page
   useEffect(() => {
@@ -104,6 +117,15 @@ export default function HomePage() {
       document.body.style.height = '';
     };
   }, []);
+
+  // Only render content when assets are loaded
+  if (!assetsLoaded) {
+    return (
+      <div className="min-h-screen wes-texture relative overflow-hidden flex items-center justify-center">
+        <div className="w-32 h-1.5 bg-gradient-to-r from-wes-pink to-wes-vintage-gold rounded-full mx-auto shadow-inner-vintage animate-pulse"></div>
+      </div>
+    );
+  }
 
   return (
     <PageFadeIn className="min-h-screen wes-texture relative overflow-hidden">
