@@ -743,13 +743,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
   const handleApplySettingsFromTaskNew = async (taskId: string, replaceImages: boolean, inputImages: string[]) => {
     try {
-      // Fetch the settings from the task
-      const response = await fetchWithAuth(`/api/tool-settings/from-task/${taskId}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch settings from task');
-      }
-      
-      const settings = await response.json();
+      // Fetch the settings from the task using Supabase
+      const { extractToolSettingsFromTask } = await import('@/shared/hooks/useToolSettings');
+      const settings = await extractToolSettingsFromTask(taskId);
       
       // Apply the settings
       onVideoControlModeChange(settings.videoControlMode || 'batch');
