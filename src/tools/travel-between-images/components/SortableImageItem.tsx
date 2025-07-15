@@ -102,7 +102,7 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
         className="max-w-full max-h-full object-contain rounded-sm"
         key={imageUrl} // Force re-render when imageUrl changes
       />
-      {(!isMobile || !isDragDisabled || isSelected) && (
+      {(!isMobile || !isDragDisabled) && (
         <Button
           variant="destructive"
           size="icon"
