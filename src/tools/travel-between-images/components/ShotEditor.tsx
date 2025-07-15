@@ -1111,6 +1111,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                 onBlur={handleNameSave}
                 className="text-2xl font-bold text-primary h-auto py-1 px-2 min-w-[200px]"
                 autoFocus
+                maxLength={30}
               />
               <Button size="sm" variant="outline" onClick={handleNameSave}>
                 Save

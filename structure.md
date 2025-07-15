@@ -263,8 +263,8 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
 - **SettingsModal.tsx**: Modal for API key entry/saving to database (uses useApiKeys hook). Replaces localStorage-based approach
 - **PromptEditorModal.tsx**: Modal for bulk prompt editing, AI-assisted generation/refinement
 - **LoraSelectorModal.tsx**: Browse/select LoRA models. Supports filtering by `lora_type` (e.g., "Flux.dev", "Wan 2.1 14b")
-- **CreateProjectModal.tsx**: Dialog to create new project (uses ProjectContext.addNewProject)
-- **ProjectSettingsModal.tsx**: Dialog to update project name/aspect ratio (uses ProjectContext.updateProject). Includes "Crop to project size when uploading images" checkbox that persists across sessions
+- **CreateProjectModal.tsx**: Dialog to create new project (uses ProjectContext.addNewProject). Project names are limited to 30 characters maximum.
+- **ProjectSettingsModal.tsx**: Dialog to update project name/aspect ratio (uses ProjectContext.updateProject). Project names are limited to 30 characters maximum. Includes "Crop to project size when uploading images" checkbox that persists across sessions
 - **FileInput.tsx**: Reusable file input (image/video) with drag-and-drop, preview
 - **MediaLightbox.tsx**: Reusable lightbox for images/videos. Keyboard/button navigation. Now includes horizontal flip functionality for images with canvas-based save capability using local SQLite API
 - **ShotImageManager.tsx**: Manages images in a shot (D&D reorder, delete via callbacks). Used by ShotEditor, ShotsPage.tsx
@@ -313,6 +313,7 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
 - **imageCropper.ts**: Crops images to supported aspect ratios. Includes `cropImageToProjectAspectRatio` function for cropping to specific project dimensions
 - **cropSettings.ts**: Utility for managing "crop to project size" setting persistence in localStorage. Defaults to true
 - **aspectRatios.ts**: Defines aspect ratios (e.g., "16:9" -> "902x508"). Single source for project/server dimensions. Parsing/matching helpers
+- **dummyNames.ts**: Creative movie-pun project names for auto-generation when user doesn't provide a name. All names are 30 characters or less to match project name character limits.
 - **steerableMotion.ts**: Video generation API (POST /api/steerable-motion). Includes prompt enhancement via OpenAI API when enhance_prompt=true and openai_api_key is provided. Supports mutually exclusive LoRA options: apply_causvid and use_lighti2x_lora.
 - **taskConfig.ts**: Centralized task configuration system. Manages task visibility, display names, progress support, and cancellation permissions. Provides functions like `isTaskVisible()`, `getTaskDisplayName()`, `taskSupportsProgress()`, and `filterVisibleTasks()`. Replaces hardcoded task type arrays with scalable configuration registry. Supports categories ('generation', 'processing', 'orchestration', 'utility') and extensible task capabilities.
 - **deepEqual.ts**: Deep equality comparison utility with `sanitizeSettings()` function to ignore undefined values. Used by tool settings system to detect actual changes vs initialization.

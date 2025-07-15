@@ -66,6 +66,7 @@ const CreateShotModal: React.FC<CreateShotModalProps> = ({
               onChange={(e) => setShotName(e.target.value)} 
               className="col-span-3" 
               placeholder={defaultShotName || "e.g., My Awesome Shot"}
+              maxLength={30}
             />
           </div>
           <FileInput 

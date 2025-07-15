@@ -740,6 +740,7 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
                                 placeholder="My Awesome LoRA" 
                                 value={addForm.name} 
                                 onChange={e => handleFormChange('name', e.target.value)} 
+                                maxLength={30}
                             />
                         </div>
                         
@@ -837,6 +838,7 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
                                 placeholder="Creator's username" 
                                 value={addForm.created_by_username} 
                                 onChange={e => handleFormChange('created_by_username', e.target.value)} 
+                                maxLength={30}
                             />
                         )}
                     </div>

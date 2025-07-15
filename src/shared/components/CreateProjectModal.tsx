@@ -65,7 +65,15 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, 
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent 
+        className="sm:max-w-[425px]"
+        onOpenAutoFocus={(event) => {
+          // Prevent auto-focus on mobile devices to avoid triggering the keyboard
+          if ('ontouchstart' in window) {
+            event.preventDefault();
+          }
+        }}
+      >
         <DialogHeader>
           <DialogTitle>Create New Project</DialogTitle>
           <DialogDescription>
@@ -83,6 +91,8 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, 
               onChange={(e) => setProjectName(e.target.value)}
               className="col-span-3"
               disabled={isCreatingProject}
+              maxLength={30}
+              placeholder="Enter project name..."
             />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">

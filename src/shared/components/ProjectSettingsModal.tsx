@@ -122,7 +122,15 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({ isOp
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent 
+        className="sm:max-w-[425px]"
+        onOpenAutoFocus={(event) => {
+          // Prevent auto-focus on mobile devices to avoid triggering the keyboard
+          if ('ontouchstart' in window) {
+            event.preventDefault();
+          }
+        }}
+      >
         <DialogHeader>
           <DialogTitle>Project Settings: {project.name}</DialogTitle>
           <DialogDescription>
@@ -140,6 +148,7 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({ isOp
               onChange={(e) => setProjectName(e.target.value)}
               className="col-span-3"
               disabled={isUpdatingProject}
+              maxLength={30}
             />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">

@@ -270,7 +270,7 @@ python headless.py --db-type supabase \\
       <DialogContent 
         style={modalStyle}
         className={`sm:max-w-2xl overflow-y-auto ${
-          isMobile ? 'mx-2 my-5 max-h-[calc(100vh-2.5rem)]' : ''
+          isMobile ? 'my-5 max-h-[calc(100vh-2.5rem)]' : ''
         }`}
       >
         <DialogHeader className="relative">

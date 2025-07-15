@@ -149,6 +149,7 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
                 }}
                 className="text-xl font-medium h-9"
                 autoFocus
+                maxLength={30}
               />
               <Button variant="ghost" size="icon" onClick={handleSaveName} className="h-9 w-9">
                 <Check className="h-4 w-4" />

@@ -231,6 +231,7 @@ const ShotGroup: React.FC<ShotGroupProps> = ({ shot }) => {
           onBlur={handleInputBlur}
           onKeyDown={handleInputKeyDown}
           className="bg-zinc-700 text-white p-1 rounded border border-zinc-600 text-sm focus:ring-1 focus:ring-sky-500 outline-none w-full"
+          maxLength={30}
         />
       ) : (
         <p

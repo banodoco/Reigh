@@ -16,6 +16,7 @@ import { usePaneAwareModalStyle } from '@/shared/hooks/usePaneAwareModalStyle';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { usePersistentToolState } from '@/shared/hooks/usePersistentToolState';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/shared/components/ui/collapsible';
+import { useIsMobile } from "@/shared/hooks/use-mobile";
 
 // Use aliased types for internal state if they were named the same
 interface GenerationControlValues extends PGC_GenerationControlValues {}
@@ -56,6 +57,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
   const [activeTab, setActiveTab] = useState<EditorMode>('generate');
   const [activePromptIdForFullView, setActivePromptIdForFullView] = useState<string | null>(null);
   const modalStyle = usePaneAwareModalStyle();
+  const isMobile = useIsMobile();
   const [isAIPromptSectionExpanded, setIsAIPromptSectionExpanded] = useState(false);
   
   // Scroll state and ref
@@ -336,7 +338,18 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleFinalSaveAndClose()}>
-      <DialogContent style={modalStyle} className="max-w-4xl flex flex-col p-0">
+      <DialogContent 
+        style={modalStyle} 
+        className={`max-w-4xl flex flex-col p-0 ${
+          isMobile ? 'my-5 max-h-[calc(100vh-2.5rem)]' : ''
+        }`}
+        onOpenAutoFocus={(event) => {
+          // Prevent auto-focus on mobile devices to avoid triggering the keyboard
+          if ('ontouchstart' in window) {
+            event.preventDefault();
+          }
+        }}
+      >
         <DialogHeader className="p-6 pb-0 flex-shrink-0">
           <DialogTitle>Prompt Editor</DialogTitle>
           <DialogDescription>
@@ -362,9 +375,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
                     AI Prompt Tools
                     {!isAIPromptSectionExpanded && <Sparkles className="h-3 w-3 text-pink-400 animate-pulse" />}
                   </span>
-                  <span className="text-sm text-muted-foreground">
-                    (Generate new or bulk edit existing prompts)
-                  </span>
+       
                 </div>
                 {isAIPromptSectionExpanded ? (
                   <ChevronDown className="h-4 w-4" />
@@ -480,7 +491,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
           </Dialog>
         )}
 
-        <DialogFooter className="p-6 pt-2 border-t">
+        <DialogFooter className={`p-6 pt-2 border-t ${isMobile ? 'pb-16' : ''}`}>
            <Button variant="outline" onClick={handleInternalAddBlankPrompt} className="mr-auto">
             <PackagePlus className="mr-2 h-4 w-4" /> Add Blank Prompt
           </Button>

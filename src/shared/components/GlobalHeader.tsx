@@ -235,22 +235,72 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
             paddingLeft: contentOffsetLeft ? `${contentOffsetLeft}px` : undefined,
           }}
         >
-          {/* Top row - Brand + Project Selector */}
-                      <div className="flex items-center justify-between h-12 w-full" style={{ paddingLeft: '16px', paddingRight: '16px' }}>
-            {/* Brand - Left side (text only on mobile) */}
-            <Link to={session ? "/tools" : "/"} className="group relative">
-              <div className="relative">
-                <span className="font-playfair text-xl font-bold tracking-wide text-primary text-shadow-vintage group-hover:animate-vintage-glow transition-all duration-300">
-                  Reigh
-                </span>
-                <div className="absolute -top-1 -right-1">
-                  <Star className="w-2 h-2 text-wes-vintage-gold animate-rotate-slow opacity-50" />
+          {/* Top row - Brand + Project Buttons + App Settings */}
+          <div className="flex items-center justify-between h-12 w-full" style={{ paddingLeft: '16px', paddingRight: '16px' }}>
+            {/* Left side - Brand + Project Buttons */}
+            <div className="flex items-center space-x-2">
+              {/* Brand */}
+              <Link to={session ? "/tools" : "/"} className="group relative">
+                <div className="relative">
+                  <span className="font-playfair text-xl font-bold tracking-wide text-primary text-shadow-vintage group-hover:animate-vintage-glow transition-all duration-300">
+                    Reigh
+                  </span>
+                  <div className="absolute -top-1 -right-1">
+                    <Star className="w-2 h-2 text-wes-vintage-gold animate-rotate-slow opacity-50" />
+                  </div>
                 </div>
-              </div>
-            </Link>
+              </Link>
 
-            {/* Project Selector - Right side (wider now) */}
-            <div className="flex-1 ml-4">
+              {/* Project Buttons */}
+              {selectedProjectId && projects.length > 0 && ( 
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsProjectSettingsModalOpen(true)}
+                  className="h-10 w-10 wes-button no-sweep bg-gradient-to-br from-wes-coral to-wes-salmon border-2 border-wes-vintage-gold/30 hover:from-wes-coral-dark hover:to-wes-salmon-dark shadow-wes-vintage hover:shadow-wes-hover wes-stamp group relative"
+                  title="Project settings"
+                  disabled={!selectedProject}
+                >
+                  <Wrench className="h-4 w-4 text-white transition-all duration-500 group-hover:scale-110 group-hover:animate-wrench-turn" />
+                  <div className="absolute -top-1 -right-1">
+                    <Sparkles className="w-2 h-2 text-wes-vintage-gold animate-rotate-slow opacity-70" />
+                  </div>
+                </Button>
+              )}
+              
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => setIsCreateProjectModalOpen(true)} 
+                className="h-10 w-10 wes-button no-sweep bg-gradient-to-br from-wes-yellow to-wes-salmon border-2 border-wes-vintage-gold/30 hover:from-wes-yellow-dark hover:to-wes-salmon shadow-wes-vintage hover:shadow-wes-hover group wes-viewfinder"
+                title="Create new project"
+              >
+                <PlusCircle className="h-4 w-4 text-white transition-all duration-500 group-hover:animate-bubble-pop" />
+                <div className="absolute -top-1 -left-1">
+                  <Star className="w-2 h-2 text-wes-vintage-gold animate-rotate-slow" />
+                </div>
+              </Button>
+            </div>
+
+            {/* Right side - App Settings */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onOpenSettings}
+              className="h-10 w-10 wes-button no-sweep bg-gradient-to-br from-wes-dusty-blue to-wes-lavender border-2 border-wes-vintage-gold/40 hover:from-wes-dusty-blue-dark hover:to-wes-lavender-dark shadow-wes-vintage hover:shadow-wes-hover wes-viewfinder group relative overflow-hidden"
+              title="App Settings"
+            >
+              <div className="absolute inset-0 bg-film-grain opacity-20 animate-film-grain"></div>
+              <Settings className="h-4 w-4 text-white relative z-10 transition-transform group-hover:animate-spin" />
+              <div className="absolute -top-1 -right-1">
+                <Crown className="w-2 h-2 text-wes-vintage-gold animate-bounce-gentle opacity-80" />
+              </div>
+            </Button>
+          </div>
+
+          {/* Bottom row - Project Selector */}
+          <div className="flex items-center h-14 w-full border-t border-wes-vintage-gold/20" style={{ paddingLeft: '16px', paddingRight: '16px' }}>
+            <div className="flex-1">
               {isLoadingProjects && projects.length === 0 ? (
                 <div className="text-center relative">
                   <div className="animate-vintage-pulse flex items-center justify-center space-x-2 p-2 wes-vintage-card">
@@ -303,56 +353,6 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                   </SelectContent>
                 </Select>
               )}
-            </div>
-          </div>
-
-          {/* Bottom row - App Settings + Action Buttons */}
-          <div className="flex items-center justify-between h-14 w-full border-t border-wes-vintage-gold/20" style={{ paddingLeft: '16px', paddingRight: '16px' }}>
-            {/* App Settings - Left side (aligned with Reigh text) */}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onOpenSettings}
-              className="h-10 w-10 wes-button no-sweep bg-gradient-to-br from-wes-dusty-blue to-wes-lavender border-2 border-wes-vintage-gold/40 hover:from-wes-dusty-blue-dark hover:to-wes-lavender-dark shadow-wes-vintage hover:shadow-wes-hover wes-viewfinder group relative overflow-hidden"
-              title="App Settings"
-            >
-              <div className="absolute inset-0 bg-film-grain opacity-20 animate-film-grain"></div>
-              <Settings className="h-4 w-4 text-white relative z-10 transition-transform group-hover:animate-spin" />
-              <div className="absolute -top-1 -right-1">
-                <Crown className="w-2 h-2 text-wes-vintage-gold animate-bounce-gentle opacity-80" />
-              </div>
-            </Button>
-
-            {/* Action Buttons - Right side */}
-            <div className="flex items-center space-x-2">
-              {selectedProjectId && projects.length > 0 && ( 
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setIsProjectSettingsModalOpen(true)}
-                  className="h-10 w-10 wes-button no-sweep bg-gradient-to-br from-wes-coral to-wes-salmon border-2 border-wes-vintage-gold/30 hover:from-wes-coral-dark hover:to-wes-salmon-dark shadow-wes-vintage hover:shadow-wes-hover wes-stamp group relative"
-                  title="Project settings"
-                  disabled={!selectedProject}
-                >
-                  <Wrench className="h-4 w-4 text-white transition-all duration-500 group-hover:scale-110 group-hover:animate-wrench-turn" />
-                  <div className="absolute -top-1 -right-1">
-                    <Sparkles className="w-2 h-2 text-wes-vintage-gold animate-rotate-slow opacity-70" />
-                  </div>
-                </Button>
-              )}
-              
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={() => setIsCreateProjectModalOpen(true)} 
-                className="h-10 w-10 wes-button no-sweep bg-gradient-to-br from-wes-yellow to-wes-salmon border-2 border-wes-vintage-gold/30 hover:from-wes-yellow-dark hover:to-wes-salmon shadow-wes-vintage hover:shadow-wes-hover group wes-viewfinder"
-                title="Create new project"
-              >
-                <PlusCircle className="h-4 w-4 text-white transition-all duration-500 group-hover:animate-bubble-pop" />
-                <div className="absolute -top-1 -left-1">
-                  <Star className="w-2 h-2 text-wes-vintage-gold animate-rotate-slow" />
-                </div>
-              </Button>
             </div>
           </div>
         </div>
