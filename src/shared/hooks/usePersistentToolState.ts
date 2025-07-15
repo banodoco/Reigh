@@ -75,7 +75,16 @@ export function usePersistentToolState<T extends Record<string, any>>(
           // Fallback to defaults if fetch fails
           const effectiveSettings = deepMerge(resolvedDefaults, {});
           Object.entries(stateMapping).forEach(([key, [_, setter]]) => {
-            setter(effectiveSettings[key as keyof T] as any);
+            const value = effectiveSettings[key as keyof T];
+            if (value !== undefined) {
+              setter(value as any);
+            } else {
+              // For undefined values, check if the key exists in defaults and use that
+              const defaultValue = resolvedDefaults[key as keyof T];
+              if (defaultValue !== undefined) {
+                setter(defaultValue as any);
+              }
+            }
           });
           hasHydratedRef.current = true;
           setReady(true);
@@ -89,8 +98,15 @@ export function usePersistentToolState<T extends Record<string, any>>(
 
         // Apply each setting to its corresponding setter
         Object.entries(stateMapping).forEach(([key, [_, setter]]) => {
-          if (effectiveSettings[key as keyof T] !== undefined) {
-            setter(effectiveSettings[key as keyof T] as any);
+          const value = effectiveSettings[key as keyof T];
+          if (value !== undefined) {
+            setter(value as any);
+          } else {
+            // For undefined values, check if the key exists in defaults and use that
+            const defaultValue = resolvedDefaults[key as keyof T];
+            if (defaultValue !== undefined) {
+              setter(defaultValue as any);
+            }
           }
         });
 
