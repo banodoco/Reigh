@@ -19,8 +19,8 @@ interface CreditLedgerEntry {
 interface CreditLedgerResponse {
   entries: CreditLedgerEntry[];
   pagination: {
-    limit: number;
-    offset: number;
+  limit: number;
+  offset: number;
     total: number;
     hasMore: boolean;
   };
@@ -152,11 +152,11 @@ export function useCredits() {
           Authorization: `Bearer ${session.access_token}`,
         },
       });
-
+      
       if (functionError) {
         throw new Error(functionError.message || 'Failed to create checkout session');
       }
-
+      
       return data;
     },
     onSuccess: (data) => {
@@ -188,11 +188,11 @@ export function useCredits() {
           Authorization: `Bearer ${session.access_token}`,
         },
       });
-
+      
       if (functionError) {
         throw new Error(functionError.message || 'Failed to grant credits');
       }
-
+      
       return data;
     },
     onSuccess: () => {

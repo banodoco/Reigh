@@ -189,7 +189,7 @@ export function usePersistentToolState<T extends Record<string, any>>(
           const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
           if (isMobile) {
             console.error(`[usePersistentToolState] [${toolId}] Mobile save failed - this should now work with Supabase migration. Error: ${errorMessage}`);
-          }
+        }
         }
       } else {
         console.log(`[usePersistentToolState] [${toolId}] Skipping save - already updating or no changes`);

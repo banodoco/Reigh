@@ -168,15 +168,16 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
 - `single-image-generate`: Handles wan-local image generation tasks
 - `steerable-motion`: Handles video travel generation tasks
 - `ai-prompt`: Unified prompt generation, editing, and summary tasks via OpenAI server-side
+- `create_task`: Creates tasks in the queue (replaced Express task creation)
+- `calculate-task-cost`: Calculates task costs and updates credit ledger
+- `stripe-checkout`: Creates Stripe checkout sessions for credit purchases (placeholder)
+- `grant-credits`: Admin function for granting credits to users
+- `generate-pat` / `revoke-pat`: Personal Access Token management for workers
+- `hello-debug`: Debug function for testing Edge Function connectivity
 
-##### Remaining Express Endpoints:
-- `/api/projects/*` - Project management (still uses Express but could be migrated)
-- `/api/shots/*` - Shot management (still uses Express but client uses Supabase)
-- `/api/api-keys` - API key storage (still uses Express but client uses Supabase)
-- `/api/resources` - User resources management (still uses Express but client uses Supabase)
-- `/api/steerable-motion` - Video generation (still defined but Edge Function is used)
-- `/api/single-image` - Single image generation (still active)
-- `/api/local-image-upload` - Local file uploads
+##### Express Server Status:
+- **All API routes removed** - Server now only handles static files and WebSocket services
+- All frontend functionality migrated to Supabase Edge Functions and direct database calls
 
 ##### Migrated to Supabase (Express routes deprecated):
 - `~~~/api/tasks/*~~` - Task management → Now uses `useTasks` hooks with direct Supabase

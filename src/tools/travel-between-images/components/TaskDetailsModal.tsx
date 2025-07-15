@@ -1,11 +1,11 @@
 import React, { useEffect, useState, ReactNode } from 'react';
-import { 
-  Dialog, 
-  DialogContent, 
+import {
+  Dialog,
+  DialogContent,
   DialogDescription, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogTrigger, 
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
   DialogFooter 
 } from '@/shared/components/ui/dialog';
 import { Button } from '@/shared/components/ui/button';
@@ -44,11 +44,11 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
       try {
         // Step 1: Get the task ID from the generation using Supabase
         const result = await getTaskIdMutation.mutateAsync(generationId);
-        
+
         if (!result.taskId) {
-          console.log(`[TaskDetailsModal] No task ID found for generation ID: ${generationId}`);
-          setTaskId(null);
-          return;
+            console.log(`[TaskDetailsModal] No task ID found for generation ID: ${generationId}`);
+            setTaskId(null);
+            return;
         }
         
         setTaskId(result.taskId);

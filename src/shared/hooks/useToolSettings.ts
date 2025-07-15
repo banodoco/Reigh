@@ -223,10 +223,10 @@ export function useToolSettings<T>(
       }
 
       await updateToolSettingsSupabase({
-        scope,
-        id: idForScope,
-        toolId,
-        patch: newSettings,
+          scope,
+          id: idForScope,
+          toolId,
+          patch: newSettings,
       });
     },
     onSuccess: () => {

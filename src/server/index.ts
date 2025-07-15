@@ -12,11 +12,6 @@ process.on('uncaughtException', (error) => {
 
 import express from 'express';
 import cors from 'cors';
-import projectsRouter from './routes/projects';
-import shotsRouter from './routes/shots';
-import steerableMotionRouter from './routes/steerableMotion';
-import resourcesRouter from './routes/resources';
-import apiKeysRouter from './routes/apiKeys';
 import dotenv from 'dotenv';
 import multer from 'multer';
 import path from 'path';
@@ -25,7 +20,7 @@ import { startTaskPoller, startTaskStatusPoller } from './services/taskProcessin
 import { initializeWebSocketServer } from './services/webSocketService';
 import http from 'http';
 import { seedDatabase } from '../lib/seed';
-import singleImageRouter from './routes/singleImageGeneration';
+
 // import { fileURLToPath } from 'url'; // No longer needed if using process.cwd()
 
 // // Determine __dirname for ES modules
@@ -43,13 +38,7 @@ const PORT: number = process.env.PORT ? parseInt(process.env.PORT, 10) : 8085;
 app.use(cors()); // Basic CORS setup, configure as needed for production
 app.use(express.json()); // To parse JSON request bodies
 
-// API Routes
-app.use('/api/projects', projectsRouter);
-app.use('/api/shots', shotsRouter);
-app.use('/api/steerable-motion', steerableMotionRouter);
-app.use('/api/resources', resourcesRouter);
-app.use('/api/api-keys', apiKeysRouter);
-app.use('/api/single-image', singleImageRouter);
+// No API routes - all functionality migrated to Supabase Edge Functions
 
 const startServer = async () => {
   try {

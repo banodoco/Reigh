@@ -37,7 +37,7 @@ export function useTaskCost() {
           Authorization: `Bearer ${session.access_token}`,
         },
       });
-
+      
       if (functionError) {
         throw new Error(functionError.message || 'Failed to calculate task cost');
       }
@@ -45,7 +45,7 @@ export function useTaskCost() {
       if (data.error) {
         throw new Error(data.error);
       }
-
+      
       return data;
     },
     onSuccess: (data) => {

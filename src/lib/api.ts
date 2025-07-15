@@ -63,9 +63,9 @@ export async function fetchWithAuth(url: string, options: FetchOptions = {}): Pr
     
     try {
       const response = await fetch(fullUrl, {
-        ...options,
-        headers,
-      });
+      ...options,
+      headers,
+    });
       
       // If we get 401, clear cache and retry with fresh token
       if (response.status === 401) {

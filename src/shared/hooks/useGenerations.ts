@@ -112,11 +112,11 @@ export function useDeleteGeneration() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('generations')
-        .delete()
+  const { error } = await supabase
+    .from('generations')
+    .delete()
         .eq('id', id);
-
+  
       if (error) {
         throw new Error(`Failed to delete generation: ${error.message}`);
       }
@@ -161,17 +161,17 @@ export function useGetTaskIdForGeneration() {
 }
 
 export function useCreateGeneration() {
-  const queryClient = useQueryClient();
+    const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: createGeneration,
-    onSuccess: () => {
+    return useMutation({
+        mutationFn: createGeneration,
+        onSuccess: () => {
       // Invalidate the generations query to refetch
-      queryClient.invalidateQueries({ queryKey: ['generations'] });
-    },
-    onError: (error: Error) => {
+            queryClient.invalidateQueries({ queryKey: ['generations'] });
+        },
+        onError: (error: Error) => {
       console.error('Error creating generation:', error);
       toast.error(error.message || 'Failed to create generation');
     },
-  });
-} 
+            });
+        }
