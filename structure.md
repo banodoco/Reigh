@@ -299,14 +299,46 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
 - **imageUploader.ts**: Uploads to Supabase storage
 - **utils.ts**: General utilities. Includes `getDisplayUrl()` which safely converts relative storage paths to fully-qualified URLs. If `VITE_API_TARGET_URL` is set to a localhost address but the app is being accessed from another host (e.g. mobile device on LAN), the helper automatically falls back to a relative URL so images and videos still load. **Always use this helper instead of hand-rolling URL logic.**
 - **imageCropper.ts**: Crops images to supported aspect ratios. Includes `cropImageToProjectAspectRatio` function for cropping to specific project dimensions
-- **cropSettings.ts**: Utility for managing "crop to project size" setting persistence in localStorage. Defaults to true
+- **cropSettings.ts**: Legacy localStorage utilities for crop settings (deprecated). Modern implementations should use `useToolSettings('upload', { projectId })` for database-based storage with better mobile compatibility
 - **aspectRatios.ts**: Defines aspect ratios (e.g., "16:9" -> "902x508"). Single source for project/server dimensions. Parsing/matching helpers
 - **steerableMotion.ts**: Video generation API (POST /api/steerable-motion). Includes prompt enhancement via OpenAI API when enhance_prompt=true and openai_api_key is provided. Supports mutually exclusive LoRA options: apply_causvid and use_lighti2x_lora.
 - **taskConfig.ts**: Centralized task configuration system. Manages task visibility, display names, progress support, and cancellation permissions. Provides functions like `isTaskVisible()`, `getTaskDisplayName()`, `taskSupportsProgress()`, and `filterVisibleTasks()`. Replaces hardcoded task type arrays with scalable configuration registry. Supports categories ('generation', 'processing', 'orchestration', 'utility') and extensible task capabilities.
 - **deepEqual.ts**: Deep equality comparison utility with `sanitizeSettings()` function to ignore undefined values. Used by tool settings system to detect actual changes vs initialization.
 
 ##### Hooks
-- **useToolSettings.ts**: Manages tool-specific settings stored in database at user/project/shot scopes. Provides `useToolSettings<T>()` hook that fetches merged settings and `update()` function for saving. Settings cascade from app defaults → user → project → shot, with later scopes overriding earlier ones.
+- **useToolSettings.ts**: Manages tool-specific settings stored in database at user/project/shot scopes. Provides `useToolSettings<T>()` hook that fetches merged settings and `update()` function for saving. Settings cascade from app defaults → user → project → shot, with later scopes overriding earlier ones. Now uses API endpoints with `fetchWithAuth` for consistent authentication handling across devices.
+
+## Mobile Persistence & Cross-Device Sync
+
+### Mobile Compatibility Improvements
+**Fixed in 2025**: Resolved critical mobile persistence issues where settings were not being saved on mobile devices due to intentional mobile exclusions in the code.
+
+### Database-First Persistence Strategy
+- **Core Principle**: All critical user preferences are stored in the database for cross-device synchronization
+- **Mobile UI Separation**: UI behavior (like pane locking) is separated from preference persistence - mobile devices get appropriate UI behavior while preferences are preserved for desktop usage
+- **localStorage Fallbacks**: Remaining localStorage usage includes comprehensive error handling for mobile browser limitations (private browsing, storage quotas, etc.)
+
+### Current Persistence Status
+
+#### ✅ **Database Storage (Cross-Device Sync)**
+- User preferences (last opened project) - stored in `users.settings['user-preferences']`
+- Pane lock preferences - stored in `users.settings.ui.paneLocks` (UI behavior differs on mobile but preferences sync)
+- Settings Modal preferences - stored in `users.settings.ui.settingsModal` (installation tabs, generation methods, computer type)
+- Tool settings (Edit Travel, Video Travel, Image Generation) - stored in respective tables' `settings` columns
+- API keys - stored in `users.api_keys`
+- Crop settings - managed via `useToolSettings('upload', { projectId })`
+- Project selection and management - full Supabase integration
+
+#### 📱 **localStorage with Error Handling**
+- Timeline frame positions (per-shot positioning data) - includes mobile-friendly fallbacks
+- Temporary UI state - graceful degradation when storage unavailable
+
+### Implementation Details
+- **PanesContext**: Removed mobile exclusions from persistence calls while maintaining mobile-appropriate UI behavior
+- **SettingsModal**: Migrated from localStorage to `useUserUIState` for database storage
+- **Edit Travel Tool**: Fully migrated to `usePersistentToolState` with proper interaction tracking
+- **Error Handling**: All localStorage access wrapped in try-catch blocks with meaningful fallbacks
+- **Legacy Cleanup**: Deprecated old localStorage-based functions with migration guidance
 
 ##### Services (`src/server/services/`)
 - **taskProcessingService.ts**: Processes task completions and creates generations

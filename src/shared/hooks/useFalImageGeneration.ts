@@ -1,13 +1,15 @@
 import { useState, useRef, useCallback } from 'react';
 import { useApiKeys } from '@/shared/hooks/useApiKeys';
-// import { fal } from '@fal-ai/client'; // REMOVE if not used
+import { fal } from '@fal-ai/client';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { uploadImageToStorage } from '@/shared/lib/imageUploader';
-import { Json } from '@/integrations/supabase/types';
 import { GeneratedImageWithMetadata, DisplayableMetadata, MetadataLora } from '@/shared/components/ImageGallery';
 import { PromptEntry } from '@/tools/image-generation/components/ImageGenerationForm'; // Assuming this path, adjust if needed
 import { nanoid } from 'nanoid';
+
+// Local type definition
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 // Types for the hook
 export interface FalImageGenerationParams {
@@ -304,22 +306,23 @@ export const initializeGlobalFalClient = () => {
 // If fal is not used in this file anymore, the import can be removed.
 // import { fal } from '@fal-ai/client'; // Check if still needed after all changes
 
-// Helper to initialize Fal client if it's not already configured
-// This should be called once, perhaps in your App.tsx or when the app loads.
-// For now, it's here for completeness but might be better placed globally.
+// Helper to initialize Fal client - now uses database-based API keys
+// This is deprecated in favor of per-request API key resolution via useApiKeys
 let falInitialized = false;
 export const initializeGlobalFalClient = () => {
   if (falInitialized) return;
-  const API_KEY = localStorage.getItem('fal_api_key') || '0b6f1876-0aab-4b56-b821-b384b64768fa:121392c885a381f93de56d701e3d532f';
-  if (API_KEY) {
-    try {
-        // fal.config({ credentials: API_KEY });
-        console.log("[useFalImageGeneration] Fal client initialized with stored/default key.");
-        falInitialized = true;
-    } catch (e) {
-        console.error("[useFalImageGeneration] Error initializing Fal client:", e);
-    }
-  } else {
-    console.warn("[useFalImageGeneration] Fal API key not found in localStorage. Fal client not initialized.");
+  
+  // Note: This function is deprecated and should not be used for new code.
+  // Use useApiKeys hook to get database-stored API keys instead of localStorage.
+  // Keeping this for backward compatibility but it will use fallback API key.
+  
+  const FALLBACK_API_KEY = '0b6f1876-0aab-4b56-b821-b384b64768fa:121392c885a381f93de56d701e3d532f';
+  
+  try {
+    fal.config({ credentials: FALLBACK_API_KEY });
+    console.warn("[FalClientConfig] Using fallback API key. Consider migrating to useApiKeys hook for database-based storage.");
+    falInitialized = true;
+  } catch (e) {
+    console.error("[FalClientConfig] Error configuring Fal client globally:", e);
   }
 }; 

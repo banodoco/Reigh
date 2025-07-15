@@ -25,7 +25,7 @@ const PanesContext = createContext<PanesContextType | undefined>(undefined);
 export const PanesProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const isMobile = useIsMobile();
   
-  // Load pane locks from user settings (desktop only)
+  // Load pane locks from user settings - works on all devices for cross-device sync
   const { value: paneLocks, update: savePaneLocks, isLoading } = useUserUIState('paneLocks', {
     shots: false,
     tasks: false,
@@ -40,10 +40,11 @@ export const PanesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [shotsPaneWidth, setShotsPaneWidthState] = useState(300);
   const [tasksPaneWidth, setTasksPaneWidthState] = useState(300);
 
-  // Hydrate local state once when settings load (desktop only)
+  // Hydrate local state once when settings load
   useEffect(() => {
     if (isMobile) {
-      // On mobile, always start with unlocked state
+      // On mobile, always start with unlocked state for UI behavior,
+      // but still load the preferences for potential future use
       setLocks({
         shots: false,
         tasks: false,
@@ -53,70 +54,62 @@ export const PanesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }
 
     if (!isLoading) {
-      // Hydrating pane locks from server
+      // Hydrating pane locks from server (desktop behavior)
       setLocks(paneLocks);
     }
   }, [isLoading, paneLocks, isMobile]);
 
-  // Lock toggle functions
+  // Lock toggle functions - now save on all devices for cross-device sync
   const toggleLock = useCallback((pane: 'shots' | 'tasks' | 'gens') => {
     setLocks(prev => {
       const newValue = !prev[pane];
       const newLocks = { ...prev, [pane]: newValue };
       
-      // Toggling pane lock
-      
-      // Save to database only on desktop
-      if (!isMobile) {
-        savePaneLocks({ [pane]: newValue });
-      }
+      // Save to database on all devices for cross-device sync
+      // Mobile users won't see the lock behavior, but preferences are preserved
+      // for when they switch to desktop
+      savePaneLocks({ [pane]: newValue });
       
       return newLocks;
     });
-  }, [savePaneLocks, isMobile]);
+  }, [savePaneLocks]);
 
-  // Individual setters for backward compatibility
+  // Individual setters for backward compatibility - also save on all devices
   const setIsGenerationsPaneLocked = useCallback((isLocked: boolean) => {
     setLocks(prev => {
       if (prev.gens === isLocked) return prev;
       const newLocks = { ...prev, gens: isLocked };
       
-      // Save to database only on desktop
-      if (!isMobile) {
-        savePaneLocks({ gens: isLocked });
-      }
+      // Save to database on all devices for cross-device sync
+      savePaneLocks({ gens: isLocked });
       
       return newLocks;
     });
-  }, [savePaneLocks, isMobile]);
+  }, [savePaneLocks]);
 
   const setIsShotsPaneLocked = useCallback((isLocked: boolean) => {
     setLocks(prev => {
       if (prev.shots === isLocked) return prev;
       const newLocks = { ...prev, shots: isLocked };
       
-      // Save to database only on desktop
-      if (!isMobile) {
-        savePaneLocks({ shots: isLocked });
-      }
+      // Save to database on all devices for cross-device sync
+      savePaneLocks({ shots: isLocked });
       
       return newLocks;
     });
-  }, [savePaneLocks, isMobile]);
+  }, [savePaneLocks]);
 
   const setIsTasksPaneLocked = useCallback((isLocked: boolean) => {
     setLocks(prev => {
       if (prev.tasks === isLocked) return prev;
       const newLocks = { ...prev, tasks: isLocked };
       
-      // Save to database only on desktop
-      if (!isMobile) {
-        savePaneLocks({ tasks: isLocked });
-      }
+      // Save to database on all devices for cross-device sync
+      savePaneLocks({ tasks: isLocked });
       
       return newLocks;
     });
-  }, [savePaneLocks, isMobile]);
+  }, [savePaneLocks]);
 
   // Dimension setters
   const setGenerationsPaneHeight = useCallback((height: number) => {
@@ -133,7 +126,8 @@ export const PanesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const value = useMemo(
     () => ({
-      // On mobile, always return false for locks
+      // On mobile, always return false for locks (UI behavior)
+      // but the actual lock preferences are still saved for cross-device sync
       isGenerationsPaneLocked: isMobile ? false : locks.gens,
       setIsGenerationsPaneLocked,
       generationsPaneHeight,
