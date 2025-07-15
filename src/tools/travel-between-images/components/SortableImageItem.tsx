@@ -18,6 +18,7 @@ import {
 import { Checkbox } from '@/shared/components/ui/checkbox';
 import { Label } from '@/shared/components/ui/label';
 import { cn, getDisplayUrl } from '@/shared/lib/utils';
+import { useIsMobile } from '@/shared/hooks/use-mobile';
 
 interface SortableImageItemProps {
   image: GenerationRow;
@@ -25,6 +26,7 @@ interface SortableImageItemProps {
   onDoubleClick: () => void;
   onClick: (event: React.MouseEvent) => void;
   isSelected: boolean;
+  isDragDisabled?: boolean;
 }
 
 const SKIP_CONFIRMATION_KEY = 'skipImageDeletionConfirmation';
@@ -35,13 +37,16 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
   onDoubleClick,
   onClick,
   isSelected,
+  isDragDisabled = false,
 }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: image.shotImageEntryId,
+    disabled: isDragDisabled,
   });
   const [isConfirmDeleteDialogOpen, setIsConfirmDeleteDialogOpen] = useState(false);
   const [skipConfirmationNextTimeVisual, setSkipConfirmationNextTimeVisual] = useState(false);
   const currentDialogSkipChoiceRef = useRef(false);
+  const isMobile = useIsMobile();
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -81,9 +86,10 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
       ref={setNodeRef}
       style={style}
       {...attributes}
-      {...listeners}
+      {...(isDragDisabled ? {} : listeners)}
       className={cn(
-        'relative group bg-muted/50 rounded border p-1 flex flex-col items-center justify-center aspect-square overflow-hidden shadow-sm cursor-grab active:cursor-grabbing',
+        'relative group bg-muted/50 rounded border p-1 flex flex-col items-center justify-center aspect-square overflow-hidden shadow-sm',
+        isDragDisabled ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing',
         { 'ring-2 ring-offset-2 ring-blue-500 border-blue-500': isSelected },
       )}
       onDoubleClick={onDoubleClick}
@@ -95,15 +101,17 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
         className="max-w-full max-h-full object-contain rounded-sm"
         key={imageUrl} // Force re-render when imageUrl changes
       />
-      <Button
-        variant="destructive"
-        size="icon"
-        className="absolute top-1 right-1 h-7 w-7 p-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10"
-        onClick={handleDeleteClick}
-        title="Remove image from shot"
-      >
-        <Trash2 className="h-3.5 w-3.5" />
-      </Button>
+      {(!isMobile || !isDragDisabled || isSelected) && (
+        <Button
+          variant="destructive"
+          size="icon"
+          className="absolute top-1 right-1 h-7 w-7 p-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10"
+          onClick={handleDeleteClick}
+          title="Remove image from shot"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </Button>
+      )}
       <AlertDialog open={isConfirmDeleteDialogOpen} onOpenChange={setIsConfirmDeleteDialogOpen}>
         <AlertDialogOverlay
           onPointerDown={(e) => {

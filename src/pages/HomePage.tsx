@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, Image as ImageIcon, Video, Users, FileText, ChevronDown, ChevronUp, GitBranch, X, HandHeart, Brain } from 'lucide-react';
+import { ArrowRight, Image as ImageIcon, Video, Users, FileText, ChevronDown, ChevronUp, GitBranch, X, HandHeart, Brain, Palette, Crown } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import type { Session } from '@supabase/supabase-js';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -51,6 +51,14 @@ export default function HomePage() {
   // Scroll to top when component mounts
   useEffect(() => {
     window.scrollTo(0, 0);
+  }, []);
+
+  // Prevent scrolling on this page
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = 'auto';
+    };
   }, []);
 
   useEffect(() => {
@@ -119,7 +127,7 @@ export default function HomePage() {
   }
 
   return (
-    <PageFadeIn className="min-h-screen wes-texture relative overflow-hidden">
+    <PageFadeIn className="h-screen wes-texture relative overflow-hidden">
       {/* Animated Background */}
       <div className="absolute inset-0 bg-gradient-to-br from-wes-cream via-white to-wes-mint/20 opacity-60 animate-gradient-shift"></div>
       <div className="absolute inset-0 wes-chevron-pattern opacity-30 animate-pulse-subtle"></div>
@@ -204,12 +212,23 @@ export default function HomePage() {
         </button>
       </div>
 
-      <div className="container mx-auto px-4 relative z-10 min-h-screen flex items-center justify-center">
+      <div className="container mx-auto px-4 relative z-10 h-screen flex items-center justify-center">
         {/* Hero Section */}
-        <div className="text-center w-full">
+        <div className="text-center w-full -mt-16">
           <div className="max-w-4xl mx-auto">
 
 
+            {/* Icon above title */}
+            <FadeInSection delayMs={25}>
+              <div className="flex justify-center mb-6">
+                <div className="relative">
+                  <div className="flex items-center justify-center w-12 h-12 md:w-14 md:h-14 bg-gradient-to-br from-wes-pink/60 via-wes-lavender/60 to-wes-dusty-blue/60 rounded-lg border border-wes-vintage-gold/20 shadow-sm transition-all duration-300 opacity-70">
+                    <Palette className="h-6 w-6 md:h-7 md:w-7 text-white/90 transition-transform duration-300" />
+                  </div>
+                </div>
+              </div>
+            </FadeInSection>
+            
             {/* Main title */}
             <FadeInSection delayMs={50}>
               <h1 className="font-playfair text-6xl md:text-8xl font-bold text-primary mb-8 text-shadow-vintage">
@@ -225,7 +244,7 @@ export default function HomePage() {
             {/* Subtitle */}
             <FadeInSection delayMs={200}>
               <p className="font-inter text-xl md:text-2xl text-muted-foreground leading-relaxed tracking-wide mb-8">
-              A tool and community for exploring the emerging artform of image-guided video
+              A tool for exploring the emerging artform of image-guided video
               </p>
             </FadeInSection>
             
@@ -426,7 +445,7 @@ export default function HomePage() {
             </button>
             
             <div className="mb-6 pr-12 sm:pr-0">
-              <h2 className="font-playfair text-2xl sm:text-3xl font-bold text-primary mb-4">Open Creative Partner Programme</h2>
+              <h2 className="font-playfair text-2xl sm:text-3xl font-bold text-primary mb-4">Anyone can run Reigh for free</h2>
               <div className="w-16 h-1 bg-gradient-to-r from-wes-coral to-wes-pink rounded-full mb-6 animate-pulse-breathe"></div>
             </div>
             
@@ -547,7 +566,7 @@ export default function HomePage() {
             </button>
             
             <div className="mb-6 pr-12 sm:pr-0">
-              <h2 className="font-playfair text-2xl sm:text-3xl font-bold text-primary mb-4">Our Philosophy</h2>
+              <h2 className="font-playfair text-2xl sm:text-3xl font-bold text-primary mb-4">Let's explore a new artform together!</h2>
               <div className="w-16 h-1 bg-gradient-to-r from-wes-vintage-gold to-wes-mint rounded-full mb-6 animate-pulse-wave"></div>
             </div>
             

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, Fragment } from 'react';
 import { Link } from 'react-router-dom';
 import {
   DndContext,
@@ -28,6 +28,9 @@ import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
 import { Slider } from './ui/slider';
+import { useIsMobile } from '@/shared/hooks/use-mobile';
+import { Button } from './ui/button';
+import { ArrowRight } from 'lucide-react';
 
 export interface ShotImageManagerProps {
   images: GenerationRow[];
@@ -53,6 +56,8 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [mobileSelectedId, setMobileSelectedId] = useState<string | null>(null);
+  const isMobile = useIsMobile();
 
   const sensors = useSensors(
     useSensor(MouseSensor, {
@@ -137,6 +142,20 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
 
   const handleItemClick = (id: string, event: React.MouseEvent) => {
     event.preventDefault(); // Prevent any default behavior like navigation
+    
+    // Mobile behavior for batch mode
+    if (isMobile && generationMode === 'batch') {
+      if (mobileSelectedId === id) {
+        // Clicking on selected image deselects it
+        setMobileSelectedId(null);
+      } else {
+        // Select the image
+        setMobileSelectedId(id);
+      }
+      return;
+    }
+    
+    // Desktop behavior
     if (event.metaKey || event.ctrlKey) {
       setSelectedIds((prev) =>
         prev.includes(id) ? prev.filter((selectedId) => selectedId !== id) : [...prev, id],
@@ -144,6 +163,30 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
     } else {
       setSelectedIds([id]);
     }
+  };
+
+  const handleMobileDoubleClick = (index: number) => {
+    if (isMobile && generationMode === 'batch') {
+      setLightboxIndex(index);
+      setMobileSelectedId(null); // Clear selection when opening lightbox
+    }
+  };
+
+  const handleMoveHere = (targetIndex: number) => {
+    if (!mobileSelectedId) return;
+    
+    const selectedIndex = images.findIndex(img => img.shotImageEntryId === mobileSelectedId);
+    if (selectedIndex === -1) return;
+    
+    let newOrder = [...images];
+    const [removed] = newOrder.splice(selectedIndex, 1);
+    
+    // Adjust target index if moving from before to after
+    const adjustedIndex = selectedIndex < targetIndex ? targetIndex - 1 : targetIndex;
+    newOrder.splice(adjustedIndex, 0, removed);
+    
+    onImageReorder(newOrder.map(img => img.shotImageEntryId));
+    setMobileSelectedId(null); // Clear selection after move
   };
 
   const handleNext = () => {
@@ -355,6 +398,82 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
     12: 'grid-cols-12',
   };
 
+  // Mobile batch mode with selection
+  if (isMobile && generationMode === 'batch' && mobileSelectedId) {
+    const mobileColumns = 3; // Always use 3 columns on mobile
+    const itemsPerRow = mobileColumns;
+    
+    return (
+      <div className="relative">
+        <div className={cn("grid gap-3 grid-cols-3")}>
+          {images.map((image, index) => {
+            const isSelected = image.shotImageEntryId === mobileSelectedId;
+            const isLastItem = index === images.length - 1;
+            
+            return (
+              <React.Fragment key={image.shotImageEntryId}>
+                {/* Move here button before first item */}
+                {index === 0 && (
+                  <div className="absolute left-0 top-0 -translate-x-1/2 h-full flex items-center z-10">
+                    <Button
+                      size="icon"
+                      variant="secondary"
+                      className="h-6 w-6 rounded-full p-0"
+                      onClick={() => handleMoveHere(0)}
+                      title="Move here"
+                    >
+                      <ArrowRight className="h-3 w-3" />
+                    </Button>
+                  </div>
+                )}
+                
+                <div className="relative">
+                  <SortableImageItem
+                    image={image}
+                    isSelected={isSelected}
+                    onClick={(e) => handleItemClick(image.shotImageEntryId, e)}
+                    onDelete={() => onImageDelete(image.shotImageEntryId)}
+                    onDoubleClick={() => handleMobileDoubleClick(index)}
+                    isDragDisabled={true} // Disable drag on mobile when in selection mode
+                  />
+                  
+                  {/* Move here button after this item */}
+                  <div 
+                    className="absolute top-1/2 -right-1 -translate-y-1/2 translate-x-1/2 z-10"
+                  >
+                    <Button
+                      size="icon"
+                      variant="secondary"
+                      className="h-6 w-6 rounded-full p-0"
+                      onClick={() => handleMoveHere(index + 1)}
+                      title="Move here"
+                    >
+                      <ArrowRight className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+              </React.Fragment>
+            );
+          })}
+        </div>
+        
+        {lightboxIndex !== null && (
+          <MediaLightbox
+            media={images[lightboxIndex]}
+            onClose={() => setLightboxIndex(null)}
+            onNext={handleNext}
+            onPrevious={handlePrevious}
+            onImageSaved={onImageSaved ? (newImageUrl: string) => onImageSaved(images[lightboxIndex].id, newImageUrl) : undefined}
+            showNavigation={true}
+            showImageEditTools={true}
+            showDownload={true}
+            videoPlayerComponent="hover-scrub"
+          />
+        )}
+      </div>
+    );
+  }
+
   return (
     <DndContext
       sensors={sensors}
@@ -363,15 +482,15 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
       onDragEnd={handleDragEnd}
     >
       <SortableContext items={images.map((img) => img.shotImageEntryId)} strategy={rectSortingStrategy}>
-        <div className={cn("grid gap-3", gridColsClass[columns])}>
+        <div className={cn("grid gap-3 grid-cols-3 sm:"+gridColsClass[columns])}>
           {images.map((image, index) => (
             <SortableImageItem
               key={image.shotImageEntryId}
               image={image}
-              isSelected={selectedIds.includes(image.shotImageEntryId)}
+              isSelected={isMobile && generationMode === 'batch' ? image.shotImageEntryId === mobileSelectedId : selectedIds.includes(image.shotImageEntryId)}
               onClick={(e) => handleItemClick(image.shotImageEntryId, e)}
               onDelete={() => onImageDelete(image.shotImageEntryId)}
-              onDoubleClick={() => setLightboxIndex(index)}
+              onDoubleClick={() => isMobile && generationMode === 'batch' ? handleMobileDoubleClick(index) : setLightboxIndex(index)}
             />
           ))}
         </div>

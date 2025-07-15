@@ -407,7 +407,7 @@ python headless.py --db-type supabase \\
                       {/* Left: Computer Type Selection */}
                       <div className="space-y-3">
                         <p className="text-sm font-medium">What kind of computer do you have?</p>
-                        <div className="flex gap-4">
+                        <div className="flex gap-4 flex-wrap">
                           <div className="flex items-center space-x-2">
                             <input
                               type="radio"
@@ -436,6 +436,20 @@ python headless.py --db-type supabase \\
                               Windows
                             </label>
                           </div>
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="radio"
+                              id="mac"
+                              name="computer-type"
+                              value="mac"
+                              checked={computerType === "mac"}
+                              onChange={(e) => setComputerType(e.target.value)}
+                              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-2"
+                            />
+                            <label htmlFor="mac" className="text-sm font-medium">
+                              Mac
+                            </label>
+                          </div>
                         </div>
                       </div>
 
@@ -447,7 +461,7 @@ python headless.py --db-type supabase \\
                               {formatTokenAge(getActiveToken()?.created_at || 0)}
                             </p>
                           </div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-col gap-2">
                             <Button
                               variant="outline"
                               size="sm"
@@ -469,21 +483,31 @@ python headless.py --db-type supabase \\
                       </div>
                     </div>
                     
-                    <Tabs value={activeInstallTab} onValueChange={setActiveInstallTab} className="w-full">
-                      <TabsList className="grid w-full grid-cols-2 bg-gray-100 border border-gray-200">
-                        <TabsTrigger 
-                          value="need-install"
-                          className="data-[state=active]:bg-white data-[state=active]:shadow-sm"
-                        >
-                          I need to install
-                        </TabsTrigger>
-                        <TabsTrigger 
-                          value="already-installed"
-                          className="data-[state=active]:bg-white data-[state=active]:shadow-sm"
-                        >
-                          I've already installed
-                        </TabsTrigger>
-                      </TabsList>
+                    {/* Mac Notice - Full Width */}
+                    {computerType === "mac" && (
+                      <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <p className="text-sm text-yellow-800">
+                          You can't process tasks locally on a Mac yet.
+                        </p>
+                      </div>
+                    )}
+                    
+                    {computerType !== "mac" && (
+                      <Tabs value={activeInstallTab} onValueChange={setActiveInstallTab} className="w-full">
+                        <TabsList className="grid w-full grid-cols-2 bg-gray-100 border border-gray-200">
+                          <TabsTrigger 
+                            value="need-install"
+                            className="data-[state=active]:bg-white data-[state=active]:shadow-sm"
+                          >
+                            I need to install
+                          </TabsTrigger>
+                          <TabsTrigger 
+                            value="already-installed"
+                            className="data-[state=active]:bg-white data-[state=active]:shadow-sm"
+                          >
+                            I've already installed
+                          </TabsTrigger>
+                        </TabsList>
 
                       <TabsContent value="need-install" className="space-y-4">
                         <div className="space-y-4">
@@ -665,6 +689,7 @@ python headless.py --db-type supabase \\
                         </div>
                       </TabsContent>
                     </Tabs>
+                    )}
                   </div>
                 </div>
               )}

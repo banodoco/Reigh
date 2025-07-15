@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Button } from '@/shared/components/ui/button';
 import { getDisplayUrl } from '@/shared/lib/utils';
+import { cn } from '@/lib/utils';
 
 interface SimpleVideoPlayerProps {
   src: string;
@@ -80,7 +81,10 @@ const SimpleVideoPlayer: React.FC<SimpleVideoPlayerProps> = ({
             variant={playbackRate === speed ? "default" : "secondary"}
             size="sm"
             onClick={() => handleSpeedChange(speed)}
-            className="h-6 min-w-[48px] px-2 text-xs text-white"
+            className={cn(
+              "h-6 min-w-[48px] px-2 text-xs",
+              playbackRate === speed ? "text-white" : "text-foreground"
+            )}
           >
             {speed}x
           </Button>

@@ -217,7 +217,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               className="relative flex items-center justify-center" 
               style={{
                 maxHeight: '95vh',
-                maxWidth: '95vw'
+                maxWidth: '95vw',
+                width: '95vw'
               }}
             >
               {/* Navigation Controls - Left Arrow */}
@@ -236,27 +237,19 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               <div className="relative">
                 {isVideo ? (
                   videoPlayerComponent === 'simple-player' ? (
-                    <div style={{
-                      maxWidth: '95vw',
-                      width: 'auto',
-                      minHeight: '40vh'
-                    }}>
-                    <SimpleVideoPlayer
-                      src={displayUrl}
-                      poster={media.thumbUrl}
+                    <div style={{ width: '95vw', maxWidth: '95vw' }}>
+                      <SimpleVideoPlayer
+                        src={displayUrl}
+                        poster={media.thumbUrl}
                         className="w-full h-full max-h-[85vh] sm:max-h-[80vh] object-contain"
-                    />
+                      />
                     </div>
                   ) : (
                     <HoverScrubVideo
                       src={displayUrl}
                       poster={media.thumbUrl}
                       className="w-full h-full max-h-[85vh] sm:max-h-[80vh] object-contain"
-                      style={{
-                        maxWidth: '95vw',
-                        width: 'auto',
-                        minHeight: '40vh'
-                      }}
+                      style={{ width: '95vw', maxWidth: '95vw' }}
                     />
                   )
                 ) : (
@@ -270,8 +263,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       style={{ 
                         maxHeight: '85vh',
                         maxWidth: '95vw',
-                        minHeight: '40vh',
-                        width: 'auto',
+                        width: '95vw',
                         height: 'auto',
                         transform: isFlippedHorizontally ? 'scaleX(-1)' : 'none'
                       }}

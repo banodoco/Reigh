@@ -1096,11 +1096,11 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-full space-y-4">
+    <div className="flex flex-col space-y-4">
       {/* Header */}
       <div className="flex-shrink-0 flex flex-wrap justify-between items-center gap-y-2">
         <Button onClick={onBack}>&larr; Back to Shot List</Button>
-        <div className="flex items-center space-x-2 min-w-0 flex-1 justify-center px-4">
+        <div className="hidden sm:flex items-center space-x-2 min-w-0 flex-1 justify-center px-4">
           <span className="hidden sm:inline text-2xl font-bold">Editing Shot:</span>
           {isEditingName ? (
             <div className="flex items-center space-x-2">
@@ -1155,7 +1155,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       </div>
 
       {/* Output Videos Section - Now at the top */}
-      <div className="flex-shrink-0">
+      <div className="">
         <VideoOutputsGallery 
           videoOutputs={videoOutputs} 
           onDelete={handleDeleteVideoOutput}
@@ -1166,10 +1166,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       </div>
 
       {/* Main Content Area */}
-      <div className="flex flex-col flex-grow gap-4 min-h-0">
+      <div className="flex flex-col gap-4">
         
         {/* Image Manager */}
-        <div className="flex flex-col w-full gap-4 min-h-0">
+        <div className="flex flex-col w-full gap-4">
           <Card className="flex flex-col">
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -1197,8 +1197,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                 </>
               )}
             </CardHeader>
-            <CardContent className={nonVideoImages.length > 0 ? "overflow-y-auto overflow-x-hidden" : "overflow-x-hidden"}>
-              <div className="p-1 overflow-x-hidden">
+            <CardContent className={nonVideoImages.length > 0 ? "" : ""}>
+              <div className="p-1">
                 {generationMode === 'timeline' ? (
                   <Timeline
                     shotId={selectedShot.id}

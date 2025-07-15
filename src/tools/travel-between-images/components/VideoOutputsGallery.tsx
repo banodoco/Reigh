@@ -90,7 +90,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
 
   if (sortedVideoOutputs.length === 0) {
     return (
-      <Card className="p-6">
+      <Card className="p-4 sm:p-6">
         <div className="text-center text-muted-foreground">
           <p>No video outputs yet. Generate some videos to see them here.</p>
         </div>
@@ -99,26 +99,26 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   }
 
   return (
-    <Card className="p-6">
-      <div className="flex flex-col space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold">Output Videos ({sortedVideoOutputs.length})</h3>
+    <Card className="p-4 sm:p-6">
+      <div className="flex flex-col space-y-2 sm:space-y-3">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <h3 className="text-base sm:text-lg font-semibold">Output Videos ({sortedVideoOutputs.length})</h3>
           {totalPages > 1 && (
             <div className="flex items-center space-x-2">
-              <span className="text-sm text-muted-foreground">
+              <span className="text-xs sm:text-sm text-muted-foreground">
                 Page {currentPage} of {totalPages}
               </span>
             </div>
           )}
         </div>
 
-        <Separator />
+        <Separator className="my-2" />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="flex flex-wrap -mx-1 sm:-mx-1.5 md:-mx-2">
           {currentVideoOutputs.map((video, index) => {
             const originalIndex = startIndex + index;
             return (
-              <div key={video.id} className="relative group">
+              <div key={video.id} className="w-1/2 lg:w-1/3 px-1 sm:px-1.5 md:px-2 mb-2 sm:mb-3 md:mb-4 relative group">
                 <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden shadow-sm border">
                   <HoverScrubVideo
                     src={getDisplayUrl(video.location || video.imageUrl)}
@@ -131,25 +131,25 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
                 </div>
                 
                 {/* Action buttons – styled to match ImageGallery overlays */}
-                <div className="absolute top-2 right-2 flex flex-col items-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="absolute top-1 right-1 sm:top-2 sm:right-2 flex flex-col items-end gap-1 opacity-0 group-hover:opacity-100 group-touch:opacity-100 transition-opacity">
                   <Button
                     variant="secondary"
                     size="icon"
                     onClick={() => setSelectedVideoForDetails(video)}
-                    className="h-7 w-7 p-0 rounded-full bg-black/50 hover:bg-black/70 text-white"
+                    className="h-6 w-6 sm:h-7 sm:w-7 p-0 rounded-full bg-black/50 hover:bg-black/70 text-white"
                     title="View details"
                   >
-                    <Info className="h-3.5 w-3.5" />
+                    <Info className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                   </Button>
                   <Button
                     variant="destructive"
                     size="icon"
                     onClick={() => onDelete(video.id)}
                     disabled={deletingVideoId === video.id}
-                    className="h-7 w-7 p-0 rounded-full"
+                    className="h-6 w-6 sm:h-7 sm:w-7 p-0 rounded-full"
                     title="Delete video"
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
+                    <Trash2 className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                   </Button>
                 </div>
               </div>
@@ -158,7 +158,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
         </div>
 
         {totalPages > 1 && (
-          <Pagination className="mt-6">
+          <Pagination className="mt-4 sm:mt-6">
             <PaginationContent>
               <PaginationItem>
                 <PaginationPrevious
