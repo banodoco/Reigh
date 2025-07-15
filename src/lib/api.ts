@@ -10,7 +10,7 @@ let cachedSession: { token: string; expiresAt: number } | null = null;
 /**
  * Constructs the full URL for API requests
  * In development mode, uses relative URLs (proxy handles routing)
- * In production/preview mode, uses the full API server URL
+ * In production/preview mode, uses explicit API URL if configured, otherwise relative URLs for same-origin
  */
 function getApiUrl(path: string): string {
   // If path is already a full URL, return as-is
@@ -24,10 +24,18 @@ function getApiUrl(path: string): string {
     return path;
   }
   
-  // In production/preview mode, use the full API server URL
-  const apiBaseUrl = import.meta.env.VITE_API_TARGET_URL || 'http://127.0.0.1:8085';
-  const cleanPath = path.startsWith('/') ? path : `/${path}`;
-  return `${apiBaseUrl}${cleanPath}`;
+  // In production/preview mode, check if explicit API target is configured
+  const apiBaseUrl = import.meta.env.VITE_API_TARGET_URL;
+  
+  if (apiBaseUrl && apiBaseUrl.trim() !== '') {
+    // Explicit API server URL configured (e.g., for separate backend deployment)
+    const cleanPath = path.startsWith('/') ? path : `/${path}`;
+    return `${apiBaseUrl}${cleanPath}`;
+  }
+  
+  // No explicit API URL configured - use relative URLs for same-origin requests
+  // This works for mobile and desktop when frontend and backend are served from the same domain
+  return path;
 }
 
 /**
