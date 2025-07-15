@@ -147,7 +147,7 @@ export default function HomePage() {
       
       {/* Top Navigation Links */}
       <div className={`fixed top-6 left-6 sm:top-12 sm:left-12 flex items-center space-x-6 ${
-        showCreativePartner || isCreativePartnerPaneClosing || showPhilosophy || isPhilosophyPaneClosing || isCreativePartnerPaneOpening || isPhilosophyPaneOpening ? 'z-30' : 'z-50'
+        showCreativePartner || isCreativePartnerPaneClosing || showPhilosophy || isPhilosophyPaneClosing || isCreativePartnerPaneOpening || isPhilosophyPaneOpening ? 'z-0' : 'z-50'
       }`}>
         {/* Philosophy Link */}
         <button
@@ -176,7 +176,7 @@ export default function HomePage() {
       </div>
         
       <div className={`fixed top-6 right-6 sm:top-12 sm:right-12 flex items-center ${
-        showPhilosophy || isPhilosophyPaneClosing || showCreativePartner || isCreativePartnerPaneClosing || isPhilosophyPaneOpening || isCreativePartnerPaneOpening ? 'z-30' : 'z-50'
+        showPhilosophy || isPhilosophyPaneClosing || showCreativePartner || isCreativePartnerPaneClosing || isPhilosophyPaneOpening || isCreativePartnerPaneOpening ? 'z-0' : 'z-50'
       }`}>
         {/* Creative Partner Programme */}
         <button
@@ -406,7 +406,7 @@ export default function HomePage() {
         )}
 
         {/* Creative Partner Programme Side Pane */}
-        <div className={`fixed top-0 right-0 h-full w-5/6 max-w-[30rem] sm:w-[30rem] bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out ${
+        <div className={`fixed top-0 right-0 h-full w-5/6 max-w-[30rem] sm:w-[30rem] bg-white shadow-2xl z-[60] transform transition-transform duration-300 ease-in-out ${
           showCreativePartner ? 'translate-x-0' : 'translate-x-full'
         }`}>
           <div className="p-4 sm:p-8 h-full overflow-y-auto">
@@ -527,7 +527,7 @@ export default function HomePage() {
         </div>
 
         {/* Philosophy Side Pane */}
-        <div className={`fixed top-0 left-0 h-full w-5/6 max-w-[30rem] sm:w-[30rem] bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out ${
+        <div className={`fixed top-0 left-0 h-full w-5/6 max-w-[30rem] sm:w-[30rem] bg-white shadow-2xl z-[60] transform transition-transform duration-300 ease-in-out ${
           showPhilosophy ? 'translate-x-0' : '-translate-x-full'
         }`}>
           <div className="p-4 sm:p-8 h-full overflow-y-auto">
