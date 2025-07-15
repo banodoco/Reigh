@@ -26,6 +26,7 @@ import { formatDistanceToNow, isValid } from "date-fns";
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 import { DraggableImage } from "@/shared/components/DraggableImage";
 import { getDisplayUrl } from "@/shared/lib/utils";
+import { useIsMobile } from "@/shared/hooks/use-mobile";
 
 // Define the structure for individual LoRA details within metadata
 export interface MetadataLora {
@@ -411,6 +412,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
     }
   }, [totalPages, page]);
 
+  const isMobile = useIsMobile();
+
   return (
                 <TooltipProvider>
       <div className="space-y-4">
@@ -538,8 +541,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
                   );
                 }
 
-                return (
-                <DraggableImage key={`draggable-${imageKey}`} image={image}>
+                // Conditionally wrap with DraggableImage only on desktop to avoid interfering with mobile scrolling
+                const imageContent = (
                   <div 
                       className="border rounded-lg overflow-hidden hover:shadow-md transition-shadow relative group bg-card"
                   >
@@ -720,7 +723,16 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
                     </>)
                     }
                   </div>
-                </DraggableImage>
+                );
+
+                return isMobile ? (
+                  <React.Fragment key={imageKey}>
+                    {imageContent}
+                  </React.Fragment>
+                ) : (
+                  <DraggableImage key={`draggable-${imageKey}`} image={image}>
+                    {imageContent}
+                  </DraggableImage>
                 );
             })}
             </div>

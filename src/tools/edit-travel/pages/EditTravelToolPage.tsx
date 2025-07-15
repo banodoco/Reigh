@@ -21,6 +21,9 @@ import EditTravelForm from "../components/EditTravelForm";
 import usePersistentState from "@/shared/hooks/usePersistentState";
 import { useApiKeys } from '@/shared/hooks/useApiKeys';
 import { PageFadeIn } from '@/shared/components/transitions';
+import { usePersistentToolState } from '@/shared/hooks/usePersistentToolState';
+import { ToolSettingsGate } from '@/shared/components/ToolSettingsGate';
+import { type EditTravelSettings } from '../settings';
 
 // Local definition for Json type
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
@@ -59,11 +62,11 @@ const EditTravelToolPage: React.FC = () => {
   const kontextCurrentSubscriptionRef = useRef<any>(null);
   const reconstructionCancelRef = useRef(false);
   
-  const { selectedProjectId } = useProject();
+  const { selectedProjectId: projectId } = useProject();
   const queryClient = useQueryClient();
 
-  const { data: shots } = useListShots(selectedProjectId);
-  const { data: generatedImages, isLoading: isLoadingGenerations } = useGenerations(selectedProjectId);
+  const { data: shots } = useListShots(projectId);
+  const { data: generatedImages, isLoading: isLoadingGenerations } = useGenerations(projectId);
   const addImageToShotMutation = useAddImageToShot();
   const deleteGenerationMutation = useDeleteGeneration();
   
@@ -81,25 +84,19 @@ const EditTravelToolPage: React.FC = () => {
     { path: "kudzueye/boreal-flux-dev-v2", scale: "0.06" }
   ];
 
-  useEffect(() => {
-    const savedFileRaw = localStorage.getItem('editTravelInputFile');
-    if (savedFileRaw) {
-      try {
-        const savedFileData = JSON.parse(savedFileRaw);
-        if (savedFileData?.dataUrl && savedFileData?.name && savedFileData?.type) {
-          const restoredFile = dataURLtoFile(savedFileData.dataUrl, savedFileData.name, savedFileData.type);
-          if (restoredFile) setInputFile(restoredFile);
-        }
-      } catch (error) {
-        console.error("Error loading input file from localStorage:", error);
-        localStorage.removeItem('editTravelInputFile');
-      }
-    }
-  }, [selectedProjectId]);
-
-  useEffect(() => {
-    setShowPlaceholders(!isLoadingGenerations && (!generatedImages || generatedImages.length === 0));
-  }, [generatedImages, isLoadingGenerations]);
+  const { ready } = usePersistentToolState<EditTravelSettings>(
+    'edit-travel',
+    { projectId },
+    {
+      prompts: [prompts, setPrompts],
+      imagesPerPrompt: [imagesPerPrompt, setImagesPerPrompt],
+      generationMode: [generationMode, setGenerationMode],
+      fluxSoftEdgeStrength: [fluxSoftEdgeStrength, setFluxSoftEdgeStrength],
+      fluxDepthStrength: [fluxDepthStrength, setFluxDepthStrength],
+      reconstructVideo: [reconstructVideo, setReconstructVideo],
+    },
+    { scope: 'project' }
+  );
 
   useEffect(() => {
     let previewObjectUrl: string | null = null;
@@ -165,7 +162,7 @@ const EditTravelToolPage: React.FC = () => {
   const handleSavePrompts = (updatedPrompts: PromptEntry[]) => setPrompts(updatedPrompts);
   
   const handleGenerate = async () => {
-    if (!selectedProjectId || !inputFile) {
+    if (!projectId || !inputFile) {
       toast.error("Project and input file are required.");
       return;
     }
@@ -201,7 +198,7 @@ const EditTravelToolPage: React.FC = () => {
     
     try {
       const { data: newTask, error } = await supabase.from('tasks').insert({
-        project_id: selectedProjectId,
+        project_id: projectId,
         task_type: taskType, 
         params: specificParams,
         status: 'Queued',
@@ -212,7 +209,7 @@ const EditTravelToolPage: React.FC = () => {
       if (newTask) {        
         toast.success(`${generationMode.charAt(0).toUpperCase() + generationMode.slice(1)} task created (ID: ${newTask.id.substring(0,8)}...).`);
         if (showPlaceholders) setShowPlaceholders(false);
-        queryClient.invalidateQueries({ queryKey: ['shots', selectedProjectId] });
+        queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
       }
     } catch (err: any) {
       console.error(`Error creating ${generationMode} task:`, err);
@@ -236,7 +233,7 @@ const EditTravelToolPage: React.FC = () => {
   
   const handleAddImageToTargetShot = async (generationId: string, imageUrl?: string, thumbUrl?: string): Promise<boolean> => {
     const targetShot = lastAffectedShotId || (shots && shots.length > 0 ? shots[0].id : undefined);
-    if (!targetShot || !selectedProjectId) {
+    if (!targetShot || !projectId) {
       toast.error("No target shot or project available.");
       return false;
     }
@@ -246,7 +243,7 @@ const EditTravelToolPage: React.FC = () => {
         generation_id: generationId, 
         imageUrl, 
         thumbUrl, 
-        project_id: selectedProjectId
+        project_id: projectId
       });
       setLastAffectedShotId(targetShot);
       return true;
@@ -261,7 +258,7 @@ const EditTravelToolPage: React.FC = () => {
   const hasValidFalApiKey = !!falApiKey && falApiKey.trim() !== '';
   const effectiveFps = videoDuration && prompts.length > 1 && videoDuration > 0 ? (prompts.length -1) / videoDuration : 0;
   const MemoizedShotsPane = React.memo(ShotsPane);
-  const canGenerate = !!selectedProjectId && !!inputFile && prompts.filter(p => p.fullPrompt.trim() !== "").length > 0 && !isCreatingTask;
+  const canGenerate = !!projectId && !!inputFile && prompts.filter(p => p.fullPrompt.trim() !== "").length > 0 && !isCreatingTask;
   const imagesToShow = showPlaceholders && (!generatedImages || generatedImages.length === 0) 
     ? Array(4).fill(null).map((_,idx) => ({id: `ph-${idx}`, url: "/placeholder.svg", prompt: "Placeholder"})) 
     : [...(generatedImages || [])].reverse();
