@@ -328,8 +328,7 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
       setProjects(prevProjects => 
         prevProjects.map(p => p.id === projectId ? mappedProject : p)
                      .sort((a, b) => a.name.localeCompare(b.name))
-      );
-      toast.success(`Project "${mappedProject.name}" updated successfully.`);
+      );      
       return true;
     } catch (err: any) {
       console.error("[ProjectContext] Exception during project update via API:", err);

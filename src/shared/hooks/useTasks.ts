@@ -106,8 +106,7 @@ export const useUpdateTaskStatus = () => {
       return data;
     },
     onSuccess: (_, taskId) => {
-      queryClient.invalidateQueries({ queryKey: [TASKS_QUERY_KEY] });
-      toast.success('Task status updated successfully');
+      queryClient.invalidateQueries({ queryKey: [TASKS_QUERY_KEY] });      
     },
     onError: (error: Error) => {
       console.error('Error updating task status:', error);
@@ -220,7 +219,6 @@ export const useCancelTask = (projectId: string | null) => {
     mutationFn: cancelTask,
     onSuccess: (_, taskId) => {
       queryClient.invalidateQueries({ queryKey: [TASKS_QUERY_KEY] });
-      toast.success('Task cancelled successfully');
     },
     onError: (error: Error) => {
       console.error('Error cancelling task:', error);
@@ -238,8 +236,7 @@ export const useCancelPendingTasks = () => {
     onSuccess: (data, projectId) => {
       queryClient.invalidateQueries({ queryKey: [TASKS_QUERY_KEY, projectId] });
       queryClient.invalidateQueries({ queryKey: [TASKS_QUERY_KEY, projectId, ['Queued']] });
-      queryClient.invalidateQueries({ queryKey: [TASKS_QUERY_KEY, projectId, ['Cancelled']] });
-      toast.success(`${data.cancelledCount} pending tasks cancelled successfully`);
+      queryClient.invalidateQueries({ queryKey: [TASKS_QUERY_KEY, projectId, ['Cancelled']] });      
     },
     onError: (error: Error) => {
       console.error('Error cancelling pending tasks:', error);

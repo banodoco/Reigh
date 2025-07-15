@@ -103,8 +103,7 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({ isOp
     
     const success = await updateProject(project.id, updates);
     if (success) {
-      // Name in toast will be the new name if it was changed, or old name if only aspect ratio changed
-      toast.success(`Project "${updates.name || project.name}" updated successfully!`);
+      // Name in toast will be the new name if it was changed, or old name if only aspect ratio changed      
       onOpenChange(false);
     } 
     // Errors are handled within updateProject with toasts

@@ -225,6 +225,10 @@ export default {
 						opacity: '0' 
 					},
 				},
+        'custom-fade-in': {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
         'gradient-shift': {
           '0%, 100%': { opacity: '0.6' },
           '50%': { opacity: '0.8' },
@@ -286,6 +290,7 @@ export default {
 				'subtle-wiggle': 'subtle-wiggle 2s ease-in-out infinite',
 				'spin-left-fade': 'spinLeftFade 0.6s ease-out forwards',
 				'spin-right-fade': 'spinRightFade 0.6s ease-out forwards',
+        'custom-fade-in': 'custom-fade-in 0.3s ease-out forwards',
         'gradient-shift': 'gradientShift 12s ease-in-out infinite',
         'pulse-subtle': 'pulseSubtle 8s ease-in-out infinite',
         shimmer: 'shimmer 3s linear infinite',

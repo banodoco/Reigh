@@ -7,6 +7,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
 import { toast } from '@/shared/components/ui/use-toast';
 import { PageFadeIn } from '@/shared/components/transitions';
+import { FadeInSection } from '@/shared/components/transitions/FadeInSection';
 import { PaintParticles } from '@/shared/components/PaintParticles';
 
 export default function HomePage() {
@@ -150,7 +151,7 @@ export default function HomePage() {
             isPhilosophyButtonAnimating ? 'animate-spin-left-fade' : ''
           } ${showPhilosophy || isPhilosophyPaneClosing || isPhilosophyButtonAnimating ? 'opacity-0 pointer-events-none' : 'opacity-100 pointer-events-auto'}`}
         >
-          <Brain className="w-6 h-6 sm:w-4 sm:h-4 text-wes-vintage-gold" />
+          <Brain className="w-6 h-6 sm:w-4 sm:h-4 text-wes-vintage-gold animate-brain-pulse" />
           <span className="font-inter text-sm font-medium text-primary group-hover:text-primary/80 hidden sm:inline">Philosophy</span>
         </button>
       </div>
@@ -173,7 +174,7 @@ export default function HomePage() {
             isCreativePartnerButtonAnimating ? 'animate-spin-right-fade' : ''
           } ${showCreativePartner || isCreativePartnerPaneClosing || isCreativePartnerButtonAnimating ? 'opacity-0 pointer-events-none' : 'opacity-100 pointer-events-auto'}`}
         >
-          <HandHeart className="w-6 h-6 sm:w-4 sm:h-4 group-hover:scale-110 transition-transform" />
+          <HandHeart className="w-6 h-6 sm:w-4 sm:h-4 animate-gifting-motion" />
           <span className="font-inter text-sm font-medium hidden sm:inline">Open Creative Partner Programme</span>
         </button>
       </div>
@@ -185,153 +186,163 @@ export default function HomePage() {
 
 
             {/* Main title */}
-            <h1 className="font-playfair text-6xl md:text-8xl font-bold text-primary mb-8 text-shadow-vintage">
-              Reigh
-            </h1>
+            <FadeInSection delayMs={50}>
+              <h1 className="font-playfair text-6xl md:text-8xl font-bold text-primary mb-8 text-shadow-vintage">
+                Reigh
+              </h1>
+            </FadeInSection>
             
             {/* Decorative divider */}
-            <div className="w-32 h-1.5 bg-gradient-to-r from-wes-pink to-wes-vintage-gold rounded-full mx-auto mb-8 shadow-inner-vintage"></div>
+            <FadeInSection delayMs={100}>
+              <div className="w-32 h-1.5 bg-gradient-to-r from-wes-pink to-wes-vintage-gold rounded-full mx-auto mb-8 shadow-inner-vintage animate-pulse-glow"></div>
+            </FadeInSection>
             
             {/* Subtitle */}
-            <p className="font-inter text-xl md:text-2xl text-muted-foreground leading-relaxed tracking-wide mb-8">
-            A tool and community for exploring the emerging artform of image-guided video
-            </p>
+            <FadeInSection delayMs={200}>
+              <p className="font-inter text-xl md:text-2xl text-muted-foreground leading-relaxed tracking-wide mb-8">
+              A tool and community for exploring the emerging artform of image-guided video
+              </p>
+            </FadeInSection>
             
             {/* Sign-in button below hero */}
-            {!session ? (
-              <div className="group">
-                <button
-                  onClick={handleDiscordSignIn}
-                  className="flex items-center space-x-2 px-6 py-4 bg-gradient-to-r from-wes-vintage-gold to-wes-coral rounded-full border-2 border-wes-vintage-gold/40 hover:border-wes-vintage-gold/60 transition-all duration-300 shadow-wes-vintage hover:shadow-wes-hover text-white text-lg font-medium mx-auto relative overflow-hidden"
-                >
-                  <div className="relative">
-                    {/* Paint particles - behind the brush - arranged in clockwise circle */}
-                    <PaintParticles />
-                    
-                    {/* Paintbrush Icon - in front */}
-                    <div className="w-5 h-5 transform scale-x-[-1] transition-transform duration-300 relative z-10">
-                      <div className="w-full h-full group-hover:animate-paintbrush-stroke origin-[50%_90%]">
-                        <img 
-                          src="/brush-paintbrush-icon.webp"
-                          alt="Paintbrush"
-                          className="w-full h-full brightness-0 invert" 
-                        />
+            <FadeInSection delayMs={250}>
+              {!session ? (
+                <div className="group">
+                  <button
+                    onClick={handleDiscordSignIn}
+                    className="flex items-center space-x-2 px-6 py-4 bg-gradient-to-r from-wes-vintage-gold to-wes-coral rounded-full border-2 border-wes-vintage-gold/40 hover:border-wes-vintage-gold/60 transition-all duration-300 shadow-wes-vintage hover:shadow-wes-hover text-white text-lg font-medium mx-auto relative overflow-hidden"
+                  >
+                    <div className="relative">
+                      {/* Paint particles - behind the brush - arranged in clockwise circle */}
+                      <PaintParticles />
+                      
+                      {/* Paintbrush Icon - in front */}
+                      <div className="w-5 h-5 transform scale-x-[-1] transition-transform duration-300 relative z-10">
+                        <div className="w-full h-full group-hover:animate-paintbrush-stroke origin-[50%_90%]">
+                          <img 
+                            src="/brush-paintbrush-icon.webp"
+                            alt="Paintbrush"
+                            className="w-full h-full brightness-0 invert" 
+                          />
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <span>Sign in with Discord</span>
-                </button>
-              </div>
-            ) : (
-              <div className="group">
-                <button
-                  onClick={() => navigate('/tools')}
-                  className="flex items-center space-x-2 px-6 py-4 bg-gradient-to-r from-wes-mint to-wes-vintage-gold rounded-full border-2 border-wes-mint/40 hover:border-wes-mint/60 transition-all duration-300 shadow-wes-vintage hover:shadow-wes-hover text-white text-lg font-medium mx-auto relative overflow-hidden"
-                >
-                  <div className="relative">
-                    {/* Paint particles - behind the brush - arranged in clockwise circle */}
-                    <PaintParticles />
-                    
-                    {/* Paintbrush Icon - in front */}
-                    <div className="w-5 h-5 transform scale-x-[-1] transition-transform duration-300 relative z-10">
-                      <div className="w-full h-full group-hover:animate-paintbrush-stroke origin-[50%_90%]">
-                        <img 
-                          src="/brush-paintbrush-icon.webp"
-                          alt="Paintbrush"
-                          className="w-full h-full brightness-0 invert" 
-                        />
+                    <span>Sign in with Discord</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="group">
+                  <button
+                    onClick={() => navigate('/tools')}
+                    className="flex items-center space-x-2 px-6 py-4 bg-gradient-to-r from-wes-mint to-wes-vintage-gold rounded-full border-2 border-wes-mint/40 hover:border-wes-mint/60 transition-all duration-300 shadow-wes-vintage hover:shadow-wes-hover text-white text-lg font-medium mx-auto relative overflow-hidden"
+                  >
+                    <div className="relative">
+                      {/* Paint particles - behind the brush - arranged in clockwise circle */}
+                      <PaintParticles />
+                      
+                      {/* Paintbrush Icon - in front */}
+                      <div className="w-5 h-5 transform scale-x-[-1] transition-transform duration-300 relative z-10">
+                        <div className="w-full h-full group-hover:animate-paintbrush-stroke origin-[50%_90%]">
+                          <img 
+                            src="/brush-paintbrush-icon.webp"
+                            alt="Paintbrush"
+                            className="w-full h-full brightness-0 invert" 
+                          />
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <span>Go to Tools</span>
-                </button>
-              </div>
-            )}
+                    <span>Go to Tools</span>
+                  </button>
+                </div>
+              )}
+            </FadeInSection>
 
             {/* Open Source Indicator - Same distance from content as top nav is from top */}
-            <div className="mt-12 flex justify-center">
-              <TooltipProvider>
-                <Tooltip open={isTooltipOpen} onOpenChange={setIsTooltipOpen}>
-                  <TooltipTrigger asChild>
-                    <div 
-                      className="group relative cursor-pointer"
-                      onClick={() => setIsTooltipOpen(!isTooltipOpen)}
-                    >
-                      {/* Floating particles */}
-                      <div className="absolute -inset-4 opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-opacity duration-500">
-                        <div className="absolute top-0 left-0 w-1 h-1 bg-wes-vintage-gold rounded-full animate-ping" style={{ animationDelay: '0s' }}></div>
-                        <div className="absolute top-2 right-1 w-0.5 h-0.5 bg-wes-coral rounded-full animate-ping" style={{ animationDelay: '0.3s' }}></div>
-                        <div className="absolute bottom-1 left-2 w-0.5 h-0.5 bg-wes-mint rounded-full animate-ping" style={{ animationDelay: '0.6s' }}></div>
+            <FadeInSection delayMs={300}>
+              <div className="mt-12 flex justify-center">
+                <TooltipProvider>
+                  <Tooltip open={isTooltipOpen} onOpenChange={setIsTooltipOpen}>
+                    <TooltipTrigger asChild>
+                      <div 
+                        className="group relative cursor-pointer"
+                        onClick={() => setIsTooltipOpen(!isTooltipOpen)}
+                      >
+                        {/* Floating particles */}
+                        <div className="absolute -inset-4 opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-opacity duration-500">
+                          <div className="absolute top-0 left-0 w-1 h-1 bg-wes-vintage-gold rounded-full animate-ping" style={{ animationDelay: '0s' }}></div>
+                          <div className="absolute top-2 right-1 w-0.5 h-0.5 bg-wes-coral rounded-full animate-ping" style={{ animationDelay: '0.3s' }}></div>
+                          <div className="absolute bottom-1 left-2 w-0.5 h-0.5 bg-wes-mint rounded-full animate-ping" style={{ animationDelay: '0.6s' }}></div>
+                        </div>
+                        
+                        {/* Spinning dashed ring */}
+                        <div className="absolute -inset-3 rounded-full border-2 border-dashed border-wes-vintage-gold/20 opacity-0 group-hover:opacity-100 group-active:opacity-100 group-hover:animate-spin group-active:animate-spin transition-all duration-500"></div>
+                        
+                        {/* Expanding glow */}
+                        <div className="absolute -inset-2 bg-gradient-to-r from-wes-vintage-gold/10 to-wes-coral/10 rounded-full blur-md opacity-0 group-hover:opacity-100 group-active:opacity-100 group-hover:scale-150 group-active:scale-150 transition-all duration-500"></div>
+                        
+                        {/* Main icon container */}
+                        <div className="relative bg-white/80 backdrop-blur-sm rounded-full p-3 border-2 border-wes-vintage-gold/20 hover:border-wes-vintage-gold/40 active:border-wes-vintage-gold/40 transition-all duration-300 hover:shadow-wes-ornate active:shadow-wes-ornate group-hover:scale-110 group-active:scale-110">
+                          <GitBranch className="w-5 h-5 text-wes-vintage-gold group-hover:animate-pulse group-active:animate-pulse transition-all duration-300" />
+                        </div>
                       </div>
-                      
-                      {/* Spinning dashed ring */}
-                      <div className="absolute -inset-3 rounded-full border-2 border-dashed border-wes-vintage-gold/20 opacity-0 group-hover:opacity-100 group-active:opacity-100 group-hover:animate-spin group-active:animate-spin transition-all duration-500"></div>
-                      
-                      {/* Expanding glow */}
-                      <div className="absolute -inset-2 bg-gradient-to-r from-wes-vintage-gold/10 to-wes-coral/10 rounded-full blur-md opacity-0 group-hover:opacity-100 group-active:opacity-100 group-hover:scale-150 group-active:scale-150 transition-all duration-500"></div>
-                      
-                      {/* Main icon container */}
-                      <div className="relative bg-white/80 backdrop-blur-sm rounded-full p-3 border-2 border-wes-vintage-gold/20 hover:border-wes-vintage-gold/40 active:border-wes-vintage-gold/40 transition-all duration-300 hover:shadow-wes-ornate active:shadow-wes-ornate group-hover:scale-110 group-active:scale-110">
-                        <GitBranch className="w-5 h-5 text-wes-vintage-gold group-hover:animate-pulse group-active:animate-pulse transition-all duration-300" />
-                      </div>
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-xs sm:max-w-md p-3 sm:p-4 mx-2 sm:mx-0">
-                    <p className="text-sm leading-relaxed">
-                      Reigh is an{' '}
-                      <a 
-                        href="https://github.com/peteromallet/reigh" 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="underline text-wes-vintage-gold hover:text-wes-coral transition-colors font-medium"
-                      >
-                        open tool
-                      </a>
-                      . Because it's built on{' '}
-                      <a 
-                        href="https://github.com/Wan-Video/Wan2.1" 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="underline text-wes-vintage-gold hover:text-wes-coral transition-colors font-medium"
-                      >
-                        open models
-                      </a>
-                      , you can run it{' '}
-                      <button 
-                        onClick={() => {
-                          setIsTooltipOpen(false);
-                          setIsCreativePartnerButtonAnimating(true);
-                          setShowPhilosophy(false);
-                          setTimeout(() => {
-                            setShowCreativePartner(true);
-                            setTimeout(() => setIsCreativePartnerButtonAnimating(false), 300);
-                          }, 50);
-                        }}
-                        className="underline text-wes-vintage-gold hover:text-wes-coral transition-colors font-medium"
-                      >
-                        for free
-                      </button>
-                      {' '}on your computer. You can also run it on the cloud for convenience. In addition to a tool, we're also creating{' '}
-                      <button 
-                        onClick={() => {
-                          setIsTooltipOpen(false);
-                          setIsPhilosophyButtonAnimating(true);
-                          setShowCreativePartner(false);
-                          setTimeout(() => {
-                            setShowPhilosophy(true);
-                            setTimeout(() => setIsPhilosophyButtonAnimating(false), 300);
-                          }, 50);
-                        }}
-                        className="underline text-wes-vintage-gold hover:text-wes-coral transition-colors font-medium"
-                      >
-                        a community
-                      </button>
-                      {' '}for artists who wish to explore this new artform.
-                    </p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs sm:max-w-md p-3 sm:p-4 mx-2 sm:mx-0">
+                      <p className="text-sm leading-relaxed">
+                        Reigh is an{' '}
+                        <a 
+                          href="https://github.com/peteromallet/reigh" 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="underline text-wes-vintage-gold hover:text-wes-coral transition-colors font-medium"
+                        >
+                          open tool
+                        </a>
+                        . Because it's built on{' '}
+                        <a 
+                          href="https://github.com/Wan-Video/Wan2.1" 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="underline text-wes-vintage-gold hover:text-wes-coral transition-colors font-medium"
+                        >
+                          open models
+                        </a>
+                        , you can run it{' '}
+                        <button 
+                          onClick={() => {
+                            setIsTooltipOpen(false);
+                            setIsCreativePartnerButtonAnimating(true);
+                            setShowPhilosophy(false);
+                            setTimeout(() => {
+                              setShowCreativePartner(true);
+                              setTimeout(() => setIsCreativePartnerButtonAnimating(false), 300);
+                            }, 50);
+                          }}
+                          className="underline text-wes-vintage-gold hover:text-wes-coral transition-colors font-medium"
+                        >
+                          for free
+                        </button>
+                        {' '}on your computer. You can also run it on the cloud for convenience. In addition to a tool, we're also creating{' '}
+                        <button 
+                          onClick={() => {
+                            setIsTooltipOpen(false);
+                            setIsPhilosophyButtonAnimating(true);
+                            setShowCreativePartner(false);
+                            setTimeout(() => {
+                              setShowPhilosophy(true);
+                              setTimeout(() => setIsPhilosophyButtonAnimating(false), 300);
+                            }, 50);
+                          }}
+                          className="underline text-wes-vintage-gold hover:text-wes-coral transition-colors font-medium"
+                        >
+                          a community
+                        </button>
+                        {' '}for artists who wish to explore this new artform.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+            </FadeInSection>
 
 
 
@@ -385,7 +396,7 @@ export default function HomePage() {
             
             <div className="mb-6 pr-12 sm:pr-0">
               <h2 className="font-playfair text-2xl sm:text-3xl font-bold text-primary mb-4">Open Creative Partner Programme</h2>
-              <div className="w-16 h-1 bg-gradient-to-r from-wes-coral to-wes-pink rounded-full mb-6"></div>
+              <div className="w-16 h-1 bg-gradient-to-r from-wes-coral to-wes-pink rounded-full mb-6 animate-pulse-breathe"></div>
             </div>
             
             <div className="space-y-6 text-muted-foreground">
@@ -504,7 +515,7 @@ export default function HomePage() {
             
             <div className="mb-6 pr-12 sm:pr-0">
               <h2 className="font-playfair text-2xl sm:text-3xl font-bold text-primary mb-4">Our Philosophy</h2>
-              <div className="w-16 h-1 bg-gradient-to-r from-wes-vintage-gold to-wes-mint rounded-full mb-6"></div>
+              <div className="w-16 h-1 bg-gradient-to-r from-wes-vintage-gold to-wes-mint rounded-full mb-6 animate-pulse-wave"></div>
             </div>
             
             <div className="space-y-6 text-muted-foreground">

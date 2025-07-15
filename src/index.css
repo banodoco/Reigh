@@ -1026,6 +1026,18 @@
   animation: shimmer 3s linear infinite;
 }
 
+.animate-pulse-glow {
+  animation: pulseGlow 4s ease-in-out infinite;
+}
+
+.animate-pulse-breathe {
+  animation: pulseBreath 3s ease-in-out infinite;
+}
+
+.animate-pulse-wave {
+  animation: pulseWave 5s ease-in-out infinite;
+}
+
 .animate-float-slow {
   animation: floatSlow 20s ease-in-out infinite;
 }
@@ -1249,4 +1261,79 @@
 
 .group:hover .group-hover\:animate-bubble-pop {
   animation: bubblePop 0.8s ease-in-out infinite;
+}
+
+/* Icon hover animations */
+@keyframes brainPulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes giftingMotion {
+  0%, 100% {
+    transform: translateX(-1px);
+  }
+  50% {
+    transform: translateX(1px);
+  }
+}
+
+.group:hover .animate-brain-pulse {
+  animation: brainPulse 1.5s ease-in-out infinite;
+}
+
+.group:hover .animate-gifting-motion {
+  animation: giftingMotion 2s ease-in-out infinite;
+}
+
+/* Decorative line animations */
+@keyframes pulseGlow {
+  0%, 100% {
+    opacity: 1;
+    filter: brightness(1);
+  }
+  50% {
+    opacity: 0.6;
+    filter: brightness(1.02);
+  }
+}
+
+@keyframes pulseBreath {
+  0%, 100% {
+    opacity: 1;
+    filter: brightness(1);
+  }
+  33% {
+    opacity: 0.8;
+    filter: brightness(1.1);
+  }
+  66% {
+    opacity: 0.9;
+    filter: brightness(0.95);
+  }
+}
+
+@keyframes pulseWave {
+  0%, 100% {
+    opacity: 1;
+    filter: brightness(1);
+  }
+  25% {
+    opacity: 0.8;
+    filter: brightness(1.05);
+  }
+  50% {
+    opacity: 0.5;
+    filter: brightness(1.1);
+  }
+  75% {
+    opacity: 0.8;
+    filter: brightness(1.05);
+  }
 }

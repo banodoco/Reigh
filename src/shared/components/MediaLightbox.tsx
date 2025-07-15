@@ -119,11 +119,32 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     }
   };
 
-  const handleDownload = () => {
-    const link = document.createElement('a');
-    link.href = displayUrl;
-    link.download = `media_${media.id}.${isVideo ? 'mp4' : 'png'}`;
-    link.click();
+  const handleDownload = async () => {
+    try {
+      const response = await fetch(displayUrl);
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `media_${media.id}.${isVideo ? 'mp4' : 'png'}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up the object URL
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error downloading file:', error);
+      // Fallback to direct link
+      const link = document.createElement('a');
+      link.href = displayUrl;
+      link.download = `media_${media.id}.${isVideo ? 'mp4' : 'png'}`;
+      link.target = '_blank';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
   };
 
   const handleAddToShot = async () => {
@@ -308,7 +329,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           variant="secondary"
                           size="sm"
                           onClick={handleDownload}
-                          className="bg-black/50 hover:bg-black/70 text-white h-8 w-8 sm:h-auto sm:w-auto"
+                          className="bg-black/50 hover:bg-black/70 text-white"
                         >
                           <Download className="h-4 w-4" />
                         </Button>
@@ -321,7 +342,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     variant="secondary"
                     size="sm"
                     onClick={onClose}
-                    className="bg-black/50 hover:bg-black/70 text-white h-8 w-8 sm:h-auto sm:w-auto"
+                    className="bg-black/50 hover:bg-black/70 text-white"
                   >
                     <X className="h-4 w-4" />
                   </Button>

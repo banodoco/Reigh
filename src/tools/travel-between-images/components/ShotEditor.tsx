@@ -1275,7 +1275,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                                 onClick={handleGenerateBatch} 
                                 disabled={isGenerationDisabled}
                             >
-                                {isCreatingTask ? 'Creating Tasks...' : 'Generate All Videos'}
+                                {isCreatingTask ? 'Creating Tasks...' : 'Generate Video'}
                             </Button>
                             {nonVideoImages.length < 2 && <p className="text-xs text-center text-muted-foreground mt-2">You need at least two images to generate videos.</p>}
                             {isGenerationDisabledDueToApiKey && (

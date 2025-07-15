@@ -70,13 +70,6 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
   const handleCancel = () => {
     // Cancel main task first
     cancelTaskMutation.mutate(task.id, {
-      onSuccess: () => {
-        toast({
-          title: 'Task Cancelled',
-          description: `Task ${displayTaskType} (${task.id.substring(0, 8)}) has been cancelled.`,
-          variant: 'default',
-        });
-      },
       onError: (error) => {
         toast({
           title: 'Cancellation Failed',

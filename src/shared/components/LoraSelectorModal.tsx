@@ -255,8 +255,8 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps> = ({ loras, onAddLora,
     <div>
       {/* LoRAs Filter */}
       <div className="mb-6 p-4 bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-xl shadow-sm">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
             <div className="flex items-center space-x-2">
               <Checkbox 
                 id="show-my-loras-only" 
@@ -264,7 +264,7 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps> = ({ loras, onAddLora,
                 onCheckedChange={(checked) => setShowMyLorasOnly(!!checked)}
                 className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
               />
-              <Label htmlFor="show-my-loras-only" className="text-base font-medium text-slate-900 cursor-pointer">
+              <Label htmlFor="show-my-loras-only" className="text-sm sm:text-base font-medium text-slate-900 cursor-pointer">
                 Show only my LoRAs
               </Label>
             </div>
@@ -275,22 +275,24 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps> = ({ loras, onAddLora,
                 onCheckedChange={(checked) => setShowAddedLorasOnly(!!checked)}
                 className="data-[state=checked]:bg-green-600 data-[state=checked]:border-green-600"
               />
-              <Label htmlFor="show-added-loras-only" className="text-base font-medium text-slate-900 cursor-pointer">
+              <Label htmlFor="show-added-loras-only" className="text-sm sm:text-base font-medium text-slate-900 cursor-pointer">
                 Show only added LoRAs
               </Label>
             </div>
-            {myLorasCount > 0 && (
-              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
-                {myLorasCount} saved
-              </span>
-            )}
-            {selectedLoraIds.length > 0 && (
-              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
-                {selectedLoraIds.length} added
-              </span>
-            )}
+            <div className="flex gap-2">
+              {myLorasCount > 0 && (
+                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+                  {myLorasCount} saved
+                </span>
+              )}
+              {selectedLoraIds.length > 0 && (
+                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
+                  {selectedLoraIds.length} added
+                </span>
+              )}
+            </div>
           </div>
-          <div className="text-sm text-slate-600 font-medium">
+          <div className="text-xs sm:text-sm text-slate-600 font-medium">
             {showMyLorasOnly && showAddedLorasOnly ? (
               <span className="text-purple-700">Showing {processedLoras.length} of your added LoRAs</span>
             ) : showMyLorasOnly ? (

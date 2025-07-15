@@ -689,7 +689,7 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
             className="w-full md:w-1/2" 
             disabled={isGenerating || !hasApiKey || actionablePromptsCount === 0}
           >
-            {isGenerating ? "Creating tasks..." : "Generate Images"}
+            {isGenerating ? "Creating tasks..." : `Generate ${imagesPerPrompt * prompts.length} Images`}
           </Button>
         </div>
       </form>
