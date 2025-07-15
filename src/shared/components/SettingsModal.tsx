@@ -275,17 +275,17 @@ python headless.py --db-type supabase \\
       >
         <DialogHeader className="relative">
           <DialogTitle className="text-2xl">App Settings</DialogTitle>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleSignOut}
-            className={`absolute top-0 flex items-center gap-2 text-muted-foreground hover:text-foreground ${
-              isMobile ? 'left-0' : 'right-0'
-            }`}
-          >
-            <LogOut className="h-4 w-4" />
-            Sign out
-          </Button>
+          {!isMobile && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleSignOut}
+              className="absolute top-0 right-0 flex items-center gap-2 text-muted-foreground hover:text-foreground"
+            >
+              <LogOut className="h-4 w-4" />
+              Sign out
+            </Button>
+          )}
         </DialogHeader>
         
         {/* Generation Method Selection */}
@@ -293,7 +293,20 @@ python headless.py --db-type supabase \\
           <div className="grid grid-cols-2 gap-6 items-start">
             {/* Left column: options */}
             <div className="space-y-4">
-              <h3 className="font-semibold">How would you like to generate?</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold">How would you like to generate?</h3>
+                {isMobile && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleSignOut}
+                    className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Sign out
+                  </Button>
+                )}
+              </div>
               
               <div className="space-y-3">
                 <div className="flex items-center space-x-2">
