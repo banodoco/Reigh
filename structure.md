@@ -277,7 +277,7 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
 - **useFalImageGeneration.ts**: Handles image generation with Fal.ai
 - **useGenerations.ts**: Manages generation CRUD operations
 - **useLastAffectedShot.ts**: Tracks the last shot that was affected by an action
-- **usePaneAwareModalStyle.ts**: Provides modal styling that respects pane visibility and ensures proper centering in available viewport space. Prevents modals from getting cut off on wider screens by calculating optimal positioning based on locked panes and adding maxWidth constraints.
+- **usePaneAwareModalStyle.ts**: Provides modal styling that adjusts height to account for bottom pane (generations pane) while keeping modals centered above all panes. Modals use default centering and appear with proper z-index above pane content.
 - **usePersistentState.ts**: localStorage-backed state management with mobile-specific error handling for iOS Safari private mode restrictions
 - **usePersistentToolState.ts**: Tool-specific persistent state with debouncing
 - **useResources.ts**: Manages resources (uploaded files)
