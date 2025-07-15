@@ -165,8 +165,8 @@ export default function HomePage() {
                      } ${isPhilosophyPaneClosing ? 'animate-spin-left-fade-reverse' : ''} ${
              showPhilosophy || isPhilosophyButtonAnimating
                ? 'opacity-0 pointer-events-none'
-               : showCreativePartner
-                 ? 'opacity-40 pointer-events-none brightness-50 transition-all duration-150'
+               : showCreativePartner || isCreativePartnerButtonAnimating
+                 ? 'opacity-40 pointer-events-none brightness-50 transition-all duration-100'
                  : 'opacity-100 pointer-events-auto transition-all duration-300'
            }`}
         >
@@ -194,8 +194,8 @@ export default function HomePage() {
                      } ${isCreativePartnerPaneClosing ? 'animate-spin-right-fade-reverse' : ''} ${
              showCreativePartner || isCreativePartnerButtonAnimating
                ? 'opacity-0 pointer-events-none'
-               : showPhilosophy
-                 ? 'opacity-40 pointer-events-none brightness-50 transition-all duration-150'
+               : showPhilosophy || isPhilosophyButtonAnimating
+                 ? 'opacity-40 pointer-events-none brightness-50 transition-all duration-100'
                  : 'opacity-100 pointer-events-auto transition-all duration-300'
            }`}
         >
