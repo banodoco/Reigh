@@ -56,16 +56,16 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
 
   const sensors = useSensors(
     useSensor(MouseSensor, {
-      // Require the mouse to move by 5 pixels before activating
+      // Increased distance to prevent accidental drags and reduce performance load
       activationConstraint: {
-        distance: 5,
+        distance: 8,
       },
     }),
     useSensor(TouchSensor, {
-      // Press delay of 250ms, with tolerance of 5px of movement
+      // Reduced delay for better responsiveness but with tolerance
       activationConstraint: {
-        delay: 250,
-        tolerance: 5,
+        delay: 150,
+        tolerance: 8,
       },
     }),
     useSensor(KeyboardSensor, {

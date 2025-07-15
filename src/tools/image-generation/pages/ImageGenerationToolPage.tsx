@@ -353,7 +353,7 @@ const ImageGenerationToolPage: React.FC = () => {
   const falApiKey = getApiKey('fal_api_key');
   const openaiApiKey = getApiKey('openai_api_key');
   const hasValidFalApiKey = true; // Always true - let the task creation handle validation
-  console.log('[ImageGenFormVisibilityIssue] hasValidFalApiKey set to:', hasValidFalApiKey);
+
 
   const targetShotIdForButton = lastAffectedShotId || (shots && shots.length > 0 ? shots[0].id : undefined);
   const targetShotNameForButtonTooltip = targetShotIdForButton 

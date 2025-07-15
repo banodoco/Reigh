@@ -13,6 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/sha
 import { Badge } from '@/shared/components/ui/badge';
 import { Separator } from '@/shared/components/ui/separator';
 import { Checkbox } from '@/shared/components/ui/checkbox';
+import { usePaneAwareModalStyle } from '@/shared/hooks/usePaneAwareModalStyle';
 import { Label } from '@/shared/components/ui/label';
 import { ScrollArea } from '@/shared/components/ui/scroll-area';
 import { Task } from '@/types/tasks';
@@ -29,6 +30,7 @@ interface TaskDetailsModalProps {
 }
 
 const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, children, onApplySettings, onApplySettingsFromTask, onClose }) => {
+  const modalStyle = usePaneAwareModalStyle();
   const [isOpen, setIsOpen] = useState(false);
   const [replaceImages, setReplaceImages] = useState(true);
   const [taskId, setTaskId] = useState<string | null>(null);
@@ -96,7 +98,11 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
       }}
     >
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="sm:max-w-[700px] max-h-[80vh] flex flex-col" aria-describedby="task-details-description">
+      <DialogContent 
+        style={modalStyle}
+        className="sm:max-w-[700px] max-h-[80vh] flex flex-col" 
+        aria-describedby="task-details-description"
+      >
         <DialogHeader className="flex-shrink-0">
           <DialogTitle className="text-xl font-semibold">Generation Task Details</DialogTitle>
           <p id="task-details-description" className="sr-only">

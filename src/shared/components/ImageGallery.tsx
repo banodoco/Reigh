@@ -150,11 +150,12 @@ const InfoPopover: React.FC<{ metadata: DisplayableMetadata | undefined; metadat
             onPointerLeave={(e) => {
               // If pointer leaves the button and not heading into popover content, close after a short delay
               // Use setTimeout to allow entering the content without closing immediately
-              setTimeout(() => {
+              // Use requestAnimationFrame for better performance than setTimeout
+              requestAnimationFrame(() => {
                 if (!document.querySelector(':hover')?.closest('[data-info-popover]')) {
                   closePopover();
                 }
-              }, 50);
+              });
             }}
           >
             <Info className="h-3.5 w-3.5" />
@@ -203,9 +204,10 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
   const ITEMS_PER_PAGE = 45;
   const [page, setPage] = React.useState(0);
 
-  // When filters change, reset to first page
+  // When filters change, reset to first page (debounced to avoid rapid state changes)
   React.useEffect(() => {
-    setPage(0);
+    const timer = setTimeout(() => setPage(0), 10);
+    return () => clearTimeout(timer);
   }, [filterByToolType, mediaTypeFilter]);
 
   const tickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -417,7 +419,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
   return (
                 <TooltipProvider>
       <div className="space-y-4">
-        <div className="flex flex-wrap justify-between items-center mb-2 gap-x-4 gap-y-2"> {/* Added gap-y-2 and flex-wrap for better responsiveness */}
+        <div className="flex flex-wrap justify-between items-center mb-4 gap-x-4 gap-y-2"> {/* Added gap-y-2 and flex-wrap for better responsiveness */}
             {images.length > 0 && (
               <div className="flex items-center gap-2">
                 {/* Pagination Controls */}
@@ -431,7 +433,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
                     >
                       Prev
                     </Button>
-                    <span className={`text-sm ${whiteText ? 'text-white' : 'text-muted-foreground'} whitespace-nowrap`}>
+                    <span className={`text-sm ${whiteText ? 'text-white' : 'text-muted-foreground'} whitespace-nowrap mx-4`}>
                       Showing {rangeStart}-{rangeEnd} (out of {totalFilteredItems})
                     </span>
                     <Button
@@ -485,7 +487,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
         </div>
 
         {images.length > 0 && filteredImages.length === 0 && (filterByToolType || mediaTypeFilter !== 'all') && (
-          <div className="text-center py-8 text-muted-foreground border rounded-lg bg-card shadow-sm">
+          <div className="text-center py-12 mt-8 text-muted-foreground border rounded-lg bg-card shadow-sm" style={{ marginBottom: '4rem' }}>
             <Filter className="mx-auto h-10 w-10 mb-3 opacity-60" />
             <p className="font-semibold">No items match the current filters.</p>
             <p className="text-sm">Adjust the filters or uncheck them to see all items.</p>
@@ -493,7 +495,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
         )}
 
         {images.length === 0 && (
-           <div className="text-center py-8 text-muted-foreground border rounded-lg bg-card shadow-sm">
+           <div className="text-center py-12 mt-8 text-muted-foreground border rounded-lg bg-card shadow-sm" style={{ marginBottom: '4rem' }}>
              <Sparkles className="mx-auto h-10 w-10 mb-3 opacity-60" />
              <p className="font-semibold">No images generated yet.</p>
              <p className="text-sm">Use the controls above to generate some images.</p>
@@ -765,7 +767,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
 
       {/* Pagination Controls */}
       {totalPages > 1 && (
-        <div className={`flex justify-center items-center mt-6 ${whiteText ? 'text-white' : 'text-gray-600'}`}>
+        <div className={`flex justify-center items-center mt-6 mb-8 ${whiteText ? 'text-white' : 'text-gray-600'}`}>
           <Button
             variant="outline"
             size="sm"
@@ -774,7 +776,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
           >
             Prev
           </Button>
-          <span className={`text-sm ${whiteText ? 'text-white' : 'text-muted-foreground'} whitespace-nowrap`}>
+          <span className={`text-sm ${whiteText ? 'text-white' : 'text-muted-foreground'} whitespace-nowrap mx-4`}>
             Showing {rangeStart}-{rangeEnd} (out of {totalFilteredItems})
           </span>
           <Button

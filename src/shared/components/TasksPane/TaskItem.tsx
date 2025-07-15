@@ -120,9 +120,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
     const orchestratorDetails = pRoot.orchestrator_details || {};
     const orchestratorId = orchestratorDetails.orchestrator_task_id || pRoot.orchestrator_task_id || pRoot.task_id || task.id;
     const orchestratorRunId = orchestratorDetails.run_id || pRoot.orchestrator_run_id;
-    console.log('[TravelProgressIssue] Orchestrator ID:', orchestratorId);
-    console.log('[TravelProgressIssue] Orchestrator RunID:', orchestratorRunId);
-    console.log('[TravelProgressIssue] Task list size:', tasksData.length);
+
     const subtasks = tasksData.filter((t) => {
       const p: any = typeof t.params === 'string' ? JSON.parse(t.params) : t.params || {};
       return (
@@ -130,7 +128,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
         && t.id !== task.id
       );
     });
-    console.log('[TravelProgressIssue] Found subtasks:', subtasks.map(t => ({ id: t.id, status: t.status })));
+
     if (subtasks.length === 0) {
       toast({ title: 'Progress', description: 'No subtasks found yet.', variant: 'default' });
       return;
@@ -141,7 +139,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
 
     const rawPercent = (completed / denominator) * 100;
     const percent = Math.round(Math.min(rawPercent, 100));
-    console.log('[TravelProgressIssue] Completed:', completed, 'Total:', subtasks.length, 'Denominator:', denominator, 'Percent:', percent);
+
     toast({ title: 'Progress', description: `${percent}% Complete`, variant: 'default' });
 
     // Show inline for 5s

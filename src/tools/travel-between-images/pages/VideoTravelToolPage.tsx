@@ -441,7 +441,7 @@ const VideoTravelToolPage: React.FC = () => {
           updateSettings('shot', currentSettings);
         } else {          
         }
-      }, 500); // Wait 500ms before saving
+      }, 200); // Reduced wait time for better performance
     }
     
     // Cleanup timeout on unmount

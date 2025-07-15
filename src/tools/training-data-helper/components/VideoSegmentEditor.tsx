@@ -28,15 +28,15 @@ function SegmentFramePreview({ segment, captureFrameAtTime, videoReady }: Segmen
     setLoading(true);
     
     try {
-      // Wait for video to be fully ready
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // Reduced wait time for better performance
+      await new Promise(resolve => setTimeout(resolve, 100));
       
-      // Capture frames one at a time to avoid overwhelming the video element
+      // Capture frames with optimized timing
       const startImg = await captureFrameAtTime(segment.startTime / 1000);
       setStartFrame(startImg);
       
-      // Small delay between captures
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Minimal delay between captures
+      await new Promise(resolve => setTimeout(resolve, 50));
       
       const endImg = await captureFrameAtTime(segment.endTime / 1000);
       setEndFrame(endImg);
@@ -54,10 +54,10 @@ function SegmentFramePreview({ segment, captureFrameAtTime, videoReady }: Segmen
     // Only load frames when video is ready
     if (!videoReady) return;
     
-    // Debounce frame loading to avoid overwhelming the video element
+    // Optimized debounce for frame loading
     const timeoutId = setTimeout(() => {
       loadFrames();
-    }, 300);
+    }, 150);
 
     return () => clearTimeout(timeoutId);
   }, [segment.id, videoReady]);

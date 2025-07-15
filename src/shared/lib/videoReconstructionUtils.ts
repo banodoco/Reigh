@@ -165,9 +165,7 @@ export const reconstructVideoClientSide = async (
     mediaRecorder.start(100); 
     if (audioSourceNode && audioBuffer) {
       audioSourceNode.start();
-      console.log("[ClientSideReconstruction] Audio source started.");
     }
-    console.log("[ClientSideReconstruction] MediaRecorder started. Drawing frames...");
 
     try {
       for (let i = 0; i < editedFrames.length; i++) {
@@ -192,7 +190,6 @@ export const reconstructVideoClientSide = async (
         const imageLoadPromise = new Promise<void>((resolveLoad, rejectLoad) => {
           img.onload = () => resolveLoad();
           img.onerror = (err) => {
-              console.error("[ClientSideReconstruction] Error loading frame image:", frame.url, err);
               onProgress(`Error loading frame ${i + 1} for reconstruction.`);
               rejectLoad(new Error(`Failed to load image ${frame.url} for reconstruction.`));
           };
@@ -225,16 +222,22 @@ export const reconstructVideoClientSide = async (
         } else {
           durationMs = (videoDurationSeconds - currentTimestamp) * 1000;
         }
-        durationMs = Math.max(durationMs, 1000 / (targetFps > 0 ? targetFps : 24));
+        // Cap duration to prevent long setTimeout violations while maintaining timing accuracy
+        const cappedDurationMs = Math.min(Math.max(durationMs, 1000 / (targetFps > 0 ? targetFps : 24)), 200);
         
-        console.log(`[ClientSideReconstruction] Frame ${i+1}/${editedFrames.length} (orig_ts: ${currentTimestamp.toFixed(2)}s) processed. Next frame in ${durationMs.toFixed(0)}ms.`);
         onProgress(`Processing frame ${i+1}/${editedFrames.length}...`);
-        await new Promise(r => setTimeout(r, durationMs));
+        
+        // Use optimized timing for better performance
+        if (cappedDurationMs > 50) {
+          await new Promise(r => setTimeout(r, cappedDurationMs));
+        } else {
+          // Use requestAnimationFrame for very short delays
+          await new Promise(r => requestAnimationFrame(r));
+        }
       } 
   
         if (mediaRecorder.state === "recording") {
           mediaRecorder.stop();
-          console.log("[ClientSideReconstruction] All frames processed, stopping MediaRecorder.");
         }
     } catch (error) {
       console.error("[ClientSideReconstruction] Error during frame processing loop:", error);

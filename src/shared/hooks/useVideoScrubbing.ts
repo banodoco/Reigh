@@ -96,8 +96,8 @@ export const useVideoScrubbing = () => {
       const width = e.currentTarget.offsetWidth;
       const normalizedPosition = offsetX / width; // Value from 0.0 to 1.0
 
-      // Reduced max speed from 3.0 to 2.0 for better performance
-      const MAX_SPEED = 2.0;
+      // Optimized max speed for better performance
+      const MAX_SPEED = 1.5;
       let newRate;
 
       // The new logic is simpler:

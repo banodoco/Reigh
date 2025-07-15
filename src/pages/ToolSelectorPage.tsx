@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { AppEnv, type AppEnvValue } from '../types/env';
-import { Camera, Palette, Zap, Star, Crown, Gem, Paintbrush, Video, Edit, Sparkles, Film, Maximize2, Wand2, Layers, Eye } from 'lucide-react';
+import { Camera, Palette, Zap, Crown, Paintbrush, Video, Edit, Sparkles, Film, Maximize2, Wand2, Layers, Eye } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toolsUIManifest, type ToolUIDefinition } from '../tools';
 import { PageFadeIn, FadeInSection } from '@/shared/components/transitions';
@@ -242,7 +242,7 @@ const ToolSelectorPage: React.FC = () => {
       <div className="absolute top-40 right-20 w-24 h-24 bg-wes-yellow/15 rounded-full blur-2xl animate-parallax-float" style={{ animationDelay: '2s' }}></div>
       <div className="absolute bottom-20 left-1/4 w-40 h-40 bg-wes-lavender/10 rounded-full blur-3xl animate-parallax-float" style={{ animationDelay: '4s' }}></div>
       
-      <div className="container mx-auto px-1 sm:px-2 pt-3 sm:pt-4 pb-12 sm:pb-16 relative z-10">
+      <div className="container mx-auto px-1 sm:px-2 pt-3 sm:pt-4 pb-4 sm:pb-6 relative z-10">
         {/* Responsive Layout */}
         <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 lg:gap-8 max-w-7xl mx-auto">
           {/* Process Column - Full width on mobile, 2/3 on desktop */}
@@ -272,23 +272,6 @@ const ToolSelectorPage: React.FC = () => {
                 />
               ))}
             </div>
-          </div>
-        </div>
-        
-        {/* Enhanced footer decorative line - Responsive */}
-        <div className="mt-16 sm:mt-24 lg:mt-32 flex items-center justify-center">
-          <div className="flex items-center space-x-3 sm:space-x-6">
-            <div className="w-16 sm:w-32 h-px bg-gradient-to-r from-transparent to-wes-vintage-gold/60"></div>
-            <Star className="w-2 h-2 sm:w-3 sm:h-3 text-wes-vintage-gold animate-rotate-slow" />
-            <div className="w-3 h-3 sm:w-4 sm:h-4 bg-wes-dusty-blue rounded-full animate-vintage-pulse wes-badge"></div>
-            <Gem className="w-3 h-3 sm:w-4 sm:h-4 text-wes-coral animate-bounce-gentle" />
-            <div className="w-12 sm:w-20 h-px bg-wes-vintage-gold/60"></div>
-            <div className="text-wes-vintage-gold text-lg sm:text-xl animate-sway">❋</div>
-            <div className="w-12 sm:w-20 h-px bg-wes-vintage-gold/60"></div>
-            <Gem className="w-3 h-3 sm:w-4 sm:h-4 text-wes-mint animate-bounce-gentle" style={{ animationDelay: '1s' }} />
-            <div className="w-3 h-3 sm:w-4 sm:h-4 bg-wes-pink rounded-full animate-vintage-pulse wes-badge" style={{ animationDelay: '2s' }}></div>
-            <Star className="w-2 h-2 sm:w-3 sm:h-3 text-wes-vintage-gold animate-rotate-slow" style={{ animationDelay: '1s' }} />
-            <div className="w-16 sm:w-32 h-px bg-gradient-to-l from-transparent to-wes-vintage-gold/60"></div>
           </div>
         </div>
       </div>

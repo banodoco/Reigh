@@ -205,16 +205,12 @@ export const useListShots = (projectId: string | null): UseQueryResult<Shot[], E
     queryFn: async () => {
       if (!projectId) return [];
       
-      console.log(`[ShotsFetch] Fetching shots for project ${projectId}`);
-      
       // First get all shots for the project
       const { data: shots, error: shotsError } = await supabase
         .from('shots')
         .select('*')
         .eq('project_id', projectId)
         .order('created_at', { ascending: false });
-      
-      console.log('[ShotsFetch] Raw shots data:', shots);
       
       if (shotsError) throw shotsError;
       
@@ -232,9 +228,7 @@ export const useListShots = (projectId: string | null): UseQueryResult<Shot[], E
         .in('shot_id', shotIds)
         .order('position', { ascending: true });
       
-      console.log('[ShotsFetch] Raw shot_generations data:', shotGenerations);
-      
-      if (sgError) throw sgError;
+            if (sgError) throw sgError;
       
       // Group generations by shot_id
       const generationsByShot = shotGenerations.reduce((acc, sg) => {
@@ -261,8 +255,6 @@ export const useListShots = (projectId: string | null): UseQueryResult<Shot[], E
         project_id: shot.project_id,
         images: generationsByShot[shot.id] || []
       }));
-      
-      console.log('[ShotsFetch] Final transformed shots:', transformedShots);
       
       return transformedShots;
     },

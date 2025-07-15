@@ -9,16 +9,12 @@ import { toast } from 'sonner';
 async function fetchGenerations(projectId: string | null, limit?: number): Promise<GeneratedImageWithMetadata[]> {
   if (!projectId) return [];
   
-  console.log(`[GenerationsFetch] Fetching generations for project ${projectId} (limit: ${limit})`);
-  
   const { data, error } = await supabase
     .from('generations')
     .select('*')
     .eq('project_id', projectId)
     .order('created_at', { ascending: false })
     .limit(limit || 1000);
-  
-  console.log('[GenerationsFetch] Raw data from Supabase:', data);
   
   if (error) throw error;
 
@@ -123,8 +119,7 @@ export function useDeleteGeneration() {
     },
     onSuccess: () => {
       // Invalidate the generations query to refetch
-      queryClient.invalidateQueries({ queryKey: ['generations'] });
-      toast.success('Generation deleted successfully');
+      queryClient.invalidateQueries({ queryKey: ['generations'] });      
     },
     onError: (error: Error) => {
       console.error('Error deleting generation:', error);

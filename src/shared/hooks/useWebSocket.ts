@@ -6,6 +6,41 @@ import { RealtimeChannel } from '@supabase/supabase-js';
 
 export function useWebSocket(projectId: string | null) {
   const queryClient = useQueryClient();
+  // --- BEGIN batching invalidations logic ---
+  // We frequently receive rapid-fire Realtime messages (especially while many tasks
+  // are running). Calling `queryClient.invalidateQueries` for each message can be
+  // expensive because every invalidation triggers React Query to evaluate all
+  // observers synchronously – easily blowing past the 50 ms "long task" budget
+  // and flooding DevTools with `[Violation] 'message' handler took …` warnings.
+
+  // Instead, we batch invalidations arriving within a short window (100 ms).
+  // Every message adds its queryKey to `pendingInvalidationsRef`; a single
+  // debounced timer then flushes the unique set of keys.
+
+  // Using `JSON.stringify` to store keys allows us to dedupe array/object keys in a Set.
+  const pendingInvalidationsRef = useRef<Set<string>>(new Set());
+  const flushTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const scheduleInvalidation = (key: any) => {
+    pendingInvalidationsRef.current.add(JSON.stringify(key));
+
+    if (!flushTimerRef.current) {
+      flushTimerRef.current = setTimeout(() => {
+        pendingInvalidationsRef.current.forEach((keyString) => {
+          try {
+            const parsedKey = JSON.parse(keyString);
+            queryClient.invalidateQueries({ queryKey: parsedKey });
+          } catch (err) {
+            // Fallback for primitive keys that can't be parsed
+            queryClient.invalidateQueries({ queryKey: keyString as any });
+          }
+        });
+        pendingInvalidationsRef.current.clear();
+        flushTimerRef.current = null;
+      }, 100); // Flush once every 100 ms max
+    }
+  };
+  // --- END batching invalidations logic ---
   const channelRef = useRef<RealtimeChannel | null>(null);
   const setupTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -49,29 +84,26 @@ export function useWebSocket(projectId: string | null) {
             // No need to check projectId - we're already subscribed to the right channel!
             switch (message.type) {
               case 'TASK_CREATED':
-                console.log(`[WebSocket] Task created for project ${projectId}, invalidating task queries.`);
-                queryClient.invalidateQueries({ queryKey: ['tasks', { projectId }] });
+                // Batch invalidations to avoid excessive synchronous work
+                scheduleInvalidation(['tasks', { projectId }]);
                 break;
 
               case 'TASK_COMPLETED':
-                console.log(`[WebSocket] Task completed for project ${projectId}. Invalidating task & generation queries.`);
-                queryClient.invalidateQueries({ queryKey: ['tasks', { projectId }] });
-                queryClient.invalidateQueries({ queryKey: ['tasks'] }); // General task list
-                queryClient.invalidateQueries({ queryKey: ['generations', projectId] });
+                scheduleInvalidation(['tasks', { projectId }]);
+                scheduleInvalidation(['tasks']);
+                scheduleInvalidation(['generations', projectId]);
                 break;
 
               case 'TASKS_STATUS_UPDATE':
-                // console.log(`[WebSocket] Invalidating task queries for project ${projectId} due to status update.`);
-                queryClient.invalidateQueries({ queryKey: ['tasks', { projectId }] });
+                scheduleInvalidation(['tasks', { projectId }]);
                 break;
 
               case 'GENERATIONS_UPDATED':
                 const { shotId } = message.payload;
-                console.log(`[WebSocket] Invalidating generation/shot queries for project: ${projectId}, shot: ${shotId}`);
-                queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
-                queryClient.invalidateQueries({ queryKey: ['generations', projectId] });
+                scheduleInvalidation(['shots', projectId]);
+                scheduleInvalidation(['generations', projectId]);
                 if (shotId) {
-                  queryClient.invalidateQueries({ queryKey: ['shots', shotId] });
+                  scheduleInvalidation(['shots', shotId]);
                 }
                 break;
 

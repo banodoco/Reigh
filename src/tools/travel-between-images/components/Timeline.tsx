@@ -132,9 +132,12 @@ const Timeline: React.FC<TimelineProps> = ({ images, frameSpacing, onImageReorde
     return initial;
   });
 
-  // Save positions to localStorage whenever they change
+  // Save positions to localStorage whenever they change (debounced for performance)
   useEffect(() => {
-    localStorage.setItem(`timelineFramePositions_${shotId}`, JSON.stringify(Array.from(framePositions.entries())));
+    const timer = setTimeout(() => {
+      localStorage.setItem(`timelineFramePositions_${shotId}`, JSON.stringify(Array.from(framePositions.entries())));
+    }, 100);
+    return () => clearTimeout(timer);
   }, [framePositions, shotId]);
 
   // Sync frame positions when image list changes

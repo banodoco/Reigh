@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { useApiKeys } from "@/shared/hooks/useApiKeys";
 import { useApiTokens } from "@/shared/hooks/useApiTokens";
 import usePersistentState from "@/shared/hooks/usePersistentState";
+import { usePaneAwareModalStyle } from "@/shared/hooks/usePaneAwareModalStyle";
 import { useUserUIState } from "@/shared/hooks/useUserUIState";
 import { useCredits } from "@/shared/hooks/useCredits";
 import { supabase } from "@/integrations/supabase/client";
@@ -48,6 +49,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   onOpenChange,
   initialTab = "generate-locally",
 }) => {
+  const modalStyle = usePaneAwareModalStyle();
   const { apiKeys, isLoading: isLoadingKeys, saveApiKeys, isUpdating } = useApiKeys();
   const { 
     tokens, 
@@ -263,7 +265,10 @@ python headless.py --db-type supabase \\
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent 
+        style={modalStyle}
+        className="sm:max-w-2xl max-h-[90vh] overflow-y-auto"
+      >
         <DialogHeader className="relative">
           <DialogTitle className="text-2xl">App Settings</DialogTitle>
           <Button

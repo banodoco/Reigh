@@ -22,9 +22,20 @@ const CreditsManagement: React.FC = () => {
     isCreatingCheckout,
     createCheckout,
     formatCurrency,
-    formatTransactionType,
     useCreditLedger,
   } = useCredits();
+
+  // Local formatter for transaction type labels
+  const formatTransactionType = (type: string) => {
+    switch (type) {
+      case 'purchase':
+        return 'Purchase';
+      case 'spend':
+        return 'Spend';
+      default:
+        return type;
+    }
+  };
 
   const [activeTab, setActiveTab] = useState('purchase');
   const [purchaseAmount, setPurchaseAmount] = useState(50); // Default to $50
@@ -57,15 +68,16 @@ const CreditsManagement: React.FC = () => {
                     <div className="h-8 w-16 bg-gray-200 rounded"></div>
                   </div>
                 ) : (
-                  formatCurrency(balance?.currentBalance || 0)
+                  formatCurrency(balance?.balance || 0)
                 )}
               </div>
             </div>
             <div className="text-right text-sm text-gray-600">
-              <div>Total Purchased: {formatCurrency(balance?.totalPurchased || 0)}</div>
-              <div>Total Spent: {formatCurrency(balance?.totalSpent || 0)}</div>
-              {(balance?.totalRefunded || 0) > 0 && (
-                <div>Total Refunded: {formatCurrency(balance?.totalRefunded || 0)}</div>
+              {/* Placeholder aggregates – replace with real values when available */}
+              <div>Total Purchased: {formatCurrency(0)}</div>
+              <div>Total Spent: {formatCurrency(0)}</div>
+              {false && (
+                <div>Total Refunded: {formatCurrency(0)}</div>
               )}
             </div>
           </div>
@@ -152,7 +164,7 @@ const CreditsManagement: React.FC = () => {
                     <p className="text-gray-600">Loading transaction history...</p>
                   </div>
                 </div>
-              ) : ledgerData?.transactions.length === 0 ? (
+              ) : (ledgerData?.entries?.length || 0) === 0 ? (
                 <div className="p-8 text-center">
                   <Gift className="w-8 h-8 text-gray-400 mx-auto mb-2" />
                   <p className="text-gray-600">No transactions yet</p>
@@ -171,20 +183,14 @@ const CreditsManagement: React.FC = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {ledgerData?.transactions.map((tx, index) => (
+                    {ledgerData?.entries?.map((tx, index) => (
                       <TableRow key={index}>
                         <TableCell>
                           {formatDistanceToNow(new Date(tx.created_at), { addSuffix: true })}
                         </TableCell>
                         <TableCell>
                           <Badge
-                            variant={
-                              tx.type === 'stripe'
-                                ? 'default'
-                                : tx.type === 'refund'
-                                ? 'destructive'
-                                : 'secondary'
-                            }
+                            variant={tx.type === 'purchase' ? 'default' : 'secondary'}
                           >
                             {formatTransactionType(tx.type)}
                           </Badge>
@@ -197,7 +203,7 @@ const CreditsManagement: React.FC = () => {
                           {tx.amount > 0 ? `+${formatCurrency(tx.amount)}` : formatCurrency(tx.amount)}
                         </TableCell>
                         <TableCell className="text-sm text-gray-500">
-                          {tx.metadata?.description || formatTransactionType(tx.type)}
+                          {tx.description || formatTransactionType?.(tx.type) || tx.type}
                         </TableCell>
                       </TableRow>
                     ))}

@@ -27,7 +27,7 @@ export const useSlidingPane = ({ side, isLocked, onToggleLock }: UseSlidingPaneO
       // If locked, don't allow programmatic close via hover
       return;
     }
-    console.log(`[PaneLockDebug] [${side}] setOpen(${open}) called (isLocked: ${isLocked})`);
+
     setIsOpen(open);
   }, [isLocked, side, isMobile]);
 
@@ -114,7 +114,7 @@ export const useSlidingPane = ({ side, isLocked, onToggleLock }: UseSlidingPaneO
         clearTimeout(leaveTimeoutRef.current);
         leaveTimeoutRef.current = null;
     }
-    console.log(`[PaneLockDebug] [${side}] openPane()`);
+
     if (isMobile) {
       // Dispatch global event so other panes close immediately
       const evt = new CustomEvent('mobilePaneOpen', { detail: { side } });
@@ -152,12 +152,12 @@ export const useSlidingPane = ({ side, isLocked, onToggleLock }: UseSlidingPaneO
     if (force !== undefined) {
       // Force to specific state - used by UI buttons
       if (force !== isLocked) {
-        console.log(`[PaneLockDebug] [${side}] toggleLock -> ${force}`);
+
         onToggleLock();
       }
     } else {
       // Toggle current state
-      console.log(`[PaneLockDebug] [${side}] toggleLock -> ${!isLocked}`);
+
       onToggleLock();
     }
   };

@@ -13,7 +13,7 @@ interface ProcessingWarningsProps {
 export const GlobalProcessingWarning: React.FC<ProcessingWarningsProps> = ({ onOpenSettings }) => {
   const { balance, isLoadingBalance } = useCredits();
   const { tokens, isLoading: isLoadingTokens } = useApiTokens();
-  const [inCloudChecked] = usePersistentState<boolean>("generation-in-cloud", true);
+  const [inCloudChecked, setInCloudChecked] = usePersistentState<boolean>("generation-in-cloud", true);
   const [onComputerChecked] = usePersistentState<boolean>("generation-on-computer", true);
   
   const hasCredits = balance && balance.currentBalance > 0;
@@ -53,7 +53,43 @@ export const GlobalProcessingWarning: React.FC<ProcessingWarningsProps> = ({ onO
     );
   }
 
-  // 2. Show the existing credits/token warning.
+  // 2. Cloud processing enabled but the user has no credits – show a dedicated banner here.
+  const noCreditsButCloudEnabled = inCloudChecked && !hasCredits;
+
+  if (noCreditsButCloudEnabled) {
+    return (
+      <div className="animate-in slide-in-from-top-2 fade-in duration-300">
+        <div className="container mx-auto px-4 md:px-6 mt-4">
+          <Alert className="border-orange-200 bg-orange-50 text-orange-900 flex items-center justify-between py-3 pr-4">
+            <div className="flex items-center space-x-3">
+              <span className="inline-flex items-center">
+                <AlertTriangle className="h-5 w-5 text-orange-700 mr-2" />
+                                 <span className="space-x-1">
+                   <span>Cloud processing enabled but you have no credits.</span>
+                   <span
+                     className="text-orange-700 underline hover:text-orange-800 cursor-pointer"
+                     onClick={() => setInCloudChecked(false)}
+                   >
+                     Turn off cloud processing
+                   </span>
+                   <span>or</span>
+                   <span
+                     className="text-orange-700 underline hover:text-orange-800 cursor-pointer"
+                     onClick={onOpenSettings}
+                   >
+                     buy credits
+                   </span>
+                   <span>to dismiss.</span>
+                 </span>
+              </span>
+            </div>
+          </Alert>
+        </div>
+      </div>
+    );
+  }
+
+  // 3. Show the existing credits/token warning if both cloud processing is disabled AND no valid token.
   if (hasCredits || hasValidToken) {
     return null;
   }
@@ -89,37 +125,6 @@ export const TasksPaneProcessingWarning: React.FC<ProcessingWarningsProps> = ({ 
   
   const hasCredits = balance && balance.currentBalance > 0;
   const hasValidToken = tokens.length > 0;
-  
-  // Show warning if they have cloud processing enabled but no credits, 
-  // AND they have a valid token (so GlobalProcessingWarning won't show)
-  if (!inCloudChecked || hasCredits || !hasValidToken) {
-    return null;
-  }
-  
-  return (
-    <div className="px-3">
-      <Alert className="mb-2 border-orange-200 bg-orange-50 text-orange-900 rounded-md">
-        <AlertDescription className="text-xs leading-relaxed">
-          <div className="flex items-start space-x-2">
-            <AlertTriangle className="h-4 w-4 flex-shrink-0 text-orange-700 mt-0.5" />
-            <div className="space-y-1">
-              <div className="text-sm font-medium">Cloud processing enabled but you have no credits.</div>
-              <div className="text-xs">
-                Turn off cloud processing or{' '}
-                <Button
-                  variant="link"
-                  size="sm"
-                  onClick={onOpenSettings}
-                  className="p-0 h-auto text-orange-700 underline hover:text-orange-800 text-xs"
-                >
-                  buy credits
-                </Button>
-                {' '}to dismiss.
-              </div>
-            </div>
-          </div>
-        </AlertDescription>
-      </Alert>
-    </div>
-  );
+  // This warning is now shown globally, so don't duplicate it in the tasks pane.
+  return null;
 }; 
