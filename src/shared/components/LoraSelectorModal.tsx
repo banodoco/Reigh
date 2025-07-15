@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardFooter as ItemCardFooter, CardH
 import { Input } from "@/shared/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/components/ui/select";
 import { usePaneAwareModalStyle } from '@/shared/hooks/usePaneAwareModalStyle';
+import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/components/ui/tabs";
 import { useListResources, useCreateResource, useDeleteResource, Resource } from '@/shared/hooks/useResources';
 import { Textarea } from '@/shared/components/ui/textarea';
@@ -960,6 +961,7 @@ export const LoraSelectorModal: React.FC<LoraSelectorModalProps> = ({
   lora_type,
 }) => {
   const modalStyle = usePaneAwareModalStyle();
+  const isMobile = useIsMobile();
   const myLorasResource = useListResources('lora');
   const createResource = useCreateResource();
   const deleteResource = useDeleteResource();
@@ -975,7 +977,9 @@ export const LoraSelectorModal: React.FC<LoraSelectorModalProps> = ({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent
         style={modalStyle}
-        className="max-w-4xl flex flex-col overflow-y-auto"
+        className={`max-w-4xl flex flex-col overflow-y-auto ${
+          isMobile ? 'mx-2 my-5 max-h-[calc(100vh-2.5rem)]' : ''
+        }`}
       >
         <DialogHeader>
           <DialogTitle>LoRA Library</DialogTitle>

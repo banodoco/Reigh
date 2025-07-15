@@ -22,6 +22,7 @@ import { usePaneAwareModalStyle } from "@/shared/hooks/usePaneAwareModalStyle";
 import { useUserUIState } from "@/shared/hooks/useUserUIState";
 import { useCredits } from "@/shared/hooks/useCredits";
 import { supabase } from "@/integrations/supabase/client";
+import { useIsMobile } from "@/shared/hooks/use-mobile";
 import { 
   Select,
   SelectContent,
@@ -50,6 +51,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   initialTab = "generate-locally",
 }) => {
   const modalStyle = usePaneAwareModalStyle();
+  const isMobile = useIsMobile();
   const { apiKeys, isLoading: isLoadingKeys, saveApiKeys, isUpdating } = useApiKeys();
   const { 
     tokens, 
@@ -267,7 +269,9 @@ python headless.py --db-type supabase \\
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent 
         style={modalStyle}
-        className="sm:max-w-2xl overflow-y-auto"
+        className={`sm:max-w-2xl overflow-y-auto ${
+          isMobile ? 'mx-2 my-5 max-h-[calc(100vh-2.5rem)]' : ''
+        }`}
       >
         <DialogHeader className="relative">
           <DialogTitle className="text-2xl">App Settings</DialogTitle>

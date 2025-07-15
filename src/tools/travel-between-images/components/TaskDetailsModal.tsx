@@ -14,6 +14,7 @@ import { Badge } from '@/shared/components/ui/badge';
 import { Separator } from '@/shared/components/ui/separator';
 import { Checkbox } from '@/shared/components/ui/checkbox';
 import { usePaneAwareModalStyle } from '@/shared/hooks/usePaneAwareModalStyle';
+import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { Label } from '@/shared/components/ui/label';
 import { ScrollArea } from '@/shared/components/ui/scroll-area';
 import { Task } from '@/types/tasks';
@@ -31,6 +32,7 @@ interface TaskDetailsModalProps {
 
 const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, children, onApplySettings, onApplySettingsFromTask, onClose }) => {
   const modalStyle = usePaneAwareModalStyle();
+  const isMobile = useIsMobile();
   const [isOpen, setIsOpen] = useState(false);
   const [replaceImages, setReplaceImages] = useState(true);
   const [taskId, setTaskId] = useState<string | null>(null);
@@ -100,7 +102,9 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent 
         style={modalStyle}
-        className="sm:max-w-[700px] flex flex-col" 
+        className={`sm:max-w-[700px] flex flex-col ${
+          isMobile ? 'mx-2 my-5 max-h-[calc(100vh-2.5rem)]' : ''
+        }`}
         aria-describedby="task-details-description"
       >
         <DialogHeader className="flex-shrink-0">
