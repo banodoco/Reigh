@@ -8,10 +8,7 @@ interface UISettings {
     gens: boolean;
   };
   settingsModal: {
-    activeInstallTab: string;
-    computerType: string;
-    generationOnComputer: boolean;
-    generationInCloud: boolean;
+    activeTab: string;
   };
   videoTravelWidescreen: {
     enabled: boolean;
@@ -72,12 +69,7 @@ export function useUserUIState<K extends keyof UISettings>(
   // Debounced update function
   const update = (patch: Partial<UISettings[K]>) => {
     // Immediately update local state for responsive UI
-    setValue(prev => {
-      if (typeof prev === 'object' && prev !== null && typeof patch === 'object' && patch !== null) {
-        return { ...prev, ...patch } as UISettings[K];
-      }
-      return patch as UISettings[K];
-    });
+    setValue(prev => ({ ...prev, ...patch }));
 
     // Clear existing timeout
     if (debounceRef.current) {
@@ -102,12 +94,7 @@ export function useUserUIState<K extends keyof UISettings>(
         const currentKeyValue = currentUI[key] || fallback;
 
         // Merge the patch with current value
-        let updatedKeyValue: UISettings[K];
-        if (typeof currentKeyValue === 'object' && currentKeyValue !== null && typeof patch === 'object' && patch !== null) {
-          updatedKeyValue = { ...currentKeyValue, ...patch } as UISettings[K];
-        } else {
-          updatedKeyValue = patch as UISettings[K];
-        }
+        const updatedKeyValue = { ...currentKeyValue, ...patch };
         
         // Update the database
         const { error } = await supabase

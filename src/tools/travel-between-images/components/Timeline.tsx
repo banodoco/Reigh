@@ -117,35 +117,24 @@ const Timeline: React.FC<TimelineProps> = ({ images, frameSpacing, onImageReorde
   const [zoomLevel, setZoomLevel] = useState(1);
   const [zoomCenter, setZoomCenter] = useState(0);
 
-  // Persisted frame positions with mobile-friendly error handling
+  // Persisted frame positions
   const [framePositions, setFramePositions] = useState<Map<string, number>>(() => {
-    try {
-      const stored = localStorage.getItem(`timelineFramePositions_${shotId}`);
-      if (stored) {
-        try {
-          return new Map(JSON.parse(stored));
-        } catch (parseError) {
-          console.warn('[Timeline] Failed to parse frame positions from localStorage:', parseError);
-        }
+    const stored = localStorage.getItem(`timelineFramePositions_${shotId}`);
+    if (stored) {
+      try {
+        return new Map(JSON.parse(stored));
+      } catch {
+        /* ignore */
       }
-    } catch (storageError) {
-      console.warn('[Timeline] localStorage access failed, using default positions:', storageError);
     }
-    
-    // Fallback: create initial positions
     const initial = new Map<string, number>();
     images.forEach((img, idx) => initial.set(img.shotImageEntryId, idx * frameSpacing));
     return initial;
   });
 
-  // Save positions to localStorage whenever they change (with error handling)
+  // Save positions to localStorage whenever they change
   useEffect(() => {
-    try {
-      localStorage.setItem(`timelineFramePositions_${shotId}`, JSON.stringify(Array.from(framePositions.entries())));
-    } catch (error) {
-      console.warn('[Timeline] Failed to save frame positions to localStorage:', error);
-      // Note: Consider migrating to shot-specific database storage in the future for better mobile compatibility
-    }
+    localStorage.setItem(`timelineFramePositions_${shotId}`, JSON.stringify(Array.from(framePositions.entries())));
   }, [framePositions, shotId]);
 
   // Sync frame positions when image list changes

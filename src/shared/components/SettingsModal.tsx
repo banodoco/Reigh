@@ -70,36 +70,15 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const [isOpenAIKeyMasked, setIsOpenAIKeyMasked] = useState(false);
   const [isReplicateKeyMasked, setIsReplicateKeyMasked] = useState(false);
   
-  // Migrate Settings Modal preferences to database storage for better mobile persistence
-  const { value: settingsModalPrefs, update: updateSettingsModalPrefs, isLoading: isLoadingModalPrefs } = useUserUIState('settingsModal', {
-    activeInstallTab: 'need-install',
-    computerType: 'linux',
-    generationOnComputer: true,
-    generationInCloud: true,
-  });
-
-  // Extract individual values for easier use
-  const activeInstallTab = settingsModalPrefs.activeInstallTab;
-  const computerType = settingsModalPrefs.computerType;
-  const onComputerChecked = settingsModalPrefs.generationOnComputer;
-  const inCloudChecked = settingsModalPrefs.generationInCloud;
-
-  // Update functions
-  const setActiveInstallTab = (value: string) => {
-    updateSettingsModalPrefs({ activeInstallTab: value });
-  };
-
-  const setComputerType = (value: string) => {
-    updateSettingsModalPrefs({ computerType: value });
-  };
-
-  const setOnComputerChecked = (value: boolean) => {
-    updateSettingsModalPrefs({ generationOnComputer: value });
-  };
-
-  const setInCloudChecked = (value: boolean) => {
-    updateSettingsModalPrefs({ generationInCloud: value });
-  };
+  // Installation tab preference (persistent)
+  const [activeInstallTab, setActiveInstallTab] = usePersistentState<string>("settings-install-tab", "need-install");
+  
+  // Computer type preference (persistent)
+  const [computerType, setComputerType] = usePersistentState<string>("computer-type", "linux");
+  
+  // Generation method preferences (persistent)
+  const [onComputerChecked, setOnComputerChecked] = usePersistentState<boolean>("generation-on-computer", true);
+  const [inCloudChecked, setInCloudChecked] = usePersistentState<boolean>("generation-in-cloud", true);
 
   // Copy command feedback states
   const [copiedInstallCommand, setCopiedInstallCommand] = useState(false);

@@ -21,9 +21,6 @@ import EditTravelForm from "../components/EditTravelForm";
 import usePersistentState from "@/shared/hooks/usePersistentState";
 import { useApiKeys } from '@/shared/hooks/useApiKeys';
 import { PageFadeIn } from '@/shared/components/transitions';
-import { usePersistentToolState } from '@/shared/hooks/usePersistentToolState';
-import { EditTravelSettings } from '../settings';
-import { Alert, AlertDescription } from '@/shared/components/ui/alert';
 
 // Local definition for Json type
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
@@ -39,33 +36,12 @@ const EDIT_TRAVEL_FLUX_DEPTH_STRENGTH_KEY = 'editTravelFluxDepthStrength';
 const EDIT_TRAVEL_RECONSTRUCT_VIDEO_KEY = 'editTravelReconstructVideo';
 
 const EditTravelToolPage: React.FC = () => {
-  const { selectedProjectId } = useProject();
-  
-  // Migrate to database-based persistence for better mobile support
-  const [prompts, setPrompts] = useState<PromptEntry[]>([]);
-  const [imagesPerPrompt, setImagesPerPrompt] = useState<number>(1);
-  const [generationMode, setGenerationMode] = useState<'kontext' | 'flux'>('kontext');
-  const [fluxSoftEdgeStrength, setFluxSoftEdgeStrength] = useState<number>(0.2);
-  const [fluxDepthStrength, setFluxDepthStrength] = useState<number>(0.6);
-  const [reconstructVideo, setReconstructVideo] = useState<boolean>(true);
-  
-  // Set up persistent tool state with database storage
-  const { ready: settingsReady, markAsInteracted } = usePersistentToolState<EditTravelSettings>(
-    'edit-travel',
-    { projectId: selectedProjectId },
-    {
-      prompts: [prompts, setPrompts],
-      imagesPerPrompt: [imagesPerPrompt, setImagesPerPrompt],
-      generationMode: [generationMode, setGenerationMode],
-      fluxSoftEdgeStrength: [fluxSoftEdgeStrength, setFluxSoftEdgeStrength],
-      fluxDepthStrength: [fluxDepthStrength, setFluxDepthStrength],
-      reconstructVideo: [reconstructVideo, setReconstructVideo],
-    },
-    {
-      scope: 'project',
-      enabled: !!selectedProjectId
-    }
-  );
+  const [prompts, setPrompts] = usePersistentState<PromptEntry[]>('editTravelPrompts', []);
+  const [imagesPerPrompt, setImagesPerPrompt] = usePersistentState<number>('editTravelImagesPerPrompt', 1);
+  const [generationMode, setGenerationMode] = usePersistentState<'kontext' | 'flux'>('editTravelGenerationMode', 'kontext');
+  const [fluxSoftEdgeStrength, setFluxSoftEdgeStrength] = usePersistentState<number>('editTravelFluxSoftEdgeStrength', 0.2);
+  const [fluxDepthStrength, setFluxDepthStrength] = usePersistentState<number>('editTravelFluxDepthStrength', 0.6);
+  const [reconstructVideo, setReconstructVideo] = usePersistentState<boolean>('editTravelReconstructVideo', true);
 
   const [isPromptEditorOpen, setIsPromptEditorOpen] = useState(false);
   const [inputFile, setInputFile] = useState<File | null>(null);
@@ -83,6 +59,7 @@ const EditTravelToolPage: React.FC = () => {
   const kontextCurrentSubscriptionRef = useRef<any>(null);
   const reconstructionCancelRef = useRef(false);
   
+  const { selectedProjectId } = useProject();
   const queryClient = useQueryClient();
 
   const { data: shots } = useListShots(selectedProjectId);
@@ -104,8 +81,21 @@ const EditTravelToolPage: React.FC = () => {
     { path: "kudzueye/boreal-flux-dev-v2", scale: "0.06" }
   ];
 
-  // Note: Removed localStorage file loading for mobile compatibility
-  // Users will need to re-select files on page refresh
+  useEffect(() => {
+    const savedFileRaw = localStorage.getItem('editTravelInputFile');
+    if (savedFileRaw) {
+      try {
+        const savedFileData = JSON.parse(savedFileRaw);
+        if (savedFileData?.dataUrl && savedFileData?.name && savedFileData?.type) {
+          const restoredFile = dataURLtoFile(savedFileData.dataUrl, savedFileData.name, savedFileData.type);
+          if (restoredFile) setInputFile(restoredFile);
+        }
+      } catch (error) {
+        console.error("Error loading input file from localStorage:", error);
+        localStorage.removeItem('editTravelInputFile');
+      }
+    }
+  }, [selectedProjectId]);
 
   useEffect(() => {
     setShowPlaceholders(!isLoadingGenerations && (!generatedImages || generatedImages.length === 0));
@@ -157,39 +147,22 @@ const EditTravelToolPage: React.FC = () => {
   const handleFileChange = (files: File[]) => {
     const file = files?.[0] || null;
     setInputFile(file);
-    // Note: We no longer store files in localStorage for mobile compatibility
-    // Files will need to be re-selected on page refresh
+    if (file) {
+      fileToDataURL(file)
+        .then(dataUrl => {
+            const itemToStore = { dataUrl, name: file.name, type: file.type };
+            localStorage.setItem('editTravelInputFile', JSON.stringify(itemToStore));
+        })
+        .catch(error => {
+          console.error("Error processing file for localStorage:", error);
+          toast.error("Could not save input file locally.");
+        });
+    } else {
+      localStorage.removeItem('editTravelInputFile');
+    }
   };
   
-  const handleSavePrompts = (updatedPrompts: PromptEntry[]) => {
-    setPrompts(updatedPrompts);
-    markAsInteracted();
-  };
-  
-  const handleImagesPerPromptChange = (value: number) => {
-    setImagesPerPrompt(value);
-    markAsInteracted();
-  };
-  
-  const handleGenerationModeChange = (value: 'kontext' | 'flux') => {
-    setGenerationMode(value);
-    markAsInteracted();
-  };
-  
-  const handleFluxSoftEdgeStrengthChange = (value: number) => {
-    setFluxSoftEdgeStrength(value);
-    markAsInteracted();
-  };
-  
-  const handleFluxDepthStrengthChange = (value: number) => {
-    setFluxDepthStrength(value);
-    markAsInteracted();
-  };
-  
-  const handleReconstructVideoChange = (value: boolean) => {
-    setReconstructVideo(value);
-    markAsInteracted();
-  };
+  const handleSavePrompts = (updatedPrompts: PromptEntry[]) => setPrompts(updatedPrompts);
   
   const handleGenerate = async () => {
     if (!selectedProjectId || !inputFile) {
@@ -322,16 +295,16 @@ const EditTravelToolPage: React.FC = () => {
         videoDuration={videoDuration}
         effectiveFps={effectiveFps}
         reconstructVideo={reconstructVideo}
-        onReconstructVideoChange={handleReconstructVideoChange}
+        onReconstructVideoChange={setReconstructVideo}
         isClientSideReconstructing={isClientSideReconstructing}
         imagesPerPrompt={imagesPerPrompt}
-        onImagesPerPromptChange={handleImagesPerPromptChange}
+        onImagesPerPromptChange={setImagesPerPrompt}
         generationMode={generationMode}
-        onGenerationModeChange={handleGenerationModeChange}
+        onGenerationModeChange={setGenerationMode}
         fluxSoftEdgeStrength={fluxSoftEdgeStrength}
-        onFluxSoftEdgeStrengthChange={handleFluxSoftEdgeStrengthChange}
+        onFluxSoftEdgeStrengthChange={setFluxSoftEdgeStrength}
         fluxDepthStrength={fluxDepthStrength}
-        onFluxDepthStrengthChange={handleFluxDepthStrengthChange}
+        onFluxDepthStrengthChange={setFluxDepthStrength}
         onGenerate={handleGenerate}
         canGenerate={canGenerate}
         isCreatingTask={isCreatingTask}
