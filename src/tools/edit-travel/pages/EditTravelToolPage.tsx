@@ -18,12 +18,11 @@ import { useQueryClient } from "@tanstack/react-query";
 import { findClosestAspectRatio } from "@/shared/lib/aspectRatios";
 import ShotsPane from '@/shared/components/ShotsPane/ShotsPane';
 import EditTravelForm from "../components/EditTravelForm";
-import usePersistentState from "@/shared/hooks/usePersistentState";
-import { useApiKeys } from '@/shared/hooks/useApiKeys';
-import { PageFadeIn } from '@/shared/components/transitions';
 import { usePersistentToolState } from '@/shared/hooks/usePersistentToolState';
 import { ToolSettingsGate } from '@/shared/components/ToolSettingsGate';
 import { type EditTravelSettings } from '../settings';
+import { useApiKeys } from '@/shared/hooks/useApiKeys';
+import { PageFadeIn } from '@/shared/components/transitions';
 
 // Local definition for Json type
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
@@ -39,12 +38,12 @@ const EDIT_TRAVEL_FLUX_DEPTH_STRENGTH_KEY = 'editTravelFluxDepthStrength';
 const EDIT_TRAVEL_RECONSTRUCT_VIDEO_KEY = 'editTravelReconstructVideo';
 
 const EditTravelToolPage: React.FC = () => {
-  const [prompts, setPrompts] = usePersistentState<PromptEntry[]>('editTravelPrompts', []);
-  const [imagesPerPrompt, setImagesPerPrompt] = usePersistentState<number>('editTravelImagesPerPrompt', 1);
-  const [generationMode, setGenerationMode] = usePersistentState<'kontext' | 'flux'>('editTravelGenerationMode', 'kontext');
-  const [fluxSoftEdgeStrength, setFluxSoftEdgeStrength] = usePersistentState<number>('editTravelFluxSoftEdgeStrength', 0.2);
-  const [fluxDepthStrength, setFluxDepthStrength] = usePersistentState<number>('editTravelFluxDepthStrength', 0.6);
-  const [reconstructVideo, setReconstructVideo] = usePersistentState<boolean>('editTravelReconstructVideo', true);
+  const [prompts, setPrompts] = useState<PromptEntry[]>([]);
+  const [imagesPerPrompt, setImagesPerPrompt] = useState<number>(1);
+  const [generationMode, setGenerationMode] = useState<'kontext' | 'flux'>('kontext');
+  const [fluxSoftEdgeStrength, setFluxSoftEdgeStrength] = useState<number>(0.2);
+  const [fluxDepthStrength, setFluxDepthStrength] = useState<number>(0.6);
+  const [reconstructVideo, setReconstructVideo] = useState<boolean>(true);
 
   const [isPromptEditorOpen, setIsPromptEditorOpen] = useState(false);
   const [inputFile, setInputFile] = useState<File | null>(null);
@@ -264,97 +263,99 @@ const EditTravelToolPage: React.FC = () => {
     : [...(generatedImages || [])].reverse();
 
   return (
-    <PageFadeIn className="container mx-auto p-4 relative">
-      <header className="flex justify-between items-center mb-6 sticky top-0 bg-background/90 backdrop-blur-md py-4 z-10">
-        <h1 className="text-3xl font-bold">Edit Travel Tool</h1>
-        <Button variant="ghost" size="icon" onClick={() => setIsSettingsModalOpen(true)} className="h-10 w-10" title="Settings">
-          <Settings className="h-5 w-5" />
-        </Button>
-      </header>
+    <ToolSettingsGate ready={ready}>
+      <PageFadeIn className="container mx-auto p-4 relative">
+        <header className="flex justify-between items-center mb-6 sticky top-0 bg-background/90 backdrop-blur-md py-4 z-10">
+          <h1 className="text-3xl font-bold">Edit Travel Tool</h1>
+          <Button variant="ghost" size="icon" onClick={() => setIsSettingsModalOpen(true)} className="h-10 w-10" title="Settings">
+            <Settings className="h-5 w-5" />
+          </Button>
+        </header>
 
-      {!hasValidFalApiKey && (
-         <div className="mb-4 p-3 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 rounded-md flex items-center">
-            <AlertTriangle className="h-5 w-5 text-yellow-500 mr-2" />
-            <span>FAL API Key is not set. Please add it in Settings to enable generation.</span>
-        </div>
-      )}
-
-      <EditTravelForm
-        prompts={prompts}
-        onManagePrompts={() => setIsPromptEditorOpen(true)}
-        openaiApiKey={openaiApiKey}
-        falApiKey={falApiKey}
-        onFileChange={handleFileChange}
-        onFileRemove={() => setInputFile(null)}
-        inputFilePreviewUrl={inputFilePreviewUrl}
-        inputFileName={inputFile?.name}
-        isOverallGenerating={isOverallGenerating}
-        videoDuration={videoDuration}
-        effectiveFps={effectiveFps}
-        reconstructVideo={reconstructVideo}
-        onReconstructVideoChange={setReconstructVideo}
-        isClientSideReconstructing={isClientSideReconstructing}
-        imagesPerPrompt={imagesPerPrompt}
-        onImagesPerPromptChange={setImagesPerPrompt}
-        generationMode={generationMode}
-        onGenerationModeChange={setGenerationMode}
-        fluxSoftEdgeStrength={fluxSoftEdgeStrength}
-        onFluxSoftEdgeStrengthChange={setFluxSoftEdgeStrength}
-        fluxDepthStrength={fluxDepthStrength}
-        onFluxDepthStrengthChange={setFluxDepthStrength}
-        onGenerate={handleGenerate}
-        canGenerate={canGenerate}
-        isCreatingTask={isCreatingTask}
-        inputFile={inputFile}
-      />
-
-      {(isOverallGenerating) && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[10000]">
-            <div className="bg-background p-8 rounded-lg shadow-2xl w-full max-w-md text-center">
-              <h2 className="text-2xl font-semibold mb-4">
-                {isClientSideReconstructing ? "Reconstructing Video..." : "Generating..."}
-              </h2>
-              <p className="mb-4">
-                {isClientSideReconstructing 
-                    ? "Combining edited frames and audio. This may take some time." 
-                    : "Processing your request. This may take a moment."}
-              </p>
-              <div className="w-full bg-muted rounded-full h-2.5 mb-6 relative overflow-hidden">
-                <div className="bg-primary h-2.5 rounded-full absolute animate-ping" style={{ width: `100%`, animationDuration: '1.5s'}}/>
-              </div>
-              <Button variant="destructive" onClick={handleCancelGeneration}>Cancel Generation</Button>
-            </div>
+        {!hasValidFalApiKey && (
+           <div className="mb-4 p-3 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 rounded-md flex items-center">
+              <AlertTriangle className="h-5 w-5 text-yellow-500 mr-2" />
+              <span>FAL API Key is not set. Please add it in Settings to enable generation.</span>
           </div>
-      )}
-      
-      <ImageGallery 
-        images={imagesToShow}
-        onDelete={(id) => deleteGenerationMutation.mutate(id)} 
-        onAddToLastShot={handleAddImageToTargetShot}
-        allShots={shots || []}
-        lastShotId={lastAffectedShotId}
-        currentToolType="edit-travel" 
-        initialFilterState={true}
-      />
-      
-      <MemoizedShotsPane />
+        )}
 
-      {isPromptEditorOpen && (
-        <PromptEditorModal
-          isOpen={isPromptEditorOpen}
-          onClose={() => setIsPromptEditorOpen(false)}
+        <EditTravelForm
           prompts={prompts}
-          onSave={handleSavePrompts}
-          generatePromptId={generatePromptId}
-          apiKey={openaiApiKey || falApiKey || undefined}
+          onManagePrompts={() => setIsPromptEditorOpen(true)}
+          openaiApiKey={openaiApiKey}
+          falApiKey={falApiKey}
+          onFileChange={handleFileChange}
+          onFileRemove={() => setInputFile(null)}
+          inputFilePreviewUrl={inputFilePreviewUrl}
+          inputFileName={inputFile?.name}
+          isOverallGenerating={isOverallGenerating}
+          videoDuration={videoDuration}
+          effectiveFps={effectiveFps}
+          reconstructVideo={reconstructVideo}
+          onReconstructVideoChange={setReconstructVideo}
+          isClientSideReconstructing={isClientSideReconstructing}
+          imagesPerPrompt={imagesPerPrompt}
+          onImagesPerPromptChange={setImagesPerPrompt}
+          generationMode={generationMode}
+          onGenerationModeChange={setGenerationMode}
+          fluxSoftEdgeStrength={fluxSoftEdgeStrength}
+          onFluxSoftEdgeStrengthChange={setFluxSoftEdgeStrength}
+          fluxDepthStrength={fluxDepthStrength}
+          onFluxDepthStrengthChange={setFluxDepthStrength}
+          onGenerate={handleGenerate}
+          canGenerate={canGenerate}
+          isCreatingTask={isCreatingTask}
+          inputFile={inputFile}
         />
-      )}
-      
-      <SettingsModal
-        isOpen={isSettingsModalOpen}
-        onOpenChange={setIsSettingsModalOpen}
-      />
-    </PageFadeIn>
+
+        {(isOverallGenerating) && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[10000]">
+              <div className="bg-background p-8 rounded-lg shadow-2xl w-full max-w-md text-center">
+                <h2 className="text-2xl font-semibold mb-4">
+                  {isClientSideReconstructing ? "Reconstructing Video..." : "Generating..."}
+                </h2>
+                <p className="mb-4">
+                  {isClientSideReconstructing 
+                      ? "Combining edited frames and audio. This may take some time." 
+                      : "Processing your request. This may take a moment."}
+                </p>
+                <div className="w-full bg-muted rounded-full h-2.5 mb-6 relative overflow-hidden">
+                  <div className="bg-primary h-2.5 rounded-full absolute animate-ping" style={{ width: `100%`, animationDuration: '1.5s'}}/>
+                </div>
+                <Button variant="destructive" onClick={handleCancelGeneration}>Cancel Generation</Button>
+              </div>
+            </div>
+        )}
+        
+        <ImageGallery 
+          images={imagesToShow}
+          onDelete={(id) => deleteGenerationMutation.mutate(id)} 
+          onAddToLastShot={handleAddImageToTargetShot}
+          allShots={shots || []}
+          lastShotId={lastAffectedShotId}
+          currentToolType="edit-travel" 
+          initialFilterState={true}
+        />
+        
+        <MemoizedShotsPane />
+
+        {isPromptEditorOpen && (
+          <PromptEditorModal
+            isOpen={isPromptEditorOpen}
+            onClose={() => setIsPromptEditorOpen(false)}
+            prompts={prompts}
+            onSave={handleSavePrompts}
+            generatePromptId={generatePromptId}
+            apiKey={openaiApiKey || falApiKey || undefined}
+          />
+        )}
+        
+        <SettingsModal
+          isOpen={isSettingsModalOpen}
+          onOpenChange={setIsSettingsModalOpen}
+        />
+      </PageFadeIn>
+    </ToolSettingsGate>
   );
 };
 

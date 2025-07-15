@@ -15,6 +15,7 @@ import {
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import MediaLightbox from "@/shared/components/MediaLightbox";
+import { usePersistentToolState } from '@/shared/hooks/usePersistentToolState';
 
 // TimelineItemProps defines the props for individual draggable timeline thumbnail items
 interface TimelineItemProps {
@@ -117,43 +118,54 @@ const Timeline: React.FC<TimelineProps> = ({ images, frameSpacing, onImageReorde
   const [zoomLevel, setZoomLevel] = useState(1);
   const [zoomCenter, setZoomCenter] = useState(0);
 
-  // Persisted frame positions
-  const [framePositions, setFramePositions] = useState<Map<string, number>>(() => {
-    const stored = localStorage.getItem(`timelineFramePositions_${shotId}`);
-    if (stored) {
-      try {
-        return new Map(JSON.parse(stored));
-      } catch {
-        /* ignore */
-      }
-    }
-    const initial = new Map<string, number>();
-    images.forEach((img, idx) => initial.set(img.shotImageEntryId, idx * frameSpacing));
+  // Add before the usePersistentToolState call:
+  const [framePositionsArray, setFramePositionsArray] = useState<[string, number][]>(() => {
+    const initial: [string, number][] = [];
+    images.forEach((img, idx) => initial.push([img.shotImageEntryId, idx * frameSpacing]));
     return initial;
   });
 
-  // Save positions to localStorage whenever they change
-  useEffect(() => {
-    localStorage.setItem(`timelineFramePositions_${shotId}`, JSON.stringify(Array.from(framePositions.entries())));
-  }, [framePositions, shotId]);
+  // Convert array to Map for easier usage
+  const framePositions = new Map(framePositionsArray);
+  const setFramePositions = (newMap: Map<string, number>) => {
+    setFramePositionsArray(Array.from(newMap.entries()));
+  };
+
+  // Update the usePersistentToolState to use the array:
+  const { ready } = usePersistentToolState<{ framePositions: [string, number][] }>(
+    'travel-between-images',
+    { shotId },
+    {
+      framePositions: [framePositionsArray, setFramePositionsArray],
+    },
+    { scope: 'shot' }
+  );
 
   // Sync frame positions when image list changes
   useEffect(() => {
-    setFramePositions(prev => {
-      const map = new Map(prev);
-      // Ensure every image has a position
-      images.forEach((img, idx) => {
-        if (!map.has(img.shotImageEntryId)) {
-          map.set(img.shotImageEntryId, idx * frameSpacing);
-        }
-      });
-      // Remove stale entries
-      [...map.keys()].forEach(key => {
-        if (!images.some(img => img.shotImageEntryId === key)) map.delete(key);
-      });
-      return map;
+    const map = new Map(framePositions);
+    let changed = false;
+    
+    // Ensure every image has a position
+    images.forEach((img, idx) => {
+      if (!map.has(img.shotImageEntryId)) {
+        map.set(img.shotImageEntryId, idx * frameSpacing);
+        changed = true;
+      }
     });
-  }, [images, frameSpacing]);
+    
+    // Remove stale entries
+    [...map.keys()].forEach(key => {
+      if (!images.some(img => img.shotImageEntryId === key)) {
+        map.delete(key);
+        changed = true;
+      }
+    });
+    
+    if (changed) {
+      setFramePositions(map);
+    }
+  }, [images, frameSpacing, framePositions, setFramePositions]);
 
   // ----- Timeline dimension calculations -----
   const staticMaxFrame = Math.max(...Array.from(framePositions.values()));
@@ -264,16 +276,15 @@ const Timeline: React.FC<TimelineProps> = ({ images, frameSpacing, onImageReorde
       setActiveId(null);
       return;
     }
-    setFramePositions(prev => {
-      const map = new Map(prev);
-      map.set(event.active.id, dragFramePosition);
-      return map;
-    });
+    
+    const map = new Map(framePositions);
+    map.set(event.active.id, dragFramePosition);
+    setFramePositions(map);
 
     const newOrder = [...images]
       .sort((a, b) => {
-        const fa = framePositions.get(a.shotImageEntryId) ?? 0;
-        const fb = framePositions.get(b.shotImageEntryId) ?? 0;
+        const fa = map.get(a.shotImageEntryId) ?? 0;
+        const fb = map.get(b.shotImageEntryId) ?? 0;
         return a.shotImageEntryId === event.active.id ? dragFramePosition - fb : fa - fb;
       })
       .map(img => img.shotImageEntryId);

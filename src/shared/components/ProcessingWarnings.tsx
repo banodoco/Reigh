@@ -4,7 +4,7 @@ import { Alert, AlertDescription } from '@/shared/components/ui/alert';
 import { Button } from '@/shared/components/ui/button';
 import { useCredits } from '@/shared/hooks/useCredits';
 import { useApiTokens } from '@/shared/hooks/useApiTokens';
-import usePersistentState from '@/shared/hooks/usePersistentState';
+import { useUserUIState } from '@/shared/hooks/useUserUIState';
 
 interface ProcessingWarningsProps {
   onOpenSettings: () => void;
@@ -13,8 +13,15 @@ interface ProcessingWarningsProps {
 export const GlobalProcessingWarning: React.FC<ProcessingWarningsProps> = ({ onOpenSettings }) => {
   const { balance, isLoadingBalance } = useCredits();
   const { tokens, isLoading: isLoadingTokens } = useApiTokens();
-  const [inCloudChecked] = usePersistentState<boolean>("generation-in-cloud", true);
-  const [onComputerChecked] = usePersistentState<boolean>("generation-on-computer", true);
+  const { value: settingsModalState } = useUserUIState('settingsModal', {
+    activeInstallTab: "need-install",
+    computerType: "linux", 
+    onComputerChecked: true,
+    inCloudChecked: true
+  });
+
+  const inCloudChecked = settingsModalState.inCloudChecked;
+  const onComputerChecked = settingsModalState.onComputerChecked;
   
   const hasCredits = balance && balance.currentBalance > 0;
   const hasValidToken = tokens.length > 0;
@@ -85,7 +92,14 @@ export const GlobalProcessingWarning: React.FC<ProcessingWarningsProps> = ({ onO
 export const TasksPaneProcessingWarning: React.FC<ProcessingWarningsProps> = ({ onOpenSettings }) => {
   const { balance } = useCredits();
   const { tokens } = useApiTokens();
-  const [inCloudChecked] = usePersistentState<boolean>("generation-in-cloud", true);
+  const { value: tasksPaneSettingsState } = useUserUIState('settingsModal', {
+    activeInstallTab: "need-install",
+    computerType: "linux", 
+    onComputerChecked: true,
+    inCloudChecked: true
+  });
+
+  const inCloudChecked = tasksPaneSettingsState.inCloudChecked;
   
   const hasCredits = balance && balance.currentBalance > 0;
   const hasValidToken = tokens.length > 0;
