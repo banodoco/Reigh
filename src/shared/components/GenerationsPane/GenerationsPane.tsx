@@ -15,7 +15,7 @@ import PaneControlTab from '../PaneControlTab';
 import { Skeleton } from '@/shared/components/ui/skeleton';
 
 const DEFAULT_PANE_HEIGHT = 350;
-const GENERATIONS_PER_PAGE = 24;
+const GENERATIONS_PER_PAGE = 45;
 
 export const GenerationsPane: React.FC = () => {
   const { selectedProjectId } = useProject();

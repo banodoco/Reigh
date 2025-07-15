@@ -9,7 +9,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
-const GENERATIONS_PER_PAGE = 48; // Show more on the full page
+const GENERATIONS_PER_PAGE = 45; // 45 items per page for consistency
 
 const GenerationsPage: React.FC = () => {
   const { selectedProjectId } = useProject();

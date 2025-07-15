@@ -98,7 +98,7 @@ async function createGeneration(params: {
   return data;
 }
 
-export function useGenerations(projectId: string | null, page: number = 1, limit: number = 24) {
+export function useGenerations(projectId: string | null, page: number = 1, limit: number = 1000) {
   return useQuery<GeneratedImageWithMetadata[], Error>({
     queryKey: ['generations', projectId],
     staleTime: 30 * 1000,

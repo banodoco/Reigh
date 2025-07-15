@@ -199,8 +199,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
   // State for the new media type filter
   const [mediaTypeFilter, setMediaTypeFilter] = useState<'all' | 'image' | 'video'>(initialMediaTypeFilter);
 
-  // Pagination state (48 items per page)
-  const ITEMS_PER_PAGE = 48;
+  // Pagination state (45 items per page)
+  const ITEMS_PER_PAGE = 45;
   const [page, setPage] = React.useState(0);
 
   // When filters change, reset to first page
