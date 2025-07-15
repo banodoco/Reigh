@@ -267,7 +267,7 @@ python headless.py --db-type supabase \\
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent 
         style={modalStyle}
-        className="sm:max-w-2xl max-h-[90vh] overflow-y-auto"
+        className="sm:max-w-2xl overflow-y-auto"
       >
         <DialogHeader className="relative">
           <DialogTitle className="text-2xl">App Settings</DialogTitle>

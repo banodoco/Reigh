@@ -11,16 +11,16 @@ export const usePaneAwareModalStyle = () => {
   } = usePanes();
 
   const modalStyle = useMemo(() => {
-    // Only adjust height for bottom pane - modal should be centered on full screen
+    // Only adjust maxHeight for bottom pane - modal should be centered on full screen
     // and appear ABOVE all panes (z-index handled by dialog component)
-    const dynamicHeight = isGenerationsPaneLocked 
+    // Use maxHeight instead of height so modal can shrink with less content
+    const dynamicMaxHeight = isGenerationsPaneLocked 
       ? `calc(100vh - ${generationsPaneHeight + VERTICAL_PADDING_PX}px)` 
       : `calc(100vh - ${VERTICAL_PADDING_PX}px)`;
 
     return {
       // No transform adjustments - let the default dialog centering work
-      height: dynamicHeight,
-      maxHeight: dynamicHeight,
+      maxHeight: dynamicMaxHeight,
     };
   }, [isGenerationsPaneLocked, generationsPaneHeight]);
 

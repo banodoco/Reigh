@@ -100,7 +100,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent 
         style={modalStyle}
-        className="sm:max-w-[700px] max-h-[80vh] flex flex-col" 
+        className="sm:max-w-[700px] flex flex-col" 
         aria-describedby="task-details-description"
       >
         <DialogHeader className="flex-shrink-0">
