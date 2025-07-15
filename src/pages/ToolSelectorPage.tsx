@@ -109,7 +109,7 @@ const ToolCard = ({ item, isSquare = false, index, isVisible }: { item: any, isS
   if (!shouldShow) return null;
 
   const content = (
-    <div className={`wes-tool-card relative overflow-hidden ${isSquare ? 'h-full !p-0' : 'h-32'} wes-polaroid ${isComingSoon ? 'opacity-30' : ''}`}>
+    <div className={`wes-tool-card relative overflow-hidden ${isSquare ? 'h-full !p-0' : 'h-32 sm:h-32'} wes-polaroid ${isComingSoon ? 'opacity-30' : ''}`}>
       {/* Coming Soon Badge */}
       {isComingSoon && (
         <div className={`absolute ${isSquare ? 'top-1 right-2' : 'top-2 right-2'} z-10 ${isWiggling ? 'animate-subtle-wiggle' : ''}`}>
@@ -121,49 +121,49 @@ const ToolCard = ({ item, isSquare = false, index, isVisible }: { item: any, isS
 
       {/* Horizontal layout for Process tools */}
       {!isSquare ? (
-        <div className="flex items-center h-full p-4 sm:p-6 relative">
-          {/* Large subtle number in background */}
+        <div className="flex items-center h-full p-3 sm:p-4 lg:p-6 relative">
+          {/* Large subtle number in background - hidden on mobile */}
           {index !== undefined && (
-            <div className="absolute right-6 top-1/2 -translate-y-1/2 -translate-y-5 hidden sm:block">
-              <span className="font-playfair text-[10.5rem] font-bold text-wes-vintage-gold/50 select-none block w-24 text-center">
+            <div className="absolute right-4 lg:right-6 top-1/2 -translate-y-1/2 -translate-y-5 hidden lg:block">
+              <span className="font-playfair text-[8rem] lg:text-[10.5rem] font-bold text-wes-vintage-gold/50 select-none block w-20 lg:w-24 text-center">
                 {index + 1}
               </span>
             </div>
           )}
           
           {/* Icon */}
-          <div className="flex-shrink-0 mr-4 sm:mr-6 relative z-10">
-            <div className={`w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br ${item.gradient} rounded-2xl flex items-center justify-center shadow-wes-deep ${!isComingSoon ? 'group-hover:shadow-wes-hover group-hover:scale-110' : ''} transition-all duration-700`}>
-              <item.icon className="w-8 h-8 sm:w-10 sm:h-10 text-white drop-shadow-lg" />
+          <div className="flex-shrink-0 mr-3 sm:mr-4 lg:mr-6 relative z-10">
+            <div className={`w-12 h-12 sm:w-16 sm:h-16 lg:w-20 lg:h-20 bg-gradient-to-br ${item.gradient} rounded-xl sm:rounded-2xl flex items-center justify-center shadow-wes-deep ${!isComingSoon ? 'group-hover:shadow-wes-hover group-hover:scale-110' : ''} transition-all duration-700`}>
+              <item.icon className="w-6 h-6 sm:w-8 sm:h-8 lg:w-10 lg:h-10 text-white drop-shadow-lg" />
             </div>
           </div>
           
           {/* Text content */}
-          <div className="flex-1 relative z-10">
-            <h3 className={`font-playfair text-xl sm:text-2xl font-bold text-primary mb-1 ${!isComingSoon ? 'group-hover:text-primary/80' : ''} transition-colors duration-300`}>
+          <div className="flex-1 relative z-10 min-w-0">
+            <h3 className={`font-playfair text-lg sm:text-xl lg:text-2xl font-bold text-primary mb-1 ${!isComingSoon ? 'group-hover:text-primary/80' : ''} transition-colors duration-300 leading-tight`}>
               {item.name}
             </h3>
-            <p className="font-inter text-sm text-muted-foreground leading-relaxed">
+            <p className="font-inter text-xs sm:text-sm text-muted-foreground leading-relaxed pr-2">
               {item.description}
             </p>
           </div>
         </div>
       ) : (
-        /* Square layout for Assistant tools */
-        <div className="p-6 h-full flex flex-col">
+        /* Square layout for Assistant tools - Responsive padding and sizing */
+        <div className="p-4 sm:p-5 lg:p-6 h-full flex flex-col">
           {/* Tool Header without icon */}
-          <div className="wes-symmetry mb-3 relative">
+          <div className="wes-symmetry mb-2 sm:mb-3 relative">
             <div className="">
-              <h3 className={`font-playfair text-2xl font-bold text-primary mb-2 ${!isComingSoon ? 'group-hover:text-primary/80' : ''} transition-colors duration-300 text-shadow-vintage text-center leading-tight whitespace-pre-line`}>
+              <h3 className={`font-playfair text-lg sm:text-xl lg:text-2xl font-bold text-primary mb-2 ${!isComingSoon ? 'group-hover:text-primary/80' : ''} transition-colors duration-300 text-shadow-vintage text-center leading-tight whitespace-pre-line`}>
                 {item.name}
               </h3>
-              <div className={`w-16 h-1 bg-gradient-to-r from-${item.accent} to-wes-vintage-gold rounded-full mx-auto ${!isComingSoon ? 'group-hover:w-24' : ''} transition-all duration-700`}></div>
+              <div className={`w-12 sm:w-16 h-1 bg-gradient-to-r from-${item.accent} to-wes-vintage-gold rounded-full mx-auto ${!isComingSoon ? 'group-hover:w-16 sm:group-hover:w-24' : ''} transition-all duration-700`}></div>
             </div>
           </div>
 
           {/* Description */}
           <div className="flex-1">
-            <p className="font-inter text-muted-foreground leading-relaxed text-center text-sm">
+            <p className="font-inter text-muted-foreground leading-relaxed text-center text-xs sm:text-sm">
               {item.description}
             </p>
           </div>
@@ -171,8 +171,8 @@ const ToolCard = ({ item, isSquare = false, index, isVisible }: { item: any, isS
       )}
 
       {/* Decorative Elements */}
-      <div className="absolute top-4 right-4 opacity-20">
-        <Sparkles className="w-5 h-5 text-primary animate-sway" />
+      <div className="absolute top-3 sm:top-4 right-3 sm:right-4 opacity-20">
+        <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-primary animate-sway" />
       </div>
 
       {/* Hover shimmer effect (only for active tools) */}
@@ -186,7 +186,7 @@ const ToolCard = ({ item, isSquare = false, index, isVisible }: { item: any, isS
     return (
       <div className="relative">
         {/* Stable hover area to prevent flicker */}
-        <div className="absolute inset-0 -m-4 z-0 pointer-events-none" />
+        <div className="absolute inset-0 -m-2 sm:-m-4 z-0 pointer-events-none" />
         <button
           type="button"
           className="block wes-corners cursor-pointer relative z-10 w-full text-left"
@@ -208,7 +208,7 @@ const ToolCard = ({ item, isSquare = false, index, isVisible }: { item: any, isS
       }}
     >
       {/* Stable hover area to prevent flicker */}
-      <div className="absolute inset-0 -m-4 z-0 pointer-events-none" />
+      <div className="absolute inset-0 -m-2 sm:-m-4 z-0 pointer-events-none" />
       <div className="block wes-corners relative z-10">
         {content}
       </div>
@@ -242,12 +242,12 @@ const ToolSelectorPage: React.FC = () => {
       <div className="absolute top-40 right-20 w-24 h-24 bg-wes-yellow/15 rounded-full blur-2xl animate-parallax-float" style={{ animationDelay: '2s' }}></div>
       <div className="absolute bottom-20 left-1/4 w-40 h-40 bg-wes-lavender/10 rounded-full blur-3xl animate-parallax-float" style={{ animationDelay: '4s' }}></div>
       
-      <div className="container mx-auto px-4 pt-4 pb-16 relative z-10">
-        {/* Two Column Layout */}
-        <div className="flex flex-col lg:flex-row gap-8 max-w-7xl mx-auto">
-          {/* Process Column (2/3 width) */}
-          <div className="lg:w-2/3">
-            <div className="flex flex-col gap-4 mt-4">
+      <div className="container mx-auto px-3 sm:px-4 pt-3 sm:pt-4 pb-12 sm:pb-16 relative z-10">
+        {/* Responsive Layout */}
+        <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 lg:gap-8 max-w-7xl mx-auto">
+          {/* Process Column - Full width on mobile, 2/3 on desktop */}
+          <div className="w-full lg:w-2/3">
+            <div className="flex flex-col gap-3 sm:gap-4 mt-2 sm:mt-4">
               {processTools.map((tool, index) => (
                 <ToolCard
                   key={tool.id}
@@ -259,9 +259,10 @@ const ToolSelectorPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Assistant Tools Column (1/3 width) */}
-          <div className="lg:w-1/3">
-            <div className="grid grid-cols-2 gap-4 mt-4">
+          {/* Assistant Tools Column - Full width on mobile, 1/3 on desktop */}
+          <div className="w-full lg:w-1/3">
+            {/* Mobile: Single column, Tablet: 2 columns, Desktop: 2 columns */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mt-2 sm:mt-4">
               {assistantTools.map((tool, index) => (
                 <ToolCard
                   key={tool.id}
@@ -274,20 +275,20 @@ const ToolSelectorPage: React.FC = () => {
           </div>
         </div>
         
-        {/* Enhanced footer decorative line */}
-        <div className="mt-32 flex items-center justify-center">
-          <div className="flex items-center space-x-6">
-            <div className="w-32 h-px bg-gradient-to-r from-transparent to-wes-vintage-gold/60"></div>
-            <Star className="w-3 h-3 text-wes-vintage-gold animate-rotate-slow" />
-            <div className="w-4 h-4 bg-wes-dusty-blue rounded-full animate-vintage-pulse wes-badge"></div>
-            <Gem className="w-4 h-4 text-wes-coral animate-bounce-gentle" />
-            <div className="w-20 h-px bg-wes-vintage-gold/60"></div>
-            <div className="text-wes-vintage-gold text-xl animate-sway">❋</div>
-            <div className="w-20 h-px bg-wes-vintage-gold/60"></div>
-            <Gem className="w-4 h-4 text-wes-mint animate-bounce-gentle" style={{ animationDelay: '1s' }} />
-            <div className="w-4 h-4 bg-wes-pink rounded-full animate-vintage-pulse wes-badge" style={{ animationDelay: '2s' }}></div>
-            <Star className="w-3 h-3 text-wes-vintage-gold animate-rotate-slow" style={{ animationDelay: '1s' }} />
-            <div className="w-32 h-px bg-gradient-to-l from-transparent to-wes-vintage-gold/60"></div>
+        {/* Enhanced footer decorative line - Responsive */}
+        <div className="mt-16 sm:mt-24 lg:mt-32 flex items-center justify-center">
+          <div className="flex items-center space-x-3 sm:space-x-6">
+            <div className="w-16 sm:w-32 h-px bg-gradient-to-r from-transparent to-wes-vintage-gold/60"></div>
+            <Star className="w-2 h-2 sm:w-3 sm:h-3 text-wes-vintage-gold animate-rotate-slow" />
+            <div className="w-3 h-3 sm:w-4 sm:h-4 bg-wes-dusty-blue rounded-full animate-vintage-pulse wes-badge"></div>
+            <Gem className="w-3 h-3 sm:w-4 sm:h-4 text-wes-coral animate-bounce-gentle" />
+            <div className="w-12 sm:w-20 h-px bg-wes-vintage-gold/60"></div>
+            <div className="text-wes-vintage-gold text-lg sm:text-xl animate-sway">❋</div>
+            <div className="w-12 sm:w-20 h-px bg-wes-vintage-gold/60"></div>
+            <Gem className="w-3 h-3 sm:w-4 sm:h-4 text-wes-mint animate-bounce-gentle" style={{ animationDelay: '1s' }} />
+            <div className="w-3 h-3 sm:w-4 sm:h-4 bg-wes-pink rounded-full animate-vintage-pulse wes-badge" style={{ animationDelay: '2s' }}></div>
+            <Star className="w-2 h-2 sm:w-3 sm:h-3 text-wes-vintage-gold animate-rotate-slow" style={{ animationDelay: '1s' }} />
+            <div className="w-16 sm:w-32 h-px bg-gradient-to-l from-transparent to-wes-vintage-gold/60"></div>
           </div>
         </div>
       </div>

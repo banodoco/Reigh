@@ -47,7 +47,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
 
   return (
     <>
-      <header className="wes-header sticky top-0 z-50 w-full relative overflow-hidden">
+      <header className="wes-header sticky top-0 z-50 w-full relative overflow-hidden lg:p-0" style={{ padding: 0, margin: 0 }}>
         {/* Enhanced background patterns */}
         <div className="wes-deco-pattern absolute inset-0 opacity-20"></div>
         <div className="absolute inset-0 wes-diamond-pattern opacity-10"></div>
@@ -62,8 +62,9 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
         <div className="absolute top-2 left-4 text-wes-vintage-gold text-xs animate-sway">❋</div>
         <div className="absolute top-2 right-4 text-wes-coral text-xs animate-sway" style={{ animationDelay: '1s' }}>◆</div>
         
+        {/* Desktop Layout (lg and up) */}
         <div 
-          className="container flex items-center justify-between transition-all duration-300 ease-in-out relative z-10 h-24"
+          className="hidden lg:flex container items-center justify-between transition-all duration-300 ease-in-out relative z-10 h-24"
           style={{
             paddingRight: contentOffsetRight ? `${contentOffsetRight}px` : undefined,
             paddingLeft: contentOffsetLeft ? `${contentOffsetLeft}px` : undefined,
@@ -72,7 +73,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
           {/* Left side - Brand + Project Selector */}
           <div className="flex items-center space-x-6">
             {/* Brand */}
-            <Link to={session ? "/tools" : "/"} className="group flex items-center space-x-4 wes-nav-item relative">
+            <Link to={session ? "/tools" : "/"} className="group flex items-center space-x-4 relative">
               <div className="relative">
                 <div className="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-wes-pink via-wes-lavender to-wes-dusty-blue rounded-2xl border-3 border-wes-vintage-gold/40 shadow-wes-vintage group-hover:shadow-wes-hover transition-all duration-500 wes-badge">
                   <Palette className="h-8 w-8 text-white group-hover:rotate-12 transition-transform duration-500 drop-shadow-lg" />
@@ -215,6 +216,138 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                 <Star className="w-2 h-2 text-wes-coral animate-rotate-slow opacity-60" />
               </div>
             </Button>
+          </div>
+        </div>
+
+        {/* Mobile Layout (below lg) */}
+        <div 
+          className="lg:hidden w-full"
+          style={{
+            position: 'relative',
+            zIndex: 10,
+            padding: 0,
+            margin: 0,
+            paddingTop: '8px',
+            paddingRight: contentOffsetRight ? `${contentOffsetRight}px` : undefined,
+            paddingLeft: contentOffsetLeft ? `${contentOffsetLeft}px` : undefined,
+          }}
+        >
+          {/* Top row - Brand + Project Selector */}
+                      <div className="flex items-center justify-between h-12 w-full" style={{ paddingLeft: '16px', paddingRight: '16px' }}>
+            {/* Brand - Left side (text only on mobile) */}
+            <Link to={session ? "/tools" : "/"} className="group relative">
+              <div className="relative">
+                <span className="font-playfair text-xl font-bold tracking-wide text-primary text-shadow-vintage group-hover:animate-vintage-glow transition-all duration-300">
+                  Reigh
+                </span>
+                <div className="absolute -top-1 -right-1">
+                  <Star className="w-2 h-2 text-wes-vintage-gold animate-rotate-slow opacity-50" />
+                </div>
+              </div>
+            </Link>
+
+            {/* Project Selector - Right side (wider now) */}
+            <div className="flex-1 ml-4">
+              {isLoadingProjects && projects.length === 0 ? (
+                <div className="text-center relative">
+                  <div className="animate-vintage-pulse flex items-center justify-center space-x-2 p-2 wes-vintage-card">
+                    <div className="w-4 h-4 bg-wes-vintage-gold rounded-full flex items-center justify-center">
+                      <Sparkles className="h-2 w-2 text-primary animate-rotate-slow" />
+                    </div>
+                    <span className="font-crimson text-sm text-primary text-shadow-vintage">Loading...</span>
+                  </div>
+                </div>
+              ) : projects.length === 0 && !isLoadingProjects ? (
+                <div className="text-center">
+                  <div className="wes-vintage-card p-2 wes-stamp">
+                    <p className="font-inter text-xs text-muted-foreground">No projects</p>
+                  </div>
+                </div>
+              ) : (
+                <Select 
+                  value={selectedProjectId || ''} 
+                  onValueChange={handleProjectChange}
+                  disabled={isLoadingProjects || projects.length === 0}
+                >
+                  <SelectTrigger className="w-full wes-select border-2 border-wes-vintage-gold/30 bg-white/95 font-inter text-xs shadow-wes-vintage hover:shadow-wes-hover transition-all duration-500 wes-ornate-frame h-10">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-6 h-6 bg-gradient-to-br from-wes-vintage-gold to-wes-coral rounded-md flex items-center justify-center">
+                        <Palette className="h-3 w-3 text-white" />
+                      </div>
+                      <SelectValue placeholder="Select project" className="font-crimson text-primary" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent className="wes-vintage-card wes-ornate-frame border-2 border-wes-vintage-gold/30 shadow-wes-deep">
+                    {projects.map(project => (
+                      <SelectItem 
+                        key={project.id} 
+                        value={project.id}
+                        className="font-inter hover:bg-wes-vintage-gold/20 transition-colors duration-300 p-3 wes-corners"
+                      >
+                        <div className="wes-symmetry">
+                          <div className="flex items-center space-x-2">
+                            <div className="w-4 h-4 bg-gradient-to-br from-wes-mint to-wes-sage rounded-full flex items-center justify-center">
+                              <Star className="h-2 w-2 text-white" />
+                            </div>
+                            <span className="font-crimson font-medium text-primary text-sm">{project.name}</span>
+                          </div>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+          </div>
+
+          {/* Bottom row - App Settings + Action Buttons */}
+          <div className="flex items-center justify-between h-14 w-full border-t border-wes-vintage-gold/20" style={{ paddingLeft: '16px', paddingRight: '16px' }}>
+            {/* App Settings - Left side (aligned with Reigh text) */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onOpenSettings}
+              className="h-10 w-10 wes-button no-sweep bg-gradient-to-br from-wes-dusty-blue to-wes-lavender border-2 border-wes-vintage-gold/40 hover:from-wes-dusty-blue-dark hover:to-wes-lavender-dark shadow-wes-vintage hover:shadow-wes-hover wes-viewfinder group relative overflow-hidden"
+              title="App Settings"
+            >
+              <div className="absolute inset-0 bg-film-grain opacity-20 animate-film-grain"></div>
+              <Settings className="h-4 w-4 text-white relative z-10 transition-transform group-hover:animate-spin" />
+              <div className="absolute -top-1 -right-1">
+                <Crown className="w-2 h-2 text-wes-vintage-gold animate-bounce-gentle opacity-80" />
+              </div>
+            </Button>
+
+            {/* Action Buttons - Right side */}
+            <div className="flex items-center space-x-2">
+              {selectedProjectId && projects.length > 0 && ( 
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsProjectSettingsModalOpen(true)}
+                  className="h-10 w-10 wes-button no-sweep bg-gradient-to-br from-wes-coral to-wes-salmon border-2 border-wes-vintage-gold/30 hover:from-wes-coral-dark hover:to-wes-salmon-dark shadow-wes-vintage hover:shadow-wes-hover wes-stamp group relative"
+                  title="Project settings"
+                  disabled={!selectedProject}
+                >
+                  <Wrench className="h-4 w-4 text-white transition-all duration-500 group-hover:scale-110 group-hover:animate-wrench-turn" />
+                  <div className="absolute -top-1 -right-1">
+                    <Sparkles className="w-2 h-2 text-wes-vintage-gold animate-rotate-slow opacity-70" />
+                  </div>
+                </Button>
+              )}
+              
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => setIsCreateProjectModalOpen(true)} 
+                className="h-10 w-10 wes-button no-sweep bg-gradient-to-br from-wes-yellow to-wes-salmon border-2 border-wes-vintage-gold/30 hover:from-wes-yellow-dark hover:to-wes-salmon shadow-wes-vintage hover:shadow-wes-hover group wes-viewfinder"
+                title="Create new project"
+              >
+                <PlusCircle className="h-4 w-4 text-white transition-all duration-500 group-hover:animate-bubble-pop" />
+                <div className="absolute -top-1 -left-1">
+                  <Star className="w-2 h-2 text-wes-vintage-gold animate-rotate-slow" />
+                </div>
+              </Button>
+            </div>
           </div>
         </div>
         
