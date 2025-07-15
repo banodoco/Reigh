@@ -19,6 +19,8 @@ import { fetchWithAuth } from '@/lib/api';
 import { useCreateTask, useListTasks } from "@/shared/hooks/useTasks";
 import { PageFadeIn } from '@/shared/components/transitions';
 import { useSearchParams } from 'react-router-dom';
+import { usePersistentToolState } from '@/shared/hooks/usePersistentToolState';
+import { defaultImageGenerationSettings } from '../settings';
 
 // Remove unnecessary environment detection - tool should work in all environments
 
@@ -407,6 +409,22 @@ const ImageGenerationToolPage: React.FC = () => {
     ? placeholderImages 
     : [...(generatedImagesData || [])];
 
+  const { ready, markAsInteracted } = usePersistentToolState<ImageGenerationSettings>(
+    'image-generation',
+    { projectId },
+    {
+      prompts: [prompts, setPrompts],
+      imagesPerPrompt: [imagesPerPrompt, setImagesPerPrompt],
+      selectedLorasByMode: [selectedLorasByMode, setSelectedLorasByMode],
+      depthStrength: [depthStrength, setDepthStrength],
+      softEdgeStrength: [softEdgeStrength, setSoftEdgeStrength],
+      generationMode: [generationMode, setGenerationMode],
+      beforeEachPromptText: [beforeEachPromptText, setBeforeEachPromptText],
+      afterEachPromptText: [afterEachPromptText, setAfterEachPromptText],
+    },
+    { scope: 'project', defaults: defaultImageGenerationSettings }
+  );
+
   return (
     <PageFadeIn className="flex flex-col h-screen">
       <header className="flex justify-between items-center mb-6 sticky top-0 bg-background py-4 z-40 border-b border-border/50 shadow-sm">
@@ -438,11 +456,7 @@ const ImageGenerationToolPage: React.FC = () => {
         <>
           {console.log('[ImageGenFormVisibilityIssue] Entering form rendering branch'), null}
           <div ref={formContainerRef} className="mb-8 p-6 border rounded-lg shadow-sm bg-card">
-            <ToolSettingsGate
-              ready={true}
-              loadingMessage="Loading image generation settings..."
-            >
-              {console.log('[ImageGenFormVisibilityIssue] Inside ToolSettingsGate, rendering ImageGenerationForm'), null}
+            {ready ? (
               <ImageGenerationForm
                 ref={imageGenerationFormRef}
                 onGenerate={handleNewGenerate}
@@ -451,7 +465,11 @@ const ImageGenerationToolPage: React.FC = () => {
                 apiKey={falApiKey}
                 openaiApiKey={openaiApiKey}
               />
-            </ToolSettingsGate>
+            ) : (
+              <div className="flex items-center justify-center h-full">
+                <p>Loading image generation settings...</p>
+              </div>
+            )}
           </div>
 
           <div ref={galleryRef} className="mt-8">

@@ -1,19 +1,18 @@
-import { useRef, useEffect, useState, useCallback } from 'react';
-import { useToolSettings, SettingsScope } from './useToolSettings';
-import { deepEqual, sanitizeSettings } from '../lib/deepEqual';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { deepEqual, deepMerge } from '../lib/deepEqual';
 
 export interface StateMapping<T> {
   [key: string]: [T[keyof T], React.Dispatch<React.SetStateAction<T[keyof T]>>];
 }
 
-export interface UsePersistentToolStateOptions {
+export type SettingsScope = 'project' | 'shot';
+
+export interface UsePersistentToolStateOptions<T> {
   debounceMs?: number;
   scope?: SettingsScope;
-  /**
-   * If false, the hook will skip fetching/saving settings and immediately report ready=true.
-   * Useful when the relevant entity (e.g. project) has not been selected yet.
-   */
   enabled?: boolean;
+  defaults: T;
 }
 
 export interface UsePersistentToolStateResult {
@@ -24,65 +23,22 @@ export interface UsePersistentToolStateResult {
   markAsInteracted: () => void;
 }
 
-/**
- * Hook that synchronizes local React state with persistent tool settings in the database.
- * Provides automatic hydration, debounced saves, and deep equality checks.
- * 
- * @param toolId - The tool identifier (e.g., 'image-generation', 'video-travel')
- * @param context - Context for settings resolution (projectId, shotId, etc.)
- * @param stateMapping - Object mapping setting keys to [value, setter] tuples
- * @param options - Additional options for behavior customization
- * @returns Object with ready state, saving state, and interaction tracking
- * 
- * @example
- * const { ready, isSaving } = usePersistentToolState(
- *   'image-generation',
- *   { projectId },
- *   {
- *     generationMode: [generationMode, setGenerationMode],
- *     imagesPerPrompt: [imagesPerPrompt, setImagesPerPrompt],
- *   }
- * );
- */
 export function usePersistentToolState<T extends Record<string, any>>(
   toolId: string,
   context: { projectId?: string; shotId?: string },
   stateMapping: StateMapping<T>,
-  options: UsePersistentToolStateOptions = {}
+  options: UsePersistentToolStateOptions<T>
 ): UsePersistentToolStateResult {
-  const { debounceMs = 500, scope = 'project', enabled = true } = options;
-  
-  // Fast-path: if persistence is disabled, provide a noop implementation so the UI can render immediately.
-  if (!enabled) {
-    const noop = () => {};
-    return {
-      ready: true,
-      isSaving: false,
-      saveError: undefined,
-      hasUserInteracted: false,
-      markAsInteracted: noop,
-    } as UsePersistentToolStateResult;
-  }
-
-  // Obtain current settings and mutation helpers
-  const {
-    settings,
-    isLoading: isLoadingSettings,
-    update: updateSettings,
-    isUpdating,
-  } = useToolSettings<T>(toolId, { ...context, enabled });
-
-  // Track hydration and interaction state
+  const { debounceMs = 500, scope = 'project', enabled = true, defaults } = options;
+  const [ready, setReady] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<Error | undefined>();
+  const [hasUserInteracted, setHasUserInteracted] = useState(false);
   const hasHydratedRef = useRef(false);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const userHasInteractedRef = useRef(false);
   const lastSavedSettingsRef = useRef<T | null>(null);
   const hydratedForEntityRef = useRef<string | null>(null);
-
-  // Public state for consumers
-  const [ready, setReady] = useState(false);
-  const [saveError, setSaveError] = useState<Error | undefined>();
-  const [hasUserInteracted, setHasUserInteracted] = useState(false);
 
   // Get a unique key for the current entity (project/shot)
   const entityKey = scope === 'shot' ? context.shotId : context.projectId;
@@ -101,24 +57,47 @@ export function usePersistentToolState<T extends Record<string, any>>(
 
   // Hydrate local state from persisted settings
   useEffect(() => {
-    if (!isLoadingSettings && !hasHydratedRef.current && entityKey) {
-      // Use an empty object if settings could not be fetched (e.g. first time or API failure)
-      const effectiveSettings: Partial<T> = (settings as Partial<T>) || {};
-      
-      hasHydratedRef.current = true;
-      userHasInteractedRef.current = false;
-      
-      // Apply each setting to its corresponding setter
-      Object.entries(stateMapping).forEach(([key, [_, setter]]) => {
-        if (effectiveSettings[key as keyof T] !== undefined) {
-          setter(effectiveSettings[key as keyof T] as any);
-        }
-      });
+    if (!hasHydratedRef.current && entityKey) {
+      const fetchSettings = async () => {
+        const { data, error } = await supabase
+          .from('tool_settings')
+          .select('settings')
+          .eq('tool_id', toolId)
+          .eq('entity_id', entityKey)
+          .eq('scope', scope)
+          .single();
 
-      // Mark as ready after hydration
-      setReady(true);
+        if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found
+          console.error('[usePersistentToolState] Failed to fetch settings:', error);
+          // Fallback to defaults if fetch fails
+          const effectiveSettings = deepMerge(defaults, {});
+          Object.entries(stateMapping).forEach(([key, [_, setter]]) => {
+            setter(effectiveSettings[key as keyof T] as any);
+          });
+          hasHydratedRef.current = true;
+          setReady(true);
+          return;
+        }
+
+        const effectiveSettings = deepMerge(defaults, (data?.settings as Partial<T>) || {});
+
+        hasHydratedRef.current = true;
+        userHasInteractedRef.current = false;
+
+        // Apply each setting to its corresponding setter
+        Object.entries(stateMapping).forEach(([key, [_, setter]]) => {
+          if (effectiveSettings[key as keyof T] !== undefined) {
+            setter(effectiveSettings[key as keyof T] as any);
+          }
+        });
+
+        // Mark as ready after hydration
+        setReady(true);
+      };
+
+      fetchSettings();
     }
-  }, [settings, isLoadingSettings, stateMapping, entityKey]);
+  }, [toolId, entityKey, scope, defaults, stateMapping]);
 
   // Collect current state values from the mapping
   const getCurrentState = useCallback((): T => {
@@ -137,7 +116,7 @@ export function usePersistentToolState<T extends Record<string, any>>(
 
   // Save settings with debouncing and deep comparison
   useEffect(() => {
-    if (!entityKey || !settings || !hasHydratedRef.current || !userHasInteractedRef.current) {
+    if (!entityKey || !hasHydratedRef.current || !userHasInteractedRef.current) {
       return;
     }
 
@@ -152,20 +131,48 @@ export function usePersistentToolState<T extends Record<string, any>>(
       
       // Check if we just saved these exact settings
       if (lastSavedSettingsRef.current && 
-          deepEqual(sanitizeSettings(currentState), sanitizeSettings(lastSavedSettingsRef.current))) {
+          deepEqual(currentState, lastSavedSettingsRef.current)) {
         return;
       }
 
-      // Check if settings actually changed from what's in the database
-      if (!isUpdating && !deepEqual(sanitizeSettings(currentState), sanitizeSettings(settings))) {
-        try {
-          lastSavedSettingsRef.current = currentState;
-          await updateSettings(scope, currentState);
-          setSaveError(undefined);
-        } catch (error) {
-          setSaveError(error as Error);
-          console.error('[usePersistentToolState] Save error:', error);
-        }
+      // Fetch current settings to merge with patch
+      const { data: currentSettingsData, error: fetchError } = await supabase
+        .from('tool_settings')
+        .select('settings')
+        .eq('tool_id', toolId)
+        .eq('entity_id', entityKey)
+        .eq('scope', scope)
+        .single();
+
+      if (fetchError) {
+        console.error('[usePersistentToolState] Failed to fetch current settings for update:', fetchError);
+        setSaveError(fetchError as Error);
+        return;
+      }
+
+      const currentSettings = deepMerge(defaults, (currentSettingsData?.settings as Partial<T>) || {});
+
+      // Merge current settings with the new state to create the patch
+      const patch = deepMerge(currentSettings, currentState);
+
+      // Upsert the new settings
+      const { error: upsertError } = await supabase
+        .from('tool_settings')
+        .upsert({
+          tool_id: toolId,
+          entity_id: entityKey,
+          scope: scope,
+          settings: patch,
+        })
+        .select()
+        .single();
+
+      if (upsertError) {
+        console.error('[usePersistentToolState] Failed to upsert settings:', upsertError);
+        setSaveError(upsertError as Error);
+      } else {
+        lastSavedSettingsRef.current = currentState;
+        setSaveError(undefined);
       }
     }, debounceMs);
 
@@ -176,12 +183,11 @@ export function usePersistentToolState<T extends Record<string, any>>(
       }
     };
   }, [
+    toolId,
     entityKey,
-    settings,
-    getCurrentState,
-    updateSettings,
-    isUpdating,
     scope,
+    defaults,
+    getCurrentState,
     debounceMs,
     // Include all state values to trigger saves on change
     ...Object.entries(stateMapping).map(([_, [value]]) => value)
@@ -189,7 +195,7 @@ export function usePersistentToolState<T extends Record<string, any>>(
 
   return {
     ready,
-    isSaving: isUpdating,
+    isSaving: isSaving,
     saveError,
     hasUserInteracted,
     markAsInteracted
