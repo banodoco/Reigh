@@ -279,7 +279,9 @@ python headless.py --db-type supabase \\
             variant="ghost"
             size="sm"
             onClick={handleSignOut}
-            className="absolute top-0 right-0 flex items-center gap-2 text-muted-foreground hover:text-foreground"
+            className={`absolute top-0 flex items-center gap-2 text-muted-foreground hover:text-foreground ${
+              isMobile ? 'left-0' : 'right-0'
+            }`}
           >
             <LogOut className="h-4 w-4" />
             Sign out
@@ -337,7 +339,7 @@ python headless.py --db-type supabase \\
           </div>
         </div>
 
-        <div className="space-y-8">
+        <div className={`space-y-8 ${isMobile ? 'pb-8' : 'pb-4'}`}>
           {/* Credits Management Section */}
           {inCloudChecked && (
             <div className="space-y-4">
