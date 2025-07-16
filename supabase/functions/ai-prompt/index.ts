@@ -48,40 +48,51 @@ serve(async (req) => {
 
         let systemMsg = `You are a helpful assistant that generates image prompts based on user input.
 
-        The user's request is as follows: ${overallPromptText}
-
 IMPORTANT: Each prompt you generate should be specifically designed for AI image generation. The prompts should follow the user's instruction. Unless the user requests otherwise, the prompts should be detailed, descriptive, and focus on visual elements like composition, lighting, style, colors, and atmosphere.
 
 CRITICAL FORMATTING REQUIREMENTS:
 - Output EXACTLY ${numberToGenerate} prompts
 - Each prompt must be on its own line
-- NO numbering (1., 2., 3., etc.)
-- NO bullet points (-, *, •, etc.)
-- NO quotation marks around prompts
-- NO empty lines between prompts
-- NO additional formatting, markdown, or special characters
-- Each prompt should be a complete sentence or phrase
+- NO numbering, bullet points, quotation marks, empty lines, formatting, markdown or special characters
+- Make sure to follow the user's request and the rules to remember
 
-IMPORTANT: The user's request is as follows: ${overallPromptText}
-Rules to remember: ${rulesToRememberText}`;
+Remember: The user's request is as follows: ${overallPromptText}
+
+And rules to remember are: ${rulesToRememberText}`;
         
         if (existingPrompts.length) {
           const ctx = existingPrompts.map((p: any) => `- ${typeof p === "string" ? p : p.text ?? ""}`).join("\n");
-          systemMsg += `\n\nExisting Prompts for Context (do not repeat these, but use them as inspiration for new, distinct image generation ideas):\n${ctx}`;
+          systemMsg += `\n\nExisting Prompts for Context (do NOT repeat or return these, but use them as inspiration for new, distinct image generation ideas):\n${ctx}`;
         }
         
         const userMsg = overallPromptText || "Please generate general image prompts based on the overall goal and rules.";
+        
+        // Generate dynamic examples based on the requested number
+        const generateExamplePrompts = (count: number): string[] => {
+          const examplePool = [
+            "A majestic dragon soaring through storm clouds with lightning illuminating its scales, dramatic chiaroscuro lighting, fantasy art style",
+            "A serene Japanese garden at dawn with cherry blossoms falling, soft golden hour lighting, peaceful atmosphere, traditional composition", 
+            "A futuristic cyberpunk cityscape at night with neon reflections on wet streets, high contrast lighting, noir aesthetic",
+            "An ancient library with floating books and magical glowing orbs, warm amber lighting, mystical atmosphere, detailed architecture",
+            "A vast desert landscape with towering sand dunes under a starry night sky, moonlight casting long shadows, epic scale composition"
+          ];
+          return examplePool.slice(0, Math.min(count, examplePool.length));
+        };
+
+        const examplePrompts = generateExamplePrompts(numberToGenerate);
+        const formatExample = examplePrompts.join("\n");
+        
         const instruction = `Generate exactly ${numberToGenerate} distinct image generation prompts. Each prompt should be detailed and optimized for AI image generation, focusing on visual descriptions, style, composition, lighting, and atmosphere.
 
-FORMAT EXAMPLE (for 3 prompts):
-A majestic dragon soaring through storm clouds with lightning illuminating its scales, dramatic chiaroscuro lighting, fantasy art style
-A serene Japanese garden at dawn with cherry blossoms falling, soft golden hour lighting, peaceful atmosphere, traditional composition
-A futuristic cyberpunk cityscape at night with neon reflections on wet streets, high contrast lighting, noir aesthetic
+FORMAT EXAMPLE (${numberToGenerate} prompts):
+${formatExample}
 
-YOUR OUTPUT (${numberToGenerate} prompts):`;
+YOUR OUTPUT (${numberToGenerate} prompts):
+
+IMPORTANT: Only respond with the ${numberToGenerate} prompts, nothing else. Do not include any commentary, explanations, or additional text.`;
 
         const resp = await openai.chat.completions.create({
-          model: "o3-mini",
+          model: "o3",
           messages: [
             { role: "system", content: systemMsg },
             { role: "user", content: `${userMsg}\n\n${instruction}` },
