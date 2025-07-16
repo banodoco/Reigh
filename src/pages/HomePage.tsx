@@ -220,7 +220,7 @@ export default function HomePage() {
 
             {/* Icon above title */}
             <FadeInSection delayMs={25}>
-              <div className="flex justify-center mb-6 mt-4">
+              <div className="flex justify-center mb-6 mt-6">
                 <div className="relative">
                   <div className="flex items-center justify-center w-12 h-12 md:w-14 md:h-14 bg-gradient-to-br from-wes-pink/60 via-wes-lavender/60 to-wes-dusty-blue/60 rounded-lg border border-wes-vintage-gold/20 shadow-sm transition-all duration-300 opacity-70">
                     <Palette className="h-6 w-6 md:h-7 md:w-7 text-white/90 transition-transform duration-300" />
