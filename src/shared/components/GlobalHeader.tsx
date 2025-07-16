@@ -64,14 +64,14 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
         
         {/* Desktop Layout (lg and up) */}
         <div 
-          className="hidden lg:flex container items-center justify-between transition-all duration-300 ease-in-out relative z-10 h-24"
+          className="hidden lg:flex container items-center justify-between transition-all duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] relative z-10 h-24"
           style={{
             paddingRight: contentOffsetRight ? `${contentOffsetRight}px` : undefined,
             paddingLeft: contentOffsetLeft ? `${contentOffsetLeft}px` : undefined,
           }}
         >
           {/* Left side - Brand + Project Selector */}
-          <div className="flex items-center space-x-6">
+          <div className="flex items-center space-x-6 pl-4">
             {/* Brand */}
             <Link to={session ? "/tools" : "/"} className="group flex items-center space-x-4 relative">
               <div className="relative">
@@ -95,7 +95,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
             </Link>
 
             {/* Project Management */}
-            <div className="flex items-center space-x-4 relative">
+            <div className="flex items-center space-x-4 relative p-2 border-2 border-wes-vintage-gold/30 rounded-xl bg-white/50 shadow-wes-vintage">
               {isLoadingProjects && projects.length === 0 ? (
                 <div className="w-[280px] text-center">
                   <div className="flex items-center justify-center space-x-2 p-3 wes-vintage-card">
@@ -198,7 +198,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
           }}
         >
           {/* Top row - Brand + Project Buttons + App Settings */}
-          <div className="flex items-center justify-between h-12 w-full" style={{ paddingLeft: '16px', paddingRight: '16px' }}>
+          <div className="flex items-center justify-between h-12 w-full" style={{ paddingLeft: '20px', paddingRight: '16px' }}>
             {/* Left side - Brand + Project Buttons */}
             <div className="flex items-center space-x-2">
               {/* Brand */}
@@ -264,7 +264,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
 
           {/* Bottom row - Project Selector */}
           <div className="flex items-center h-14 w-full border-t border-wes-vintage-gold/20" style={{ paddingLeft: '16px', paddingRight: '16px' }}>
-            <div className="flex-1">
+            <div className="flex-1 p-2 border-2 border-wes-vintage-gold/30 rounded-xl bg-white/50 shadow-wes-vintage">
               {isLoadingProjects && projects.length === 0 ? (
                 <div className="text-center">
                   <div className="flex items-center justify-center space-x-2 p-2 wes-vintage-card">

@@ -4,6 +4,7 @@ import { Camera, Palette, Zap, Crown, Paintbrush, Video, Edit, Sparkles, Film, M
 import { useEffect, useState } from 'react';
 import { toolsUIManifest, type ToolUIDefinition } from '../tools';
 import { PageFadeIn, FadeInSection } from '@/shared/components/transitions';
+import { useContentResponsive, useContentResponsiveDirection, useContentResponsiveColumns } from '@/shared/hooks/useContentResponsive';
 import React from 'react';
 
 // Define process tools (main workflow)
@@ -73,7 +74,7 @@ const assistantTools = [
   {
     id: 'generate-perspectives',
     name: 'Different\nPerspectives',
-    description: 'Create multiple viewpoints from a single image.',
+    description: 'Create images from different perspectives.',
     tool: null, // Coming soon
     icon: Eye,
     gradient: 'from-wes-lavender via-wes-pink to-wes-coral',
@@ -95,6 +96,9 @@ const assistantTools = [
 const ToolCard = ({ item, isSquare = false, index, isVisible }: { item: any, isSquare?: boolean, index?: number, isVisible: boolean }) => {
   const [isWiggling, setIsWiggling] = useState(false);
   const navigate = useNavigate();
+  
+  // Use content-responsive breakpoints for dynamic sizing
+  const { isSm, isLg } = useContentResponsive();
 
   const handleComingSoonClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -107,6 +111,12 @@ const ToolCard = ({ item, isSquare = false, index, isVisible }: { item: any, isS
   const shouldShow = isComingSoon || isVisible;
 
   if (!shouldShow) return null;
+
+  // Dynamic sizing based on content area
+  const iconSize = isLg ? 'w-10 h-10' : isSm ? 'w-8 h-8' : 'w-6 h-6';
+  const iconContainerSize = isLg ? 'w-20 h-20' : isSm ? 'w-16 h-16' : 'w-12 h-12';
+  const titleSize = isLg ? 'text-2xl' : isSm ? 'text-xl' : 'text-lg';
+  const descriptionSize = isSm ? 'text-sm' : 'text-xs';
 
   const content = (
     <div className={`wes-tool-card relative overflow-hidden ${isSquare ? 'h-full !p-0' : 'h-32 sm:h-32'} wes-polaroid ${isComingSoon ? 'opacity-30' : ''}`}>
@@ -122,9 +132,9 @@ const ToolCard = ({ item, isSquare = false, index, isVisible }: { item: any, isS
       {/* Horizontal layout for Process tools */}
       {!isSquare ? (
         <div className="flex items-center h-full p-2 sm:p-2 lg:p-3 relative">
-          {/* Large subtle number in background - hidden on mobile */}
-          {index !== undefined && (
-            <div className="absolute right-4 lg:right-6 top-1/2 -translate-y-1/2 -translate-y-5 hidden lg:block">
+          {/* Large subtle number in background - responsive visibility */}
+          {index !== undefined && isLg && (
+            <div className="absolute right-4 lg:right-6 top-1/2 -translate-y-1/2 -translate-y-5">
               <span className="font-playfair text-[8rem] lg:text-[10.5rem] font-bold text-wes-vintage-gold/50 select-none block w-20 lg:w-24 text-center">
                 {index + 1}
               </span>
@@ -132,38 +142,38 @@ const ToolCard = ({ item, isSquare = false, index, isVisible }: { item: any, isS
           )}
           
           {/* Icon */}
-          <div className="flex-shrink-0 mr-3 sm:mr-4 lg:mr-6 relative z-10">
-            <div className={`w-12 h-12 sm:w-16 sm:h-16 lg:w-20 lg:h-20 bg-gradient-to-br ${item.gradient} rounded-xl sm:rounded-2xl flex items-center justify-center shadow-wes-deep ${!isComingSoon ? 'group-hover:shadow-wes-hover group-hover:scale-110' : ''} transition-all duration-700`}>
-              <item.icon className="w-6 h-6 sm:w-8 sm:h-8 lg:w-10 lg:h-10 text-white drop-shadow-lg" />
+          <div className={`flex-shrink-0 ${isSm ? 'mr-4' : 'mr-3'} ${isLg ? 'mr-6' : ''} relative z-10`}>
+            <div className={`${iconContainerSize} bg-gradient-to-br ${item.gradient} rounded-xl sm:rounded-2xl flex items-center justify-center shadow-wes-deep ${!isComingSoon ? 'group-hover:shadow-wes-hover group-hover:scale-110' : ''} transition-all duration-700`}>
+              <item.icon className={`${iconSize} text-white drop-shadow-lg`} />
             </div>
           </div>
           
           {/* Text content */}
           <div className="flex-1 relative z-10 min-w-0">
-            <h3 className={`font-playfair text-lg sm:text-xl lg:text-2xl font-bold text-primary mb-1 ${!isComingSoon ? 'group-hover:text-primary/80' : ''} transition-colors duration-300 leading-tight`}>
+            <h3 className={`font-playfair ${titleSize} font-bold text-primary mb-1 ${!isComingSoon ? 'group-hover:text-primary/80' : ''} transition-colors duration-300 leading-tight`}>
               {item.name}
             </h3>
-            <p className="font-inter text-xs sm:text-sm text-muted-foreground leading-relaxed pr-2">
+            <p className={`font-inter ${descriptionSize} text-muted-foreground leading-relaxed pr-2`}>
               {item.description}
             </p>
           </div>
         </div>
       ) : (
         /* Square layout for Assistant tools - Responsive padding and sizing */
-        <div className="p-2 sm:p-3 lg:p-4 h-full flex flex-col">
+        <div className={`${isSm ? 'p-3' : 'p-2'} ${isLg ? 'p-4' : ''} h-full flex flex-col`}>
           {/* Tool Header without icon */}
-          <div className="wes-symmetry mb-2 sm:mb-3 relative">
+          <div className={`wes-symmetry ${isSm ? 'mb-3' : 'mb-2'} relative`}>
             <div className="">
-              <h3 className={`font-playfair text-lg sm:text-xl lg:text-2xl font-bold text-primary mb-2 ${!isComingSoon ? 'group-hover:text-primary/80' : ''} transition-colors duration-300 text-shadow-vintage text-center leading-tight whitespace-pre-line`}>
+              <h3 className={`font-playfair ${titleSize} font-bold text-primary mb-2 ${!isComingSoon ? 'group-hover:text-primary/80' : ''} transition-colors duration-300 text-shadow-vintage text-center leading-tight whitespace-pre-line`}>
                 {item.name}
               </h3>
-              <div className={`w-12 sm:w-16 h-1 bg-gradient-to-r from-${item.accent} to-wes-vintage-gold rounded-full mx-auto ${!isComingSoon ? 'group-hover:w-16 sm:group-hover:w-24' : ''} transition-all duration-700`}></div>
+              <div className={`${isSm ? 'w-16' : 'w-12'} h-1 bg-gradient-to-r from-${item.accent} to-wes-vintage-gold rounded-full mx-auto ${!isComingSoon ? `${isSm ? 'group-hover:w-24' : 'group-hover:w-16'}` : ''} transition-all duration-700`}></div>
             </div>
           </div>
 
           {/* Description */}
           <div className="flex-1">
-            <p className="font-inter text-muted-foreground leading-relaxed text-center text-xs sm:text-sm">
+            <p className={`font-inter text-muted-foreground leading-relaxed text-center ${descriptionSize}`}>
               {item.description}
             </p>
           </div>
@@ -171,8 +181,8 @@ const ToolCard = ({ item, isSquare = false, index, isVisible }: { item: any, isS
       )}
 
       {/* Decorative Elements */}
-      <div className="absolute top-3 sm:top-4 right-3 sm:right-4 opacity-20">
-        <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-primary animate-sway" />
+      <div className={`absolute ${isSm ? 'top-4 right-4' : 'top-3 right-3'} opacity-20`}>
+        <Sparkles className={`${isSm ? 'w-5 h-5' : 'w-4 h-4'} text-primary animate-sway`} />
       </div>
 
       {/* Hover shimmer effect (only for active tools) */}
@@ -219,6 +229,17 @@ const ToolCard = ({ item, isSquare = false, index, isVisible }: { item: any, isS
 const ToolSelectorPage: React.FC = () => {
   const currentEnv = (import.meta.env.VITE_APP_ENV?.toLowerCase() || AppEnv.WEB) as AppEnvValue;
 
+  // Content-responsive breakpoints and layout values
+  const { isSm, isLg } = useContentResponsive();
+  const layoutDirection = useContentResponsiveDirection({
+    base: 'column',
+    lg: 'row',
+  });
+  const assistantGridCols = useContentResponsiveColumns({
+    base: 1,
+    sm: 2,
+  });
+
   // Scroll to top when component mounts
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -229,6 +250,13 @@ const ToolSelectorPage: React.FC = () => {
     if (currentEnv === AppEnv.DEV) return true;
     return tool.environments.includes(currentEnv);
   };
+
+  // Dynamic spacing based on content area
+  const containerPadding = isSm ? 'px-2' : 'px-1';
+  const containerSpacing = isLg ? 'pt-4 pb-6' : isSm ? 'pt-4 pb-6' : 'pt-3 pb-4';
+  const sectionGap = isLg ? 'gap-8' : isSm ? 'gap-6' : 'gap-4';
+  const itemGap = isSm ? 'gap-4' : 'gap-3';
+  const topMargin = isSm ? 'mt-4' : 'mt-2';
 
   return (
     <PageFadeIn className="min-h-screen wes-texture relative overflow-hidden">
@@ -242,12 +270,22 @@ const ToolSelectorPage: React.FC = () => {
       <div className="absolute top-40 right-20 w-24 h-24 bg-wes-yellow/15 rounded-full blur-2xl animate-parallax-float" style={{ animationDelay: '2s' }}></div>
       <div className="absolute bottom-20 left-1/4 w-40 h-40 bg-wes-lavender/10 rounded-full blur-3xl animate-parallax-float" style={{ animationDelay: '4s' }}></div>
       
-      <div className="container mx-auto px-1 sm:px-2 pt-3 sm:pt-4 pb-4 sm:pb-6 relative z-10">
-        {/* Responsive Layout */}
-        <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 lg:gap-8 max-w-7xl mx-auto">
-          {/* Process Column - Full width on mobile, 2/3 on desktop */}
-          <div className="w-full lg:w-2/3">
-            <div className="flex flex-col gap-3 sm:gap-4 mt-2 sm:mt-4">
+      <div className={`container mx-auto ${containerPadding} ${containerSpacing} relative z-10`}>
+        {/* Content-Responsive Layout */}
+        <div 
+          className={`flex ${sectionGap} max-w-7xl mx-auto`}
+          style={{ 
+            flexDirection: layoutDirection,
+          }}
+        >
+          {/* Process Column - Dynamic width based on layout */}
+          <div 
+            className="w-full"
+            style={{ 
+              width: layoutDirection === 'row' ? '66.666667%' : '100%',
+            }}
+          >
+            <div className={`flex flex-col ${itemGap} ${topMargin}`}>
               {processTools.map((tool, index) => (
                 <ToolCard
                   key={tool.id}
@@ -259,10 +297,19 @@ const ToolSelectorPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Assistant Tools Column - Full width on mobile, 1/3 on desktop */}
-          <div className="w-full lg:w-1/3">
-            {/* Mobile: Single column, Tablet: 2 columns, Desktop: 2 columns */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mt-2 sm:mt-4">
+          {/* Assistant Tools Column - Dynamic width and grid based on layout */}
+          <div 
+            className="w-full"
+            style={{ 
+              width: layoutDirection === 'row' ? '33.333333%' : '100%',
+            }}
+          >
+            <div 
+              className={`grid ${itemGap} ${topMargin}`}
+              style={{ 
+                gridTemplateColumns: `repeat(${assistantGridCols}, 1fr)`,
+              }}
+            >
               {assistantTools.map((tool, index) => (
                 <ToolCard
                   key={tool.id}

@@ -12,14 +12,8 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
 - **Backend & DB**: Supabase (Postgres DB, Storage, typed client), Express.js (Node.js API server), Hono (lightweight router for modular routes)
 - **AI**: FAL-AI (image generation API)
 
-### Performance & Optimization
-- **Query Optimization**: TanStack Query configured with extended cache times (10-15 min), disabled window refocus refetching, and retry prevention to avoid observer conflicts
-- **Lazy Loading**: Most tool pages use React.lazy() except ImageGenerationToolPage (removed to prevent TanStack Query v5 observer initialization issues during direct navigation)
-- **Persistent State**: Tools use `usePersistentToolState` with enabled/disabled flag to prevent blocking when dependencies (like projectId) aren't ready
-
 ### Ports
-- Frontend (Vite): `2222` (accessible from LAN for mobile testing)
-- Backend (Express): `8085` (binds to 0.0.0.0 for mobile access, configurable via process.env.PORT)
+Vite runs on `2222`; Express runs on `8085`.
 
 ## 2. Directory Structure (Top-Level)
 
@@ -55,81 +49,12 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
 | **API Endpoints (Remaining)** | |
 | `POST /api/local-image-upload` | Upload single image files to server local storage |
 | `POST /api/upload-flipped-image` | Upload processed (flipped) images from lightbox edit functionality |
-| **Migrated to Supabase** | |
-| `~~PATCH /api/generations/:id~~` | ~~Update generation location~~ → Now uses `useUpdateGenerationLocation` hook |
-| `~~GET /api/tool-settings/*~~` | ~~Tool settings endpoints~~ → Now uses direct Supabase in `useToolSettings` |
-| `~~GET /api/tasks/*~~` | ~~Task management~~ → Now uses `useTasks` hooks with direct Supabase |
-| `~~GET/POST /api/credits/*~~` | ~~Credits system~~ → Now uses `useCredits` with Supabase + Edge Functions |
-| `~~GET/POST/DELETE /api/generations/*~~` | ~~Generation CRUD~~ → Now uses `useGenerations` hooks |
+| **Migrated to Supabase** | All former Express routes have been migrated to Supabase Edge Functions or direct client calls. |
 
 ### DB Workflow (Drizzle ORM - SQLite & PostgreSQL)
-1. **Schema**: `/db/schema/schema.ts` (Drizzle, PG-first)
-2. **Migrations**: 
-   - PostgreSQL: `npm run db:generate:pg`
-   - SQLite: `npm run db:generate:sqlite`
-3. **Apply Migrations**: 
-   - PG: to Supabase (CLI/CI)
-   - SQLite: auto on `npm run start:api`
-4. **DAL Usage**: 
-   - API server uses db from `/src/lib/db/index.ts` (Drizzle client)
-   - Client-side uses db (Supabase JS client) or API calls
-5. **Seeding**: `npm run db:seed:sqlite` (local SQLite)
+1. **Schema Changes** (tables, columns): run `npm run db:generate:pg|sqlite` then apply via Drizzle or Supabase.
 
-### Database Security & Migration Strategy
-
-**Current State**: The project uses a **dual migration system**:
-- **Drizzle migrations** (`/db/migrations/`) for schema changes (tables, columns, indexes)
-- **Supabase migrations** (`/supabase/migrations/`) for Supabase-specific features (RLS policies, storage bucket setup, triggers, functions)
-
-**Row Level Security (RLS) Status**: ✅ **ACTIVE**
-- All 11 main tables (`users`, `projects`, `shots`, `shot_generations`, `generations`, `resources`, `tasks`, `user_api_tokens`, `training_data`, `training_data_segments`, `training_data_batches`) have RLS enabled
-- 22 security policies enforce strict data isolation:
-  - Users can only access their own data
-  - Task creation restricted to `service_role` (Edge Functions only)
-  - Credit validation enforced at database level
-  - API tokens can only be viewed by their owner
-
-**Personal Access Tokens (PAT) System**: ✅ **IMPLEMENTED & SIMPLIFIED**
-- **Purpose**: Allow users to run local worker scripts that process tasks without exposing elevated privileges
-- **Architecture**: Simple 24-character tokens (no more JWT complexity)
-- **Security**: 
-  - Tokens honor all existing RLS policies
-  - Direct token storage for instant validation
-  - No expiry dates (permanent until revoked)
-- **Components**:
-  - `user_api_tokens` table: Stores simplified token metadata (id, user_id, token, label, created_at)
-  - `generate-pat` Edge Function: Creates new 24-character tokens using cryptographically secure random generation
-  - `revoke-pat` Edge Function: Revokes existing tokens
-  - `verify_api_token()` PostgreSQL function: Validates tokens at database level with direct token lookup
-  - `useApiTokens` hook: Client-side token management (simplified without expiry handling)
-  - Updated Settings Modal: Primary section for token management
-
-**Task Cost System**: ✅ **IMPLEMENTED**
-- **Purpose**: Flexible cost calculation based on task execution time and configurable cost factors
-- **Architecture**: 
-  - `task_cost_configs` table stores per-task-type cost configurations with base cost per second and JSONB cost factors
-  - `calculate-task-cost` Edge Function calculates actual costs based on `generation_started_at` and `generation_processed_at` timestamps
-  - Costs are automatically added to `credits_ledger` as 'spend' entries
-- **Components**:
-  - `task_cost_configs` table: Stores cost configurations with flexible cost factors for resolution, frame count, model type, etc.
-  - `calculate-task-cost` Edge Function: Takes task_id, calculates duration and cost, inserts into credit ledger
-  - Updated `tasks` table: Added `generation_started_at` column for precise timing calculations
-  - Cost factors support complex calculations based on task parameters stored in JSONB format
-
-**Migration Workflow**:
-
-1. **Schema Changes** (tables, columns):
-   ```bash
-   # Update /db/schema/schema.ts
-   npm run db:generate:pg          # Generate Drizzle migration
-   # Apply via Drizzle or Supabase CLI
-   ```
-
-2. **RLS Policies, Functions, Triggers**:
-   ```bash
-   # Create file in /supabase/migrations/YYYYMMDD_description.sql
-   supabase db push               # Apply to remote
-   ```
+2. **RLS Policies, Functions, Triggers**: add SQL file in `/supabase/migrations` and execute `supabase db push`.
 
 3. **Important**: After manual RLS policy application (as done for the initial setup), future `supabase db push` commands should work normally. The migration history is now synchronized.
 
@@ -180,10 +105,7 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
 - All frontend functionality migrated to Supabase Edge Functions and direct database calls
 
 ##### Migrated to Supabase (Express routes deprecated):
-- `~~~/api/tasks/*~~` - Task management → Now uses `useTasks` hooks with direct Supabase
-- `~~~/api/tool-settings/*~~` - Tool settings → Now uses `useToolSettings` with direct Supabase  
-- `~~~/api/credits/*~~` - Credits system → Now uses `useCredits` with Supabase + Edge Functions
-- `~~~/api/generations/*~~` - Generation CRUD → Now uses `useGenerations` hooks with direct Supabase
+- All former Express routes were replaced by Supabase Edge Functions or direct Supabase client usage.
 
 #### 3.2. Top-Level Pages (`src/pages/`)
 - **ToolSelectorPage.tsx**: Grid of available tools. Accessible at `/tools` in all environments (and at `/` when VITE_APP_ENV is not 'web').
@@ -224,7 +146,7 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
 - **components/BatchSelector.tsx**: Component for creating and selecting training data batches. Allows users to organize videos into logical groups with names and descriptions. Features editable batch names with pencil icon, abbreviated relative time display ("Created 5 mins ago"), and delete functionality with validation to prevent deletion of batches containing videos.
 - **components/VideoUploadList.tsx**: Displays uploaded videos in a grid layout with thumbnails, metadata, and selection/deletion functionality. Enhanced with error handling for invalid video files (400 Bad Request errors) and `markVideoAsInvalid()` function.
 - **components/VideoSegmentEditor.tsx**: Comprehensive video player with advanced segment creation tools and keyboard shortcuts. Features:
-  - **Keyboard Shortcuts**: 1 (jump back 0.25s), 2 (1/4x speed), 3 (1/2x speed), 4 (jump forward 0.25s), 0 (normal speed), Space (play/pause), S/5 (segment start/end toggle), Enter (create segment), D (remove last mark)
+  - **Keyboard Shortcuts**: See `VideoSegmentEditor.tsx` for full mapping
   - **Smart Marker Reordering**: Intelligent reordering when setting markers out of chronological order with informative toast messages
   - **Enhanced Video Controls**: Custom timeline with segment markers, playback speed controls, frame-accurate navigation
   - **Segment Management**: Create, edit, delete segments with frame preview and validation
@@ -239,13 +161,7 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
 ##### Components
 - **GlobalHeader.tsx**: Site-wide header (branding, project selector/settings, new project '+', global settings). Content offset by locked panes.
 
-**Z-Index Hierarchy**: The app uses a layered z-index system:
-- Header: `z-50`
-- Panes: `z-60` (shots/tasks), `z-[100]` (generations), `z-[101/102]` (pane controls)  
-- Body pseudo-elements: `z-999` and `z-1000` (film grain effects)
-- Modals/Lightboxes: `z-[99999]` (ensures they appear above everything, rendered via portal)
-- Select dropdowns: `z-[10000]` (ensures they appear above modals)
-- Drag overlays: `z-[10000]` (above everything during drag operations)
+<!-- z-index detail removed for brevity -->
 - **ShotsPane/**:
   - `ShotsPane.tsx`: Left slide-out panel for shots
   - `ShotGroup.tsx`: Droppable area in shot
@@ -336,86 +252,7 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
 - **edit-travel/settings.ts**: Defines `EditTravelSettings` interface and default values for Edit Travel tool (project scope – prompts, generation mode, flux strengths, etc.).
 
 #### Adding a New Tool
-
-To add a new tool to the system, follow these steps (most registration is now automatic):
-
-1. **Create tool directory structure**:
-   ```
-   src/tools/my-new-tool/
-   ├── pages/MyNewToolPage.tsx     # Main tool page component
-   ├── components/                 # Tool-specific components
-   ├── settings.ts                 # Tool settings definition
-   └── hooks/                      # Tool-specific hooks (optional)
-   ```
-
-2. **Define tool settings** in `src/tools/my-new-tool/settings.ts`:
-   ```ts
-   export interface MyNewToolSettings {
-     // Your tool's settings interface
-     someProperty: string;
-     anotherProperty: number;
-   }
-
-   export const myNewToolSettings = {
-     id: 'my-new-tool',
-     scope: ['project'] as const, // or ['user', 'project', 'shot']
-     defaults: {
-       someProperty: 'default value',
-       anotherProperty: 42,
-     } satisfies MyNewToolSettings,
-   };
-   ```
-
-3. **Register in the tools manifest** by adding imports to `src/tools/index.ts`:
-   ```ts
-   // Add your export
-   export { myNewToolSettings } from './my-new-tool/settings';
-   
-   // Add to toolsManifest array
-   export const toolsManifest = [
-     // ... existing tools
-     myNewToolSettings,
-   ] as const;
-
-   // Add UI definition to toolsUIManifest
-   export const toolsUIManifest: ToolUIDefinition[] = [
-     // ... existing tools
-     {
-       id: myNewToolSettings.id,
-       name: 'My New Tool',
-       path: '/tools/my-new-tool',
-       description: 'Description of what this tool does.',
-       environments: [AppEnv.DEV], // or LOCAL_ENVS for broader visibility
-       icon: SomeIcon, // Import from lucide-react
-       gradient: 'from-color-1 to-color-2',
-       accent: 'color-name',
-       ornament: '★',
-       badge: 'New', // optional
-     },
-   ];
-   ```
-
-4. **Add route** in `src/app/routes.tsx`:
-   ```ts
-   {
-     path: '/tools/my-new-tool',
-     element: <MyNewToolPage />,
-   }
-   ```
-
-5. **Optional server route** (if your tool needs backend endpoints):
-   - Create `src/server/routes/myNewTool.ts`
-   - Register it in `src/server/index.ts`
-
-**What happens automatically:**
-- Tool settings defaults are registered in `toolSettingsService.ts` 
-- Tool appears in ToolSelectorPage based on environment configuration
-- Database persistence works via `useToolSettings` or `usePersistentToolState` hooks
-- Settings cascade (app defaults → user → project → shot) works immediately
-
-**Migration considerations:**
-- Add database migrations in `/db/migrations/` if new tables/columns needed
-- Update `taskConfig.ts` if your tool creates background tasks
+See `structure_detail/adding_new_tool.md` for the detailed workflow.
 
 ## Motion Guidelines
 
@@ -426,18 +263,4 @@ To add a new tool to the system, follow these steps (most registration is now au
 - `FadeInSection`: For staggered animations with configurable delay
 
 **Usage Examples**:
-```tsx
-// Page-level fade
-return (
-  <PageFadeIn className="container mx-auto p-4">
-    {/* page content */}
-  </PageFadeIn>
-);
-
-// Staggered list items
-{items.map((item, index) => (
-  <FadeInSection key={item.id} delayMs={index * 100}>
-    <ItemComponent item={item} />
-  </FadeInSection>
-))}
-```
+*(Usage examples removed – refer to `PageFadeIn` and `FadeInSection` components if needed.)*

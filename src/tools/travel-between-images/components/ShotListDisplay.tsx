@@ -1,20 +1,30 @@
 import React from 'react';
 import { Shot } from '@/types/shots';
 import VideoShotDisplay from './VideoShotDisplay'; // Assuming it's in the same directory
+import { Button } from '@/shared/components/ui/button';
 
 interface ShotListDisplayProps {
   shots: Shot[] | undefined | null;
   onSelectShot: (shot: Shot) => void;
   currentProjectId: string | null;
+  onCreateNewShot?: () => void;
 }
 
 const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
   shots,
   onSelectShot,
   currentProjectId,
+  onCreateNewShot,
 }) => {
   if (!shots || shots.length === 0) {
-    return <p>No shots available for this project. You can create one using the button above.</p>;
+    return (
+      <div className="py-8">
+        <p className="mb-6">No shots available for this project. You can create one using the button below.</p>
+        {onCreateNewShot && (
+          <Button onClick={onCreateNewShot}>Create New Shot</Button>
+        )}
+      </div>
+    );
   }
 
   return (

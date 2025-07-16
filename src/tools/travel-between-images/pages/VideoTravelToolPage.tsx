@@ -18,6 +18,7 @@ import { Skeleton } from '@/shared/components/ui/skeleton';
 import { PageFadeIn } from '@/shared/components/transitions';
 import { useListPublicResources } from '@/shared/hooks/useResources';
 import { ActiveLora } from '@/shared/components/ActiveLoRAsDisplay';
+import { useContentResponsive, useContentResponsiveColumns } from '@/shared/hooks/useContentResponsive';
 // import { useLastAffectedShot } from '@/shared/hooks/useLastAffectedShot';
 
 const VideoTravelToolPage: React.FC = () => {
@@ -36,6 +37,14 @@ const VideoTravelToolPage: React.FC = () => {
   // const { lastAffectedShotId, setLastAffectedShotId } = useLastAffectedShot(); // Keep for later if needed
   const [isLoraModalOpen, setIsLoraModalOpen] = useState(false);
   const [selectedLoras, setSelectedLoras] = useState<ActiveLora[]>([]);
+
+  // Content-responsive breakpoints for dynamic layout
+  const { isSm, isLg } = useContentResponsive();
+  const skeletonGridCols = useContentResponsiveColumns({
+    base: 1,
+    md: 2,
+    lg: 3,
+  });
 
   // Add ref for main container to enable scroll-to-top functionality
   const mainContainerRef = useRef<HTMLDivElement>(null);
@@ -512,12 +521,15 @@ const VideoTravelToolPage: React.FC = () => {
     }
     // Skeleton while we wait for ProjectContext to hydrate
     return (
-      <div className="p-4 space-y-4">
+      <div className={`${isSm ? 'p-4' : 'p-2'} space-y-4`}>
         {/* Header skeleton */}
         <Skeleton className="h-9 w-40" />
 
-        {/* List skeleton – resembles shot tiles */}
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {/* List skeleton – resembles shot tiles with content-responsive columns */}
+        <div 
+          className={`grid gap-4`}
+          style={{ gridTemplateColumns: `repeat(${skeletonGridCols}, minmax(0, 1fr))` }}
+        >
           {Array.from({ length: 8 }).map((_, idx) => (
             <Skeleton key={idx} className="h-40 rounded-lg" />
           ))}
@@ -534,12 +546,18 @@ const VideoTravelToolPage: React.FC = () => {
     <div ref={mainContainerRef} className="w-full pt-5">
       {!shouldShowShotEditor ? (
         <>
-          <div className="flex justify-between items-center mb-6">
-            <h1 className="text-3xl font-bold">Travel Between Images</h1>
-            <Button onClick={() => setIsCreateShotModalOpen(true)}>Create New Shot</Button>
+          <div className={`flex ${isSm ? 'justify-between' : 'flex-col gap-4'} items-${isSm ? 'center' : 'start'} mb-6`}>
+            <h1 className={`${isLg ? 'text-3xl' : isSm ? 'text-2xl' : 'text-xl'} font-bold`}>Travel Between Images</h1>
+            {/* Only show header button when there are shots */}
+            {(!isLoading && shots && shots.length > 0) && (
+              <Button onClick={() => setIsCreateShotModalOpen(true)}>Create New Shot</Button>
+            )}
           </div>
           {isLoading ? (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <div 
+              className="grid gap-4"
+              style={{ gridTemplateColumns: `repeat(${skeletonGridCols}, minmax(0, 1fr))` }}
+            >
               {Array.from({ length: 8 }).map((_, idx) => (
                 <Skeleton key={idx} className="h-40 rounded-lg" />
               ))}
@@ -549,6 +567,7 @@ const VideoTravelToolPage: React.FC = () => {
               shots={shots || []}
               onSelectShot={handleShotSelect}
               currentProjectId={selectedProjectId}
+              onCreateNewShot={() => setIsCreateShotModalOpen(true)}
             />
           )}
         </>

@@ -944,6 +944,29 @@
     padding-top: 0rem !important;
     padding-bottom: 0rem !important;
   }
+
+  /* Content-responsive debugging info */
+  /* CSS custom properties set by Layout.tsx for content area dimensions */
+  /* --content-width: actual available content width in px */
+  /* --content-height: actual available content height in px */
+  /* --content-sm, --content-md, --content-lg, --content-xl, --content-2xl: 1 or 0 */
+  
+  /* Helper utilities for content-aware layouts */
+  .content-responsive-debug {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 8px;
+    font-size: 12px;
+    z-index: 10000;
+    border-radius: 4px;
+  }
+  
+  .content-responsive-debug::after {
+    content: 'Content: ' var(--content-width) 'x' var(--content-height) ' | SM:' var(--content-sm, 0) ' LG:' var(--content-lg, 0);
+  }
 }
 
 /* Timeline scrollbar always visible and styled */

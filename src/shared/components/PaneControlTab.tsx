@@ -19,22 +19,29 @@ interface PaneControlTabProps {
 const PaneControlTab: React.FC<PaneControlTabProps> = ({ side, isLocked, isOpen, toggleLock, openPane, paneDimension, bottomOffset = 0, handlePaneEnter, handlePaneLeave }) => {
   const isMobile = useIsMobile();
   
+  // Determine whether the pane is currently visible (same logic as useSlidingPane)
+  const isVisible = isLocked || (isOpen && !isLocked);
+
   const getDynamicStyle = (): React.CSSProperties => {
     const style: React.CSSProperties = {};
+
     if (side === 'left' || side === 'right') {
-        style.top = `calc(50% - ${bottomOffset / 2}px)`;
-        if(isLocked || (isOpen && !isLocked)) {
-            style.transform = side === 'left' ? 'translate(-50%, -50%)' : 'translate(50%, -50%)';
-            if(side === 'left') style.left = `${paneDimension}px`;
-            else style.right = `${paneDimension}px`;
-        } else {
-            style.transform = 'translateY(-50%)';
-        }
-    } else if (side === 'bottom' && (isLocked || (isOpen && !isLocked))) {
-        style.bottom = `${paneDimension}px`;
-        style.left = '50%';
-        style.transform = 'translate(-50%, 50%)';
+      style.top = `calc(50% - ${bottomOffset / 2}px)`; // keep vertically centred
+      // Anchor to the edge (left:0 / right:0) and slide with translateX so it
+      // uses the same transform compositor path as the pane itself.
+      if (side === 'left') {
+        style.left = '0px';
+        style.transform = `translateX(${isVisible ? paneDimension : 0}px) translateY(-50%)`;
+      } else {
+        style.right = '0px';
+        style.transform = `translateX(${isVisible ? -paneDimension : 0}px) translateY(-50%)`;
+      }
+    } else if (side === 'bottom') {
+      style.left = '50%';
+      style.bottom = '0px';
+      style.transform = `translateX(-50%) translateY(${isVisible ? -paneDimension : 0}px)`;
     }
+
     return style;
   };
 
@@ -70,7 +77,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({ side, isLocked, isOpen,
         data-pane-control
         style={getDynamicStyle()}
         className={cn(
-          'fixed z-[102] flex items-center p-1 bg-zinc-800/80 backdrop-blur-sm border border-zinc-700 rounded-md gap-1 transition-opacity duration-200',
+          'fixed z-[102] flex items-center p-1 bg-zinc-800/80 backdrop-blur-sm border border-zinc-700 rounded-md gap-1 transition-[transform,top] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]',
           getPositionClasses(),
           'opacity-100'
         )}
@@ -110,7 +117,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({ side, isLocked, isOpen,
         data-pane-control
         style={getDynamicStyle()}
         className={cn(
-          'fixed z-[101] flex items-center p-1 bg-zinc-800/90 backdrop-blur-sm border border-zinc-700 rounded-md transition-all duration-200',
+          'fixed z-[101] flex items-center p-1 bg-zinc-800/90 backdrop-blur-sm border border-zinc-700 rounded-md transition-[transform,top] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]',
           positionClass
         )}
         onMouseEnter={handlePaneEnter}
@@ -146,7 +153,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({ side, isLocked, isOpen,
         data-pane-control
         style={getDynamicStyle()}
         className={cn(
-          'fixed z-[101] flex items-center p-1 bg-zinc-800/90 backdrop-blur-sm border border-zinc-700 rounded-md transition-all duration-200',
+          'fixed z-[101] flex items-center p-1 bg-zinc-800/90 backdrop-blur-sm border border-zinc-700 rounded-md transition-[transform,top] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]',
           positionClass
         )}
       >
@@ -191,7 +198,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({ side, isLocked, isOpen,
       data-pane-control
       style={getDynamicStyle()}
       className={cn(
-        'fixed z-[102] flex items-center p-1 bg-zinc-800/80 backdrop-blur-sm border border-zinc-700 rounded-md gap-1 transition-opacity duration-200',
+        'fixed z-[102] flex items-center p-1 bg-zinc-800/80 backdrop-blur-sm border border-zinc-700 rounded-md gap-1 transition-[transform,top] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]',
         getPositionClasses(),
         isOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'
       )}

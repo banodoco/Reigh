@@ -485,10 +485,26 @@ python headless.py --db-type supabase \\
                     
                     {/* Mac Notice - Full Width */}
                     {computerType === "mac" && (
-                      <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                        <p className="text-sm text-yellow-800">
-                          You can't process tasks locally on a Mac yet.
-                        </p>
+                      <div className="p-4 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-xl shadow-sm">
+                        <div className="flex items-start space-x-3">
+                          <div className="flex-shrink-0">
+                            <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5" />
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-sm text-amber-800 leading-relaxed">
+                              You can't process tasks locally on a Mac yet.{" "}
+                              <button
+                                className="text-blue-600 hover:text-blue-700 underline font-medium transition-colors duration-200 hover:bg-blue-50 px-1 py-0.5 rounded"
+                                onClick={() => {
+                                  setOnComputerChecked(false);
+                                  setInCloudChecked(true);
+                                }}
+                              >
+                                Process in the cloud
+                              </button>
+                            </p>
+                          </div>
+                        </div>
                       </div>
                     )}
                     
