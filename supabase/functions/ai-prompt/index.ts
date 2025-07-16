@@ -48,9 +48,21 @@ serve(async (req) => {
 
         let systemMsg = `You are a helpful assistant that generates image prompts based on user input.
 
+        The user's request is as follows: ${overallPromptText}
+
 IMPORTANT: Each prompt you generate should be specifically designed for AI image generation. The prompts should follow the user's instruction. Unless the user requests otherwise, the prompts should be detailed, descriptive, and focus on visual elements like composition, lighting, style, colors, and atmosphere.
 
-Overall goal: ${overallPromptText}
+CRITICAL FORMATTING REQUIREMENTS:
+- Output EXACTLY ${numberToGenerate} prompts
+- Each prompt must be on its own line
+- NO numbering (1., 2., 3., etc.)
+- NO bullet points (-, *, •, etc.)
+- NO quotation marks around prompts
+- NO empty lines between prompts
+- NO additional formatting, markdown, or special characters
+- Each prompt should be a complete sentence or phrase
+
+IMPORTANT: The user's request is as follows: ${overallPromptText}
 Rules to remember: ${rulesToRememberText}`;
         
         if (existingPrompts.length) {
@@ -59,7 +71,14 @@ Rules to remember: ${rulesToRememberText}`;
         }
         
         const userMsg = overallPromptText || "Please generate general image prompts based on the overall goal and rules.";
-        const instruction = `Instruction: Generate ${numberToGenerate} distinct image generation prompts as a plain text list, each on a new line. Do not number them or add any other formatting. Each prompt should be detailed and optimized for AI image generation, focusing on visual descriptions, style, composition, lighting, and atmosphere.`;
+        const instruction = `Generate exactly ${numberToGenerate} distinct image generation prompts. Each prompt should be detailed and optimized for AI image generation, focusing on visual descriptions, style, composition, lighting, and atmosphere.
+
+FORMAT EXAMPLE (for 3 prompts):
+A majestic dragon soaring through storm clouds with lightning illuminating its scales, dramatic chiaroscuro lighting, fantasy art style
+A serene Japanese garden at dawn with cherry blossoms falling, soft golden hour lighting, peaceful atmosphere, traditional composition
+A futuristic cyberpunk cityscape at night with neon reflections on wet streets, high contrast lighting, noir aesthetic
+
+YOUR OUTPUT (${numberToGenerate} prompts):`;
 
         const resp = await openai.chat.completions.create({
           model: "o3-mini",
@@ -70,13 +89,38 @@ Rules to remember: ${rulesToRememberText}`;
         });
         const outputText = resp.choices[0]?.message?.content?.trim() || "";
         const prompts = outputText.split("\n").map((s) => s.trim()).filter(Boolean);
+        
+        // Validate we got the expected number of prompts
+        if (prompts.length !== numberToGenerate) {
+          console.warn(`[ai-prompt] Expected ${numberToGenerate} prompts but got ${prompts.length}. Adjusting...`);
+          // If we got too many, take the first N
+          if (prompts.length > numberToGenerate) {
+            prompts.splice(numberToGenerate);
+          }
+          // If we got too few, we'll just return what we have rather than failing
+        }
+        
         return jsonResponse({ prompts, usage: resp.usage });
       }
       case "edit_prompt": {
         const { originalPromptText = "", editInstructions = "", modelType = "fast" } = body;
         if (!originalPromptText || !editInstructions) return jsonResponse({ error: "originalPromptText and editInstructions required" }, 400);
-        const systemMsg = `You are an AI assistant that helps refine user prompts for image generation.\nYour task is to edit the provided image prompt based on the user's instructions.\nIMPORTANT: Only change what is specifically requested. Output only the revised prompt text. Keep it optimized for AI image generation with detailed visual descriptions.`;
-        const userMsg = `Original Image Prompt:\n"${originalPromptText}"\n\nEdit Instructions:\n"${editInstructions}"`;
+        const systemMsg = `You are an AI assistant that helps refine user prompts for image generation.
+
+Your task is to edit the provided image prompt based on the user's instructions.
+
+CRITICAL FORMATTING REQUIREMENTS:
+- Output ONLY the revised prompt text
+- NO additional commentary, explanations, or formatting
+- NO quotation marks around the output
+- Keep it optimized for AI image generation with detailed visual descriptions
+
+IMPORTANT: Only change what is specifically requested in the edit instructions.`;
+        const userMsg = `Original Image Prompt: ${originalPromptText}
+
+Edit Instructions: ${editInstructions}
+
+Revised Prompt:`;
         const model = modelType === "smart" ? "o3-mini" : "gpt-4o-mini";
         const resp = await openai.chat.completions.create({
           model,
@@ -95,7 +139,11 @@ Rules to remember: ${rulesToRememberText}`;
         if (!promptText) return jsonResponse({ error: "promptText required" }, 400);
         const resp = await openai.chat.completions.create({
           model: "gpt-4o-mini-2024-07-18",
-          messages: [{ role: "user", content: `Summarise this image prompt in <10 words:\n\n\"${promptText}\"` }],
+          messages: [{ role: "user", content: `Create a brief summary of this image prompt in 10 words or less. Output only the summary text with no additional formatting or quotation marks:
+
+"${promptText}"
+
+Summary:` }],
           temperature: 1,
           max_tokens: 50,
         });

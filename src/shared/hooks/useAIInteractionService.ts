@@ -31,7 +31,6 @@ export const useAIInteractionService = ({
           body: {
             task: 'generate_prompts',
             overallPromptText: params.overallPromptText,
-            specificPromptsText: params.specificPromptsText,
             rulesToRememberText: params.rulesToRememberText,
             numberToGenerate: params.numberToGenerate,
             existingPrompts: params.includeExistingContext ? params.existingPrompts ?? [] : [],

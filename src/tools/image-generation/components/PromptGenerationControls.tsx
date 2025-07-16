@@ -86,16 +86,16 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
       <h3 className="text-lg font-semibold flex items-center">
         <Wand2 className="mr-2 h-5 w-5" /> Generate New Prompts
       </h3>
-      <div>
+        <div>
         <Label htmlFor="gen_overallPromptText">What prompts would you like to generate?</Label>
-        <Textarea
-          id="gen_overallPromptText"
-          value={overallPromptText}
-          onChange={(e) => setOverallPromptText(e.target.value)}
+          <Textarea
+            id="gen_overallPromptText"
+            value={overallPromptText}
+            onChange={(e) => setOverallPromptText(e.target.value)}
           placeholder="e.g., A medieval fantasy adventure with dragons and magic..."
           rows={4}
-          disabled={!hasApiKey || isGenerating}
-        />
+            disabled={!hasApiKey || isGenerating}
+          />
       </div>
       <div>
         <Label htmlFor="gen_rulesToRememberText">Rules/Constraints</Label>
