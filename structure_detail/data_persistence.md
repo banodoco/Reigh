@@ -179,6 +179,6 @@ export function MyTool() {
 
 **📚 Related Documentation**
 
-[Adding a Tool](./adding_new_tool.md) • [Database Overview](./db_overview.md) • [Back to Structure](../structure.md)
+[Adding a Tool](./adding_new_tool.md) • [Database & Storage](./db_and_storage.md) • [Back to Structure](../structure.md)
 
 </div>

@@ -1,6 +1,6 @@
-# 🗄️ Database Overview & Workflow
+# 🗄️ Database & Storage Overview
 
-> **Quick Reference**: Schema management, migrations, and database introspection for Reigh.
+> **Quick Reference**: Schema management, migrations, database introspection, and storage buckets for Reigh.
 
 ---
 
@@ -31,6 +31,17 @@ supabase db push           # Applies all pending migrations
 -- Create in /supabase/migrations/[timestamp]_my_feature.sql
 -- Then run: supabase db push
 ```
+
+---
+
+## 🗂️ Storage Buckets Map
+
+| Bucket | Access | Purpose | Notes |
+|--------|--------|---------|-------|
+| **`public`** | ✅ Public | Generated media | Default Supabase bucket |
+| **`training-data`** | 🔒 RLS | Training videos | Owner-restricted access |
+| **`lora_files`** | ✅ Public | LoRA models | User uploads |
+| *(others)* | — | Various | Check `/supabase/migrations/` |
 
 ---
 
@@ -173,4 +184,4 @@ supabase/
 
 [Schema File](../db/schema/schema.ts) • [Migrations](../db/migrations/) • [Back to Structure](../structure.md)
 
-</div> 
+</div>

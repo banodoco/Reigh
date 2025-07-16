@@ -31,7 +31,7 @@
 | Topic | File | Description |
 |-------|------|-------------|
 | **Development Setup** | [README.md](README.md) | Local environment setup, commands, troubleshooting |
-| **Database** | [db_overview.md](structure_detail/db_overview.md) | Schema map, migration workflow, table reference |
+| **Database & Storage** | [db_and_storage.md](structure_detail/db_and_storage.md) | Schema map, migration workflow, storage buckets |
 | **Data Persistence** | [data_persistence.md](structure_detail/data_persistence.md) | State management patterns, hooks, storage layers |
 | **Task System** | [task_worker_lifecycle.md](structure_detail/task_worker_lifecycle.md) | Async task queue, worker polling, Edge Functions |
 | **Adding Tools** | [adding_new_tool.md](structure_detail/adding_new_tool.md) | Step-by-step guide for new tool modules |
@@ -87,7 +87,7 @@ This document is meant to serve as a comprehensive view of Reigh's architecture.
 
 | Topic | Documentation | Description |
 |-------|---------------|-------------|
-| **Database** | [`db_overview.md`](structure_detail/db_overview.md) | Schema, migrations, RLS policies |
+| **Database & Storage** | [`db_and_storage.md`](structure_detail/db_and_storage.md) | Schema, migrations, RLS policies, storage buckets |
 | **Persistence** | [`data_persistence.md`](structure_detail/data_persistence.md) | State management & storage patterns |
 | **Adding Tools** | [`adding_new_tool.md`](structure_detail/adding_new_tool.md) | Step-by-step tool creation guide |
 | **Design System** | [`design_motion_guidelines.md`](structure_detail/design_motion_guidelines.md) | UI/UX standards & animations |
@@ -132,6 +132,8 @@ See `.env.example` for all variables. Key ones:
 | `calculate-task-cost` | Credit calculation | `/supabase/functions/` |
 
 ---
+
+
 
 ### 📄 Top-Level Pages (`/src/pages/`)
 
@@ -204,18 +206,9 @@ For the complete catalog, see [`shared_hooks_contexts.md`](structure_detail/shar
 
 Reigh uses an async task queue for AI workloads. For the complete flow diagram and implementation details, see [structure_detail/task_worker_lifecycle.md](structure_detail/task_worker_lifecycle.md).
 
-## 5. Storage Buckets Map
 
-| Bucket | Access | Purpose | Notes |
-|--------|--------|---------|-------|
-| **`public`** | ✅ Public | Generated media | Default Supabase bucket |
-| **`training-data`** | 🔒 RLS | Training videos | Owner-restricted access |
-| **`lora_files`** | ✅ Public | LoRA models | User uploads |
-| *(others)* | — | Various | Check `/supabase/migrations/` |
 
----
-
-## 6. Development Workflow
+## 5. Development Workflow
 
 See [README.md](README.md) for:
 - Local environment setup (5-min quickstart)
@@ -229,6 +222,6 @@ See [README.md](README.md) for:
 
 **🎯 Quick Links**
 
-[Back to Top](#-reigh-developer-onboarding) • [Add a Tool](structure_detail/adding_new_tool.md) • [Database](structure_detail/db_overview.md) • [Persistence](structure_detail/data_persistence.md)
+[Back to Top](#-reigh-developer-onboarding) • [Add a Tool](structure_detail/adding_new_tool.md) • [Database & Storage](structure_detail/db_and_storage.md) • [Persistence](structure_detail/data_persistence.md)
 
 </div>
