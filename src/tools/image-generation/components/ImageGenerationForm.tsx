@@ -374,7 +374,7 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
       };
       const updatedLoras = [...selectedLoras, newLora];
       setSelectedLoras(updatedLoras);
-      toast.success(`LoRA added.`);
+
     } else { toast.error("Selected LoRA has no model file specified."); }
   };
   const handleRemoveLora = (loraIdToRemove: string) => {

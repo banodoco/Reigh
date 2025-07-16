@@ -199,7 +199,7 @@ export function useCredits() {
       // Invalidate balance and ledger to refresh
       queryClient.invalidateQueries({ queryKey: ['credits', 'balance'] });
       queryClient.invalidateQueries({ queryKey: ['credits', 'ledger'] });
-      toast.success('Credits granted successfully');
+      
     },
     onError: (error) => {
       toast.error(error.message || 'Failed to grant credits');

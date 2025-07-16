@@ -407,7 +407,7 @@ export function VideoSegmentEditor({ video, segments, onCreateSegment, onDeleteS
 
   const jumpToTime = (time: number) => {
     seekTo(time);
-    toast.success(`Jumped to ${formatTime(time)}`);
+    
   };
 
   // Jump back by exactly 0.25 seconds using the *live* video time to avoid stale state
@@ -441,11 +441,11 @@ export function VideoSegmentEditor({ video, segments, onCreateSegment, onDeleteS
         setStartFrameImage(frameImage);
         // Keep the existing end frame image since the old start becomes the end
         
-        toast.success(`Reordered markers: new start at ${formatTime(actualTime)}, end at ${formatTime(segmentStartTime)}`);
+
       } catch (error) {
         console.error('Error capturing start frame:', error);
         setStartFrameImage(null);
-        toast.success(`Reordered markers: new start at ${formatTime(actualTime)}, end at ${formatTime(segmentStartTime)} (frame preview unavailable)`);
+
       }
     } else {
       // Normal behavior: set start time
@@ -460,14 +460,14 @@ export function VideoSegmentEditor({ video, segments, onCreateSegment, onDeleteS
         setStartFrameImage(frameImage);
         
         if (frameImage) {
-          toast.success('Segment start time set to ' + formatTime(actualTime));
+  
         } else {
-          toast.success('Segment start time set to ' + formatTime(actualTime) + ' (frame preview unavailable)');
+          
         }
       } catch (error) {
         console.error('Error capturing start frame:', error);
         setStartFrameImage(null);
-        toast.success('Segment start time set to ' + formatTime(actualTime) + ' (frame preview unavailable)');
+        
       }
     }
   };
@@ -493,11 +493,11 @@ export function VideoSegmentEditor({ video, segments, onCreateSegment, onDeleteS
         setStartFrameImage(frameImage);
         // Keep existing end frame image since old start becomes end
         
-        toast.success(`Reordered markers: start at ${formatTime(actualTime)}, end at ${formatTime(oldStart)}`);
+
       } catch (error) {
         console.error('Error capturing start frame:', error);
         setStartFrameImage(null);
-        toast.success(`Reordered markers: start at ${formatTime(actualTime)}, end at ${formatTime(oldStart)} (frame preview unavailable)`);
+
       }
     } else if (actualTime <= segmentStartTime + 0.001) { // Add small tolerance for floating point comparison
       toast.error('End time must be after start time');
@@ -512,14 +512,14 @@ export function VideoSegmentEditor({ video, segments, onCreateSegment, onDeleteS
         setEndFrameImage(frameImage);
         
         if (frameImage) {
-          toast.success('Segment end time set to ' + formatTime(actualTime));
+  
         } else {
-          toast.success('Segment end time set to ' + formatTime(actualTime) + ' (frame preview unavailable)');
+          
         }
       } catch (error) {
         console.error('Error capturing end frame:', error);
         setEndFrameImage(null);
-        toast.success('Segment end time set to ' + formatTime(actualTime) + ' (frame preview unavailable)');
+        
       }
     }
   };
@@ -551,7 +551,7 @@ export function VideoSegmentEditor({ video, segments, onCreateSegment, onDeleteS
         jumpToTime(targetJumpTime);
       }, 100);
       
-      toast.success('Segment created successfully');
+
     } catch (error) {
       console.error('[VideoSegmentEditor] Failed to create segment:', error);
       toast.error('Failed to create segment');
@@ -576,7 +576,7 @@ export function VideoSegmentEditor({ video, segments, onCreateSegment, onDeleteS
     
     // Just seek to the start of the segment without auto-playing
     seekTo(startTime);
-    toast.success(`Jumped to segment: ${formatDuration(segment.startTime)} - ${formatDuration(segment.endTime)}`);
+    
   };
 
   const formatTime = (seconds: number) => {
@@ -593,7 +593,7 @@ export function VideoSegmentEditor({ video, segments, onCreateSegment, onDeleteS
 
   const handleDeleteSegment = (segmentId: string) => {
     onDeleteSegment(segmentId);
-    toast.success('Segment deleted');
+    
   };
 
   const handleDeleteLastSegment = () => {
@@ -602,12 +602,12 @@ export function VideoSegmentEditor({ video, segments, onCreateSegment, onDeleteS
       // Remove end time
       setSegmentEndTime(null);
       setEndFrameImage(null);
-      toast.success('Removed end time mark');
+
     } else if (segmentStartTime !== null) {
       // Remove start time
       setSegmentStartTime(null);
       setStartFrameImage(null);
-      toast.success('Removed start time mark');
+
     } else {
       toast.error('No marks to remove');
     }
@@ -633,7 +633,7 @@ export function VideoSegmentEditor({ video, segments, onCreateSegment, onDeleteS
       setSegmentStartTime(null);
       setSegmentEndTime(null);
       setDescription('');
-      toast.success('Segment updated successfully');
+
     } catch (error) {
       toast.error('Failed to update segment');
     }

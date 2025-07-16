@@ -45,7 +45,7 @@ export const useCreateShot = () => {
     },
     onSuccess: (newShot) => {
       queryClient.invalidateQueries({ queryKey: ['shots'] });
-      toast.success(`Shot "${newShot.shot.name}" created successfully`);
+      
     },
     onError: (error: Error) => {
       console.error('Error creating shot:', error);
@@ -190,7 +190,7 @@ export const useDuplicateShot = () => {
         queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
       }
       if (!error && data) {
-        toast.success(`Shot "${data.name}" duplicated successfully!`);
+  
       }
     },
   });
@@ -460,7 +460,7 @@ export const useDeleteShot = () => {
     },
     onSuccess: (_, { projectId }) => {
       queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
-      toast.success('Shot deleted');
+
     },
     onError: (error: Error) => {
       console.error('Error deleting shot:', error);
@@ -498,7 +498,7 @@ export const useUpdateShotName = () => {
     },
     onSuccess: (_, { projectId }) => {
       queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
-      toast.success('Shot name updated');
+
     },
     onError: (error: Error) => {
       console.error('Error updating shot name:', error);
@@ -612,7 +612,7 @@ export const useHandleExternalImageDrop = () => {
         });
         if (result && result.shot && result.shot.id) {
           shotId = result.shot.id;
-          toast.success(`New shot "${newShotName}" created!`);
+    
         } else {
           toast.error("Failed to create new shot.");
           return null;
@@ -634,7 +634,7 @@ export const useHandleExternalImageDrop = () => {
             toast.error(`Failed to upload image ${imageFile.name} to storage.`);
             continue; // Skip to next file
           }
-          toast.success(`Image ${imageFile.name} uploaded to storage!`);
+  
 
           // 2b. Create a generation record for the uploaded image
           try {
@@ -658,7 +658,7 @@ export const useHandleExternalImageDrop = () => {
             thumbUrl: newGeneration.location || undefined,
           });
           generationIds.push(newGeneration.id as string);
-          toast.success(`Image ${imageFile.name} added to shot!`);
+  
 
         } catch (fileError) {
             console.error(`[useShots] Error processing file ${imageFile.name}:`, fileError);

@@ -159,7 +159,7 @@ export const useFalImageGeneration = (): UseFalImageGenerationResult => {
           try {
             userImageUrl = await uploadImageToStorage(startingImageFile);
             if (userImageUrl) {
-              toast.success("Starting image uploaded successfully!");
+      
             } else {
               toast.error("Starting image upload failed. Task creation via API might fail or proceed without it if allowed by worker.");
             }
@@ -254,7 +254,7 @@ export const useFalImageGeneration = (): UseFalImageGenerationResult => {
 
         const taskIdStr = String(taskId);
         console.log(`[useFalImageGeneration] Task created via Supabase (type: ${toolType}):`, { taskId: taskIdStr });
-        toast.success(`Task '${toolType}' (ID: ${taskIdStr.substring(0,8)}) created successfully via Supabase.`);
+
         return { taskId: taskIdStr };
 
       } catch (err: any) {

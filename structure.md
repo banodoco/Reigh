@@ -167,7 +167,7 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
 ##### Active Edge Functions:
 - `single-image-generate`: Handles wan-local image generation tasks
 - `steerable-motion`: Handles video travel generation tasks
-- `ai-prompt`: Unified prompt generation, editing, and summary tasks via OpenAI server-side
+- `ai-prompt`: Unified image prompt generation, editing, and summary tasks via OpenAI server-side. Emphasizes detailed visual descriptions optimized for AI image generation.
 - `create_task`: Creates tasks in the queue (replaced Express task creation)
 - `calculate-task-cost`: Calculates task costs and updates credit ledger
 - `stripe-checkout`: Creates Stripe checkout sessions for credit purchases (placeholder)
@@ -261,7 +261,7 @@ This document is meant to sereve as a comprehensive view of Reigh's archtiecture
 - **ImageGallery.tsx**: Displays generated images; supports delete, upscale, "apply settings", drag-to-shot, and navigation between images in fullscreen modal
 - **ImageDragPreview.tsx**: Renders the visual preview for single or multiple images being dragged from the ShotImageManager
 - **SettingsModal.tsx**: Modal for API key entry/saving to database (uses useApiKeys hook). Replaces localStorage-based approach
-- **PromptEditorModal.tsx**: Modal for bulk prompt editing, AI-assisted generation/refinement
+- **PromptEditorModal.tsx**: Modal for bulk image prompt editing, AI-assisted generation/refinement. Simplified interface with single prompt field "What prompts would you like to generate?" and existing prompts included as context by default.
 - **LoraSelectorModal.tsx**: Browse/select LoRA models. Supports filtering by `lora_type` (e.g., "Flux.dev", "Wan 2.1 14b")
 - **CreateProjectModal.tsx**: Dialog to create new project (uses ProjectContext.addNewProject). Project names are limited to 30 characters maximum.
 - **ProjectSettingsModal.tsx**: Dialog to update project name/aspect ratio (uses ProjectContext.updateProject). Project names are limited to 30 characters maximum. Includes "Crop to project size when uploading images" checkbox that persists across sessions

@@ -309,7 +309,7 @@ export const saveReconstructedVideo = async ({
       throw new Error(`Could not get public URL for uploaded ${generationMode} video from Supabase.`);
     }
     finalVideoUrlForDbAndDisplay = publicUrlData.publicUrl;
-    toast.success(`Reconstructed ${toolTypeSuffix} video uploaded to gallery storage.`);
+    
     console.log(`[saveReconstructedVideo] ${toolTypeSuffix} video successfully uploaded to Supabase: ${finalVideoUrlForDbAndDisplay}`);
 
   } catch (storageError: any) {
@@ -359,7 +359,7 @@ export const saveReconstructedVideo = async ({
         isVideo: true,
       };
       setGeneratedImages((prev) => [newVideoEntry, ...prev]);
-      toast.success(`Reconstructed ${toolTypeSuffix} video (client-side) saved and added to gallery.`);
+      
       console.log(`[saveReconstructedVideo] ${toolTypeSuffix} video record saved to DB and gallery updated.`);
       return true;
     }

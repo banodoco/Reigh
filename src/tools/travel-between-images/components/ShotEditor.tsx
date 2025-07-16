@@ -611,7 +611,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       queryClient.invalidateQueries({ queryKey: ['generations', selectedProjectId] });
 
       console.log(`[ShotEditor-HandleImageSaved] Complete process finished successfully`);
-      toast.success("Image updated successfully!");
+    
     } catch (error) {
       console.error("[ShotEditor-HandleImageSaved] Unexpected error:", error);
       toast.error("Failed to update image.");
@@ -873,7 +873,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         await handleReplaceImagesFromTask(inputImages);
       }
       
-      toast.success('Settings applied successfully!');
+
     } catch (error) {
       console.error('Error applying settings from task:', error);
       toast.error('Failed to apply settings from task');
@@ -956,7 +956,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       handleReplaceImagesFromTask(settings.inputImages);
     }
 
-    toast.success('Settings applied successfully!');
+
   };
 
   const handleReplaceImagesFromTask = async (inputImages: string[]) => {
@@ -1050,7 +1050,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       // Refresh the shot data
       onShotImagesUpdate();
       
-      toast.success(`Successfully replaced images with ${inputImages.length} images from the previous generation!`);
+
     } catch (error: any) {
       console.error('Error replacing images:', error);
       toast.error(`Failed to replace images: ${error.message}`);

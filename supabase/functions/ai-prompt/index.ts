@@ -41,19 +41,25 @@ serve(async (req) => {
       case "generate_prompts": {
         const {
           overallPromptText = "",
-          specificPromptsText = "",
           rulesToRememberText = "",
           numberToGenerate = 3,
           existingPrompts = [],
         } = body;
 
-        let systemMsg = `You are a helpful assistant that generates a list of prompts based on user input.\nOverall goal: ${overallPromptText}\nRules to remember: ${rulesToRememberText}`;
+        let systemMsg = `You are a helpful assistant that generates image prompts based on user input.
+
+IMPORTANT: Each prompt you generate should be specifically designed for AI image generation. The prompts should follow the user's instruction. Unless the user requests otherwise, the prompts should be detailed, descriptive, and focus on visual elements like composition, lighting, style, colors, and atmosphere.
+
+Overall goal: ${overallPromptText}
+Rules to remember: ${rulesToRememberText}`;
+        
         if (existingPrompts.length) {
           const ctx = existingPrompts.map((p: any) => `- ${typeof p === "string" ? p : p.text ?? ""}`).join("\n");
-          systemMsg += `\n\nExisting Prompts for Context (do not repeat these, but use them as inspiration for new, distinct ideas):\n${ctx}`;
+          systemMsg += `\n\nExisting Prompts for Context (do not repeat these, but use them as inspiration for new, distinct image generation ideas):\n${ctx}`;
         }
-        const userMsg = specificPromptsText || "Please generate general prompts based on the overall goal and rules.";
-        const instruction = `Instruction: Generate ${numberToGenerate} distinct prompts as a plain text list, each on a new line. Do not number them or add any other formatting.`;
+        
+        const userMsg = overallPromptText || "Please generate general image prompts based on the overall goal and rules.";
+        const instruction = `Instruction: Generate ${numberToGenerate} distinct image generation prompts as a plain text list, each on a new line. Do not number them or add any other formatting. Each prompt should be detailed and optimized for AI image generation, focusing on visual descriptions, style, composition, lighting, and atmosphere.`;
 
         const resp = await openai.chat.completions.create({
           model: "o3-mini",
@@ -69,8 +75,8 @@ serve(async (req) => {
       case "edit_prompt": {
         const { originalPromptText = "", editInstructions = "", modelType = "fast" } = body;
         if (!originalPromptText || !editInstructions) return jsonResponse({ error: "originalPromptText and editInstructions required" }, 400);
-        const systemMsg = `You are an AI assistant that helps refine user prompts.\nYour task is to edit the provided prompt based on the user's instructions.\nIMPORTANT: Only change what is specifically requested. Output only the revised prompt text.`;
-        const userMsg = `Original Prompt:\n"${originalPromptText}"\n\nEdit Instructions:\n"${editInstructions}"`;
+        const systemMsg = `You are an AI assistant that helps refine user prompts for image generation.\nYour task is to edit the provided image prompt based on the user's instructions.\nIMPORTANT: Only change what is specifically requested. Output only the revised prompt text. Keep it optimized for AI image generation with detailed visual descriptions.`;
+        const userMsg = `Original Image Prompt:\n"${originalPromptText}"\n\nEdit Instructions:\n"${editInstructions}"`;
         const model = modelType === "smart" ? "o3-mini" : "gpt-4o-mini";
         const resp = await openai.chat.completions.create({
           model,
@@ -89,7 +95,7 @@ serve(async (req) => {
         if (!promptText) return jsonResponse({ error: "promptText required" }, 400);
         const resp = await openai.chat.completions.create({
           model: "gpt-4o-mini-2024-07-18",
-          messages: [{ role: "user", content: `Summarise in <10 words:\n\n\"${promptText}\"` }],
+          messages: [{ role: "user", content: `Summarise this image prompt in <10 words:\n\n\"${promptText}\"` }],
           temperature: 1,
           max_tokens: 50,
         });
@@ -103,4 +109,4 @@ serve(async (req) => {
     console.error(`[ai-prompt] Error handling task ${task}:`, err?.message || err);
     return jsonResponse({ error: "Internal server error", details: err?.message }, 500);
   }
-}); 
+}) 

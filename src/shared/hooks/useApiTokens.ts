@@ -97,7 +97,7 @@ export const useApiTokens = () => {
     mutationFn: revokeApiToken,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['apiTokens'] });
-      toast.success('API token revoked successfully');
+      
     },
     onError: (error: Error) => {
       console.error('Error revoking API token:', error);
@@ -115,7 +115,7 @@ export const useApiTokens = () => {
     onSuccess: (data) => {
       setGeneratedToken(data.token);
       queryClient.invalidateQueries({ queryKey: ['apiTokens'] });
-      toast.success('API Token refreshed');
+      
     },
     onError: (error: Error) => {
       console.error('Error refreshing token:', error);

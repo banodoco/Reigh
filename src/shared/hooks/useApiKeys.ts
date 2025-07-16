@@ -89,7 +89,7 @@ export const useApiKeys = () => {
     mutationFn: updateApiKeys,
     onSuccess: (updatedKeys) => {
       queryClient.setQueryData(['apiKeys'], updatedKeys);
-      toast.success('API keys updated successfully');
+
     },
     onError: (error: Error) => {
       console.error('Error updating API keys:', error);

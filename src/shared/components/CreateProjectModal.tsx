@@ -53,7 +53,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, 
     try {
       const newProject = await addNewProject({ name: finalProjectName, aspectRatio: aspectRatio });
       if (newProject) {
-        toast.success(`Project "${newProject.name}" created successfully!`);
+  
         setProjectName('');
         setAspectRatio(ASPECT_RATIOS[0].value);
         onOpenChange(false);

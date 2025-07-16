@@ -209,7 +209,7 @@ export function useTrainingData() {
       const newBatch = transformBatch(data);
       setBatches(prev => [newBatch, ...prev]);
       setSelectedBatchId(newBatch.id);
-      toast.success('Batch created successfully!');
+
       return newBatch.id;
     } catch (error) {
       console.error('Error creating batch:', error);
@@ -235,7 +235,7 @@ export function useTrainingData() {
 
       // Update local state
       setBatches(prev => prev.map(b => b.id === id ? transformBatch(data) : b));
-      toast.success('Batch updated successfully!');
+
     } catch (error) {
       console.error('Error updating batch:', error);
       toast.error('Failed to update batch');
@@ -268,7 +268,7 @@ export function useTrainingData() {
         setSelectedBatchId(remainingBatches.length > 0 ? remainingBatches[0].id : null);
       }
 
-      toast.success('Batch deleted successfully');
+
     } catch (error) {
       console.error('Error deleting batch:', error);
       toast.error('Failed to delete batch');
@@ -401,7 +401,7 @@ export function useTrainingData() {
        // Refresh one more time to ensure URLs are generated
        await fetchVideos();
        
-       toast.success(`Successfully uploaded ${videoFiles.length} video(s)`);
+       
      } catch (error) {
        console.error('Error uploading videos:', error);
        throw error;

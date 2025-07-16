@@ -317,7 +317,7 @@ File Size: ${segmentBlob.size} bytes`;
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      toast.success(`Successfully downloaded ${processedSegments} segments!`);
+      
 
     } catch (error) {
       console.error('Error preparing download:', error);

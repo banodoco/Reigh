@@ -34,33 +34,19 @@ if (typeof window !== 'undefined') {
     
     const pool = new Pool({
       connectionString,
-      // Enhanced connection pool configuration for Supabase
-      max: 10, // Increased maximum number of connections in the pool
-      min: 2, // Maintain at least 2 connections to prevent cold starts
-      idleTimeoutMillis: 60000, // Increased to 60 seconds - keep connections alive longer
-      connectionTimeoutMillis: 20000, // Increased timeout for new connections
-      allowExitOnIdle: false, // Don't allow process to exit when connections are idle
-      statement_timeout: 0, // Disable statement timeout (let queries run as needed)
-      query_timeout: 30000, // Set query timeout to 30 seconds
+      // Connection pool configuration for Supabase
+      max: 5, // Maximum number of connections in the pool
+      min: 1, // Minimum number of connections in the pool
+      idleTimeoutMillis: 30000, // Close idle connections after 30 seconds
+      connectionTimeoutMillis: 10000, // Timeout for new connections
+      allowExitOnIdle: true, // Allow the process to exit when all connections are idle
     });
 
-    // Enhanced error handling for the connection pool
+    // Handle unexpected errors on idle clients so they don't crash the process
     pool.on('error', (err) => {
       console.error('[DB] Unexpected error on idle PostgreSQL client', err);
-      // Log additional details about the error
-      if (err.message.includes('db_termination')) {
-        console.error('[DB] Database termination detected - this may indicate Supabase connection limits or network issues');
-      }
-      // The pool will automatically remove the broken client and create a new one
-    });
-
-    // Add connection event logging to better understand connection lifecycle
-    pool.on('connect', (client) => {
-      console.log('[DB] New PostgreSQL client connected to database');
-    });
-
-    pool.on('remove', (client) => {
-      console.log('[DB] PostgreSQL client removed from pool');
+      // The pool will automatically remove the broken client and will create a new one
+      // for the next query, so we just log here instead of letting the error bubble up.
     });
 
     // Pass the imported schema to Drizzle for relational queries

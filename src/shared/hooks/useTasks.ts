@@ -65,7 +65,7 @@ export const useCreateTask = (options?: { showToast?: boolean }) => {
     onSuccess: (data, variables) => {
       // Show per-task success toast only if not suppressed
       if (showToast) {
-        toast.success(`Task created successfully!`);
+  
       }
       
       // Invalidate the tasks query to trigger a refetch

@@ -7,7 +7,6 @@ export interface AIPromptItem {
 
 export interface GeneratePromptsParams {
   overallPromptText: string;
-  specificPromptsText: string;
   rulesToRememberText: string;
   numberToGenerate: number;
   existingPrompts?: AIPromptItem[];         // Renamed and kept optional

@@ -712,7 +712,7 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
             setMainGenerationIndex(0);
             setFileInputKey(prev => prev + 1); // Reset file input
 
-            toast.success("LoRA added successfully!");
+      
             
             // Switch to browse tab to show the newly added LoRA
             onSwitchToBrowse();

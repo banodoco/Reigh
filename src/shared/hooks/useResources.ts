@@ -78,7 +78,7 @@ export const useCreateResource = () => {
         },
         onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: ['resources', data.type] });
-            toast.success(`LoRA "${data.metadata.Name}" added to your collection.`);
+    
         },
         onError: (error) => {
             toast.error(error.message);
@@ -104,7 +104,7 @@ export const useDeleteResource = () => {
         },
         onSuccess: (data, variables) => {
             queryClient.invalidateQueries({ queryKey: ['resources', variables.type] });
-            toast.success(`LoRA removed from your collection.`);
+    
         },
         onError: (error) => {
             toast.error(error.message);

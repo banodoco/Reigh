@@ -53,11 +53,9 @@ export function useTaskCost() {
       queryClient.invalidateQueries({ queryKey: ['credits', 'balance'] });
       queryClient.invalidateQueries({ queryKey: ['credits', 'ledger'] });
       
-      // Show success toast with cost information
+      // Task cost calculated
       const costInDollars = (data.cost / 100).toFixed(2);
-      toast.success(`Task cost calculated: $${costInDollars} for ${data.duration_seconds}s`, {
-        description: `Task: ${data.task_type}`,
-      });
+      console.log(`Task cost calculated: $${costInDollars} for ${data.duration_seconds}s - Task: ${data.task_type}`);
     },
     onError: (error) => {
       console.error('Error calculating task cost:', error);

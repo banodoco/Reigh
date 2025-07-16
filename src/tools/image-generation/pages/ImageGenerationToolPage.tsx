@@ -170,7 +170,7 @@ const ImageGenerationToolPage: React.FC = () => {
       }
 
       const upscaledImageUrl = functionData.upscaledImageUrl;
-      toast.success(`Debug upscale successful! Mock URL: ${upscaledImageUrl}. Message: ${functionData.message}`, { id: toastId, duration: 5000 });
+      
 
       const newMetadata: DisplayableMetadata = {
         ...(currentMetadata || {}),
@@ -290,7 +290,7 @@ const ImageGenerationToolPage: React.FC = () => {
         await queryClient.refetchQueries({ queryKey: ['tasks', selectedProjectId] });
 
         setIsCreatingTasks(false);
-        toast.success(`1 task added`);
+  
         setPendingTasksInfo(null);
       } catch (err) {
         console.error('[ImageGeneration] Error creating task:', err);
@@ -307,7 +307,7 @@ const ImageGenerationToolPage: React.FC = () => {
     if (isCreatingTasks && pendingTasksInfo && projectTasks) {
       if (projectTasks.length >= pendingTasksInfo.initial + pendingTasksInfo.expected) {
         setIsCreatingTasks(false);
-        toast.success(`${pendingTasksInfo.expected} tasks added`);
+  
         setPendingTasksInfo(null);
       }
     }
@@ -343,7 +343,7 @@ const ImageGenerationToolPage: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['generations', selectedProjectId] });
 
       console.log(`[ImageGeneration-HandleImageSaved] Complete process finished successfully`);
-      toast.success("Image updated successfully!");
+      
     } catch (error) {
       console.error("[ImageGeneration-HandleImageSaved] Unexpected error:", error);
       toast.error("Failed to update image.");

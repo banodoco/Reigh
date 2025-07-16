@@ -158,7 +158,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const handleCopyToken = () => {
     if (generatedToken) {
       navigator.clipboard.writeText(generatedToken);
-      toast.success("Token copied to clipboard");
+
     }
   };
 

@@ -176,7 +176,7 @@ const EditTravelToolPage: React.FC = () => {
     try {
       toast.info("Uploading input file...");
       uploadedInputUrl = await uploadImageToStorage(inputFile);
-      toast.success("Input file uploaded!");
+      
     } catch (uploadError: any) {
       console.error("Error uploading input file:", uploadError);
       toast.error(`Failed to upload input file: ${uploadError.message || 'Unknown error'}`);
@@ -210,7 +210,7 @@ const EditTravelToolPage: React.FC = () => {
       if (error) throw error;
 
       if (newTask) {        
-        toast.success(`${generationMode.charAt(0).toUpperCase() + generationMode.slice(1)} task created (ID: ${newTask.id.substring(0,8)}...).`);
+  
         if (showPlaceholders) setShowPlaceholders(false);
         queryClient.invalidateQueries({ queryKey: ['shots', selectedProjectId] });
       }

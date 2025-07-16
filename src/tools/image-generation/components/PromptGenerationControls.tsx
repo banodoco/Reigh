@@ -9,7 +9,6 @@ import { Wand2 } from 'lucide-react';
 
 export interface GenerationControlValues {
   overallPromptText: string;
-  specificPromptsText: string;
   rulesToRememberText: string;
   numberToGenerate: number;
   includeExistingContext: boolean;
@@ -34,19 +33,17 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
   onValuesChange,
 }) => {
   const [overallPromptText, setOverallPromptText] = useState(initialValues?.overallPromptText || '');
-  const [specificPromptsText, setSpecificPromptsText] = useState(initialValues?.specificPromptsText || '');
   const [rulesToRememberText, setRulesToRememberText] = useState(initialValues?.rulesToRememberText || '');
   const [numberToGenerate, setNumberToGenerate] = useState<number>(initialValues?.numberToGenerate || 3);
-  const [includeExistingContext, setIncludeExistingContext] = useState(initialValues?.includeExistingContext || false);
+  const [includeExistingContext, setIncludeExistingContext] = useState(initialValues?.includeExistingContext ?? true);
   const [addSummary, setAddSummary] = useState(initialValues?.addSummary || false);
 
   useEffect(() => {
     if (initialValues) {
       setOverallPromptText(initialValues.overallPromptText || '');
-      setSpecificPromptsText(initialValues.specificPromptsText || '');
       setRulesToRememberText(initialValues.rulesToRememberText || '');
       setNumberToGenerate(initialValues.numberToGenerate || 3);
-      setIncludeExistingContext(initialValues.includeExistingContext || false);
+      setIncludeExistingContext(initialValues.includeExistingContext ?? true);
       setAddSummary(initialValues.addSummary || false);
     }
   }, [initialValues]);
@@ -55,7 +52,6 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
     if (onValuesChange) {
       onValuesChange({
         overallPromptText,
-        specificPromptsText,
         rulesToRememberText,
         numberToGenerate,
         includeExistingContext,
@@ -63,7 +59,7 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
       });
     }
   }, [
-    overallPromptText, specificPromptsText, rulesToRememberText, 
+    overallPromptText, rulesToRememberText, 
     numberToGenerate, includeExistingContext, addSummary, 
     onValuesChange
   ]);
@@ -78,7 +74,6 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
     }
     await onGenerate({
       overallPromptText,
-      specificPromptsText,
       rulesToRememberText,
       numberToGenerate,
       existingPrompts: includeExistingContext ? existingPromptsForContext : undefined,
@@ -91,29 +86,16 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
       <h3 className="text-lg font-semibold flex items-center">
         <Wand2 className="mr-2 h-5 w-5" /> Generate New Prompts
       </h3>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="gen_overallPromptText">Overall Context/Story</Label>
-          <Textarea
-            id="gen_overallPromptText"
-            value={overallPromptText}
-            onChange={(e) => setOverallPromptText(e.target.value)}
-            placeholder="e.g., A medieval fantasy adventure..."
-            rows={3}
-            disabled={!hasApiKey || isGenerating}
-          />
-        </div>
-        <div>
-          <Label htmlFor="gen_specificPromptsText">Specific Focus for New Prompts</Label>
-          <Textarea
-            id="gen_specificPromptsText"
-            value={specificPromptsText}
-            onChange={(e) => setSpecificPromptsText(e.target.value)}
-            placeholder="e.g., Describe a hidden elven village..."
-            rows={3}
-            disabled={!hasApiKey || isGenerating}
-          />
-        </div>
+      <div>
+        <Label htmlFor="gen_overallPromptText">What prompts would you like to generate?</Label>
+        <Textarea
+          id="gen_overallPromptText"
+          value={overallPromptText}
+          onChange={(e) => setOverallPromptText(e.target.value)}
+          placeholder="e.g., A medieval fantasy adventure with dragons and magic..."
+          rows={4}
+          disabled={!hasApiKey || isGenerating}
+        />
       </div>
       <div>
         <Label htmlFor="gen_rulesToRememberText">Rules/Constraints</Label>

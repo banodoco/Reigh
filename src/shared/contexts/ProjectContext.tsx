@@ -286,8 +286,7 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
       
       // Save the new project as last opened in user settings
       updateUserPreferences('user', { lastOpenedProjectId: mappedProject.id });
-      
-      toast.success(`Project "${mappedProject.name}" created and selected.`);
+            
       return mappedProject;
     } catch (err: any) {
       console.error("[ProjectContext] Exception during project creation via API:", err);
@@ -369,7 +368,7 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
         return updated;
       });
 
-      toast.success('Project deleted successfully.');
+      
       return true;
     } catch (err: any) {
       console.error('[ProjectContext] Exception during project deletion via API:', err);

@@ -261,7 +261,7 @@ const addNewProject = async (projectName: string): Promise<Project | null> => {
     setProjects(prevProjects => [...prevProjects, newProject].sort((a, b) => a.name.localeCompare(b.name)));
     setSelectedProjectIdState(newProject.id);
     localStorage.setItem('selectedProjectId', newProject.id);
-    toast.success(`Project "${newProject.name}" created and selected.`);
+            // Project created and selected
     return newProject;
   } catch (err: any) {
     console.error("Exception during project creation via API:", err);

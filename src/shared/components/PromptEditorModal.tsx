@@ -65,8 +65,8 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
   const [showScrollToTop, setShowScrollToTop] = useState(false);
 
   const [generationControlValues, setGenerationControlValues] = useState<GenerationControlValues>({
-    overallPromptText: '', specificPromptsText: '', rulesToRememberText: '',
-    numberToGenerate: 24, includeExistingContext: false, addSummary: true,
+    overallPromptText: '', rulesToRememberText: '',
+    numberToGenerate: 24, includeExistingContext: true, addSummary: true,
   });
   const [bulkEditControlValues, setBulkEditControlValues] = useState<BulkEditControlValues>({
     editInstructions: '', modelType: 'smart' as AIModelType,
@@ -272,7 +272,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
         // Continue to the next prompt
       }
     }
-    toast.success(`Bulk edit complete. ${successCount} of ${promptsToUpdate.length} prompts updated.`);
+    
     console.log(`[PromptEditorModal] AI Bulk Edit: Finished. ${successCount} / ${promptsToUpdate.length} prompts processed successfully.`);
   };
 
@@ -302,7 +302,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
           );
           return updatedPrompts;
         });
-        toast.success("Prompt updated with AI assistance.");
+
       } else {
         console.warn(`[PromptEditorModal] AI Individual Edit: Edit returned no result or failed for prompt ID: ${promptToEdit.id}. Success: ${result.success}`);
         toast.info("AI edit did not return a result or failed.");
@@ -340,8 +340,8 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleFinalSaveAndClose()}>
       <DialogContent 
         style={modalStyle} 
-        className={`max-w-4xl flex flex-col p-0 ${
-          isMobile ? 'my-5 max-h-[calc(100vh-2.5rem)]' : ''
+        className={`max-w-4xl ${
+          isMobile ? 'my-5 max-h-[calc(100vh-2.5rem)] flex flex-col justify-between p-0' : 'flex flex-col p-0'
         }`}
         onOpenAutoFocus={(event) => {
           // Prevent auto-focus on mobile devices to avoid triggering the keyboard
@@ -350,14 +350,16 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
           }
         }}
       >
-        <DialogHeader className="p-6 pb-0 flex-shrink-0">
-          <DialogTitle>Prompt Editor</DialogTitle>
-          <DialogDescription>
-            Manage your prompts. Use the 'Generate' tab to create new prompts with AI, or the 'Bulk Edit' tab to refine existing ones.
-          </DialogDescription>
-        </DialogHeader>
+        <div className={`${isMobile ? 'flex-shrink-0' : ''}`}>
+          <DialogHeader className="p-6 pb-0 flex-shrink-0">
+            <DialogTitle>Prompt Editor</DialogTitle>
+            <DialogDescription>
+              Manage your prompts. Use the 'Generate' tab to create new prompts with AI, or the 'Bulk Edit' tab to refine existing ones.
+            </DialogDescription>
+          </DialogHeader>
+        </div>
 
-        <div className="flex-1 overflow-y-auto">
+        <div className={`${isMobile ? 'flex-1 overflow-y-auto' : 'flex-1 overflow-y-auto'}`}>
           <Collapsible 
             open={isAIPromptSectionExpanded} 
             onOpenChange={setIsAIPromptSectionExpanded}
@@ -491,12 +493,14 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
           </Dialog>
         )}
 
-        <DialogFooter className={`p-6 pt-2 border-t ${isMobile ? 'pb-16' : ''}`}>
+        <div className={`${isMobile ? 'flex-shrink-0' : ''}`}>
+          <DialogFooter className={`p-6 pt-2 border-t ${isMobile ? 'pb-16' : ''}`}>
            <Button variant="outline" onClick={handleInternalAddBlankPrompt} className="mr-auto">
             <PackagePlus className="mr-2 h-4 w-4" /> Add Blank Prompt
           </Button>
-          <Button onClick={handleFinalSaveAndClose}>Close</Button>
-        </DialogFooter>
+                      <Button onClick={handleFinalSaveAndClose}>Close</Button>
+          </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );

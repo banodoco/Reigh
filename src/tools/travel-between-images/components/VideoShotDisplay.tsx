@@ -56,7 +56,7 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
         { shotId: shot.id, newName: editableName.trim(), projectId: currentProjectId }, // Pass projectId
         {
           onSuccess: () => {
-            toast.success(`Shot "${editableName.trim()}" updated.`);
+    
             // Optimistic update already handles UI, or rely on query invalidation
           },
           onError: (error) => {
@@ -91,7 +91,7 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
         { shotId: shot.id, projectId: currentProjectId }, // Pass projectId
         {
           onSuccess: () => {
-            toast.success(`Shot "${shot.name}" deleted.`);
+      
             // Optimistic update or query invalidation handles UI removal
           },
           onError: (error) => {

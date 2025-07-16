@@ -29,7 +29,7 @@ export const throttledToast = {
   
   success: (message: string, options?: any) => {
     if (shouldShowToast(message)) {
-      toast.success(message, options);
+      // Success toast removed
     }
   },
   
