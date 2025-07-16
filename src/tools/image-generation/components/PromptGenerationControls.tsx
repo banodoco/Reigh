@@ -84,7 +84,7 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
   return (
     <div className="space-y-4 p-4 border-b mb-4">
       <h3 className="text-lg font-semibold flex items-center">
-        <Wand2 className="mr-2 h-5 w-5" /> Generate New Prompts
+        <Wand2 className="mr-2 h-5 w-5" /> Generate Prompts
       </h3>
         <div>
         <Label htmlFor="gen_overallPromptText">What prompts would you like to generate?</Label>

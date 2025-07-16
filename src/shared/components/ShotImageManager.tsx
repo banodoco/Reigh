@@ -485,6 +485,7 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
                      onClick={(e) => handleItemClick(image.shotImageEntryId, e)}
                      onDoubleClick={() => handleMobileDoubleClick(index)}
                      onDelete={() => onImageDelete(image.shotImageEntryId)}
+                     hideDeleteButton={mobileSelectedIds.length > 0}
                    />
                    
                   {/* Move button before first image */}
@@ -650,6 +651,7 @@ interface MobileImageItemProps {
   onClick: (event: React.MouseEvent) => void;
   onDoubleClick: () => void;
   onDelete: () => void; // Add this
+  hideDeleteButton?: boolean;
 }
 
 const MobileImageItem: React.FC<MobileImageItemProps> = ({
@@ -658,6 +660,7 @@ const MobileImageItem: React.FC<MobileImageItemProps> = ({
   onClick,
   onDoubleClick,
   onDelete, // Add this
+  hideDeleteButton,
 }) => {
   const imageUrl = image.thumbUrl || image.imageUrl;
   const displayUrl = getDisplayUrl(imageUrl);
@@ -677,18 +680,20 @@ const MobileImageItem: React.FC<MobileImageItemProps> = ({
         alt={`Image ${image.id}`}
         className="max-w-full max-h-full object-contain rounded-sm"
       />
-      <Button
-        variant="destructive"
-        size="icon"
-        className="absolute top-1 right-1 h-7 w-7 p-0 rounded-full opacity-70 hover:opacity-100 transition-opacity z-10"
-        onClick={(e) => {
-          e.stopPropagation();
-          onDelete();
-        }}
-        title="Remove image from shot"
-      >
-        <Trash2 className="h-3.5 w-3.5" />
-      </Button>
+      {!hideDeleteButton && (
+        <Button
+          variant="destructive"
+          size="icon"
+          className="absolute top-1 right-1 h-7 w-7 p-0 rounded-full opacity-70 hover:opacity-100 transition-opacity z-10"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+          title="Remove image from shot"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </Button>
+      )}
     </div>
   );
 };

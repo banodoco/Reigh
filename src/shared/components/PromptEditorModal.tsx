@@ -14,8 +14,7 @@ import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/components/ui/tabs";
 import { usePaneAwareModalStyle } from '@/shared/hooks/usePaneAwareModalStyle';
 import { useProject } from '@/shared/contexts/ProjectContext';
-import { useToolSettings } from '@/shared/hooks/useToolSettings';
-import { PromptEditorSettings } from '@/tools/image-generation/settings';
+import { usePersistentToolState } from '@/shared/hooks/usePersistentToolState';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/shared/components/ui/collapsible';
 import { useIsMobile } from "@/shared/hooks/use-mobile";
 
@@ -23,7 +22,12 @@ import { useIsMobile } from "@/shared/hooks/use-mobile";
 interface GenerationControlValues extends PGC_GenerationControlValues {}
 interface BulkEditControlValues extends BEC_BulkEditControlValues {}
 
-// Remove the old interface as we'll use PromptEditorSettings from image-generation tool
+interface PersistedEditorControlsSettings {
+  generationSettings?: GenerationControlValues;
+  bulkEditSettings?: BulkEditControlValues;
+  activeTab?: EditorMode;
+  isAIPromptSectionExpanded?: boolean;
+}
 
 interface PromptToEditState {
   id: string;
@@ -60,29 +64,13 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showScrollToTop, setShowScrollToTop] = useState(false);
 
-  const { selectedProjectId } = useProject();
-  
-  // Use project-scoped tool settings for persistence
-  const { settings: promptEditorSettings, update: updatePromptEditorSettings, isLoading: isLoadingSettings } = useToolSettings<{ promptEditor?: PromptEditorSettings }>('image-generation', { 
-    projectId: selectedProjectId 
-  });
-
-  // Initialize state from settings
   const [generationControlValues, setGenerationControlValues] = useState<GenerationControlValues>({
-    overallPromptText: promptEditorSettings?.promptEditor?.overallPromptText || '',
-    rulesToRememberText: promptEditorSettings?.promptEditor?.rulesToRememberText || '',
-    numberToGenerate: promptEditorSettings?.promptEditor?.numberToGenerate || 24,
-    includeExistingContext: promptEditorSettings?.promptEditor?.includeExistingContext ?? true,
-    addSummary: promptEditorSettings?.promptEditor?.addSummary ?? true,
+    overallPromptText: '', rulesToRememberText: '',
+    numberToGenerate: 24, includeExistingContext: true, addSummary: true,
   });
-  
   const [bulkEditControlValues, setBulkEditControlValues] = useState<BulkEditControlValues>({
-    editInstructions: promptEditorSettings?.promptEditor?.editInstructions || '',
-    modelType: (promptEditorSettings?.promptEditor?.modelType as AIModelType) || 'smart',
+    editInstructions: '', modelType: 'smart' as AIModelType,
   });
-
-  // Initialize activeTab and isAIPromptSectionExpanded from settings
-  const [initializedFromSettings, setInitializedFromSettings] = useState(false);
 
   // Scroll handler
   const handleScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
@@ -98,35 +86,22 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
     }
   }, []);
 
-  // Initialize state from settings when they load
-  useEffect(() => {
-    if (!isLoadingSettings && promptEditorSettings?.promptEditor && !initializedFromSettings) {
-      const settings = promptEditorSettings.promptEditor;
-      
-      setGenerationControlValues({
-        overallPromptText: settings.overallPromptText || '',
-        rulesToRememberText: settings.rulesToRememberText || '',
-        numberToGenerate: settings.numberToGenerate || 24,
-        includeExistingContext: settings.includeExistingContext ?? true,
-        addSummary: settings.addSummary ?? true,
-      });
-      
-      setBulkEditControlValues({
-        editInstructions: settings.editInstructions || '',
-        modelType: (settings.modelType as AIModelType) || 'smart',
-      });
-      
-      if (settings.activeTab) {
-        setActiveTab(settings.activeTab);
-      }
-      
-      if (settings.isAIPromptSectionExpanded !== undefined) {
-        setIsAIPromptSectionExpanded(settings.isAIPromptSectionExpanded);
-      }
-      
-      setInitializedFromSettings(true);
+  // -------------------------------------------------------------
+  // New persistent settings wiring
+  // -------------------------------------------------------------
+  // Persist settings to the currently-selected project so they are shared across sessions
+  const { selectedProjectId } = useProject();
+
+  const { markAsInteracted } = usePersistentToolState<PersistedEditorControlsSettings>(
+    'prompt-editor-controls',
+    { projectId: selectedProjectId ?? undefined },
+    {
+      generationSettings: [generationControlValues, setGenerationControlValues],
+      bulkEditSettings: [bulkEditControlValues, setBulkEditControlValues],
+      activeTab: [activeTab, setActiveTab],
+      isAIPromptSectionExpanded: [isAIPromptSectionExpanded, setIsAIPromptSectionExpanded],
     }
-  }, [isLoadingSettings, promptEditorSettings, initializedFromSettings]);
+  );
 
   // Effect to initialize modal state (prompts) on open – persistence handled by hook
   useEffect(() => {
@@ -349,50 +324,20 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
     setActivePromptIdForFullView(currentId => currentId === promptId ? null : promptId);
   };
 
-  // Save settings to project when values change
-  const saveCurrentSettings = useCallback(() => {
-    if (selectedProjectId && initializedFromSettings) {
-      const newSettings: PromptEditorSettings = {
-        overallPromptText: generationControlValues.overallPromptText,
-        rulesToRememberText: generationControlValues.rulesToRememberText,
-        numberToGenerate: generationControlValues.numberToGenerate,
-        includeExistingContext: generationControlValues.includeExistingContext,
-        addSummary: generationControlValues.addSummary,
-        editInstructions: bulkEditControlValues.editInstructions,
-        modelType: bulkEditControlValues.modelType,
-        activeTab,
-        isAIPromptSectionExpanded,
-      };
-      
-      updatePromptEditorSettings('project', { promptEditor: newSettings });
-    }
-  }, [
-    selectedProjectId, initializedFromSettings, generationControlValues, 
-    bulkEditControlValues, activeTab, isAIPromptSectionExpanded, updatePromptEditorSettings
-  ]);
-
   const handleGenerationValuesChange = useCallback((values: GenerationControlValues) => {
     setGenerationControlValues(values);
-  }, []);
+    markAsInteracted();
+  }, [markAsInteracted]);
 
   const handleBulkEditValuesChange = useCallback((values: BulkEditControlValues) => {
     setBulkEditControlValues(values);
-  }, []);
+    markAsInteracted();
+  }, [markAsInteracted]);
 
   const handleToggleAIPromptSection = useCallback(() => {
     setIsAIPromptSectionExpanded(prev => !prev);
-  }, []);
-
-  // Debounced save effect
-  useEffect(() => {
-    if (!initializedFromSettings) return;
-    
-    const timeoutId = setTimeout(() => {
-      saveCurrentSettings();
-    }, 500);
-
-    return () => clearTimeout(timeoutId);
-  }, [saveCurrentSettings]);
+    markAsInteracted();
+  }, [markAsInteracted]);
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleFinalSaveAndClose()}>
@@ -417,7 +362,11 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
           </DialogHeader>
         </div>
 
-        <div className={`${isMobile ? 'flex-1 overflow-y-auto' : 'flex-1 overflow-y-auto'}`}>
+        <div
+          ref={scrollRef}
+          onScroll={handleScroll}
+          className={`${isMobile ? 'flex-1 overflow-y-auto' : 'flex-1 overflow-y-auto'} pt-4`}
+        >
           <Collapsible 
             open={isAIPromptSectionExpanded} 
             onOpenChange={setIsAIPromptSectionExpanded}
@@ -446,10 +395,10 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
             </CollapsibleTrigger>
             <CollapsibleContent>
               <div className="bg-accent/30 border border-accent-foreground/10 rounded-lg p-4 mb-4">
-                <Tabs value={activeTab} onValueChange={(value) => { setActiveTab(value as EditorMode); }}>
+                <Tabs value={activeTab} onValueChange={(value) => { markAsInteracted(); setActiveTab(value as EditorMode); }}>
                   <TabsList className="grid w-full grid-cols-2 mb-4">
                     <TabsTrigger value="generate"><Wand2Icon className="mr-2 h-4 w-4" />Generate New</TabsTrigger>
-                    <TabsTrigger value="bulk-edit"><Edit className="mr-2 h-4 w-4" />Bulk Edit All</TabsTrigger>
+                    <TabsTrigger value="bulk-edit"><Edit className="mr-2 h-4 w-4" />Bulk Edit</TabsTrigger>
                   </TabsList>
                   <TabsContent value="generate">
                     <PromptGenerationControls 

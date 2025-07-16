@@ -531,7 +531,7 @@ const VideoTravelToolPage: React.FC = () => {
   }
 
   return (
-    <div ref={mainContainerRef} className="container mx-auto p-4">
+    <div ref={mainContainerRef} className="w-full pt-5">
       {!shouldShowShotEditor ? (
         <>
           <div className="flex justify-between items-center mb-6">
