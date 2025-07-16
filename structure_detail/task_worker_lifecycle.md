@@ -27,14 +27,14 @@ Reigh uses an async task queue pattern for all AI generation workloads. This dec
   - `input` (tool-specific parameters)
   - `cost` (pre-calculated credits)
 - Edge Function validates user has sufficient credits
-- Inserts row into `tasks` table with `status = 'queued'`
+- Inserts row into `tasks` table with `status = 'Queued'`
 - Returns task ID to client
 
 ### 2. Worker Polling
 - Express worker (`src/server/services/taskProcessingService.ts`) polls every 3 seconds
 - Calls `claim_next_task` Edge Function which:
-  - Finds oldest `queued` task
-  - Updates to `processing` with worker_id
+  - Finds oldest `Queued` task
+  - Updates to `In Progress` with `worker_id`
   - Returns task details
 - Worker processes based on `tool_id`:
   - Image generation → FAL API
@@ -47,7 +47,7 @@ Reigh uses an async task queue pattern for all AI generation workloads. This dec
   - Output data (URLs, metadata)
   - Error info (if failed)
 - Edge Function:
-  - Updates task status to `completed` or `failed`
+  - Updates task status to `Complete` or `Failed`
   - Creates `generations` records if successful
   - Deducts credits from user's balance
 
@@ -110,5 +110,5 @@ node --loader ts-node/esm src/server/index.ts
    ```
 
 4. **Force task processing**:
-   - Set a task to `queued` manually in Supabase dashboard
+   - Set a task to `Queued` manually in Supabase dashboard
    - Worker should pick it up within 3 seconds 

@@ -5,6 +5,15 @@
 > • Need implementation specifics? Follow the links to sub-docs in [structure_detail/](structure_detail/) (one file per topic).  
 > • When in doubt, the source of truth is always the code – this guide just points you in the right direction.
 
+> **When to Update This Guide & Sub-Docs**  
+> • Create, delete, rename, or move any top-level directory, core config file, or critical script.  
+> • Add, hide, deprecate, or significantly refactor a tool — also create/update its doc in `structure_detail/`.  
+> • Modify database schema, migrations, RLS policies, or Edge Function names/logic.  
+> • Introduce a new state-persistence strategy (storage bucket, LocalStorage schema, etc.).  
+> • Add or change shared hooks, contexts, or reusable UI primitives.  
+> • Update global design, motion, or accessibility standards.  
+> • Any change that would confuse a new dev skimming this file.
+
 ## Table of Contents
 - [1. Tech Stack & Ports](#1-tech-stack--ports)
 - [2. Directory Structure](#2-directory-structure-top-level)
@@ -191,19 +200,11 @@ For the complete catalog, see [`shared_hooks_contexts.md`](structure_detail/shar
 
 ---
 
-## 4. Development Workflow
-
-See [README.md](README.md) for:
-- Local environment setup (5-min quickstart)
-- Development commands
-- Mobile testing
-- Troubleshooting
-
-## 5. Task & Worker Lifecycle
+## 4. Task & Worker Lifecycle
 
 Reigh uses an async task queue for AI workloads. For the complete flow diagram and implementation details, see [structure_detail/task_worker_lifecycle.md](structure_detail/task_worker_lifecycle.md).
 
-## 6. Storage Buckets Map
+## 5. Storage Buckets Map
 
 | Bucket | Access | Purpose | Notes |
 |--------|--------|---------|-------|
@@ -211,6 +212,16 @@ Reigh uses an async task queue for AI workloads. For the complete flow diagram a
 | **`training-data`** | 🔒 RLS | Training videos | Owner-restricted access |
 | **`lora_files`** | ✅ Public | LoRA models | User uploads |
 | *(others)* | — | Various | Check `/supabase/migrations/` |
+
+---
+
+## 6. Development Workflow
+
+See [README.md](README.md) for:
+- Local environment setup (5-min quickstart)
+- Development commands
+- Mobile testing
+- Troubleshooting
 
 ---
 
