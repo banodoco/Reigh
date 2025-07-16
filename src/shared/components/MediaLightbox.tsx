@@ -214,11 +214,11 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
             onPointerDownOutside={onClose}
           >
             <div 
-              className="relative flex items-center justify-center" 
+              className="relative flex items-center justify-center"
               style={{
                 maxHeight: '95vh',
                 maxWidth: '95vw',
-                width: '95vw'
+                width: 'auto'
               }}
             >
               {/* Navigation Controls - Left Arrow */}
@@ -227,7 +227,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   variant="secondary"
                   size="lg"
                   onClick={onPrevious}
-                  className="bg-black/50 hover:bg-black/70 text-white z-10 mr-2 sm:mr-4 h-10 w-10 sm:h-12 sm:w-12 hidden sm:flex"
+                  className="hidden sm:flex bg-black/50 hover:bg-black/70 text-white z-20 h-10 w-10 sm:h-12 sm:w-12 absolute left-2 top-1/2 -translate-y-1/2"
                 >
                   <ChevronLeft className="h-6 w-6 sm:h-8 sm:w-8" />
                 </Button>
@@ -237,7 +237,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               <div className="relative">
                 {isVideo ? (
                   videoPlayerComponent === 'simple-player' ? (
-                    <div style={{ width: '95vw', maxWidth: '95vw' }}>
+                    <div style={{ maxWidth: '95vw' }}>
                       <SimpleVideoPlayer
                         src={displayUrl}
                         poster={media.thumbUrl}
@@ -249,7 +249,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       src={displayUrl}
                       poster={media.thumbUrl}
                       className="w-full h-full max-h-[85vh] sm:max-h-[80vh] object-contain"
-                      style={{ width: '95vw', maxWidth: '95vw' }}
+                      style={{ maxWidth: '95vw' }}
                     />
                   )
                 ) : (
@@ -263,7 +263,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       style={{ 
                         maxHeight: '85vh',
                         maxWidth: '95vw',
-                        width: '95vw',
+                        width: 'auto',
                         height: 'auto',
                         transform: isFlippedHorizontally ? 'scaleX(-1)' : 'none'
                       }}
@@ -451,7 +451,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   variant="secondary"
                   size="lg"
                   onClick={onNext}
-                  className="bg-black/50 hover:bg-black/70 text-white z-10 ml-2 sm:ml-4 h-10 w-10 sm:h-12 sm:w-12 hidden sm:flex"
+                  className="hidden sm:flex bg-black/50 hover:bg-black/70 text-white z-20 h-10 w-10 sm:h-12 sm:w-12 absolute right-2 top-1/2 -translate-y-1/2"
                 >
                   <ChevronRight className="h-6 w-6 sm:h-8 sm:w-8" />
                 </Button>

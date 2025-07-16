@@ -16,6 +16,7 @@ import ShotImageManager from '@/shared/components/ShotImageManager';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/components/ui/collapsible";
 import { Input } from "@/shared/components/ui/input";
 import { ChevronsUpDown, Info, X } from 'lucide-react';
+import { useIsMobile } from "@/shared/hooks/use-mobile";
 import { arrayMove } from '@dnd-kit/sortable';
 import { getDisplayUrl } from '@/shared/lib/utils';
 import { RadioGroup, RadioGroupItem } from "@/shared/components/ui/radio-group";
@@ -237,7 +238,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const queryClient = useQueryClient();
   const skipNextSyncRef = useRef(false);
-
+  const isMobile = useIsMobile();
 
   
   // Shot name editing state
@@ -1174,24 +1175,28 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>Manage Shot Images</CardTitle>
-                <div className="flex items-center space-x-2">
-                  <ToggleGroup type="single" value={generationMode} onValueChange={(value: 'batch' | 'by-pair' | 'timeline') => value && onGenerationModeChange(value)} size="sm">
-                    <ToggleGroupItem value="batch" aria-label="Toggle batch">
-                      Batch
-                    </ToggleGroupItem>
- 
-                    <ToggleGroupItem value="timeline" aria-label="Toggle timeline">
-                      Timeline
-                    </ToggleGroupItem>
-                  </ToggleGroup>
-                </div>
+                {!isMobile && (
+                  <div className="flex items-center space-x-2">
+                    <ToggleGroup type="single" value={generationMode} onValueChange={(value: 'batch' | 'by-pair' | 'timeline') => value && onGenerationModeChange(value)} size="sm">
+                      <ToggleGroupItem value="batch" aria-label="Toggle batch">
+                        Batch
+                      </ToggleGroupItem>
+   
+                      <ToggleGroupItem value="timeline" aria-label="Toggle timeline">
+                        Timeline
+                      </ToggleGroupItem>
+                    </ToggleGroup>
+                  </div>
+                )}
               </div>
               {nonVideoImages.length > 0 && (
                 <>
                   <p className="text-sm text-muted-foreground pt-1">
-                    {generationMode === 'timeline' 
-                      ? 'Drag images to precise frame positions. Drop on other images to reorder.'
-                      : 'Drag to reorder. Cmd+click to select and move multiple images.'
+                    {isMobile 
+                      ? 'Tap to select and move multiple images.'
+                      : generationMode === 'timeline' 
+                        ? 'Drag images to precise frame positions. Drop on other images to reorder.'
+                        : 'Drag to reorder. Cmd+click to select and move multiple images.'
                     }
                   </p>
                 </>
@@ -1212,8 +1217,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                     images={nonVideoImages}
                     onImageDelete={handleDeleteImageFromShot}
                     onImageReorder={handleReorderImagesInShot}
-                    columns={5}
-                    generationMode={generationMode}
+                    columns={isMobile ? 3 : 6}
+                    generationMode={isMobile ? 'batch' : generationMode}
                     pairConfigs={pairConfigs}
                     onPairConfigChange={handleUpdatePairConfig}
                     onImageSaved={handleImageSaved}

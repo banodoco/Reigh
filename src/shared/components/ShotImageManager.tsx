@@ -21,7 +21,7 @@ import {
 import { GenerationRow } from '@/types/shots';
 import { SortableImageItem } from '@/tools/travel-between-images/components/SortableImageItem'; // Adjust path as needed
 import MediaLightbox from './MediaLightbox';
-import { cn } from '@/shared/lib/utils';
+import { cn, getDisplayUrl } from '@/shared/lib/utils';
 import { MultiImagePreview, SingleImagePreview } from './ImageDragPreview';
 import { PairConfig } from '@/tools/travel-between-images/components/ShotEditor';
 import { Input } from './ui/input';
@@ -31,6 +31,11 @@ import { Slider } from './ui/slider';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { Button } from './ui/button';
 import { ArrowDown } from 'lucide-react';
+import { AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel } from "@/shared/components/ui/alert-dialog";
+import { Checkbox } from "@/shared/components/ui/checkbox";
+import { Trash2 } from 'lucide-react';
+
+const SKIP_CONFIRMATION_KEY = 'skipImageDeletionConfirmation';
 
 export interface ShotImageManagerProps {
   images: GenerationRow[];
@@ -57,8 +62,26 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [mobileSelectedIds, setMobileSelectedIds] = useState<string[]>([]);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [skipConfirmationNextTimeVisual, setSkipConfirmationNextTimeVisual] = useState(false);
+  const currentDialogSkipChoiceRef = useRef(false);
   const isMobile = useIsMobile();
   const outerRef = useRef<HTMLDivElement>(null);
+
+  // Batch delete function - hoisted to top level to survive re-renders
+  const performBatchDelete = React.useCallback(
+    (ids: string[]) => {
+      if (ids.length === 0) return;
+      
+      // Clear selection first for immediate UI feedback
+      setMobileSelectedIds([]);
+      setConfirmOpen(false);
+      
+      // Execute deletions
+      ids.forEach(id => onImageDelete(id));
+    },
+    [onImageDelete]
+  );
 
   // Deselect when clicking outside the entire image manager area (mobile selection mode)
   useEffect(() => {
@@ -426,6 +449,19 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
     const mobileColumns = 3; // Always use 3 columns on mobile
     const itemsPerRow = mobileColumns;
     
+    const shouldSkipConfirmation = typeof window !== 'undefined' && sessionStorage.getItem(SKIP_CONFIRMATION_KEY) === 'true';
+
+    const handleDeleteTrigger = () => {
+      if (mobileSelectedIds.length === 0) return;
+      if (shouldSkipConfirmation) {
+        performBatchDelete(mobileSelectedIds);
+      } else {
+        setSkipConfirmationNextTimeVisual(false);
+        currentDialogSkipChoiceRef.current = false;
+        setConfirmOpen(true);
+      }
+    };
+    
     return (
       <div ref={outerRef} className="relative"
         onClick={(e)=>{
@@ -443,13 +479,12 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
             return (
               <React.Fragment key={image.shotImageEntryId}>
                 <div className="relative">
-                  <SortableImageItem
+                  <MobileImageItem
                      image={image}
                      isSelected={isSelected}
                      onClick={(e) => handleItemClick(image.shotImageEntryId, e)}
-                     onDelete={() => onImageDelete(image.shotImageEntryId)}
                      onDoubleClick={() => handleMobileDoubleClick(index)}
-                     isDragDisabled={true} // Disable drag on mobile when in selection mode
+                     onDelete={() => onImageDelete(image.shotImageEntryId)}
                    />
                    
                   {/* Move button before first image */}
@@ -490,6 +525,56 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
             );
           })}
         </div>
+
+        {/* {mobileSelectedIds.length > 0 && (
+          <div className="fixed bottom-4 right-4 z-40">
+            <Button
+              variant="destructive"
+              size="lg"
+              onClick={handleDeleteTrigger}
+              className="shadow-lg"
+            >
+              {mobileSelectedIds.length > 1 ? `Delete ${mobileSelectedIds.length}` : 'Delete'}
+            </Button>
+          </div>
+        )} */}
+
+        {/* Confirmation dialog rendered outside the conditional so it persists through unmounts */}
+        <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+          <AlertDialogContent
+            onPointerDown={(e)=>e.stopPropagation()}
+          >
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Image{mobileSelectedIds.length > 1 ? 's' : ''}</AlertDialogTitle>
+              <AlertDialogDescription>
+                Do you want to permanently remove {mobileSelectedIds.length > 1 ? 'these images' : 'this image'} from the shot? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="flex items-center space-x-2 my-4">
+              <Checkbox
+                id="skip-confirm"
+                checked={skipConfirmationNextTimeVisual}
+                onCheckedChange={(checked)=>{
+                  const v = Boolean(checked);
+                  setSkipConfirmationNextTimeVisual(v);
+                  currentDialogSkipChoiceRef.current = v;
+                }}
+              />
+              <Label htmlFor="skip-confirm" className="text-sm font-medium leading-none">
+                Delete without confirmation in the future
+              </Label>
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setConfirmOpen(false)}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={()=>{
+                if (currentDialogSkipChoiceRef.current) {
+                  sessionStorage.setItem(SKIP_CONFIRMATION_KEY,'true');
+                }
+                performBatchDelete(mobileSelectedIds);
+              }}>Delete</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
         
         {lightboxIndex !== null && (
           <MediaLightbox
@@ -516,7 +601,7 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
       onDragEnd={handleDragEnd}
     >
       <SortableContext items={images.map((img) => img.shotImageEntryId)} strategy={rectSortingStrategy}>
-        <div className={cn("grid gap-3 grid-cols-3 sm:"+gridColsClass[columns])}>
+        <div className={cn("grid gap-3", isMobile ? "grid-cols-3" : gridColsClass[columns])}>
           {images.map((image, index) => (
             <SortableImageItem
               key={image.shotImageEntryId}
@@ -554,6 +639,57 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
         />
       )}
     </DndContext>
+  );
+};
+
+// Lightweight non-sortable image item used in mobile batch mode to avoid
+// relying on dnd-kit context (which isn’t mounted in that view).
+interface MobileImageItemProps {
+  image: GenerationRow;
+  isSelected: boolean;
+  onClick: (event: React.MouseEvent) => void;
+  onDoubleClick: () => void;
+  onDelete: () => void; // Add this
+}
+
+const MobileImageItem: React.FC<MobileImageItemProps> = ({
+  image,
+  isSelected,
+  onClick,
+  onDoubleClick,
+  onDelete, // Add this
+}) => {
+  const imageUrl = image.thumbUrl || image.imageUrl;
+  const displayUrl = getDisplayUrl(imageUrl);
+
+  return (
+    <div
+      className={cn(
+        'relative bg-muted/50 rounded border p-1 flex flex-col items-center justify-center aspect-square overflow-hidden shadow-sm cursor-pointer',
+        { 'ring-2 ring-offset-2 ring-blue-500 border-blue-500': isSelected },
+      )}
+      onClick={onClick}
+      onDoubleClick={onDoubleClick}
+      data-mobile-item="true"
+    >
+      <img
+        src={displayUrl}
+        alt={`Image ${image.id}`}
+        className="max-w-full max-h-full object-contain rounded-sm"
+      />
+      <Button
+        variant="destructive"
+        size="icon"
+        className="absolute top-1 right-1 h-7 w-7 p-0 rounded-full opacity-70 hover:opacity-100 transition-opacity z-10"
+        onClick={(e) => {
+          e.stopPropagation();
+          onDelete();
+        }}
+        title="Remove image from shot"
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+      </Button>
+    </div>
   );
 };
 

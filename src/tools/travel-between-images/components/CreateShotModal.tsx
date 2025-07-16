@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useIsMobile } from '@/shared/hooks/use-mobile';
 import {
   Dialog,
   DialogContent,
@@ -29,6 +30,7 @@ const CreateShotModal: React.FC<CreateShotModalProps> = ({
 }) => {
   const [shotName, setShotName] = useState('');
   const [files, setFiles] = useState<File[]>([]);
+  const isMobile = useIsMobile();
 
   const handleSubmit = async () => {
     let finalShotName = shotName.trim();
@@ -48,7 +50,14 @@ const CreateShotModal: React.FC<CreateShotModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent
+        className="sm:max-w-[425px]"
+        onOpenAutoFocus={(event) => {
+          if (isMobile) {
+            event.preventDefault();
+          }
+        }}
+      >
         <DialogHeader>
           <DialogTitle>Create New Shot</DialogTitle>
           <DialogDescription>
