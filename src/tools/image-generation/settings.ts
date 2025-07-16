@@ -12,6 +12,20 @@ export interface ActiveLora {
   path: string;
   strength: number;
   previewImageUrl?: string;
+  trigger_word?: string;
+}
+
+// Prompt Editor Settings Interface
+export interface PromptEditorSettings {
+  overallPromptText?: string;
+  rulesToRememberText?: string;
+  numberToGenerate?: number;
+  includeExistingContext?: boolean;
+  addSummary?: boolean;
+  editInstructions?: string;
+  modelType?: 'standard' | 'smart';
+  activeTab?: 'generate' | 'bulk-edit';
+  isAIPromptSectionExpanded?: boolean;
 }
 
 export interface ImageGenerationSettings {
@@ -23,7 +37,21 @@ export interface ImageGenerationSettings {
   generationMode?: GenerationMode;
   beforeEachPromptText?: string;
   afterEachPromptText?: string;
+  // Prompt Editor Settings
+  promptEditor?: PromptEditorSettings;
 }
+
+export const defaultPromptEditorSettings: PromptEditorSettings = {
+  overallPromptText: '',
+  rulesToRememberText: '',
+  numberToGenerate: 24,
+  includeExistingContext: true,
+  addSummary: true,
+  editInstructions: '',
+  modelType: 'smart',
+  activeTab: 'generate',
+  isAIPromptSectionExpanded: false,
+};
 
 export const defaultImageGenerationSettings: ImageGenerationSettings = {
   prompts: [
@@ -44,6 +72,7 @@ export const defaultImageGenerationSettings: ImageGenerationSettings = {
   generationMode: 'wan-local',
   beforeEachPromptText: '',
   afterEachPromptText: '',
+  promptEditor: defaultPromptEditorSettings,
 };
 
 export const imageGenerationSettings = {

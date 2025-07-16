@@ -23,26 +23,19 @@ export const useAIInteractionService = ({
   // === New implementation: delegate prompt generation to Supabase Edge Function ===
   const generatePrompts = useCallback(
     async (params: GeneratePromptsParams): Promise<AIPromptItem[]> => {
-      console.log('[useAIInteractionService] Starting generatePrompts with params:', params);
       setIsGenerating(true);
 
       try {
-        const requestBody = {
-          task: 'generate_prompts',
-          overallPromptText: params.overallPromptText,
-          rulesToRememberText: params.rulesToRememberText,
-          numberToGenerate: params.numberToGenerate,
-          existingPrompts: params.includeExistingContext ? params.existingPrompts ?? [] : [],
-        };
-        
-        console.log('[useAIInteractionService] Invoking ai-prompt function with body:', requestBody);
-        
         // Invoke the new edge function. We pass the full params object so the server can replicate previous behaviour.
         const { data, error } = await supabase.functions.invoke('ai-prompt', {
-          body: requestBody,
+          body: {
+            task: 'generate_prompts',
+            overallPromptText: params.overallPromptText,
+            rulesToRememberText: params.rulesToRememberText,
+            numberToGenerate: params.numberToGenerate,
+            existingPrompts: params.includeExistingContext ? params.existingPrompts ?? [] : [],
+          },
         });
-
-        console.log('[useAIInteractionService] Function invocation completed. Error:', error, 'Data:', data);
 
         if (error) {
           console.error('AI Service: Edge function error generating prompts:', error);
@@ -50,7 +43,6 @@ export const useAIInteractionService = ({
         }
 
         const generatedTexts: string[] = (data as any)?.prompts ?? [];
-        console.log(`[useAIInteractionService] Received ${generatedTexts.length} generated texts:`, generatedTexts);
 
         const newPrompts: AIPromptItem[] = [];
         for (const text of generatedTexts) {
@@ -59,10 +51,8 @@ export const useAIInteractionService = ({
 
           // Optionally generate summaries client-side if requested and we have an API key available.
           if (params.addSummaryForNewPrompts) {
-            console.log(`[useAIInteractionService] Generating summary for prompt: ${text.substring(0, 50)}...`);
             const summary = await generateSummaryForPromptInternal(text);
             shortText = summary || '';
-            console.log(`[useAIInteractionService] Summary generated: ${shortText}`);
           }
 
           newPrompts.push({
@@ -72,14 +62,11 @@ export const useAIInteractionService = ({
             hidden: false,
           });
         }
-        
-        console.log(`[useAIInteractionService] Returning ${newPrompts.length} processed prompts`);
         return newPrompts;
       } catch (err) {
         console.error('AI Service: Unexpected error calling generate-prompts:', err);
         return [];
       } finally {
-        console.log('[useAIInteractionService] Setting isGenerating to false');
         setIsGenerating(false);
       }
     },
