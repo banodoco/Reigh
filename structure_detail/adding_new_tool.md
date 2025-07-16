@@ -1,94 +1,163 @@
-# Adding a New Tool to Reigh
+# 🛠️ Adding a New Tool
 
-This guide explains the steps required to register a brand-new tool in the Reigh code-base.  It is largely unchanged from the original `structure.md` section but lives here so that the main onboarding document stays concise.
+> **⚡ Quick Guide**: Follow these steps and your tool will be auto-wired into the system (routing, persistence, UI visibility).
 
 ---
 
-## 1. Create the directory structure
+## 📋 Step-by-Step Checklist
 
-```text
+### 1️⃣ Create Tool Structure
+
+Create your tool directory with this layout:
+
+```
 src/tools/my-new-tool/
-├── pages/MyNewToolPage.tsx     # Main tool page component
-├── components/                 # Tool-specific components
-├── settings.ts                 # Tool settings definition
-└── hooks/                      # Tool-specific hooks (optional)
+├── pages/
+│   └── MyNewToolPage.tsx      # Primary UI component
+├── components/                 # Tool-specific widgets
+├── hooks/                      # Custom hooks (optional)
+└── settings.ts                 # Config & defaults
 ```
 
-## 2. Define tool settings
+### 2️⃣ Define Tool Settings
 
-Create `src/tools/my-new-tool/settings.ts`:
+Create `settings.ts` with your tool's configuration:
 
-```ts
-export interface MyNewToolSettings {
-  someProperty: string;
-  anotherProperty: number;
-}
-
+```typescript
+// src/tools/my-new-tool/settings.ts
 export const myNewToolSettings = {
   id: 'my-new-tool',
-  scope: ['project'] as const, // or ['user', 'project', 'shot']
+  scope: ['project'] as const,     // Can be: ['user'], ['project'], ['shot'], or combinations
   defaults: {
-    someProperty: 'default value',
-    anotherProperty: 42,
-  } satisfies MyNewToolSettings,
+    // Your strongly-typed default values
+    enableFeatureX: true,
+    maxItems: 10,
+    apiEndpoint: 'https://api.example.com',
+  },
 };
+
+// TypeScript type for your settings
+export type MyNewToolSettings = typeof myNewToolSettings.defaults;
 ```
 
-## 3. Register in the tools manifest
+### 3️⃣ Register in Tool Manifest
 
-Edit `src/tools/index.ts`:
+Add your tool to the global registry:
 
-```ts
-// Add your export
+```typescript
+// src/tools/index.ts
+
+// 1. Export your settings
 export { myNewToolSettings } from './my-new-tool/settings';
 
-// Add to toolsManifest array
-export const toolsManifest = [
-  // ... existing tools
-  myNewToolSettings,
-] as const;
+// 2. Add to manifest array
+toolsManifest.push(myNewToolSettings);
 
-// Add UI definition to toolsUIManifest
-export const toolsUIManifest: ToolUIDefinition[] = [
-  // ... existing tools
-  {
-    id: myNewToolSettings.id,
-    name: 'My New Tool',
-    path: '/tools/my-new-tool',
-    description: 'Description of what this tool does.',
-    environments: [AppEnv.DEV], // or LOCAL_ENVS for broader visibility
-    icon: SomeIcon, // Import from lucide-react
-    gradient: 'from-color-1 to-color-2',
-    accent: 'color-name',
-    ornament: '★',
-    badge: 'New', // optional
-  },
-];
+// 3. Add UI metadata
+toolsUIManifest.push({
+  id: myNewToolSettings.id,
+  name: 'My New Tool',               // Display name
+  path: '/tools/my-new-tool',        // Route path
+  icon: SomeIcon,                    // Lucide icon component
+  description: 'Tool description',   // Optional
+  category: 'generation',            // Optional categorization
+});
 ```
 
-## 4. Add a route
+### 4️⃣ Add Route
 
-In `src/app/routes.tsx`:
+Register the route in the app router:
 
-```ts
+```typescript
+// src/app/routes.tsx
+
+// Import your page component
+import { MyNewToolPage } from '@/tools/my-new-tool/pages/MyNewToolPage';
+
+// Add to routes array
 {
   path: '/tools/my-new-tool',
-  element: <MyNewToolPage />,
+  element: <MyNewToolPage />
 }
 ```
 
-## 5. Optional server route (if needed)
+### 5️⃣ Implement Tool UI
 
-Create `src/server/routes/myNewTool.ts` and register it in `src/server/index.ts`.
+Create your main page component:
 
-## 6. What happens automatically?
+```typescript
+// src/tools/my-new-tool/pages/MyNewToolPage.tsx
+import { usePersistentToolState } from '@/shared/hooks/usePersistentToolState';
+import { myNewToolSettings } from '../settings';
 
-* Tool-settings defaults are registered in `toolSettingsService.ts`.
-* The tool appears in the Tool Selector page based on environment configuration.
-* Database persistence works via `useToolSettings` or `usePersistentToolState` hooks.
-* Settings cascade (app defaults → user → project → shot) works immediately.
+export function MyNewToolPage() {
+  const { state, updateState, isLoading } = usePersistentToolState(
+    myNewToolSettings.id,
+    myNewToolSettings.defaults
+  );
 
-## 7. Migration considerations
+  if (isLoading) {
+    return <div>Loading settings...</div>;
+  }
 
-* Add database migrations in `/db/migrations/` if new tables/columns are required.
-* Update `taskConfig.ts` if your tool creates background tasks. 
+  return (
+    <div className="container mx-auto p-6">
+      <h1>My New Tool</h1>
+      {/* Your tool UI here */}
+    </div>
+  );
+}
+```
+
+### 6️⃣ (Optional) Add Backend Logic
+
+If your tool needs server-side processing:
+
+#### Option A: Edge Function
+```bash
+# Create new Edge Function
+supabase functions new my-tool-process
+
+# Implement in supabase/functions/my-tool-process/index.ts
+# Deploy with: supabase functions deploy my-tool-process
+```
+
+#### Option B: Express Route
+```typescript
+// src/server/routes/my-tool.ts
+// Add Express routes for backend processing
+```
+
+---
+
+## ✅ That's It!
+
+Your tool now has:
+- 🔧 Automatic settings persistence via `useToolSettings`
+- 💾 Local state management via `usePersistentToolState`
+- 🎨 Automatic appearance in Tool Selector
+- 🔄 Cross-device settings sync
+- 📱 Mobile-responsive layout support
+
+## 🎯 Pro Tips
+
+1. **Settings Scope**: Choose scope based on where settings should persist:
+   - `user`: Global user preferences
+   - `project`: Project-specific config
+   - `shot`: Shot-level overrides
+
+2. **State Management**: Use `markAsInteracted()` after programmatic changes to ensure saves
+
+3. **Testing**: Check your tool appears in `/tools` selector and settings persist across refreshes
+
+4. **Icons**: Browse available icons at [lucide.dev](https://lucide.dev)
+
+---
+
+<div align="center">
+
+**📚 Related Docs**
+
+[Back to Structure](../structure.md) • [Tool Settings](./data_persistence.md) • [Design Guidelines](./design_motion_guidelines.md)
+
+</div> 
