@@ -41,6 +41,57 @@ Reigh uses an async task queue pattern for all AI generation workloads. This dec
   - Video processing → FFmpeg
   - Prompt enhancement → OpenAI
 
+## Worker Types
+
+### Local Express Worker
+- Basic task processor (`/src/server/services/taskProcessingService.ts`)
+- Handles simple tasks like prompt enhancement and basic image generation
+- Runs alongside the main application in development
+
+### Headless-Wan2GP Worker (Cloud/Local GPU)
+- Advanced video generation worker: [Headless-Wan2GP](https://github.com/peteromallet/Headless-Wan2GP)
+- Specialized for travel-between-images video generation tasks
+- Can run locally with GPU or deployed to cloud instances
+- Handles computationally intensive video generation workflows
+
+#### Task Types Handled
+- **`travel_orchestrator`** - Manages multi-segment travel workflows
+- **`travel_segment`** - Creates guide videos and runs WGP generation using VACE
+- **`travel_stitch`** - Stitches segment videos with crossfades and timing
+- **`image-generation`** - Fallback for basic image generation tasks
+
+#### Deployment Options
+
+**Local Deployment (GPU Required)**
+```bash
+# Clone the worker repository
+git clone https://github.com/peteromallet/Headless-Wan2GP.git
+cd Headless-Wan2GP
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Configure environment
+cp .env.example .env
+# Edit .env with your Supabase credentials and API keys
+
+# Run the worker
+python main.py
+```
+
+**Cloud Deployment**
+- Deploy to GPU-enabled cloud instances (AWS, Google Cloud, etc.)
+- Requires CUDA-compatible GPU for video generation
+- Configure with production Supabase credentials
+- Multiple workers can run simultaneously for parallel processing
+
+#### Worker Configuration
+The worker polls the same task queue but specializes in video generation:
+- Connects to Supabase using environment credentials
+- Claims tasks with `tool_id` matching its capabilities
+- Updates task status and uploads results to designated storage buckets
+- Supports both SQLite (local dev) and PostgreSQL (production) backends
+
 ### 3. Task Completion
 - Worker calls `complete_task` Edge Function with:
   - Task ID
@@ -72,8 +123,9 @@ Reigh uses an async task queue pattern for all AI generation workloads. This dec
   - `useTasks.ts` - Task creation & monitoring
   - `useWebSocket.ts` - Realtime subscription
 
-## Running a Local Worker
+## Running Workers Locally
 
+### Basic Express Worker (Development)
 ```bash
 # Ensure Supabase is running
 supabase status
@@ -84,6 +136,29 @@ npm run dev:server
 # Or run standalone
 node --loader ts-node/esm src/server/index.ts
 ```
+
+### Headless-Wan2GP Worker (GPU Required)
+For video generation tasks, you'll need the specialized worker:
+
+```bash
+# Clone and setup the GPU worker
+git clone https://github.com/peteromallet/Headless-Wan2GP.git
+cd Headless-Wan2GP
+
+# Install Python dependencies
+pip install -r requirements.txt
+
+# Configure environment (copy from main Reigh project)
+cp .env.example .env
+# Set SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, etc.
+
+# Run the video generation worker
+python main.py
+```
+
+**When to use which worker:**
+- **Express Worker**: Prompt enhancement, basic image generation, development
+- **Headless-Wan2GP**: Video travel generation, production workloads, GPU-intensive tasks
 
 ## Debugging Tips
 
@@ -97,7 +172,8 @@ node --loader ts-node/esm src/server/index.ts
    ```
 
 2. **Check worker logs**:
-   - Look for `[Task Poller]` prefixed messages
+   - **Express Worker**: Look for `[Task Poller]` prefixed messages
+   - **Headless-Wan2GP**: Check Python output for task processing status
    - Failed claims show as "No tasks to claim"
 
 3. **Test Edge Functions locally**:
