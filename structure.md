@@ -206,9 +206,12 @@ For the complete catalog, see [`shared_hooks_contexts.md`](structure_detail/shar
 
 Reigh uses an async task queue for AI workloads. For the complete flow diagram and implementation details, see [structure_detail/task_worker_lifecycle.md](structure_detail/task_worker_lifecycle.md).
 
-**Worker Types (High-Level):**
-- **Express Worker (Local Dev):** Polls the queue every few seconds, handles prompt enhancement & light image tasks. Runs automatically with `npm run dev`.
-- **Headless-Wan2GP Worker (GPU / Cloud):** Python-based worker capable of processing **all AI tasks** (image & video generation, prompt enhancement, stitching, upscaling, etc.). Runs locally on a CUDA GPU or scales horizontally in GPU cloud instances. See [Headless-Wan2GP](https://github.com/peteromallet/Headless-Wan2GP) and the Task Worker doc for setup.
+### Headless-Wan2GP Worker (GPU / Cloud)
+Headless-Wan2GP is the **primary worker responsible for _all_ AI tasks** — image & video generation, prompt enhancement, upscaling, stitching, and more. It polls the Supabase task queue and executes jobs in a GPU-accelerated Python environment.
+
+- Runs locally on any CUDA-capable GPU or scales horizontally in cloud GPU instances.
+- Setup & deployment guide: [Headless-Wan2GP GitHub](https://github.com/peteromallet/Headless-Wan2GP).
+- Task flow details: see the [Task & Worker Lifecycle doc](structure_detail/task_worker_lifecycle.md).
 
 ## 5. Development Workflow
 

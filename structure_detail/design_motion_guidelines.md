@@ -2,6 +2,30 @@
 
 > **Consistency is key**: Follow these patterns to maintain a cohesive user experience across Reigh.
 
+## 🗺️ High-Level Overview
+
+Reigh’s design language is implemented through **TailwindCSS**, **shadcn-ui**, and a small set of project-specific wrappers.  
+If you only skim one section of this document, read this one—it tells you **where the design primitives live** and **how to extend them safely**.
+
+### Core Building Blocks
+
+| Layer | Location | Purpose |
+|-------|----------|---------|
+| **Theme Tokens** | `themes/default/theme.ts` | Source-of-truth color palette & shadows exported as CSS variables |
+| **Tailwind Config** | `tailwind.config.ts` | Registers the theme tokens and custom utilities/breakpoints |
+| **UI Primitives** | `src/shared/components/ui/` | Thin wrappers around shadcn-ui with project-level defaults |
+| **Motion Helpers** | `src/shared/components/transitions/` | Reusable animation components (PageFadeIn, FadeInSection, …) |
+| **High-Level Layout** | `src/app/Layout.tsx` & `src/shared/components/` | GlobalHeader, PaneHeader, etc.—compose primitives into app-specific patterns |
+
+### Typical Workflow
+
+1. **Pick a primitive**: Import a component from `src/shared/components/ui/` (or extend one if it doesn’t exist).
+2. **Style with tokens**: Use Tailwind classes that reference the semantic tokens (`bg-background`, `text-foreground`, etc.).
+3. **Add motion (optional)**: Wrap content in a helper from `src/shared/components/transitions/` instead of writing custom keyframes.
+4. **Accessibility & Dark-mode check**: Confirm focus states, aria labels, and contrast in both light & dark themes.
+
+> 💡 **Tip:** If you find yourself reaching for raw CSS, it’s usually a sign that the primitive or token you need should be added to the shared layers above. Discuss in PR before introducing new patterns.
+
 ---
 
 ## 🎬 Motion & Animations
