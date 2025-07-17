@@ -119,7 +119,7 @@ const ToolCard = ({ item, isSquare = false, index, isVisible }: { item: any, isS
   const descriptionSize = isSm ? 'text-sm' : 'text-xs';
 
   const content = (
-    <div className={`wes-tool-card relative overflow-hidden ${isSquare ? 'h-full !p-0' : 'h-32 sm:h-32'} wes-polaroid ${isComingSoon ? 'opacity-30' : ''}`}>
+    <div className={`wes-tool-card relative overflow-hidden ${isSquare ? 'aspect-square !p-0' : 'h-32 sm:h-32'} wes-polaroid ${isComingSoon ? 'opacity-30' : ''}`}>
       {/* Coming Soon Badge */}
       {isComingSoon && (
         <div className={`absolute ${isSquare ? 'top-1 right-2' : 'top-2 right-2'} z-10 ${isWiggling ? 'animate-subtle-wiggle' : ''}`}>
@@ -253,14 +253,13 @@ const ToolSelectorPage: React.FC = () => {
 
   // Dynamic spacing based on content area
   const containerPadding = isSm ? 'px-2' : 'px-1';
-  // Reduce bottom padding to 1/3 of previous (pb-6 -> pb-2, pb-4 -> pb-2)
-  const containerSpacing = isLg ? 'pt-4 pb-2' : isSm ? 'pt-4 pb-2' : 'pt-3 pb-2';
+  const containerSpacing = isLg ? 'pt-4 pb-2' : isSm ? 'pt-4 pb-2' : 'pt-3 pb-[0.333rem]';
   const sectionGap = isLg ? 'gap-8' : isSm ? 'gap-6' : 'gap-4';
   const itemGap = isSm ? 'gap-4' : 'gap-3';
   const topMargin = isSm ? 'mt-4' : 'mt-2';
 
   return (
-    <PageFadeIn className="min-h-screen wes-texture relative overflow-hidden">
+    <PageFadeIn className="min-h-[70vh] wes-texture relative overflow-hidden">
       {/* Enhanced background decorative elements */}
       <div className="absolute inset-0 bg-gradient-to-br from-wes-cream via-white to-wes-mint/20 opacity-60"></div>
       <div className="absolute inset-0 wes-chevron-pattern opacity-30"></div>
