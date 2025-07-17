@@ -356,7 +356,7 @@ const ImageGenerationToolPage: React.FC = () => {
   const imagesToShow = [...(generatedImagesData || [])];
 
   return (
-    <PageFadeIn className="flex flex-col h-screen">
+    <PageFadeIn className="flex flex-col min-h-screen">
       <header className="flex justify-between items-center mb-6 sticky top-0 bg-background py-4 z-40 border-b border-border/50 shadow-sm">
         <h1 className="text-3xl font-bold">
           Image Generation
