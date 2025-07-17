@@ -14,6 +14,10 @@
 > • Update global design, motion, or accessibility standards.  
 > • Any change that would confuse a new dev skimming this file.
 
+> **Who This Guide Is For**  
+> • 🤖 + 👨‍💻
+
+
 ## Table of Contents
 - [1. Tech Stack & Ports](#1-tech-stack--ports)
 - [2. Directory Structure](#2-directory-structure-top-level)

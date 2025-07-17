@@ -1,5 +1,7 @@
 # Reigh: Local Development
 
+---
+
 This repo is only used for development. For actual usage - including local usage, run in [Reigh.art](https://reigh.art/).
 
 Looking for the full architecture & code walkthrough? Check **[structure.md](structure.md)**.  
