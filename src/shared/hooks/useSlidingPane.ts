@@ -130,7 +130,7 @@ export const useSlidingPane = ({ side, isLocked, onToggleLock }: UseSlidingPaneO
     if (isLocked) return;
     leaveTimeoutRef.current = setTimeout(() => {
       setOpen(false);
-    }, 300);
+    }, 100);
   };
 
   const handlePaneEnter = () => {

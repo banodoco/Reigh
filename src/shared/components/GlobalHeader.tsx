@@ -64,10 +64,10 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
         
         {/* Desktop Layout (lg and up) */}
         <div 
-          className="hidden lg:flex container items-center justify-between transition-all duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] relative z-10 h-24"
+          className="hidden lg:flex container items-center justify-between transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] relative z-10 h-24"
           style={{
-            paddingRight: contentOffsetRight ? `${contentOffsetRight}px` : undefined,
-            paddingLeft: contentOffsetLeft ? `${contentOffsetLeft}px` : undefined,
+            paddingRight: `${contentOffsetRight}px`,
+            paddingLeft: `${contentOffsetLeft}px`,
           }}
         >
           {/* Left side - Brand + Project Selector */}

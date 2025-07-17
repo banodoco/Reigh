@@ -116,7 +116,7 @@ export function useUserUIState<K extends keyof UISettings>(
       } catch (error) {
         console.error('[useUserUIState] Error in update:', error);
       }
-    }, 400);
+    }, 200);
   };
 
   // Cleanup timeout on unmount
