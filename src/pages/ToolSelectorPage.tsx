@@ -253,7 +253,8 @@ const ToolSelectorPage: React.FC = () => {
 
   // Dynamic spacing based on content area
   const containerPadding = isSm ? 'px-2' : 'px-1';
-  const containerSpacing = isLg ? 'pt-4 pb-6' : isSm ? 'pt-4 pb-6' : 'pt-3 pb-4';
+  // Reduce bottom padding to 1/3 of previous (pb-6 -> pb-2, pb-4 -> pb-2)
+  const containerSpacing = isLg ? 'pt-4 pb-2' : isSm ? 'pt-4 pb-2' : 'pt-3 pb-2';
   const sectionGap = isLg ? 'gap-8' : isSm ? 'gap-6' : 'gap-4';
   const itemGap = isSm ? 'gap-4' : 'gap-3';
   const topMargin = isSm ? 'mt-4' : 'mt-2';
