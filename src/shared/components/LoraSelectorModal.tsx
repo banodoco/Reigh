@@ -19,8 +19,9 @@ import { Checkbox } from "@/shared/components/ui/checkbox";
 import { toast } from "sonner";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/shared/components/ui/alert-dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/shared/components/ui/tooltip";
-import { Info } from 'lucide-react';
+import { Info, X } from 'lucide-react';
 import HoverScrubVideo from '@/shared/components/HoverScrubVideo';
+import { Slider } from "@/shared/components/ui/slider";
 
 // Description Modal Component
 const DescriptionModal: React.FC<{
@@ -36,7 +37,7 @@ const DescriptionModal: React.FC<{
           <DialogTitle className="text-lg font-semibold">{title}</DialogTitle>
           <DialogDescription>Full description</DialogDescription>
         </DialogHeader>
-        <ScrollArea className="flex-1 pr-4">
+        <ScrollArea className="flex-1 pr-4 overflow-y-auto">
           <div className="py-4">
             <p className="text-sm text-muted-foreground whitespace-pre-wrap">
               {description}
@@ -102,7 +103,9 @@ interface LoraSelectorModalProps {
   onAddLora: (lora: LoraModel) => void;
   /** Callback to remove a LoRA from the generator */
   onRemoveLora: (loraId: string) => void;
-  selectedLoraIds: string[];
+  /** Callback to update a LoRA's strength */
+  onUpdateLoraStrength: (loraId: string, strength: number) => void;
+  selectedLoras: (LoraModel & { strength: number })[];
   lora_type: string;
 }
 
@@ -110,14 +113,26 @@ interface CommunityLorasTabProps {
   loras: LoraModel[];
   onAddLora: (lora: LoraModel) => void;
   onRemoveLora: (loraId: string) => void;
-  selectedLoraIds: string[];
+  onUpdateLoraStrength: (loraId: string, strength: number) => void;
+  selectedLoras: (LoraModel & { strength: number })[];
   lora_type: string;
   myLorasResource: UseQueryResult<Resource[], Error>;
   createResource: UseMutationResult<Resource, Error, { type: 'lora'; metadata: LoraModel; }, unknown>;
   deleteResource: UseMutationResult<void, Error, { id: string; type: "lora"; }, unknown>;
 }
 
-const CommunityLorasTab: React.FC<CommunityLorasTabProps> = ({ loras, onAddLora, onRemoveLora, selectedLoraIds, lora_type, myLorasResource, createResource, deleteResource }) => {
+const CommunityLorasTab: React.FC<CommunityLorasTabProps & { onClose: () => void }> = ({ 
+  loras, 
+  onAddLora, 
+  onRemoveLora, 
+  onUpdateLoraStrength,
+  selectedLoras,
+  lora_type, 
+  myLorasResource, 
+  createResource, 
+  deleteResource,
+  onClose
+}) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortOption, setSortOption] = useState<SortOption>('downloads');
   const [showMyLorasOnly, setShowMyLorasOnly] = useState(false);
@@ -128,6 +143,9 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps> = ({ loras, onAddLora,
   // Description modal state
   const [descriptionModalOpen, setDescriptionModalOpen] = useState(false);
   const [selectedDescription, setSelectedDescription] = useState<{ title: string; description: string }>({ title: '', description: '' });
+
+  const selectedLoraMap = useMemo(() => new Map(selectedLoras.map(l => [l['Model ID'], l.strength])), [selectedLoras]);
+  const selectedLoraIds = useMemo(() => Array.from(selectedLoraMap.keys()), [selectedLoraMap]);
 
   const myLoraModelIds = useMemo(() => myLorasResource.data?.map(r => r.metadata["Model ID"]) || [], [myLorasResource.data]);
 
@@ -187,7 +205,7 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps> = ({ loras, onAddLora,
     // Filter by "Added LoRAs Only" if enabled
     if (showAddedLorasOnly) {
       filtered = filtered.filter(lora => {
-        return selectedLoraIds.includes(lora["Model ID"]);
+        return selectedLoraMap.has(lora["Model ID"]);
       });
     }
     
@@ -236,7 +254,7 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps> = ({ loras, onAddLora,
         break;
     }
     return sorted;
-  }, [allLoras, searchTerm, sortOption, showMyLorasOnly, showAddedLorasOnly, myLoraModelIds, selectedLoraIds]);
+  }, [allLoras, searchTerm, sortOption, showMyLorasOnly, showAddedLorasOnly, myLoraModelIds, selectedLoraMap]);
 
   // Reset page when filter/sort changes
   React.useEffect(() => { setPage(0); }, [searchTerm, sortOption, showMyLorasOnly, showAddedLorasOnly]);
@@ -252,59 +270,7 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps> = ({ loras, onAddLora,
   ).length;
 
   return (
-    <div>
-      {/* LoRAs Filter */}
-      <div className="mb-6 p-4 bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-xl shadow-sm">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
-            <div className="flex items-center space-x-2">
-              <Checkbox 
-                id="show-my-loras-only" 
-                checked={showMyLorasOnly}
-                onCheckedChange={(checked) => setShowMyLorasOnly(!!checked)}
-                className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
-              />
-              <Label htmlFor="show-my-loras-only" className="text-sm sm:text-base font-medium text-slate-900 cursor-pointer">
-                Show only my LoRAs
-              </Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox 
-                id="show-added-loras-only" 
-                checked={showAddedLorasOnly}
-                onCheckedChange={(checked) => setShowAddedLorasOnly(!!checked)}
-                className="data-[state=checked]:bg-green-600 data-[state=checked]:border-green-600"
-              />
-              <Label htmlFor="show-added-loras-only" className="text-sm sm:text-base font-medium text-slate-900 cursor-pointer">
-                Show only added LoRAs
-              </Label>
-            </div>
-            <div className="flex gap-2">
-              {myLorasCount > 0 && (
-                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
-                  {myLorasCount} saved
-                </span>
-              )}
-              {selectedLoraIds.length > 0 && (
-                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
-                  {selectedLoraIds.length} added
-                </span>
-              )}
-            </div>
-          </div>
-          <div className="text-xs sm:text-sm text-slate-600 font-medium">
-            {showMyLorasOnly && showAddedLorasOnly ? (
-              <span className="text-purple-700">Showing {processedLoras.length} of your added LoRAs</span>
-            ) : showMyLorasOnly ? (
-              <span className="text-blue-700">Showing {processedLoras.length} of your LoRAs</span>
-            ) : showAddedLorasOnly ? (
-              <span className="text-green-700">Showing {processedLoras.length} added LoRAs</span>
-            ) : (
-              <span>Showing all {processedLoras.length} LoRAs</span>
-            )}
-          </div>
-        </div>
-      </div>
+    <div className="relative flex flex-col h-full min-h-0">
 
       <div className="flex gap-2 mb-4">
         <Input
@@ -327,18 +293,20 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps> = ({ loras, onAddLora,
           </SelectContent>
         </Select>
       </div>
-      <ScrollArea className="flex-grow pr-4 h-[500px]">
+      {/* Scrollable content area */}
+      <div className="flex-1 min-h-0 overflow-y-auto pr-4">
         <div className="space-y-3 p-1">
           {paginatedLoras.length > 0 ? (
             paginatedLoras.map((lora) => {
-              const isSelectedOnGenerator = selectedLoraIds.includes(lora["Model ID"]);
+              const isSelectedOnGenerator = selectedLoraMap.has(lora["Model ID"]);
+              const strength = selectedLoraMap.get(lora["Model ID"]);
               const isMyLora = lora.created_by?.is_you || 
                               lora.Author === 'You' || 
                               lora.Author === 'You (Local)' ||
                               myLoraModelIds.includes(lora["Model ID"]);
               const isInSavedLoras = myLoraModelIds.includes(lora["Model ID"]);
               const isLocalLora = lora.Author === 'You (Local)';
-              const resourceId = (lora as any)._resourceId;
+              const resourceId = (lora as LoraModel & { _resourceId?: string })._resourceId;
 
               return (
                 <Card 
@@ -363,9 +331,9 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps> = ({ loras, onAddLora,
                 >
                   <div className="flex flex-col">
                     <CardHeader className="pb-2">
-                        <div className="flex justify-between items-start gap-2">
+                        <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-2">
                             <div className="flex-grow">
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 flex-wrap">
                                   <CardTitle className="text-xl" title={lora.Name !== "N/A" ? lora.Name : lora["Model ID"]}>
                                       {lora.Name !== "N/A" ? lora.Name : lora["Model ID"]}
                                   </CardTitle>
@@ -382,19 +350,36 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps> = ({ loras, onAddLora,
                                 </div>
                                 <p className="text-sm text-muted-foreground" title={lora.Author}>By: {lora.Author}</p>
                             </div>
-                            <div className="flex gap-2 flex-shrink-0">
-                              {!isMyLora && (
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => createResource.mutate({ type: 'lora', metadata: lora })}
-                                    disabled={isInSavedLoras || createResource.isPending}
-                                >
-                                    {isInSavedLoras ? 'Saved' : 'Save'}
-                                </Button>
-                              )}
+                            <div className="flex flex-col lg:items-end gap-2 flex-shrink-0">
+                              <div className="flex gap-2">
+                                {!isMyLora && (
+                                  <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => createResource.mutate({ type: 'lora', metadata: lora })}
+                                      disabled={isInSavedLoras || createResource.isPending}
+                                  >
+                                      {isInSavedLoras ? 'Saved' : 'Save'}
+                                  </Button>
+                                )}
+                              </div>
                             </div>
                         </div>
+                        {isSelectedOnGenerator && (
+                          <div className="w-full lg:w-48 lg:ml-auto space-y-1 mt-2" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex justify-between items-center">
+                              <Label htmlFor={`lora-strength-${lora['Model ID']}`} className="text-xs">Strength</Label>
+                              <span className="text-xs font-medium">{strength?.toFixed(2)}</span>
+                            </div>
+                            <Slider
+                              id={`lora-strength-${lora['Model ID']}`}
+                              value={[strength ?? 1]}
+                              onValueChange={(value) => onUpdateLoraStrength(lora['Model ID'], value[0])}
+                              min={0} max={2} step={0.05}
+                              className="w-full"
+                            />
+                          </div>
+                        )}
                         <div className="text-xs text-muted-foreground pt-1">
                           {lora.Downloads && <span>Downloads: {lora.Downloads.toLocaleString()} | </span>}
                           {lora.Likes && <span>Likes: {lora.Likes.toLocaleString()} | </span>}
@@ -404,7 +389,7 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps> = ({ loras, onAddLora,
                     <CardContent className="space-y-3 pt-0">
                       {lora.Description && (
                         <div className="space-y-2">
-                          <p className="text-xs text-muted-foreground max-h-10 overflow-y-auto" title={lora.Description}>
+                          <p className="text-xs text-muted-foreground max-h-10 overflow-hidden" title={lora.Description}>
                             {lora.Description}
                           </p>
                           {lora.Description.length > 100 && (
@@ -489,7 +474,73 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps> = ({ loras, onAddLora,
             </Pagination>
           )}
         </div>
-      </ScrollArea>
+      </div>
+
+      {/* Sticky Bottom Bar - Works on both mobile and desktop */}
+      <div className="sticky bottom-0 bg-white border-t border-gray-200 shadow-lg p-4 mt-4 lg:rounded-b-lg lg:mx-6 lg:border-x lg:border-b lg:border-gray-200">
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center space-x-2">
+                <Checkbox 
+                  id="show-added-loras-only-sticky" 
+                  checked={showAddedLorasOnly}
+                  onCheckedChange={(checked) => setShowAddedLorasOnly(!!checked)}
+                  className="data-[state=checked]:bg-green-600 data-[state=checked]:border-green-600"
+                />
+                <Label htmlFor="show-added-loras-only-sticky" className="text-sm font-medium text-slate-900 cursor-pointer">
+                  <span className="hidden sm:inline">Show only added LoRAs</span>
+                  <span className="sm:hidden">Added</span>
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox 
+                  id="show-my-loras-only-sticky" 
+                  checked={showMyLorasOnly}
+                  onCheckedChange={(checked) => setShowMyLorasOnly(!!checked)}
+                  className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                />
+                <Label htmlFor="show-my-loras-only-sticky" className="text-sm font-medium text-slate-900 cursor-pointer">
+                  <span className="hidden sm:inline">Show only my LoRAs</span>
+                  <span className="sm:hidden">My LoRAs</span>
+                </Label>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {myLorasCount > 0 && (
+                <span className="hidden lg:inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+                  {myLorasCount} saved
+                </span>
+              )}
+              {selectedLoraIds.length > 0 && (
+                <span className="hidden lg:inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
+                  {selectedLoraIds.length} added
+                </span>
+              )}
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={onClose}
+                className="flex items-center gap-1"
+              >
+                <X className="h-4 w-4" />
+                <span className="hidden sm:inline">Close</span>
+              </Button>
+            </div>
+          </div>
+          <div className="text-xs text-slate-600 text-center">
+            {showMyLorasOnly && showAddedLorasOnly ? (
+              <span className="text-purple-700">Showing {processedLoras.length} of your added LoRAs</span>
+            ) : showMyLorasOnly ? (
+              <span className="text-blue-700">Showing {processedLoras.length} of your LoRAs</span>
+            ) : showAddedLorasOnly ? (
+              <span className="text-green-700">Showing {processedLoras.length} added LoRAs</span>
+            ) : (
+              <span>Showing all {processedLoras.length} LoRAs</span>
+            )}
+          </div>
+        </div>
+      </div>
 
       {/* Description Modal */}
       <DescriptionModal 
@@ -555,7 +606,7 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
         return () => {
             newUrls.forEach(url => URL.revokeObjectURL(url));
         };
-    }, [sampleFiles]);
+    }, [sampleFiles, mainGenerationIndex, previewUrls]);
 
     const extractFilenameFromUrl = (url: string) => {
         try {
@@ -695,7 +746,7 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
                 trigger_word: addForm.trigger_word,
             };
 
-            await createResource.mutateAsync({ type: 'lora', metadata: newLora });
+            await createResource.mutateAsync({ type: 'lora', metadata: newLora as any });
 
             // Reset form
             setAddForm({
@@ -961,7 +1012,8 @@ export const LoraSelectorModal: React.FC<LoraSelectorModalProps> = ({
   loras,
   onAddLora,
   onRemoveLora,
-  selectedLoraIds,
+  onUpdateLoraStrength,
+  selectedLoras,
   lora_type,
 }) => {
   const modalStyle = usePaneAwareModalStyle();
@@ -981,7 +1033,7 @@ export const LoraSelectorModal: React.FC<LoraSelectorModalProps> = ({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent
         style={modalStyle}
-        className={`max-w-4xl flex flex-col overflow-y-auto ${
+        className={`max-w-4xl flex flex-col max-h-[90vh] overflow-hidden ${
           isMobile ? 'mx-2 my-5 max-h-[calc(100vh-2.5rem)]' : ''
         }`}
       >
@@ -991,29 +1043,31 @@ export const LoraSelectorModal: React.FC<LoraSelectorModalProps> = ({
             Browse all LoRAs, filter by your collection, or add new ones.
           </DialogDescription>
         </DialogHeader>
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex flex-col flex-1 overflow-hidden">
+            <TabsList className="grid w-full grid-cols-2 flex-shrink-0">
                 <TabsTrigger value="browse">Browse All LoRAs</TabsTrigger>
                 <TabsTrigger value="add-new">Add New LoRA</TabsTrigger>
             </TabsList>
-            <TabsContent value="browse">
+            <TabsContent value="browse" className="flex-1 flex flex-col min-h-0 overflow-hidden">
                 <CommunityLorasTab 
                     loras={loras} 
                     onAddLora={onAddLora} 
                     onRemoveLora={onRemoveLora}
-                    selectedLoraIds={selectedLoraIds} 
+                    onUpdateLoraStrength={onUpdateLoraStrength}
+                    selectedLoras={selectedLoras} 
                     lora_type={lora_type}
                     myLorasResource={myLorasResource}
                     createResource={createResource}
                     deleteResource={deleteResource}
+                    onClose={onClose}
                 />
             </TabsContent>
-            <TabsContent value="add-new">
+            <TabsContent value="add-new" className="flex-1 min-h-0 overflow-auto">
                 <MyLorasTab 
                     myLorasResource={myLorasResource}
                     onAddLora={onAddLora}
                     onRemoveLora={onRemoveLora}
-                    selectedLoraIds={selectedLoraIds}
+                    selectedLoraIds={selectedLoras.map(l => l['Model ID'])}
                     deleteResource={deleteResource}
                     createResource={createResource}
                     lora_type={lora_type}

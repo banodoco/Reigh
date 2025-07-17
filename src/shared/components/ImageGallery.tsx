@@ -418,7 +418,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
 
   return (
                 <TooltipProvider>
-      <div className="space-y-4">
+      <div className="space-y-4 pb-16">
         <div className="flex flex-wrap justify-between items-center mb-4 gap-x-4 gap-y-2"> {/* Added gap-y-2 and flex-wrap for better responsiveness */}
             {images.length > 0 && (
               <div className="flex items-center gap-2">
@@ -487,7 +487,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
         </div>
 
         {images.length > 0 && filteredImages.length === 0 && (filterByToolType || mediaTypeFilter !== 'all') && (
-          <div className="text-center py-12 mt-8 text-muted-foreground border rounded-lg bg-card shadow-sm" style={{ marginBottom: '4rem' }}>
+          <div className="text-center py-12 mt-8 text-muted-foreground border rounded-lg bg-card shadow-sm">
             <Filter className="mx-auto h-10 w-10 mb-3 opacity-60" />
             <p className="font-semibold">No items match the current filters.</p>
             <p className="text-sm">Adjust the filters or uncheck them to see all items.</p>
@@ -495,7 +495,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
         )}
 
         {images.length === 0 && (
-           <div className="text-center py-12 mt-8 text-muted-foreground border rounded-lg bg-card shadow-sm" style={{ marginBottom: '4rem' }}>
+           <div className="text-center py-12 mt-8 text-muted-foreground border rounded-lg bg-card shadow-sm">
              <Sparkles className="mx-auto h-10 w-10 mb-3 opacity-60" />
              <p className="font-semibold">No images generated yet.</p>
              <p className="text-sm">Use the controls above to generate some images.</p>
@@ -503,7 +503,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
         )}
 
         {paginatedImages.length > 0 && (
-            <div className={`grid gap-4 mb-16 ${columnsPerRow === 6 ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-6' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 2xl:grid-cols-5'}`}>
+            <div className={`grid gap-4 mb-8 ${columnsPerRow === 6 ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-6' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 2xl:grid-cols-5'}`}>
             {paginatedImages.map((image, index) => {
                 const displayUrl = getDisplayUrl(image.url);
                 const metadataForDisplay = image.metadata ? formatMetadataForDisplay(image.metadata) : "No metadata available.";
@@ -767,7 +767,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
 
       {/* Pagination Controls */}
       {totalPages > 1 && (
-        <div className={`flex justify-center items-center mt-6 mb-8 ${whiteText ? 'text-white' : 'text-gray-600'}`}>
+        <div className={`flex justify-center items-center mt-6 mb-4 ${whiteText ? 'text-white' : 'text-gray-600'}`}>
           <Button
             variant="outline"
             size="sm"

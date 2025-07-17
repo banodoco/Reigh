@@ -68,6 +68,20 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
   const isMobile = useIsMobile();
   const outerRef = useRef<HTMLDivElement>(null);
 
+  // Notify other components (e.g., PaneControlTab) when mobile selection is active
+  useEffect(() => {
+    if (!isMobile) return;
+
+    const active = mobileSelectedIds.length > 0;
+    const event = new CustomEvent('mobileSelectionActive', { detail: active });
+    window.dispatchEvent(event);
+
+    return () => {
+      // On cleanup, ensure we reset to inactive if component unmounts
+      window.dispatchEvent(new CustomEvent('mobileSelectionActive', { detail: false }));
+    };
+  }, [mobileSelectedIds.length, isMobile]);
+
   // Batch delete function - hoisted to top level to survive re-renders
   const performBatchDelete = React.useCallback(
     (ids: string[]) => {

@@ -240,6 +240,13 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const skipNextSyncRef = useRef(false);
   const isMobile = useIsMobile();
 
+  // Ensure mobile users are always in batch generation mode
+  useEffect(() => {
+    if (isMobile && generationMode !== 'batch') {
+      onGenerationModeChange('batch');
+    }
+  }, [isMobile, generationMode]);
+
   
   // Shot name editing state
   const [isEditingName, setIsEditingName] = useState(false);
@@ -1097,9 +1104,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   };
 
   return (
-    <div className="flex flex-col space-y-4">
+    <div className="flex flex-col space-y-4 pb-16">
       {/* Header */}
-      <div className="flex-shrink-0 flex flex-wrap justify-between items-center gap-y-2">
+      <div className="flex-shrink-0 flex flex-wrap justify-between items-center gap-y-2 px-2">
         <Button onClick={onBack}>&larr; Back to Shot List</Button>
         <div className="hidden sm:flex items-center space-x-2 min-w-0 flex-1 justify-center px-4">
           <span className="hidden sm:inline text-2xl font-bold">Editing Shot:</span>
@@ -1131,7 +1138,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             </span>
           )}
         </div>
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
+        <div className="flex flex-row items-center space-x-2">
           {(hasPrevious || hasNext) && (
             <>
               <Button 
@@ -1273,6 +1280,25 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                             availableLoras={availableLoras}
                         />
                         
+                        {/* LoRA Settings (Mobile) */}
+                        <div className="block lg:hidden mt-6">
+                            <div className="space-y-4 p-4 border rounded-lg bg-card">
+                                <h3 className="font-semibold text-sm">LoRA Models</h3>
+                                
+                                <Button type="button" variant="outline" className="w-full" onClick={() => setIsLoraModalOpen(true)}>
+                                    Add or Manage LoRAs
+                                </Button>
+                                
+                                <ActiveLoRAsDisplay
+                                    selectedLoras={selectedLoras}
+                                    onRemoveLora={onRemoveLora}
+                                    onLoraStrengthChange={onLoraStrengthChange}
+                                    availableLoras={availableLoras}
+                                    className="mt-4"
+                                />
+                            </div>
+                        </div>
+                        
                         <div className="mt-6 pt-6 border-t">
                             <Button 
                                 size="lg" 
@@ -1297,8 +1323,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                         </div>
                     </div>
 
-                    {/* Right Column: LoRA Settings */}
-                    <div className="lg:w-80 order-1 lg:order-2">
+                    {/* Right Column: LoRA Settings (Desktop) */}
+                    <div className="hidden lg:block lg:w-80 order-1 lg:order-2">
                         <div className="space-y-4 p-4 border rounded-lg bg-card">
                             <h3 className="font-semibold text-sm">LoRA Models</h3>
                             
@@ -1326,7 +1352,16 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         loras={availableLoras}
         onAddLora={onAddLora}
         onRemoveLora={onRemoveLora}
-        selectedLoraIds={selectedLoras.map(l => l.id)}
+        onUpdateLoraStrength={onLoraStrengthChange}
+        selectedLoras={selectedLoras.map(lora => {
+          const fullLora = availableLoras.find(l => l['Model ID'] === lora.id);
+          return {
+            ...fullLora,
+            "Model ID": lora.id,
+            Name: lora.name,
+            strength: lora.strength,
+          } as LoraModel & { strength: number };
+        })}
         lora_type="Wan 2.1 14b"
       />
       

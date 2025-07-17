@@ -46,6 +46,12 @@ interface ImageGenerationFormProps {
   hasApiKey?: boolean;
   apiKey?: string;
   openaiApiKey?: string;
+  /**
+   * Indicates that the latest generate action successfully queued tasks. When
+   * true, the submit button will briefly show "Added to queue!" to give the
+   * user feedback that their request was accepted.
+   */
+  justQueued?: boolean;
 }
 
 export interface PromptEntry {
@@ -254,10 +260,14 @@ export const PromptInputRow: React.FC<PromptInputRowProps> = ({
   );
 };
 
-const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerationFormProps>((
-  { onGenerate, isGenerating = false, hasApiKey: incomingHasApiKey = true, apiKey, openaiApiKey },
-  ref
-) => {
+const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerationFormProps>(({
+  onGenerate,
+  isGenerating = false,
+  hasApiKey: incomingHasApiKey = true,
+  apiKey,
+  openaiApiKey,
+  justQueued = false,
+}, ref) => {
 
   const [prompts, setPrompts] = useState<PromptEntry[]>([]);
   const promptIdCounter = useRef(1);
@@ -684,12 +694,16 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
         </div>
 
         <div className="md:col-span-2 flex justify-center mt-4">
-          <Button 
-            type="submit" 
-            className="w-full md:w-1/2" 
+          <Button
+            type="submit"
+            className="w-full md:w-1/2"
             disabled={isGenerating || !hasApiKey || actionablePromptsCount === 0}
           >
-            {isGenerating ? "Creating tasks..." : `Generate ${imagesPerPrompt * prompts.length} Images`}
+            {justQueued
+              ? "Added to queue!"
+              : isGenerating
+                ? "Creating tasks..."
+                : `Generate ${imagesPerPrompt * prompts.length} Images`}
           </Button>
         </div>
       </form>
@@ -700,7 +714,16 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
         loras={availableLoras}
         onAddLora={handleAddLora}
         onRemoveLora={handleRemoveLora}
-        selectedLoraIds={selectedLoras.map(l => l.id)}
+        onUpdateLoraStrength={handleLoraStrengthChange}
+        selectedLoras={selectedLoras.map(lora => {
+          const fullLora = availableLoras.find(l => l['Model ID'] === lora.id);
+          return {
+            ...fullLora,
+            "Model ID": lora.id,
+            Name: lora.name,
+            strength: lora.strength,
+          } as LoraModel & { strength: number };
+        })}
         lora_type={"Wan 2.1 14b"}
       />
         

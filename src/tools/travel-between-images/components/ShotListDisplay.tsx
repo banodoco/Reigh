@@ -21,7 +21,7 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
       <div className="py-8">
         <p className="mb-6">No shots available for this project. You can create one using the button below.</p>
         {onCreateNewShot && (
-          <Button onClick={onCreateNewShot}>Create New Shot</Button>
+          <Button onClick={onCreateNewShot}>New Shot</Button>
         )}
       </div>
     );

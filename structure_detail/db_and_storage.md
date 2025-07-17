@@ -20,7 +20,6 @@ export const myTable = pgTable('my_table', {
 ```bash
 # Generate SQL migration from schema changes
 npm run db:generate:pg    # PostgreSQL
-npm run db:generate:sqlite  # SQLite (local dev)
 
 # Apply to database
 supabase db push           # Applies all pending migrations
@@ -168,7 +167,6 @@ WHERE tablename = 'your_table';
 ```
 db/
 ├── migrations/          # PostgreSQL migrations
-├── migrations-sqlite/   # SQLite migrations (dev)
 └── schema/
     └── schema.ts       # Source of truth
     

@@ -1,4 +1,4 @@
-import { drizzle } from 'drizzle-orm/node-postgres';
+import { NodePgDatabase, drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import * as schema from './schema/schema';
 import { eq, sql, and } from 'drizzle-orm';
@@ -13,7 +13,7 @@ async function seed() {
   console.log(`[Seed] Starting database seed process for PostgreSQL...`);
 
   let pool: Pool | null = null;
-  let db: any;
+  let db: NodePgDatabase<typeof schema>;
 
   try {
     const connectionString = process.env.DATABASE_URL;
@@ -79,9 +79,9 @@ async function seed() {
 
     // 3. Create sample tasks
     console.log('[Seed] Creating sample tasks...');
-    const taskIds = [];
+    const taskIds: string[] = [];
     for (let i = 0; i < 5; i++) {
-      const taskData = {
+      const taskData: typeof schema.tasks.$inferInsert = {
         taskType: i % 2 === 0 ? 'single_image' : 'travel_stitch',
         params: {
           prompt: `Sample task ${i + 1}`,
@@ -100,7 +100,7 @@ async function seed() {
 
     // 4. Create sample generations
     console.log('[Seed] Creating sample generations...');
-    const generationIds = [];
+    const generationIds: string[] = [];
     for (let i = 0; i < 3; i++) {
       const genData = {
         tasks: [taskIds[i]],
@@ -119,7 +119,7 @@ async function seed() {
 
     // 5. Create sample shots
     console.log('[Seed] Creating sample shots...');
-    const shotIds = [];
+    const shotIds: string[] = [];
     for (let i = 0; i < 2; i++) {
       const shotData = {
         name: `Shot ${i + 1}`,

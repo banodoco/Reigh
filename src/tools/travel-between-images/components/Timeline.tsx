@@ -27,6 +27,7 @@ interface TimelineItemProps {
   zoomLevel: number;
   fullMinFrames: number;
   fullRange: number;
+  isSwapTarget: boolean;
 }
 
 // Internal thumbnail component for the timeline. Kept inside this file as it is only
@@ -41,7 +42,12 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
   zoomLevel,
   fullMinFrames,
   fullRange,
+  isSwapTarget,
 }) => {
+  const isLockedAtZero = framePosition === 0;
+
+  // Allow dragging even when the item originates at frame 0 so that a swap can
+  // occur. We retain the isLockedAtZero flag only for styling purposes.
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: image.shotImageEntryId,
   });
@@ -54,8 +60,11 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
       : ((framePosition - minFrames) / (maxFrames - minFrames)) * 100;
 
   const baseTransform = "translateX(-50%)";
+  // While dragging, add a slight downward offset so the shadow sits below the cursor
   const style = {
-    transform: isDragging ? `${baseTransform} ${CSS.Transform.toString(transform)}` : baseTransform,
+    transform: isDragging
+      ? `${baseTransform} translateY(12px) ${CSS.Transform.toString(transform)}`
+      : baseTransform,
     transition: isDragging ? transition : undefined,
     opacity: isDragging ? 0.3 : 1,
     left: `${leftPercent}%`,
@@ -69,7 +78,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
       {...attributes}
       {...listeners}
       onDoubleClick={onDoubleClick}
-      className={`absolute cursor-move ${isDragging ? "z-10" : ""}`}
+      className={`absolute cursor-move ${isDragging ? "z-10" : ""} ${isSwapTarget ? "ring-4 ring-primary/60" : ""}`}
     >
       <div className="flex flex-col items-center">
         <div className={`w-20 h-20 border-2 ${isDragging ? "border-primary/50" : "border-primary"} rounded-lg overflow-hidden mb-1`}>
@@ -267,17 +276,37 @@ const Timeline: React.FC<TimelineProps> = ({ images, frameSpacing, onImageReorde
       setActiveId(null);
       return;
     }
-    setFramePositions(prev => {
-      const map = new Map(prev);
-      map.set(event.active.id, dragFramePosition);
-      return map;
-    });
+
+    const updatedMap = new Map(framePositions);
+    const activeIdLocal: string = event.active.id;
+    const originalPosOfActive = updatedMap.get(activeIdLocal) ?? 0;
+
+    // Identify entry occupying the drop position (excluding the active item)
+    const targetEntry = [...updatedMap.entries()].find(
+      ([id, pos]) => id !== activeIdLocal && pos === dragFramePosition
+    );
+
+    if (targetEntry) {
+      // Swap the positions
+      updatedMap.set(targetEntry[0], originalPosOfActive);
+    } else if (originalPosOfActive === 0 && dragFramePosition !== 0) {
+      // Frame 0 moved to an empty slot – choose the nearest frame to occupy 0
+      const nearest = [...updatedMap.entries()]
+        .filter(([id]) => id !== activeIdLocal)
+        .sort((a, b) => a[1] - b[1])[0];
+      if (nearest) updatedMap.set(nearest[0], 0);
+    }
+
+    // Place active item at its new position
+    updatedMap.set(activeIdLocal, dragFramePosition);
+
+    setFramePositions(updatedMap);
 
     const newOrder = [...images]
       .sort((a, b) => {
-        const fa = framePositions.get(a.shotImageEntryId) ?? 0;
-        const fb = framePositions.get(b.shotImageEntryId) ?? 0;
-        return a.shotImageEntryId === event.active.id ? dragFramePosition - fb : fa - fb;
+        const fa = updatedMap.get(a.shotImageEntryId) ?? 0;
+        const fb = updatedMap.get(b.shotImageEntryId) ?? 0;
+        return fa - fb;
       })
       .map(img => img.shotImageEntryId);
 
@@ -334,6 +363,15 @@ const Timeline: React.FC<TimelineProps> = ({ images, frameSpacing, onImageReorde
     } as const;
   };
   const dragDistances = computeDragDistances();
+
+  // Determine which item will be swapped with the active one (for visual feedback)
+  const swapTargetId = (() => {
+    if (dragFramePosition === null || !activeId) return null;
+    const entry = [...framePositions.entries()].find(
+      ([id, pos]) => id !== activeId && pos === dragFramePosition
+    );
+    return entry ? entry[0] : null;
+  })();
 
   return (
     <div className="w-full overflow-x-hidden">
@@ -415,6 +453,7 @@ const Timeline: React.FC<TimelineProps> = ({ images, frameSpacing, onImageReorde
                 zoomLevel={zoomLevel}
                 fullMinFrames={fullMinFrames}
                 fullRange={fullRange}
+                isSwapTarget={swapTargetId === image.shotImageEntryId}
               />
             ))}
 
@@ -422,7 +461,7 @@ const Timeline: React.FC<TimelineProps> = ({ images, frameSpacing, onImageReorde
               {activeId && dragFramePosition !== null && (
                 <div className="relative">
                   <div className="flex flex-col items-center">
-                    <div className="w-20 h-20 border-2 border-primary rounded-lg overflow-hidden mb-1 shadow-lg">
+                    <div className="w-20 h-20 border-2 border-primary rounded-lg overflow-hidden mb-1 shadow-[0_6px_8px_-2px_rgba(0,0,0,0.3)]">
                       <img src={getDisplayUrl(images.find(img => img.shotImageEntryId === activeId)!.imageUrl)} alt={`Frame ${dragFramePosition}`} className="w-full h-full object-cover" />
                     </div>
                     <div className="bg-primary text-primary-foreground px-2 py-1 rounded text-xs font-medium mb-1">Frame {dragFramePosition}</div>

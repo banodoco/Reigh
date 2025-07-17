@@ -90,7 +90,7 @@ The worker polls the same task queue but specializes in video generation:
 - Connects to Supabase using environment credentials
 - Claims tasks with `tool_id` matching its capabilities
 - Updates task status and uploads results to designated storage buckets
-- Supports both SQLite (local dev) and PostgreSQL (production) backends
+- Uses PostgreSQL (Supabase) for both local development and production
 
 ### 3. Task Completion
 - Worker calls `complete_task` Edge Function with:
@@ -130,11 +130,8 @@ The worker polls the same task queue but specializes in video generation:
 # Ensure Supabase is running
 supabase status
 
-# Start the worker (included in npm run dev)
-npm run dev:server
-
-# Or run standalone
-node --loader ts-node/esm src/server/index.ts
+# Start the worker
+npm run start:api
 ```
 
 ### Headless-Wan2GP Worker (GPU Required)

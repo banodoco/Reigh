@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { ArrowRight, Image as ImageIcon, Video, Users, FileText, ChevronDown, ChevronUp, GitBranch, X, HandHeart, Brain, Palette, Crown } from 'lucide-react';
+/* eslint-disable no-sequences */
+import React, { useState, useEffect, useRef } from 'react';
+import { ArrowRight, Video, Users, FileText, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, GitBranch, X, HandHeart, Brain, Palette, Infinity } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import type { Session } from '@supabase/supabase-js';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -116,6 +117,90 @@ export default function HomePage() {
   const [isCreativePartnerPaneOpening, setIsCreativePartnerPaneOpening] = useState(false);
   const [isTooltipOpen, setIsTooltipOpen] = useState(false);
   const [assetsLoaded, setAssetsLoaded] = useState(false);
+  // Examples pane state
+  const [showExamples, setShowExamples] = useState(false);
+  const [isExamplesButtonAnimating, setIsExamplesButtonAnimating] = useState(false);
+  const [isExamplesPaneOpening, setIsExamplesPaneOpening] = useState(false);
+  const [isExamplesPaneClosing, setIsExamplesPaneClosing] = useState(false);
+  const [openTipOpen, setOpenTipOpen] = useState(false);
+  const [openTipDisabled, setOpenTipDisabled] = useState(false);
+
+  // Tooltip state: "for exploring"
+  const [exploringTipOpen, setExploringTipOpen] = useState(false);
+  const [exploringTipDisabled, setExploringTipDisabled] = useState(false);
+
+  // Tooltip state: "emerging artform"
+  const [emergingTipOpen, setEmergingTipOpen] = useState(false);
+  const [emergingTipDisabled, setEmergingTipDisabled] = useState(false);
+
+  // New handler for activating the open tool feature and closing the tooltip
+  const handleOpenToolActivate = () => {
+    // Open the side pane
+    setIsCreativePartnerButtonAnimating(true);
+    setIsCreativePartnerPaneOpening(true);
+    setShowPhilosophy(false);
+    setShowExamples(false);
+    setShowCreativePartner(true);
+    setTimeout(() => {
+      setIsCreativePartnerButtonAnimating(false);
+      setIsCreativePartnerPaneOpening(false);
+    }, 350);
+
+    // Close the tooltip and prevent it from reopening immediately
+    setOpenTipDisabled(true);
+    setOpenTipOpen(false);
+    setTimeout(() => setOpenTipDisabled(false), 500); // Reset after a short delay
+  };
+
+  // Handler for "for exploring" tooltip – now opens the bottom Examples pane
+  const handleExploringActivate = () => {
+    // Open the bottom Examples pane
+    setIsExamplesButtonAnimating(true);
+    setIsExamplesPaneOpening(true);
+    setShowCreativePartner(false);
+    setShowPhilosophy(false);
+    setShowExamples(true);
+    setTimeout(() => {
+      setIsExamplesButtonAnimating(false);
+      setIsExamplesPaneOpening(false);
+    }, 350);
+
+    // Close tooltip and prevent immediate reopen
+    setExploringTipDisabled(true);
+    setExploringTipOpen(false);
+    setTimeout(() => setExploringTipDisabled(false), 500);
+  };
+
+  // Handler for "emerging artform" tooltip – opens bottom examples pane
+  const handleEmergingActivate = () => {
+    // Open the right Philosophy side pane
+    setIsPhilosophyButtonAnimating(true);
+    setIsPhilosophyPaneOpening(true);
+    setShowCreativePartner(false);
+    setShowExamples(false);
+    setShowPhilosophy(true);
+    setTimeout(() => {
+      setIsPhilosophyButtonAnimating(false);
+      setIsPhilosophyPaneOpening(false);
+    }, 350);
+
+    // Close tooltip and prevent immediate reopen
+    setEmergingTipDisabled(true);
+    setEmergingTipOpen(false);
+    setTimeout(() => setEmergingTipDisabled(false), 500);
+  };
+
+  // Refs for pane contents to reset scroll on close
+  const examplesContentRef = useRef<HTMLDivElement | null>(null);
+  const creativeContentRef = useRef<HTMLDivElement | null>(null);
+  const philosophyContentRef = useRef<HTMLDivElement | null>(null);
+
+  // Helper to reset pane scroll after close animation (300ms)
+  const resetPaneScroll = (ref: React.RefObject<HTMLDivElement>) => {
+    setTimeout(() => {
+      if (ref.current) ref.current.scrollTop = 0;
+    }, 300);
+  };
 
   // Preload assets
   useEffect(() => {
@@ -205,6 +290,15 @@ export default function HomePage() {
     }
   ];
 
+  const imagePairIndices = [1, 2];
+  const multiSquareIndices = [1, 2, 3, 4];
+  const motionExamples = [
+    { id: 1, label: 'Vortex Motion' },
+    { id: 2, label: 'Pulsing Effect' },
+    { id: 3, label: 'Melting Transition' },
+    { id: 4, label: 'Particle Explosion' },
+  ];
+
   // Remove aggressive mobile scroll prevention - let content flow naturally
   // The side panes handle their own overflow, and the main content should be scrollable
 
@@ -249,7 +343,36 @@ export default function HomePage() {
       
       {/* Top Navigation Links */}
       <div className={`fixed top-6 left-6 sm:top-12 sm:left-12 flex items-center space-x-6 ${
-        showCreativePartner || isCreativePartnerPaneClosing || showPhilosophy || isPhilosophyPaneClosing || isCreativePartnerPaneOpening || isPhilosophyPaneOpening ? 'z-0' : 'z-50'
+        showCreativePartner || isCreativePartnerPaneClosing || showPhilosophy || isPhilosophyPaneClosing || showExamples || isExamplesPaneClosing || isCreativePartnerPaneOpening || isPhilosophyPaneOpening || isExamplesPaneOpening ? 'z-0' : 'z-50'
+      }`}>
+        {/* Creative Partner Programme */}
+        <button
+          onClick={() => {
+            setIsCreativePartnerButtonAnimating(true);
+            setIsCreativePartnerPaneOpening(true);
+            setShowPhilosophy(false);
+            setShowCreativePartner(true);
+            // Reset animation state after pane is fully open
+            setTimeout(() => setIsCreativePartnerButtonAnimating(false), 350);
+            setTimeout(() => setIsCreativePartnerPaneOpening(false), 300);
+          }}
+          className={`group flex items-center sm:space-x-2 px-4 py-4 sm:px-4 sm:py-2 bg-gradient-to-r from-wes-mint to-wes-vintage-gold backdrop-blur-sm rounded-full border-2 border-wes-mint/40 hover:border-wes-mint/60 transition-all duration-300 shadow-wes-vintage hover:shadow-wes-hover text-white ${
+            isCreativePartnerButtonAnimating ? 'animate-spin-left-fade' : ''
+                     } ${isCreativePartnerPaneClosing ? 'animate-spin-left-fade-reverse' : ''} ${
+             showCreativePartner || isCreativePartnerButtonAnimating
+               ? 'opacity-0 pointer-events-none'
+               : showPhilosophy || isPhilosophyButtonAnimating || showExamples || isExamplesButtonAnimating
+                 ? 'opacity-40 pointer-events-none brightness-50 transition-all duration-100'
+                 : 'opacity-100 pointer-events-auto transition-all duration-300'
+           }`}
+        >
+          <HandHeart className="w-6 h-6 sm:w-4 sm:h-4 animate-gifting-motion" />
+          <span className="font-inter text-sm font-medium hidden sm:inline">Open Creative Partner Programme</span>
+        </button>
+      </div>
+        
+      <div className={`fixed top-6 right-6 sm:top-12 sm:right-12 flex items-center ${
+        showCreativePartner || isCreativePartnerPaneClosing || showPhilosophy || isPhilosophyPaneClosing || showExamples || isExamplesPaneClosing || isPhilosophyPaneOpening || isCreativePartnerPaneOpening || isExamplesPaneOpening ? 'z-0' : 'z-50'
       }`}>
         {/* Philosophy Link */}
         <button
@@ -263,46 +386,17 @@ export default function HomePage() {
             setTimeout(() => setIsPhilosophyPaneOpening(false), 300);
           }}
           className={`group flex items-center sm:space-x-2 px-4 py-4 sm:px-4 sm:py-2 bg-white/80 backdrop-blur-sm rounded-full border-2 border-wes-vintage-gold/20 hover:border-wes-vintage-gold/40 transition-all duration-300 hover:shadow-wes-ornate ${
-            isPhilosophyButtonAnimating ? 'animate-spin-left-fade' : ''
-                     } ${isPhilosophyPaneClosing ? 'animate-spin-left-fade-reverse' : ''} ${
+            isPhilosophyButtonAnimating ? 'animate-spin-right-fade' : ''
+                     } ${isPhilosophyPaneClosing ? 'animate-spin-right-fade-reverse' : ''} ${
              showPhilosophy || isPhilosophyButtonAnimating
                ? 'opacity-0 pointer-events-none'
-               : showCreativePartner || isCreativePartnerButtonAnimating
+               : showCreativePartner || isCreativePartnerButtonAnimating || showExamples || isExamplesButtonAnimating
                  ? 'opacity-40 pointer-events-none brightness-50 transition-all duration-100'
                  : 'opacity-100 pointer-events-auto transition-all duration-300'
            }`}
         >
           <Brain className="w-6 h-6 sm:w-4 sm:h-4 text-wes-vintage-gold animate-brain-pulse" />
           <span className="font-inter text-sm font-medium text-primary group-hover:text-primary/80 hidden sm:inline">Philosophy</span>
-        </button>
-      </div>
-        
-      <div className={`fixed top-6 right-6 sm:top-12 sm:right-12 flex items-center ${
-        showPhilosophy || isPhilosophyPaneClosing || showCreativePartner || isCreativePartnerPaneClosing || isPhilosophyPaneOpening || isCreativePartnerPaneOpening ? 'z-0' : 'z-50'
-      }`}>
-        {/* Creative Partner Programme */}
-        <button
-          onClick={() => {
-            setIsCreativePartnerButtonAnimating(true);
-            setIsCreativePartnerPaneOpening(true);
-            setShowPhilosophy(false);
-            setShowCreativePartner(true);
-            // Reset animation state after pane is fully open
-            setTimeout(() => setIsCreativePartnerButtonAnimating(false), 350);
-            setTimeout(() => setIsCreativePartnerPaneOpening(false), 300);
-          }}
-          className={`group flex items-center sm:space-x-2 px-4 py-4 sm:px-4 sm:py-2 bg-gradient-to-r from-wes-coral/90 to-wes-pink/90 backdrop-blur-sm rounded-full border-2 border-wes-coral/30 hover:border-wes-coral/50 transition-all duration-300 hover:shadow-wes-ornate text-white hover:from-wes-coral hover:to-wes-pink ${
-            isCreativePartnerButtonAnimating ? 'animate-spin-right-fade' : ''
-                     } ${isCreativePartnerPaneClosing ? 'animate-spin-right-fade-reverse' : ''} ${
-             showCreativePartner || isCreativePartnerButtonAnimating
-               ? 'opacity-0 pointer-events-none'
-               : showPhilosophy || isPhilosophyButtonAnimating
-                 ? 'opacity-40 pointer-events-none brightness-50 transition-all duration-100'
-                 : 'opacity-100 pointer-events-auto transition-all duration-300'
-           }`}
-        >
-          <HandHeart className="w-6 h-6 sm:w-4 sm:h-4 animate-gifting-motion" />
-          <span className="font-inter text-sm font-medium hidden sm:inline">Open Creative Partner Programme</span>
         </button>
       </div>
 
@@ -338,7 +432,121 @@ export default function HomePage() {
             {/* Subtitle */}
             <FadeInSection delayMs={200}>
               <p className="font-inter text-xl md:text-2xl text-muted-foreground leading-relaxed tracking-wide mb-8">
-              A tool for exploring the emerging artform of image-guided video
+                An{' '}
+                <TooltipProvider>
+                  <Tooltip open={openTipOpen} onOpenChange={(o)=>{ if(!openTipDisabled) setOpenTipOpen(o); }}>
+                    <TooltipTrigger asChild>
+                <span
+                  onClick={handleOpenToolActivate}
+                  onMouseLeave={() => { if(openTipDisabled) setOpenTipDisabled(false);} }
+                  className={`sparkle-underline cursor-pointer transition-colors duration-200 ${openTipDisabled ? 'pointer-events-none' : ''} ${
+                    showCreativePartner ? 'pointer-events-none opacity-60' : showPhilosophy || showExamples ? 'opacity-40 pointer-events-none brightness-50 transition-all duration-100' : 'opacity-100 pointer-events-auto transition-all duration-300'
+                  }`}
+                >
+                  open tool
+                </span>
+              </TooltipTrigger>
+              <TooltipContent
+                side="top"
+                align="center"
+                onClick={handleOpenToolActivate}
+                className="group flex items-center gap-2 text-left p-3 max-w-xs border-2 border-transparent bg-wes-cream/80 rounded-lg shadow-md cursor-pointer transition-all duration-300 hover:bg-gradient-to-r hover:from-wes-pink/10 hover:via-wes-coral/10 hover:to-wes-vintage-gold/10 hover:border-transparent hover:bg-origin-border hover:shadow-2xl hover:-translate-y-1"
+              >
+                <div className="flex-shrink-0">
+                  <ChevronLeft className="hover-arrow w-6 h-6 text-wes-vintage-gold transition-transform transition-colors duration-700 ease-in-out group-hover:text-wes-coral group-hover:animate-sway-x" />
+                </div>
+                <p className="text-xs sm:text-sm leading-relaxed text-primary">
+                  Reigh is open source and can be run for free on your computer, or in the cloud for convenience.
+                </p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>{' '}made{' '}
+          {/* Exploring tooltip temporarily disabled */}
+          {/*
+          <TooltipProvider>
+            <Tooltip
+              open={exploringTipOpen}
+              onOpenChange={(o) => {
+                if (!exploringTipDisabled) setExploringTipOpen(o);
+              }}
+            >
+              <TooltipTrigger asChild>
+                <span
+                  onClick={handleExploringActivate}
+                  onMouseLeave={() => {
+                    if (exploringTipDisabled) setExploringTipDisabled(false);
+                  }}
+                  className={`sparkle-underline cursor-pointer transition-colors duration-200 ${exploringTipDisabled ? 'pointer-events-none' : ''} ${
+                    showCreativePartner
+                      ? 'pointer-events-none opacity-60'
+                      : showPhilosophy || showExamples
+                      ? 'opacity-40 pointer-events-none brightness-50 transition-all duration-100'
+                      : 'opacity-100 pointer-events-auto transition-all duration-300'
+                  }`}
+                >
+                  for exploring
+                </span>
+              </TooltipTrigger>
+              <TooltipContent
+                side="top"
+                align="center"
+                onClick={handleExploringActivate}
+                className="group flex flex-col items-center gap-2 text-center p-3 max-w-xs border-2 border-transparent bg-wes-cream/80 rounded-lg shadow-md cursor-pointer transition-all duration-300 hover:bg-gradient-to-r hover:from-wes-pink/10 hover:via-wes-coral/10 hover:to-wes-vintage-gold/10 hover:border-transparent hover:bg-origin-border hover:shadow-2xl hover:-translate-y-1"
+              >
+                <p className="text-xs sm:text-sm leading-relaxed text-primary">
+                  Dummy text for exploring tooltip. This is some longer dummy text to demonstrate how the tooltip handles more content while maintaining its layout and style.
+                </p>
+                <div className="flex-shrink-0">
+                  <ChevronDown className="hover-arrow w-6 h-6 text-wes-vintage-gold transition-transform transition-colors duration-700 ease-in-out group-hover:text-wes-coral group-hover:animate-sway-y" />
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          */}
+          for exploring an{' '}
+            <TooltipProvider>
+              <Tooltip
+                open={emergingTipOpen}
+                onOpenChange={(o) => {
+                  if (!emergingTipDisabled) setEmergingTipOpen(o);
+                }}
+              >
+                <TooltipTrigger asChild>
+                  <span
+                    onClick={handleEmergingActivate}
+                    onMouseLeave={() => {
+                      if (emergingTipDisabled) setEmergingTipDisabled(false);
+                    }}
+                    className={`sparkle-underline cursor-pointer transition-colors duration-200 ${emergingTipDisabled ? 'pointer-events-none' : ''} ${
+                      showExamples
+                        ? 'pointer-events-none opacity-60'
+                        : showCreativePartner || showPhilosophy
+                        ? 'opacity-40 pointer-events-none brightness-50 transition-all duration-100'
+                        : 'opacity-100 pointer-events-auto transition-all duration-300'
+                    }`}
+                  >
+                    emerging artform
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent
+                  side="top"
+                  align="center"
+                  onClick={handleEmergingActivate}
+                  className="group flex items-center gap-2 text-left p-3 max-w-xs border-2 border-transparent bg-wes-cream/80 rounded-lg shadow-md cursor-pointer transition-all duration-300 hover:bg-gradient-to-r hover:from-wes-pink/10 hover:via-wes-coral/10 hover:to-wes-vintage-gold/10 hover:border-transparent hover:bg-origin-border hover:shadow-2xl hover:-translate-y-1"
+                >
+                  <div className="flex items-center gap-1 text-primary">
+                    <div className="w-16 h-16 sm:w-20 sm:h-20 bg-muted/20 border rounded" />
+                    <span className="text-xs sm:text-sm font-medium">+</span>
+                    <div className="w-16 h-16 sm:w-20 sm:h-20 bg-muted/20 border rounded" />
+                    <span className="text-xs sm:text-sm font-medium">=</span>
+                    <div className="w-16 h-16 sm:w-20 sm:h-20 bg-muted/20 border rounded" />
+                  </div>
+                  <div className="flex-shrink-0">
+                    <ChevronRight className="hover-arrow w-6 h-6 text-wes-vintage-gold transition-transform transition-colors duration-700 ease-in-out group-hover:text-wes-coral group-hover:animate-sway-x" />
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>.
               </p>
             </FadeInSection>
             
@@ -372,7 +580,7 @@ export default function HomePage() {
                 <div className="group">
                   <button
                     onClick={() => navigate('/tools')}
-                    className="flex items-center space-x-2 px-6 py-4 bg-gradient-to-r from-wes-mint to-wes-vintage-gold rounded-full border-2 border-wes-mint/40 hover:border-wes-mint/60 transition-all duration-300 shadow-wes-vintage hover:shadow-wes-hover text-white text-lg font-medium mx-auto relative overflow-hidden"
+                    className="flex items-center space-x-2 px-6 py-4 bg-gradient-to-r from-wes-vintage-gold to-wes-coral rounded-full border-2 border-wes-vintage-gold/40 hover:border-wes-vintage-gold/60 transition-all duration-300 shadow-wes-vintage hover:shadow-wes-hover text-white text-lg font-medium mx-auto relative overflow-hidden"
                   >
                     <div className="relative">
                       {/* Paint particles - behind the brush - arranged in clockwise circle */}
@@ -395,90 +603,35 @@ export default function HomePage() {
               )}
             </FadeInSection>
 
-            {/* Open Source Indicator - Same distance from content as top nav is from top */}
-            <FadeInSection delayMs={300}>
+            {/* See Examples Trigger */}
+            <FadeInSection delayMs={350}>
               <div className="mt-12 flex justify-center">
-                <TooltipProvider>
-                  <Tooltip open={isTooltipOpen} onOpenChange={setIsTooltipOpen}>
-                    <TooltipTrigger asChild>
-                      <div 
-                        className="group relative cursor-pointer"
-                        onClick={() => setIsTooltipOpen(!isTooltipOpen)}
-                      >
-                        {/* Floating particles */}
-                        <div className="absolute -inset-4 opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-opacity duration-500">
-                          <div className="absolute top-0 left-0 w-1 h-1 bg-wes-vintage-gold rounded-full animate-ping" style={{ animationDelay: '0s' }}></div>
-                          <div className="absolute top-2 right-1 w-0.5 h-0.5 bg-wes-coral rounded-full animate-ping" style={{ animationDelay: '0.3s' }}></div>
-                          <div className="absolute bottom-1 left-2 w-0.5 h-0.5 bg-wes-mint rounded-full animate-ping" style={{ animationDelay: '0.6s' }}></div>
-                        </div>
-                        
-                        {/* Spinning dashed ring */}
-                        <div className="absolute -inset-3 rounded-full border-2 border-dashed border-wes-vintage-gold/20 opacity-0 group-hover:opacity-100 group-active:opacity-100 group-hover:animate-spin group-active:animate-spin transition-all duration-500"></div>
-                        
-                        {/* Expanding glow */}
-                        <div className="absolute -inset-2 bg-gradient-to-r from-wes-vintage-gold/10 to-wes-coral/10 rounded-full blur-md opacity-0 group-hover:opacity-100 group-active:opacity-100 group-hover:scale-150 group-active:scale-150 transition-all duration-500"></div>
-                        
-                        {/* Main icon container */}
-                        <div className="relative bg-white/80 backdrop-blur-sm rounded-full p-3 border-2 border-wes-vintage-gold/20 hover:border-wes-vintage-gold/40 active:border-wes-vintage-gold/40 transition-all duration-300 hover:shadow-wes-ornate active:shadow-wes-ornate group-hover:scale-110 group-active:scale-110">
-                          <GitBranch className="w-5 h-5 text-wes-vintage-gold group-hover:animate-pulse group-active:animate-pulse transition-all duration-300" />
-                        </div>
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-xs sm:max-w-md p-3 sm:p-4 mx-2 sm:mx-0">
-                      <p className="text-sm leading-relaxed">
-                        Reigh is an{' '}
-                        <a 
-                          href="https://github.com/peteromallet/reigh" 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="underline text-wes-vintage-gold hover:text-wes-coral transition-colors font-medium"
-                        >
-                          open tool
-                        </a>
-                        . Because it's built on{' '}
-                        <a 
-                          href="https://github.com/Wan-Video/Wan2.1" 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="underline text-wes-vintage-gold hover:text-wes-coral transition-colors font-medium"
-                        >
-                          open models
-                        </a>
-                        , you can run it{' '}
-                        <button 
-                          onClick={() => {
-                            setIsTooltipOpen(false);
-                            setIsCreativePartnerButtonAnimating(true);
-                            setShowPhilosophy(false);
-                            setTimeout(() => {
-                              setShowCreativePartner(true);
-                              setTimeout(() => setIsCreativePartnerButtonAnimating(false), 300);
-                            }, 50);
-                          }}
-                          className="underline text-wes-vintage-gold hover:text-wes-coral transition-colors font-medium"
-                        >
-                          for free
-                        </button>
-                        {' '}on your computer. You can also run it on the cloud for convenience. In addition to a tool, we're also creating{' '}
-                        <button 
-                          onClick={() => {
-                            setIsTooltipOpen(false);
-                            setIsPhilosophyButtonAnimating(true);
-                            setShowCreativePartner(false);
-                            setTimeout(() => {
-                              setShowPhilosophy(true);
-                              setTimeout(() => setIsPhilosophyButtonAnimating(false), 300);
-                            }, 50);
-                          }}
-                          className="underline text-wes-vintage-gold hover:text-wes-coral transition-colors font-medium"
-                        >
-                          a community
-                        </button>
-                        {' '}for artists who wish to explore this new artform.
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                {/* Placeholder icon to balance the design */}
+                <Infinity className="w-9 h-9 text-wes-vintage-gold/80" />
+                {/*
+                // Temporarily removed interactive "See examples" button
+                // <button
+                //   onClick={() => {
+                //     setIsExamplesButtonAnimating(true);
+                //     setIsExamplesPaneOpening(true);
+                //     setShowExamples(true);
+                //     // Reset animation state after pane is fully open
+                //     setTimeout(() => setIsExamplesButtonAnimating(false), 350);
+                //     setTimeout(() => setIsExamplesPaneOpening(false), 300);
+                //   }}
+                //   className={`group text-sm font-medium text-muted-foreground hover:text-primary underline underline-offset-2 transition-colors duration-200 ${
+                //     isExamplesButtonAnimating ? 'animate-pulse' : ''
+                //   } ${
+                //     showExamples || isExamplesButtonAnimating
+                //       ? 'opacity-0 pointer-events-none'
+                //       : showCreativePartner || isCreativePartnerButtonAnimating || showPhilosophy || isPhilosophyButtonAnimating
+                //         ? 'opacity-40 pointer-events-none brightness-50 transition-all duration-100'
+                //         : 'opacity-100 pointer-events-auto transition-all duration-300'
+                //   }`}
+                // >
+                //   See examples
+                // </button>
+                */}
               </div>
             </FadeInSection>
 
@@ -492,41 +645,52 @@ export default function HomePage() {
           has been commented out for a simplified hero-only layout.
         */}
 
-        {/* Side Panes */}
+        {/* Side & Bottom Panes */}
         {/* Overlay */}
-        {(showCreativePartner || showPhilosophy) && (
+        {(showCreativePartner || showPhilosophy || showExamples) && (
           <div 
             className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 transition-all duration-300"
             onClick={() => {
               if (showPhilosophy) {
                 setIsPhilosophyPaneClosing(true);
+                resetPaneScroll(philosophyContentRef);
                 setTimeout(() => setIsPhilosophyPaneClosing(false), 300);
               }
               if (showCreativePartner) {
                 setIsCreativePartnerPaneClosing(true);
+                resetPaneScroll(creativeContentRef);
                 setTimeout(() => setIsCreativePartnerPaneClosing(false), 300);
+              }
+              if (showExamples) {
+                setIsExamplesPaneClosing(true);
+                resetPaneScroll(examplesContentRef);
+                setTimeout(() => setIsExamplesPaneClosing(false), 300);
               }
               // Reset opening states if needed
               setIsPhilosophyPaneOpening(false);
               setIsCreativePartnerPaneOpening(false);
+              setIsExamplesPaneOpening(false);
               // Show buttons immediately when starting to close
               setShowCreativePartner(false);
               setShowPhilosophy(false);
+              setShowExamples(false);
               setIsPhilosophyButtonAnimating(false);
               setIsCreativePartnerButtonAnimating(false);
+              setIsExamplesButtonAnimating(false);
             }}
           />
         )}
 
         {/* Creative Partner Programme Side Pane */}
-        <div className={`fixed top-0 right-0 h-full w-5/6 max-w-[30rem] sm:w-[30rem] bg-white shadow-2xl z-[60] transform transition-transform duration-300 ease-in-out ${
-          showCreativePartner ? 'translate-x-0' : 'translate-x-full'
+        <div className={`fixed top-0 left-0 h-full w-5/6 max-w-[30rem] sm:w-[30rem] bg-white shadow-2xl z-[60] transform transition-transform duration-300 ease-in-out ${
+          showCreativePartner ? 'translate-x-0' : '-translate-x-full'
         }`}>
-          <div className="p-4 sm:p-8 h-full overflow-y-auto">
+          <div ref={creativeContentRef} className="p-4 sm:p-8 h-full overflow-y-auto">
             {/* Close Button */}
             <button
               onClick={() => {
                 setIsCreativePartnerPaneClosing(true);
+                resetPaneScroll(creativeContentRef);
                 setTimeout(() => setIsCreativePartnerPaneClosing(false), 300);
                 setIsCreativePartnerPaneOpening(false);
                 // Show buttons immediately when starting to close
@@ -544,17 +708,11 @@ export default function HomePage() {
             </div>
             
             <div className="space-y-6 text-muted-foreground">
-              <p className="text-sm font-medium text-primary leading-relaxed">
-                We want to make it as easy as possible to use Reigh for free!
+              <p className="text-sm leading-relaxed">
+                When you sign up to Reigh, you'll notice something strange:&nbsp; if you have a decent computer, you can run it for free!
               </p>
               
-              <p className="text-sm leading-relaxed">
-                When you sign up to Reigh, you'll notice that - in addition to being able to purchase credits - you can run the app for free!
-              </p>
-              
-              <p className="text-sm leading-relaxed">
-                If you have a decent computer, you'll just need to run a command in your terminal and it'll process your AI tasks for you in the background!
-              </p>
+
               
               <div className="rounded-lg overflow-hidden border border-gray-200 shadow-sm">
                 <img 
@@ -565,35 +723,24 @@ export default function HomePage() {
               </div>
               
               <p className="text-sm leading-relaxed">
-                This isn't just possible, but we make it exceedingly easy - you can use the web app in any browser while the tasks process at home.
-              </p>
-              
-              <p className="text-sm leading-relaxed">
-                You don't have to fill out an application or network your way in - or wait for some product marketing manager to approve of you and your art.
-              </p>
-              
-              <p className="text-sm leading-relaxed">
-                While we'll be glad if you pay for credits, we want to make this as easy as possible for you to use Reigh for free!
+                This isn't just possible, but we make it exceedingly easy&nbsp;&mdash;&nbsp;you can use the app in any browser while the tasks process at home.
               </p>
               
               <div className="space-y-4">
                 <h3 className="font-semibold text-primary text-lg">But...why make it free?</h3>
                 
                 <p className="text-sm leading-relaxed">
-                  Today, venture-backed companies are investing tens of millions in 'Creative Partner Programs'
+                  Today, venture-backed startups invest tens of millions in 'Creative Partner Programs'.
                 </p>
                 
                 <p className="text-sm leading-relaxed">
-                  The reason they do this is simple: it's valuable to have people make art with your tool. They give it for free so you'll in effect create marketing materials for them.
+                  The reason they do this is simple: it's valuable to have people make art with your tool - every piece you make is in effect marketing materials for them.
                 </p>
                 
                 <p className="text-sm leading-relaxed">
-                  But it's not free - like everything in life, the cost ultimately has to be borne by someone. In this case, it's paid by the people you attract for them. On aggregate, they pay a higher price to cover the cost of your credits.
+                  But it's not free - the cost is ultimately paid by the people you attract for them. On aggregate, they pay a higher price to cover the cost of your credits.
                 </p>
-                
-                <p className="text-sm leading-relaxed">
-                  Not just this, but they're often running closed models on expensive hardware - these are typically not optimised like open models, meaning they cost up to 5 times as much as open models for comparable quality.
-                </p>
+    
               </div>
               
               <div className="space-y-4">
@@ -612,17 +759,11 @@ export default function HomePage() {
                 </p>
                 
                 <p className="text-sm leading-relaxed">
-                  We hope that artists will then use them to create and that this in turns attracts people to use it - meaning we can offer the cheapest possible credits to end-users.
+                  We hope that artists will then use them to create and that this in turns attracts others&nbsp;&mdash;&nbsp;many of whom will want to pay for convenience.
                 </p>
-                
+
                 <p className="text-sm leading-relaxed">
-                  We believe that a world in which more companies operate in this way will be a better future for artists, and the world in general.
-                </p>
-              </div>
-              
-              <div className="pt-4 border-t border-gray-200 space-y-4">
-                <p className="text-sm leading-relaxed">
-                  If you choose to create with Reigh and participate in our Open Creative Partner Programme, you'll be honouring the age-old truth in the sentiment expressed by Picasso:
+                  We believe that this is a better approach that will make creation affordable to more people. If you agree and choose to create with Reigh, you'll be honouring the age-old truth in the sentiment expressed by Picasso:
                 </p>
                 
                 <blockquote className="bg-wes-coral/10 border-l-4 border-wes-coral p-3 rounded-r-lg">
@@ -640,14 +781,15 @@ export default function HomePage() {
         </div>
 
         {/* Philosophy Side Pane */}
-        <div className={`fixed top-0 left-0 h-full w-5/6 max-w-[30rem] sm:w-[30rem] bg-white shadow-2xl z-[60] transform transition-transform duration-300 ease-in-out ${
-          showPhilosophy ? 'translate-x-0' : '-translate-x-full'
+        <div className={`fixed top-0 right-0 h-full w-5/6 max-w-[30rem] sm:w-[30rem] bg-white shadow-2xl z-[60] transform transition-transform duration-300 ease-in-out ${
+          showPhilosophy ? 'translate-x-0' : 'translate-x-full'
         }`}>
-          <div className="p-4 sm:p-8 h-full overflow-y-auto">
+          <div ref={philosophyContentRef} className="p-4 sm:p-8 h-full overflow-y-auto">
             {/* Close Button */}
             <button
               onClick={() => {
                 setIsPhilosophyPaneClosing(true);
+                resetPaneScroll(philosophyContentRef);
                 setTimeout(() => setIsPhilosophyPaneClosing(false), 300);
                 setIsPhilosophyPaneOpening(false);
                 // Show buttons immediately when starting to close
@@ -658,102 +800,199 @@ export default function HomePage() {
             >
               <X className="w-5 h-5 sm:w-4 sm:h-4 text-gray-600" />
             </button>
-            
-            <div className="mb-6 pr-12 sm:pr-0">
-              <h2 className="font-playfair text-2xl sm:text-3xl font-bold text-primary mb-4">Let's explore a new artform together!</h2>
-              <div className="w-16 h-1 bg-gradient-to-r from-wes-vintage-gold to-wes-mint rounded-full mb-6 animate-pulse-wave"></div>
+
+            {/* Examples content moved from the Bottom Pane */}
+            <div className="mb-8 space-y-3">
+              <h2 className="font-playfair text-2xl sm:text-3xl font-bold text-primary">Reigh is a tool for travelling between images</h2>
+              <div className="w-16 h-1 bg-gradient-to-r from-wes-vintage-gold to-wes-coral rounded-full animate-pulse-breathe"></div>
             </div>
-            
-            <div className="space-y-6 text-muted-foreground">
-              <p className="text-sm leading-relaxed">
-                Everyday on Twitter, you'll see people gushing over the latest model or capability. While new capabilities are objectively amazing, I believe two things:
-              </p>
-              
-              <div className="bg-gray-50 p-4 rounded-lg border-l-4 border-wes-vintage-gold">
-                <ol className="space-y-3 text-sm">
-                  <li className="flex items-start space-x-3">
-                    <span className="font-semibold text-wes-vintage-gold">1)</span>
-                    <span>The most important aspect for artistic creation isn't how high resolution a generation is or how long a video you can produce from a single prompt - but that you have enough control over the output that it feels like it was made <strong className="text-primary"><em>by you</em></strong>, <strong className="text-primary">not</strong> <strong className="text-primary"><em>for you</em></strong>.</span>
-                  </li>
-                  <li className="flex items-start space-x-3">
-                    <span className="font-semibold text-wes-vintage-gold">2)</span>
-                    <span><strong className="text-primary">AI video is a new medium</strong> - and, as such, while attempts to merely use it to replicate other mediums are understandable and will be widespread, they also capture very little of its potential.</span>
-                  </li>
-                </ol>
+
+            <div className="space-y-12 pb-4 text-left">
+              {/* Section 1 */}
+              <div className="space-y-3">
+                {/* Inputs row */}
+                <div className="flex gap-4">
+                  {imagePairIndices.map(i => (
+                    <div key={i} className="bg-muted/20 border rounded-lg w-40 sm:w-52 aspect-video flex items-center justify-center text-xs text-muted-foreground">
+                      16:9 Image {i}
+                    </div>
+                  ))}
+                </div>
+                {/* Spacer between inputs and output */}
+                <div className="h-2" />
+                {/* Output row */}
+                <div className="bg-muted/20 border rounded-lg w-full aspect-video flex items-center justify-center text-xs text-muted-foreground">
+                  16:9 Output
+                </div>
               </div>
-              
-                             <p className="text-sm leading-relaxed">
-                 These two beliefs are why I built Reigh.
-               </p>
-              
-              <div className="space-y-6">
-                <div>
-                  <h3 className="font-semibold text-primary text-lg mb-3">Reigh is a tool for travelling between images</h3>
-                  <p className="text-sm leading-relaxed mb-3">
-                    Reigh focuses exclusively on the art that we have yet to unlock in travelling between images using AI.
-                  </p>
-                  <p className="text-sm leading-relaxed">
-                    While focusing on a single technique may seem limited, Reigh is founded on the belief that:
-                  </p>
-                  <div className="mt-3 space-y-3 pl-4">
-                    <div className="flex items-start space-x-2">
-                      <span className="text-wes-vintage-gold font-medium">(i)</span>
-                                             <p className="text-sm leading-relaxed">
-                         This approach <strong className="text-primary">offers a huge amount of control and flexibility</strong>: not only can you place image anchor points wherever you wish to control how the video looks at different points, but you can also use LoRAs and structural control to guide how it moves. Thanks to developments in image generation and image editing, you can also generate guidance images to drive the video with increased precision.
-                       </p>
-                    </div>
-                    <div className="flex items-start space-x-2">
-                      <span className="text-wes-vintage-gold font-medium">(ii)</span>
-                                             <p className="text-sm leading-relaxed">
-                         Because using images to drive generations is <strong className="text-primary">unbounded by what makes logical sense or what can even be prompted</strong> from its training material, it nudges people towards exploring entirely new ways to use AI video - not just replicating existing mediums.
-                       </p>
-                    </div>
+
+              {/* Section 2 */}
+              <div className="space-y-3">
+                <h3 className="font-semibold text-primary text-lg">You can travel between batches of images of any size – with seamless transitions</h3>
+                <div className="grid grid-cols-2 items-stretch gap-4">
+                  {/* Left part: 4 inputs in 2x2 grid */}
+                  <div className="grid grid-cols-2 gap-3">
+                    {multiSquareIndices.map(i => (
+                      <div key={i} className="bg-muted/20 border rounded-lg aspect-square flex items-center justify-center text-xs text-muted-foreground">
+                        Square {i}
+                      </div>
+                    ))}
+                  </div>
+                  {/* Right part: Output square, stretched to match height */}
+                  <div className="bg-muted/20 border rounded-lg aspect-square flex items-center justify-center text-xs text-muted-foreground">
+                    Square Output
                   </div>
                 </div>
-                
-                <div>
-                  <h3 className="font-semibold text-primary text-lg mb-3">Exploring this new artform properly requires a focused tool and community</h3>
-                  <p className="text-sm leading-relaxed mb-3">
-                    We believe that by just focusing on this, we can build a tool that unlocks the artistic potential of this approach.
-                  </p>
-                  <p className="text-sm leading-relaxed mb-3">
-                    If the community who uses this also gathers and shares their learnings and techniques, we can also accelerate our collective artistic development.
-                  </p>
-                  <p className="text-sm leading-relaxed mb-3">
-                    This is why we build Reigh, alongside a Discord community that's deeply embedded with the tool.
-                  </p>
-                  <p className="text-sm leading-relaxed">
-                    As we've seen from Deforum and Warpfusion, a community empowered by a great tool can discover and invent an entirely new artform.
-                  </p>
-                </div>
-                
-                <div>
-                  <h3 className="font-semibold text-primary text-lg mb-3">Reigh is free to use but you can pay for convenience</h3>
-                  <p className="text-sm leading-relaxed mb-3">
-                    Reigh is free to use - you can run the AI processing on your computer, while those who wish to avoid the complication of local usage, can use it in the cloud for very cheap.
-                  </p>
-                  <p className="text-sm leading-relaxed">
-                    We want to make it as accessible as possible, in order to unlock the potential of this artform.
-                  </p>
-                </div>
-                
-                <div className="pt-4 border-t border-gray-200">
-                  <h3 className="font-semibold text-primary text-lg mb-3">We hope that you join us, and use it to discover an approach and artistic technique that is truly your own</h3>
-                  <p className="text-sm leading-relaxed mb-3">
-                    There are endless potential aesthetic and motion styles.
-                  </p>
-                  <p className="text-sm leading-relaxed mb-4">
-                    By struggling to figure out your own approach, and helping us make the tool as good as it can be, you can discover an approach that is truly your own.
-                  </p>
-                  <p className="text-sm leading-relaxed mb-4 font-medium">
-                    I hope that you'll join us.
-                  </p>
-                  
-                  <p className="text-left mb-6 font-serif text-lg italic transform -rotate-1" style={{ fontFamily: 'cursive' }}>
-                    POM
-                  </p>
+              </div>
+
+              {/* Section 3 */}
+              <div className="space-y-4">
+                <h3 className="font-semibold text-primary text-lg">You can use LoRAs to achieve all kinds of weird and interesting motion</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  {motionExamples.map(example => (
+                    <div key={example.id} className="relative">
+                      {/* Label attached across the bottom */}
+                      <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-muted/60 backdrop-blur-sm px-4 py-0.5 text-xs font-medium text-muted-foreground rounded-full border border-muted whitespace-nowrap text-center">
+                        {example.label}
+                      </div>
+                      {/* Thumbnail */}
+                      <div className="bg-muted/20 border rounded-lg aspect-video flex items-center justify-center text-xs text-muted-foreground">
+                        16:9 Example {example.id}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
+
+              {/* Closing message & CTA */}
+              <div className="space-y-8 mb-8">
+                {/* Message */}
+                <div className="space-y-6">
+                  <p className="text-sm leading-relaxed">
+                    We believe that there's endless potential in this approach waiting to be unlocked.
+                  </p>
+                  <p className="text-sm leading-relaxed">
+                    However, reaching it requires two things:
+                  </p>
+                  <ol className="list-decimal pl-4 md:pl-6 space-y-2 text-sm leading-relaxed">
+                    <li><span className="font-medium">A powerful tool</span> that's cheap or free to use</li>
+                    <li><span className="font-medium">A community</span> and scene that pushes one another artistically</li>
+                  </ol>
+                  <p className="text-sm leading-relaxed">
+                    On top of the open source community's work, I've built the tool&nbsp;&mdash;&nbsp;you can run it for free on your computer, or for very cheap on our service&nbsp;&mdash;&nbsp;and am now building the community.
+                  </p>
+                  <p className="text-sm leading-relaxed">
+                    If you're interested in exploring with us, you're very welcome&nbsp;to join.
+                  </p>
+                  <p className="font-serif text-lg italic transform -rotate-1">POM</p>
+                </div>
+
+                {/* CTA */}
+                <div>
+                  <button
+                    onClick={handleDiscordSignIn}
+                    className="inline-flex items-center px-5 py-2 bg-white/80 backdrop-blur-sm text-primary rounded-full border-2 border-wes-vintage-gold/60 hover:border-wes-vintage-gold/80 hover:bg-white/90 transition-colors duration-200 shadow-sm"
+                  >
+                    Join us
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Examples Bottom Pane */}
+        <div
+          className={`fixed left-0 bottom-0 w-full h-1/2 max-h-[50vh] bg-white shadow-2xl z-[60] transform transition-transform duration-300 ease-in-out ${
+            showExamples ? 'translate-y-0' : 'translate-y-full'
+          }`}
+        >
+          <div ref={examplesContentRef} className="p-4 sm:p-8 h-full overflow-y-auto">
+            {/* Close Button */}
+            <button
+              onClick={() => {
+                setIsExamplesPaneClosing(true);
+                resetPaneScroll(examplesContentRef);
+                setTimeout(() => setIsExamplesPaneClosing(false), 300);
+                setIsExamplesPaneOpening(false);
+                setShowExamples(false);
+                setIsExamplesButtonAnimating(false);
+              }}
+              className="absolute top-2 right-2 sm:top-4 sm:right-4 p-2 sm:p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors duration-200 z-10"
+            >
+              <X className="w-5 h-5 sm:w-4 sm:h-4 text-gray-600" />
+            </button>
+
+            <div className="mb-8 text-center space-y-3">
+              <h2 className="font-playfair text-2xl sm:text-3xl font-bold text-primary">Reigh is a tool for travelling between images</h2>
+              <div className="w-16 h-1 bg-gradient-to-r from-wes-vintage-gold to-wes-coral rounded-full mx-auto animate-pulse-breathe"></div>
+            </div>
+
+      <div className="space-y-12 pb-4">
+              {/* Section 1 */}
+              <div className="space-y-4">
+                <div className="flex flex-wrap justify-center items-center gap-4">
+                  {/* Two 16:9 input placeholders */}
+                  {imagePairIndices.map(i => (
+                    <div key={i} className="bg-muted/20 border rounded-lg w-40 sm:w-56 aspect-video flex items-center justify-center text-xs text-muted-foreground">
+                      16:9 Image {i}
+                    </div>
+                  ))}
+                  <ArrowRight className="w-6 h-6 text-wes-vintage-gold" />
+                  {/* 16:9 output placeholder */}
+                  <div className="bg-muted/20 border rounded-lg w-40 sm:w-56 aspect-video flex items-center justify-center text-xs text-muted-foreground">
+                    16:9 Output
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 2 */}
+              <div className="space-y-4">
+                <h3 className="font-semibold text-primary text-lg text-center">You can travel between batches of images of any size – with seamless transitions</h3>
+                <div className="flex flex-wrap justify-center items-center gap-3">
+                  {/* Four square inputs */}
+                  {multiSquareIndices.map(i => (
+                    <div key={i} className="bg-muted/20 border rounded-lg w-24 sm:w-28 aspect-square flex items-center justify-center text-xs text-muted-foreground">
+                      Square {i}
+                    </div>
+                  ))}
+                  <ArrowRight className="w-5 h-5 text-wes-vintage-gold" />
+                  {/* Square output */}
+                  <div className="bg-muted/20 border rounded-lg w-24 sm:w-28 aspect-square flex items-center justify-center text-xs text-muted-foreground">
+                    Square Output
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 3 */}
+              <div className="space-y-4">
+                <h3 className="font-semibold text-primary text-lg text-center">You can use LoRAs to achieve all kinds of weird and interesting motion</h3>
+                <div className="flex flex-wrap justify-center items-center gap-4">
+            {motionExamples.map(example => (
+              <div key={example.id} className="relative w-40 sm:w-56">
+                {/* Label attached across the bottom */}
+                <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-muted/60 backdrop-blur-sm px-4 py-0.5 text-xs font-medium text-muted-foreground rounded-full border border-muted whitespace-nowrap text-center">
+                  {example.label}
+                </div>
+                {/* Thumbnail */}
+                <div className="bg-muted/20 border rounded-lg aspect-video flex items-center justify-center text-xs text-muted-foreground">
+                  16:9 Example {example.id}
+                </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+        {/* Closing line + Join Us Button */}
+        <div className="text-center space-y-8 mb-6">
+          <p className="text-base md:text-lg font-medium text-primary m-0 max-w-2xl mx-auto">We believe that there's endless potential in this approach waiting to be unlocked&nbsp;&mdash; and that a tool and community focusing exclusively on it can unleash its promise.</p>
+          <button
+            onClick={handleDiscordSignIn}
+            className="inline-flex items-center px-5 py-2 bg-white/80 backdrop-blur-sm text-primary rounded-full border-2 border-wes-vintage-gold/60 hover:border-wes-vintage-gold/80 hover:bg-white/90 transition-colors duration-200 shadow-sm"
+          >
+            Join us
+          </button>
+        </div>
             </div>
           </div>
         </div>

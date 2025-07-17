@@ -14,11 +14,13 @@ import { nanoid } from 'nanoid';
 import { useGenerations, useDeleteGeneration, useUpdateGenerationLocation } from "@/shared/hooks/useGenerations";
 import { Settings } from "lucide-react";
 import { useApiKeys } from '@/shared/hooks/useApiKeys';
+import { useQueuedFeedback } from '@/shared/hooks/useQueuedFeedback';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { useCreateTask, useListTasks } from "@/shared/hooks/useTasks";
 import { PageFadeIn } from '@/shared/components/transitions';
 import { useSearchParams } from 'react-router-dom';
+import { ToolPageHeader } from '@/shared/components/ToolPageHeader';
 
 // Remove unnecessary environment detection - tool should work in all environments
 
@@ -43,6 +45,9 @@ const ImageGenerationToolPage: React.FC = () => {
 
   const [isCreatingTasks, setIsCreatingTasks] = useState(false);
   const [pendingTasksInfo, setPendingTasksInfo] = useState<{ initial: number; expected: number } | null>(null);
+
+  // Transient "Added to queue!" feedback handler
+  const { justQueued, triggerQueued } = useQueuedFeedback();
 
   // Always use hooks - no environment-based disabling
   const { apiKeys, getApiKey } = useApiKeys();
@@ -226,8 +231,12 @@ const ImageGenerationToolPage: React.FC = () => {
       await queryClient.invalidateQueries({ queryKey: ['tasks', selectedProjectId] });
       await queryClient.refetchQueries({ queryKey: ['tasks', selectedProjectId] });
 
+      // Indicate to the form that tasks were queued successfully (set before clearing loading state to avoid label flash)
+      triggerQueued();
+
+      // Now clear loading state
       setIsCreatingTasks(false);
-      
+
       setPendingTasksInfo(null);
 
     } else {
@@ -248,9 +257,13 @@ const ImageGenerationToolPage: React.FC = () => {
         await queryClient.invalidateQueries({ queryKey: ['tasks', selectedProjectId] });
         await queryClient.refetchQueries({ queryKey: ['tasks', selectedProjectId] });
 
+        // Indicate to the form that tasks were queued successfully (call first to avoid flash)
+        triggerQueued();
+
         setIsCreatingTasks(false);
-  
+
         setPendingTasksInfo(null);
+
       } catch (err) {
         console.error('[ImageGeneration] Error creating task:', err);
         toast.error('Failed to create task.');
@@ -265,8 +278,10 @@ const ImageGenerationToolPage: React.FC = () => {
   useEffect(() => {
     if (isCreatingTasks && pendingTasksInfo && projectTasks) {
       if (projectTasks.length >= pendingTasksInfo.initial + pendingTasksInfo.expected) {
+        // All expected tasks have appeared – stop loading and show success message
+        triggerQueued();
+
         setIsCreatingTasks(false);
-  
         setPendingTasksInfo(null);
       }
     }
@@ -357,15 +372,11 @@ const ImageGenerationToolPage: React.FC = () => {
 
   return (
     <PageFadeIn className="flex flex-col min-h-screen">
-      <header className="flex justify-between items-center mb-6 sticky top-0 bg-background py-4 z-40 border-b border-border/50 shadow-sm">
-        <h1 className="text-3xl font-bold">
-          Image Generation
-        </h1>
+      <ToolPageHeader title="Image Generation" />
         {/* <Button variant="ghost" onClick={() => setShowSettingsModal(true)}>
           <Settings className="h-5 w-5" />
           <span className="sr-only">Settings</span>
         </Button> */}
-      </header>
 
       {!hasValidFalApiKey && (
         <div className="flex flex-col items-center justify-center h-full">
@@ -395,11 +406,12 @@ const ImageGenerationToolPage: React.FC = () => {
                 hasApiKey={hasValidFalApiKey}
                 apiKey={falApiKey}
                 openaiApiKey={openaiApiKey}
+                justQueued={justQueued}
               />
             </ToolSettingsGate>
           </div>
 
-          <div ref={galleryRef} className="mt-8 pb-24">
+          <div ref={galleryRef} className="mt-8">
             <ImageGallery
               images={imagesToShow}
               onDelete={handleDeleteImage}

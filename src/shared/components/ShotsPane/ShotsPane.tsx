@@ -136,7 +136,7 @@ export const ShotsPane: React.FC = () => {
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className="text-zinc-400 hover:text-zinc-100"
+                className="text-zinc-400 hover:text-zinc-100 hover:bg-zinc-700/50 active:bg-zinc-600/60"
                 onClick={() => {
                   toggleLock(false);
                   setCurrentShotId(null);
@@ -170,6 +170,7 @@ export const ShotsPane: React.FC = () => {
               <Button
                 variant="ghost"
                 size="sm"
+                className="text-zinc-400 hover:text-zinc-100 hover:bg-zinc-700/50 active:bg-zinc-600/60"
                 disabled={currentPage === 1}
                 onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               >
@@ -181,6 +182,7 @@ export const ShotsPane: React.FC = () => {
               <Button
                 variant="ghost"
                 size="sm"
+                className="text-zinc-400 hover:text-zinc-100 hover:bg-zinc-700/50 active:bg-zinc-600/60"
                 disabled={currentPage === Math.ceil(shots.length / pageSize)}
                 onClick={() => setCurrentPage((p) => Math.min(Math.ceil(shots.length / pageSize), p + 1))}
               >

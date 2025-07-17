@@ -82,7 +82,7 @@ This document is meant to serve as a comprehensive view of Reigh's architecture.
 | **`/src/tools`** | Feature modules | Each tool has `pages/`, `components/`, `settings.ts` |
 | **`/src/shared`** | Shared resources | UI components, hooks, contexts, utilities |
 | **`/src/server`** | Express worker | Task polling & WebSocket (**no REST routes**) |
-| **`/db`** | Database layer | Drizzle schema, migrations (PG & SQLite), seeds |
+| **`/db`** | Database layer | Drizzle schema, migrations (PostgreSQL), seeds |
 | **`/supabase`** | Supabase config | Edge Functions, migrations, CLI config |
 | **`/public`** | Static assets | Images, fonts, manifests |
 | **Root configs** | Build & tooling | `vite.config.ts`, `tailwind.config.ts`, `tsconfig.json` |

@@ -17,6 +17,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/shared/components/ui/skeleton';
 import { PageFadeIn } from '@/shared/components/transitions';
 import { useListPublicResources } from '@/shared/hooks/useResources';
+import { ToolPageHeader } from '@/shared/components/ToolPageHeader';
 import { ActiveLora } from '@/shared/components/ActiveLoRAsDisplay';
 import { useContentResponsive, useContentResponsiveColumns } from '@/shared/hooks/useContentResponsive';
 // import { useLastAffectedShot } from '@/shared/hooks/useLastAffectedShot';
@@ -543,16 +544,15 @@ const VideoTravelToolPage: React.FC = () => {
   }
 
   return (
-    <div ref={mainContainerRef} className="w-full pt-5">
+    <div ref={mainContainerRef} className="w-full">
       {!shouldShowShotEditor ? (
         <>
-          <div className={`flex ${isSm ? 'justify-between' : 'flex-col gap-4'} items-${isSm ? 'center' : 'start'} mb-6`}>
-            <h1 className={`${isLg ? 'text-3xl' : isSm ? 'text-2xl' : 'text-xl'} font-bold`}>Travel Between Images</h1>
+          <ToolPageHeader title="Travel Between Images">
             {/* Only show header button when there are shots */}
             {(!isLoading && shots && shots.length > 0) && (
-              <Button onClick={() => setIsCreateShotModalOpen(true)}>Create New Shot</Button>
+              <Button onClick={() => setIsCreateShotModalOpen(true)}>New Shot</Button>
             )}
-          </div>
+          </ToolPageHeader>
           {isLoading ? (
             <div 
               className="grid gap-4"
@@ -574,7 +574,7 @@ const VideoTravelToolPage: React.FC = () => {
       ) : (
         // Show a loading state while settings are being fetched
         isLoadingSettings ? (
-          <PageFadeIn>
+          <PageFadeIn className="pt-5">
             <ShotEditor
               selectedShot={shotToEdit}
               projectId={selectedProjectId}
@@ -637,7 +637,7 @@ const VideoTravelToolPage: React.FC = () => {
             />
           </PageFadeIn>
         ) : (
-          <PageFadeIn>
+          <PageFadeIn className="pt-5">
             <ShotEditor
               selectedShot={shotToEdit}
               projectId={selectedProjectId}

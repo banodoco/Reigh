@@ -754,7 +754,82 @@
   }
 }
 
-/* Enhanced keyframe animations */
+@layer components {
+  .sparkle-underline {
+    position: relative;
+    padding-bottom: 5px; /* Keeps text from getting too close to line */
+  }
+
+  /* Shared container for both underlines */
+  .sparkle-underline::before,
+  .sparkle-underline::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    bottom: 2px;
+    width: 100%;
+    height: 2px;
+    pointer-events: none;
+    transition: opacity 0.4s ease-in-out;
+  }
+
+  /* Static, default underline */
+  .sparkle-underline::after {
+    background-image: repeating-linear-gradient(
+      to right,
+      hsl(var(--muted-foreground) / 0.5) 0 2px,
+      transparent 2px 4px
+    );
+    background-size: 4px 1px;
+    background-repeat: repeat-x;
+    opacity: 1; /* Visible by default */
+  }
+
+  .sparkle-underline:hover::after {
+    opacity: 0; /* Fade out on hover */
+  }
+
+  /* Animated, colorful underline */
+  .sparkle-underline::before {
+    background-image: linear-gradient(
+      90deg,
+      hsl(var(--wes-coral)),
+      hsl(var(--wes-mustard)),
+      hsl(var(--wes-teal)),
+      hsl(var(--wes-coral)) /* Loop back */
+    );
+    background-size: 200% 100%;
+    opacity: 0; /* Hidden by default */
+    animation: sparkleColorWave 3s linear infinite;
+  }
+
+  .sparkle-underline:hover::before {
+    opacity: 1; /* Fade in on hover */
+  }
+
+  /* Enhance persistence for sparkle-underline when tooltip open */
+  .sparkle-underline[data-state="open"]::before {
+    opacity: 1;
+    animation: sparkleColorWave 3s linear infinite;
+  }
+  .sparkle-underline[data-state="open"]::after {
+    opacity: 0;
+  }
+   
+  /* Multicolour border for tooltips on hover */
+  .tooltip-content:hover {
+    border-image: linear-gradient(to right, hsl(var(--wes-pink)), hsl(var(--wes-coral)), hsl(var(--wes-vintage-gold))) 1;
+    border-image-slice: 1;
+    border-width: 2px;
+  }
+}
+
+@keyframes sparkleColorWave {
+  to {
+    background-position: -200% 0;
+  }
+}
+
 @keyframes filmGrain {
   0% { opacity: 0.3; }
   50% { opacity: 0.5; }
@@ -1385,4 +1460,31 @@
     opacity: 0.8;
     filter: brightness(1.05);
   }
+}
+
+@keyframes swayX {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(-1.5px); }
+}
+
+@keyframes swayY {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-1.5px); }
+}
+
+.animate-sway-x {
+  animation: swayX 0.6s ease-in-out infinite;
+}
+
+.animate-sway-y {
+  animation: swayY 0.6s ease-in-out infinite;
+}
+
+/* Group-hover variant for sway-x animation */
+.group:hover .group-hover\:animate-sway-x {
+  animation: swayX 0.8s ease-in-out infinite;
+}
+
+.group:hover .group-hover\:animate-sway-y {
+  animation: swayY 0.8s ease-in-out infinite;
 }

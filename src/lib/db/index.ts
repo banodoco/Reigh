@@ -64,36 +64,5 @@ if (typeof window !== 'undefined') {
 
 export { db };
 
-/*
 // Commenting out closeDbConnection and process handlers for now to simplify and focus on connection.
-// These need to be revisited if specific cleanup is required and APP_ENV logic is clarified.
-export async function closeDbConnection(): Promise<void> {
-  try {
-    // This logic needs to be adapted based on whether db is a Drizzle/better-sqlite3 instance or Supabase client
-    // and if APP_ENV is reliably available/necessary here.
-    if (db && typeof (db as any).close === 'function') { // Example for better-sqlite3 direct driver instance
-        (db as any).close();
-        console.log('[DB] SQLite connection closed.');
-    } else if (db && db._driver && typeof (db._driver as any).close === 'function') { // Drizzle might wrap it
-        (db._driver as any).close();
-        console.log('[DB] Drizzle/SQLite connection closed.');
-    }
-    // Add logic for Supabase client if needed, though it typically doesn't require explicit close for client-side usage.
-  } catch (error) {
-    console.error('[DB] Error closing database connection:', error);
-  }
-}
-
-if (typeof process !== 'undefined' && process.on) {
-  process.on('SIGINT', async () => {
-    console.log('[DB] SIGINT received, attempting to close DB connection...');
-    // await closeDbConnection();
-    process.exit(0);
-  });
-  process.on('SIGTERM', async () => {
-    console.log('[DB] SIGTERM received, attempting to close DB connection...');
-    // await closeDbConnection();
-    process.exit(0);
-  });
-}
-*/ 
+// Cleanup handlers for Supabase/PostgreSQL connections can be added here if needed in the future. 

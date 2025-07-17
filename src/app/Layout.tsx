@@ -100,7 +100,7 @@ const Layout: React.FC = () => {
       <div className="fixed inset-0 bg-gradient-to-br from-wes-cream via-white to-wes-mint/10 opacity-60 pointer-events-none"></div>
       
       <GlobalHeader 
-        contentOffsetRight={isTasksPaneLocked ? tasksPaneWidth + 16 : 0} 
+        contentOffsetRight={isTasksPaneLocked ? tasksPaneWidth + 16 : 16} 
         contentOffsetLeft={isShotsPaneLocked ? shotsPaneWidth : 0}
         onOpenSettings={handleOpenSettings}
       />

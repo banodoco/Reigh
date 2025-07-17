@@ -59,7 +59,7 @@ const CreateShotModal: React.FC<CreateShotModalProps> = ({
         }}
       >
         <DialogHeader>
-          <DialogTitle>Create New Shot</DialogTitle>
+          <DialogTitle>New Shot</DialogTitle>
           <DialogDescription>
             Enter a name for your new shot. You can also add starting images.
           </DialogDescription>
@@ -90,7 +90,7 @@ const CreateShotModal: React.FC<CreateShotModalProps> = ({
             Cancel
           </Button>
           <Button type="submit" onClick={handleSubmit} disabled={isLoading}>
-            {isLoading ? 'Creating...' : 'Save Shot'}
+            {isLoading ? 'Creating...' : 'New Shot'}
           </Button>
         </DialogFooter>
       </DialogContent>

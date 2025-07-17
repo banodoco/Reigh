@@ -18,6 +18,16 @@ interface PaneControlTabProps {
 
 const PaneControlTab: React.FC<PaneControlTabProps> = ({ side, isLocked, isOpen, toggleLock, openPane, paneDimension, bottomOffset = 0, handlePaneEnter, handlePaneLeave }) => {
   const isMobile = useIsMobile();
+  const [selectionActive, setSelectionActive] = React.useState(false);
+
+  // Listen for selection events to hide controls
+  React.useEffect(() => {
+    const handler = (e: CustomEvent<boolean>) => {
+      setSelectionActive(!!e.detail);
+    };
+    window.addEventListener('mobileSelectionActive', handler as EventListener);
+    return () => window.removeEventListener('mobileSelectionActive', handler as EventListener);
+  }, []);
   
   // Determine whether the pane is currently visible (same logic as useSlidingPane)
   const isVisible = isLocked || (isOpen && !isLocked);
@@ -47,6 +57,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({ side, isLocked, isOpen,
 
   // Mobile: Only show button when pane is closed
   if (isMobile) {
+    if (selectionActive) return null; // hide when selection active
     // Don't show control when pane is open on mobile
     if (isOpen) return null;
     
