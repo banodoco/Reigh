@@ -176,6 +176,10 @@ supabase/
 └── migrations/         # RLS, functions, triggers
 ```
 
+## 📅 Recent Key Migrations
+
+For details on recent migrations (e.g., those adding credits systems, task costs, and generation timestamps), check the files in `supabase/migrations/`. They are named with timestamps and descriptive purposes. Run `supabase db push` to apply any pending ones.
+
 ---
 
 <div align="center">

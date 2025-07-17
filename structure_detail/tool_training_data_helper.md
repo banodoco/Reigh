@@ -178,6 +178,6 @@ To enable this tool:
 
 **🔗 Related Documentation**
 
-[Video Processing](../video-processing.md) • [Storage Buckets](../structure.md#-storage-buckets) • [Back to Structure](../structure.md)
+[Storage Buckets](../structure.md##-database--storage-overview) • [Back to Structure](../structure.md)
 
 </div> 

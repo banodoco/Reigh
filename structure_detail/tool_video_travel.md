@@ -156,6 +156,6 @@ graph TD
 
 **🔗 Related Documentation**
 
-[Timeline Guide](../timeline.md) • [LoRA Usage](../lora-guide.md) • [Back to Structure](../structure.md)
+[Back to Structure](../structure.md)
 
 </div> 

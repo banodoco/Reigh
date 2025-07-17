@@ -142,6 +142,6 @@ Located in `/ui/` - Full shadcn-ui component library including:
 
 **📚 More Resources**
 
-[Component Storybook](../storybook) • [Hook Tests](../tests/hooks) • [Back to Structure](../structure.md)
+[Back to Structure](../structure.md)
 
 </div> 

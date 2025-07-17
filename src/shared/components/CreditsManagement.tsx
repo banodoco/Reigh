@@ -61,7 +61,7 @@ const CreditsManagement: React.FC = () => {
         <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">Remaining Budget</h3>
+              <h3 className="text-lg font-semibold text-gray-900">Remaining Credit</h3>
               <div className="text-2xl font-bold text-gray-900">
                 {isLoadingBalance ? (
                   <div className="animate-pulse">
