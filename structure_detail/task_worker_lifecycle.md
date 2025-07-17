@@ -31,7 +31,7 @@ Reigh uses an async task queue pattern for all AI generation workloads. This dec
 - Returns task ID to client
 
 ### 2. Worker Polling
-- Express worker (`src/server/services/taskProcessingService.ts`) polls every 3 seconds
+- Express worker (`src/server/services/taskProcessingService.ts`) polls every **10 seconds** (see `setTimeout(..., 10000)` in `startTaskPoller`)
 - Calls `claim_next_task` Edge Function which:
   - Finds oldest `Queued` task
   - Updates to `In Progress` with `worker_id`
@@ -187,4 +187,4 @@ python main.py
 
 4. **Force task processing**:
    - Set a task to `Queued` manually in Supabase dashboard
-   - Worker should pick it up within 3 seconds 
+   - Worker should pick it up within **≈10 seconds** 

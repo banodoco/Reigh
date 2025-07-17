@@ -12,7 +12,7 @@
 |------|---------|---------------|
 | **`usePersistentState`** | LocalStorage-backed state | `const [theme, setTheme] = usePersistentState('theme', 'dark')` |
 | **`usePersistentToolState`** | Tool settings with DB sync | `const { state, updateState } = usePersistentToolState(toolId, defaults)` |
-| **`useToolSettings`** | Cross-device settings | `const { settings, updateSettings } = useToolSettings('my-tool')` |
+| **`useToolSettings`** | Cross-device settings | `const { settings, update } = useToolSettings('my-tool')` |
 | **`useUserUIState`** | Global UI preferences | `const { uiState, updateUIState } = useUserUIState()` |
 
 ### 🎨 Generation & Media

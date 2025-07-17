@@ -17,9 +17,8 @@ src/tools/training-data-helper/
 │   ├── VideoUploadList.tsx           # Video grid display
 │   ├── MultiVideoUploader.tsx        # Bulk upload
 │   ├── VideoSegmentEditor.tsx        # Advanced editor
-│   └── Timeline.tsx                  # Shared timeline
-├── hooks/
-│   └── useTrainingData.ts           # Data operations
+│   └── hooks/
+│       └── useTrainingData.ts           # Data operations
 └── settings.ts                      # Tool configuration
 ```
 
@@ -128,10 +127,9 @@ const {
   id: 'training-data-helper',
   scope: ['user'],
   defaults: {
-    autoPlay: true,
-    defaultSegmentDuration: 5,
-    showTimestamps: true,
-    gridView: 'thumbnails'
+    autoPlaySegments: true,
+    defaultSegmentDuration: 10,
+    segmentOverlap: 500
   }
 }
 ```

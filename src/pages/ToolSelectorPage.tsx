@@ -119,9 +119,9 @@ const ToolCard = ({ item, isSquare = false, index, isVisible }: { item: any, isS
   const descriptionSize = isSm ? 'text-sm' : 'text-xs';
 
   const content = (
-    <div className={`wes-tool-card relative overflow-hidden ${isSquare ? 'aspect-square !p-0' : 'h-32 sm:h-32'} wes-polaroid ${isComingSoon ? 'opacity-30' : ''}`}>
+    <div className={`wes-tool-card relative overflow-hidden ${isSquare ? 'h-auto sm:aspect-square !p-0' : 'h-32 sm:h-32'} wes-polaroid ${isComingSoon ? 'opacity-30' : ''}`}>
       {/* Coming Soon Badge */}
-      {isComingSoon && (
+      {isComingSoon && isSm && (
         <div className={`absolute ${isSquare ? 'top-1 right-2' : 'top-2 right-2'} z-10 ${isWiggling ? 'animate-subtle-wiggle' : ''}`}>
           <div className="bg-gradient-to-r from-wes-vintage-gold to-wes-mustard text-primary text-xs font-bold px-2 py-0.5 rounded-md border border-primary/20 shadow-sm">
             COMING SOON
@@ -171,12 +171,14 @@ const ToolCard = ({ item, isSquare = false, index, isVisible }: { item: any, isS
             </div>
           </div>
 
-          {/* Description */}
-          <div className="flex-1">
-            <p className={`font-inter text-muted-foreground leading-relaxed text-center ${descriptionSize}`}>
-              {item.description}
-            </p>
-          </div>
+          {/* Description - hidden on mobile to save space */}
+          {isSm && (
+            <div className="flex-1">
+              <p className={`font-inter text-muted-foreground leading-relaxed text-center ${descriptionSize}`}>
+                {item.description}
+              </p>
+            </div>
+          )}
         </div>
       )}
 
@@ -235,10 +237,7 @@ const ToolSelectorPage: React.FC = () => {
     base: 'column',
     lg: 'row',
   });
-  const assistantGridCols = useContentResponsiveColumns({
-    base: 1,
-    sm: 2,
-  });
+  // Assistant tools grid will rely on Tailwind's responsive classes instead of dynamic column calculation
 
   // Scroll to top when component mounts
   useEffect(() => {
@@ -257,6 +256,7 @@ const ToolSelectorPage: React.FC = () => {
   const sectionGap = isLg ? 'gap-8' : isSm ? 'gap-6' : 'gap-4';
   const itemGap = isSm ? 'gap-4' : 'gap-3';
   const topMargin = isSm ? 'mt-4' : 'mt-2';
+  const bottomMargin = layoutDirection === 'column' ? 'mb-8' : '';
 
   return (
     <PageFadeIn className="min-h-[70vh] wes-texture relative overflow-hidden">
@@ -278,12 +278,9 @@ const ToolSelectorPage: React.FC = () => {
             flexDirection: layoutDirection,
           }}
         >
-          {/* Process Column - Dynamic width based on layout */}
+          {/* Process Column */}
           <div 
-            className="w-full"
-            style={{ 
-              width: layoutDirection === 'row' ? '66.666667%' : '100%',
-            }}
+            className="w-full lg:w-2/3"
           >
             <div className={`flex flex-col ${itemGap} ${topMargin}`}>
               {processTools.map((tool, index) => (
@@ -297,18 +294,12 @@ const ToolSelectorPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Assistant Tools Column - Dynamic width and grid based on layout */}
+          {/* Assistant Tools Column */}
           <div 
-            className="w-full"
-            style={{ 
-              width: layoutDirection === 'row' ? '33.333333%' : '100%',
-            }}
+            className="w-full lg:w-1/3"
           >
             <div 
-              className={`grid ${itemGap} ${topMargin}`}
-              style={{ 
-                gridTemplateColumns: `repeat(${assistantGridCols}, 1fr)`,
-              }}
+              className={`grid ${itemGap} ${topMargin} grid-cols-1 sm:grid-cols-2`}
             >
               {assistantTools.map((tool, index) => (
                 <ToolCard

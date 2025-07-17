@@ -16,9 +16,6 @@ src/tools/image-generation/
 │   ├── ImageGenerationForm.tsx        # Generation settings form
 │   ├── PromptGenerationControls.tsx   # Prompt management UI
 │   ├── BulkEditControls.tsx          # Batch operations
-│   └── LoraSelectorModal.tsx         # LoRA model picker
-├── hooks/
-│   └── useGenerations.ts             # Generation CRUD operations
 └── settings.ts                       # Tool configuration
 ```
 
@@ -48,13 +45,6 @@ src/tools/image-generation/
 - Prompt templates
 - Real-time validation
 
-### `LoraSelectorModal.tsx`
-**LoRA model selection**
-- Fetches models from Supabase `resources` table
-- Community LoRA API integration
-- Strength slider controls (0-1.0)
-- Add/remove multiple LoRAs
-
 ---
 
 ## 🪝 Custom Hooks
@@ -77,13 +67,26 @@ const {
 ```typescript
 {
   id: 'image-generation',
-  scope: ['user', 'project'],
+  scope: ['project'],
   defaults: {
-    imagesPerPrompt: 4,
-    beforePromptText: '',
-    afterPromptText: '',
-    selectedLoRAs: [],
-    aspectRatio: '1:1'
+    prompts: [
+      {
+        id: 'prompt-1',
+        fullPrompt: 'A majestic cat astronaut exploring a vibrant nebula, artstation',
+        shortPrompt: 'Cat Astronaut',
+      }
+    ],
+    imagesPerPrompt: 1,
+    selectedLorasByMode: {
+      'wan-local': [],
+      'flux-api': [],
+      'hidream-api': []
+    },
+    depthStrength: 50,
+    softEdgeStrength: 20,
+    generationMode: 'wan-local',
+    beforeEachPromptText: '',
+    afterEachPromptText: ''
   }
 }
 ```

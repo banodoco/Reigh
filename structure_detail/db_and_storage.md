@@ -79,7 +79,7 @@ ORDER BY table_name, ordinal_position;
 | **`projects`** | Creative projects | `id`, `user_id`, `name`, `settings` | → shots, generations |
 | **`shots`** | Project scenes | `id`, `project_id`, `name`, `order`, `settings` | → shot_generations |
 | **`generations`** | AI outputs | `id`, `type`, `url`, `metadata`, `task_id` | → tasks, shots |
-| **`tasks`** | Job queue | `id`, `type`, `status`, `params`, `result` | → generations, workers |
+| **`tasks`** | Job queue | `id`, `task_type`, `status`, `params`, `output_location`, `worker_id` | → generations, workers |
 
 ### Financial & Credits
 
