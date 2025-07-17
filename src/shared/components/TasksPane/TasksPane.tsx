@@ -96,7 +96,7 @@ export const TasksPane: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
         <div
           {...paneProps}
           className={cn(
-            'pointer-events-auto absolute top-0 right-0 h-full w-full bg-zinc-900/95 border-l border-zinc-600 shadow-xl transform transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] flex flex-col',
+            'pointer-events-auto absolute top-0 right-0 h-full w-full bg-zinc-900/95 border-l border-zinc-600 shadow-xl transform transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] flex flex-col',
             transformClass
           )}
         >

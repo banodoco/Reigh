@@ -123,7 +123,7 @@ export const ShotsPane: React.FC = () => {
         <div
           {...paneProps}
           className={cn(
-            `pointer-events-auto absolute top-0 left-0 h-full w-full border-2 border-r shadow-xl transform transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] flex flex-col`,
+            `pointer-events-auto absolute top-0 left-0 h-full w-full border-2 border-r shadow-xl transform transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] flex flex-col`,
             transformClass,
             flashEffect 
               ? "bg-green-400/20 border-green-400 shadow-green-400/50 animate-pulse" 

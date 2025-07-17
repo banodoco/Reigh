@@ -129,7 +129,7 @@ export const GenerationsPane: React.FC = () => {
           right: isTasksPaneLocked ? `${tasksPaneWidth}px` : 0,
         }}
         className={cn(
-          `fixed bottom-0 bg-zinc-900/95 border-t border-zinc-700 shadow-xl z-[100] transform transition-all duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] flex flex-col`,
+          `fixed bottom-0 bg-zinc-900/95 border-t border-zinc-700 shadow-xl z-[100] transform transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] flex flex-col`,
           transformClass
         )}
       >

@@ -106,7 +106,7 @@ const Layout: React.FC = () => {
       />
       
       <div
-        className="flex-grow relative z-10 transition-[margin,padding] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]"
+        className="flex-grow relative z-10 transition-[margin,padding] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
         style={mainContentStyle}
       >
         <GlobalProcessingWarning onOpenSettings={handleOpenSettings} />
