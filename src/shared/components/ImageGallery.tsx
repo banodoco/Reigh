@@ -503,7 +503,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
         )}
 
         {paginatedImages.length > 0 && (
-            <div className={`grid gap-4 mb-8 ${columnsPerRow === 6 ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-6' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 2xl:grid-cols-5'}`}>
+            <div className={`grid gap-4 mb-16 ${columnsPerRow === 6 ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-6' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 2xl:grid-cols-5'}`}>
             {paginatedImages.map((image, index) => {
                 const displayUrl = getDisplayUrl(image.url);
                 const metadataForDisplay = image.metadata ? formatMetadataForDisplay(image.metadata) : "No metadata available.";

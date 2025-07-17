@@ -30,43 +30,10 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
-// Dummy placeholder images for display purposes
-const placeholderImages: GeneratedImageWithMetadata[] = [
-  {
-    id: 'placeholder-1',
-    url: '/placeholder.svg',
-    prompt: 'Loading...',
-    metadata: {
-      prompt: 'Loading...',
-      model: 'placeholder',
-      seed: 0,
-      steps: 0,
-      cfg_scale: 0,
-      width: 512,
-      height: 512,
-      generatedAt: new Date().toISOString(),
-    } as DisplayableMetadata
-  },
-  {
-    id: 'placeholder-2',
-    url: '/placeholder.svg',
-    prompt: 'Loading...',
-    metadata: {
-      prompt: 'Loading...',
-      model: 'placeholder',
-      seed: 0,
-      steps: 0,
-      cfg_scale: 0,
-      width: 512,
-      height: 512,
-      generatedAt: new Date().toISOString(),
-    } as DisplayableMetadata
-  }
-];
+
 
 const ImageGenerationToolPage: React.FC = () => {
-  const [generatedImages, setGeneratedImages] = useState<GeneratedImageWithMetadata[]>(placeholderImages);
-  const [showPlaceholders, setShowPlaceholders] = useState(true);
+  const [generatedImages, setGeneratedImages] = useState<GeneratedImageWithMetadata[]>([]);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [isUpscalingImageId, setIsUpscalingImageId] = useState<string | null>(null);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -99,16 +66,10 @@ const ImageGenerationToolPage: React.FC = () => {
   useEffect(() => {
     if (generatedImagesData) {
       setGeneratedImages(generatedImagesData);
-      setShowPlaceholders(generatedImagesData.length === 0);
     } else {
-      setGeneratedImages(placeholderImages);
-      setShowPlaceholders(true);
+      setGeneratedImages([]);
     }
   }, [generatedImagesData]);
-
-  useEffect(() => {
-    setShowPlaceholders(!isLoadingGenerations && (!generatedImagesData || generatedImagesData.length === 0));
-  }, [generatedImagesData, isLoadingGenerations]);
 
   useEffect(() => {
     // Effect removed
@@ -186,7 +147,6 @@ const ImageGenerationToolPage: React.FC = () => {
       };
 
       setGeneratedImages(prev => [upscaledImage, ...prev]);
-      setShowPlaceholders(false);
     } catch (error) {
       console.error("Error upscaling image:", error);
       toast.error(`Failed to upscale image: ${error instanceof Error ? error.message : 'Unknown error'}`, { id: toastId });
@@ -213,10 +173,9 @@ const ImageGenerationToolPage: React.FC = () => {
 
     setIsCreatingTasks(true);
     
-    // Clear placeholders if needed
-    if (showPlaceholders && restOfFormData.prompts.length * restOfFormData.imagesPerPrompt > 0) {
+    // Clear existing images if needed
+    if (restOfFormData.prompts.length * restOfFormData.imagesPerPrompt > 0) {
       setGeneratedImages([]);
-      setShowPlaceholders(false);
     }
 
     if (generationMode === 'wan-local') {
@@ -394,9 +353,7 @@ const ImageGenerationToolPage: React.FC = () => {
 
   const isGenerating = isCreatingTasks;
 
-  const imagesToShow = showPlaceholders 
-    ? placeholderImages 
-    : [...(generatedImagesData || [])];
+  const imagesToShow = [...(generatedImagesData || [])];
 
   return (
     <PageFadeIn className="flex flex-col h-screen">
@@ -442,7 +399,7 @@ const ImageGenerationToolPage: React.FC = () => {
             </ToolSettingsGate>
           </div>
 
-          <div ref={galleryRef} className="mt-8">
+          <div ref={galleryRef} className="mt-8 pb-24">
             <ImageGallery
               images={imagesToShow}
               onDelete={handleDeleteImage}
