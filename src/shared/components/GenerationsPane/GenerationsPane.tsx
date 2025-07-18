@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useContext } from 'react';
 import { useRenderLogger } from '@/shared/hooks/useRenderLogger';
 import { useProject } from "@/shared/contexts/ProjectContext";
-import { useGenerations, useDeleteGeneration } from '@/shared/hooks/useGenerations';
+import { useGenerations, useDeleteGeneration, GenerationsPaginatedResponse } from '@/shared/hooks/useGenerations';
 import { useSlidingPane } from '@/shared/hooks/useSlidingPane';
 import { cn } from '@/shared/lib/utils';
 import { Button } from '@/shared/components/ui/button';
@@ -22,28 +22,38 @@ export const GenerationsPane: React.FC = () => {
   const { selectedProjectId } = useProject();
   const navigate = useNavigate();
   const [page, setPage] = useState(1);
-  const { data: allGenerations, isLoading, error } = useGenerations(selectedProjectId);
+  const { data: generationsResponse, isLoading, error } = useGenerations(
+    selectedProjectId, 
+    page, 
+    GENERATIONS_PER_PAGE,
+    true,
+    {
+      toolType: undefined, // No tool filtering in generations pane
+      mediaType: 'image'   // Only show images in the pane
+    }
+  );
   const { data: shotsData } = useListShots(selectedProjectId);
 
   // Log every render with item count & page for loop detection
-  useRenderLogger('GenerationsPane', { page, totalItems: allGenerations?.length });
+  useRenderLogger('GenerationsPane', { page, totalItems: generationsResponse?.total });
 
   const lastAffectedShotContext = useContext(LastAffectedShotContext);
   const { lastAffectedShotId = null, setLastAffectedShotId = () => {} } = lastAffectedShotContext || {};
   const addImageToShotMutation = useAddImageToShot();
   const deleteGenerationMutation = useDeleteGeneration();
 
-  // Client-side pagination
+  // Server-side pagination - data is already paginated
   const paginatedData = useMemo(() => {
-    if (!allGenerations) return { items: [], totalPages: 0, currentPage: page };
+    if (!generationsResponse) return { items: [], totalPages: 0, currentPage: page };
     
-    const startIndex = (page - 1) * GENERATIONS_PER_PAGE;
-    const endIndex = startIndex + GENERATIONS_PER_PAGE;
-    const items = allGenerations.slice(startIndex, endIndex);
-    const totalPages = Math.ceil(allGenerations.length / GENERATIONS_PER_PAGE);
+    const totalPages = Math.ceil(generationsResponse.total / GENERATIONS_PER_PAGE);
     
-    return { items, totalPages, currentPage: page };
-  }, [allGenerations, page]);
+    return { 
+      items: generationsResponse.items, 
+      totalPages, 
+      currentPage: page 
+    };
+  }, [generationsResponse, page]);
 
   const {
     isGenerationsPaneLocked,
@@ -185,7 +195,7 @@ export const GenerationsPane: React.FC = () => {
                     lastShotId={lastAffectedShotId || undefined}
                     onAddToLastShot={handleAddToShot}
                     offset={(page - 1) * GENERATIONS_PER_PAGE}
-                    totalCount={allGenerations?.length || paginatedData.items.length}
+                    totalCount={generationsResponse?.total || paginatedData.items.length}
                     whiteText
                     columnsPerRow={6}
                     initialMediaTypeFilter="image"

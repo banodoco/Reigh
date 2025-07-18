@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { ToolSettingsGate } from "@/shared/components/ToolSettingsGate";
 import ImageGenerationForm, { ImageGenerationFormHandles, PromptEntry } from "../components/ImageGenerationForm";
 import { ImageGallery, GeneratedImageWithMetadata, DisplayableMetadata, MetadataLora } from "@/shared/components/ImageGallery";
@@ -11,17 +11,22 @@ import { useLastAffectedShot } from "@/shared/hooks/useLastAffectedShot";
 import { useProject } from "@/shared/contexts/ProjectContext";
 import { uploadImageToStorage } from '@/shared/lib/imageUploader';
 import { nanoid } from 'nanoid';
-import { useGenerations, useDeleteGeneration, useUpdateGenerationLocation } from "@/shared/hooks/useGenerations";
+import { useGenerations, useDeleteGeneration, useUpdateGenerationLocation, GenerationsPaginatedResponse } from "@/shared/hooks/useGenerations";
 import { Settings } from "lucide-react";
 import { useApiKeys } from '@/shared/hooks/useApiKeys';
 import { useQueuedFeedback } from '@/shared/hooks/useQueuedFeedback';
 import { useQueryClient } from '@tanstack/react-query';
+import { useListPublicResources } from '@/shared/hooks/useResources';
 
 import { useCreateTask, useListTasks } from "@/shared/hooks/useTasks";
 import { PageFadeIn } from '@/shared/components/transitions';
 import { useSearchParams } from 'react-router-dom';
 import { ToolPageHeader } from '@/shared/components/ToolPageHeader';
 import { useToolPageHeader } from '@/shared/contexts/ToolPageHeaderContext';
+import { timeEnd } from '@/shared/lib/logger';
+import { useIsMobile } from "@/shared/hooks/use-mobile";
+import { fetchGenerations } from "@/shared/hooks/useGenerations";
+import { getDisplayUrl } from '@/shared/lib/utils';
 
 // Remove unnecessary environment detection - tool should work in all environments
 
@@ -35,11 +40,17 @@ export type Json =
 
 
 
-const ImageGenerationToolPage: React.FC = () => {
+const ImageGenerationToolPage: React.FC = React.memo(() => {
   const [generatedImages, setGeneratedImages] = useState<GeneratedImageWithMetadata[]>([]);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [isUpscalingImageId, setIsUpscalingImageId] = useState<string | null>(null);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [loadGenerations, setLoadGenerations] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const isMobile = useIsMobile();
+  
+  // Early prefetch of public LoRAs to reduce loading time
+  useListPublicResources('lora');
   
   // Suppress per-task success toasts; we'll show a single aggregated toast
   const { mutateAsync: createTaskAsync } = useCreateTask({ showToast: false });
@@ -70,23 +81,36 @@ const ImageGenerationToolPage: React.FC = () => {
   const { data: shots, isLoading: isLoadingShots, error: shotsError } = useListShots(selectedProjectId);
   const addImageToShotMutation = useAddImageToShot();
   const { lastAffectedShotId, setLastAffectedShotId } = useLastAffectedShot();
-  const { data: generatedImagesData, isLoading: isLoadingGenerations } = useGenerations(selectedProjectId);
+  const itemsPerPage = isMobile ? 24 : 25;
+  const { data: generationsResponse, isLoading: isLoadingGenerations } = useGenerations(
+    selectedProjectId, 
+    currentPage, 
+    itemsPerPage, 
+    loadGenerations,
+    {
+      mediaType: 'image'
+    }
+  );
   const deleteGenerationMutation = useDeleteGeneration();
   const updateGenerationLocationMutation = useUpdateGenerationLocation();
 
   const queryClient = useQueryClient();
 
+  // Optimized: Use the memoized imagesToShow directly instead of local state duplication
   useEffect(() => {
-    if (generatedImagesData) {
-      setGeneratedImages(generatedImagesData);
+    if (generationsResponse?.items) {
+      setGeneratedImages(generationsResponse.items);
     } else {
       setGeneratedImages([]);
     }
-  }, [generatedImagesData]);
+  }, [generationsResponse]);
 
   useEffect(() => {
-    // Effect removed
-  }, [generatedImagesData]);
+    const timer = setTimeout(() => {
+      setLoadGenerations(true);
+    }, 300); // Delay fetching to allow for page transition
+    return () => clearTimeout(timer);
+  }, []);
 
   // Handle scrolling to gallery when coming from "View All" in GenerationsPane
   useEffect(() => {
@@ -105,11 +129,11 @@ const ImageGenerationToolPage: React.FC = () => {
       // Start checking after a small initial delay
       setTimeout(checkAndScroll, 150);
     }
-  }, [searchParams, generatedImagesData, isLoadingGenerations]);
+  }, [searchParams, generationsResponse, isLoadingGenerations]);
 
-  const handleDeleteImage = async (id: string) => {
+  const handleDeleteImage = useCallback(async (id: string) => {
     deleteGenerationMutation?.mutate(id);
-  };
+  }, [deleteGenerationMutation]);
 
   const handleUpscaleImage = async (imageId: string, imageUrl: string, currentMetadata?: DisplayableMetadata) => {
     setIsUpscalingImageId(imageId);
@@ -186,9 +210,10 @@ const ImageGenerationToolPage: React.FC = () => {
 
     setIsCreatingTasks(true);
     
-    // Clear existing images if needed
+    // Clear existing images and reset to page 1 if needed
     if (restOfFormData.prompts.length * restOfFormData.imagesPerPrompt > 0) {
       setGeneratedImages([]);
+      setCurrentPage(1);
     }
 
     if (generationMode === 'wan-local') {
@@ -239,6 +264,9 @@ const ImageGenerationToolPage: React.FC = () => {
       await queryClient.invalidateQueries({ queryKey: ['tasks', selectedProjectId] });
       await queryClient.refetchQueries({ queryKey: ['tasks', selectedProjectId] });
 
+      // Also invalidate generations to ensure they refresh when tasks complete
+      queryClient.invalidateQueries({ queryKey: ['generations', selectedProjectId] });
+
       // Indicate to the form that tasks were queued successfully (set before clearing loading state to avoid label flash)
       triggerQueued();
 
@@ -264,6 +292,9 @@ const ImageGenerationToolPage: React.FC = () => {
         // Refresh tasks and then clear loading state
         await queryClient.invalidateQueries({ queryKey: ['tasks', selectedProjectId] });
         await queryClient.refetchQueries({ queryKey: ['tasks', selectedProjectId] });
+
+        // Also invalidate generations to ensure they refresh when tasks complete
+        queryClient.invalidateQueries({ queryKey: ['generations', selectedProjectId] });
 
         // Indicate to the form that tasks were queued successfully (call first to avoid flash)
         triggerQueued();
@@ -295,55 +326,54 @@ const ImageGenerationToolPage: React.FC = () => {
     }
   }, [projectTasks, isCreatingTasks, pendingTasksInfo]);
 
-  const handleImageSaved = async (imageId: string, newImageUrl: string) => {
-    console.log(`[ImageGeneration-HandleImageSaved] Starting image update process:`, { imageId, newImageUrl });
-    
+  const handleImageSaved = useCallback(async (imageId: string, newImageUrl: string) => {
     try {
       // Update the database record via Supabase
-      console.log(`[ImageGeneration-HandleImageSaved] Updating database record for image:`, imageId);
       await updateGenerationLocationMutation.mutateAsync({
         id: imageId,
         location: newImageUrl,
       });
 
-      console.log(`[ImageGeneration-HandleImageSaved] Database update successful for image:`, imageId);
-
       // Update local state
-      console.log(`[ImageGeneration-HandleImageSaved] Updating local state...`);
       setGeneratedImages(prevImages => {
-        const updated = prevImages.map(img => 
+        return prevImages.map(img => 
           img.id === imageId 
             ? { ...img, url: newImageUrl } 
             : img
         );
-        console.log(`[ImageGeneration-HandleImageSaved] Local state updated. Found image to update:`, updated.some(img => img.id === imageId));
-        return updated;
       });
 
       // Invalidate the generations query to ensure fresh data
-      console.log(`[ImageGeneration-HandleImageSaved] Invalidating React Query cache...`);
       queryClient.invalidateQueries({ queryKey: ['generations', selectedProjectId] });
-
-      console.log(`[ImageGeneration-HandleImageSaved] Complete process finished successfully`);
       
     } catch (error) {
-      console.error("[ImageGeneration-HandleImageSaved] Unexpected error:", error);
+      console.error("[ImageGeneration-HandleImageSaved] Error:", error);
       toast.error("Failed to update image.");
     }
-  };
+  }, [updateGenerationLocationMutation, setGeneratedImages, queryClient, selectedProjectId]);
 
   const falApiKey = getApiKey('fal_api_key');
   const openaiApiKey = getApiKey('openai_api_key');
   const hasValidFalApiKey = true; // Always true - let the task creation handle validation
 
+  // Memoize target shot calculations to prevent re-renders
+  const targetShotInfo = useMemo(() => {
+    const targetShotIdForButton = lastAffectedShotId || (shots && shots.length > 0 ? shots[0].id : undefined);
+    const targetShotNameForButtonTooltip = targetShotIdForButton 
+      ? (shots?.find(s => s.id === targetShotIdForButton)?.name || 'Selected Shot')
+      : (shots && shots.length > 0 ? shots[0].name : 'Last Shot');
+    
+    return { targetShotIdForButton, targetShotNameForButtonTooltip };
+  }, [lastAffectedShotId, shots]);
 
-  const targetShotIdForButton = lastAffectedShotId || (shots && shots.length > 0 ? shots[0].id : undefined);
-  const targetShotNameForButtonTooltip = targetShotIdForButton 
-    ? (shots?.find(s => s.id === targetShotIdForButton)?.name || 'Selected Shot')
-    : (shots && shots.length > 0 ? shots[0].name : 'Last Shot');
+  // Memoize validated shots array
+  const validShots = useMemo(() => shots || [], [shots]);
 
-  const handleAddImageToTargetShot = async (generationId: string, imageUrl?: string, thumbUrl?: string): Promise<boolean> => {
-    if (!targetShotIdForButton) {
+  // Memoize images array to prevent unnecessary re-renders
+  const imagesToShow = useMemo(() => [...(generationsResponse?.items || [])], [generationsResponse]);
+
+  const handleAddImageToTargetShot = useCallback(async (generationId: string, imageUrl?: string, thumbUrl?: string): Promise<boolean> => {
+    if (!targetShotInfo.targetShotIdForButton) {
       toast.error("No target shot available to add to. Create a shot first or interact with one.");
       return false;
     }
@@ -357,29 +387,82 @@ const ImageGenerationToolPage: React.FC = () => {
     }
     try {
       await addImageToShotMutation?.mutateAsync({
-        shot_id: targetShotIdForButton,
+        shot_id: targetShotInfo.targetShotIdForButton,
         generation_id: generationId,
         imageUrl: imageUrl,
         thumbUrl: thumbUrl,
         project_id: selectedProjectId, 
       });
-      setLastAffectedShotId(targetShotIdForButton);
+      setLastAffectedShotId(targetShotInfo.targetShotIdForButton);
       return true;
     } catch (error) {
       console.error("Error adding image to target shot:", error);
       toast.error("Failed to add image to shot.");
       return false;
     }
-  };
-
-  const validShots = shots || [];
+  }, [targetShotInfo.targetShotIdForButton, selectedProjectId, addImageToShotMutation, setLastAffectedShotId]);
 
   const isGenerating = isCreatingTasks;
 
-  const imagesToShow = [...(generatedImagesData || [])];
+  const scrollPosRef = useRef<number>(0);
+
+  const handleServerPageChange = useCallback((page:number)=>{
+    scrollPosRef.current = window.scrollY;
+    setCurrentPage(page);
+  },[]);
+
+  // [NavPerf] Stop timers when page has mounted
+  useEffect(() => {
+    timeEnd('NavPerf', 'PageLoad:/tools/image-generation');
+  }, []);
+
+  // Prefetch next and previous pages for smoother navigation
+  useEffect(() => {
+    if (!selectedProjectId || !loadGenerations) return;
+
+    const filters = { mediaType: 'image' } as const;
+
+    const nextPage = currentPage + 1;
+    
+    queryClient.prefetchQuery({
+      queryKey: ['generations', selectedProjectId, nextPage, itemsPerPage, filters],
+      queryFn: () => fetchGenerations(selectedProjectId, itemsPerPage, (nextPage - 1) * itemsPerPage, filters),
+      staleTime: 30 * 1000,
+    }).then(() => {
+      const cached = queryClient.getQueryData(['generations', selectedProjectId, nextPage, itemsPerPage, filters]) as GenerationsPaginatedResponse | undefined;
+      cached?.items.forEach(img => {
+        const preloadImg = new Image();
+        preloadImg.src = getDisplayUrl(img.url);
+      });
+    });
+
+    if (currentPage > 1) {
+      const prevPage = currentPage - 1;
+      
+      queryClient.prefetchQuery({
+        queryKey: ['generations', selectedProjectId, prevPage, itemsPerPage, filters],
+        queryFn: () => fetchGenerations(selectedProjectId, itemsPerPage, (prevPage - 1) * itemsPerPage, filters),
+        staleTime: 30 * 1000,
+      }).then(() => {
+        
+        const cachedPrev = queryClient.getQueryData(['generations', selectedProjectId, prevPage, itemsPerPage, filters]) as GenerationsPaginatedResponse | undefined;
+        cachedPrev?.items.forEach(img => {
+          const preloadImg = new Image();
+          preloadImg.src = getDisplayUrl(img.url);
+        });
+      });
+    }
+  }, [selectedProjectId, currentPage, itemsPerPage, queryClient, loadGenerations]);
+
+  useEffect(()=>{
+    if(generationsResponse){
+      // restore scroll
+      window.scrollTo({top:scrollPosRef.current,behavior:'auto'});
+    }
+  },[generationsResponse]);
 
   return (
-    <PageFadeIn className="flex flex-col min-h-screen">
+    <PageFadeIn>
         {/* <Button variant="ghost" onClick={() => setShowSettingsModal(true)}>
           <Settings className="h-5 w-5" />
           <span className="sr-only">Settings</span>
@@ -418,19 +501,32 @@ const ImageGenerationToolPage: React.FC = () => {
             </ToolSettingsGate>
           </div>
 
-          <div ref={galleryRef} className="mt-8">
-            <ImageGallery
-              images={imagesToShow}
-              onDelete={handleDeleteImage}
-              onImageSaved={handleImageSaved}
-              onAddToLastShot={handleAddImageToTargetShot}
-              isDeleting={isDeleting}
-              allShots={validShots}
-              lastShotId={targetShotIdForButton}
-              lastShotNameForTooltip={targetShotNameForButtonTooltip}
-              currentToolType="image-generation"
-              initialMediaTypeFilter="image"
-            />
+          <div ref={galleryRef} className="mt-2">
+            {isLoadingGenerations ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                {Array.from({ length: 20 }).map((_, idx) => (
+                  <div key={idx} className="aspect-square bg-muted animate-pulse rounded-lg" />
+                ))}
+              </div>
+            ) : (
+              <ImageGallery
+                images={imagesToShow}
+                onDelete={handleDeleteImage}
+                onImageSaved={handleImageSaved}
+                onAddToLastShot={handleAddImageToTargetShot}
+                isDeleting={isDeleting}
+                allShots={validShots}
+                lastShotId={targetShotInfo.targetShotIdForButton}
+                lastShotNameForTooltip={targetShotInfo.targetShotNameForButtonTooltip}
+                currentToolType="image-generation"
+                initialMediaTypeFilter="image"
+                itemsPerPage={itemsPerPage}
+                offset={(currentPage - 1) * itemsPerPage}
+                totalCount={generationsResponse?.total || 0}
+                onServerPageChange={handleServerPageChange}
+                serverPage={currentPage}
+              />
+            )}
           </div>
         </>
       )}
@@ -443,7 +539,7 @@ const ImageGenerationToolPage: React.FC = () => {
       />
     </PageFadeIn>
   );
-};
+});
 
 export default ImageGenerationToolPage;
 

@@ -26,7 +26,8 @@ export const useListPublicResources = (type: 'lora') => {
             if (error) throw error;
             return data || [];
         },
-        staleTime: 10 * 60 * 1000, // 10 minutes
+        staleTime: 15 * 60 * 1000, // 15 minutes - increased for better performance since LoRAs don't change often
+        gcTime: 30 * 60 * 1000, // keep in cache for 30 minutes
         refetchOnWindowFocus: false,
     });
 };

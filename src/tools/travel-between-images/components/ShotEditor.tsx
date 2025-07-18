@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef, Suspense } from "react";
 import { nanoid } from "nanoid";
 import { Button } from "@/shared/components/ui/button";
 import { Slider } from "@/shared/components/ui/slider";
@@ -37,7 +37,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from '@tanstack/react-query';
 
 import SettingsModal from '@/shared/components/SettingsModal';
-import Timeline from "@/tools/travel-between-images/components/Timeline";
+// Lazy load the heavy Timeline component
+const LazyTimeline = React.lazy(() => import("@/tools/travel-between-images/components/Timeline"));
 import { useCreateGeneration, useUpdateGenerationLocation } from '@/shared/hooks/useGenerations';
 
 // Add the missing type definition
@@ -1065,9 +1066,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         });
 
         const newGenerationRow: GenerationRow = {
-          ...(newGeneration as Omit<GenerationRow, 'id' | 'shotImageEntryId'>),
-          shotImageEntryId: newShotImage.id,
-          id: (newShotImage as any).generationId ?? (newShotImage as any).generation_id,
+          ...(newGeneration as any),
+          shotImageEntryId: (newShotImage as any).id,
+          id: (newShotImage as any).generationId ?? (newShotImage as any).generation_id ?? (newGeneration as any).id,
           isOptimistic: false,
         };
         newGenerationRows.push(newGenerationRow);
@@ -1235,19 +1236,25 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
               )}
             </CardHeader>
             <CardContent className={nonVideoImages.length > 0 ? "" : ""}>
-              <div className="p-1">
-                {generationMode === 'timeline' ? (
-                  <Timeline
-                    shotId={selectedShot.id}
-                    images={nonVideoImages}
-                    frameSpacing={batchVideoFrames}
-                    contextFrames={batchVideoContext}
-                    onImageReorder={handleReorderImagesInShot}
-                    onImageSaved={handleImageSaved}
-                    onContextFramesChange={onBatchVideoContextChange}
-                    onFramePositionsChange={setTimelineFramePositions}
-                  />
-                ) : (
+                              <div className="p-1">
+                  {generationMode === 'timeline' ? (
+                    <Suspense fallback={
+                      <div className="flex items-center justify-center p-8">
+                        <div className="text-sm text-muted-foreground">Loading Timeline...</div>
+                      </div>
+                    }>
+                      <LazyTimeline
+                        shotId={selectedShot.id}
+                        images={nonVideoImages}
+                        frameSpacing={batchVideoFrames}
+                        contextFrames={batchVideoContext}
+                        onImageReorder={handleReorderImagesInShot}
+                        onImageSaved={handleImageSaved}
+                        onContextFramesChange={onBatchVideoContextChange}
+                        onFramePositionsChange={setTimelineFramePositions}
+                      />
+                    </Suspense>
+                  ) : (
                   <ShotImageManager
                     images={nonVideoImages}
                     onImageDelete={handleDeleteImageFromShot}

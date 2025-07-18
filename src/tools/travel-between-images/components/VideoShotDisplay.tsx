@@ -199,6 +199,7 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
                   src={getDisplayUrl(image.thumbUrl || image.imageUrl)} 
                   alt={`Shot image ${index + 1} for ${shot.name}`}
                   className="w-full h-full object-cover"
+                  loading="lazy"
                 />
               </div>
             ))

@@ -85,22 +85,28 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
     <div
       ref={setNodeRef}
       style={style}
-      {...attributes}
-      {...(isDragDisabled ? {} : listeners)}
       className={cn(
-        'relative group bg-muted/50 rounded border p-1 flex flex-col items-center justify-center aspect-square overflow-hidden shadow-sm',
-        isDragDisabled ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing',
-        { 'ring-2 ring-offset-2 ring-blue-500 border-blue-500': isSelected },
+        "group relative border rounded-lg overflow-hidden cursor-pointer bg-card hover:ring-2 hover:ring-primary/50 transition-colors",
+        isSelected && "ring-2 ring-primary",
+        isDragDisabled && "cursor-default"
       )}
-      onDoubleClick={onDoubleClick}
+      {...(!isDragDisabled ? attributes : {})}
+      {...(!isDragDisabled ? listeners : {})}
       onClick={onClick}
-      data-mobile-item="true"
+      onDoubleClick={onDoubleClick}
     >
       <img
         src={displayUrl}
-        alt={`Image ${image.id}`}
-        className="max-w-full max-h-full object-contain rounded-sm"
-        key={imageUrl} // Force re-render when imageUrl changes
+        alt="Shot image"
+        loading="lazy"
+        className="w-full h-full object-cover"
+        onError={(e) => {
+          // Fallback to original URL if display URL fails
+          const target = e.target as HTMLImageElement;
+          if (target.src !== (image.thumbUrl || image.imageUrl)) {
+            target.src = image.thumbUrl || image.imageUrl;
+          }
+        }}
       />
       {(!isMobile || !isDragDisabled) && (
         <Button

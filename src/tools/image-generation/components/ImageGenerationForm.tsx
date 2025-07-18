@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useImperativeHandle, forwardRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useImperativeHandle, forwardRef, useCallback, useMemo, Suspense } from "react";
 import { Input } from "@/shared/components/ui/input";
 import { Button } from "@/shared/components/ui/button";
 import { Label } from "@/shared/components/ui/label";
@@ -25,6 +25,17 @@ import { useProject } from "@/shared/contexts/ProjectContext";
 import { usePersistentToolState } from "@/shared/hooks/usePersistentToolState";
 import { ImageGenerationSettings } from "../settings";
 import { useListPublicResources } from '@/shared/hooks/useResources';
+
+// Lazy load modals to improve initial bundle size and performance
+const LazyLoraSelectorModal = React.lazy(() => 
+  import("@/shared/components/LoraSelectorModal").then(module => ({ 
+    default: module.LoraSelectorModal 
+  }))
+);
+
+const LazyPromptEditorModal = React.lazy(() => 
+  import("@/shared/components/PromptEditorModal")
+);
 
 type GenerationMode = 'wan-local'; // Only wan-local is supported now
 
@@ -108,7 +119,7 @@ export interface PromptInputRowProps {
   isActiveForFullView: boolean;
 }
 
-export const PromptInputRow: React.FC<PromptInputRowProps> = ({
+export const PromptInputRow: React.FC<PromptInputRowProps> = React.memo(({
   promptEntry, onUpdate, onRemove, canRemove, isGenerating, hasApiKey, index,
   onEditWithAI,
   aiEditButtonIcon,
@@ -147,7 +158,8 @@ export const PromptInputRow: React.FC<PromptInputRowProps> = ({
     isShowingShort = true;
   }
 
-  const autoResizeTextarea = () => {
+  // Debounced auto-resize function to prevent excessive reflows
+  const autoResizeTextarea = useCallback(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'inherit';
       const scrollHeight = textareaRef.current.scrollHeight;
@@ -159,13 +171,13 @@ export const PromptInputRow: React.FC<PromptInputRowProps> = ({
       }
       textareaRef.current.style.height = `${baseHeight}px`;
     }
-  };
+  }, [isShowingShort, isActiveForFullView, isEditingFullPrompt]);
 
   useEffect(() => {
     autoResizeTextarea();
-  }, [displayText, isActiveForFullView, isEditingFullPrompt, isShowingShort]);
+  }, [displayText, autoResizeTextarea]);
 
-  useEffect(() => { autoResizeTextarea(); }, []);
+  useEffect(() => { autoResizeTextarea(); }, [autoResizeTextarea]);
 
   const handleFullPromptChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newText = e.target.value;
@@ -258,7 +270,7 @@ export const PromptInputRow: React.FC<PromptInputRowProps> = ({
       </div>
     </div>
   );
-};
+});
 
 const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerationFormProps>(({
   onGenerate,
@@ -302,8 +314,13 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
     }
   );
 
-
   const hasApiKey = true; // Always true for wan-local
+
+  // Memoize actionable prompts count to prevent recalculation on every render
+  const actionablePromptsCount = useMemo(() => 
+    prompts.filter(p => p.fullPrompt.trim() !== "").length, 
+    [prompts]
+  );
 
   const generatePromptId = () => `prompt-${promptIdCounter.current++}`;
   
@@ -341,9 +358,10 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
     }
   }));
 
+  // Optimize default LoRA loading - only run when all conditions are met
   useEffect(() => { 
     if (
-      generationMode === 'wan-local' && // only apply defaults when in Wan mode
+      generationMode === 'wan-local' && 
       ready &&
       !defaultsApplied.current && 
       availableLoras.length > 0 && 
@@ -368,7 +386,7 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
         defaultsApplied.current = true;
       }
     } 
-  }, [generationMode, availableLoras, ready, defaultsApplied.current, selectedLoras.length]);
+  }, [generationMode, availableLoras, ready, selectedLoras.length]);
 
   const handleAddLora = (loraToAdd: LoraModel) => { 
     markAsInteracted();
@@ -487,18 +505,16 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
     onGenerate(generationData);
   };
   
-  const actionablePromptsCount = prompts.filter(p => p.fullPrompt.trim() !== "").length;
-
-  // Mark as interacted when other controls change
-  const handleSliderChange = (setter: React.Dispatch<React.SetStateAction<number>>) => (value: number) => {
+  // Optimize event handlers with useCallback to prevent recreating on each render
+  const handleSliderChange = useCallback((setter: React.Dispatch<React.SetStateAction<number>>) => (value: number) => {
     markAsInteracted();
     setter(value);
-  };
+  }, [markAsInteracted]);
 
-  const handleTextChange = (setter: React.Dispatch<React.SetStateAction<string>>) => (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+  const handleTextChange = useCallback((setter: React.Dispatch<React.SetStateAction<string>>) => (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     markAsInteracted();
     setter(e.target.value);
-  };
+  }, [markAsInteracted]);
 
   // Ensure the `promptIdCounter` is always ahead of any existing numeric IDs.
   // This prevents duplicate IDs which caused multiple prompts to update together.
@@ -539,10 +555,36 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
   // Show a minimal skeleton while settings hydrate so the layout is visible immediately
   if (!ready) {
     return (
-      <div className="animate-pulse space-y-4">
-        <div className="h-10 bg-muted rounded" />
-        <div className="h-32 bg-muted rounded" />
-        <div className="h-8 bg-muted rounded" />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-pulse">
+        {/* Prompts Section Skeleton */}
+        <div className="space-y-4">
+          <div className="h-8 bg-muted rounded" /> {/* Header */}
+          <div className="space-y-3">
+            <div className="h-20 bg-muted rounded" /> {/* Prompt 1 */}
+            <div className="h-20 bg-muted rounded" /> {/* Prompt 2 */}
+          </div>
+          <div className="h-10 bg-muted rounded w-32" /> {/* Add button */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="h-24 bg-muted rounded" /> {/* Before */}
+            <div className="h-24 bg-muted rounded" /> {/* After */}
+          </div>
+          <div className="h-16 bg-muted rounded" /> {/* Slider */}
+        </div>
+        
+        {/* LoRA Section Skeleton */}
+        <div className="space-y-6">
+          <div>
+            <div className="h-8 bg-muted rounded" /> {/* Label + Button */}
+            <div className="mt-4 space-y-2">
+              <div className="h-24 bg-muted rounded" /> {/* Active LoRAs */}
+            </div>
+          </div>
+        </div>
+        
+        {/* Button Skeleton */}
+        <div className="md:col-span-2 flex justify-center mt-4">
+          <div className="h-10 bg-muted rounded w-full md:w-1/2" />
+        </div>
       </div>
     );
   }
@@ -708,33 +750,37 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
         </div>
       </form>
 
-      <LoraSelectorModal
-        isOpen={isLoraModalOpen}
-        onClose={() => setIsLoraModalOpen(false)}
-        loras={availableLoras}
-        onAddLora={handleAddLora}
-        onRemoveLora={handleRemoveLora}
-        onUpdateLoraStrength={handleLoraStrengthChange}
-        selectedLoras={selectedLoras.map(lora => {
-          const fullLora = availableLoras.find(l => l['Model ID'] === lora.id);
-          return {
-            ...fullLora,
-            "Model ID": lora.id,
-            Name: lora.name,
-            strength: lora.strength,
-          } as LoraModel & { strength: number };
-        })}
-        lora_type={"Wan 2.1 14b"}
-      />
+      <Suspense fallback={<div>Loading LoraSelectorModal...</div>}>
+        <LazyLoraSelectorModal
+          isOpen={isLoraModalOpen}
+          onClose={() => setIsLoraModalOpen(false)}
+          loras={availableLoras}
+          onAddLora={handleAddLora}
+          onRemoveLora={handleRemoveLora}
+          onUpdateLoraStrength={handleLoraStrengthChange}
+          selectedLoras={selectedLoras.map(lora => {
+            const fullLora = availableLoras.find(l => l['Model ID'] === lora.id);
+            return {
+              ...fullLora,
+              "Model ID": lora.id,
+              Name: lora.name,
+              strength: lora.strength,
+            } as LoraModel & { strength: number };
+          })}
+          lora_type={"Wan 2.1 14b"}
+        />
+      </Suspense>
         
-      <PromptEditorModal
-        isOpen={isPromptModalOpen}
-        onClose={() => setIsPromptModalOpen(false)}
-        prompts={prompts}
-        onSave={handleSavePromptsFromModal}
-        generatePromptId={generatePromptId}
-        apiKey={openaiApiKey}
-      />
+      <Suspense fallback={<div>Loading PromptEditorModal...</div>}>
+        <LazyPromptEditorModal
+          isOpen={isPromptModalOpen}
+          onClose={() => setIsPromptModalOpen(false)}
+          prompts={prompts}
+          onSave={handleSavePromptsFromModal}
+          generatePromptId={generatePromptId}
+          apiKey={openaiApiKey}
+        />
+      </Suspense>
     </>
   );
 });

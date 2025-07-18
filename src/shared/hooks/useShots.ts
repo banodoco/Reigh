@@ -201,7 +201,9 @@ export const useListShots = (projectId: string | null): UseQueryResult<Shot[], E
   return useQuery({
     queryKey: ['shots', projectId],
     enabled: !!projectId,
-    staleTime: 30 * 1000, // consider data fresh for 30 seconds to prevent repeated immediate refetches
+    staleTime: 2 * 60 * 1000, // increased from 30s to 2 minutes - shots don't change very frequently
+    gcTime: 5 * 60 * 1000, // keep in cache for 5 minutes
+    refetchOnWindowFocus: false,
     queryFn: async () => {
       if (!projectId) return [];
       
@@ -258,7 +260,6 @@ export const useListShots = (projectId: string | null): UseQueryResult<Shot[], E
       
       return transformedShots;
     },
-    refetchOnWindowFocus: false,
   });
 };
 
@@ -341,28 +342,17 @@ export const useAddImageToShot = () => {
         generation_id = newGeneration.id;
       }
       
-      // Then link generation to shot
-      // First get the max position for this shot
-      const { data: maxPosData } = await supabase
-        .from('shot_generations')
-        .select('position')
-        .eq('shot_id', shot_id)
-        .order('position', { ascending: false })
-        .limit(1);
-      
-      const nextPosition = maxPosData && maxPosData.length > 0 ? maxPosData[0].position + 1 : 0;
-      
-      const { data: shotGeneration, error: linkError } = await supabase
-        .from('shot_generations')
-        .insert({
-          shot_id: shot_id,
-          generation_id: generation_id,
-          position: nextPosition
+      // Use RPC function to atomically add generation to shot with proper position
+      console.time('[AddToShotPerf] RPC call duration');
+      const { data: shotGeneration, error: rpcError } = await supabase
+        .rpc('add_generation_to_shot', {
+          p_shot_id: shot_id,
+          p_generation_id: generation_id
         })
-        .select()
         .single();
+      console.timeEnd('[AddToShotPerf] RPC call duration');
       
-      if (linkError) throw linkError;
+      if (rpcError) throw rpcError;
       
       return shotGeneration;
     },

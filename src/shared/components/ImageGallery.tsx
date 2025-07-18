@@ -95,8 +95,14 @@ interface ImageGalleryProps {
   whiteText?: boolean;
   /** Number of columns per row for the grid layout (default 5) */
   columnsPerRow?: number;
+  /** Number of items to display per page */
+  itemsPerPage?: number;
   /** Initial media type filter state ('all' | 'image' | 'video') */
   initialMediaTypeFilter?: 'all' | 'image' | 'video';
+  /** Callback for server-side pagination */
+  onServerPageChange?: (page: number) => void;
+  /** Current server page (1-based) */
+  serverPage?: number;
 }
 
 // Helper to format metadata for display
@@ -182,7 +188,7 @@ const InfoPopover: React.FC<{ metadata: DisplayableMetadata | undefined; metadat
   );
 };
 
-export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, isDeleting, onApplySettings, allShots, lastShotId, onAddToLastShot, currentToolType, initialFilterState = true, onImageSaved, offset = 0, totalCount, whiteText = false, columnsPerRow = 5, initialMediaTypeFilter = 'all' }) => {
+export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, isDeleting, onApplySettings, allShots, lastShotId, onAddToLastShot, currentToolType, initialFilterState = true, onImageSaved, offset = 0, totalCount, whiteText = false, columnsPerRow = 5, itemsPerPage = 45, initialMediaTypeFilter = 'all', onServerPageChange, serverPage }) => {
   const [activeLightboxMedia, setActiveLightboxMedia] = useState<GenerationRow | null>(null);
   const [downloadingImageId, setDownloadingImageId] = useState<string | null>(null);
   const { toast } = useToast();
@@ -194,6 +200,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
     currentShotId || lastShotId || (simplifiedShotOptions.length > 0 ? simplifiedShotOptions[0].id : "")
   );
   const [showTickForImageId, setShowTickForImageId] = useState<string | null>(null);
+  const [addingToShotImageId, setAddingToShotImageId] = useState<string | null>(null);
 
   // State for the filter checkbox
   const [filterByToolType, setFilterByToolType] = useState<boolean>(initialFilterState);
@@ -201,7 +208,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
   const [mediaTypeFilter, setMediaTypeFilter] = useState<'all' | 'image' | 'video'>(initialMediaTypeFilter);
 
   // Pagination state (45 items per page)
-  const ITEMS_PER_PAGE = 45;
+  const ITEMS_PER_PAGE = itemsPerPage;
   const [page, setPage] = React.useState(0);
 
   // When filters change, reset to first page (debounced to avoid rapid state changes)
@@ -345,6 +352,15 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
   };
 
   const filteredImages = React.useMemo(() => {
+    // Determine if we're in server-side pagination mode first
+    const isServerPaginationMode = !!(onServerPageChange && serverPage);
+    
+    // In server pagination mode, skip client-side filtering since the server should handle it
+    if (isServerPaginationMode) {
+      return images;
+    }
+    
+    // Client-side filtering for non-server paginated data
     let currentFiltered = images;
 
     // 1. Apply tool_type filter
@@ -394,17 +410,25 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
     }
         
     return currentFiltered;
-  }, [images, filterByToolType, currentToolType, mediaTypeFilter]);
+  }, [images, filterByToolType, currentToolType, mediaTypeFilter, onServerPageChange, serverPage]);
 
+  // Determine if we're in server-side pagination mode
+  const isServerPagination = !!(onServerPageChange && serverPage);
+  
   // Calculate pagination helpers (must come after filteredImages is defined)
-  const totalFilteredItems = filteredImages.length;
+  const totalFilteredItems = isServerPagination ? (totalCount ?? (offset + images.length)) : filteredImages.length;
+  const currentPageForCalc = isServerPagination ? (serverPage! - 1) : page;
   const totalPages = Math.max(1, Math.ceil(totalFilteredItems / ITEMS_PER_PAGE));
-  const paginatedImages = React.useMemo(() =>
-    filteredImages.slice(page * ITEMS_PER_PAGE, (page + 1) * ITEMS_PER_PAGE),
-    [filteredImages, page]
-  );
+  
+  const paginatedImages = React.useMemo(() => {
+    if (isServerPagination) {
+      // In server pagination mode, don't slice - the server already sent us the right page
+      return filteredImages;
+    }
+    return filteredImages.slice(page * ITEMS_PER_PAGE, (page + 1) * ITEMS_PER_PAGE);
+  }, [filteredImages, page, isServerPagination]);
 
-  const rangeStart = totalFilteredItems === 0 ? 0 : page * ITEMS_PER_PAGE + 1;
+  const rangeStart = totalFilteredItems === 0 ? 0 : (isServerPagination ? offset : page * ITEMS_PER_PAGE) + 1;
   const rangeEnd = rangeStart + paginatedImages.length - 1;
 
   // Ensure current page is within bounds when totalPages changes (e.g., after filtering)
@@ -420,16 +444,21 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
                 <TooltipProvider>
       <div className="space-y-4 pb-16">
         <div className="flex flex-wrap justify-between items-center mb-4 gap-x-4 gap-y-2"> {/* Added gap-y-2 and flex-wrap for better responsiveness */}
-            {images.length > 0 && (
-              <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2">
                 {/* Pagination Controls */}
                 {totalPages > 1 && (
                   <>
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setPage((p) => Math.max(0, p - 1))}
-                      disabled={page === 0}
+                      onClick={() => {
+                        if (isServerPagination) {
+                          onServerPageChange!(Math.max(1, serverPage! - 1));
+                        } else {
+                          setPage((p) => Math.max(0, p - 1));
+                        }
+                      }}
+                      disabled={isServerPagination ? serverPage === 1 : page === 0}
                     >
                       Prev
                     </Button>
@@ -439,8 +468,14 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-                      disabled={page >= totalPages - 1}
+                      onClick={() => {
+                        if (isServerPagination) {
+                          onServerPageChange!(serverPage! + 1);
+                        } else {
+                          setPage((p) => Math.min(totalPages - 1, p + 1));
+                        }
+                      }}
+                      disabled={isServerPagination ? serverPage >= totalPages : page >= totalPages - 1}
                     >
                       Next
                     </Button>
@@ -452,7 +487,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
                   </span>
                 )}
               </div>
-            )}
+
             <div className="flex items-center gap-x-4 gap-y-2 flex-wrap"> {/* Grouping filters, added flex-wrap */}
                 {/* New Media Type Filter */}
                 <div className="flex items-center space-x-1.5">
@@ -616,20 +651,33 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
                                                 toast({ title: "Select a Shot", description: "Please select a shot first to add this image.", variant: "destructive" });
                                                 return;
                                             }
-                                            const success = await onAddToLastShot(image.id!, displayUrl, displayUrl);
-                                            if (success) {
-                                                setShowTickForImageId(image.id!);
-                                                if (tickTimeoutRef.current) clearTimeout(tickTimeoutRef.current);
-                                                tickTimeoutRef.current = setTimeout(() => {
-                                                    setShowTickForImageId(null);
-                                                }, 2000);
+                                            setAddingToShotImageId(image.id!);
+                                            console.time('[AddToShotPerf] Total operation time');
+                                            try {
+                                                const success = await onAddToLastShot(image.id!, displayUrl, displayUrl);
+                                                console.timeEnd('[AddToShotPerf] Total operation time');
+                                                if (success) {
+                                                    setShowTickForImageId(image.id!);
+                                                    if (tickTimeoutRef.current) clearTimeout(tickTimeoutRef.current);
+                                                    tickTimeoutRef.current = setTimeout(() => {
+                                                        setShowTickForImageId(null);
+                                                    }, 2000);
+                                                }
+                                            } finally {
+                                                setAddingToShotImageId(null);
                                             }
                                         }}
-                                        disabled={!selectedShotIdLocal || showTickForImageId === image.id}
+                                        disabled={!selectedShotIdLocal || showTickForImageId === image.id || addingToShotImageId === image.id}
                                         aria-label={showTickForImageId === image.id ? `Added to ${currentTargetShotName}` : (currentTargetShotName ? `Add to shot: ${currentTargetShotName}` : "Add to selected shot")}
                                         onPointerDown={(e) => e.stopPropagation()}
                                     >
-                                        {showTickForImageId === image.id ? <Check className="h-4 w-4" /> : <PlusCircle className="h-4 w-4" />}
+                                        {addingToShotImageId === image.id ? (
+                                            <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-white"></div>
+                                        ) : showTickForImageId === image.id ? (
+                                            <Check className="h-4 w-4" />
+                                        ) : (
+                                            <PlusCircle className="h-4 w-4" />
+                                        )}
                                     </Button>
                                 </TooltipTrigger>
                                 <TooltipContent side="bottom">
@@ -767,12 +815,18 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
 
       {/* Pagination Controls */}
       {totalPages > 1 && (
-        <div className={`flex justify-center items-center mt-6 mb-4 ${whiteText ? 'text-white' : 'text-gray-600'}`}>
+        <div className={`flex justify-center items-center mt-4 mb-6 ${whiteText ? 'text-white' : 'text-gray-600'}`}>
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setPage((p) => Math.max(0, p - 1))}
-            disabled={page === 0}
+            onClick={() => {
+              if (isServerPagination) {
+                onServerPageChange!(Math.max(1, serverPage! - 1));
+              } else {
+                setPage((p) => Math.max(0, p - 1));
+              }
+            }}
+            disabled={isServerPagination ? serverPage === 1 : page === 0}
           >
             Prev
           </Button>
@@ -782,8 +836,14 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-            disabled={page >= totalPages - 1}
+            onClick={() => {
+              if (isServerPagination) {
+                onServerPageChange!(serverPage! + 1);
+              } else {
+                setPage((p) => Math.min(totalPages - 1, p + 1));
+              }
+            }}
+            disabled={isServerPagination ? serverPage >= totalPages : page >= totalPages - 1}
           >
             Next
           </Button>

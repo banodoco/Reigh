@@ -6,6 +6,7 @@ import { toolsUIManifest, type ToolUIDefinition } from '../tools';
 import { PageFadeIn, FadeInSection } from '@/shared/components/transitions';
 import { useContentResponsive, useContentResponsiveDirection, useContentResponsiveColumns } from '@/shared/hooks/useContentResponsive';
 import React from 'react';
+import { time, timeEnd } from '@/shared/lib/logger';
 
 // Define process tools (main workflow)
 const processTools = [
@@ -200,6 +201,7 @@ const ToolCard = ({ item, isSquare = false, index, isVisible }: { item: any, isS
         <button
           type="button"
           className="block wes-corners cursor-pointer w-full text-left h-full"
+          onPointerDown={(e) => { e.stopPropagation(); time('NavPerf', `ClickLag:${item.id}`); }}
           onClick={handleComingSoonClick}
         >
           {content}
@@ -211,8 +213,11 @@ const ToolCard = ({ item, isSquare = false, index, isVisible }: { item: any, isS
   return (
     <div
       className="relative group cursor-pointer w-full h-full"
+      onPointerDown={(e) => { e.stopPropagation(); time('NavPerf', `ClickLag:${item.id}`); }}
       onClick={() => {
         if (item.tool?.path) {
+          timeEnd('NavPerf', `ClickLag:${item.id}`);
+          time('NavPerf', `PageLoad:${item.tool.path}`);
           navigate(item.tool.path);
         }
       }}

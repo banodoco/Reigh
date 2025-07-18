@@ -213,7 +213,7 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
         setProjects(mappedProjects);
         
         // Use the last opened project from user settings instead of localStorage
-        const lastOpenedProjectId = userPreferences?.lastOpenedProjectId;
+        const lastOpenedProjectId = userPreferencesRef.current?.lastOpenedProjectId;
         const projectIdToSelect = determineProjectIdToSelect(mappedProjects, null, lastOpenedProjectId);
         setSelectedProjectIdState(projectIdToSelect);
         
@@ -229,7 +229,7 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
       setSelectedProjectIdState(null);
     }
     setIsLoadingProjects(false);
-  }, [userPreferences?.lastOpenedProjectId, updateUserPreferences]);
+  }, [updateUserPreferences]);
 
   const addNewProject = useCallback(async (projectData: { name: string; aspectRatio: string }) => {
     if (!projectData.name.trim()) {

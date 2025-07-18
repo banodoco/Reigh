@@ -4,21 +4,75 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 /**
- * Fetch generations using direct Supabase call
+ * Fetch generations using direct Supabase call with pagination support
  */
-async function fetchGenerations(projectId: string | null, limit?: number): Promise<GeneratedImageWithMetadata[]> {
-  if (!projectId) return [];
+export async function fetchGenerations(
+  projectId: string | null, 
+  limit: number = 100, 
+  offset: number = 0,
+  filters?: {
+    toolType?: string;
+    mediaType?: 'all' | 'image' | 'video';
+  }
+): Promise<{
+  items: GeneratedImageWithMetadata[];
+  total: number;
+  hasMore: boolean;
+}> {
+  if (!projectId) return { items: [], total: 0, hasMore: false };
+
   
-  const { data, error } = await supabase
+  // Build count query
+  let countQuery = supabase
+    .from('generations')
+    .select('*', { count: 'exact', head: true })
+    .eq('project_id', projectId);
+
+  // Apply server-side filters to count query
+  if (filters?.toolType) {
+    // Filter by tool type in metadata
+    countQuery = countQuery.or(`params->>tool_type.eq.${filters.toolType},metadata->>tool_type.eq.${filters.toolType},params->>tool_type.eq.${filters.toolType}-reconstructed-client,metadata->>tool_type.eq.${filters.toolType}-reconstructed-client`);
+  }
+
+  if (filters?.mediaType && filters.mediaType !== 'all') {
+    if (filters.mediaType === 'video') {
+      countQuery = countQuery.like('type', '%video%');
+    } else if (filters.mediaType === 'image') {
+      countQuery = countQuery.not('type', 'like', '%video%');
+    }
+  }
+
+  // Get total count first  
+  const { count, error: countError } = await countQuery;
+
+  if (countError) throw countError;
+
+  // Get paginated data with same filters
+  let dataQuery = supabase
     .from('generations')
     .select('*')
-    .eq('project_id', projectId)
+    .eq('project_id', projectId);
+
+  // Apply same filters to data query
+  if (filters?.toolType) {
+    dataQuery = dataQuery.or(`params->>tool_type.eq.${filters.toolType},metadata->>tool_type.eq.${filters.toolType},params->>tool_type.eq.${filters.toolType}-reconstructed-client,metadata->>tool_type.eq.${filters.toolType}-reconstructed-client`);
+  }
+
+  if (filters?.mediaType && filters.mediaType !== 'all') {
+    if (filters.mediaType === 'video') {
+      dataQuery = dataQuery.like('type', '%video%');
+    } else if (filters.mediaType === 'image') {
+      dataQuery = dataQuery.not('type', 'like', '%video%');
+    }
+  }
+
+  const { data, error } = await dataQuery
     .order('created_at', { ascending: false })
-    .limit(limit || 1000);
+    .range(offset, offset + limit - 1);
   
   if (error) throw error;
 
-  return data?.map((item: any) => ({
+  const items = data?.map((item: any) => ({
     id: item.id,
     url: item.location,
     prompt: item.params?.prompt || item.metadata?.prompt || 'No prompt',
@@ -26,6 +80,11 @@ async function fetchGenerations(projectId: string | null, limit?: number): Promi
     createdAt: item.created_at,
     isVideo: item.type?.includes('video'),
   })) || [];
+
+  const total = count || 0;
+  const hasMore = offset + limit < total;
+
+  return { items, total, hasMore };
 }
 
 /**
@@ -94,12 +153,29 @@ async function createGeneration(params: {
   return data;
 }
 
-export function useGenerations(projectId: string | null, page: number = 1, limit: number = 1000) {
-  return useQuery<GeneratedImageWithMetadata[], Error>({
-    queryKey: ['generations', projectId],
+export type GenerationsPaginatedResponse = {
+  items: GeneratedImageWithMetadata[];
+  total: number;
+  hasMore: boolean;
+};
+
+export function useGenerations(
+  projectId: string | null, 
+  page: number = 1, 
+  limit: number = 100, 
+  enabled: boolean = true,
+  filters?: {
+    toolType?: string;
+    mediaType?: 'all' | 'image' | 'video';
+  }
+) {
+  const offset = (page - 1) * limit;
+  
+  return useQuery<GenerationsPaginatedResponse, Error>({
+    queryKey: ['generations', projectId, page, limit, filters],
     staleTime: 30 * 1000,
-    queryFn: () => fetchGenerations(projectId, limit),
-    enabled: !!projectId,
+    queryFn: () => fetchGenerations(projectId, limit, offset, filters),
+    enabled: !!projectId && enabled
   });
 }
 
@@ -118,7 +194,7 @@ export function useDeleteGeneration() {
       }
     },
     onSuccess: () => {
-      // Invalidate the generations query to refetch
+      // Invalidate all generations queries to refetch
       queryClient.invalidateQueries({ queryKey: ['generations'] });      
     },
     onError: (error: Error) => {
@@ -136,7 +212,7 @@ export function useUpdateGenerationLocation() {
       return updateGenerationLocation(id, location);
     },
     onSuccess: () => {
-      // Invalidate the generations query to refetch
+      // Invalidate all generations queries to refetch
       queryClient.invalidateQueries({ queryKey: ['generations'] });
     },
     onError: (error: Error) => {
@@ -161,7 +237,7 @@ export function useCreateGeneration() {
     return useMutation({
         mutationFn: createGeneration,
         onSuccess: () => {
-      // Invalidate the generations query to refetch
+      // Invalidate all generations queries to refetch
             queryClient.invalidateQueries({ queryKey: ['generations'] });
         },
         onError: (error: Error) => {
