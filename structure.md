@@ -248,6 +248,17 @@ See [README.md](README.md) for:
 
 ---
 
+## Recent Bug Fixes & Known Issues
+
+### Fixed: Infinite Loop in ProjectContext (Jan 2025)
+- **Issue**: React "Maximum update depth exceeded" error caused by circular dependency in `ProjectContext.fetchProjects`
+- **Root Cause**: `fetchProjects` depended on `userPreferences?.lastOpenedProjectId` but also called `updateUserPreferences`, creating infinite re-renders
+- **Solution**: Use `userPreferencesRef.current` instead of state dependency to break the circular dependency
+- **Files Changed**: `src/shared/contexts/ProjectContext.tsx`
+- **Symptoms**: Dev server crashes on startup, Select components in GlobalHeader causing infinite loops
+
+---
+
 <div align="center">
 
 **🎯 Quick Links**
