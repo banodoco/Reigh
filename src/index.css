@@ -1,7 +1,7 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
+/* Reigh App Styles */
 @layer base {
   :root {
     /* Wes Anderson-inspired pastel palette */
@@ -1495,7 +1495,3 @@
   display: none; /* Chrome, Safari, Opera */
 }
 
-/* Container Query root for main content */
-.content-container {
-  container-type: inline-size;
-}
