@@ -213,8 +213,13 @@ const VideoTravelToolPage: React.FC = () => {
       );
       setHeader(headerContent);
     }
+    // Only clear header on component unmount, not on every effect re-run
+  }, [isLoading, shots, setIsCreateShotModalOpen, shouldShowShotEditor]);
+
+  // Clean up header on component unmount
+  useLayoutEffect(() => {
     return () => clearHeader();
-  }, [setHeader, clearHeader, isLoading, shots, setIsCreateShotModalOpen, shouldShowShotEditor]);
+  }, []);
 
   // Update state when settings are loaded from database
   useEffect(() => {
