@@ -35,6 +35,7 @@ interface BatchSettingsFormProps {
   onSteerableMotionSettingsChange: (settings: Partial<SteerableMotionSettings>) => void;
   projects: Project[];
   selectedProjectId: string | null;
+  isTimelineMode?: boolean; // Add timeline mode flag
 
   selectedLoras?: ActiveLora[];
   availableLoras?: LoraModel[];
@@ -59,6 +60,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
   onSteerableMotionSettingsChange,
   projects,
   selectedProjectId,
+  isTimelineMode,
   selectedLoras,
   availableLoras,
 }) => {
@@ -114,49 +116,53 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                 </div>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="relative">
-                  <Label htmlFor="batchVideoFrames" className="text-sm font-medium block mb-1">Frames per pair: {batchVideoFrames}</Label>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">
-                        <Info className="h-4 w-4" />
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Determines the duration of the video segment for each image. <br /> More frames result in a longer segment.</p>
-                    </TooltipContent>
-                  </Tooltip>
-                  <Slider
-                    id="batchVideoFrames"
-                    min={10}
-                    max={81} 
-                    step={1}
-                    value={[batchVideoFrames]}
-                    onValueChange={(value) => onBatchVideoFramesChange(value[0])}
-                  />
-                </div>
-                <div className="relative">
-                  <Label htmlFor="batchVideoContext" className="text-sm font-medium block mb-1">Number of Context Frames: {batchVideoContext}</Label>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">
-                        <Info className="h-4 w-4" />
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>How many frames from one segment to reference for the next. <br /> Helps create smoother transitions.</p>
-                    </TooltipContent>
-                  </Tooltip>
-                  <Slider
-                    id="batchVideoContext"
-                    min={0}
-                    max={60}
-                    step={1}
-                    value={[batchVideoContext]}
-                    onValueChange={(value) => onBatchVideoContextChange(value[0])}
-                  />
-                </div>
+            <div className={`grid grid-cols-1 gap-4 ${!isTimelineMode ? 'md:grid-cols-2' : ''}`}>
+                {!isTimelineMode && (
+                  <div className="relative">
+                    <Label htmlFor="batchVideoFrames" className="text-sm font-medium block mb-1">Frames per pair: {batchVideoFrames}</Label>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">
+                          <Info className="h-4 w-4" />
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Determines the duration of the video segment for each image. <br /> More frames result in a longer segment.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                    <Slider
+                      id="batchVideoFrames"
+                      min={10}
+                      max={81} 
+                      step={1}
+                      value={[batchVideoFrames]}
+                      onValueChange={(value) => onBatchVideoFramesChange(value[0])}
+                    />
+                  </div>
+                )}
+                {!isTimelineMode && (
+                  <div className="relative">
+                    <Label htmlFor="batchVideoContext" className="text-sm font-medium block mb-1">Number of Context Frames: {batchVideoContext}</Label>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">
+                          <Info className="h-4 w-4" />
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>How many frames from one segment to reference for the next. <br /> Helps create smoother transitions.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                    <Slider
+                      id="batchVideoContext"
+                      min={0}
+                      max={60}
+                      step={1}
+                      value={[batchVideoContext]}
+                      onValueChange={(value) => onBatchVideoContextChange(value[0])}
+                    />
+                  </div>
+                )}
             </div>
 
             <div className="relative">

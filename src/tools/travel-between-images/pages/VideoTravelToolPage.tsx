@@ -19,6 +19,7 @@ import { PageFadeIn } from '@/shared/components/transitions';
 import { useListPublicResources } from '@/shared/hooks/useResources';
 import { ToolPageHeader } from '@/shared/components/ToolPageHeader';
 import { ActiveLora } from '@/shared/components/ActiveLoRAsDisplay';
+import { useToolPageHeader } from '@/shared/contexts/ToolPageHeaderContext';
 import { useContentResponsive, useContentResponsiveColumns } from '@/shared/hooks/useContentResponsive';
 // import { useLastAffectedShot } from '@/shared/hooks/useLastAffectedShot';
 
@@ -38,6 +39,7 @@ const VideoTravelToolPage: React.FC = () => {
   // const { lastAffectedShotId, setLastAffectedShotId } = useLastAffectedShot(); // Keep for later if needed
   const [isLoraModalOpen, setIsLoraModalOpen] = useState(false);
   const [selectedLoras, setSelectedLoras] = useState<ActiveLora[]>([]);
+  const { setHeader, clearHeader } = useToolPageHeader();
 
   // Content-responsive breakpoints for dynamic layout
   const { isSm, isLg } = useContentResponsive();
@@ -116,6 +118,20 @@ const VideoTravelToolPage: React.FC = () => {
     // A project became available – reset flag
     setShowProjectError(false);
   }, [selectedProjectId]);
+
+  // Set up the page header with dynamic content based on state
+  useEffect(() => {
+    const headerContent = (
+      <ToolPageHeader title="Travel Between Images">
+        {/* Only show header button when there are shots */}
+        {(!isLoading && shots && shots.length > 0) && (
+          <Button onClick={() => setIsCreateShotModalOpen(true)}>New Shot</Button>
+        )}
+      </ToolPageHeader>
+    );
+    setHeader(headerContent);
+    return () => clearHeader();
+  }, [setHeader, clearHeader, isLoading, shots, setIsCreateShotModalOpen]);
 
   // Update state when settings are loaded from database
   useEffect(() => {
@@ -547,12 +563,6 @@ const VideoTravelToolPage: React.FC = () => {
     <div ref={mainContainerRef} className="w-full">
       {!shouldShowShotEditor ? (
         <>
-          <ToolPageHeader title="Travel Between Images">
-            {/* Only show header button when there are shots */}
-            {(!isLoading && shots && shots.length > 0) && (
-              <Button onClick={() => setIsCreateShotModalOpen(true)}>New Shot</Button>
-            )}
-          </ToolPageHeader>
           {isLoading ? (
             <div 
               className="grid gap-4"

@@ -21,6 +21,7 @@ import { useCreateTask, useListTasks } from "@/shared/hooks/useTasks";
 import { PageFadeIn } from '@/shared/components/transitions';
 import { useSearchParams } from 'react-router-dom';
 import { ToolPageHeader } from '@/shared/components/ToolPageHeader';
+import { useToolPageHeader } from '@/shared/contexts/ToolPageHeaderContext';
 
 // Remove unnecessary environment detection - tool should work in all environments
 
@@ -56,6 +57,13 @@ const ImageGenerationToolPage: React.FC = () => {
   const formContainerRef = useRef<HTMLDivElement>(null);
   const { selectedProjectId } = useProject();
   const [searchParams] = useSearchParams();
+  const { setHeader, clearHeader } = useToolPageHeader();
+
+  // Set the header when component mounts and clear when unmounting
+  useEffect(() => {
+    setHeader(<ToolPageHeader title="Image Generation" />);
+    return () => clearHeader();
+  }, [setHeader, clearHeader]);
 
   // Track project tasks to know when they appear in the TasksPane (must be after selectedProjectId)
   const { data: projectTasks } = useListTasks({ projectId: selectedProjectId });
@@ -372,7 +380,6 @@ const ImageGenerationToolPage: React.FC = () => {
 
   return (
     <PageFadeIn className="flex flex-col min-h-screen">
-      <ToolPageHeader title="Image Generation" />
         {/* <Button variant="ghost" onClick={() => setShowSettingsModal(true)}>
           <Settings className="h-5 w-5" />
           <span className="sr-only">Settings</span>

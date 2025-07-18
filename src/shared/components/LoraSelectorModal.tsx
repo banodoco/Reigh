@@ -477,7 +477,7 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & { onClose: () => void
       </div>
 
       {/* Sticky Bottom Bar - Works on both mobile and desktop */}
-      <div className="sticky bottom-0 bg-white border-t border-gray-200 shadow-lg p-4 mt-4 lg:rounded-b-lg lg:mx-6 lg:border-x lg:border-b lg:border-gray-200">
+      <div className="sticky bottom-0 bg-white/95 backdrop-blur-sm border-t-2 border-gray-300 shadow-2xl p-4 mt-6 lg:rounded-b-lg lg:mx-6 lg:border-x-2 lg:border-b-2 lg:border-gray-300 before:absolute before:inset-x-0 before:-top-4 before:h-4 before:bg-gradient-to-t before:from-white/80 before:to-transparent before:pointer-events-none relative">
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-4">

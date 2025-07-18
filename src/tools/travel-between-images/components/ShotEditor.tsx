@@ -232,6 +232,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const [fileInputKey, setFileInputKey] = useState<number>(Date.now());
   const [deletingVideoId, setDeletingVideoId] = useState<string | null>(null);
   
+  // Timeline frame positions for task creation
+  const [timelineFramePositions, setTimelineFramePositions] = useState<Map<string, number>>(new Map());
+  
   const { mutate: createTask, isPending: isCreatingTask } = useCreateTask();
 
   const [creatingTaskId, setCreatingTaskId] = useState<string | null>(null);
@@ -676,17 +679,39 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       return;
     }
 
-    const basePrompts =
-      generationMode === 'batch' || generationMode === 'timeline' ? [batchVideoPrompt] : pairConfigs.map((cfg) => cfg.prompt);
+    let basePrompts: string[];
+    let segmentFrames: number[];
+    let frameOverlap: number[];
+    let negativePrompts: string[];
 
-    const segmentFrames =
-      generationMode === 'batch' || generationMode === 'timeline' ? [batchVideoFrames] : pairConfigs.map((cfg) => cfg.frames);
-
-    const frameOverlap = 
-      generationMode === 'batch' || generationMode === 'timeline' ? [batchVideoContext] : pairConfigs.map((cfg) => cfg.context);
-
-    const negativePrompts = 
-      generationMode === 'batch' || generationMode === 'timeline' ? [steerableMotionSettings.negative_prompt] : pairConfigs.map((cfg) => cfg.negativePrompt);
+    if (generationMode === 'timeline') {
+      // Extract frame gaps from timeline positions
+      const sortedPositions = [...timelineFramePositions.entries()]
+        .map(([id, pos]) => ({ id, pos }))
+        .sort((a, b) => a.pos - b.pos);
+      
+      const frameGaps = [];
+      for (let i = 0; i < sortedPositions.length - 1; i++) {
+        const gap = sortedPositions[i + 1].pos - sortedPositions[i].pos;
+        frameGaps.push(gap);
+      }
+      
+      basePrompts = frameGaps.length > 0 ? frameGaps.map(() => batchVideoPrompt) : [batchVideoPrompt];
+      segmentFrames = frameGaps.length > 0 ? frameGaps : [batchVideoFrames];
+      frameOverlap = frameGaps.length > 0 ? frameGaps.map(() => batchVideoContext) : [batchVideoContext];
+      negativePrompts = frameGaps.length > 0 ? frameGaps.map(() => steerableMotionSettings.negative_prompt) : [steerableMotionSettings.negative_prompt];
+    } else if (generationMode === 'batch') {
+      basePrompts = [batchVideoPrompt];
+      segmentFrames = [batchVideoFrames];
+      frameOverlap = [batchVideoContext];
+      negativePrompts = [steerableMotionSettings.negative_prompt];
+    } else {
+      // by-pair mode
+      basePrompts = pairConfigs.map((cfg) => cfg.prompt);
+      segmentFrames = pairConfigs.map((cfg) => cfg.frames);
+      frameOverlap = pairConfigs.map((cfg) => cfg.context);
+      negativePrompts = pairConfigs.map((cfg) => cfg.negativePrompt);
+    }
 
     const requestBody: any = {
       project_id: projectId,
@@ -1216,8 +1241,11 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                     shotId={selectedShot.id}
                     images={nonVideoImages}
                     frameSpacing={batchVideoFrames}
+                    contextFrames={batchVideoContext}
                     onImageReorder={handleReorderImagesInShot}
                     onImageSaved={handleImageSaved}
+                    onContextFramesChange={onBatchVideoContextChange}
+                    onFramePositionsChange={setTimelineFramePositions}
                   />
                 ) : (
                   <ShotImageManager
@@ -1278,6 +1306,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                             selectedProjectId={selectedProjectId}
                             selectedLoras={selectedLoras}
                             availableLoras={availableLoras}
+                            isTimelineMode={generationMode === 'timeline'}
                         />
                         
                         {/* LoRA Settings (Mobile) */}

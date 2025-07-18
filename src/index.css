@@ -1488,3 +1488,12 @@
 .group:hover .group-hover\:animate-sway-y {
   animation: swayY 0.8s ease-in-out infinite;
 }
+
+/* Hide scrollbar but keep scroll functionality */
+.no-scrollbar {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}

@@ -12,6 +12,7 @@ import { ProjectProvider, useProject } from "@/shared/contexts/ProjectContext";
 import { useWebSocket } from '@/shared/hooks/useWebSocket';
 import { PanesProvider } from '@/shared/contexts/PanesContext';
 import { CurrentShotProvider } from '@/shared/contexts/CurrentShotContext';
+import { ToolPageHeaderProvider } from '@/shared/contexts/ToolPageHeaderContext';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -215,7 +216,9 @@ function App() {
         <PanesProvider>
           <LastAffectedShotProvider>
             <CurrentShotProvider>
-              <AppInternalContent />
+              <ToolPageHeaderProvider>
+                <AppInternalContent />
+              </ToolPageHeaderProvider>
             </CurrentShotProvider>
           </LastAffectedShotProvider>
         </PanesProvider>

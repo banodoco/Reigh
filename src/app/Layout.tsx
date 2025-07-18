@@ -12,6 +12,7 @@ import type { Session } from '@supabase/supabase-js';
 import { Loading } from '@/shared/components/ui/loading';
 import { GlobalProcessingWarning } from '@/shared/components/ProcessingWarnings';
 import SettingsModal from '@/shared/components/SettingsModal';
+import { useHeaderState } from '@/shared/contexts/ToolPageHeaderContext';
 
 // Scroll to top component
 function ScrollToTop() {
@@ -33,6 +34,7 @@ const Layout: React.FC = () => {
     isGenerationsPaneLocked, 
     generationsPaneHeight 
   } = usePanes();
+  const { header } = useHeaderState();
 
   // Get content-responsive breakpoints for app-wide use
   const { isSm, isMd, isLg, isXl, is2Xl, contentWidth, contentHeight } = useContentResponsive();
@@ -111,6 +113,8 @@ const Layout: React.FC = () => {
       >
         <GlobalProcessingWarning onOpenSettings={handleOpenSettings} />
         
+        {header}
+
         <main className={cn("container mx-auto h-full overflow-y-auto", containerPadding, containerSpacing)}>
           <div className="min-h-full">
             <Outlet /> 
