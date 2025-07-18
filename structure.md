@@ -1,5 +1,10 @@
 # Reigh: Developer Onboarding
 
+> **Important: This Document Reflects Current State Only**  
+> • This guide documents the current architecture and setup, not historical changes or bug fixes.  
+> • For change history, see git commits, pull requests, or dedicated changelog files.  
+> • Keep this document up-to-date with the actual codebase, not past issues.
+
 > **How to Use This Guide**  
 > • Skim the Tech Stack & Directory tables below to orient yourself.  
 > • Need implementation specifics? Follow the links to sub-docs in [structure_detail/](structure_detail/) (one file per topic).  
@@ -245,24 +250,6 @@ See [README.md](README.md) for:
 - Development commands
 - Mobile testing
 - Troubleshooting
-
----
-
-## Recent Bug Fixes & Known Issues
-
-### Fixed: Infinite Loop in ProjectContext (Jan 2025)
-- **Issue**: React "Maximum update depth exceeded" error caused by circular dependency in `ProjectContext.fetchProjects`
-- **Root Cause**: `fetchProjects` depended on `userPreferences?.lastOpenedProjectId` but also called `updateUserPreferences`, creating infinite re-renders
-- **Solution**: Use `userPreferencesRef.current` instead of state dependency to break the circular dependency
-- **Files Changed**: `src/shared/contexts/ProjectContext.tsx`
-- **Symptoms**: Dev server crashes on startup, Select components in GlobalHeader causing infinite loops
-
-### Fixed: Infinite Loop in VideoTravelToolPage Header Management (Jan 2025)
-- **Issue**: React "Maximum update depth exceeded" error in travel-between-images page from problematic `useLayoutEffect` cleanup
-- **Root Cause**: Cleanup function `() => clearHeader()` ran on every effect re-run, triggering state changes that caused dependencies to change infinitely
-- **Solution**: Separate header management from cleanup logic; create dedicated cleanup effect that only runs on unmount
-- **Files Changed**: `src/tools/travel-between-images/pages/VideoTravelToolPage.tsx`
-- **Symptoms**: Travel-between-images page crashes when loading, infinite `clearHeader` calls
 
 ---
 
