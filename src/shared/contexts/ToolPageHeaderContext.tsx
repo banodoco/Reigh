@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react';
 
 interface ToolPageHeaderContextType {
   setHeader: (header: ReactNode) => void;
@@ -22,10 +22,13 @@ interface ToolPageHeaderProviderProps {
 export const ToolPageHeaderProvider: React.FC<ToolPageHeaderProviderProps> = ({ children }) => {
   const [header, setHeader] = useState<ReactNode>(null);
 
+  const handleSetHeader = useCallback((newHeader: ReactNode) => setHeader(newHeader), []);
+  const handleClearHeader = useCallback(() => setHeader(null), []);
+
   const value = {
     header,
-    setHeader: (newHeader: ReactNode) => setHeader(newHeader),
-    clearHeader: () => setHeader(null),
+    setHeader: handleSetHeader,
+    clearHeader: handleClearHeader,
   };
 
   return (

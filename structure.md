@@ -1,13 +1,9 @@
 # Reigh: Developer Onboarding
 
-> **Important: This Document Reflects Current State Only**  
-> • This guide documents the current architecture and setup, not historical changes or bug fixes.  
-> • For change history, see git commits, pull requests, or dedicated changelog files.  
-> • Keep this document up-to-date with the actual codebase, not past issues.
-
 > **How to Use This Guide**  
 > • Skim the Tech Stack & Directory tables below to orient yourself.  
 > • Need implementation specifics? Follow the links to sub-docs in [structure_detail/](structure_detail/) (one file per topic).  
+> • This guide documents the current architecture and setup, not historical changes or bug fixes. If you need to see change history, fetch git commits.
 > • When in doubt, the source of truth is always the code – this guide just points you in the right direction.
 
 > **When to Update This Guide & Sub-Docs**  
