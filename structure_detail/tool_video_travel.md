@@ -21,8 +21,7 @@ src/tools/travel-between-images/
 │   ├── TaskDetailsModal.tsx           # Generation parameters
 │   ├── VideoShotDisplay.tsx           # Shot preview card
 │   ├── ShotListDisplay.tsx            # Shot grid view
-│   ├── SortableImageItem.tsx          # Draggable images
-│   └── CreateShotModal.tsx            # New shot dialog
+│   └── SortableImageItem.tsx          # Draggable images
 └── settings.ts                        # Tool configuration
 ```
 

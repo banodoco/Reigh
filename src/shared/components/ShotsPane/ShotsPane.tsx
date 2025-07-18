@@ -10,7 +10,7 @@ import { Button } from '@/shared/components/ui/button';
 import { ArrowRightIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { usePanes } from '@/shared/contexts/PanesContext';
-import CreateShotModal from '@/tools/travel-between-images/components/CreateShotModal';
+import CreateShotModal from '@/shared/components/CreateShotModal';
 import { useCreateShot, useHandleExternalImageDrop } from '@/shared/hooks/useShots';
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 import PaneControlTab from '../PaneControlTab';
@@ -21,7 +21,6 @@ export const ShotsPane: React.FC = () => {
   const { selectedProjectId } = useProject();
   const { data: shots, isLoading, error } = useListShots(selectedProjectId);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [flashEffect, setFlashEffect] = useState(false);
   // Pagination state
   const pageSize = 5;
   const [currentPage, setCurrentPage] = useState(1);
@@ -70,12 +69,6 @@ export const ShotsPane: React.FC = () => {
         currentShotCount: shots?.length ?? 0
       });
       createdShotId = result?.shotId || null;
-      
-      // Trigger flash effect for successful image drop
-      if (createdShotId) {
-        setFlashEffect(true);
-        setTimeout(() => setFlashEffect(false), 600); // Flash for 600ms
-      }
     } else {
       const newShotResult = await createShotMutation.mutateAsync({ name: shotName, projectId: selectedProjectId });
       createdShotId = newShotResult?.shot?.id || null;
@@ -125,11 +118,8 @@ export const ShotsPane: React.FC = () => {
         <div
           {...paneProps}
           className={cn(
-            `pointer-events-auto absolute top-0 left-0 h-full w-full border-2 border-r shadow-xl transform transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] flex flex-col`,
-            transformClass,
-            flashEffect 
-              ? "bg-green-400/20 border-green-400 shadow-green-400/50 animate-pulse" 
-              : "bg-zinc-900/95 border-zinc-700"
+            `pointer-events-auto absolute top-0 left-0 h-full w-full border-2 border-r shadow-xl transform transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] flex flex-col bg-zinc-900/95 border-zinc-700`,
+            transformClass
           )}
         >
           <div className="p-2 border-b border-zinc-800 flex items-center justify-between flex-shrink-0">

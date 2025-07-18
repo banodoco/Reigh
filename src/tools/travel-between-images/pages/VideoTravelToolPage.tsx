@@ -5,7 +5,7 @@ import { useListShots, useCreateShot, useHandleExternalImageDrop, useUpdateShotN
 import { Shot } from '@/types/shots';
 import { Button } from '@/shared/components/ui/button';
 import { useProject } from "@/shared/contexts/ProjectContext";
-import CreateShotModal from '../components/CreateShotModal';
+import CreateShotModal from '@/shared/components/CreateShotModal';
 import ShotListDisplay from '../components/ShotListDisplay';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
@@ -778,6 +778,7 @@ const VideoTravelToolPage: React.FC = () => {
               hasPrevious={hasPrevious}
               hasNext={hasNext}
               onUpdateShotName={handleUpdateShotName}
+              settingsLoading={isLoadingSettings}
             />
           </PageFadeIn>
         </Suspense>

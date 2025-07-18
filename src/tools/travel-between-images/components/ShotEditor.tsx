@@ -28,6 +28,7 @@ import { ActiveLoRAsDisplay, ActiveLora } from '@/shared/components/ActiveLoRAsD
 import { useApiKeys } from '@/shared/hooks/useApiKeys';
 import { cropImageToProjectAspectRatio } from '@/shared/lib/imageCropper';
 import { parseRatio } from '@/shared/lib/aspectRatios';
+import { Skeleton } from '@/shared/components/ui/skeleton';
 // (Timeline related imports removed – now provided within the Timeline component file)
 
 import { useToolSettings } from '@/shared/hooks/useToolSettings';
@@ -156,6 +157,9 @@ export interface ShotEditorProps {
   hasNext?: boolean;
   // Shot name editing
   onUpdateShotName?: (newName: string) => void;
+
+  // Indicates if parent is still loading settings. Manage Shot Images should wait until this is false.
+  settingsLoading?: boolean;
 }
 
 const DEFAULT_RESOLUTION = '840x552';
@@ -220,7 +224,17 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   hasPrevious,
   hasNext,
   onUpdateShotName,
+  settingsLoading,
 }) => {
+  // Early return if selectedShot is null to prevent null reference errors
+  if (!selectedShot) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <p className="text-muted-foreground">No shot selected</p>
+      </div>
+    );
+  }
+
   const { selectedProjectId, projects } = useProject();
   const { getApiKey } = useApiKeys();
   const [isUploadingImage, setIsUploadingImage] = useState(false);
@@ -244,12 +258,41 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const skipNextSyncRef = useRef(false);
   const isMobile = useIsMobile();
 
-  // Ensure mobile users are always in batch generation mode
+  // Track if generation mode has been determined
+  const [isModeReady, setIsModeReady] = useState(false);
+
+  // Reset mode readiness when shot changes
   useEffect(() => {
-    if (isMobile && generationMode !== 'batch') {
-      onGenerationModeChange('batch');
+    setIsModeReady(false);
+  }, [selectedShot.id]);
+
+  // Ensure mobile users are always in batch generation mode and track readiness
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (settingsLoading) {
+        // Wait until settings finish loading before showing content
+        return;
+      }
+
+      if (isMobile && generationMode !== 'batch') {
+        onGenerationModeChange('batch');
+      } else {
+        setIsModeReady(true);
+      }
+    }, 100); // Show skeleton for at least 100ms
+
+    return () => clearTimeout(timer);
+  }, [isMobile, generationMode, settingsLoading]);
+
+  // Mark mode as ready after mobile mode adjustments are complete
+  useEffect(() => {
+    if (settingsLoading) return;
+
+    if (isMobile && generationMode === 'batch') {
+      const timer = setTimeout(() => setIsModeReady(true), 50);
+      return () => clearTimeout(timer);
     }
-  }, [isMobile, generationMode]);
+  }, [isMobile, generationMode, settingsLoading]);
 
   
   // Shot name editing state
@@ -1129,6 +1172,39 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     onPairConfigsChange(updatedConfigs);
   };
 
+  // Skeleton component for image manager
+  const ImageManagerSkeleton = () => (
+    <div className="space-y-4">
+      {/* Header skeleton */}
+      <div className="flex items-center justify-between mb-4">
+        <Skeleton className="h-7 w-48" />
+        {!isMobile && (
+          <Skeleton className="h-8 w-36" />
+        )}
+      </div>
+      
+      {/* Description skeleton */}
+      <Skeleton className="h-4 w-full max-w-lg mb-6" />
+      
+      {/* Content area skeleton */}
+      <div className="p-1 min-h-[200px]">
+        {/* Image grid skeleton - fewer items initially */}
+        <div className={`grid gap-3 ${isMobile ? 'grid-cols-3' : 'grid-cols-6'}`}>
+          {Array.from({ length: isMobile ? 3 : 6 }).map((_, i) => (
+            <div key={i} className="aspect-square">
+              <Skeleton className="w-full h-full rounded-lg" />
+            </div>
+          ))}
+        </div>
+      </div>
+      
+      {/* Upload section skeleton */}
+      <div className="pt-4 border-t space-y-3">
+        <Skeleton className="h-12 w-full" />
+      </div>
+    </div>
+  );
+
   return (
     <div className="flex flex-col space-y-4 pb-16">
       {/* Header */}
@@ -1205,79 +1281,87 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         {/* Image Manager */}
         <div className="flex flex-col w-full gap-4">
           <Card className="flex flex-col">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>Manage Shot Images</CardTitle>
-                {!isMobile && (
-                  <div className="flex items-center space-x-2">
-                    <ToggleGroup type="single" value={generationMode} onValueChange={(value: 'batch' | 'by-pair' | 'timeline') => value && onGenerationModeChange(value)} size="sm">
-                      <ToggleGroupItem value="batch" aria-label="Toggle batch">
-                        Batch
-                      </ToggleGroupItem>
-   
-                      <ToggleGroupItem value="timeline" aria-label="Toggle timeline">
-                        Timeline
-                      </ToggleGroupItem>
-                    </ToggleGroup>
-                  </div>
-                )}
-              </div>
-              {nonVideoImages.length > 0 && (
-                <>
-                  <p className="text-sm text-muted-foreground pt-1">
-                    {isMobile 
-                      ? 'Tap to select and move multiple images.'
-                      : generationMode === 'timeline' 
-                        ? 'Drag images to precise frame positions. Drop on other images to reorder.'
-                        : 'Drag to reorder. Cmd+click to select and move multiple images.'
-                    }
-                  </p>
-                </>
-              )}
-            </CardHeader>
-            <CardContent className={nonVideoImages.length > 0 ? "" : ""}>
-                              <div className="p-1">
-                  {generationMode === 'timeline' ? (
-                    <Suspense fallback={
-                      <div className="flex items-center justify-center p-8">
-                        <div className="text-sm text-muted-foreground">Loading Timeline...</div>
+            {!isModeReady ? (
+              <CardContent className="p-6">
+                <ImageManagerSkeleton />
+              </CardContent>
+            ) : (
+              <>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle>Manage Shot Images</CardTitle>
+                    {!isMobile && (
+                      <div className="flex items-center space-x-2">
+                        <ToggleGroup type="single" value={generationMode} onValueChange={(value: 'batch' | 'by-pair' | 'timeline') => value && onGenerationModeChange(value)} size="sm">
+                          <ToggleGroupItem value="batch" aria-label="Toggle batch">
+                            Batch
+                          </ToggleGroupItem>
+       
+                          <ToggleGroupItem value="timeline" aria-label="Toggle timeline">
+                            Timeline
+                          </ToggleGroupItem>
+                        </ToggleGroup>
                       </div>
-                    }>
-                      <LazyTimeline
-                        shotId={selectedShot.id}
-                        images={nonVideoImages}
-                        frameSpacing={batchVideoFrames}
-                        contextFrames={batchVideoContext}
-                        onImageReorder={handleReorderImagesInShot}
-                        onImageSaved={handleImageSaved}
-                        onContextFramesChange={onBatchVideoContextChange}
-                        onFramePositionsChange={setTimelineFramePositions}
-                      />
-                    </Suspense>
-                  ) : (
-                  <ShotImageManager
-                    images={nonVideoImages}
-                    onImageDelete={handleDeleteImageFromShot}
-                    onImageReorder={handleReorderImagesInShot}
-                    columns={isMobile ? 3 : 6}
-                    generationMode={isMobile ? 'batch' : generationMode}
-                    pairConfigs={pairConfigs}
-                    onPairConfigChange={handleUpdatePairConfig}
-                    onImageSaved={handleImageSaved}
+                    )}
+                  </div>
+                  {nonVideoImages.length > 0 && (
+                    <>
+                      <p className="text-sm text-muted-foreground pt-1">
+                        {isMobile 
+                          ? 'Tap to select and move multiple images.'
+                          : generationMode === 'timeline' 
+                            ? 'Drag images to precise frame positions. Drop on other images to reorder.'
+                            : 'Drag to reorder. Cmd+click to select and move multiple images.'
+                        }
+                      </p>
+                    </>
+                  )}
+                </CardHeader>
+                <CardContent className={nonVideoImages.length > 0 ? "" : ""}>
+                  <div className="p-1">
+                    {generationMode === 'timeline' ? (
+                      <Suspense fallback={
+                        <div className="flex items-center justify-center p-8">
+                          <div className="text-sm text-muted-foreground">Loading Timeline...</div>
+                        </div>
+                      }>
+                        <LazyTimeline
+                          shotId={selectedShot.id}
+                          images={nonVideoImages}
+                          frameSpacing={batchVideoFrames}
+                          contextFrames={batchVideoContext}
+                          onImageReorder={handleReorderImagesInShot}
+                          onImageSaved={handleImageSaved}
+                          onContextFramesChange={onBatchVideoContextChange}
+                          onFramePositionsChange={setTimelineFramePositions}
+                        />
+                      </Suspense>
+                    ) : (
+                    <ShotImageManager
+                      images={nonVideoImages}
+                      onImageDelete={handleDeleteImageFromShot}
+                      onImageReorder={handleReorderImagesInShot}
+                      columns={isMobile ? 3 : 6}
+                      generationMode={isMobile ? 'batch' : generationMode}
+                      pairConfigs={pairConfigs}
+                      onPairConfigChange={handleUpdatePairConfig}
+                      onImageSaved={handleImageSaved}
+                    />
+                  )}
+                  </div>
+                </CardContent>
+                <div className="p-4 border-t space-y-3">
+                  <FileInput
+                    key={fileInputKey}
+                    onFileChange={handleImageUploadToShot}
+                    acceptTypes={['image']}
+                    label="Add more images"
+                    disabled={isUploadingImage || !isModeReady}
+                    multiple
                   />
-                )}
-              </div>
-            </CardContent>
-            <div className="p-4 border-t space-y-3">
-              <FileInput
-                key={fileInputKey}
-                onFileChange={handleImageUploadToShot}
-                acceptTypes={['image']}
-                label="Add more images"
-                disabled={isUploadingImage}
-                multiple
-              />
-            </div>
+                </div>
+              </>
+            )}
           </Card>
         </div>
 

@@ -155,8 +155,8 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                     </Tooltip>
                     <Slider
                       id="batchVideoContext"
-                      min={0}
-                      max={60}
+                      min={1}
+                      max={24}
                       step={1}
                       value={[batchVideoContext]}
                       onValueChange={(value) => onBatchVideoContextChange(value[0])}

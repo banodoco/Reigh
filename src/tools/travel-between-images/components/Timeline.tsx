@@ -6,6 +6,8 @@ import { GenerationRow } from "@/types/shots";
 import { getDisplayUrl } from "@/shared/lib/utils";
 import { toast } from "sonner";
 import MediaLightbox from "@/shared/components/MediaLightbox";
+import { Info } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/components/ui/tooltip";
 
 // Props for individual timeline items
 interface TimelineItemProps {
@@ -165,6 +167,7 @@ const Timeline: React.FC<TimelineProps> = ({
     currentX: number;
     currentY: number;
     originalFramePos: number;
+    isCommandPressed: boolean;
   }>({
     isDragging: false,
     activeId: null,
@@ -173,6 +176,7 @@ const Timeline: React.FC<TimelineProps> = ({
     currentX: 0,
     currentY: 0,
     originalFramePos: 0,
+    isCommandPressed: false,
   });
   
   // Refs
@@ -356,6 +360,7 @@ const Timeline: React.FC<TimelineProps> = ({
       currentX: e.clientX,
       currentY: e.clientY,
       originalFramePos: framePos,
+      isCommandPressed: e.metaKey, // Detect Command key on Mac (or Ctrl on Windows)
     });
   }, [framePositions]);
 
@@ -385,27 +390,39 @@ const Timeline: React.FC<TimelineProps> = ({
     const targetFrame = Math.max(0, pixelToFrame(targetPixelPos, containerWidth));
     const validFrame = findClosestValidPosition(targetFrame, dragState.activeId);
     
-    // Update positions
-    const updatedMap = new Map(framePositions);
-    const originalPos = updatedMap.get(dragState.activeId) ?? 0;
+    // Apply the final positions from the dynamic preview
+    // Get the current dynamic positions which already include Command+drag logic
+    const currentDynamic = dynamicPositions();
     
-    // Check for swap
-    const targetEntry = [...updatedMap.entries()].find(
-      ([id, pos]) => id !== dragState.activeId && pos === validFrame
-    );
+    // Update the dragged item to its final valid position
+    const updatedMap = new Map(currentDynamic);
+    const originalPos = framePositions.get(dragState.activeId) ?? 0;
     
-    if (targetEntry) {
-      // Swap positions
-      updatedMap.set(targetEntry[0], originalPos);
-    } else if (originalPos === 0 && validFrame !== 0) {
-      // Frame 0 moved - find nearest to take its place
-      const nearest = [...updatedMap.entries()]
-        .filter(([id]) => id !== dragState.activeId)
-        .sort((a, b) => a[1] - b[1])[0];
-      if (nearest) updatedMap.set(nearest[0], 0);
+    if (!dragState.isCommandPressed) {
+      // For normal drag, handle swapping and frame 0 reassignment logic
+      const targetEntry = [...framePositions.entries()].find(
+        ([id, pos]) => id !== dragState.activeId && pos === validFrame
+      );
+      
+      if (targetEntry) {
+        // Swap positions
+        updatedMap.set(targetEntry[0], originalPos);
+        updatedMap.set(dragState.activeId, validFrame);
+      } else if (originalPos === 0 && validFrame !== 0) {
+        // Frame 0 moved - find nearest to take its place
+        const nearest = [...framePositions.entries()]
+          .filter(([id]) => id !== dragState.activeId)
+          .sort((a, b) => a[1] - b[1])[0];
+        if (nearest) updatedMap.set(nearest[0], 0);
+        updatedMap.set(dragState.activeId, validFrame);
+      } else {
+        updatedMap.set(dragState.activeId, validFrame);
+      }
+    } else {
+      // For Command+drag, just ensure the dragged item is at the valid position
+      updatedMap.set(dragState.activeId, validFrame);
     }
     
-    updatedMap.set(dragState.activeId, validFrame);
     setFramePositions(updatedMap);
     
     // Update order
@@ -428,6 +445,7 @@ const Timeline: React.FC<TimelineProps> = ({
       currentX: 0,
       currentY: 0,
       originalFramePos: 0,
+      isCommandPressed: false,
     });
   }, [dragState, framePositions, fullMin, fullRange, pixelToFrame, findClosestValidPosition, images, onImageReorder]);
 
@@ -616,9 +634,63 @@ const Timeline: React.FC<TimelineProps> = ({
     }
     
     const newPositions = new Map(framePositions);
-    newPositions.set(dragState.activeId, currentDragFrame);
+    const originalPos = framePositions.get(dragState.activeId) ?? 0;
+    const frameDiff = currentDragFrame - originalPos;
+    
+    if (dragState.isCommandPressed && frameDiff !== 0) {
+      // Command+drag: Push all subsequent items forward/backward in real-time
+      const sortedEntries = [...framePositions.entries()]
+        .sort((a, b) => a[1] - b[1]);
+      
+      // Find the index of the dragged item in the sorted list
+      const draggedIndex = sortedEntries.findIndex(([id]) => id === dragState.activeId);
+      
+      if (draggedIndex !== -1) {
+        // Move the dragged item
+        newPositions.set(dragState.activeId, currentDragFrame);
+        
+        // Calculate max gap constraint
+        const maxGap = calculateMaxGap();
+        const isMovingBackward = frameDiff < 0;
+        
+        // Push all items that come after the dragged item
+        let lastPosition = currentDragFrame;
+        for (let i = draggedIndex + 1; i < sortedEntries.length; i++) {
+          const [id, currentPos] = sortedEntries[i];
+          let newPos = currentPos + frameDiff;
+          
+          // Apply constraints based on direction
+          if (isMovingBackward) {
+            // When moving backward, be more permissive to allow the backward flow
+            // But still ensure minimum spacing and don't go below 0
+            const minAllowedPos = Math.max(0, lastPosition + 1);
+            const maxAllowedPos = lastPosition + maxGap;
+            
+            // For backward movement, prioritize the intended position if it's reasonable
+            if (newPos >= minAllowedPos) {
+              newPos = Math.min(newPos, maxAllowedPos);
+            } else {
+              newPos = minAllowedPos;
+            }
+          } else {
+            // Forward movement: standard constraints
+            const minAllowedPos = lastPosition + 1;
+            const maxAllowedPos = lastPosition + maxGap;
+            newPos = Math.max(minAllowedPos, Math.min(maxAllowedPos, newPos));
+          }
+          
+          newPos = Math.max(0, newPos); // Never go below frame 0
+          newPositions.set(id, newPos);
+          lastPosition = newPos;
+        }
+      }
+    } else {
+      // Normal drag: only move the dragged item
+      newPositions.set(dragState.activeId, currentDragFrame);
+    }
+    
     return newPositions;
-  }, [framePositions, dragState.isDragging, dragState.activeId, currentDragFrame]);
+  }, [framePositions, dragState.isDragging, dragState.activeId, dragState.isCommandPressed, currentDragFrame, calculateMaxGap]);
 
   // Prepare data
   const currentPositions = dynamicPositions();
@@ -655,23 +727,30 @@ const Timeline: React.FC<TimelineProps> = ({
     <div className="w-full overflow-x-hidden">
       {/* Controls */}
       <div className="flex items-center justify-between mb-3 gap-6">
-        <div className="flex items-center gap-4">
-          <div className="flex-1 max-w-xs">
-            <Label htmlFor="contextFrames" className="text-sm font-medium block mb-1">
-              Context Frames: {contextFrames}
-            </Label>
+        <div className="flex items-center gap-4 flex-1">
+          <div className="w-1/2">
+            <div className="flex items-center gap-2 mb-1">
+              <Label htmlFor="contextFrames" className="text-sm font-medium">
+                Context Frames: {contextFrames}
+              </Label>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="h-3 w-3 text-muted-foreground cursor-help hover:text-foreground transition-colors" />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p><strong>Tip:</strong> Hold Cmd while dragging to push all following items forward</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
             <Slider
               id="contextFrames"
-              min={0}
-              max={60}
+              min={1}
+              max={24}
               step={1}
               value={[contextFrames]}
               onValueChange={(value) => onContextFramesChange(value[0])}
               className="w-full"
             />
-          </div>
-          <div className="flex items-center gap-4 text-sm text-muted-foreground">
-            <span>Pairs: <strong>{numPairs}</strong></span>
           </div>
         </div>
         
@@ -817,7 +896,7 @@ const Timeline: React.FC<TimelineProps> = ({
 
           {/* Timeline items */}
           {images.map((image, idx) => {
-            const framePosition = framePositions.get(image.shotImageEntryId) ?? idx * frameSpacing;
+            const framePosition = currentPositions.get(image.shotImageEntryId) ?? idx * frameSpacing;
             const isDragging = dragState.isDragging && dragState.activeId === image.shotImageEntryId;
 
             return (
