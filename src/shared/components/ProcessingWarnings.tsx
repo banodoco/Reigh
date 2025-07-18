@@ -1,130 +1,45 @@
-import React from 'react';
-import { AlertTriangle } from 'lucide-react';
-import { Alert, AlertDescription } from '@/shared/components/ui/alert';
-import { Button } from '@/shared/components/ui/button';
-import { useCredits } from '@/shared/hooks/useCredits';
-import { useApiTokens } from '@/shared/hooks/useApiTokens';
-import usePersistentState from '@/shared/hooks/usePersistentState';
+import React, { useMemo } from 'react';
+import { useProject } from "@/shared/contexts/ProjectContext";
+import { AlertTriangle, Settings } from "lucide-react";
+import { useListTasks } from '@/shared/hooks/useTasks';
 
-interface ProcessingWarningsProps {
+const WARNING_TASK_STATUSES = ['In Progress', 'Failed', 'Cancelled'];
+
+interface TasksPaneProcessingWarningProps {
   onOpenSettings: () => void;
 }
 
-export const GlobalProcessingWarning: React.FC<ProcessingWarningsProps> = ({ onOpenSettings }) => {
-  const { balance, isLoadingBalance } = useCredits();
-  const { tokens, isLoading: isLoadingTokens } = useApiTokens();
-  const [inCloudChecked, setInCloudChecked] = usePersistentState<boolean>("generation-in-cloud", true);
-  const [onComputerChecked] = usePersistentState<boolean>("generation-on-computer", true);
-  
-  const hasCredits = balance && balance.currentBalance > 0;
-  const hasValidToken = tokens.length > 0;
+export const TasksPaneProcessingWarning: React.FC<TasksPaneProcessingWarningProps> = ({ onOpenSettings }) => {
+  const { selectedProjectId } = useProject();
+  const { data: tasks, isLoading } = useListTasks({ 
+    projectId: selectedProjectId, 
+    status: WARNING_TASK_STATUSES
+  });
 
-  // If both generation methods are disabled, show a dedicated warning.
-  const generationDisabled = !inCloudChecked && !onComputerChecked;
+  const hasFailedOrCancelledTasks = useMemo(() => 
+    tasks?.some(task => WARNING_TASK_STATUSES.includes(task.status)),
+    [tasks]
+  );
 
-  // Avoid showing any warning while data is loading.
-  if (isLoadingBalance || isLoadingTokens) {
-    return null;
-  }
-
-  // 1. Generation disabled takes top priority.
-  if (generationDisabled) {
-    return (
-      <div className="animate-in slide-in-from-top-2 fade-in duration-300">
-        <div className="container mx-auto px-4 md:px-6 mt-4">
-          <Alert className="border-orange-200 bg-orange-50 text-orange-900 flex items-center justify-between py-3 pr-4">
-            <div className="flex items-center space-x-3">
-              <span className="inline-flex items-center">
-                <AlertTriangle className="h-5 w-5 text-orange-700 mr-2" />
-                <span>You have disabled both cloud and local generation. Enable at least one in Settings.</span>
-              </span>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onOpenSettings}
-              className="border-orange-300 hover:bg-orange-100 flex-shrink-0"
-            >
-              Visit Settings
-            </Button>
-          </Alert>
-        </div>
-      </div>
-    );
-  }
-
-  // 2. Cloud processing enabled but the user has no credits – show a dedicated banner here.
-  const noCreditsButCloudEnabled = inCloudChecked && !hasCredits;
-
-  if (noCreditsButCloudEnabled) {
-    return (
-      <div className="animate-in slide-in-from-top-2 fade-in duration-300">
-        <div className="container mx-auto px-4 md:px-6 mt-4">
-          <Alert className="border-orange-200 bg-orange-50 text-orange-900 flex items-center justify-between py-3 pr-4">
-            <div className="flex items-center space-x-3">
-              <span className="inline-flex items-center">
-                <AlertTriangle className="h-5 w-5 text-orange-700 mr-2" />
-                                 <span className="space-x-1">
-                   <span>Cloud processing enabled but you have no credits.</span>
-                   <span
-                     className="text-orange-700 underline hover:text-orange-800 cursor-pointer"
-                     onClick={() => setInCloudChecked(false)}
-                   >
-                     Turn off cloud processing
-                   </span>
-                   <span>or</span>
-                   <span
-                     className="text-orange-700 underline hover:text-orange-800 cursor-pointer"
-                     onClick={onOpenSettings}
-                   >
-                     buy credits
-                   </span>
-                   <span>to dismiss.</span>
-                 </span>
-              </span>
-            </div>
-          </Alert>
-        </div>
-      </div>
-    );
-  }
-
-  // 3. Show the existing credits/token warning if both cloud processing is disabled AND no valid token.
-  if (hasCredits || hasValidToken) {
+  if (isLoading || !hasFailedOrCancelledTasks) {
     return null;
   }
   
   return (
-    <div className="animate-in slide-in-from-top-2 fade-in duration-300">
-      <div className="container mx-auto px-4 md:px-6 mt-4">
-        <Alert className="border-orange-200 bg-orange-50 text-orange-900 flex items-center justify-between py-3 pr-4">
-          <div className="flex items-center space-x-3">
-            <span className="inline-flex items-center">
-              <AlertTriangle className="h-5 w-5 text-orange-700 mr-2" />
-              <span>You don't have credits and haven't set up local processing.</span>
-            </span>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onOpenSettings}
-            className="border-orange-300 hover:bg-orange-100 flex-shrink-0"
-          >
-            Visit Settings
-          </Button>
-        </Alert>
+    <div className="p-2 border-b border-zinc-800 bg-yellow-900/30">
+      <div className="flex items-center text-yellow-300">
+        <AlertTriangle className="h-5 w-5 mr-3 flex-shrink-0" />
+        <div className="flex-grow text-sm">
+          <p>Some generations have failed or were cancelled. This may be due to exhausted credits or worker settings.</p>
+        </div>
+        <button 
+          onClick={onOpenSettings} 
+          className="ml-2 p-1 rounded-md hover:bg-yellow-400/20 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:ring-offset-2 focus:ring-offset-zinc-900"
+          aria-label="Open settings"
+        >
+          <Settings className="h-4 w-4" />
+        </button>
       </div>
     </div>
   );
-};
-
-export const TasksPaneProcessingWarning: React.FC<ProcessingWarningsProps> = ({ onOpenSettings }) => {
-  const { balance } = useCredits();
-  const { tokens } = useApiTokens();
-  const [inCloudChecked] = usePersistentState<boolean>("generation-in-cloud", true);
-  
-  const hasCredits = balance && balance.currentBalance > 0;
-  const hasValidToken = tokens.length > 0;
-  // This warning is now shown globally, so don't duplicate it in the tasks pane.
-  return null;
 }; 

@@ -3,6 +3,7 @@ import { tasks as tasksSchema, generations as generationsSchema, shotGenerations
 import { eq, and, isNull, sql, inArray, notInArray, like, isNotNull } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { broadcast } from './webSocketService';
+import { time, timeEnd, log } from '@/shared/lib/logger';
 
 // Define the structure of a task object more explicitly if possible, for now using 'any'
 type Task = typeof tasksSchema.$inferSelect;
@@ -257,13 +258,14 @@ let statusPollerRunning = false;
 export async function pollAndBroadcastTaskUpdates(): Promise<void> {
   // Prevent overlapping executions
   if (statusPollerRunning) {
-    console.log('[TaskStatusPoller] Previous execution still running, skipping...');
+    log('PerfDebug:TaskStatusPoller', 'Previous execution still running, skipping...');
     return;
   }
   
   statusPollerRunning = true;
   
   try {
+    time('PerfDebug:TaskStatusPoller', 'pollAndBroadcastTaskUpdates');
     // console.log('[TaskStatusPoller] Checking for active task updates...');
     const activeTasks = await db
       .select()
@@ -302,6 +304,7 @@ export async function pollAndBroadcastTaskUpdates(): Promise<void> {
   } catch (error) {
     console.error('[TaskStatusPoller] Error polling for task status updates:', error);
   } finally {
+    timeEnd('PerfDebug:TaskStatusPoller', 'pollAndBroadcastTaskUpdates');
     statusPollerRunning = false;
   }
 }
@@ -339,13 +342,14 @@ export function startTaskStatusPoller(): void {
 async function pollForCompletedTasks(): Promise<void> {
   // Prevent overlapping executions
   if (taskPollerRunning) {
-    console.log('[TaskPoller] Previous execution still running, skipping...');
+    log('PerfDebug:TaskPoller', 'Previous execution still running, skipping...');
     return;
   }
   
   taskPollerRunning = true;
   
   try {
+    time('PerfDebug:TaskPoller', 'pollForCompletedTasks');
     // console.log('[TaskPoller] Checking for completed travel_stitch tasks...'); // Can be noisy
     const tasksToProcess = await db
       .select()
@@ -394,6 +398,7 @@ async function pollForCompletedTasks(): Promise<void> {
   } catch (error) {
     console.error('[TaskPoller] Error querying for tasks to process:', error);
   } finally {
+    timeEnd('PerfDebug:TaskPoller', 'pollForCompletedTasks');
     taskPollerRunning = false;
   }
 }

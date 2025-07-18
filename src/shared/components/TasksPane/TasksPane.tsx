@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useRenderLogger } from '@/shared/hooks/useRenderLogger';
 import TaskList from './TaskList';
 import { cn } from '@/shared/lib/utils'; // For conditional classnames
 import { Button } from '@/shared/components/ui/button'; // For the lock button
@@ -11,6 +12,8 @@ import { useCancelAllPendingTasks, useListTasks } from '@/shared/hooks/useTasks'
 import { useToast } from '@/shared/hooks/use-toast';
 import { filterVisibleTasks } from '@/shared/lib/taskConfig';
 import { TasksPaneProcessingWarning } from '../ProcessingWarnings';
+
+const CANCELLABLE_TASK_STATUSES = ['Queued', 'In Progress'];
 
 interface TasksPaneProps {
   onOpenSettings: () => void;
@@ -27,13 +30,15 @@ export const TasksPane: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
 
   // Project context & task helpers
   const { selectedProjectId } = useProject();
-  const { data: cancellableTasks } = useListTasks({ projectId: selectedProjectId, status: ['Queued', 'In Progress'] });
+  const { data: cancellableTasks } = useListTasks({ projectId: selectedProjectId, status: CANCELLABLE_TASK_STATUSES });
   
   // Count only visible tasks (exclude travel_segment and travel_stitch) for display
   const visibleCancellableCount = filterVisibleTasks(cancellableTasks || []).length;
 
   const cancelAllPendingMutation = useCancelAllPendingTasks();
   const { toast } = useToast();
+
+  useRenderLogger('TasksPane', { cancellableCount: visibleCancellableCount });
 
   const handleCancelAllPending = () => {
     if (!selectedProjectId) {

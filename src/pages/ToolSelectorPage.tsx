@@ -84,7 +84,7 @@ const assistantTools = [
   {
     id: 'train-lora',
     name: 'Train\nLoRA',
-    description: 'Fine-tune models for unique styles & motion.',
+    description: 'Fine-tune LoRAs for unique styles & motion.',
     tool: null, // Coming soon
     icon: Layers,
     gradient: 'from-wes-sage via-wes-mint to-wes-dusty-blue',
@@ -119,7 +119,7 @@ const ToolCard = ({ item, isSquare = false, index, isVisible }: { item: any, isS
   const descriptionSize = isSm ? 'text-sm' : 'text-xs';
 
   const content = (
-    <div className={`wes-tool-card relative overflow-hidden ${isSquare ? 'h-auto sm:aspect-square !p-0' : 'h-32 sm:h-32'} wes-polaroid ${isComingSoon ? 'opacity-30' : ''}`}>
+    <div className={`wes-tool-card relative overflow-hidden ${isSquare ? 'min-h-48' : 'h-32 sm:h-32'} ${isComingSoon ? 'opacity-40' : ''} h-full`}>
       {/* Coming Soon Badge */}
       {isComingSoon && isSm && (
         <div className={`absolute ${isSquare ? 'top-1 right-2' : 'top-2 right-2'} z-10 ${isWiggling ? 'animate-subtle-wiggle' : ''}`}>
@@ -131,7 +131,7 @@ const ToolCard = ({ item, isSquare = false, index, isVisible }: { item: any, isS
 
       {/* Horizontal layout for Process tools */}
       {!isSquare ? (
-        <div className="flex items-center h-full p-2 sm:p-2 lg:p-3 relative">
+        <div className="flex items-center h-full p-1 sm:p-2 lg:p-3 relative">
           {/* Large subtle number in background - responsive visibility */}
           {index !== undefined && isLg && (
             <div className="absolute right-4 lg:right-6 top-1/2 -translate-y-1/2 -translate-y-5">
@@ -160,7 +160,7 @@ const ToolCard = ({ item, isSquare = false, index, isVisible }: { item: any, isS
         </div>
       ) : (
         /* Square layout for Assistant tools - Responsive padding and sizing */
-        <div className={`${isSm ? 'p-3' : 'p-2'} ${isLg ? 'p-4' : ''} h-full flex flex-col`}>
+        <div className={`${isSm ? 'p-2' : 'p-1'} ${isLg ? 'p-3' : ''} h-full flex flex-col`}>
           {/* Tool Header without icon */}
           <div className={`wes-symmetry ${isSm ? 'mb-3' : 'mb-2'} relative`}>
             <div className="">
@@ -196,12 +196,10 @@ const ToolCard = ({ item, isSquare = false, index, isVisible }: { item: any, isS
 
   if (isComingSoon) {
     return (
-      <div className="relative">
-        {/* Stable hover area to prevent flicker */}
-        <div className="absolute inset-0 -m-2 sm:-m-4 z-0 pointer-events-none" />
+      <div className="relative w-full h-full">
         <button
           type="button"
-          className="block wes-corners cursor-pointer relative z-10 w-full text-left"
+          className="block wes-corners cursor-pointer w-full text-left h-full"
           onClick={handleComingSoonClick}
         >
           {content}
@@ -212,16 +210,14 @@ const ToolCard = ({ item, isSquare = false, index, isVisible }: { item: any, isS
 
   return (
     <div
-      className="relative group cursor-pointer"
+      className="relative group cursor-pointer w-full h-full"
       onClick={() => {
         if (item.tool?.path) {
           navigate(item.tool.path);
         }
       }}
     >
-      {/* Stable hover area to prevent flicker */}
-      <div className="absolute inset-0 -m-2 sm:-m-4 z-0 pointer-events-none" />
-      <div className="block wes-corners relative z-10">
+      <div className="block wes-corners h-full">
         {content}
       </div>
     </div>
@@ -233,11 +229,7 @@ const ToolSelectorPage: React.FC = () => {
 
   // Content-responsive breakpoints and layout values
   const { isSm, isLg } = useContentResponsive();
-  const layoutDirection = useContentResponsiveDirection({
-    base: 'column',
-    lg: 'row',
-  });
-  // Assistant tools grid will rely on Tailwind's responsive classes instead of dynamic column calculation
+  // Remove layoutDirection hook, use Tailwind classes instead
 
   // Scroll to top when component mounts
   useEffect(() => {
@@ -250,65 +242,66 @@ const ToolSelectorPage: React.FC = () => {
     return tool.environments.includes(currentEnv);
   };
 
-  // Dynamic spacing based on content area
-  const containerPadding = isSm ? 'px-2' : 'px-1';
-  const containerSpacing = isLg ? 'pt-4 pb-2' : isSm ? 'pt-4 pb-2' : 'pt-3 pb-[0.333rem]';
+  // Dynamic spacing based on content area - fixed padding to prevent right shift
+  const containerPadding = isSm ? 'px-4' : 'px-2';
+  const containerSpacing = isLg ? 'pt-6 pb-4' : isSm ? 'pt-4 pb-2' : 'pt-3 pb-[0.333rem]';
   const sectionGap = isLg ? 'gap-8' : isSm ? 'gap-6' : 'gap-4';
   const itemGap = isSm ? 'gap-4' : 'gap-3';
   const topMargin = isSm ? 'mt-4' : 'mt-2';
-  const bottomMargin = layoutDirection === 'column' ? 'mb-8' : '';
+  const bottomMargin = ''; // layoutDirection === 'column' ? 'mb-8' : '';
 
   return (
-    <PageFadeIn className="min-h-[70vh] wes-texture relative overflow-hidden">
-      {/* Enhanced background decorative elements */}
-      <div className="absolute inset-0 bg-gradient-to-br from-wes-cream via-white to-wes-mint/20 opacity-60"></div>
-      <div className="absolute inset-0 wes-chevron-pattern opacity-30"></div>
-      {/* Top gradient bar removed to reduce visual clutter */}
+    <PageFadeIn className="min-h-[70vh] relative overflow-hidden">
+      {/* Simplified background - reduced layering to prevent conflicts */}
+      <div className="absolute inset-0 bg-gradient-to-br from-wes-cream via-white to-wes-mint/20 opacity-70"></div>
       
-      {/* Floating ornamental elements */}
-      <div className="absolute top-20 left-10 w-32 h-32 bg-wes-pink/10 rounded-full blur-3xl animate-parallax-float"></div>
-      <div className="absolute top-40 right-20 w-24 h-24 bg-wes-yellow/15 rounded-full blur-2xl animate-parallax-float" style={{ animationDelay: '2s' }}></div>
-      <div className="absolute bottom-20 left-1/4 w-40 h-40 bg-wes-lavender/10 rounded-full blur-3xl animate-parallax-float" style={{ animationDelay: '4s' }}></div>
+      {/* Single subtle pattern instead of multiple conflicting ones */}
+      <div className="absolute inset-0 opacity-20" style={{
+        backgroundImage: `
+          linear-gradient(45deg, transparent 40%, hsl(var(--wes-coral) / 0.08) 40%, hsl(var(--wes-coral) / 0.08) 60%, transparent 60%),
+          linear-gradient(-45deg, transparent 40%, hsl(var(--wes-mint) / 0.08) 40%, hsl(var(--wes-mint) / 0.08) 60%, transparent 60%)
+        `,
+        backgroundSize: '24px 24px',
+        backgroundPosition: '0 0, 12px 12px'
+      }}></div>
       
-      <div className={`container mx-auto ${containerPadding} ${containerSpacing} relative z-10`}>
-        {/* Content-Responsive Layout */}
-        <div 
-          className={`flex ${sectionGap} max-w-7xl mx-auto`}
-          style={{ 
-            flexDirection: layoutDirection,
-          }}
-        >
-          {/* Process Column */}
-          <div 
-            className="w-full lg:w-2/3"
-          >
-            <div className={`flex flex-col ${itemGap} ${topMargin}`}>
-              {processTools.map((tool, index) => (
-                <ToolCard
-                  key={tool.id}
-                  item={tool}
-                  index={index}
-                  isVisible={isToolVisible(tool.tool)}
-                />
-              ))}
+      {/* Reduced floating elements to prevent visual clutter */}
+      <div className="absolute top-20 right-20 w-32 h-32 bg-wes-pink/8 rounded-full blur-3xl animate-parallax-float"></div>
+      <div className="absolute bottom-20 left-1/4 w-40 h-40 bg-wes-lavender/8 rounded-full blur-3xl animate-parallax-float" style={{ animationDelay: '4s' }}></div>
+      
+      {/* Fixed container structure to prevent right shift */}
+      <div className={`w-full ${containerPadding} ${containerSpacing} relative z-10`}>
+        <div className="max-w-7xl mx-auto">
+          {/* Content-Responsive Layout */}
+          <div className={`flex flex-col c-lg:flex-row ${sectionGap}`}>
+            {/* Process Column */}
+            <div className="w-full c-lg:w-2/3">
+              <div className={`flex flex-col ${itemGap} ${topMargin}`}>
+                {processTools.map((tool, index) => (
+                  <FadeInSection key={tool.id} delayMs={index * 50}>
+                    <ToolCard
+                      item={tool}
+                      index={index}
+                      isVisible={isToolVisible(tool.tool)}
+                    />
+                  </FadeInSection>
+                ))}
+              </div>
             </div>
-          </div>
 
-          {/* Assistant Tools Column */}
-          <div 
-            className="w-full lg:w-1/3"
-          >
-            <div 
-              className={`grid ${itemGap} ${topMargin} grid-cols-1 sm:grid-cols-2`}
-            >
-              {assistantTools.map((tool, index) => (
-                <ToolCard
-                  key={tool.id}
-                  item={tool}
-                  isSquare
-                  isVisible={isToolVisible(tool.tool)}
-                />
-              ))}
+            {/* Assistant Tools Column */}
+            <div className="w-full c-lg:w-1/3">
+              <div className={`grid ${itemGap} ${topMargin} grid-cols-2`}>
+                {assistantTools.map((tool, index) => (
+                  <FadeInSection key={tool.id} delayMs={index * 50}>
+                    <ToolCard
+                      item={tool}
+                      isSquare
+                      isVisible={isToolVisible(tool.tool)}
+                    />
+                  </FadeInSection>
+                ))}
+              </div>
             </div>
           </div>
         </div>

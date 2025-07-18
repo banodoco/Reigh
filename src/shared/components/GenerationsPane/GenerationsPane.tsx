@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useContext } from 'react';
+import { useRenderLogger } from '@/shared/hooks/useRenderLogger';
 import { useProject } from "@/shared/contexts/ProjectContext";
 import { useGenerations, useDeleteGeneration } from '@/shared/hooks/useGenerations';
 import { useSlidingPane } from '@/shared/hooks/useSlidingPane';
@@ -23,6 +24,10 @@ export const GenerationsPane: React.FC = () => {
   const [page, setPage] = useState(1);
   const { data: allGenerations, isLoading, error } = useGenerations(selectedProjectId);
   const { data: shotsData } = useListShots(selectedProjectId);
+
+  // Log every render with item count & page for loop detection
+  useRenderLogger('GenerationsPane', { page, totalItems: allGenerations?.length });
+
   const lastAffectedShotContext = useContext(LastAffectedShotContext);
   const { lastAffectedShotId = null, setLastAffectedShotId = () => {} } = lastAffectedShotContext || {};
   const addImageToShotMutation = useAddImageToShot();
@@ -164,7 +169,7 @@ export const GenerationsPane: React.FC = () => {
         </div>
         <div className="flex-grow p-3 overflow-y-auto">
             {isLoading && (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                <div className="grid grid-cols-2 c-sm:grid-cols-3 c-md:grid-cols-4 c-lg:grid-cols-5 c-xl:grid-cols-6 gap-4">
                     {Array.from({ length: 12 }).map((_, idx) => (
                         <Skeleton key={idx} className="w-full aspect-square rounded-lg bg-zinc-700/60" />
                     ))}

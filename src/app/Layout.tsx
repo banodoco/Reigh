@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Outlet, useLocation, Navigate } from 'react-router-dom';
 import { GlobalHeader } from '@/shared/components/GlobalHeader';
 import TasksPane from '@/shared/components/TasksPane/TasksPane';
@@ -10,7 +10,6 @@ import { useContentResponsive } from '@/shared/hooks/useContentResponsive';
 import { supabase } from '@/integrations/supabase/client';
 import type { Session } from '@supabase/supabase-js';
 import { Loading } from '@/shared/components/ui/loading';
-import { GlobalProcessingWarning } from '@/shared/components/ProcessingWarnings';
 import SettingsModal from '@/shared/components/SettingsModal';
 import { useHeaderState } from '@/shared/contexts/ToolPageHeaderContext';
 
@@ -45,9 +44,9 @@ const Layout: React.FC = () => {
   // Settings modal state
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   
-  const handleOpenSettings = () => {
+  const handleOpenSettings = useCallback(() => {
     setIsSettingsModalOpen(true);
-  };
+  }, []);
 
   // Initialize session and subscribe to changes
   useEffect(() => {
@@ -108,12 +107,10 @@ const Layout: React.FC = () => {
       />
       
       <div
-        className="flex-grow relative z-10 transition-[margin,padding] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
+        className="flex-grow relative z-10 transition-[margin,padding] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] content-container"
         style={mainContentStyle}
       >
-        <GlobalProcessingWarning onOpenSettings={handleOpenSettings} />
-        
-        {header}
+         {header}
 
         <main className={cn("container mx-auto h-full overflow-y-auto", containerPadding, containerSpacing)}>
           <div className="min-h-full">

@@ -2,6 +2,7 @@ import React from 'react';
 import { Shot } from '@/types/shots';
 import VideoShotDisplay from './VideoShotDisplay'; // Assuming it's in the same directory
 import { Button } from '@/shared/components/ui/button';
+import { FadeInSection } from '@/shared/components/transitions';
 
 interface ShotListDisplayProps {
   shots: Shot[] | undefined | null;
@@ -29,13 +30,14 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      {shots.map((shot) => (
-        <VideoShotDisplay
-          key={shot.id}
-          shot={shot}
-          onSelectShot={() => onSelectShot(shot)}
-          currentProjectId={currentProjectId}
-        />
+      {shots.map((shot, index) => (
+        <FadeInSection key={shot.id} delayMs={index * 50}>
+          <VideoShotDisplay
+            shot={shot}
+            onSelectShot={() => onSelectShot(shot)}
+            currentProjectId={currentProjectId}
+          />
+        </FadeInSection>
       ))}
     </div>
   );

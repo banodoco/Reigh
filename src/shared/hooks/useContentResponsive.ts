@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { usePanes } from '@/shared/contexts/PanesContext';
 
 // Local fallback type definition (mirrors original)
@@ -33,16 +34,29 @@ export interface ContentBreakpoints {
 export const useContentResponsive = (): ContentBreakpoints => {
   const panes = usePanes();
 
-  // If PanesContext still provides contentBreakpoints, use them
-  // (preferred – accounts for locked panes width)
-  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-  if ((panes as any).contentBreakpoints) {
+  const [viewport, setViewport] = useState({
+    width: typeof window !== 'undefined' ? window.innerWidth : 1200,
+    height: typeof window !== 'undefined' ? window.innerHeight : 800,
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleResize = () => {
+      setViewport({ width: window.innerWidth, height: window.innerHeight });
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // If PanesContext provides contentBreakpoints, use them
+  if ((panes as any).contentBreakpoints && (panes as any).contentBreakpoints.contentWidth > 0) {
     return (panes as any).contentBreakpoints as ContentBreakpoints;
   }
 
-  // Fallback: derive simple viewport-based breakpoints so the hook never throws
-  const width = typeof window !== 'undefined' ? window.innerWidth : 1200;
-  const height = typeof window !== 'undefined' ? window.innerHeight : 800;
+  // Fallback to viewport-based breakpoints
+  const { width, height } = viewport;
 
   return {
     isSm: width >= 640,

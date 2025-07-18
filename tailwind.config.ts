@@ -9,6 +9,8 @@ export default {
 		"./src/**/*.{ts,tsx}",
 	],
 	prefix: "",
+	corePlugins: {
+	},
 	theme: {
 		container: {
 			center: true,
@@ -673,6 +675,7 @@ export default {
 	},
 	plugins: [
 		require("tailwindcss-animate"),
+		require('@tailwindcss/container-queries'),
 		// Custom plugin for text shadow
 		function({ addUtilities }: any) {
 			const newUtilities = {

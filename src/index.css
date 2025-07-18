@@ -581,11 +581,17 @@
   }
 
   .wes-tool-card {
-    @apply wes-vintage-card wes-ornate-frame wes-texture p-8;
+    @apply wes-vintage-card wes-ornate-frame;
     @apply transition-all duration-500 ease-out cursor-pointer;
     @apply hover:shadow-2xl hover:border-primary/20;
     position: relative;
     overflow: hidden;
+    background: white;
+    padding: 12px;
+    box-shadow: 
+      0 4px 8px hsl(var(--primary) / 0.1),
+      0 0 0 1px hsl(var(--primary) / 0.05),
+      inset 0 0 0 1px hsl(var(--primary) / 0.1);
   }
 
   .wes-tool-card::before {
@@ -608,15 +614,6 @@
 
   .wes-tool-card:hover::before {
     transform: scale(1);
-  }
-
-  /* Create a stable hover area with pseudo-element */
-  .wes-tool-card::after {
-    content: '';
-    position: absolute;
-    inset: -20px; /* Extend hover area beyond card boundaries */
-    z-index: -1;
-    pointer-events: none;
   }
 
   .wes-tool-card:hover {
@@ -1496,4 +1493,9 @@
 }
 .no-scrollbar::-webkit-scrollbar {
   display: none; /* Chrome, Safari, Opera */
+}
+
+/* Container Query root for main content */
+.content-container {
+  container-type: inline-size;
 }

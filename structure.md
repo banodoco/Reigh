@@ -45,6 +45,7 @@
 | **Tool: Video Travel** | [tool_video_travel.md](structure_detail/tool_video_travel.md) | Frame-accurate video generation workflow |
 | **Tool: Edit Travel** | [tool_edit_travel.md](structure_detail/tool_edit_travel.md) | Text-guided image transformations |
 | **Tool: Training Data** | [tool_training_data_helper.md](structure_detail/tool_training_data_helper.md) | Training video upload & segmentation |
+| **Debug Logging** | [debug_logging.md](structure_detail/debug_logging.md) | PerfDebug log helpers & profiling |
 
 This document is meant to serve as a comprehensive view of Reigh's architecture. 
 
@@ -57,7 +58,7 @@ This document is meant to serve as a comprehensive view of Reigh's architecture.
 | Layer | Technology | Purpose |
 |-------|------------|---------|
 | **Frontend** | React + Vite + TypeScript | SPA framework & build tooling |
-| **Styling** | TailwindCSS + shadcn-ui | Utility-first CSS & component library |
+| **Styling** | TailwindCSS + @tailwindcss/container-queries + shadcn-ui | Utility-first CSS, **container-query** responsive system (`c-*` variants) |
 | **Backend** | Supabase + Express.js | Database, auth, storage & background workers |
 | **Data** | PostgreSQL + Drizzle ORM | Primary database with type-safe ORM |
 | **AI/ML** | FAL-AI | Image generation services |
@@ -218,6 +219,26 @@ Headless-Wan2GP is the **primary worker responsible for _all_ AI tasks** — ima
 - Task flow details: see the [Task & Worker Lifecycle doc](structure_detail/task_worker_lifecycle.md).
 
 ## 5. Development Workflow
+
+### Debug Logging & Performance Profiling  
+Reigh has a lightweight, env-toggleable logging system you can turn on during any local run:
+
+```bash
+# One-shot
+VITE_DEBUG_LOGS=true npm run dev
+
+# Persistently for all dev runs
+echo "VITE_DEBUG_LOGS=true" >> .env.local
+```
+
+When enabled, everything tagged `PerfDebug:*` appears in the browser/Node console:
+
+* **React render counts** – `useRenderLogger()` flags runaway re-renders.
+* **Profiler timings** – global `<Profiler>` hooks into `logger.reactProfilerOnRender`.
+* **Task pollers** – durations + overlap warnings.
+* **WebSocket flush sizes** – see batched React-Query invalidations.
+
+Full API & examples live in [debug_logging.md](structure_detail/debug_logging.md).
 
 See [README.md](README.md) for:
 - Local environment setup (5-min quickstart)

@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { RealtimeChannel } from '@supabase/supabase-js';
+import { log } from '@/shared/lib/logger';
 
 export function useWebSocket(projectId: string | null) {
   const queryClient = useQueryClient();
@@ -26,6 +27,8 @@ export function useWebSocket(projectId: string | null) {
 
     if (!flushTimerRef.current) {
       flushTimerRef.current = setTimeout(() => {
+        log('PerfDebug:WebSocketFlush', `Flushing ${pendingInvalidationsRef.current.size} invalidations`);
+
         pendingInvalidationsRef.current.forEach((keyString) => {
           try {
             const parsedKey = JSON.parse(keyString);

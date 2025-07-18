@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useRenderLogger } from '@/shared/hooks/useRenderLogger';
 import ShotGroup from './ShotGroup';
 import NewGroupDropZone from './NewGroupDropZone';
 import { useListShots } from '@/shared/hooks/useShots';
@@ -25,6 +26,7 @@ export const ShotsPane: React.FC = () => {
   const pageSize = 5;
   const [currentPage, setCurrentPage] = useState(1);
 
+  useRenderLogger('ShotsPane', { shotsCount: shots?.length, currentPage });
   // Adjust currentPage if shots length changes (e.g., after create/delete)
   useEffect(() => {
     const totalPages = Math.max(1, Math.ceil((shots?.length ?? 0) / pageSize));
