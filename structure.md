@@ -257,6 +257,13 @@ See [README.md](README.md) for:
 - **Files Changed**: `src/shared/contexts/ProjectContext.tsx`
 - **Symptoms**: Dev server crashes on startup, Select components in GlobalHeader causing infinite loops
 
+### Fixed: Infinite Loop in VideoTravelToolPage Header Management (Jan 2025)
+- **Issue**: React "Maximum update depth exceeded" error in travel-between-images page from problematic `useLayoutEffect` cleanup
+- **Root Cause**: Cleanup function `() => clearHeader()` ran on every effect re-run, triggering state changes that caused dependencies to change infinitely
+- **Solution**: Separate header management from cleanup logic; create dedicated cleanup effect that only runs on unmount
+- **Files Changed**: `src/tools/travel-between-images/pages/VideoTravelToolPage.tsx`
+- **Symptoms**: Travel-between-images page crashes when loading, infinite `clearHeader` calls
+
 ---
 
 <div align="center">
