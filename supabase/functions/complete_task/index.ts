@@ -1,3 +1,5 @@
+/* eslint-disable */
+// @ts-nocheck
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 
@@ -175,32 +177,30 @@ serve(async (req) => {
       return new Response(`Database update failed: ${dbError?.message || 'Task not found or not in progress'}`, { status: 500 });
     }
 
-    // 10) Calculate and record task cost (only for service role)
-    if (isServiceRole) {
-      try {
-        console.log(`Triggering cost calculation for task ${task_id}...`);
-        
-        const costCalculationResponse = await fetch(`${supabaseUrl}/functions/v1/calculate-task-cost`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${serviceKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ task_id })
-        });
+    // 10) Calculate and record task cost after task completion
+    try {
+      console.log(`Triggering cost calculation for task ${task_id}...`);
+      
+      const costCalculationResponse = await fetch(`${supabaseUrl}/functions/v1/calculate-task-cost`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${serviceKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ task_id })
+      });
 
-        if (costCalculationResponse.ok) {
-          const costData = await costCalculationResponse.json();
-          console.log(`Cost calculation successful: $${(costData.cost / 100).toFixed(2)} for ${costData.duration_seconds}s`);
-        } else {
-          const errorText = await costCalculationResponse.text();
-          console.error(`Cost calculation failed: ${errorText}`);
-          // Don't fail the main request, just log the error
-        }
-      } catch (costError) {
-        console.error("Error triggering cost calculation:", costError);
+      if (costCalculationResponse.ok) {
+        const costData = await costCalculationResponse.json();
+        console.log(`Cost calculation successful: $${(costData.cost / 100).toFixed(2)} for ${costData.duration_seconds}s`);
+      } else {
+        const errorText = await costCalculationResponse.text();
+        console.error(`Cost calculation failed: ${errorText}`);
         // Don't fail the main request, just log the error
       }
+    } catch (costError) {
+      console.error("Error triggering cost calculation:", costError);
+      // Don't fail the main request, just log the error
     }
 
     // 11) Check if this task completes an orchestrator workflow
@@ -241,30 +241,28 @@ serve(async (req) => {
           } else {
             console.log(`Successfully marked orchestrator ${params.orchestrator_task_id_ref} as complete.`);
             
-            // Also calculate cost for the orchestrator task if using service role
-            if (isServiceRole) {
-              try {
-                console.log(`Triggering cost calculation for orchestrator task ${params.orchestrator_task_id_ref}...`);
-                
-                const orchCostResponse = await fetch(`${supabaseUrl}/functions/v1/calculate-task-cost`, {
-                  method: 'POST',
-                  headers: {
-                    'Authorization': `Bearer ${serviceKey}`,
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify({ task_id: params.orchestrator_task_id_ref })
-                });
+            // Also calculate cost for the orchestrator task in all cases
+            try {
+              console.log(`Triggering cost calculation for orchestrator task ${params.orchestrator_task_id_ref}...`);
+              
+              const orchCostResponse = await fetch(`${supabaseUrl}/functions/v1/calculate-task-cost`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${serviceKey}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ task_id: params.orchestrator_task_id_ref })
+              });
 
-                if (orchCostResponse.ok) {
-                  const orchCostData = await orchCostResponse.json();
-                  console.log(`Orchestrator cost calculation successful: $${(orchCostData.cost / 100).toFixed(2)} for ${orchCostData.duration_seconds}s`);
-                } else {
-                  const errorText = await orchCostResponse.text();
-                  console.error(`Orchestrator cost calculation failed: ${errorText}`);
-                }
-              } catch (orchCostError) {
-                console.error("Error triggering orchestrator cost calculation:", orchCostError);
+              if (orchCostResponse.ok) {
+                const orchCostData = await orchCostResponse.json();
+                console.log(`Orchestrator cost calculation successful: $${(orchCostData.cost / 100).toFixed(2)} for ${orchCostData.duration_seconds}s`);
+              } else {
+                const errorText = await orchCostResponse.text();
+                console.error(`Orchestrator cost calculation failed: ${errorText}`);
               }
+            } catch (orchCostError) {
+              console.error("Error triggering orchestrator cost calculation:", orchCostError);
             }
           }
         }
