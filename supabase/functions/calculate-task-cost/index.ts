@@ -19,12 +19,13 @@ function jsonResponse(body: any, status = 200) {
 
 // Calculate cost based on time duration and cost factors
 function calculateTaskCost(
-  baseCostCentsPerSecond: number,
+  baseCostPerSecond: number,
   durationSeconds: number,
   costFactors: any,
   taskParams: any
 ): number {
-  let totalCost = baseCostCentsPerSecond * durationSeconds;
+  // Convert from dollars to cents and calculate base cost
+  let totalCost = baseCostPerSecond * 100 * durationSeconds;
 
   if (costFactors) {
     // Resolution-based cost multiplier
@@ -158,7 +159,7 @@ serve(async (req) => {
 
     // Calculate cost based on configuration
     const cost = calculateTaskCost(
-      costConfig.base_cost_cents_per_second,
+      costConfig.base_cost_per_second,
       durationSeconds,
       costConfig.cost_factors,
       task.params
@@ -175,7 +176,7 @@ serve(async (req) => {
         metadata: {
           task_type: task.task_type,
           duration_seconds: durationSeconds,
-          base_cost_per_second: costConfig.base_cost_cents_per_second,
+          base_cost_per_second: costConfig.base_cost_per_second,
           cost_factors: costConfig.cost_factors,
           task_params: task.params,
           calculated_at: new Date().toISOString(),
@@ -192,7 +193,7 @@ serve(async (req) => {
       success: true,
       cost: cost,
       duration_seconds: durationSeconds,
-      base_cost_per_second: costConfig.base_cost_cents_per_second,
+      base_cost_per_second: costConfig.base_cost_per_second,
       cost_factors: costConfig.cost_factors,
       task_type: task.task_type,
       task_id: task.id

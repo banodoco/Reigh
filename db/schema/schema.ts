@@ -1,6 +1,6 @@
 // PostgreSQL schema for Supabase
 
-import { pgTable, text, uuid, timestamp, integer, index, pgEnum, jsonb, boolean } from 'drizzle-orm/pg-core';
+import { pgTable, text, uuid, timestamp, integer, index, pgEnum, jsonb, boolean, numeric, decimal } from 'drizzle-orm/pg-core';
 import { relations, sql } from 'drizzle-orm';
 
 // --- ENUMS ---
@@ -15,14 +15,14 @@ export const users = pgTable('users', {
   email: text('email'),
   apiKeys: jsonb('api_keys'), // Store API keys as JSONB
   settings: jsonb('settings'), // Store tool settings as JSONB
-  credits: integer('credits').default(0).notNull(), // Cached credit balance
+  credits: numeric('credits', { precision: 10, scale: 3 }).default('0').notNull(), // Cached credit balance - supports fractional values
 });
 
 export const creditsLedger = pgTable('credits_ledger', {
   id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   taskId: uuid('task_id'), // nullable for top-ups
-  amount: integer('amount').notNull(), // positive = top-up, negative = spend
+  amount: numeric('amount', { precision: 10, scale: 3 }).notNull(), // positive = top-up, negative = spend (supports fractional cents)
   type: creditLedgerTypeEnum('type').notNull(),
   metadata: jsonb('metadata'), // Store additional data (stripe session, reason, etc.)
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
@@ -157,7 +157,7 @@ export const taskCostConfigs = pgTable('task_cost_configs', {
   taskType: text('task_type').notNull().unique(),
   category: text('category').notNull(), // 'generation', 'processing', 'orchestration', 'utility'
   displayName: text('display_name').notNull(),
-  baseCostCentsPerSecond: integer('base_cost_cents_per_second').notNull(), // Base cost per second in cents
+  baseCostPerSecond: decimal('base_cost_per_second', { precision: 10, scale: 6 }).notNull().default('0.000278'), // Base cost per second in dollars
   costFactors: jsonb('cost_factors').default('{}'), // Flexible cost factors configuration
   isActive: boolean('is_active').default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
