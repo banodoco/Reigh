@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import MediaLightbox from "@/shared/components/MediaLightbox";
 import { Info } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/components/ui/tooltip";
+import { log } from "@/shared/lib/logger";
 
 // Props for individual timeline items
 interface TimelineItemProps {
@@ -25,6 +26,7 @@ interface TimelineItemProps {
   currentDragFrame: number | null;
   dragDistances: { distanceToPrev?: number; distanceToNext?: number } | null;
   maxAllowedGap: number;
+  originalFramePos: number;
 }
 
 // TimelineItem component - simplified without dnd-kit
@@ -43,32 +45,33 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
   currentDragFrame,
   dragDistances,
   maxAllowedGap,
+  originalFramePos,
 }) => {
   // Calculate position as pixel offset instead of percentage
   const pixelPosition = ((framePosition - fullMinFrames) / fullRange) * timelineWidth;
 
   // Apply drag offset if dragging
-  const finalX = isDragging && dragOffset ? pixelPosition + dragOffset.x : pixelPosition;
+  // To avoid double-counting we translate by the difference between the desired cursor offset
+  // and the shift already implied by the updated framePosition.
+  let finalX = pixelPosition;
+  if (isDragging && dragOffset) {
+    const originalPixel = ((originalFramePos - fullMinFrames) / fullRange) * timelineWidth;
+    const desiredPixel = originalPixel + dragOffset.x;
+    finalX = desiredPixel; // cursor-aligned
+  }
   const finalY = isDragging && dragOffset ? dragOffset.y : 0;
-  
+
   // Use current drag frame for display if dragging, otherwise use original position
   const displayFrame = isDragging && currentDragFrame !== null ? currentDragFrame : framePosition;
 
   // Calculate position in percentage of the full range
-  const leftPercent = ((framePosition - fullMinFrames) / fullRange) * 100;
-  
-  // Apply drag offset if dragging
-  let styleLeft: string | number = `${leftPercent}%`;
-  if (isDragging && dragOffset) {
-    const pixelPosition = (leftPercent / 100) * timelineWidth;
-    styleLeft = pixelPosition + dragOffset.x;
-  }
+  const leftPercent = (finalX / timelineWidth) * 100;
 
   return (
     <div
       style={{
         position: 'absolute',
-        left: isDragging && dragOffset ? `${styleLeft}px` : `${leftPercent}%`,
+        left: `${leftPercent}%`,
         top: '50%',
         transform: 'translate(-50%, -50%)',
         transition: isDragging ? 'none' : 'all 0.2s ease-out',
@@ -88,10 +91,10 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
         {isDragging && dragDistances && (
           <>
             {dragDistances.distanceToPrev !== undefined && (
-              <div 
+              <div
                 className={`absolute left-0 top-1/2 -translate-y-1/2 -translate-x-full text-xs font-medium px-1 py-0.5 rounded mr-1 ${
-                  dragDistances.distanceToPrev > maxAllowedGap 
-                    ? 'bg-red-500/90 text-white' 
+                  dragDistances.distanceToPrev > maxAllowedGap
+                    ? 'bg-red-500/90 text-white'
                     : 'bg-primary/90 text-primary-foreground'
                 }`}
     >
@@ -99,10 +102,10 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
               </div>
             )}
             {dragDistances.distanceToNext !== undefined && (
-              <div 
+              <div
                 className={`absolute right-0 top-1/2 -translate-y-1/2 translate-x-full text-xs font-medium px-1 py-0.5 rounded ml-1 ${
-                  dragDistances.distanceToNext > maxAllowedGap 
-                    ? 'bg-red-500/90 text-white' 
+                  dragDistances.distanceToNext > maxAllowedGap
+                    ? 'bg-red-500/90 text-white'
                     : 'bg-primary/90 text-primary-foreground'
                 }`}
               >
@@ -111,11 +114,11 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
             )}
           </>
         )}
-        
+
         <div className={`relative w-24 h-24 border-2 ${isDragging ? "border-primary/50" : "border-primary"} rounded-lg overflow-hidden`}>
-          <img 
-            src={getDisplayUrl(image.imageUrl)} 
-            alt={`Frame ${displayFrame}`} 
+          <img
+            src={getDisplayUrl(image.imageUrl)}
+            alt={`Frame ${displayFrame}`}
             className="w-full h-full object-cover"
             draggable={false}
           />
@@ -143,15 +146,15 @@ export interface TimelineProps {
 /**
  * Refactored Timeline component with simplified drag and drop
  */
-const Timeline: React.FC<TimelineProps> = ({ 
-  images, 
-  frameSpacing, 
-  contextFrames, 
-  onImageReorder, 
-  onImageSaved, 
-  shotId, 
-  onContextFramesChange, 
-  onFramePositionsChange 
+const Timeline: React.FC<TimelineProps> = ({
+  images,
+  frameSpacing,
+  contextFrames,
+  onImageReorder,
+  onImageSaved,
+  shotId,
+  onContextFramesChange,
+  onFramePositionsChange
 }) => {
   // Core state
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
@@ -168,6 +171,9 @@ const Timeline: React.FC<TimelineProps> = ({
     currentY: number;
     originalFramePos: number;
     isCommandPressed: boolean;
+    isOptionPressed: boolean;
+    leftGap: number; // gap to previous frame at drag start
+    rightGap: number; // gap to next frame at drag start
   }>({
     isDragging: false,
     activeId: null,
@@ -177,13 +183,16 @@ const Timeline: React.FC<TimelineProps> = ({
     currentY: 0,
     originalFramePos: 0,
     isCommandPressed: false,
+    isOptionPressed: false,
+    leftGap: 0,
+    rightGap: 0,
   });
-  
+
   // Refs
   const timelineRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const initialContextFrames = useRef(contextFrames);
-  
+
   // Frame positions state
   const [framePositions, setFramePositions] = useState<Map<string, number>>(() => {
     const stored = localStorage.getItem(`timelineFramePositions_${shotId}`);
@@ -232,16 +241,16 @@ const Timeline: React.FC<TimelineProps> = ({
     const staticMax = Math.max(...positions, 0);
     const staticMin = Math.min(...positions, 0);
     const padding = 30;
-    
+
     const fullMax = Math.max(60, staticMax + padding);
     const fullMin = Math.min(0, staticMin - padding);
     const fullRange = fullMax - fullMin;
-    
+
     return { fullMin, fullMax, fullRange };
   }, [framePositions]);
-  
+
   const { fullMin, fullMax, fullRange } = getTimelineDimensions();
-  
+
   // Calculate zoom viewport
   const getZoomViewport = useCallback(() => {
     const zoomedRange = fullRange / zoomLevel;
@@ -250,14 +259,14 @@ const Timeline: React.FC<TimelineProps> = ({
       fullMin + halfZoomedRange,
       Math.min(fullMax - halfZoomedRange, zoomCenter)
     );
-    
+
     return {
       min: clampedCenter - halfZoomedRange,
       max: clampedCenter + halfZoomedRange,
       range: zoomedRange
     };
   }, [fullMin, fullMax, fullRange, zoomLevel, zoomCenter]);
-  
+
   const viewport = getZoomViewport();
 
   // Calculate max gap based on context frames
@@ -273,10 +282,24 @@ const Timeline: React.FC<TimelineProps> = ({
       .map(([_, pos]) => pos);
     positions.push(0); // Always include frame 0
     positions.sort((a, b) => a - b);
-    
+
     const maxGap = calculateMaxGap();
+
+    // Debug: log every validation attempt
+    log('TimelineFrameLimitIssue', 'validateGaps check', { excludeId, maxGap, positions });
+
     for (let i = 1; i < positions.length; i++) {
-      if (positions[i] - positions[i - 1] > maxGap) return false;
+      const diff = positions[i] - positions[i - 1];
+      if (diff > maxGap) {
+        log('TimelineFrameLimitIssue', 'Gap violation detected', {
+          index: i,
+          prevFrame: positions[i - 1],
+          nextFrame: positions[i],
+          diff,
+          maxGap,
+        });
+        return false;
+      }
     }
     return true;
   }, [calculateMaxGap]);
@@ -290,12 +313,12 @@ const Timeline: React.FC<TimelineProps> = ({
   // Find closest valid position considering constraints
   const findClosestValidPosition = useCallback((targetFrame: number, activeId: string): number => {
     const originalPos = framePositions.get(activeId) ?? 0;
-    
+
     // Helper to validate position with frame 0 reassignment logic
     const validateWithFrame0Logic = (testFrame: number): boolean => {
       const testMap = new Map(framePositions);
       testMap.set(activeId, testFrame);
-      
+
       // If we're moving frame 0, simulate the reassignment
       if (originalPos === 0 && testFrame !== 0) {
         // Find what would become the new frame 0
@@ -306,24 +329,24 @@ const Timeline: React.FC<TimelineProps> = ({
           testMap.set(nearest[0], 0);
         }
       }
-      
+
       return validateGaps(testMap);
     };
-    
+
     // First check if target is valid
     if (validateWithFrame0Logic(targetFrame)) {
       return targetFrame;
     }
-    
+
     // Binary search for closest valid position
     const direction = targetFrame > originalPos ? 1 : -1;
     let low = Math.min(originalPos, targetFrame);
     let high = Math.max(originalPos, targetFrame);
     let best = originalPos;
-    
+
     while (low <= high) {
       const mid = Math.round((low + high) / 2);
-      
+
       if (validateWithFrame0Logic(mid)) {
         best = mid;
         if (direction > 0) {
@@ -339,7 +362,7 @@ const Timeline: React.FC<TimelineProps> = ({
         }
       }
     }
-    
+
     return best;
   }, [framePositions, validateGaps]);
 
@@ -348,10 +371,17 @@ const Timeline: React.FC<TimelineProps> = ({
     e.preventDefault();
     const container = containerRef.current;
     if (!container) return;
-    
+
     const rect = container.getBoundingClientRect();
+
     const framePos = framePositions.get(imageId) ?? 0;
-    
+
+    // Determine original gaps to neighbours
+    const sorted = [...framePositions.entries()].sort((a,b)=>a[1]-b[1]);
+    const idx = sorted.findIndex(([id])=>id===imageId);
+    const prevPos = idx > 0 ? sorted[idx-1][1] : 0;
+    const nextPos = idx < sorted.length-1 ? sorted[idx+1][1] : framePos + 9999; // Use large default for last item
+
     setDragState({
       isDragging: true,
       activeId: imageId,
@@ -360,7 +390,10 @@ const Timeline: React.FC<TimelineProps> = ({
       currentX: e.clientX,
       currentY: e.clientY,
       originalFramePos: framePos,
-      isCommandPressed: e.metaKey, // Detect Command key on Mac (or Ctrl on Windows)
+      isCommandPressed: e.metaKey,
+      isOptionPressed: e.altKey,
+      leftGap: framePos - prevPos,
+      rightGap: nextPos - framePos,
     });
   }, [framePositions]);
 
@@ -371,39 +404,49 @@ const Timeline: React.FC<TimelineProps> = ({
       ...prev,
       currentX: e.clientX,
       currentY: e.clientY,
+      isCommandPressed: e.metaKey,
+      isOptionPressed: e.altKey,
     }));
   }, [dragState.isDragging]);
 
   const handleMouseUp = useCallback((e: MouseEvent) => {
     if (!dragState.isDragging || !dragState.activeId || !containerRef.current) return;
-    
+
     const container = containerRef.current;
     const rect = container.getBoundingClientRect();
     const containerWidth = rect.width;
-    
+
     // Calculate the pixel position where we're dropping
     const dragOffsetX = dragState.currentX - dragState.startX;
     const originalPixelPos = ((dragState.originalFramePos - fullMin) / fullRange) * containerWidth;
     const targetPixelPos = originalPixelPos + dragOffsetX;
-    
+
     // Convert to frame number and constrain
     const targetFrame = Math.max(0, pixelToFrame(targetPixelPos, containerWidth));
     const validFrame = findClosestValidPosition(targetFrame, dragState.activeId);
-    
+
     // Apply the final positions from the dynamic preview
     // Get the current dynamic positions which already include Command+drag logic
     const currentDynamic = dynamicPositions();
-    
+
     // Update the dragged item to its final valid position
     const updatedMap = new Map(currentDynamic);
     const originalPos = framePositions.get(dragState.activeId) ?? 0;
-    
-    if (!dragState.isCommandPressed) {
+
+    // Debug: log drop details and tentative updated positions
+    log('TimelineFrameLimitIssue', 'handleMouseUp drop result', {
+      activeId: dragState.activeId,
+      originalPos,
+      validFrame,
+      updatedPositions: Array.from(updatedMap.entries()),
+    });
+
+    if (!dragState.isCommandPressed && !dragState.isOptionPressed) {
       // For normal drag, handle swapping and frame 0 reassignment logic
       const targetEntry = [...framePositions.entries()].find(
         ([id, pos]) => id !== dragState.activeId && pos === validFrame
       );
-      
+
       if (targetEntry) {
         // Swap positions
         updatedMap.set(targetEntry[0], originalPos);
@@ -419,12 +462,21 @@ const Timeline: React.FC<TimelineProps> = ({
         updatedMap.set(dragState.activeId, validFrame);
       }
     } else {
-      // For Command+drag, just ensure the dragged item is at the valid position
-      updatedMap.set(dragState.activeId, validFrame);
+      // For Command+drag or Option+drag...
+      // NEW: guarantee that a frame always occupies position 0 after a Cmd-drag operation
+      const hasFrameZero = Array.from(updatedMap.values()).some(v => v === 0);
+      if (!hasFrameZero) {
+        const nearest = [...updatedMap.entries()]
+          .filter(([id]) => id !== dragState.activeId)
+          .sort((a, b) => a[1] - b[1])[0];
+        if (nearest) {
+          updatedMap.set(nearest[0], 0);
+        }
+      }
     }
-    
+
     setFramePositions(updatedMap);
-    
+
     // Update order
     const newOrder = [...images]
       .sort((a, b) => {
@@ -433,9 +485,9 @@ const Timeline: React.FC<TimelineProps> = ({
         return fa - fb;
       })
       .map(img => img.shotImageEntryId);
-    
+
     onImageReorder(newOrder);
-    
+
     // Reset drag state
     setDragState({
       isDragging: false,
@@ -446,6 +498,9 @@ const Timeline: React.FC<TimelineProps> = ({
       currentY: 0,
       originalFramePos: 0,
       isCommandPressed: false,
+      isOptionPressed: false,
+      leftGap: 0,
+      rightGap: 0,
     });
   }, [dragState, framePositions, fullMin, fullRange, pixelToFrame, findClosestValidPosition, images, onImageReorder]);
 
@@ -467,12 +522,12 @@ const Timeline: React.FC<TimelineProps> = ({
       initialContextFrames.current = contextFrames;
       return;
     }
-    
+
     const maxGap = calculateMaxGap();
     const sortedPositions = [...framePositions.entries()]
       .map(([id, pos]) => ({ id, pos }))
       .sort((a, b) => a.pos - b.pos);
-    
+
     let needsAdjustment = false;
     for (let i = 0; i < sortedPositions.length - 1; i++) {
       const currentGap = sortedPositions[i + 1].pos - sortedPositions[i].pos;
@@ -481,7 +536,7 @@ const Timeline: React.FC<TimelineProps> = ({
         break;
       }
     }
-    
+
     if (needsAdjustment) {
       const adjustedPositions = new Map(framePositions);
       let currentPos = 0;
@@ -491,11 +546,11 @@ const Timeline: React.FC<TimelineProps> = ({
           currentPos += Math.min(maxGap, frameSpacing);
         }
       }
-      
+
       setFramePositions(adjustedPositions);
       toast.info(`Timeline positions auto-adjusted due to context frame changes (max gap: ${maxGap} frames)`);
     }
-    
+
     initialContextFrames.current = contextFrames;
   }, [contextFrames, calculateMaxGap, framePositions, frameSpacing]);
 
@@ -505,15 +560,15 @@ const Timeline: React.FC<TimelineProps> = ({
     const sortedPositions = [...positionsToUse.entries()]
       .map(([id, pos]) => ({ id, pos }))
       .sort((a, b) => a.pos - b.pos);
-    
+
     const pairs = [];
     for (let i = 0; i < sortedPositions.length - 1; i++) {
       const startFrame = sortedPositions[i].pos;
       const endFrame = sortedPositions[i + 1].pos;
       const pairFrames = endFrame - startFrame;
-      
+
       const generationStart = (i === 0)
-        ? startFrame 
+        ? startFrame
         : (sortedPositions[i].pos - contextFrames);
 
       pairs.push({
@@ -526,7 +581,7 @@ const Timeline: React.FC<TimelineProps> = ({
         contextEnd: endFrame,
       });
     }
-    
+
     return pairs;
   }, [framePositions, contextFrames]);
 
@@ -545,7 +600,7 @@ const Timeline: React.FC<TimelineProps> = ({
   const handleTimelineDoubleClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
-    
+
     const relativeX = e.clientX - rect.left;
     const clickFrame = pixelToFrame(relativeX, rect.width);
     setZoomLevel(3);
@@ -567,6 +622,8 @@ const Timeline: React.FC<TimelineProps> = ({
     ? { x: dragState.currentX - dragState.startX, y: 0 }
     : null;
   
+  const isModifierDrag = dragState.isCommandPressed || dragState.isOptionPressed;
+
   const currentDragFrame = dragState.isDragging && containerRef.current && dragState.activeId
     ? (() => {
         const rect = containerRef.current.getBoundingClientRect();
@@ -574,13 +631,51 @@ const Timeline: React.FC<TimelineProps> = ({
         const dragOffsetX = dragState.currentX - dragState.startX;
         const originalPixelPos = ((dragState.originalFramePos - fullMin) / fullRange) * containerWidth;
         const targetPixelPos = originalPixelPos + dragOffsetX;
-        const targetFrame = Math.max(0, pixelToFrame(targetPixelPos, containerWidth));
+        let targetFrame = Math.max(0, pixelToFrame(targetPixelPos, containerWidth));
+        
+        // When using modifiers, we don't snap to items for swapping.
+        if (isModifierDrag) {
+          // However, if ONLY ONE modifier is pressed, we must constrain the drag
+          // relative to the "anchored" part of the timeline.
+          const isPushRightOnly = dragState.isCommandPressed && !dragState.isOptionPressed;
+          const isPushLeftOnly = dragState.isOptionPressed && !dragState.isCommandPressed;
+          
+          if (isPushRightOnly || isPushLeftOnly) {
+            const sorted = [...framePositions.entries()].sort((a,b) => a[1]-b[1]);
+            const activeIndex = sorted.findIndex(([id]) => id === dragState.activeId);
+            const maxGap = calculateMaxGap();
+
+            if (isPushRightOnly && activeIndex > 0) {
+              const prevItem = sorted[activeIndex - 1];
+              const minFrame = prevItem[1] + dragState.leftGap;
+              const maxFrame = prevItem[1] + maxGap;
+              targetFrame = Math.max(minFrame, Math.min(targetFrame, maxFrame));
+            } else if (isPushLeftOnly && activeIndex < sorted.length - 1) {
+              const nextItem = sorted[activeIndex + 1];
+              const minFrameGlobal = Math.max(0, nextItem[1] - maxGap);
+              const prevItemOpt = activeIndex > 0 ? sorted[activeIndex - 1] : null;
+              const minFrameOriginal = prevItemOpt ? prevItemOpt[1] + dragState.leftGap : 0;
+              const minFrame = Math.max(minFrameGlobal, minFrameOriginal);
+              const maxFrame = nextItem[1] - dragState.rightGap;
+              targetFrame = Math.max(minFrame, Math.min(targetFrame, maxFrame));
+            }
+          }
+          
+          // If both modifiers are held, we may still exceed max gap relative to frame 0. Clamp using gap validation.
+          const isBothModifiers = dragState.isCommandPressed && dragState.isOptionPressed;
+          if (isBothModifiers) {
+            targetFrame = findClosestValidPosition(targetFrame, dragState.activeId);
+          }
+          return targetFrame;
+        }
+
+        // For a normal drag, find the closest valid spot to enable snapping.
         return findClosestValidPosition(targetFrame, dragState.activeId);
       })()
     : null;
 
-  // Identify swap target
-  const swapTargetId = currentDragFrame !== null && dragState.activeId
+  // Identify swap target. This should ONLY happen on a normal drag.
+  const swapTargetId = !isModifierDrag && currentDragFrame !== null && dragState.activeId
     ? [...framePositions.entries()].find(
         ([id, pos]) => id !== dragState.activeId && pos === currentDragFrame
       )?.[0] ?? null
@@ -592,7 +687,7 @@ const Timeline: React.FC<TimelineProps> = ({
         const originalPos = framePositions.get(dragState.activeId) ?? 0;
         const testMap = new Map(framePositions);
         testMap.set(dragState.activeId, currentDragFrame);
-        
+
         // If we're moving frame 0, simulate the reassignment
         if (originalPos === 0 && currentDragFrame !== 0) {
           const nearest = [...testMap.entries()]
@@ -602,20 +697,20 @@ const Timeline: React.FC<TimelineProps> = ({
             testMap.set(nearest[0], 0);
           }
         }
-        
+
         // Now calculate distances based on the simulated positions
         const others = [...testMap.entries()]
           .filter(([id]) => id !== dragState.activeId)
           .map(([_, pos]) => pos)
           .sort((a, b) => a - b);
-        
+
         let prev: number | undefined;
         let next: number | undefined;
         others.forEach(pos => {
           if (pos < currentDragFrame) prev = pos;
           if (pos > currentDragFrame && next === undefined) next = pos;
         });
-        
+
         return {
           distanceToPrev: prev !== undefined ? currentDragFrame - prev : undefined,
           distanceToNext: next !== undefined ? next - currentDragFrame : undefined,
@@ -632,65 +727,112 @@ const Timeline: React.FC<TimelineProps> = ({
     if (!dragState.isDragging || !dragState.activeId || currentDragFrame === null) {
       return framePositions;
     }
-    
+
     const newPositions = new Map(framePositions);
     const originalPos = framePositions.get(dragState.activeId) ?? 0;
-    const frameDiff = currentDragFrame - originalPos;
-    
-    if (dragState.isCommandPressed && frameDiff !== 0) {
-      // Command+drag: Push all subsequent items forward/backward in real-time
-      const sortedEntries = [...framePositions.entries()]
-        .sort((a, b) => a[1] - b[1]);
-      
-      // Find the index of the dragged item in the sorted list
-      const draggedIndex = sortedEntries.findIndex(([id]) => id === dragState.activeId);
-      
-      if (draggedIndex !== -1) {
-        // Move the dragged item
-        newPositions.set(dragState.activeId, currentDragFrame);
-        
-        // Calculate max gap constraint
-        const maxGap = calculateMaxGap();
+    let frameDiff = currentDragFrame - originalPos; // raw cursor diff
+
+    // Modifier-driven push logic ------------------------------------
+    if ((dragState.isCommandPressed || dragState.isOptionPressed) && frameDiff !== 0) {
+      // 1. Tentatively move dragged item
+      newPositions.set(dragState.activeId, currentDragFrame);
+
+      // 2. Ensure something occupies frame 0 if the first frame moves away
+      if (originalPos === 0 && currentDragFrame !== 0) {
+        const nearest = [...newPositions.entries()]
+          .filter(([id]) => id !== dragState.activeId)
+          .sort((a, b) => a[1] - b[1])[0];
+        if (nearest) newPositions.set(nearest[0], 0);
+      }
+
+      // 3. Sort for deterministic order
+      const sortedEntries = [...newPositions.entries()].sort((a, b) => a[1] - b[1]);
+      const draggedIdx = sortedEntries.findIndex(([id]) => id === dragState.activeId);
+      const maxGap = calculateMaxGap();
+
+      // Helper: push a neighbour while respecting min/max.
+      const clamp = (value: number, lo: number, hi: number) => Math.max(lo, Math.min(value, hi));
+
+      // ---- RIGHT PUSH (Cmd) ----
+      if (dragState.isCommandPressed && draggedIdx !== -1) {
         const isMovingBackward = frameDiff < 0;
-        
-        // Push all items that come after the dragged item
-        let lastPosition = currentDragFrame;
-        for (let i = draggedIndex + 1; i < sortedEntries.length; i++) {
-          const [id, currentPos] = sortedEntries[i];
-          let newPos = currentPos + frameDiff;
-          
-          // Apply constraints based on direction
+        let lastPos = currentDragFrame;
+        for (let i = draggedIdx + 1; i < sortedEntries.length; i++) {
+          const [id, curPos] = sortedEntries[i];
+          let newPos = curPos + frameDiff;
+
           if (isMovingBackward) {
-            // When moving backward, be more permissive to allow the backward flow
-            // But still ensure minimum spacing and don't go below 0
-            const minAllowedPos = Math.max(0, lastPosition + 1);
-            const maxAllowedPos = lastPosition + maxGap;
-            
-            // For backward movement, prioritize the intended position if it's reasonable
-            if (newPos >= minAllowedPos) {
-              newPos = Math.min(newPos, maxAllowedPos);
-            } else {
-              newPos = minAllowedPos;
-            }
+            const minPos = Math.max(0, lastPos + 1);
+            const maxPos = lastPos + maxGap;
+            newPos = clamp(newPos, minPos, maxPos);
           } else {
-            // Forward movement: standard constraints
-            const minAllowedPos = lastPosition + 1;
-            const maxAllowedPos = lastPosition + maxGap;
-            newPos = Math.max(minAllowedPos, Math.min(maxAllowedPos, newPos));
+            const minPos = lastPos + 1;
+            const maxPos = lastPos + maxGap;
+            newPos = clamp(newPos, minPos, maxPos);
           }
-          
-          newPos = Math.max(0, newPos); // Never go below frame 0
+
           newPositions.set(id, newPos);
-          lastPosition = newPos;
+          lastPos = newPos;
         }
       }
+
+      // ---- LEFT PUSH (Opt) ----
+      if (dragState.isOptionPressed && draggedIdx !== -1) {
+        const isMovingForward = frameDiff > 0;
+        let nextPos = currentDragFrame;
+        for (let i = draggedIdx - 1; i >= 0; i--) {
+          const [id, curPos] = sortedEntries[i];
+          if (curPos === 0 && id !== dragState.activeId) break; // keep frame 0 pinned
+
+          let newPos = curPos + frameDiff;
+          if (isMovingForward) {
+            const maxPos = nextPos - 1;
+            const minPos = clamp(nextPos - maxGap, 0, maxPos);
+            newPos = clamp(newPos, minPos, maxPos);
+          } else {
+            const maxPos = nextPos - 1;
+            const minPos = clamp(nextPos - maxGap, 0, maxPos);
+            newPos = clamp(newPos, minPos, maxPos);
+          }
+
+          newPositions.set(id, newPos);
+          nextPos = newPos;
+        }
+      }
+
+      // 4. Post-push correction to ensure original gaps are preserved
+      const updated = [...newPositions.entries()].sort((a, b) => a[1] - b[1]);
+      const idx = updated.findIndex(([id]) => id === dragState.activeId);
+      if (idx !== -1) {
+        const draggedPosNow = updated[idx][1];
+        // Left gap preserve
+        if (idx > 0) {
+          const prevPos = updated[idx - 1][1];
+          if (draggedPosNow - prevPos < dragState.leftGap) {
+            newPositions.set(dragState.activeId, prevPos + dragState.leftGap);
+          }
+        }
+        // Right gap preserve
+        if (idx < updated.length - 1) {
+          const nextPos = updated[idx + 1][1];
+          if (nextPos - draggedPosNow < dragState.rightGap) {
+            newPositions.set(dragState.activeId, nextPos - dragState.rightGap);
+          }
+        }
+      }
+
+      // 5. Dual-modifier: final global clamp
+      if (dragState.isCommandPressed && dragState.isOptionPressed) {
+        const adjusted = findClosestValidPosition(newPositions.get(dragState.activeId) ?? currentDragFrame, dragState.activeId);
+        newPositions.set(dragState.activeId, adjusted);
+      }
     } else {
-      // Normal drag: only move the dragged item
+      // Plain drag – use snapping
       newPositions.set(dragState.activeId, currentDragFrame);
     }
-    
+
     return newPositions;
-  }, [framePositions, dragState.isDragging, dragState.activeId, dragState.isCommandPressed, currentDragFrame, calculateMaxGap]);
+  }, [framePositions, dragState.isDragging, dragState.activeId, dragState.isCommandPressed, dragState.isOptionPressed, currentDragFrame, calculateMaxGap, findClosestValidPosition]);
 
   // Prepare data
   const currentPositions = dynamicPositions();
@@ -733,14 +875,6 @@ const Timeline: React.FC<TimelineProps> = ({
               <Label htmlFor="contextFrames" className="text-sm font-medium">
                 Context Frames: {contextFrames}
               </Label>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Info className="h-3 w-3 text-muted-foreground cursor-help hover:text-foreground transition-colors" />
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p><strong>Tip:</strong> Hold Cmd while dragging to push all following items forward</p>
-                </TooltipContent>
-              </Tooltip>
             </div>
             <Slider
               id="contextFrames"
@@ -752,8 +886,21 @@ const Timeline: React.FC<TimelineProps> = ({
               className="w-full"
             />
           </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Info className="h-5 w-5 text-muted-foreground cursor-help hover:text-foreground transition-colors" />
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="mb-1 font-semibold">Timeline Drag Shortcuts</p>
+              <ul className="list-disc list-inside text-sm space-y-1">
+                <li><kbd className="font-mono">⌘</kbd> – push frames <span className="font-medium">to the right</span></li>
+                <li><kbd className="font-mono">⌥</kbd> – push frames <span className="font-medium">to the left</span></li>
+                <li><kbd className="font-mono">⌘ + ⌥</kbd> – shift the <span className="font-medium">entire timeline</span></li>
+              </ul>
+            </TooltipContent>
+          </Tooltip>
         </div>
-        
+
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={handleZoomReset} disabled={zoomLevel <= 1}>
             <span className="text-xs">⤺</span> Zoom Out Fully
@@ -807,26 +954,53 @@ const Timeline: React.FC<TimelineProps> = ({
           id="timeline-container"
           className="relative h-32 mb-8"
           onDoubleClick={handleTimelineDoubleClick}
-          style={{ 
-            width: zoomLevel > 1 ? `${zoomLevel * 100}%` : '100%', 
+          style={{
+            width: zoomLevel > 1 ? `${zoomLevel * 100}%` : '100%',
             minWidth: "100%",
             userSelect: 'none',
           }}
         >
           {/* Pair visualizations */}
           {pairInfo.map((pair, index) => {
-            // For pair visualization, we need to get the actual positions from our dynamic map
-            const sortedDynamicPositions = [...currentPositions.entries()]
-              .sort((a, b) => a[1] - b[1]);
-            
-            const actualStartFrame = sortedDynamicPositions[index]?.[1] ?? pair.startFrame;
-            const actualEndFrame = sortedDynamicPositions[index + 1]?.[1] ?? pair.endFrame;
+            // Build sorted positions array with id for pixel calculations
+            const sortedDynamicPositions = [...currentPositions.entries()].sort((a, b) => a[1] - b[1]);
+
+            const [startEntry, endEntry] = [sortedDynamicPositions[index], sortedDynamicPositions[index + 1]];
+
+            const getPixel = (entry: [string, number] | undefined): number => {
+              if (!entry) return 0;
+              const [id, framePos] = entry;
+              // Base pixel from current framePos (may already be quantized)
+              const basePixel = ((framePos - fullMin) / fullRange) * containerWidth;
+
+              // When actively dragging this item, align to cursor using its ORIGINAL start pixel plus dragOffset
+              if (dragState.isDragging && id === dragState.activeId && dragOffset) {
+                const originalPixel = ((dragState.originalFramePos - fullMin) / fullRange) * containerWidth;
+                return originalPixel + dragOffset.x;
+              }
+
+              return basePixel;
+            };
+
+            const startPixel = getPixel(startEntry);
+            const endPixel = getPixel(endEntry);
+
+            const actualStartFrame = startEntry?.[1] ?? pair.startFrame;
+            const actualEndFrame = endEntry?.[1] ?? pair.endFrame;
             const actualFrames = actualEndFrame - actualStartFrame;
+
+            const startPercent = (startPixel / containerWidth) * 100;
+            const endPercent = (endPixel / containerWidth) * 100;
+
+            const contextStartFrameUnclipped = actualEndFrame - contextFrames;
+            const contextStartFrame = Math.max(0, contextStartFrameUnclipped);
+            const visibleContextFrames = Math.max(0, actualEndFrame - contextStartFrame);
             
-            const startPercent = ((actualStartFrame - fullMin) / fullRange) * 100;
-            const endPercent = ((actualEndFrame - fullMin) / fullRange) * 100;
-            const contextStartPercent = ((actualEndFrame - contextFrames - fullMin) / fullRange) * 100;
-            const generationStartPercent = ((pair.generationStart - fullMin) / fullRange) * 100;
+            const contextStartPixel = ((contextStartFrame - fullMin) / fullRange) * containerWidth;
+            const contextStartPercent = (contextStartPixel / containerWidth) * 100;
+
+            const generationStartPixel = ((pair.generationStart - fullMin) / fullRange) * containerWidth;
+            const generationStartPercent = (generationStartPixel / containerWidth) * 100;
 
             const pairColorSchemes = [
               { bg: 'bg-blue-50', border: 'border-blue-300', context: 'bg-blue-200/60', text: 'text-blue-700', line: 'bg-blue-400' },
@@ -843,33 +1017,36 @@ const Timeline: React.FC<TimelineProps> = ({
                 {/* Main pair region */}
                 <div
                   className={`absolute top-0 bottom-0 ${colorScheme.bg} ${colorScheme.border} border-l-2 border-r-2 border-solid pointer-events-none`}
-              style={{
+                  style={{
                     left: `${startPercent}%`,
                     width: `${endPercent - startPercent}%`,
+                    transition: dragState.isDragging ? 'none' : 'left 0.2s ease-out, width 0.2s ease-out',
                   }}
                 />
-                
+
                 {/* Context frames region */}
-                {contextFrames > 0 && contextStartPercent >= 0 && index < numPairs - 1 && (
+                {contextFrames > 0 && visibleContextFrames > 0 && index < numPairs - 1 && (
                   <div
                     className={`absolute top-0 bottom-0 ${colorScheme.context} border-r border-dashed ${colorScheme.border.replace('border-', 'border-r-').replace('-300', '-400')} pointer-events-none`}
                     style={{
                       left: `${contextStartPercent}%`,
                       width: `${endPercent - contextStartPercent}%`,
+                      transition: dragState.isDragging ? 'none' : 'left 0.2s ease-out, width 0.2s ease-out',
                     }}
                   >
                     <div className={`absolute bottom-2 left-1/2 transform -translate-x-1/2 text-xs font-medium ${colorScheme.text} bg-white/80 px-2 py-0.5 rounded`}>
-                      Context ({contextFrames}f)
+                      Context ({visibleContextFrames}f)
                     </div>
                   </div>
                 )}
-                
-                {/* Pair label - now using actualFrames for dynamic update */}
+
+                {/* Pair label */}
                 <div
                   className={`absolute top-1/2 text-sm font-semibold ${colorScheme.text} bg-white/90 px-3 py-1 rounded-full border ${colorScheme.border} pointer-events-none z-10 shadow-sm`}
                   style={{
                     left: `${(startPercent + endPercent) / 2}%`,
                     transform: 'translate(-50%, -50%)',
+                    transition: dragState.isDragging ? 'none' : 'left 0.2s ease-out',
                   }}
                 >
                   Pair {index + 1} • {actualFrames}f
@@ -881,6 +1058,7 @@ const Timeline: React.FC<TimelineProps> = ({
                   style={{
                     left: `${generationStartPercent}%`,
                     transform: 'translateX(-50%)',
+                    transition: dragState.isDragging ? 'none' : 'left 0.2s ease-out',
                   }}
                 />
                 <div
@@ -888,6 +1066,7 @@ const Timeline: React.FC<TimelineProps> = ({
                   style={{
                     left: `${endPercent}%`,
                     transform: 'translateX(-50%)',
+                    transition: dragState.isDragging ? 'none' : 'left 0.2s ease-out',
                   }}
                 />
               </React.Fragment>
@@ -916,6 +1095,7 @@ const Timeline: React.FC<TimelineProps> = ({
                 currentDragFrame={isDragging ? currentDragFrame : null}
                 dragDistances={isDragging ? dragDistances : null}
                 maxAllowedGap={maxAllowedGap}
+                originalFramePos={framePositions.get(image.shotImageEntryId) ?? 0}
               />
             );
           })}

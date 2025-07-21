@@ -62,7 +62,7 @@ export default function NotFoundPage() {
             </div>
             
             <button 
-              onClick={() => window.history.back()}
+              onPointerUp={() => window.history.back()}
               className="group flex items-center space-x-3 px-6 py-3 border-2 border-primary/20 rounded-xl bg-white/80 hover:bg-accent/30 transition-all duration-300 hover:scale-105"
             >
               <Sparkles className="h-4 w-4 text-primary group-hover:animate-spin" />

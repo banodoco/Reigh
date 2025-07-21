@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Coins, CreditCard, History, Gift, DollarSign } from 'lucide-react';
+import { Coins, CreditCard, History, Gift, DollarSign, Activity, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/shared/components/ui/button';
 import { Badge } from '@/shared/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
@@ -12,10 +12,28 @@ import {
   TableHeader,
   TableRow,
 } from '@/shared/components/ui/table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/shared/components/ui/select';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/shared/components/ui/popover';
+import { Checkbox } from '@/shared/components/ui/checkbox';
 import { useCredits } from '@/shared/hooks/useCredits';
+import { useTaskLog } from '@/shared/hooks/useTaskLog';
 import { formatDistanceToNow } from 'date-fns';
 
-const CreditsManagement: React.FC = () => {
+interface CreditsManagementProps {
+  initialTab?: 'purchase' | 'history' | 'task-log';
+}
+
+const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'purchase' }) => {
   const {
     balance,
     isLoadingBalance,
@@ -24,6 +42,17 @@ const CreditsManagement: React.FC = () => {
     formatCurrency,
     useCreditLedger,
   } = useCredits();
+
+  // Task Log state
+  const [taskLogPage, setTaskLogPage] = useState(1);
+  const [taskLogFilters, setTaskLogFilters] = useState({
+    costFilter: 'all' as 'all' | 'free' | 'paid',
+    status: [] as string[],
+    taskTypes: [] as string[],
+    projectIds: [] as string[],
+  });
+
+  const { data: taskLogData, isLoading: isLoadingTaskLog } = useTaskLog(20, taskLogPage, taskLogFilters);
 
   // Local formatter for transaction type labels
   const formatTransactionType = (type: string) => {
@@ -37,9 +66,51 @@ const CreditsManagement: React.FC = () => {
     }
   };
 
-  const [activeTab, setActiveTab] = useState('purchase');
+  const [activeTab, setActiveTab] = useState<string>(initialTab);
   const [purchaseAmount, setPurchaseAmount] = useState(50); // Default to $50
   const { data: ledgerData, isLoading: isLoadingLedger } = useCreditLedger();
+
+  // Helper functions for filters
+  const updateFilter = (filterType: keyof typeof taskLogFilters, value: any) => {
+    setTaskLogFilters(prev => ({ ...prev, [filterType]: value }));
+    setTaskLogPage(1); // Reset to first page when filtering
+  };
+
+  const toggleArrayFilter = (filterType: 'status' | 'taskTypes' | 'projectIds', value: string) => {
+    setTaskLogFilters(prev => {
+      const currentArray = prev[filterType];
+      const newArray = currentArray.includes(value)
+        ? currentArray.filter(item => item !== value)
+        : [...currentArray, value];
+      return { ...prev, [filterType]: newArray };
+    });
+    setTaskLogPage(1);
+  };
+
+  const clearFilters = () => {
+    setTaskLogFilters({
+      costFilter: 'all',
+      status: [],
+      taskTypes: [],
+      projectIds: [],
+    });
+    setTaskLogPage(1);
+  };
+
+  const getFilterCount = () => {
+    let count = 0;
+    if (taskLogFilters.costFilter !== 'all') count++;
+    if (taskLogFilters.status.length > 0) count++;
+    if (taskLogFilters.taskTypes.length > 0) count++;
+    if (taskLogFilters.projectIds.length > 0) count++;
+    return count;
+  };
+
+  const formatTaskType = (taskType: string) => {
+    return taskType.split('_').map(word => 
+      word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+    ).join(' ');
+  };
 
   const handlePurchase = () => {
     if (purchaseAmount > 0) {
@@ -84,7 +155,7 @@ const CreditsManagement: React.FC = () => {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-          <TabsList className="grid w-full grid-cols-2 bg-gray-100 border border-gray-200">
+          <TabsList className="grid w-full grid-cols-3 bg-gray-100 border border-gray-200">
             <TabsTrigger 
               value="purchase"
               className="data-[state=active]:bg-white data-[state=active]:shadow-sm"
@@ -98,6 +169,13 @@ const CreditsManagement: React.FC = () => {
             >
               <History className="w-4 h-4 mr-2" />
               Transaction History
+            </TabsTrigger>
+            <TabsTrigger 
+              value="task-log"
+              className="data-[state=active]:bg-white data-[state=active]:shadow-sm"
+            >
+              <Activity className="w-4 h-4 mr-2" />
+              Task Log
             </TabsTrigger>
           </TabsList>
 
@@ -209,6 +287,390 @@ const CreditsManagement: React.FC = () => {
                     ))}
                   </TableBody>
                 </Table>
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="task-log" className="flex-1 space-y-4">
+            {/* Filters Bar */}
+            <div className="flex flex-wrap items-center gap-2 p-4 bg-gray-50 rounded-lg border">
+              <div className="flex items-center gap-2">
+                <Filter className="w-4 h-4 text-gray-500" />
+                <span className="text-sm font-medium text-gray-700">Filter by:</span>
+              </div>
+
+              {/* Cost Filter */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-8">
+                    Cost
+                    {taskLogFilters.costFilter !== 'all' && (
+                      <Badge variant="secondary" className="ml-2 h-5 w-5 p-0 text-xs flex items-center justify-center">
+                        1
+                      </Badge>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-48" align="start">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-medium text-sm">Filter by Cost</h4>
+                      {taskLogFilters.costFilter !== 'all' && (
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => updateFilter('costFilter', 'all')}
+                          className="h-6 px-2 text-xs"
+                        >
+                          Clear
+                        </Button>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="radio"
+                          id="cost-all"
+                          name="cost-filter"
+                          checked={taskLogFilters.costFilter === 'all'}
+                          onChange={() => updateFilter('costFilter', 'all')}
+                          className="w-4 h-4"
+                        />
+                        <label htmlFor="cost-all" className="text-sm cursor-pointer font-medium">
+                          All Costs
+                        </label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="radio"
+                          id="cost-free"
+                          name="cost-filter"
+                          checked={taskLogFilters.costFilter === 'free'}
+                          onChange={() => updateFilter('costFilter', 'free')}
+                          className="w-4 h-4"
+                        />
+                        <label htmlFor="cost-free" className="text-sm cursor-pointer">
+                          Free Tasks
+                        </label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="radio"
+                          id="cost-paid"
+                          name="cost-filter"
+                          checked={taskLogFilters.costFilter === 'paid'}
+                          onChange={() => updateFilter('costFilter', 'paid')}
+                          className="w-4 h-4"
+                        />
+                        <label htmlFor="cost-paid" className="text-sm cursor-pointer">
+                          Paid Tasks
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+
+              {/* Status Filter */}
+              {taskLogData?.availableFilters?.statuses?.length > 0 && (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-8">
+                      Status
+                      {taskLogFilters.status.length > 0 && (
+                        <Badge variant="secondary" className="ml-2 h-5 w-5 p-0 text-xs flex items-center justify-center">
+                          {taskLogFilters.status.length}
+                        </Badge>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-48" align="start">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-medium text-sm">Filter by Status</h4>
+                        {taskLogFilters.status.length > 0 && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => updateFilter('status', [])}
+                            className="h-6 px-2 text-xs"
+                          >
+                            Clear
+                          </Button>
+                        )}
+                      </div>
+                      <div className="flex items-center space-x-2 pb-1 border-b">
+                        <Checkbox
+                          id="status-all"
+                          checked={taskLogFilters.status.length === 0}
+                          onCheckedChange={() => updateFilter('status', [])}
+                        />
+                        <label htmlFor="status-all" className="text-sm cursor-pointer font-medium">
+                          All Statuses ({taskLogData.availableFilters.statuses.length})
+                        </label>
+                      </div>
+                      {taskLogData.availableFilters.statuses.map((status) => (
+                        <div key={status} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`status-${status}`}
+                            checked={taskLogFilters.status.includes(status)}
+                            onCheckedChange={() => toggleArrayFilter('status', status)}
+                          />
+                          <label htmlFor={`status-${status}`} className="text-sm cursor-pointer">
+                            {status}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              )}
+
+              {/* Task Type Filter */}
+              {taskLogData?.availableFilters?.taskTypes?.length > 0 && (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-8">
+                      Task Type
+                      {taskLogFilters.taskTypes.length > 0 && (
+                        <Badge variant="secondary" className="ml-2 h-5 w-5 p-0 text-xs flex items-center justify-center">
+                          {taskLogFilters.taskTypes.length}
+                        </Badge>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-56" align="start">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-medium text-sm">Filter by Task Type</h4>
+                        {taskLogFilters.taskTypes.length > 0 && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => updateFilter('taskTypes', [])}
+                            className="h-6 px-2 text-xs"
+                          >
+                            Clear
+                          </Button>
+                        )}
+                      </div>
+                      <div className="flex items-center space-x-2 pb-1 border-b">
+                        <Checkbox
+                          id="taskType-all"
+                          checked={taskLogFilters.taskTypes.length === 0}
+                          onCheckedChange={() => updateFilter('taskTypes', [])}
+                        />
+                        <label htmlFor="taskType-all" className="text-sm cursor-pointer font-medium">
+                          All Types ({taskLogData.availableFilters.taskTypes.length})
+                        </label>
+                      </div>
+                      {taskLogData.availableFilters.taskTypes.map((taskType) => (
+                        <div key={taskType} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`taskType-${taskType}`}
+                            checked={taskLogFilters.taskTypes.includes(taskType)}
+                            onCheckedChange={() => toggleArrayFilter('taskTypes', taskType)}
+                          />
+                          <label htmlFor={`taskType-${taskType}`} className="text-sm cursor-pointer">
+                            {formatTaskType(taskType)}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              )}
+
+              {/* Project Filter */}
+              {taskLogData?.availableFilters?.projects?.length > 0 && (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-8">
+                      Project
+                      {taskLogFilters.projectIds.length > 0 && (
+                        <Badge variant="secondary" className="ml-2 h-5 w-5 p-0 text-xs flex items-center justify-center">
+                          {taskLogFilters.projectIds.length}
+                        </Badge>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-64" align="start">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-medium text-sm">Filter by Project</h4>
+                        {taskLogFilters.projectIds.length > 0 && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => updateFilter('projectIds', [])}
+                            className="h-6 px-2 text-xs"
+                          >
+                            Clear
+                          </Button>
+                        )}
+                      </div>
+                      <div className="flex items-center space-x-2 pb-1 border-b">
+                        <Checkbox
+                          id="project-all"
+                          checked={taskLogFilters.projectIds.length === 0}
+                          onCheckedChange={() => updateFilter('projectIds', [])}
+                        />
+                        <label htmlFor="project-all" className="text-sm cursor-pointer font-medium">
+                          All Projects ({taskLogData.availableFilters.projects.length})
+                        </label>
+                      </div>
+                      {taskLogData.availableFilters.projects.map((project) => (
+                        <div key={project.id} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`project-${project.id}`}
+                            checked={taskLogFilters.projectIds.includes(project.id)}
+                            onCheckedChange={() => toggleArrayFilter('projectIds', project.id)}
+                          />
+                          <label htmlFor={`project-${project.id}`} className="text-sm cursor-pointer truncate">
+                            {project.name}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              )}
+
+              {/* Clear Filters */}
+              {getFilterCount() > 0 && (
+                <Button variant="ghost" size="sm" onClick={clearFilters} className="h-8 text-gray-500">
+                  Clear ({getFilterCount()})
+                </Button>
+              )}
+
+              {/* Results count */}
+              <div className="ml-auto text-sm text-gray-500">
+                {taskLogData?.pagination.total || 0} task{(taskLogData?.pagination.total || 0) !== 1 ? 's' : ''}
+              </div>
+            </div>
+
+            {/* Helper text when no filters are active */}
+            {getFilterCount() === 0 && taskLogData?.availableFilters && (
+              <div className="text-center py-2">
+                <p className="text-sm text-gray-600">
+                  💡 <strong>Tip:</strong> Use the filters above to analyze tasks by{' '}
+                  {taskLogData.availableFilters.projects.length > 1 && 'project, '}
+                  {taskLogData.availableFilters.taskTypes.length > 1 && 'task type, '}
+                  {taskLogData.availableFilters.statuses.length > 1 && 'status, '}
+                  and cost
+                </p>
+              </div>
+            )}
+
+            {/* Task Table */}
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+              {isLoadingTaskLog ? (
+                <div className="p-8 text-center">
+                  <div className="animate-pulse">
+                    <Activity className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                    <p className="text-gray-600">Loading task log...</p>
+                  </div>
+                </div>
+              ) : (taskLogData?.tasks?.length || 0) === 0 ? (
+                <div className="p-8 text-center">
+                  <Activity className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                  <p className="text-gray-600">
+                    {getFilterCount() > 0 ? 'No tasks match your filters' : 'No tasks yet'}
+                  </p>
+                  <p className="text-sm text-gray-500 mt-1">
+                    {getFilterCount() > 0 ? 
+                      'Try adjusting your filters to see more results' :
+                      'Create some AI generations to see your task history'
+                    }
+                  </p>
+                  {getFilterCount() > 0 && (
+                    <Button variant="outline" size="sm" onClick={clearFilters} className="mt-2">
+                      Clear Filters
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Task Type</TableHead>
+                        <TableHead>Project</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Duration</TableHead>
+                        <TableHead>Cost</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {taskLogData?.tasks?.map((task) => (
+                        <TableRow key={task.id}>
+                          <TableCell className="text-sm">
+                            {formatDistanceToNow(new Date(task.createdAt), { addSuffix: true })}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="capitalize">
+                              {formatTaskType(task.taskType)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-sm text-gray-600 max-w-[120px] truncate">
+                            {task.projectName || 'Unknown Project'}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={
+                                task.status === 'Complete' ? 'default' : 
+                                task.status === 'Failed' ? 'destructive' : 
+                                'secondary'
+                              }
+                            >
+                              {task.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-sm text-gray-600">
+                            {task.duration ? `${task.duration}s` : '-'}
+                          </TableCell>
+                                                  <TableCell className={`font-semibold text-sm ${
+                          task.cost ? 'text-red-600' : 'text-gray-400'
+                        }`}>
+                          {task.cost ? `$${parseFloat(task.cost.toString()).toFixed(3)}` : 'Free'}
+                        </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+
+                  {/* Pagination */}
+                  {taskLogData?.pagination && taskLogData.pagination.totalPages > 1 && (
+                    <div className="flex items-center justify-between px-4 py-3 border-t bg-gray-50">
+                      <div className="text-sm text-gray-600">
+                        Page {taskLogData.pagination.currentPage} of {taskLogData.pagination.totalPages}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setTaskLogPage(p => Math.max(1, p - 1))}
+                          disabled={taskLogPage === 1}
+                          className="h-8"
+                        >
+                          <ChevronLeft className="w-4 h-4" />
+                          Previous
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setTaskLogPage(p => p + 1)}
+                          disabled={!taskLogData.pagination.hasMore}
+                          className="h-8"
+                        >
+                          Next
+                          <ChevronRight className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </TabsContent>

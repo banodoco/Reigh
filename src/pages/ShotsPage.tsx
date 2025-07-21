@@ -141,7 +141,7 @@ const ShotsPage: React.FC = () => {
         </>
       ) : (
         <>
-          <Button onClick={handleBackToList} className="mb-4">Back to All Shots</Button>
+          <Button onPointerUp={handleBackToList} className="mb-4">Back to All Shots</Button>
           <h2 className="text-2xl font-bold mb-4">Images in: {selectedShot.name}</h2>
           <ShotImageManager
             images={managedImages}

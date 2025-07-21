@@ -606,7 +606,7 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
         return () => {
             newUrls.forEach(url => URL.revokeObjectURL(url));
         };
-    }, [sampleFiles, mainGenerationIndex, previewUrls]);
+    }, [sampleFiles, mainGenerationIndex]); // Removed previewUrls from dependencies to prevent infinite loop
 
     const extractFilenameFromUrl = (url: string) => {
         try {

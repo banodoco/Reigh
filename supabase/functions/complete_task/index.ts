@@ -60,7 +60,7 @@ serve(async (req) => {
   // 1) Check if token matches service-role key directly
   if (token === serviceKey) {
     isServiceRole = true;
-    console.log("Direct service-role key match");
+    console.log("Service role authenticated");
   }
 
   // 2) If not service key, try to decode as JWT and check role
@@ -77,13 +77,13 @@ serve(async (req) => {
         const role = payload.role || payload.app_metadata?.role;
         if (["service_role", "supabase_admin"].includes(role)) {
           isServiceRole = true;
-          console.log("JWT has service-role/admin role");
+          console.log("JWT service role authenticated");
         }
         // Don't extract user ID from JWT - always look it up in user_api_token table
       }
     } catch (e) {
       // Not a valid JWT - will be treated as PAT
-      console.log("Token is not a valid JWT, treating as PAT");
+      console.log("Token format invalid, treating as PAT");
     }
   }
 
@@ -100,14 +100,14 @@ serve(async (req) => {
         .single();
 
       if (error || !data) {
-        console.error("Token lookup failed:", error);
+        console.error("Token lookup failed");
         return new Response("Invalid or expired token", { status: 403 });
       }
 
       callerId = data.user_id;
-      console.log(`Token resolved to user ID: ${callerId}`);
+      console.log("Token resolved to user");
     } catch (e) {
-      console.error("Error querying user_api_token:", e);
+      console.error("Error querying user_api_token table");
       return new Response("Token validation failed", { status: 403 });
     }
   }
@@ -161,22 +161,18 @@ serve(async (req) => {
     
     const publicUrl = urlData.publicUrl;
 
-    // 9) Update the database with the public URL
-    const { error: dbError } = await supabaseAdmin
-      .from("tasks")
-      .update({
-        status: "Complete",
-        output_location: publicUrl,
-        generation_processed_at: new Date().toISOString()
-      })
-      .eq("id", task_id)
-      .eq("status", "In Progress");
+    // 9) Update the database with the public URL using protected function
+    const { data: updateResult, error: dbError } = await supabaseAdmin
+      .rpc('complete_task_with_timing', {
+        p_task_id: task_id,
+        p_output_location: publicUrl
+      });
 
-    if (dbError) {
+    if (dbError || !updateResult) {
       console.error("Database update error:", dbError);
       // If DB update fails, we should clean up the uploaded file
       await supabaseAdmin.storage.from('image_uploads').remove([objectPath]);
-      return new Response(`Database update failed: ${dbError.message}`, { status: 500 });
+      return new Response(`Database update failed: ${dbError?.message || 'Task not found or not in progress'}`, { status: 500 });
     }
 
     // 10) Calculate and record task cost (only for service role)

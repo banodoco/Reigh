@@ -36,3 +36,8 @@ local.db
 
 # Temporary files
 temp/
+
+# Ignore all markdown files except structure.md and structure_detail/
+*.md
+!structure.md
+!structure_detail/*.md

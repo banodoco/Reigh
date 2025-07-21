@@ -401,6 +401,11 @@ const VideoTravelToolPage: React.FC = () => {
     setSelectedShot(null);
     setVideoPairConfigs([]);
     setCurrentShotId(null);
+    // By replacing the current entry in the history stack, we effectively reset 
+    // the 'fromShotClick' state without adding a new entry to the browser history.
+    // This ensures that subsequent interactions with the shot list behave as if 
+    // it's the first visit, resolving the "two-click" issue on mobile.
+    navigate(location.pathname, { replace: true, state: { fromShotClick: false } });
   };
 
   // Navigation handlers

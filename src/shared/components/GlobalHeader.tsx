@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import type { Session } from '@supabase/supabase-js';
 import { Button } from '@/shared/components/ui/button';
@@ -19,6 +19,7 @@ interface GlobalHeaderProps {
 
 export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight = 0, contentOffsetLeft = 0, onOpenSettings }) => {
   const { projects, selectedProjectId, setSelectedProjectId, isLoadingProjects } = useProject();
+  const navigate = useNavigate();
 
   // Track authentication state to conditionally change the logo destination
   const [session, setSession] = useState<Session | null>(null);
@@ -73,7 +74,14 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
           {/* Left side - Brand + Project Selector */}
           <div className="flex items-center space-x-6 pl-4">
             {/* Brand */}
-            <Link to={session ? "/tools" : "/"} className="group flex items-center space-x-4 relative">
+            <div 
+              role="link"
+              tabIndex={0}
+              aria-label="Go to homepage"
+              onPointerUp={() => navigate(session ? "/tools" : "/")}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') navigate(session ? "/tools" : "/"); }}
+              className="group flex items-center space-x-4 relative p-2 -m-2 cursor-pointer"
+            >
               <div className="relative">
                 <div className="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-wes-pink via-wes-lavender to-wes-dusty-blue rounded-2xl border-3 border-wes-vintage-gold/40 shadow-wes-vintage group-hover:shadow-wes-hover transition-all duration-500 wes-badge">
                   <Palette className="h-8 w-8 text-white group-hover:rotate-12 transition-transform duration-500 drop-shadow-lg" />
@@ -92,7 +100,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                   <Star className="w-3 h-3 text-wes-vintage-gold animate-rotate-slow opacity-50" />
                 </div>
               </div>
-            </Link>
+            </div>
 
             {/* Project Management */}
             <div className="flex items-center space-x-4 relative p-2 border-2 border-wes-vintage-gold/30 rounded-xl bg-white/50 shadow-wes-vintage">
@@ -202,7 +210,14 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
             {/* Left side - Brand + Project Buttons */}
             <div className="flex items-center space-x-2">
               {/* Brand */}
-              <Link to={session ? "/tools" : "/"} className="group relative">
+              <div
+                role="link"
+                tabIndex={0}
+                aria-label="Go to homepage"
+                onPointerUp={() => navigate(session ? "/tools" : "/")}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') navigate(session ? "/tools" : "/"); }}
+                className="group relative block p-2 -m-2 cursor-pointer"
+              >
                 <div className="relative flex items-center space-x-2">
                   <div className="relative">
                     <div className="flex items-center justify-center w-8 h-8 bg-gradient-to-br from-wes-pink via-wes-lavender to-wes-dusty-blue rounded-xl border-2 border-wes-vintage-gold/40 shadow-wes-vintage group-hover:shadow-wes-hover transition-all duration-300">
@@ -222,7 +237,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                     </div>
                   </div>
                 </div>
-              </Link>
+              </div>
 
               {/* Project Buttons */}
               {selectedProjectId && projects.length > 0 && ( 

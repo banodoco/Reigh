@@ -3,6 +3,8 @@ import { createBrowserRouter, RouterProvider, redirect } from 'react-router-dom'
 import ToolSelectorPage from '@/pages/ToolSelectorPage';
 import HomePage from '@/pages/HomePage';
 import ArtPage from '@/pages/ArtPage';
+import PaymentSuccessPage from '@/pages/PaymentSuccessPage';
+import PaymentCancelPage from '@/pages/PaymentCancelPage';
 // Import ImageGenerationToolPage directly to prevent lazy loading issues with TanStack Query
 import ImageGenerationToolPage from '@/tools/image-generation/pages/ImageGenerationToolPage';
 // Lazy load other tool pages for better performance
@@ -47,6 +49,18 @@ const router = createBrowserRouter([
   {
     path: '/home',
     element: <HomePage />,
+    errorElement: <NotFoundPage />,
+  },
+  
+  // Payment pages (outside of Layout to avoid auth requirements)
+  {
+    path: '/payments/success',
+    element: <PaymentSuccessPage />,
+    errorElement: <NotFoundPage />,
+  },
+  {
+    path: '/payments/cancel',
+    element: <PaymentCancelPage />,
     errorElement: <NotFoundPage />,
   },
   
@@ -95,14 +109,14 @@ const router = createBrowserRouter([
         path: '/shots',
         element: <ShotsPage />,
       },
-              {
-          path: '/generations',
-          element: <GenerationsPage />,
-        },
-        {
-          path: '/art',
-          element: <ArtPage />,
-        },
+      {
+        path: '/generations',
+        element: <GenerationsPage />,
+      },
+      {
+        path: '/art',
+        element: <ArtPage />,
+      },
       // Any other top-level page routes can become children here
     ]
   },

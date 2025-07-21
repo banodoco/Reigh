@@ -157,7 +157,7 @@ export const taskCostConfigs = pgTable('task_cost_configs', {
   taskType: text('task_type').notNull().unique(),
   category: text('category').notNull(), // 'generation', 'processing', 'orchestration', 'utility'
   displayName: text('display_name').notNull(),
-  baseCostPerSecond: decimal('base_cost_per_second', { precision: 10, scale: 6 }).notNull().default('0.000278'), // Base cost per second in dollars
+  baseCostPerSecond: decimal('base_cost_per_second', { precision: 10, scale: 6 }).notNull().default('0.0278'), // Base cost per second in cents
   costFactors: jsonb('cost_factors').default('{}'), // Flexible cost factors configuration
   isActive: boolean('is_active').default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),

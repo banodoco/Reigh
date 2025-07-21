@@ -127,6 +127,10 @@ See `.env.example` for all variables. Key ones:
 - `VITE_APP_ENV`: Controls tool visibility & homepage
 - `VITE_SUPABASE_*`: Database connection
 - `VITE_FAL_PROXY_*`: AI service configuration
+- `VITE_STRIPE_PUBLISHABLE_KEY`: Stripe frontend integration
+- `STRIPE_SECRET_KEY`: Stripe server-side operations (Edge Functions)
+- `STRIPE_WEBHOOK_SECRET`: Stripe webhook signature verification
+- `FRONTEND_URL`: Payment redirect URLs
 
 #### ⚡ Active Edge Functions
 
@@ -136,6 +140,8 @@ See `.env.example` for all variables. Key ones:
 | `steerable-motion` | Video generation | `/supabase/functions/` |
 | `ai-prompt` | Prompt enhancement | `/supabase/functions/` |
 | `calculate-task-cost` | Credit calculation | `/supabase/functions/` |
+| `stripe-checkout` | Stripe payment sessions | `/supabase/functions/` |
+| `stripe-webhook` | Stripe payment webhooks | `/supabase/functions/` |
 
 ---
 
@@ -149,6 +155,8 @@ See `.env.example` for all variables. Key ones:
 | **HomePage** | `/` | Landing page (web env only) |
 | **ShotsPage** | `/shots` | Project shots management |
 | **GenerationsPage** | `/generations` | Media gallery with pagination |
+| **PaymentSuccessPage** | `/payments/success` | Stripe payment confirmation |
+| **PaymentCancelPage** | `/payments/cancel` | Stripe payment cancellation |
 | **NotFoundPage** | `*` | 404 error handler |
 
 ---

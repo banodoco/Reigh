@@ -579,7 +579,7 @@ export default function HomePage() {
               ) : (
                 <div className="group">
                   <button
-                    onClick={() => navigate('/tools')}
+                    onPointerUp={() => navigate('/tools')}
                     className="flex items-center space-x-2 px-6 py-4 bg-gradient-to-r from-wes-vintage-gold to-wes-coral rounded-full border-2 border-wes-vintage-gold/40 hover:border-wes-vintage-gold/60 transition-all duration-300 shadow-wes-vintage hover:shadow-wes-hover text-white text-lg font-medium mx-auto relative overflow-hidden"
                   >
                     <div className="relative">
@@ -734,7 +734,7 @@ export default function HomePage() {
                 </p>
                 
                 <p className="text-sm leading-relaxed">
-                  The reason they do this is simple: it's valuable to have people make art with your tool - every piece you make is in effect marketing materials for them.
+                  The reason they do this is simple: it's valuable to have people make art with your tool - every piece you make is marketing for them.
                 </p>
                 
                 <p className="text-sm leading-relaxed">
@@ -747,7 +747,7 @@ export default function HomePage() {
                 <h3 className="font-semibold text-primary text-lg">A better way for <u>all</u> artists</h3>
                 
                 <p className="text-sm leading-relaxed">
-                  While this status quo is good for artists who are given free credits, we believe that there's a better way for all artists.
+                  While this status quo is good for artists who are given free credits, we believe that there's a better way.
                 </p>
                 
                 <p className="text-sm leading-relaxed">
@@ -759,7 +759,7 @@ export default function HomePage() {
                 </p>
                 
                 <p className="text-sm leading-relaxed">
-                  We hope that artists will then use them to create and that this in turns attracts others&nbsp;&mdash;&nbsp;many of whom will want to pay for convenience.
+                  We hope that artists will then use the free tool to create and that this in turns attracts others&nbsp;&mdash;&nbsp;many of whom won't have powerful computers or will want to pay for convenience.
                 </p>
 
                 <p className="text-sm leading-relaxed">

@@ -513,6 +513,13 @@
   }
 }
 
+@layer base {
+  /* Eliminate the 300 ms mobile tap-delay everywhere (still allows pinch-zoom) */
+  body {
+    touch-action: manipulation;
+  }
+}
+
 @layer components {
   .wes-header {
     @apply wes-symmetry bg-white/80 backdrop-blur-md border-b-2 border-primary/10 relative;

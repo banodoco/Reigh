@@ -85,7 +85,7 @@ ORDER BY table_name, ordinal_position;
 | Table | Purpose | Key Columns | Notes |
 |-------|---------|-------------|-------|
 | **`credits_ledger`** | Credit transactions | `user_id`, `amount`, `type`, `task_id` | Immutable audit log |
-| **`task_cost_configs`** | Pricing rules | `task_type`, `cost_per_unit`, `unit_type` | Lookup table |
+| **`task_cost_configs`** | Pricing rules | `task_type`, `base_cost_per_second`, `cost_factors` | Standardized $0.000278/sec |
 
 ### Media & Resources
 

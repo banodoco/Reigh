@@ -24,8 +24,8 @@ function calculateTaskCost(
   costFactors: any,
   taskParams: any
 ): number {
-  // Convert from dollars to cents and calculate base cost
-  let totalCost = baseCostPerSecond * 100 * durationSeconds;
+  // baseCostPerSecond is now in cents per second
+  let totalCost = baseCostPerSecond * durationSeconds;
 
   if (costFactors) {
     // Resolution-based cost multiplier

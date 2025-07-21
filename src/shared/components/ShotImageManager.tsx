@@ -1,5 +1,5 @@
 import React, { useState, Fragment, useRef, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import {
   DndContext,
   closestCenter,
@@ -67,6 +67,7 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
   const currentDialogSkipChoiceRef = useRef(false);
   const isMobile = useIsMobile();
   const outerRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
 
   // Notify other components (e.g., PaneControlTab) when mobile selection is active
   useEffect(() => {
@@ -266,7 +267,10 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
   if (!images || images.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
-        No images to display - <Link to="/tools/image-generation" className="text-primary hover:underline">generate images</Link>
+        No images to display - <span 
+          onPointerUp={() => navigate("/tools/image-generation")}
+          className="text-primary hover:underline cursor-pointer"
+        >generate images</span>
       </p>
     );
   }

@@ -1209,7 +1209,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     <div className="flex flex-col space-y-4 pb-16">
       {/* Header */}
       <div className="flex-shrink-0 flex flex-wrap justify-between items-center gap-y-2 px-2">
-        <Button onClick={onBack}>&larr; Back to Shot List</Button>
+        <Button onPointerUp={onBack}>&larr; Back to Shot List</Button>
         <div className="hidden sm:flex items-center space-x-2 min-w-0 flex-1 justify-center px-4">
           <span className="hidden sm:inline text-2xl font-bold">Editing Shot:</span>
           {isEditingName ? (

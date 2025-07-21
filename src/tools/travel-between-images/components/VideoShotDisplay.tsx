@@ -131,7 +131,7 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
       <div 
         key={shot.id} 
         className="mb-6 p-4 border rounded-lg hover:shadow-lg transition-shadow duration-200 relative cursor-pointer"
-        onClick={() => onSelectShot(shot.id)}
+        onPointerUp={() => onSelectShot(shot.id)}
       >
         <div className="flex justify-between items-start mb-3">
           {isEditingName ? (

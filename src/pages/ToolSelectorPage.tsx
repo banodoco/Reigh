@@ -213,9 +213,19 @@ const ToolCard = ({ item, isSquare = false, index, isVisible }: { item: any, isS
   return (
     <div
       className="relative group cursor-pointer w-full h-full"
+      role="button"
+      tabIndex={0}
       onPointerDown={(e) => { e.stopPropagation(); time('NavPerf', `ClickLag:${item.id}`); }}
-      onClick={() => {
+      onPointerUp={() => {
         if (item.tool?.path) {
+          timeEnd('NavPerf', `ClickLag:${item.id}`);
+          time('NavPerf', `PageLoad:${item.tool.path}`);
+          navigate(item.tool.path);
+        }
+      }}
+      onKeyDown={(e) => {
+        if (item.tool?.path && (e.key === 'Enter' || e.key === ' ')) {
+          e.preventDefault(); // Prevent scrolling on spacebar
           timeEnd('NavPerf', `ClickLag:${item.id}`);
           time('NavPerf', `PageLoad:${item.tool.path}`);
           navigate(item.tool.path);

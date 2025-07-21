@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 
 interface ToolPageHeaderProps {
@@ -15,13 +15,22 @@ export const ToolPageHeader: React.FC<ToolPageHeaderProps> = ({
   className = "",
   children 
 }) => {
+  const navigate = useNavigate();
+
   return (
     <header className={`sticky top-0 z-40 mb-2 mt-2 ${className}`}>
       <div className="container mx-auto flex justify-between items-center py-4 mb-0">
         <div className="flex items-center gap-3">
-          <Link to={backTo} className="text-muted-foreground hover:text-primary transition-colors">
+          <div
+            role="link"
+            tabIndex={0}
+            aria-label="Go back"
+            onPointerUp={() => navigate(backTo)}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') navigate(backTo); }}
+            className="text-muted-foreground hover:text-primary transition-colors cursor-pointer p-2 -m-2"
+          >
             <ArrowLeft className="h-5 w-5" />
-          </Link>
+          </div>
           <h1 className="text-2xl font-bold">
             {title}
           </h1>

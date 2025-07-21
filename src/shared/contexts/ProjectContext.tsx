@@ -166,14 +166,9 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
         .single();
 
       if (!existingUser) {
-        // Create user record if it doesn't exist
+        // Create user record using the secure function
         const { error: userError } = await supabase
-          .from('users')
-          .insert({
-            id: user.id,
-            name: user.user_metadata?.full_name || user.email || 'Discord User',
-            email: user.email
-          });
+          .rpc('create_user_record_if_not_exists');
         
         if (userError) {
           console.error('Failed to create user:', userError);
@@ -253,14 +248,9 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
         .single();
 
       if (!existingUser) {
-        // Create user record if it doesn't exist
+        // Create user record using the secure function
         const { error: userError } = await supabase
-          .from('users')
-          .insert({
-            id: user.id,
-            name: user.user_metadata?.full_name || user.email || 'Discord User',
-            email: user.email
-          });
+          .rpc('create_user_record_if_not_exists');
         
         if (userError) {
           console.error('Failed to create user:', userError);

@@ -1,5 +1,19 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
+import Stripe from "https://esm.sh/stripe@12.18.0?target=deno";
+
+// Helper for standard JSON responses with CORS headers
+function jsonResponse(body: any, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    },
+  });
+}
 
 /**
  * Edge function: stripe-checkout
@@ -17,8 +31,13 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
  * - 500 Internal Server Error
  */
 serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === "OPTIONS") {
+    return jsonResponse({ ok: true });
+  }
+
   if (req.method !== "POST") {
-    return new Response("Method not allowed", { status: 405 });
+    return jsonResponse({ error: "Method not allowed" }, 405);
   }
 
   // ─── 1. Parse body ──────────────────────────────────────────────
@@ -26,18 +45,18 @@ serve(async (req) => {
   try {
     body = await req.json();
   } catch {
-    return new Response("Invalid JSON body", { status: 400 });
+    return jsonResponse({ error: "Invalid JSON body" }, 400);
   }
   
   const { amount } = body;
-  if (!amount || typeof amount !== 'number' || amount < 10 || amount > 100) {
-    return new Response("Amount must be a number between 10 and 100", { status: 400 });
+  if (!amount || typeof amount !== 'number' || amount < 5 || amount > 100) {
+    return jsonResponse({ error: "Amount must be a number between $5 and $100" }, 400);
   }
 
   // ─── 2. Extract authorization header ────────────────────────────
   const authHeader = req.headers.get("Authorization");
   if (!authHeader?.startsWith("Bearer ")) {
-    return new Response("Missing or invalid Authorization header", { status: 401 });
+    return jsonResponse({ error: "Missing or invalid Authorization header" }, 401);
   }
 
   const token = authHeader.slice(7); // Remove "Bearer " prefix
@@ -46,7 +65,7 @@ serve(async (req) => {
 
   if (!supabaseUrl || !supabaseAnonKey) {
     console.error("Missing required environment variables");
-    return new Response("Server configuration error", { status: 500 });
+    return jsonResponse({ error: "Server configuration error" }, 500);
   }
 
   // ─── 3. Create Supabase client with user's JWT ─────────────────
@@ -59,29 +78,64 @@ serve(async (req) => {
   // ─── 4. Verify user authentication ──────────────────────────────
   const { data: { user }, error: userError } = await supabase.auth.getUser();
   if (userError || !user) {
-    return new Response("Authentication failed", { status: 401 });
+    return jsonResponse({ error: "Authentication failed" }, 401);
   }
 
   try {
-    // ─── 5. Create Stripe checkout session ─────────────────────────
-    // For now, return a placeholder response since Stripe integration needs to be set up
-    // TODO: Replace with actual Stripe integration
-    const checkoutUrl = `https://checkout.stripe.com/placeholder?amount=${amount}&user=${user.id}`;
+    // ─── 5. Initialize Stripe and create checkout session ─────────────────────────
+    const stripeSecretKey = Deno.env.get("STRIPE_SECRET_KEY");
+    const frontendUrl = Deno.env.get("FRONTEND_URL");
     
-    console.log(`Stripe checkout requested for user ${user.id}: $${amount}`);
+    if (!stripeSecretKey) {
+      console.error("STRIPE_SECRET_KEY not set in environment");
+      return jsonResponse({ error: "Stripe not configured" }, 500);
+    }
+
+    if (!frontendUrl) {
+      console.error("FRONTEND_URL not set in environment");
+      return jsonResponse({ error: "Frontend URL not configured" }, 500);
+    }
+
+    const stripe = new Stripe(stripeSecretKey, {
+      apiVersion: "2024-06-20",
+    });
+
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      payment_method_types: ["card"],
+      line_items: [
+        {
+          price_data: {
+            currency: "usd",
+            product_data: { 
+              name: "Reigh Credits",
+              description: `${amount} credits for AI generation tasks`
+            },
+            unit_amount: amount * 100, // Convert dollars to cents
+          },
+          quantity: 1,
+        },
+      ],
+      metadata: { 
+        userId: user.id, 
+        amount: amount.toString() 
+      },
+      success_url: `${frontendUrl}/payments/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${frontendUrl}/payments/cancel`,
+      customer_email: user.email || undefined,
+    });
+
+    console.log(`Stripe checkout session created for user ${user.id}: $${amount} (session: ${session.id})`);
     
-    return new Response(JSON.stringify({
-      checkoutUrl,
-      message: `Stripe integration not yet configured. Would create checkout for $${amount}`,
+    return jsonResponse({
+      checkoutUrl: session.url,
+      sessionId: session.id,
       amount,
       userId: user.id
-    }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
     });
 
   } catch (error) {
-    console.error("Unexpected error:", error);
-    return new Response(`Internal server error: ${error.message}`, { status: 500 });
+    console.error("Error creating Stripe checkout session:", error);
+    return jsonResponse({ error: `Internal server error: ${error.message}` }, 500);
   }
 }); 

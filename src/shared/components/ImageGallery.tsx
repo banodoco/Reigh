@@ -218,6 +218,10 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
   }, [filterByToolType, mediaTypeFilter]);
 
   const tickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Touch handling for mobile double-tap detection
+  const lastTouchTimeRef = useRef<number>(0);
+  const doubleTapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     const newSelectedShotId = currentShotId || lastShotId || (simplifiedShotOptions.length > 0 ? simplifiedShotOptions[0].id : "");
@@ -237,8 +241,38 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
       if (tickTimeoutRef.current) {
         clearTimeout(tickTimeoutRef.current);
       }
+      if (doubleTapTimeoutRef.current) {
+        clearTimeout(doubleTapTimeoutRef.current);
+      }
     };
   }, []);
+
+  // Handle mobile double-tap detection
+  const handleMobileTap = (image: GeneratedImageWithMetadata) => {
+    const currentTime = Date.now();
+    const timeSinceLastTap = currentTime - lastTouchTimeRef.current;
+    
+    if (timeSinceLastTap < 300 && timeSinceLastTap > 0) {
+      // This is a double-tap, clear any pending timeout and open lightbox
+      if (doubleTapTimeoutRef.current) {
+        clearTimeout(doubleTapTimeoutRef.current);
+        doubleTapTimeoutRef.current = null;
+      }
+      handleOpenLightbox(image);
+    } else {
+      // This is a single tap, set a timeout to handle it if no second tap comes
+      if (doubleTapTimeoutRef.current) {
+        clearTimeout(doubleTapTimeoutRef.current);
+      }
+      doubleTapTimeoutRef.current = setTimeout(() => {
+        // Single tap action could go here if needed
+        // For now, we'll just clear the timeout
+        doubleTapTimeoutRef.current = null;
+      }, 300);
+    }
+    
+    lastTouchTimeRef.current = currentTime;
+  };
 
   const handleOpenLightbox = (image: GeneratedImageWithMetadata) => {
     // We need to map the partial `GeneratedImageWithMetadata` to a `GenerationRow` for the lightbox
@@ -442,7 +476,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
 
   return (
                 <TooltipProvider>
-      <div className="space-y-4 pb-16">
+      <div className="space-y-6 pb-8">
         <div className="flex flex-wrap justify-between items-center mb-4 gap-x-4 gap-y-2"> {/* Added gap-y-2 and flex-wrap for better responsiveness */}
             <div className="flex items-center gap-2">
                 {/* Pagination Controls */}
@@ -538,7 +572,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
         )}
 
         {paginatedImages.length > 0 && (
-            <div className={`grid gap-4 mb-8 ${columnsPerRow === 6 ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-6' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 2xl:grid-cols-5'}`}>
+            <div className={`grid gap-4 mb-12 ${columnsPerRow === 6 ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-6' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 2xl:grid-cols-5'}`}>
             {paginatedImages.map((image, index) => {
                 const displayUrl = getDisplayUrl(image.url);
                 const metadataForDisplay = image.metadata ? formatMetadataForDisplay(image.metadata) : "No metadata available.";
@@ -556,8 +590,13 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
                 const currentTargetShotName = selectedShotIdLocal ? simplifiedShotOptions.find(s => s.id === selectedShotIdLocal)?.name : undefined;
                 
                 let aspectRatioPadding = '100%'; 
+                let minHeight = '120px'; // Minimum height for very small images
                 if (image.metadata?.width && image.metadata?.height) {
-                aspectRatioPadding = `${(image.metadata.height / image.metadata.width) * 100}%`;
+                  const calculatedPadding = (image.metadata.height / image.metadata.width) * 100;
+                  // Ensure reasonable aspect ratio bounds
+                  const minPadding = 60; // Minimum 60% height (for very wide images)
+                  const maxPadding = 200; // Maximum 200% height (for very tall images)
+                  aspectRatioPadding = `${Math.min(Math.max(calculatedPadding, minPadding), maxPadding)}%`;
                 }
 
                 // If it's a placeholder (e.g. from Array(4).fill for loading state), render simplified placeholder item
@@ -584,7 +623,13 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
                       className="border rounded-lg overflow-hidden hover:shadow-md transition-shadow relative group bg-card"
                   >
                     <div className="relative w-full">
-                    <div style={{ paddingBottom: aspectRatioPadding }} className="relative bg-gray-200">
+                    <div 
+                      style={{ 
+                        paddingBottom: aspectRatioPadding,
+                        minHeight: minHeight 
+                      }} 
+                      className="relative bg-gray-200"
+                    >
                         {isActuallyVideo ? (
                             <video
                                 src={displayUrl}
@@ -593,7 +638,11 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
                                 loop
                                 muted
                                 className="absolute inset-0 w-full h-full object-contain group-hover:opacity-80 transition-opacity duration-300 bg-black"
-                                onDoubleClick={() => handleOpenLightbox(image)} // Consider if lightbox makes sense for video, or a different action
+                                onDoubleClick={isMobile ? undefined : () => handleOpenLightbox(image)}
+                                onTouchEnd={isMobile ? (e) => {
+                                  e.preventDefault();
+                                  handleMobileTap(image);
+                                } : undefined}
                                 style={{ cursor: 'pointer' }}
                             />
                         ) : (
@@ -601,7 +650,11 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
                                 src={displayUrl}
                                 alt={image.prompt || `Generated image ${index + 1}`}
                                 className="absolute inset-0 w-full h-full object-cover group-hover:opacity-80 transition-opacity duration-300"
-                                onDoubleClick={() => handleOpenLightbox(image)}
+                                onDoubleClick={isMobile ? undefined : () => handleOpenLightbox(image)}
+                                onTouchEnd={isMobile ? (e) => {
+                                  e.preventDefault();
+                                  handleMobileTap(image);
+                                } : undefined}
                                 style={{ cursor: 'pointer' }}
                                 loading="lazy"
                             />
@@ -787,6 +840,42 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
             })}
             </div>
         )}
+        {/* Bottom Pagination Controls (moved inside container for better spacing) */}
+        {totalPages > 1 && (
+          <div className={`flex justify-center items-center mt-4 ${whiteText ? 'text-white' : 'text-gray-600'}`}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (isServerPagination) {
+                  onServerPageChange!(Math.max(1, serverPage! - 1));
+                } else {
+                  setPage((p) => Math.max(0, p - 1));
+                }
+              }}
+              disabled={isServerPagination ? serverPage === 1 : page === 0}
+            >
+              Prev
+            </Button>
+            <span className={`text-sm ${whiteText ? 'text-white' : 'text-muted-foreground'} whitespace-nowrap mx-4`}>
+              Showing {rangeStart}-{rangeEnd} (out of {totalFilteredItems})
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (isServerPagination) {
+                  onServerPageChange!(serverPage! + 1);
+                } else {
+                  setPage((p) => Math.min(totalPages - 1, p + 1));
+                }
+              }}
+              disabled={isServerPagination ? serverPage >= totalPages : page >= totalPages - 1}
+            >
+              Next
+            </Button>
+          </div>
+        )}
       </div>
       
       {/* Lightbox Modal */}
@@ -811,43 +900,6 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
           showTickForImageId={showTickForImageId}
           onShowTick={handleShowTick}
         />
-      )}
-
-      {/* Pagination Controls */}
-      {totalPages > 1 && (
-        <div className={`flex justify-center items-center mt-4 mb-6 ${whiteText ? 'text-white' : 'text-gray-600'}`}>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              if (isServerPagination) {
-                onServerPageChange!(Math.max(1, serverPage! - 1));
-              } else {
-                setPage((p) => Math.max(0, p - 1));
-              }
-            }}
-            disabled={isServerPagination ? serverPage === 1 : page === 0}
-          >
-            Prev
-          </Button>
-          <span className={`text-sm ${whiteText ? 'text-white' : 'text-muted-foreground'} whitespace-nowrap mx-4`}>
-            Showing {rangeStart}-{rangeEnd} (out of {totalFilteredItems})
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              if (isServerPagination) {
-                onServerPageChange!(serverPage! + 1);
-              } else {
-                setPage((p) => Math.min(totalPages - 1, p + 1));
-              }
-            }}
-            disabled={isServerPagination ? serverPage >= totalPages : page >= totalPages - 1}
-          >
-            Next
-          </Button>
-        </div>
       )}
     </TooltipProvider>
   );

@@ -43,12 +43,14 @@ interface SettingsModalProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   initialTab?: string;
+  creditsTab?: 'purchase' | 'history' | 'task-log';
 }
 
 const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
   onOpenChange,
   initialTab = "generate-locally",
+  creditsTab = "purchase",
 }) => {
   const modalStyle = usePaneAwareModalStyle();
   const isMobile = useIsMobile();
@@ -365,7 +367,7 @@ python headless.py --db-type supabase \\
                 <Coins className="w-6 h-6 text-blue-600" />
                 <h3 className="text-xl font-bold text-gray-800">Credit Management</h3>
               </div>
-              <CreditsManagement />
+              <CreditsManagement initialTab={creditsTab} />
             </div>
           )}
 

@@ -12,6 +12,7 @@ import type { Session } from '@supabase/supabase-js';
 import { Loading } from '@/shared/components/ui/loading';
 import SettingsModal from '@/shared/components/SettingsModal';
 import { useHeaderState } from '@/shared/contexts/ToolPageHeaderContext';
+import { GlobalProcessingWarning } from '@/shared/components/ProcessingWarnings';
 
 // Scroll to top component
 function ScrollToTop() {
@@ -43,10 +44,25 @@ const Layout: React.FC = () => {
   
   // Settings modal state
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [settingsInitialTab, setSettingsInitialTab] = useState<string | undefined>(undefined);
+  const [settingsCreditsTab, setSettingsCreditsTab] = useState<'purchase' | 'history' | undefined>(undefined);
+  const location = useLocation();
   
-  const handleOpenSettings = useCallback(() => {
+  const handleOpenSettings = useCallback((initialTab?: string, creditsTab?: 'purchase' | 'history') => {
+    setSettingsInitialTab(initialTab);
+    setSettingsCreditsTab(creditsTab);
     setIsSettingsModalOpen(true);
   }, []);
+
+  // Check for settings navigation state
+  useEffect(() => {
+    const state = location.state as any;
+    if (state?.openSettings) {
+      handleOpenSettings(state.settingsTab, state.creditsTab);
+      // Clear the state to avoid reopening on navigation
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state, handleOpenSettings]);
 
   // Initialize session and subscribe to changes
   useEffect(() => {
@@ -110,7 +126,8 @@ const Layout: React.FC = () => {
         className="flex-grow relative z-10 transition-[margin,padding] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] content-container"
         style={mainContentStyle}
       >
-         {header}
+        <GlobalProcessingWarning onOpenSettings={handleOpenSettings} />
+        {header}
 
         <main className={cn("container mx-auto h-full overflow-y-auto", containerPadding, containerSpacing)}>
           <div className="min-h-full">
@@ -129,6 +146,8 @@ const Layout: React.FC = () => {
       <SettingsModal
         isOpen={isSettingsModalOpen}
         onOpenChange={setIsSettingsModalOpen}
+        initialTab={settingsInitialTab}
+        creditsTab={settingsCreditsTab}
       />
     </div>
   );
