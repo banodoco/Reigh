@@ -165,6 +165,24 @@ serve(async (req) => {
       task.params
     );
 
+    // Validate cost calculation
+    if (isNaN(cost) || cost < 0) {
+      console.error('Invalid cost calculated:', { cost, baseCost: costConfig.base_cost_per_second, duration: durationSeconds });
+      return jsonResponse({ error: 'Invalid cost calculation' }, 500);
+    }
+
+    // Ensure user exists before inserting credit ledger entry
+    const { data: user, error: userError } = await supabaseAdmin
+      .from('users')
+      .select('id')
+      .eq('id', task.projects.user_id)
+      .single();
+
+    if (userError || !user) {
+      console.error('User not found for credit ledger:', { user_id: task.projects.user_id, error: userError });
+      return jsonResponse({ error: 'User not found for credit calculation' }, 400);
+    }
+
     // Insert cost into credit ledger
     const { error: ledgerError } = await supabaseAdmin
       .from('credits_ledger')
@@ -185,8 +203,14 @@ serve(async (req) => {
       });
 
     if (ledgerError) {
-      console.error('Error inserting into credit ledger:', ledgerError);
-      return jsonResponse({ error: 'Failed to record cost in ledger' }, 500);
+      console.error('Error inserting into credit ledger:', { 
+        error: ledgerError, 
+        user_id: task.projects.user_id, 
+        task_id: task.id, 
+        amount: -cost,
+        cost_details: { cost, baseCost: costConfig.base_cost_per_second, duration: durationSeconds }
+      });
+      return jsonResponse({ error: `Failed to record cost in ledger: ${ledgerError.message}` }, 500);
     }
 
     return jsonResponse({
