@@ -55,6 +55,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [lastKnownTotal, setLastKnownTotal] = useState<number>(0);
   const [isPageChange, setIsPageChange] = useState(false);
+  const [isFilterChange, setIsFilterChange] = useState(false);
   const isMobile = useIsMobile();
   
   // Early prefetch of public LoRAs to reduce loading time
@@ -112,6 +113,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
 
   // Reset to page 1 when shot filter or position filter changes
   useEffect(() => {
+    setIsFilterChange(true);
     setCurrentPage(1);
   }, [selectedShotFilter, excludePositioned]);
 
@@ -126,10 +128,15 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   useEffect(() => {
     if (generationsResponse?.items) {
       setGeneratedImages(generationsResponse.items);
-    } else {
+      // Reset filter change flag when new data arrives
+      if (isFilterChange) {
+        setIsFilterChange(false);
+      }
+    } else if (!isFilterChange) {
+      // Only clear images if this isn't a filter change (prevents layout jump)
       setGeneratedImages([]);
     }
-  }, [generationsResponse]);
+  }, [generationsResponse, isFilterChange]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
