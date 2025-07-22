@@ -135,7 +135,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
                 <TimeStamp 
                   createdAt={video.createdAt || (video as any).created_at} 
                   position="top-left"
-                  className="z-10 !top-3 !left-3"
+                  className="z-10 !top-2 !left-2"
                 />
                 
                 {/* Action buttons – styled to match ImageGallery overlays */}
