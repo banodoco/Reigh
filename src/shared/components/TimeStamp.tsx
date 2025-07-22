@@ -34,13 +34,14 @@ export const TimeStamp: React.FC<TimeStampProps> = ({
   const hoverClass = showOnHover ? 'opacity-0 group-hover:opacity-100 transition-opacity' : 'opacity-100';
 
   const formattedTime = formatDistanceToNow(date, { addSuffix: true })
+    .replace("about ", "")
+    .replace("less than a minute", "<1 min")
     .replace(" minutes", " mins")
     .replace(" minute", " min")
     .replace(" hours", " hrs")
     .replace(" hour", " hr")
     .replace(" seconds", " secs")
-    .replace(" second", " sec")
-    .replace("less than a minute", "< 1 min");
+    .replace(" second", " sec");
 
   return (
     <span 
