@@ -30,6 +30,7 @@ src/tools/image-generation/
 - Integrates `ImageGallery` with live updates
 - Handles upscaling and deletion operations
 - No environment-specific branching (Wan-only)
+- **Gallery Filtering**: Supports media type (All/Images/Videos), shot filtering, position exclusion, and prompt search
 
 ### `ImageGenerationForm.tsx`
 **Simplified generation form**

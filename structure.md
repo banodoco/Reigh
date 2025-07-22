@@ -161,7 +161,7 @@ See `.env.example` for all variables. Key ones:
 | **ToolSelectorPage** | `/tools` | Grid of available tools (or `/` in non-web envs) |
 | **HomePage** | `/` | Landing page (web env only) |
 | **ShotsPage** | `/shots` | Project shots management |
-| **GenerationsPage** | `/generations` | Media gallery with pagination |
+| **GenerationsPage** | `/generations` | Media gallery with filtering (type/shot/search) & pagination |
 | **PaymentSuccessPage** | `/payments/success` | Stripe payment confirmation |
 | **PaymentCancelPage** | `/payments/cancel` | Stripe payment cancellation |
 | **NotFoundPage** | `*` | 404 error handler |

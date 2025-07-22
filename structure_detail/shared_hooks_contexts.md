@@ -112,6 +112,11 @@ Located in `/ui/` - Full shadcn-ui component library including:
 
 ### 📸 Media Components
 - **`ImageGallery`** - Grid display with lightbox
+  - Server-side pagination support
+  - Media type filtering (All/Images/Videos)
+  - Shot-based filtering with position exclusion
+  - Prompt search functionality
+  - Drag-and-drop support for desktop
 - **`MediaLightbox`** - Full-screen media viewer
 - **`HoverScrubVideo`** - Video preview on hover
 - **`DraggableImage`** - Drag-and-drop images
