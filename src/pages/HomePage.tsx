@@ -1,6 +1,6 @@
 /* eslint-disable no-sequences */
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowRight, Video, Users, FileText, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, GitBranch, X, HandHeart, Brain, Palette, Infinity } from 'lucide-react';
+import { ArrowRight, Video, Users, FileText, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, GitBranch, X, HandHeart, Brain, Infinity } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import type { Session } from '@supabase/supabase-js';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -10,97 +10,11 @@ import { toast } from '@/shared/components/ui/use-toast';
 import { PageFadeIn } from '@/shared/components/transitions';
 import { FadeInSection } from '@/shared/components/transitions/FadeInSection';
 import { PaintParticles } from '@/shared/components/PaintParticles';
+import { PaletteIcon } from '@/shared/components/PaletteIcon';
+import { WesAndersonBackground } from '@/shared/components/WesAndersonBackground';
+import { ReighLoading } from '@/shared/components/ReighLoading';
 
-// Memoized Paper Planes component for performance
-const PaperPlanes = React.memo(() => {
-  // Generate planes once on mount
-  const planes = React.useMemo(() => {
-    return Array.from({ length: 1000 }).map((_, index) => {
-      // Random properties for each plane
-      const colors = ['wes-vintage-gold', 'wes-coral', 'wes-mint', 'wes-lavender', 'wes-pink', 'wes-yellow', 'wes-dusty-blue', 'wes-sage'];
-      const color = colors[Math.floor(Math.random() * colors.length)];
-      const size = Math.random() * 8 + 6; // 6-14px (smaller for performance)
-      const opacity = Math.random() * 0.08 + 0.02; // 0.02-0.10 opacity (more subtle)
-      const duration = Math.random() * 50 + 30; // 30-80s duration (slower for less CPU)
-      const delay = Math.random() * 80; // 0-80s delay (more spread out)
-      
-      // Random starting position
-      const startSide = Math.floor(Math.random() * 4); // 0: top, 1: right, 2: bottom, 3: left
-      const startPos = Math.random() * 100;
-      
-      // Random animation type
-      const animationTypes = [
-        'paper-plane-diagonal-tl-br',
-        'paper-plane-diagonal-tr-bl',
-        'paper-plane-diagonal-bl-tr',
-        'paper-plane-diagonal-br-tl',
-        'paper-plane-horizontal-lr',
-        'paper-plane-horizontal-rl',
-        'paper-plane-vertical-tb',
-        'paper-plane-vertical-bt',
-        'paper-plane-spiral-cw',
-        'paper-plane-spiral-ccw',
-        'paper-plane-zigzag-h',
-        'paper-plane-zigzag-v',
-      ];
-      const animationType = animationTypes[Math.floor(Math.random() * animationTypes.length)];
-      
-      // Set initial position based on start side
-      let initialStyle: React.CSSProperties = {
-        borderLeft: `${size * 0.6}px solid transparent`,
-        borderRight: `${size * 0.6}px solid transparent`,
-        borderBottom: `${size}px solid`,
-        borderBottomColor: `rgb(var(--${color}) / 0.3)`,
-        transformOrigin: 'center bottom',
-        filter: 'drop-shadow(0 0.5px 1px rgba(0,0,0,0.05))',
-        opacity,
-        animation: `${animationType} ${duration}s linear infinite`,
-        animationDelay: `${delay}s`,
-        willChange: 'transform',
-        // Optimize rendering
-        contain: 'layout style paint',
-        pointerEvents: 'none' as const,
-      };
-      
-      // Set starting position
-      switch (startSide) {
-        case 0: // top
-          initialStyle.top = '-30px';
-          initialStyle.left = `${startPos}%`;
-          break;
-        case 1: // right
-          initialStyle.right = '-30px';
-          initialStyle.top = `${startPos}%`;
-          break;
-        case 2: // bottom
-          initialStyle.bottom = '-30px';
-          initialStyle.left = `${startPos}%`;
-          break;
-        case 3: // left
-          initialStyle.left = '-30px';
-          initialStyle.top = `${startPos}%`;
-          break;
-      }
-      
-      return { id: index, style: initialStyle };
-    });
-  }, []);
-  
-  return (
-    <>
-      {planes.map(plane => (
-        <div
-          key={plane.id}
-          className="absolute w-0 h-0"
-          style={plane.style}
-          aria-hidden="true"
-        />
-      ))}
-    </>
-  );
-});
 
-PaperPlanes.displayName = 'PaperPlanes';
 
 export default function HomePage() {
   const [expandedFAQ, setExpandedFAQ] = useState<number | null>(null);
@@ -201,6 +115,8 @@ export default function HomePage() {
       if (ref.current) ref.current.scrollTop = 0;
     }, 300);
   };
+
+
 
   // Preload assets
   useEffect(() => {
@@ -304,55 +220,23 @@ export default function HomePage() {
 
   // Only render content when assets are loaded
   if (!assetsLoaded) {
-    return (
-      <div className="min-h-screen wes-texture relative overflow-hidden flex items-center justify-center">
-        <div className="w-32 h-1.5 bg-gradient-to-r from-wes-pink to-wes-vintage-gold rounded-full mx-auto shadow-inner-vintage animate-pulse"></div>
-      </div>
-    );
+    return <ReighLoading />;
   }
 
-  return (
+    return (
     <PageFadeIn className="h-screen wes-texture relative overflow-hidden">
-      {/* Animated Background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-wes-cream via-white to-wes-mint/20 opacity-60 animate-gradient-shift"></div>
-      <div className="absolute inset-0 wes-chevron-pattern opacity-30 animate-pulse-subtle"></div>
-      <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-wes-vintage-gold via-wes-coral to-wes-mint animate-shimmer"></div>
-      
-      {/* Floating Background Particles */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {/* Large floating orbs */}
-        <div className="absolute top-20 left-10 w-32 h-32 bg-wes-pink/10 rounded-full blur-3xl animate-float-slow"></div>
-        <div className="absolute top-40 right-20 w-24 h-24 bg-wes-yellow/15 rounded-full blur-2xl animate-float-slow" style={{ animationDelay: '2s' }}></div>
-        <div className="absolute bottom-20 left-1/4 w-40 h-40 bg-wes-lavender/10 rounded-full blur-3xl animate-float-slow" style={{ animationDelay: '4s' }}></div>
-        
-        {/* Small floating particles */}
-        <div className="absolute top-1/4 left-1/3 w-2 h-2 bg-wes-vintage-gold/20 rounded-full animate-float-gentle" style={{ animationDelay: '1s' }}></div>
-        <div className="absolute top-1/3 right-1/4 w-1.5 h-1.5 bg-wes-coral/25 rounded-full animate-float-gentle" style={{ animationDelay: '3s' }}></div>
-        <div className="absolute top-2/3 left-1/6 w-1 h-1 bg-wes-mint/30 rounded-full animate-float-gentle" style={{ animationDelay: '5s' }}></div>
-        <div className="absolute bottom-1/3 right-1/3 w-2.5 h-2.5 bg-wes-pink/15 rounded-full animate-float-gentle" style={{ animationDelay: '7s' }}></div>
-        <div className="absolute top-1/2 left-2/3 w-1.5 h-1.5 bg-wes-lavender/20 rounded-full animate-float-gentle" style={{ animationDelay: '9s' }}></div>
-        
-        {/* Subtle geometric shapes */}
-        <div className="absolute top-1/6 right-1/6 w-3 h-3 border border-wes-vintage-gold/15 rotate-45 animate-rotate-gentle" style={{ animationDelay: '2s' }}></div>
-        <div className="absolute bottom-1/4 left-1/5 w-2 h-2 border border-wes-coral/20 rotate-12 animate-rotate-gentle" style={{ animationDelay: '6s' }}></div>
-        <div className="absolute top-3/4 right-2/5 w-2.5 h-2.5 border border-wes-mint/18 -rotate-12 animate-rotate-gentle" style={{ animationDelay: '4s' }}></div>
-        
-        {/* Paper Planes - 1000 of them! */}
-        <PaperPlanes />
-      </div>
+      <WesAndersonBackground />
       
       {/* Top Navigation Links */}
-      <div className={`fixed top-6 left-6 sm:top-12 sm:left-12 flex items-center space-x-6 ${
+      {/* <div className={`fixed top-6 left-6 sm:top-12 sm:left-12 flex items-center space-x-6 ${
         showCreativePartner || isCreativePartnerPaneClosing || showPhilosophy || isPhilosophyPaneClosing || showExamples || isExamplesPaneClosing || isCreativePartnerPaneOpening || isPhilosophyPaneOpening || isExamplesPaneOpening ? 'z-0' : 'z-50'
       }`}>
-        {/* Creative Partner Programme */}
         <button
           onClick={() => {
             setIsCreativePartnerButtonAnimating(true);
             setIsCreativePartnerPaneOpening(true);
             setShowPhilosophy(false);
             setShowCreativePartner(true);
-            // Reset animation state after pane is fully open
             setTimeout(() => setIsCreativePartnerButtonAnimating(false), 350);
             setTimeout(() => setIsCreativePartnerPaneOpening(false), 300);
           }}
@@ -369,19 +253,17 @@ export default function HomePage() {
           <HandHeart className="w-6 h-6 sm:w-4 sm:h-4 animate-gifting-motion" />
           <span className="font-inter text-sm font-medium hidden sm:inline">Open Creative Partner Programme</span>
         </button>
-      </div>
+      </div> */}
         
-      <div className={`fixed top-6 right-6 sm:top-12 sm:right-12 flex items-center ${
+      {/* <div className={`fixed top-6 right-6 sm:top-12 sm:right-12 flex items-center ${
         showCreativePartner || isCreativePartnerPaneClosing || showPhilosophy || isPhilosophyPaneClosing || showExamples || isExamplesPaneClosing || isPhilosophyPaneOpening || isCreativePartnerPaneOpening || isExamplesPaneOpening ? 'z-0' : 'z-50'
       }`}>
-        {/* Philosophy Link */}
         <button
           onClick={() => {
             setIsPhilosophyButtonAnimating(true);
             setIsPhilosophyPaneOpening(true);
             setShowCreativePartner(false);
             setShowPhilosophy(true);
-            // Reset animation state after pane is fully open
             setTimeout(() => setIsPhilosophyButtonAnimating(false), 350);
             setTimeout(() => setIsPhilosophyPaneOpening(false), 300);
           }}
@@ -398,7 +280,7 @@ export default function HomePage() {
           <Brain className="w-6 h-6 sm:w-4 sm:h-4 text-wes-vintage-gold animate-brain-pulse" />
           <span className="font-inter text-sm font-medium text-primary group-hover:text-primary/80 hidden sm:inline">Philosophy</span>
         </button>
-      </div>
+      </div> */}
 
       <div className="container mx-auto px-4 relative z-10 h-screen flex items-center justify-center">
         {/* Hero Section */}
@@ -408,13 +290,7 @@ export default function HomePage() {
 
             {/* Icon above title */}
             <FadeInSection delayMs={25}>
-              <div className="flex justify-center mb-6 mt-6">
-                <div className="relative">
-                  <div className="flex items-center justify-center w-12 h-12 md:w-14 md:h-14 bg-gradient-to-br from-wes-pink/60 via-wes-lavender/60 to-wes-dusty-blue/60 rounded-lg border border-wes-vintage-gold/20 shadow-sm transition-all duration-300 opacity-70 group group-hover:opacity-100">
-                    <Palette className="h-6 w-6 md:h-7 md:w-7 text-white/90 transition-transform duration-300 group-hover:rotate-3 group-hover:scale-105" />
-                  </div>
-                </div>
-              </div>
+              <PaletteIcon className="mb-6 mt-6" />
             </FadeInSection>
             
             {/* Main title */}

@@ -46,8 +46,8 @@ function calculateTaskCost(
     }
   }
 
-  // Round up to nearest cent
-  return Math.ceil(totalCost);
+  // Round to 3 decimal places (fractional cents)
+  return Math.round(totalCost * 1000) / 1000;
 }
 
 serve(async (req) => {
@@ -102,6 +102,18 @@ serve(async (req) => {
     // Check if task has both start and end times
     if (!task.generation_started_at || !task.generation_processed_at) {
       return jsonResponse({ error: 'Task must have both generation_started_at and generation_processed_at timestamps' }, 400);
+    }
+
+    // Check if task has orchestrator_task_id_ref - skip billing if present (sub-task of parent)
+    if (task.params?.orchestrator_task_id_ref) {
+      console.log(`Task ${task_id} has orchestrator_task_id_ref ${task.params.orchestrator_task_id_ref}, skipping credit ledger entry (sub-task)`);
+      return jsonResponse({
+        success: true,
+        skipped: true,
+        reason: 'Task is sub-task of orchestrator, parent task will be billed',
+        orchestrator_task_id: task.params.orchestrator_task_id_ref,
+        task_id: task.id
+      });
     }
 
     // Get task cost configuration

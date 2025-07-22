@@ -17,7 +17,7 @@ import ShotsPage from "@/pages/ShotsPage";
 import GenerationsPage from "@/pages/GenerationsPage"; // Import the new GenerationsPage
 import Layout from './Layout'; // Import the new Layout component
 import { AppEnv } from '@/types/env';
-import { Loading } from '@/shared/components/ui/loading';
+import { ReighLoading } from '@/shared/components/ReighLoading';
 import { supabase } from '@/integrations/supabase/client';
 
 // Determine the environment
@@ -25,9 +25,7 @@ const currentEnv = (import.meta.env.VITE_APP_ENV?.toLowerCase() || AppEnv.WEB);
 
 // Loading fallback component for lazy loaded pages
 const LazyLoadingFallback = () => (
-  <div className="flex items-center justify-center h-[50vh]">
-    <Loading />
-  </div>
+  <ReighLoading />
 );
 
 const router = createBrowserRouter([

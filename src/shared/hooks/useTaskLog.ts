@@ -86,7 +86,9 @@ export function useTaskLog(
       let query = supabase
         .from('tasks')
         .select('*', { count: 'exact' })
-        .in('project_id', projectIds);
+        .in('project_id', projectIds)
+        // Only show parent orchestrator tasks, not sub-tasks
+        .is('params->orchestrator_task_id_ref', null);
 
       // Apply status filter
       if (filters.status && filters.status.length > 0) {

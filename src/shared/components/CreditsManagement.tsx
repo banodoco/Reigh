@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Coins, CreditCard, History, Gift, DollarSign, Activity, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Coins, CreditCard, History, Gift, DollarSign, Activity, Filter, ChevronLeft, ChevronRight, Download } from 'lucide-react';
 import { Button } from '@/shared/components/ui/button';
 import { Badge } from '@/shared/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
@@ -47,10 +47,11 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
   const [taskLogPage, setTaskLogPage] = useState(1);
   const [taskLogFilters, setTaskLogFilters] = useState({
     costFilter: 'all' as 'all' | 'free' | 'paid',
-    status: [] as string[],
+    status: ['Complete'] as string[], // Default to showing only completed tasks
     taskTypes: [] as string[],
     projectIds: [] as string[],
   });
+  const [isDownloading, setIsDownloading] = useState(false);
 
   const { data: taskLogData, isLoading: isLoadingTaskLog } = useTaskLog(20, taskLogPage, taskLogFilters);
 
@@ -90,7 +91,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
   const clearFilters = () => {
     setTaskLogFilters({
       costFilter: 'all',
-      status: [],
+      status: ['Complete'], // Reset to default completed filter
       taskTypes: [],
       projectIds: [],
     });
@@ -107,6 +108,11 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
   };
 
   const formatTaskType = (taskType: string) => {
+    // Special case for travel_orchestrator
+    if (taskType === 'travel_orchestrator') {
+      return 'Travel Between Images';
+    }
+    
     return taskType.split('_').map(word => 
       word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
     ).join(' ');
@@ -115,6 +121,129 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
   const handlePurchase = () => {
     if (purchaseAmount > 0) {
       createCheckout(purchaseAmount);
+    }
+  };
+
+  // Download all filtered task records as CSV
+  const handleDownloadTaskLog = async () => {
+    setIsDownloading(true);
+    try {
+      // Import useTaskLog hook's query function directly
+      const { supabase } = await import('@/integrations/supabase/client');
+      
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        throw new Error('Authentication required');
+      }
+
+      // Get user's projects
+      const { data: projects } = await supabase
+        .from('projects')
+        .select('id, name')
+        .eq('user_id', user.id);
+
+      if (!projects || projects.length === 0) {
+        return;
+      }
+
+      const projectIds = projects.map(p => p.id);
+      const projectLookup = Object.fromEntries(projects.map(p => [p.id, p.name]));
+
+      // Build query with current filters (no pagination)
+      let query = supabase
+        .from('tasks')
+        .select('*')
+        .in('project_id', projectIds);
+
+      if (taskLogFilters.status && taskLogFilters.status.length > 0) {
+        query = query.in('status', taskLogFilters.status);
+      }
+      if (taskLogFilters.taskTypes && taskLogFilters.taskTypes.length > 0) {
+        query = query.in('task_type', taskLogFilters.taskTypes);
+      }
+      if (taskLogFilters.projectIds && taskLogFilters.projectIds.length > 0) {
+        query = query.in('project_id', taskLogFilters.projectIds);
+      }
+
+      const { data: tasksData, error: tasksError } = await query
+        .order('created_at', { ascending: false });
+
+      if (tasksError) {
+        throw new Error(`Failed to fetch tasks: ${tasksError.message}`);
+      }
+
+      // Get cost information for all tasks
+      const taskIds = tasksData?.map(task => task.id) || [];
+      let costsData: any[] = [];
+      
+      if (taskIds.length > 0) {
+        const { data: costs } = await supabase
+          .from('credits_ledger')
+          .select('task_id, amount, created_at')
+          .in('task_id', taskIds)
+          .eq('type', 'spend');
+
+        costsData = costs || [];
+      }
+
+      // Combine tasks with cost information
+      let tasks = (tasksData || []).map(task => {
+        const costEntry = costsData.find(cost => cost.task_id === task.id);
+        let duration: number | undefined;
+        
+        if (task.generation_started_at && task.generation_processed_at) {
+          const start = new Date(task.generation_started_at);
+          const end = new Date(task.generation_processed_at);
+          duration = Math.ceil((end.getTime() - start.getTime()) / 1000);
+        }
+
+        return {
+          date: new Date(task.created_at).toLocaleDateString(),
+          taskType: formatTaskType(task.task_type),
+          project: projectLookup[task.project_id] || 'Unknown Project',
+          status: task.status,
+          duration: duration ? `${duration}s` : '',
+          cost: costEntry ? `$${(Math.abs(costEntry.amount) / 100).toFixed(3)}` : 'Free',
+        };
+      });
+
+      // Apply cost filter (client-side)
+      if (taskLogFilters.costFilter === 'free') {
+        tasks = tasks.filter(task => task.cost === 'Free');
+      } else if (taskLogFilters.costFilter === 'paid') {
+        tasks = tasks.filter(task => task.cost !== 'Free');
+      }
+
+      // Convert to CSV
+      const headers = ['Date', 'Task Type', 'Project', 'Status', 'Duration', 'Cost'];
+      const csvContent = [
+        headers.join(','),
+        ...tasks.map(task => [
+          task.date,
+          `"${task.taskType}"`,
+          `"${task.project}"`,
+          task.status,
+          task.duration,
+          task.cost
+        ].join(','))
+      ].join('\n');
+
+      // Download file
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `task-log-${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+    } catch (error) {
+      console.error('Error downloading task log:', error);
+      // Could add toast error here if needed
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -242,7 +371,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                     <p className="text-gray-600">Loading transaction history...</p>
                   </div>
                 </div>
-              ) : (ledgerData?.entries?.length || 0) === 0 ? (
+              ) : (ledgerData?.entries?.filter(tx => tx.type !== 'spend').length || 0) === 0 ? (
                 <div className="p-8 text-center">
                   <Gift className="w-8 h-8 text-gray-400 mx-auto mb-2" />
                   <p className="text-gray-600">No transactions yet</p>
@@ -257,11 +386,10 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                       <TableHead>Date</TableHead>
                       <TableHead>Type</TableHead>
                       <TableHead>Amount</TableHead>
-                      <TableHead>Details</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {ledgerData?.entries?.map((tx, index) => (
+                    {ledgerData?.entries?.filter(tx => tx.type !== 'spend').map((tx, index) => (
                       <TableRow key={index}>
                         <TableCell>
                           {formatDistanceToNow(new Date(tx.created_at), { addSuffix: true })}
@@ -279,9 +407,6 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                           }`}
                         >
                           {tx.amount > 0 ? `+${formatCurrency(tx.amount)}` : formatCurrency(tx.amount)}
-                        </TableCell>
-                        <TableCell className="text-sm text-gray-500">
-                          {tx.description || formatTransactionType?.(tx.type) || tx.type}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -543,10 +668,31 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                 </Button>
               )}
 
-              {/* Results count */}
-              <div className="ml-auto text-sm text-gray-500">
+            </div>
+
+            {/* Download Button Section */}
+            <div className="flex justify-end items-center gap-2">
+              <span className="text-sm text-gray-500">
                 {taskLogData?.pagination.total || 0} task{(taskLogData?.pagination.total || 0) !== 1 ? 's' : ''}
-              </div>
+              </span>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleDownloadTaskLog}
+                disabled={isDownloading || !taskLogData?.tasks?.length}
+                className="h-8"
+              >
+                {isDownloading ? (
+                  <div className="animate-spin">
+                    <Download className="w-4 h-4" />
+                  </div>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4 mr-1" />
+                    Download CSV
+                  </>
+                )}
+              </Button>
             </div>
 
             {/* Helper text when no filters are active */}
@@ -609,7 +755,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                             {formatDistanceToNow(new Date(task.createdAt), { addSuffix: true })}
                           </TableCell>
                           <TableCell>
-                            <Badge variant="outline" className="capitalize">
+                            <Badge variant="outline" className="capitalize py-1.5 my-1">
                               {formatTaskType(task.taskType)}
                             </Badge>
                           </TableCell>
@@ -630,10 +776,12 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                           <TableCell className="text-sm text-gray-600">
                             {task.duration ? `${task.duration}s` : '-'}
                           </TableCell>
-                                                  <TableCell className={`font-semibold text-sm ${
-                          task.cost ? 'text-red-600' : 'text-gray-400'
-                        }`}>
-                          {task.cost ? `$${parseFloat(task.cost.toString()).toFixed(3)}` : 'Free'}
+                                                  <TableCell 
+                          className={`font-semibold text-sm ${
+                            task.cost ? 'text-red-600' : 'text-gray-400'
+                          }`}
+                          >
+                          {task.cost ? `$${(parseFloat(task.cost.toString()) / 100).toFixed(3)}` : 'Free'}
                         </TableCell>
                         </TableRow>
                       ))}

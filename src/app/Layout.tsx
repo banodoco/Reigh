@@ -9,7 +9,7 @@ import { usePanes } from '@/shared/contexts/PanesContext';
 import { useContentResponsive } from '@/shared/hooks/useContentResponsive';
 import { supabase } from '@/integrations/supabase/client';
 import type { Session } from '@supabase/supabase-js';
-import { Loading } from '@/shared/components/ui/loading';
+import { ReighLoading } from '@/shared/components/ReighLoading';
 import SettingsModal from '@/shared/components/SettingsModal';
 import { useHeaderState } from '@/shared/contexts/ToolPageHeaderContext';
 import { GlobalProcessingWarning } from '@/shared/components/ProcessingWarnings';
@@ -80,9 +80,7 @@ const Layout: React.FC = () => {
   // Show loading spinner while determining auth state
   if (session === undefined) {
     return (
-      <div className="flex items-center justify-center h-[50vh]">
-        <Loading />
-      </div>
+      <ReighLoading />
     );
   }
 

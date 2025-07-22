@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
-import { Loading } from '@/shared/components/ui/loading';
+import { ReighLoading } from '@/shared/components/ReighLoading';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 
 interface PanesContextType {
@@ -167,9 +167,7 @@ export const PanesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   return (
     <PanesContext.Provider value={value}>
       {(isLoading && !isMobile) ? (
-        <div className="fixed inset-0 flex items-center justify-center z-50">
-          <Loading size="lg" />
-        </div>
+        <ReighLoading />
       ) : (
         children
       )}

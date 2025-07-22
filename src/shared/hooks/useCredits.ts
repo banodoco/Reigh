@@ -76,7 +76,8 @@ async function fetchCreditLedger(limit: number = 50, offset: number = 0): Promis
     const { count, error: countError } = await supabase
       .from('credits_ledger')
       .select('*', { count: 'exact', head: true })
-      .eq('user_id', user.id);
+      .eq('user_id', user.id)
+      .neq('type', 'spend');
 
     if (countError) {
       throw new Error(`Failed to fetch ledger count: ${countError.message}`);
@@ -87,6 +88,7 @@ async function fetchCreditLedger(limit: number = 50, offset: number = 0): Promis
       .from('credits_ledger')
       .select('*')
       .eq('user_id', user.id)
+      .neq('type', 'spend')
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
