@@ -8,6 +8,9 @@ const GENERATIONS_PER_PAGE = 45; // 45 items per page for consistency
 
 const GenerationsPage: React.FC = () => {
   const { isLoadingProjects } = useProject();
+  // Add state for media type filter
+  const [mediaTypeFilter, setMediaTypeFilter] = React.useState<'all' | 'image' | 'video'>('all');
+  
   const {
     selectedProjectId,
     shotsData,
@@ -30,9 +33,14 @@ const GenerationsPage: React.FC = () => {
     page
   } = useGenerationsPageLogic({
     itemsPerPage: GENERATIONS_PER_PAGE,
-    mediaType: 'image'
+    mediaType: mediaTypeFilter // Pass dynamic mediaType instead of hardcoded 'image'
   });
 
+  // Handle media type filter change
+  const handleMediaTypeFilterChange = (newMediaType: 'all' | 'image' | 'video') => {
+    setMediaTypeFilter(newMediaType);
+    // Page reset is now handled in the hook via useEffect
+  };
 
 
     return (
@@ -69,7 +77,7 @@ const GenerationsPage: React.FC = () => {
           totalCount={totalCount}
           columnsPerRow={6}
           whiteText={false}
-          initialMediaTypeFilter="image"
+          initialMediaTypeFilter={mediaTypeFilter}
           showShotFilter={true}
           initialShotFilter={selectedShotFilter}
           onShotFilterChange={setSelectedShotFilter}
@@ -80,6 +88,7 @@ const GenerationsPage: React.FC = () => {
           onSearchChange={setSearchTerm}
           onServerPageChange={handleServerPageChange}
           serverPage={page}
+          onMediaTypeFilterChange={handleMediaTypeFilterChange}
         />
       )}
     </div>

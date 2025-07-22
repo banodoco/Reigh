@@ -46,6 +46,11 @@ export function useGenerationsPageLogic({
     // setCurrentItems([]) was causing layout jump
   }, [selectedShotFilter, excludePositioned]);
 
+  // Reset to page 1 when media type changes
+  useEffect(() => {
+    setPage(1);
+  }, [mediaType]);
+
   const { data: generationsResponse, isLoading, isError, error } = useGenerations(
     selectedProjectId, 
     page, 

@@ -120,6 +120,8 @@ interface ImageGalleryProps {
   initialSearchTerm?: string;
   /** Callback when search term changes */
   onSearchChange?: (searchTerm: string) => void;
+  /** Callback when media type filter changes */
+  onMediaTypeFilterChange?: (mediaType: 'all' | 'image' | 'video') => void;
 }
 
 // Helper to format metadata for display
@@ -231,7 +233,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   onExcludePositionedChange,
   showSearch = false,
   initialSearchTerm = '',
-  onSearchChange
+  onSearchChange,
+  onMediaTypeFilterChange
 }) => {
   const [activeLightboxMedia, setActiveLightboxMedia] = useState<GenerationRow | null>(null);
   const [downloadingImageId, setDownloadingImageId] = useState<string | null>(null);
@@ -667,7 +670,10 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                 {/* New Media Type Filter */}
                 <div className="flex items-center space-x-1.5">
                     <Label htmlFor="media-type-filter" className={`text-sm font-medium ${whiteText ? 'text-white' : 'text-muted-foreground'}`}>Type:</Label>
-                    <Select value={mediaTypeFilter} onValueChange={(value: 'all' | 'image' | 'video') => setMediaTypeFilter(value)}>
+                    <Select value={mediaTypeFilter} onValueChange={(value: 'all' | 'image' | 'video') => {
+                      setMediaTypeFilter(value);
+                      onMediaTypeFilterChange?.(value);
+                    }}>
                         <SelectTrigger id="media-type-filter" className="h-8 text-xs w-[100px]"> {/* Adjusted width slightly */}
                             <SelectValue />
                         </SelectTrigger>

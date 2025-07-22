@@ -56,6 +56,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   const [lastKnownTotal, setLastKnownTotal] = useState<number>(0);
   const [isPageChange, setIsPageChange] = useState(false);
   const [isFilterChange, setIsFilterChange] = useState(false);
+  const [mediaTypeFilter, setMediaTypeFilter] = useState<'all' | 'image' | 'video'>('all'); // Add media type filter state
   const isMobile = useIsMobile();
   
   // Early prefetch of public LoRAs to reduce loading time
@@ -101,7 +102,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     itemsPerPage, 
     loadGenerations,
     {
-      mediaType: 'image',
+      mediaType: mediaTypeFilter, // Use dynamic mediaType instead of hardcoded 'image'
       shotId: selectedShotFilter === 'all' ? undefined : selectedShotFilter,
       excludePositioned: selectedShotFilter !== 'all' ? excludePositioned : undefined
     }
@@ -116,6 +117,12 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     setIsFilterChange(true);
     setCurrentPage(1);
   }, [selectedShotFilter, excludePositioned]);
+
+  // Reset to page 1 when media type changes
+  useEffect(() => {
+    setIsFilterChange(true);
+    setCurrentPage(1);
+  }, [mediaTypeFilter]);
 
   // Update last known total when we get valid data
   useEffect(() => {
@@ -461,6 +468,12 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     setCurrentPage(page);
   },[]);
 
+  // Handle media type filter change
+  const handleMediaTypeFilterChange = useCallback((newMediaType: 'all' | 'image' | 'video') => {
+    setMediaTypeFilter(newMediaType);
+    // Page reset is now handled in the useEffect
+  }, []);
+
   // [NavPerf] Stop timers when page has mounted
   useEffect(() => {
     timeEnd('NavPerf', 'PageLoad:/tools/image-generation');
@@ -470,7 +483,11 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   useEffect(() => {
     if (!selectedProjectId || !loadGenerations) return;
 
-    const filters = { mediaType: 'image' } as const;
+    const filters = { 
+      mediaType: mediaTypeFilter,
+      shotId: selectedShotFilter === 'all' ? undefined : selectedShotFilter,
+      excludePositioned: selectedShotFilter !== 'all' ? excludePositioned : undefined
+    };
 
     const nextPage = currentPage + 1;
     
@@ -502,7 +519,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
         });
       });
     }
-  }, [selectedProjectId, currentPage, itemsPerPage, queryClient, loadGenerations]);
+  }, [selectedProjectId, currentPage, itemsPerPage, queryClient, loadGenerations, mediaTypeFilter, selectedShotFilter, excludePositioned]);
 
   useEffect(()=>{
     if(generationsResponse && isPageChange){
@@ -570,7 +587,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
                 lastShotId={targetShotInfo.targetShotIdForButton}
                 lastShotNameForTooltip={targetShotInfo.targetShotNameForButtonTooltip}
                 currentToolType="image-generation"
-                initialMediaTypeFilter="image"
+                initialMediaTypeFilter={mediaTypeFilter}
                 itemsPerPage={itemsPerPage}
                 offset={(currentPage - 1) * itemsPerPage}
                 totalCount={generationsResponse?.total ?? lastKnownTotal}
@@ -584,6 +601,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
                 showSearch={true}
                 initialSearchTerm={searchTerm}
                 onSearchChange={setSearchTerm}
+                onMediaTypeFilterChange={handleMediaTypeFilterChange}
               />
             )}
           </div>
