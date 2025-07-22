@@ -62,10 +62,7 @@ async function processCompletedStitchTask(task: any): Promise<void> {
   let outputLocation = task.output_location;
   const projectId = task.project_id;
 
-  // Normalize the output location
-  if (outputLocation) {
-    outputLocation = normalizeImagePath(outputLocation);
-  }
+  // Keep full public URL. No more host-stripping since proxy server removed.
 
   if (!shotId || !outputLocation || !projectId) {
     console.error(`[ProcessTask] Missing critical data for task ${task.id}`, { 
@@ -161,8 +158,7 @@ async function processCompletedSingleImageTask(task: any): Promise<void> {
     return;
   }
 
-  // Normalize the output location
-  outputLocation = normalizeImagePath(outputLocation);
+  // Keep full public URL – client now fetches directly from Supabase Storage
 
   try {
     // Create generation record
