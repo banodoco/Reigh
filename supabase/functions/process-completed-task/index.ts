@@ -72,7 +72,7 @@ async function processCompletedStitchTask(task: any): Promise<void> {
     });
     return;
   }
-
+  
   try {
     // Create generation record
     const newGenerationId = crypto.randomUUID();
@@ -201,10 +201,14 @@ async function processCompletedSingleImageTask(task: any): Promise<void> {
 
     console.log(`[ProcessTask] Successfully processed task ${task.id}, created generation ${newGenerationId}`);
 
+    // Realtime broadcasts happen via database triggers; no manual broadcast needed.
+
   } catch (error) {
     console.error(`[ProcessTask] Error processing single_image task ${task.id}:`, error);
   }
 }
+
+// broadcastUpdate helper removed (duplicate of DB trigger broadcast)
 
 serve(async (req) => {
   try {
