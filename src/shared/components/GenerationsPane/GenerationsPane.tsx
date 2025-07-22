@@ -9,7 +9,7 @@ import { LockIcon, UnlockIcon, ArrowUpIcon, ChevronLeft, ChevronRight } from 'lu
 import { useNavigate } from 'react-router-dom';
 import { ImageGallery } from '@/shared/components/ImageGallery';
 import { LastAffectedShotContext } from '@/shared/contexts/LastAffectedShotContext';
-import { useListShots, useAddImageToShot } from '@/shared/hooks/useShots';
+import { useListShots, useAddImageToShot, usePositionExistingGenerationInShot } from '@/shared/hooks/useShots';
 import { toast } from 'sonner';
 import { usePanes } from '@/shared/contexts/PanesContext';
 import PaneControlTab from '../PaneControlTab';
@@ -57,6 +57,7 @@ export const GenerationsPane: React.FC = () => {
   const lastAffectedShotContext = useContext(LastAffectedShotContext);
   const { lastAffectedShotId = null, setLastAffectedShotId = () => {} } = lastAffectedShotContext || {};
   const addImageToShotMutation = useAddImageToShot();
+  const positionExistingGenerationMutation = usePositionExistingGenerationInShot();
   const deleteGenerationMutation = useDeleteGeneration();
 
   // Server-side pagination - data is already paginated
@@ -122,22 +123,48 @@ export const GenerationsPane: React.FC = () => {
       });
       return Promise.resolve(false);
     }
+    
+    // Check if we're trying to add to the same shot that's currently filtered with excludePositioned enabled
+    const shouldPositionExisting = selectedShotFilter !== 'all' && 
+                                  selectedShotFilter === lastAffectedShotId && 
+                                  excludePositioned;
+    
     return new Promise<boolean>((resolve) => {
-      addImageToShotMutation.mutate({
-        shot_id: lastAffectedShotId,
-        generation_id: generationId,
-        project_id: selectedProjectId!,
-      }, {
-        onSuccess: () => {          
-          resolve(true);
-        },
-        onError: (error) => {
-          toast.error("Failed to add image to shot", {
-            description: error.message,
-          });
-          resolve(false);
-        }
-      });
+      if (shouldPositionExisting) {
+        // Use the position existing function for items in the filtered list
+        positionExistingGenerationMutation.mutate({
+          shot_id: lastAffectedShotId,
+          generation_id: generationId,
+          project_id: selectedProjectId!,
+        }, {
+          onSuccess: () => {          
+            resolve(true);
+          },
+          onError: (error) => {
+            toast.error("Failed to position image in shot", {
+              description: error.message,
+            });
+            resolve(false);
+          }
+        });
+      } else {
+        // Use the regular add function
+        addImageToShotMutation.mutate({
+          shot_id: lastAffectedShotId,
+          generation_id: generationId,
+          project_id: selectedProjectId!,
+        }, {
+          onSuccess: () => {          
+            resolve(true);
+          },
+          onError: (error) => {
+            toast.error("Failed to add image to shot", {
+              description: error.message,
+            });
+            resolve(false);
+          }
+        });
+      }
     });
   };
 

@@ -371,6 +371,45 @@ export const useAddImageToShot = () => {
   });
 };
 
+// Position existing generation with NULL position in shot
+export const usePositionExistingGenerationInShot = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ shot_id, generation_id, project_id }: { 
+      shot_id: string; 
+      generation_id: string; 
+      project_id: string;
+    }) => {
+      // Use RPC function to position existing generation with NULL position
+      const { data: shotGeneration, error: rpcError } = await supabase
+        .rpc('position_existing_generation_in_shot', {
+          p_shot_id: shot_id,
+          p_generation_id: generation_id
+        })
+        .single();
+      
+      if (rpcError) throw rpcError;
+      
+      return shotGeneration;
+    },
+    onSuccess: (_, variables) => {
+      // Use the project_id from variables directly
+      const project_id = variables.project_id;
+      
+      if (project_id) {
+        queryClient.invalidateQueries({ queryKey: ['shots', project_id] });
+        // Also invalidate generations cache so GenerationsPane updates immediately
+        queryClient.invalidateQueries({ queryKey: ['generations', project_id] });
+      }      
+    },
+    onError: (error: Error) => {
+      console.error('Error positioning existing generation in shot:', error);
+      toast.error(`Failed to position generation in shot: ${error.message}`);
+    },
+  });
+};
+
 // Type for the arguments of useRemoveImageFromShot mutation
 interface RemoveImageFromShotArgs {
   shot_id: string;
