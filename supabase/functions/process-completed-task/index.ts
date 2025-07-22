@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { normalizeImagePathsInObject } from "../_shared/urlHelpers.ts";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -7,48 +8,6 @@ const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const supabase = createClient(supabaseUrl, supabaseServiceKey, {
   auth: { persistSession: false }
 });
-
-/**
- * Normalizes image paths by removing server IP addresses
- */
-function normalizeImagePath(imagePath: string): string {
-  if (!imagePath) return imagePath;
-  
-  const localServerPattern = /^https?:\/\/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d+/;
-  
-  if (localServerPattern.test(imagePath)) {
-    const url = new URL(imagePath);
-    return url.pathname.startsWith('/') ? url.pathname.substring(1) : url.pathname;
-  }
-  
-  return imagePath;
-}
-
-/**
- * Recursively normalizes image paths in objects/arrays
- */
-function normalizeImagePathsInObject(obj: any): any {
-  if (typeof obj === 'string') {
-    if (obj.match(/\.(png|jpg|jpeg|gif|webp|svg)$/i) || obj.includes('/files/')) {
-      return normalizeImagePath(obj);
-    }
-    return obj;
-  }
-  
-  if (Array.isArray(obj)) {
-    return obj.map(item => normalizeImagePathsInObject(item));
-  }
-  
-  if (obj && typeof obj === 'object') {
-    const normalized: any = {};
-    for (const [key, value] of Object.entries(obj)) {
-      normalized[key] = normalizeImagePathsInObject(value);
-    }
-    return normalized;
-  }
-  
-  return obj;
-}
 
 /**
  * Processes completed travel_stitch tasks
