@@ -27,6 +27,7 @@ export function useGenerationsPageLogic({
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [lastKnownTotal, setLastKnownTotal] = useState<number>(0);
   const [currentItems, setCurrentItems] = useState<GeneratedImageWithMetadata[]>([]);
+  const [isPageChange, setIsPageChange] = useState(false);
   
   const { data: shotsData } = useListShots(selectedProjectId);
   const { currentShotId } = useCurrentShot();
@@ -41,8 +42,8 @@ export function useGenerationsPageLogic({
   // Reset to page 1 when shot filter or position filter changes
   useEffect(() => {
     setPage(1);
-    // Clear current items when filters change to show loading state
-    setCurrentItems([]);
+    // Don't clear items when filters change - let them transition smoothly
+    // setCurrentItems([]) was causing layout jump
   }, [selectedShotFilter, excludePositioned]);
 
   const { data: generationsResponse, isLoading, isError, error } = useGenerations(
@@ -103,15 +104,17 @@ export function useGenerationsPageLogic({
 
   const handleServerPageChange = (newPage: number) => {
     scrollPosRef.current = window.scrollY;
+    setIsPageChange(true);
     setPage(newPage);
   };
 
-  // Restore scroll position after data loads
+  // Restore scroll position after data loads - but only for page changes, not filter changes
   useEffect(() => {
-    if (generationsResponse) {
+    if (generationsResponse && isPageChange) {
       window.scrollTo({ top: scrollPosRef.current, behavior: 'auto' });
+      setIsPageChange(false);
     }
-  }, [generationsResponse]);
+  }, [generationsResponse, isPageChange]);
 
   const handleDeleteGeneration = (id: string) => {
     deleteGenerationMutation.mutate(id);

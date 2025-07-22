@@ -54,6 +54,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   const [excludePositioned, setExcludePositioned] = useState(true); // Default checked
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [lastKnownTotal, setLastKnownTotal] = useState<number>(0);
+  const [isPageChange, setIsPageChange] = useState(false);
   const isMobile = useIsMobile();
   
   // Early prefetch of public LoRAs to reduce loading time
@@ -449,6 +450,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
 
   const handleServerPageChange = useCallback((page:number)=>{
     scrollPosRef.current = window.scrollY;
+    setIsPageChange(true);
     setCurrentPage(page);
   },[]);
 
@@ -496,11 +498,12 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   }, [selectedProjectId, currentPage, itemsPerPage, queryClient, loadGenerations]);
 
   useEffect(()=>{
-    if(generationsResponse){
-      // restore scroll
+    if(generationsResponse && isPageChange){
+      // restore scroll position only for page changes, not filter changes
       window.scrollTo({top:scrollPosRef.current,behavior:'auto'});
+      setIsPageChange(false);
     }
-  },[generationsResponse]);
+  },[generationsResponse, isPageChange]);
 
   return (
     <PageFadeIn>
