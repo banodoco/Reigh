@@ -67,8 +67,8 @@ This document is meant to serve as a comprehensive view of Reigh's architecture.
 ### Development Ports
 
 ```bash
-🌐 Frontend:  http://localhost:2222  # Vite dev server
-⚙️  Backend:   http://localhost:8085  # Express worker
+🌐 Frontend:  http://localhost:2222  # Vite dev server  
+⚙️  Server:    http://localhost:8085  # WebSocket & Task Processing Server
 ```
 
 ### Package Managers
@@ -89,7 +89,7 @@ Reigh supports both npm and bun package managers:
 | **`/src/pages`** | Top-level pages | `ToolSelectorPage`, `HomePage`, `ShotsPage`, etc. |
 | **`/src/tools`** | Feature modules | Each tool has `pages/`, `components/`, `settings.ts` |
 | **`/src/shared`** | Shared resources | UI components, hooks, contexts, utilities |
-| **`/src/server`** | Express worker | Task polling & WebSocket (**no REST routes**) |
+| **`/src/server`** | WebSocket & Task Server | Real-time updates & background task processing |
 | **`/db`** | Database layer | Drizzle schema, migrations (PostgreSQL), seeds |
 | **`/supabase`** | Supabase config | Edge Functions, migrations, CLI config |
 | **`/public`** | Static assets | Images, fonts, manifests |

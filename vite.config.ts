@@ -5,42 +5,35 @@ import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }: { mode: string }) => {
-  // Define API target based on mode or environment variables
-  // For local development, target the local API server (port 8085 by default)
-  // Support both localhost and LAN access for mobile devices
-  const defaultApiTarget = process.env.VITE_API_TARGET_URL || 'http://127.0.0.1:8085';
+  // Define WebSocket target for real-time updates and task polling
+  // The Express server only handles WebSocket connections now (no API routes)
+  const defaultServerTarget = process.env.VITE_SERVER_TARGET_URL || 'http://127.0.0.1:8085';
   
   // For LAN access (mobile devices), we need to use the actual network IP
-  // The API server should be started with --host 0.0.0.0 or bound to the network interface
-  const apiTarget = defaultApiTarget;
-  const wsTarget = apiTarget.replace(/^http/, 'ws');
+  const serverTarget = defaultServerTarget;
+  const wsTarget = serverTarget.replace(/^http/, 'ws');
   
   console.log(`[Vite Config] Mode: ${mode}`);
-  console.log(`[Vite Config] API Proxy Target: ${apiTarget}/api`);
   console.log(`[Vite Config] WebSocket Proxy Target: ${wsTarget}`);
-  console.log(`[Vite Config] For mobile access, ensure API server is bound to 0.0.0.0:8085`);
+  console.log(`[Vite Config] Server Health Check: ${serverTarget}/health`);
+  console.log(`[Vite Config] For mobile access, ensure server is bound to 0.0.0.0:8085`);
 
   return {
     server: {
       host: "::", // Allows access from other devices on the network
       port: 2222,
       proxy: {
-        '/api': {
-          target: apiTarget,
-          changeOrigin: true,
-          secure: false,
-          // Add mobile-friendly proxy settings
-          configure: (proxy, _options) => {
-            proxy.on('error', (err, _req, _res) => {
-              console.log('[Vite Proxy] Error:', err.message);
-              console.log('[Vite Proxy] Tip: For mobile access, ensure your API server is running on 0.0.0.0:8085');
-            });
-          },
-        },
+        // WebSocket proxy for real-time updates
         '/ws': {
           target: wsTarget,
           ws: true,
           changeOrigin: true,
+          configure: (proxy, _options) => {
+            proxy.on('error', (err, _req, _res) => {
+              console.log('[Vite WebSocket Proxy] Error:', err.message);
+              console.log('[Vite WebSocket Proxy] Tip: Ensure server is running on 0.0.0.0:8085');
+            });
+          },
         },
       },
       headers: {
