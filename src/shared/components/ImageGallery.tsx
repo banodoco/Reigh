@@ -22,11 +22,11 @@ import {
 import { Checkbox } from "@/shared/components/ui/checkbox";
 import { Label } from "@/shared/components/ui/label";
 // Removed nanoid import to avoid random generation overhead per render
-import { formatDistanceToNow, isValid } from "date-fns";
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 import { DraggableImage } from "@/shared/components/DraggableImage";
 import { getDisplayUrl } from "@/shared/lib/utils";
 import { useIsMobile } from "@/shared/hooks/use-mobile";
+import { TimeStamp } from "@/shared/components/TimeStamp";
 
 // Define the structure for individual LoRA details within metadata
 export interface MetadataLora {
@@ -705,10 +705,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
                                                 return;
                                             }
                                             setAddingToShotImageId(image.id!);
-                                            console.time('[AddToShotPerf] Total operation time');
                                             try {
                                                 const success = await onAddToLastShot(image.id!, displayUrl, displayUrl);
-                                                console.timeEnd('[AddToShotPerf] Total operation time');
                                                 if (success) {
                                                     setShowTickForImageId(image.id!);
                                                     if (tickTimeoutRef.current) clearTimeout(tickTimeoutRef.current);
@@ -741,22 +739,14 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
                         </div>
                         )}
 
-                        {/* Action buttons - Top Right (timestamp, Info & Apply) */}
-                        <div className="absolute top-2 right-2 flex flex-col items-end gap-1.5">
-                            {/* Timestamp (always visible) */}
-                            {image.createdAt && isValid(new Date(image.createdAt)) && (
-                                <span className="text-xs text-white bg-black/50 px-1.5 py-0.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity">
-                                    {formatDistanceToNow(new Date(image.createdAt), { addSuffix: true })
-                                        .replace(" minutes", " mins")
-                                        .replace(" minute", " min")
-                                        .replace(" hours", " hrs")
-                                        .replace(" hour", " hr")
-                                        .replace(" seconds", " secs")
-                                        .replace(" second", " sec")
-                                        .replace("less than a minute", "< 1 min")}
-                                </span>
-                            )}
+                        {/* Timestamp - Top Right */}
+                        <TimeStamp 
+                          createdAt={image.createdAt} 
+                          position="top-right"
+                        />
 
+                        {/* Action buttons - Top Right (Info & Apply) */}
+                        <div className="absolute top-2 right-2 flex flex-col items-end gap-1.5 mt-8">
                             {/* Info button (shown on hover) */}
                                 {image.metadata && (
                                  <InfoPopover metadata={image.metadata} metadataForDisplay={metadataForDisplay} />

@@ -9,6 +9,7 @@ import { getDisplayUrl } from '@/shared/lib/utils';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/shared/components/ui/pagination';
 import MediaLightbox from '@/shared/components/MediaLightbox';
 import TaskDetailsModal from '@/tools/travel-between-images/components/TaskDetailsModal';
+import { TimeStamp } from '@/shared/components/TimeStamp';
 
 interface VideoOutputsGalleryProps {
   videoOutputs: GenerationRow[];
@@ -129,6 +130,12 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
                     }}
                   />
                 </div>
+                
+                {/* Timestamp - Top Left */}
+                <TimeStamp 
+                  createdAt={video.createdAt} 
+                  position="top-left"
+                />
                 
                 {/* Action buttons – styled to match ImageGallery overlays */}
                 <div className="absolute top-2 right-2 sm:top-3 sm:right-3 flex flex-col items-end gap-1 opacity-0 group-hover:opacity-100 group-touch:opacity-100 transition-opacity">

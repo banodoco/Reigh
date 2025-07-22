@@ -115,6 +115,7 @@ Located in `/ui/` - Full shadcn-ui component library including:
 - **`MediaLightbox`** - Full-screen media viewer
 - **`HoverScrubVideo`** - Video preview on hover
 - **`DraggableImage`** - Drag-and-drop images
+- **`TimeStamp`** - Consistent relative time display ("X mins ago")
 
 ### 🎛️ Tool Components
 - **`ToolSettingsGate`** - Settings loading wrapper
