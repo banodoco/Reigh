@@ -1,11 +1,14 @@
 import { defineConfig } from 'drizzle-kit';
+import { config as dotenvConfig } from 'dotenv';
+
+// Load environment variables
+dotenvConfig({ path: '.env.local' });
 
 export default defineConfig({
-  dialect: 'postgresql',
   schema: './db/schema/schema.ts',
   out: './db/migrations',
+  dialect: 'postgresql',
   dbCredentials: {
-    // Use the connection string with the password from your Supabase project
     url: process.env.DATABASE_URL!,
   },
   verbose: true,

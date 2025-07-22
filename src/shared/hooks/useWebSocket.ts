@@ -119,9 +119,7 @@ export function useWebSocket(projectId: string | null) {
           }
         })
         .subscribe((status, err) => {
-          if (status === 'SUBSCRIBED') {
-            console.log(`[WebSocket] Connected to Supabase Realtime for project ${projectId}`);
-          } else if (status === 'CHANNEL_ERROR' && err) {
+          if (status === 'CHANNEL_ERROR' && err) {
             console.error('[WebSocket] Supabase Realtime channel error:', err);
           } else if (status === 'TIMED_OUT') {
             console.error('[WebSocket] Supabase Realtime connection timed out');

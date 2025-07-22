@@ -605,7 +605,6 @@ const VideoTravelToolPage: React.FC = () => {
           trigger_word: loraToAdd.trigger_word,
         },
       ]);
-      console.log(`LoRA added.`);
     } else {
       console.error("Selected LoRA has no model file specified.");
     }

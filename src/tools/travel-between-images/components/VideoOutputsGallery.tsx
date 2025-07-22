@@ -135,11 +135,11 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
                 <TimeStamp 
                   createdAt={video.createdAt || (video as any).created_at} 
                   position="top-left"
-                  className="z-10 !top-2 !left-2"
+                  className="z-10 !top-1 !left-4 sm:!top-2 sm:!left-4"
                 />
                 
                 {/* Action buttons – styled to match ImageGallery overlays */}
-                <div className="absolute top-2 right-2 sm:top-3 sm:right-3 flex flex-col items-end gap-1 opacity-0 group-hover:opacity-100 group-touch:opacity-100 transition-opacity">
+                <div className="absolute top-1 right-3 sm:top-2 sm:right-3 md:right-4 flex flex-col items-end gap-1 opacity-0 group-hover:opacity-100 group-touch:opacity-100 transition-opacity">
                   <Button
                     variant="secondary"
                     size="icon"

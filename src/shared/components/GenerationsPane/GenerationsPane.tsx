@@ -14,6 +14,10 @@ import { toast } from 'sonner';
 import { usePanes } from '@/shared/contexts/PanesContext';
 import PaneControlTab from '../PaneControlTab';
 import { Skeleton } from '@/shared/components/ui/skeleton';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
+import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
+import { Checkbox } from '@/shared/components/ui/checkbox';
+import { Label } from '@/shared/components/ui/label';
 
 const DEFAULT_PANE_HEIGHT = 350;
 const GENERATIONS_PER_PAGE = 45;
@@ -22,6 +26,18 @@ export const GenerationsPane: React.FC = () => {
   const { selectedProjectId } = useProject();
   const navigate = useNavigate();
   const [page, setPage] = useState(1);
+  const { data: shotsData } = useListShots(selectedProjectId);
+  const { currentShotId } = useCurrentShot();
+  const [selectedShotFilter, setSelectedShotFilter] = useState<string>('all');
+  const [excludePositioned, setExcludePositioned] = useState(true); // Default checked
+  
+  // Set shot filter to current shot when it changes
+  useEffect(() => {
+    if (currentShotId && shotsData?.some(shot => shot.id === currentShotId)) {
+      setSelectedShotFilter(currentShotId);
+    }
+  }, [currentShotId, shotsData]);
+  
   const { data: generationsResponse, isLoading, error } = useGenerations(
     selectedProjectId, 
     page, 
@@ -29,10 +45,11 @@ export const GenerationsPane: React.FC = () => {
     true,
     {
       toolType: undefined, // No tool filtering in generations pane
-      mediaType: 'image'   // Only show images in the pane
+      mediaType: 'image',   // Only show images in the pane
+      shotId: selectedShotFilter === 'all' ? undefined : selectedShotFilter,
+      excludePositioned: selectedShotFilter !== 'all' ? excludePositioned : undefined
     }
   );
-  const { data: shotsData } = useListShots(selectedProjectId);
 
   // Log every render with item count & page for loop detection
   useRenderLogger('GenerationsPane', { page, totalItems: generationsResponse?.total });
@@ -79,10 +96,10 @@ export const GenerationsPane: React.FC = () => {
     }
   }, [lastAffectedShotId, shotsData, setLastAffectedShotId]);
 
-  // Reset to page 1 when project changes
+  // Reset to page 1 when project, shot filter, or position filter changes
   useEffect(() => {
     setPage(1);
-  }, [selectedProjectId]);
+  }, [selectedProjectId, selectedShotFilter, excludePositioned]);
 
   const handleNextPage = () => {
     if (page < paginatedData.totalPages) {
@@ -144,12 +161,45 @@ export const GenerationsPane: React.FC = () => {
           right: isTasksPaneLocked ? `${tasksPaneWidth}px` : 0,
         }}
         className={cn(
-          `fixed bottom-0 bg-zinc-900/95 border-t border-zinc-700 shadow-xl z-[100] transform transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] flex flex-col`,
+          `fixed bottom-0 bg-zinc-900/95 border-t border-zinc-700 shadow-xl z-[100] transform transition-all duration-300 ease-smooth flex flex-col`,
           transformClass
         )}
       >
         <div className="p-2 border-b border-zinc-800 flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-zinc-200 ml-2">Generations</h2>
+            <div className="flex items-center space-x-3">
+                <h2 className="text-xl font-semibold text-zinc-200 ml-2">Generations</h2>
+                {/* Shot filter */}
+                <Select value={selectedShotFilter} onValueChange={setSelectedShotFilter}>
+                    <SelectTrigger className="w-[180px] h-8 text-xs bg-zinc-800 border-zinc-700 text-white">
+                        <SelectValue placeholder="Filter by shot..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Shots</SelectItem>
+                        {shotsData?.map(shot => (
+                            <SelectItem key={shot.id} value={shot.id}>
+                                {shot.name}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+                {/* Position filter checkbox - only show when a specific shot is selected */}
+                {selectedShotFilter !== 'all' && (
+                    <div className="flex items-center space-x-2">
+                        <Checkbox 
+                            id="exclude-positioned"
+                            checked={excludePositioned}
+                            onCheckedChange={(checked) => setExcludePositioned(!!checked)}
+                            className="border-zinc-600 data-[state=checked]:bg-zinc-600"
+                        />
+                        <Label 
+                            htmlFor="exclude-positioned" 
+                            className="text-xs text-zinc-300 cursor-pointer"
+                        >
+                            Exclude items with a position
+                        </Label>
+                    </div>
+                )}
+            </div>
             <div className="flex items-center space-x-2">
                 {/* Pagination */}
                 <span className="text-sm text-white">

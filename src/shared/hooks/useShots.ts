@@ -268,7 +268,7 @@ interface AddImageToShotArgs {
   shot_id: string;
   generation_id: string; 
   project_id: string | null; // For invalidating correct query
-  position?: number; 
+  position?: number | null; // Allow null for unpositioned associations
   imageUrl?: string; // For optimistic update
   thumbUrl?: string; // For optimistic update
 }
@@ -343,14 +343,12 @@ export const useAddImageToShot = () => {
       }
       
       // Use RPC function to atomically add generation to shot with proper position
-      console.time('[AddToShotPerf] RPC call duration');
       const { data: shotGeneration, error: rpcError } = await supabase
         .rpc('add_generation_to_shot', {
           p_shot_id: shot_id,
           p_generation_id: generation_id
         })
         .single();
-      console.timeEnd('[AddToShotPerf] RPC call duration');
       
       if (rpcError) throw rpcError;
       
@@ -362,6 +360,8 @@ export const useAddImageToShot = () => {
       
       if (project_id) {
         queryClient.invalidateQueries({ queryKey: ['shots', project_id] });
+        // Also invalidate generations cache so GenerationsPane updates immediately
+        queryClient.invalidateQueries({ queryKey: ['generations', project_id] });
       }      
     },
     onError: (error: Error) => {
@@ -428,6 +428,8 @@ export const useRemoveImageFromShot = () => {
       
       if (project_id) {
         queryClient.invalidateQueries({ queryKey: ['shots', project_id] });
+        // Also invalidate generations cache so GenerationsPane updates immediately
+        queryClient.invalidateQueries({ queryKey: ['generations', project_id] });
       }
     },
   });
@@ -559,6 +561,8 @@ export const useUpdateShotImageOrder = () => {
     onSettled: (data, error, { projectId }) => {
       if (projectId) {
         queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
+        // Also invalidate generations cache so GenerationsPane updates immediately
+        queryClient.invalidateQueries({ queryKey: ['generations', projectId] });
       }
     },
   });

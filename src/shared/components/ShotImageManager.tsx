@@ -46,6 +46,7 @@ export interface ShotImageManagerProps {
   pairConfigs: PairConfig[];
   onPairConfigChange: (id: string, field: 'prompt' | 'frames' | 'negativePrompt' | 'context', value: string | number) => void;
   onImageSaved?: (imageId: string, newImageUrl: string) => void; // Callback when image is saved with changes
+  onMagicEdit?: (imageUrl: string, prompt: string, numImages: number) => void;
 }
 
 const ShotImageManager: React.FC<ShotImageManagerProps> = ({
@@ -57,6 +58,7 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
   pairConfigs,
   onPairConfigChange,
   onImageSaved,
+  onMagicEdit,
 }) => {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -441,7 +443,9 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
             showNavigation={true}
             showImageEditTools={true}
             showDownload={true}
+            showMagicEdit={true}
             videoPlayerComponent="hover-scrub"
+            onMagicEdit={onMagicEdit}
           />
         )}
       </DndContext>
@@ -605,7 +609,9 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
             showNavigation={true}
             showImageEditTools={true}
             showDownload={true}
+            showMagicEdit={true}
             videoPlayerComponent="hover-scrub"
+            onMagicEdit={onMagicEdit}
           />
         )}
       </div>
@@ -654,7 +660,9 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
           showNavigation={true}
           showImageEditTools={true}
           showDownload={true}
+          showMagicEdit={true}
           videoPlayerComponent="hover-scrub"
+          onMagicEdit={onMagicEdit}
         />
       )}
     </DndContext>

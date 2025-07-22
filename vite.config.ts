@@ -12,10 +12,6 @@ export default defineConfig(({ mode }: { mode: string }) => {
     server: {
       host: "::", // Allows access from other devices on the network
       port: 2222,
-      headers: {
-        "Cross-Origin-Opener-Policy": "same-origin",
-        "Cross-Origin-Embedder-Policy": "credentialless", // Reverted to allow cross-origin images
-      },
     },
     plugins: [
       react(),

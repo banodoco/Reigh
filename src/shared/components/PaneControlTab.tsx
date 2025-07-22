@@ -88,7 +88,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({ side, isLocked, isOpen,
         data-pane-control
         style={getDynamicStyle()}
         className={cn(
-          'fixed z-[102] flex items-center p-1 bg-zinc-800/80 backdrop-blur-sm border border-zinc-700 rounded-md gap-1 transition-[transform,top] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]',
+          'fixed z-[102] flex items-center p-1 bg-zinc-800/80 backdrop-blur-sm border border-zinc-700 rounded-md gap-1 transition-[transform,top] duration-300 ease-smooth',
           getPositionClasses(),
           'opacity-100'
         )}
@@ -128,7 +128,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({ side, isLocked, isOpen,
         data-pane-control
         style={getDynamicStyle()}
         className={cn(
-          'fixed z-[101] flex items-center p-1 bg-zinc-800/90 backdrop-blur-sm border border-zinc-700 rounded-md transition-[transform,top] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]',
+          'fixed z-[101] flex items-center p-1 bg-zinc-800/90 backdrop-blur-sm border border-zinc-700 rounded-md transition-[transform,top] duration-300 ease-smooth',
           positionClass
         )}
         onMouseEnter={handlePaneEnter}
@@ -164,7 +164,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({ side, isLocked, isOpen,
         data-pane-control
         style={getDynamicStyle()}
         className={cn(
-          'fixed z-[101] flex items-center p-1 bg-zinc-800/90 backdrop-blur-sm border border-zinc-700 rounded-md transition-[transform,top] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]',
+          'fixed z-[101] flex items-center p-1 bg-zinc-800/90 backdrop-blur-sm border border-zinc-700 rounded-md transition-[transform,top] duration-300 ease-smooth',
           positionClass
         )}
       >
@@ -209,7 +209,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({ side, isLocked, isOpen,
       data-pane-control
       style={getDynamicStyle()}
               className={cn(
-          'fixed z-[102] flex items-center p-1 bg-zinc-800/80 backdrop-blur-sm border border-zinc-700 rounded-md gap-1 transition-[transform,top] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]',
+          'fixed z-[102] flex items-center p-1 bg-zinc-800/80 backdrop-blur-sm border border-zinc-700 rounded-md gap-1 transition-[transform,top] duration-300 ease-smooth',
           getPositionClasses(),
           isOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'
         )}

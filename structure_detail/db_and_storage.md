@@ -4,31 +4,43 @@
 
 ---
 
-## 🔄 Code-First Workflow (Drizzle → Supabase)
+## 🔄 Development Workflow
 
-### Step 1: Edit Schema
+### Schema Documentation & Types
+The `db/schema/schema.ts` file serves as:
+- **Living documentation** of the database structure
+- **Type definitions** for TypeScript usage
+- **Seeding reference** for development data
+
 ```typescript
-// db/schema/schema.ts
+// db/schema/schema.ts - Documentation & Types Only
 export const myTable = pgTable('my_table', {
   id: uuid('id').defaultRandom().primaryKey(),
   name: text('name').notNull(),
   // ... add columns
 });
+
+// Export types for use in application
+export type MyTable = typeof myTable.$inferSelect;
+export type NewMyTable = typeof myTable.$inferInsert;
 ```
 
-### Step 2: Generate & Apply
+### Database Changes
+All actual database changes are managed via Supabase migrations:
+
 ```bash
-# Generate SQL migration from schema changes
-npm run db:generate:pg    # PostgreSQL
+# Create new migration
+supabase migration new my_feature_name
 
+# Edit the generated SQL file in /supabase/migrations/
 # Apply to database
-supabase db push           # Applies all pending migrations
+supabase db push
 ```
 
-### Step 3: Add RLS/Functions (if needed)
-```sql
--- Create in /supabase/migrations/[timestamp]_my_feature.sql
--- Then run: supabase db push
+### Development Data Seeding
+```bash
+# Populate database with sample data for development
+npm run db:seed
 ```
 
 ---
@@ -101,7 +113,15 @@ ORDER BY table_name, ordinal_position;
 | Table | Purpose | Key Columns | Notes |
 |-------|---------|-------------|-------|
 | **`workers`** | Task processors | `id`, `last_heartbeat`, `status`, `metadata` | Active workers |
-| **`shot_generations`** | Join table | `shot_id`, `generation_id` | Many-to-many |
+| **`shot_generations`** | Join table | `shot_id`, `generation_id`, `position` | Many-to-many with optional ordering |
+Did 
+### Shot-Generation Associations
+
+The `shot_generations` table links generations to shots with optional positioning:
+- **`position`** field: `NULL` for unpositioned items, numeric for ordered items
+- Unpositioned generations are associated with a shot but don't appear in the shot editor
+- The Generations Pane can filter to show only unpositioned items for a specific shot
+- This allows flexible association of reference images or alternate takes without cluttering the main shot workflow
 
 ---
 

@@ -118,7 +118,7 @@ export const ShotsPane: React.FC = () => {
         <div
           {...paneProps}
           className={cn(
-            `pointer-events-auto absolute top-0 left-0 h-full w-full border-2 border-r shadow-xl transform transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] flex flex-col bg-zinc-900/95 border-zinc-700`,
+            `pointer-events-auto absolute top-0 left-0 h-full w-full border-2 border-r shadow-xl transform transition-transform duration-300 ease-smooth flex flex-col bg-zinc-900/95 border-zinc-700`,
             transformClass
           )}
         >

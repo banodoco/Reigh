@@ -1558,6 +1558,38 @@
   75% { border-color: rgba(250, 221, 151, 0.6); }
   100% { border-color: rgba(253, 226, 228, 0.6); }
 }
+
+/* Synchronized color animations for PaletteIcon connecting line and quote box */
+.animate-connecting-line-hover {
+  animation: connecting-line-hover 32s ease-in-out 1s infinite;
+}
+
+@keyframes connecting-line-hover {
+  0%, 100% { 
+    filter: hue-rotate(0deg) saturate(1.2); 
+    opacity: 0.9;
+  }
+  25% { 
+    filter: hue-rotate(-20deg) saturate(0.8); 
+    opacity: 0.85;
+  }
+  50% { 
+    filter: hue-rotate(40deg) saturate(0.9); 
+    opacity: 0.9;
+  }
+  75% { 
+    filter: hue-rotate(-40deg) saturate(1.1); 
+    opacity: 0.85;
+  }
+}
+
+@keyframes quote-border-color-cycle {
+  0% { border-color: rgba(253, 226, 228, 0.6); }
+  25% { border-color: rgba(228, 230, 255, 0.6); }
+  50% { border-color: rgba(208, 244, 222, 0.6); }
+  75% { border-color: rgba(250, 221, 151, 0.6); }
+  100% { border-color: rgba(253, 226, 228, 0.6); }
+}
 .palette-wrapper::before {
   content: '';
   position: absolute;

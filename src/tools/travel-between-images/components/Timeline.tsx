@@ -1111,6 +1111,11 @@ const Timeline: React.FC<TimelineProps> = ({
                 onPrevious={images.length > 1 ? goPrev : undefined}
                 onImageSaved={(newUrl: string) => onImageSaved(images[lightboxIndex].id, newUrl)}
                 showNavigation={true}
+                showMagicEdit={true}
+                onMagicEdit={(imageUrl, prompt, numImages) => {
+                  // TODO: Implement magic edit generation
+                  console.log('Magic Edit from Timeline:', { imageUrl, prompt, numImages });
+                }}
               />
             )}
     </div>

@@ -29,6 +29,7 @@ import { useApiKeys } from '@/shared/hooks/useApiKeys';
 import { cropImageToProjectAspectRatio } from '@/shared/lib/imageCropper';
 import { parseRatio } from '@/shared/lib/aspectRatios';
 import { Skeleton } from '@/shared/components/ui/skeleton';
+import { usePanes } from '@/shared/contexts/PanesContext';
 // (Timeline related imports removed – now provided within the Timeline component file)
 
 import { useToolSettings } from '@/shared/hooks/useToolSettings';
@@ -226,15 +227,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   onUpdateShotName,
   settingsLoading,
 }) => {
-  // Early return if selectedShot is null to prevent null reference errors
-  if (!selectedShot) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-muted-foreground">No shot selected</p>
-      </div>
-    );
-  }
-
+  // Call all hooks first (Rules of Hooks)
   const { selectedProjectId, projects } = useProject();
   const { getApiKey } = useApiKeys();
   const [isUploadingImage, setIsUploadingImage] = useState(false);
@@ -257,6 +250,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const queryClient = useQueryClient();
   const skipNextSyncRef = useRef(false);
   const isMobile = useIsMobile();
+  const { setIsGenerationsPaneLocked } = usePanes();
 
   // Track if generation mode has been determined
   const [isModeReady, setIsModeReady] = useState(false);
@@ -333,6 +327,17 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
   // Use local state for optimistic updates on image list
   const [localOrderedShotImages, setLocalOrderedShotImages] = useState(orderedShotImages || []);
+  
+  // Filter out generations without position
+  const filteredOrderedShotImages = useMemo(() => {
+    return localOrderedShotImages.filter(img => (img as any).position !== null && (img as any).position !== undefined);
+  }, [localOrderedShotImages]);
+  
+  // Count unpositioned generations for this shot
+  const unpositionedGenerationsCount = useMemo(() => {
+    return localOrderedShotImages.filter(img => (img as any).position === null || (img as any).position === undefined).length;
+  }, [localOrderedShotImages]);
+  
   useEffect(() => {
     // Skip sync if we just finished uploading to prevent flicker
     if (skipNextSyncRef.current) {
@@ -353,12 +358,12 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // Settings persistence is now handled by the parent component via database
 
   const nonVideoImages = useMemo(() => {
-    return localOrderedShotImages.filter(g => !isGenerationVideo(g));
-  }, [localOrderedShotImages]);
+    return filteredOrderedShotImages.filter(g => !isGenerationVideo(g));
+  }, [filteredOrderedShotImages]);
   
   const videoOutputs = useMemo(() => {
-    return localOrderedShotImages.filter(g => isGenerationVideo(g));
-  }, [localOrderedShotImages]);
+    return filteredOrderedShotImages.filter(g => isGenerationVideo(g));
+  }, [filteredOrderedShotImages]);
 
   useEffect(() => {
     const newPairConfigs = nonVideoImages.slice(0, -1).map((image, index) => {
@@ -387,6 +392,15 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const {
     settings: uploadSettings,
   } = useToolSettings<{ cropToProjectSize?: boolean }>('upload', { projectId: selectedProjectId });
+
+  // Early return check after all hooks are called (Rules of Hooks)
+  if (!selectedShot) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <p className="text-muted-foreground">No shot selected</p>
+      </div>
+    );
+  }
 
   const handleImageUploadToShot = async (files: File[]) => {
     if (!files || files.length === 0) return;
@@ -607,14 +621,18 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     }
 
     // Optimistic update of local state
-    const imageMap = new Map(localOrderedShotImages.map(img => [img.shotImageEntryId, img]));
+    const imageMap = new Map(filteredOrderedShotImages.map(img => [img.shotImageEntryId, img]));
     const reorderedImages = orderedShotGenerationIds
       .map(id => imageMap.get(id))
       .filter((img): img is GenerationRow => !!img);
 
     // Preserve existing video outputs so they don't disappear during re-order
-    const videoImages = localOrderedShotImages.filter(img => isGenerationVideo(img));
-    const combinedImages = [...reorderedImages, ...videoImages];
+    const videoImages = filteredOrderedShotImages.filter(img => isGenerationVideo(img));
+    
+    // Also preserve unpositioned generations
+    const unpositionedImages = localOrderedShotImages.filter(img => (img as any).position === null || (img as any).position === undefined);
+    
+    const combinedImages = [...reorderedImages, ...videoImages, ...unpositionedImages];
     setLocalOrderedShotImages(combinedImages);
 
     // Include video images when sending the new order to the backend so their positions remain stable
@@ -1346,6 +1364,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                       pairConfigs={pairConfigs}
                       onPairConfigChange={handleUpdatePairConfig}
                       onImageSaved={handleImageSaved}
+                      onMagicEdit={(imageUrl, prompt, numImages) => {
+                        // TODO: Implement magic edit generation
+                        console.log('Magic Edit:', { imageUrl, prompt, numImages });
+                      }}
                     />
                   )}
                   </div>
@@ -1466,6 +1488,27 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           </Card>
         </div>
       </div>
+      
+      {/* Unpositioned generations message */}
+      {unpositionedGenerationsCount > 0 && (
+        <div className="w-full p-4 bg-muted/50 rounded-lg flex items-center justify-between">
+          <span className="text-sm text-muted-foreground">
+            There {unpositionedGenerationsCount === 1 ? 'is' : 'are'} {unpositionedGenerationsCount} generation{unpositionedGenerationsCount === 1 ? '' : 's'} associated with this shot that {unpositionedGenerationsCount === 1 ? "doesn't" : "don't"} have a position
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              // Open the generations pane and set the current shot context
+              setIsGenerationsPaneLocked(true);
+              // TODO: Set the shot filter in the generations pane to the current shot
+            }}
+          >
+            Open Pane
+          </Button>
+        </div>
+      )}
+      
       <LoraSelectorModal
         isOpen={isLoraModalOpen}
         onClose={() => setIsLoraModalOpen(false)}

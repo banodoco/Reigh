@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, X, FlipHorizontal, Save, Download, Trash2, Settings, PlusCircle, CheckCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, FlipHorizontal, Save, Download, Trash2, Settings, PlusCircle, CheckCircle, Sparkles } from 'lucide-react';
 import { GenerationRow } from '@/types/shots';
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Button } from '@/shared/components/ui/button';
@@ -8,6 +8,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { getDisplayUrl, cn } from '@/shared/lib/utils';
 import HoverScrubVideo from '@/shared/components/HoverScrubVideo';
 import SimpleVideoPlayer from '@/tools/travel-between-images/components/SimpleVideoPlayer';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/shared/components/ui/dialog';
+import { Textarea } from '@/shared/components/ui/textarea';
+import { Label } from '@/shared/components/ui/label';
+import { SliderWithValue } from '@/shared/components/ui/slider-with-value';
 
 interface Shot {
   id: string;
@@ -24,6 +28,7 @@ interface MediaLightboxProps {
   showNavigation?: boolean;
   showImageEditTools?: boolean;
   showDownload?: boolean;
+  showMagicEdit?: boolean;
   videoPlayerComponent?: 'hover-scrub' | 'simple-player';
   // Workflow-specific props
   allShots?: Shot[];
@@ -35,6 +40,7 @@ interface MediaLightboxProps {
   onApplySettings?: (metadata: any) => void;
   showTickForImageId?: string | null;
   onShowTick?: (imageId: string) => void;
+  onMagicEdit?: (imageUrl: string, prompt: string, numImages: number) => void;
 }
 
 const MediaLightbox: React.FC<MediaLightboxProps> = ({ 
@@ -46,6 +52,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   showNavigation = true,
   showImageEditTools = true,
   showDownload = true,
+  showMagicEdit = false,
   videoPlayerComponent = 'hover-scrub',
   // Workflow-specific props
   allShots = [],
@@ -56,10 +63,14 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   isDeleting,
   onApplySettings,
   showTickForImageId,
-  onShowTick
+  onShowTick,
+  onMagicEdit
 }) => {
   const [isFlippedHorizontally, setIsFlippedHorizontally] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+  const [isMagicEditOpen, setIsMagicEditOpen] = useState(false);
+  const [magicEditPrompt, setMagicEditPrompt] = useState('');
+  const [magicEditNumImages, setMagicEditNumImages] = useState(4);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   // Ref for the dialog content so we can programmatically focus it, enabling keyboard shortcuts immediately
   const contentRef = useRef<HTMLDivElement>(null);
@@ -179,6 +190,15 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     }
   };
 
+  const handleMagicEditGenerate = () => {
+    if (onMagicEdit && magicEditPrompt.trim()) {
+      onMagicEdit(displayUrl, magicEditPrompt, magicEditNumImages);
+      setIsMagicEditOpen(false);
+      setMagicEditPrompt('');
+      setMagicEditNumImages(4);
+    }
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'ArrowLeft' && onPrevious) {
       onPrevious();
@@ -280,6 +300,22 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
                 {/* Top Controls */}
                 <div className="absolute top-2 sm:top-4 right-2 sm:right-4 flex items-center space-x-1 sm:space-x-2 z-10">
+                  {!isVideo && showMagicEdit && onMagicEdit && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => setIsMagicEditOpen(true)}
+                          className="bg-black/50 hover:bg-black/70 text-white"
+                        >
+                          <Sparkles className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Magic Edit</TooltipContent>
+                    </Tooltip>
+                  )}
+
                   {!isVideo && showImageEditTools && (
                     <>
                       <Tooltip>
@@ -460,6 +496,65 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
           </DialogPrimitive.Content>
         </DialogPrimitive.Portal>
       </DialogPrimitive.Root>
+
+      {/* Magic Edit Modal */}
+      <Dialog open={isMagicEditOpen} onOpenChange={setIsMagicEditOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5" />
+              Magic Edit
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            {/* Image Preview */}
+            <div className="relative w-full">
+              <Label>Image</Label>
+              <div className="mt-2 rounded-lg border border-border overflow-hidden bg-muted/50">
+                <img 
+                  src={displayUrl} 
+                  alt="Image to edit"
+                  className="w-full h-48 object-contain"
+                />
+              </div>
+            </div>
+
+            {/* Prompt Input */}
+            <div className="space-y-2">
+              <Label htmlFor="magic-edit-prompt">Prompt</Label>
+              <Textarea
+                id="magic-edit-prompt"
+                value={magicEditPrompt}
+                onChange={(e) => setMagicEditPrompt(e.target.value)}
+                placeholder="Describe how you want to transform this image..."
+                className="min-h-[100px] resize-none"
+                autoFocus
+              />
+            </div>
+
+            {/* Number of Images Slider */}
+            <div className="space-y-2">
+              <SliderWithValue
+                label="Number to Generate"
+                value={magicEditNumImages}
+                onChange={setMagicEditNumImages}
+                min={1}
+                max={16}
+                step={1}
+              />
+            </div>
+
+            {/* Generate Button */}
+            <Button 
+              onClick={handleMagicEditGenerate}
+              disabled={!magicEditPrompt.trim()}
+              className="w-full"
+            >
+              Generate
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </TooltipProvider>
   );
 };

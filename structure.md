@@ -60,8 +60,8 @@ This document is meant to serve as a comprehensive view of Reigh's architecture.
 |-------|------------|---------|
 | **Frontend** | React + Vite + TypeScript | SPA framework & build tooling |
 | **Styling** | TailwindCSS + @tailwindcss/container-queries + shadcn-ui | Utility-first CSS, **container-query** responsive system (`c-*` variants) |
-| **Backend** | Supabase + Express.js | Database, auth, storage & background workers |
-| **Data** | PostgreSQL + Drizzle ORM | Primary database with type-safe ORM |
+| **Backend** | Supabase Edge Functions | Database, auth, storage & background workers (serverless) |
+| **Data** | PostgreSQL + Supabase Client | Primary database with direct queries |
 | **AI/ML** | FAL-AI | Image generation services |
 
 ### Development Ports
@@ -90,7 +90,7 @@ Reigh supports both npm and bun package managers:
 | **`/src/tools`** | Feature modules | Each tool has `pages/`, `components/`, `settings.ts` |
 | **`/src/shared`** | Shared resources | UI components, hooks, contexts, utilities |
 | **`/supabase/functions`** | Edge Functions | Task processing, payments, AI integration |
-| **`/db`** | Database layer | Drizzle schema, migrations (PostgreSQL), seeds |
+| **`/db`** | Database schema & seeding | `schema/schema.ts` (docs/types), `seed.ts` |
 | **`/supabase`** | Supabase config | Edge Functions, migrations, CLI config |
 | **`/public`** | Static assets | Images, fonts, manifests |
 | **Root configs** | Build & tooling | `vite.config.ts`, `tailwind.config.ts`, `tsconfig.json` |
@@ -217,8 +217,8 @@ For the complete catalog, see [`shared_hooks_contexts.md`](structure_detail/shar
 
 | Service | Location | Purpose |
 |---------|----------|---------|
-| **taskProcessingService** | `/src/server/services/` | Task completion handling |
-| **webSocketService** | `/src/server/services/` | Real-time broadcasts |
+| **edge functions** | `/supabase/functions/` | Task completion, cost calc, payments |
+| **database triggers** | migr. SQL | Instant task processing, status broadcasts |
 | **lib/** utilities | `/src/shared/lib/` | Image upload, auth, math helpers |
 
 ---

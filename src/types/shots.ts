@@ -7,7 +7,7 @@ export interface GenerationRow {
   location?: string | null;
   type?: string | null;
   createdAt?: string;
-  metadata?: any; // Added metadata field, consider a more specific type if known
+  metadata?: Record<string, unknown>; // Added metadata field
   isOptimistic?: boolean;
   shotImageEntryId?: string; // ID from the shot_images table linking shot to generation
 }

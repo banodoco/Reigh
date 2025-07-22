@@ -13,6 +13,8 @@ export async function fetchGenerations(
   filters?: {
     toolType?: string;
     mediaType?: 'all' | 'image' | 'video';
+    shotId?: string;
+    excludePositioned?: boolean;
   }
 ): Promise<{
   items: GeneratedImageWithMetadata[];
@@ -42,6 +44,34 @@ export async function fetchGenerations(
     }
   }
 
+  // Apply shot filter if provided
+  if (filters?.shotId) {
+    // Get generation IDs associated with this shot
+    const { data: shotGenerations, error: sgError } = await supabase
+      .from('shot_generations')
+      .select('generation_id, position')
+      .eq('shot_id', filters.shotId);
+    
+    if (sgError) throw sgError;
+    
+    let generationIds = shotGenerations?.map(sg => sg.generation_id) || [];
+    
+    // Filter by position if excludePositioned is true
+    if (filters.excludePositioned) {
+      const unpositionedIds = shotGenerations
+        ?.filter(sg => sg.position === null || sg.position === undefined)
+        .map(sg => sg.generation_id) || [];
+      generationIds = unpositionedIds;
+    }
+    
+    if (generationIds.length > 0) {
+      countQuery = countQuery.in('id', generationIds);
+    } else {
+      // No generations for this shot
+      return { items: [], total: 0, hasMore: false };
+    }
+  }
+
   // Get total count first  
   const { count, error: countError } = await countQuery;
 
@@ -63,6 +93,31 @@ export async function fetchGenerations(
       dataQuery = dataQuery.like('type', '%video%');
     } else if (filters.mediaType === 'image') {
       dataQuery = dataQuery.not('type', 'like', '%video%');
+    }
+  }
+
+  // Apply shot filter to data query
+  if (filters?.shotId) {
+    // Use the same generation IDs from count query
+    const { data: shotGenerations, error: sgError } = await supabase
+      .from('shot_generations')
+      .select('generation_id, position')
+      .eq('shot_id', filters.shotId);
+    
+    if (sgError) throw sgError;
+    
+    let generationIds = shotGenerations?.map(sg => sg.generation_id) || [];
+    
+    // Filter by position if excludePositioned is true
+    if (filters.excludePositioned) {
+      const unpositionedIds = shotGenerations
+        ?.filter(sg => sg.position === null || sg.position === undefined)
+        .map(sg => sg.generation_id) || [];
+      generationIds = unpositionedIds;
+    }
+    
+    if (generationIds.length > 0) {
+      dataQuery = dataQuery.in('id', generationIds);
     }
   }
 
@@ -107,7 +162,7 @@ async function updateGenerationLocation(id: string, location: string): Promise<v
 async function getTaskIdForGeneration(generationId: string): Promise<{ taskId: string | null }> {
   const { data, error } = await supabase
     .from('generations')
-    .select('task_id')
+    .select('tasks')
     .eq('id', generationId)
     .single();
 
@@ -115,7 +170,10 @@ async function getTaskIdForGeneration(generationId: string): Promise<{ taskId: s
     throw new Error(`Generation not found or has no task: ${error.message}`);
   }
 
-  return { taskId: data?.task_id || null };
+  const tasksArray = data?.tasks as string[] | null;
+  const taskId = Array.isArray(tasksArray) && tasksArray.length > 0 ? tasksArray[0] : null;
+
+  return { taskId };
 }
 
 /**
@@ -167,6 +225,8 @@ export function useGenerations(
   filters?: {
     toolType?: string;
     mediaType?: 'all' | 'image' | 'video';
+    shotId?: string;
+    excludePositioned?: boolean;
   }
 ) {
   const offset = (page - 1) * limit;

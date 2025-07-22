@@ -41,13 +41,29 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
   const getTaskIdMutation = useGetTaskIdForGeneration();
   const { data: task, isLoading: isLoadingTask, error: taskError } = useGetTask(taskId || '');
 
+  // Derive input images from multiple possible locations within task params
+  const inputImages: string[] = React.useMemo(() => {
+    const p = (task as any)?.params || {};
+    if (Array.isArray(p.input_images) && p.input_images.length > 0) return p.input_images;
+    if (p.full_orchestrator_payload && Array.isArray(p.full_orchestrator_payload.input_image_paths_resolved)) {
+      return p.full_orchestrator_payload.input_image_paths_resolved;
+    }
+    if (Array.isArray(p.input_image_paths_resolved)) return p.input_image_paths_resolved;
+    return [];
+  }, [task]);
+
+  const additionalLoras = (task as any)?.params?.additional_loras as Record<string, any> | undefined;
+
   useEffect(() => {
+    let cancelled = false; // guard to avoid state updates after unmount
     const fetchTaskDetails = async () => {
       if (!isOpen || !generationId) return;
 
       try {
         // Step 1: Get the task ID from the generation using Supabase
         const result = await getTaskIdMutation.mutateAsync(generationId);
+
+        if (cancelled) return;
 
         if (!result.taskId) {
             console.log(`[TaskDetailsModal] No task ID found for generation ID: ${generationId}`);
@@ -59,13 +75,19 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
         // The task data will be fetched by the useGetTask hook automatically
 
       } catch (error: any) {
+        if (cancelled) return;
         console.error(`[TaskDetailsModal] Error fetching task details:`, error);
         setTaskId(null);
       }
     };
 
     fetchTaskDetails();
-  }, [isOpen, generationId, getTaskIdMutation]);
+
+    // Cleanup to avoid setting state after unmount
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, generationId]); // Removed getTaskIdMutation to avoid infinite loop
 
   const handleApplySettings = () => {
     if (task && onApplySettings) {
@@ -78,7 +100,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
   const handleApplySettingsFromTask = () => {
     if (taskId && onApplySettingsFromTask && task) {
       // Extract input images from task params
-      const inputImages = task.params?.input_images || [];
+      // Use the inputImages array we already derived from multiple sources
       onApplySettingsFromTask(taskId, replaceImages, inputImages);
     }
     setIsOpen(false);
@@ -128,15 +150,15 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
           ) : task ? (
             <div className="overflow-y-auto pr-2 space-y-6" style={{ maxHeight: 'calc(80vh - 140px)' }}>
               {/* Input Images Section - Prominently displayed at top */}
-              {task.params?.input_images && task.params.input_images.length > 0 && (
+              {inputImages.length > 0 && (
                 <div className="space-y-3">
                   <div className="flex items-center space-x-2">
                     <div className="w-2 h-2 bg-primary rounded-full"></div>
                     <h3 className="text-lg font-semibold text-foreground">Input Images</h3>
-                    <span className="text-sm text-muted-foreground">({task.params.input_images.length} image{task.params.input_images.length !== 1 ? 's' : ''})</span>
+                    <span className="text-sm text-muted-foreground">({inputImages.length} image{inputImages.length !== 1 ? 's' : ''})</span>
                   </div>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3 p-4 bg-muted/30 rounded-lg border">
-                    {task.params.input_images.map((img: string, index: number) => (
+                    {inputImages.map((img: string, index: number) => (
                       <div key={index} className="relative group">
                         <img 
                           src={img} 
@@ -192,12 +214,12 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
                   </div>
 
                   {/* LoRAs Section */}
-                  {task.params.additional_loras && Object.keys(task.params.additional_loras).length > 0 && (
+                  {additionalLoras && Object.keys(additionalLoras).length > 0 && (
                     <div className="pt-3 border-t border-muted-foreground/20">
                       <div className="space-y-2">
                         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">LoRAs Used</p>
                         <div className="space-y-2">
-                          {Object.entries(task.params.additional_loras).map(([url, strength]) => {
+                          {Object.entries(additionalLoras).map(([url, strength]) => {
                             const fileName = url.split('/').pop() || 'Unknown';
                             const displayName = fileName.replace(/\.(safetensors|ckpt|pt)$/, '');
                             return (
@@ -231,7 +253,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
                 <div className="bg-muted/30 rounded-lg border p-4">
                   <div className="max-h-96 overflow-y-auto">
                     <pre className="text-xs font-mono text-foreground whitespace-pre-wrap break-words leading-relaxed">
-                      {JSON.stringify(task.params, null, 2)}
+                      {JSON.stringify(task?.params ?? {}, null, 2)}
                     </pre>
                   </div>
                 </div>
@@ -254,7 +276,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
         <DialogFooter className="flex-shrink-0 pt-4 border-t">
           <div className="flex justify-between w-full items-center">
             <div className="flex items-center space-x-4">
-              {task?.params?.input_images && task.params.input_images.length > 0 && (
+              {inputImages.length > 0 && (
                 <div className="flex items-center space-x-4">
                   <div className="flex items-center space-x-2">
                     <Checkbox 
@@ -266,10 +288,10 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
                       Replace these images
                     </Label>
                   </div>
-                  {onApplySettings && task && (
+                  {onApplySettingsFromTask && task && taskId && (
                     <Button 
                       variant="default" 
-                      onClick={handleApplySettings}
+                      onClick={handleApplySettingsFromTask}
                       className="text-sm"
                     >
                       Apply These Settings

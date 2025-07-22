@@ -24,18 +24,7 @@ export const GlobalProcessingWarning: React.FC<ProcessingWarningsProps> = ({ onO
   // If both generation methods are disabled, show a dedicated warning.
   const generationDisabled = !inCloudChecked && !onComputerChecked;
 
-  // Debug logging to understand why warnings aren't showing
-  console.log('[GlobalProcessingWarning] Debug values:', {
-    balance: balance?.balance,
-    hasCredits,
-    tokensCount: tokens.length,
-    hasValidToken,
-    inCloudChecked,
-    onComputerChecked,
-    generationDisabled,
-    isLoadingBalance,
-    isLoadingTokens
-  });
+
 
   // Avoid showing any warning while data is loading.
   if (isLoadingBalance || isLoadingTokens) {

@@ -103,6 +103,12 @@ interface ImageGalleryProps {
   onServerPageChange?: (page: number) => void;
   /** Current server page (1-based) */
   serverPage?: number;
+  /** Enable shot filtering dropdown */
+  showShotFilter?: boolean;
+  /** Initial shot filter value */
+  initialShotFilter?: string;
+  /** Callback when shot filter changes */
+  onShotFilterChange?: (shotId: string) => void;
 }
 
 // Helper to format metadata for display
@@ -188,7 +194,7 @@ const InfoPopover: React.FC<{ metadata: DisplayableMetadata | undefined; metadat
   );
 };
 
-export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, isDeleting, onApplySettings, allShots, lastShotId, onAddToLastShot, currentToolType, initialFilterState = true, onImageSaved, offset = 0, totalCount, whiteText = false, columnsPerRow = 5, itemsPerPage = 45, initialMediaTypeFilter = 'all', onServerPageChange, serverPage }) => {
+export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, isDeleting, onApplySettings, allShots, lastShotId, onAddToLastShot, currentToolType, initialFilterState = true, onImageSaved, offset = 0, totalCount, whiteText = false, columnsPerRow = 5, itemsPerPage = 45, initialMediaTypeFilter = 'all', onServerPageChange, serverPage, showShotFilter = false, initialShotFilter = 'all', onShotFilterChange }) => {
   const [activeLightboxMedia, setActiveLightboxMedia] = useState<GenerationRow | null>(null);
   const [downloadingImageId, setDownloadingImageId] = useState<string | null>(null);
   const { toast } = useToast();
@@ -206,6 +212,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
   const [filterByToolType, setFilterByToolType] = useState<boolean>(initialFilterState);
   // State for the new media type filter
   const [mediaTypeFilter, setMediaTypeFilter] = useState<'all' | 'image' | 'video'>(initialMediaTypeFilter);
+  // State for shot filter
+  const [shotFilter, setShotFilter] = useState<string>(initialShotFilter);
 
   // Pagination state (45 items per page)
   const ITEMS_PER_PAGE = itemsPerPage;
@@ -523,6 +531,32 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
               </div>
 
             <div className="flex items-center gap-x-4 gap-y-2 flex-wrap"> {/* Grouping filters, added flex-wrap */}
+                {/* Shot Filter */}
+                {showShotFilter && (
+                    <div className="flex items-center space-x-1.5">
+                        <Label htmlFor="shot-filter" className={`text-sm font-medium ${whiteText ? 'text-white' : 'text-muted-foreground'}`}>Shot:</Label>
+                        <Select 
+                            value={shotFilter} 
+                            onValueChange={(value) => {
+                                setShotFilter(value);
+                                onShotFilterChange?.(value);
+                            }}
+                        >
+                            <SelectTrigger id="shot-filter" className="h-8 text-xs w-[140px]">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all" className="text-xs">All Shots</SelectItem>
+                                {allShots?.map(shot => (
+                                    <SelectItem key={shot.id} value={shot.id} className="text-xs">
+                                        {shot.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                )}
+                
                 {/* New Media Type Filter */}
                 <div className="flex items-center space-x-1.5">
                     <Label htmlFor="media-type-filter" className={`text-sm font-medium ${whiteText ? 'text-white' : 'text-muted-foreground'}`}>Type:</Label>
@@ -879,6 +913,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
           showNavigation={true}
           showImageEditTools={!activeLightboxMedia.type.includes('video')}
           showDownload={true}
+          showMagicEdit={true}
           videoPlayerComponent="simple-player"
           allShots={simplifiedShotOptions}
           selectedShotId={selectedShotIdLocal}
@@ -888,7 +923,11 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
           isDeleting={isDeleting}
           onApplySettings={onApplySettings}
           showTickForImageId={showTickForImageId}
-          onShowTick={handleShowTick}
+          onShowTick={setShowTickForImageId}
+          onMagicEdit={(imageUrl, prompt, numImages) => {
+            // TODO: Implement magic edit generation
+            console.log('Magic Edit:', { imageUrl, prompt, numImages });
+          }}
         />
       )}
     </TooltipProvider>
