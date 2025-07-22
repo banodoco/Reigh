@@ -126,21 +126,16 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
 
   // Optimized: Use the memoized imagesToShow directly instead of local state duplication
   useEffect(() => {
-    if (generationsResponse?.items) {
-      if (generationsResponse.items.length === 0) {
-        // If filter results in no items, scroll to top to avoid jump
-        if (isFilterChange) {
-          window.scrollTo({ top: 0, behavior: 'auto' });
-        }
-        setGeneratedImages([]);
-      } else {
-        setGeneratedImages(generationsResponse.items);
-      }
-      // Reset filter change flag when new data arrives
+    if (generationsResponse) {
+      // Always update with new items if available, even during filter changes
+      setGeneratedImages(generationsResponse.items || []);
+      // Reset filter change flag
       if (isFilterChange) {
         setIsFilterChange(false);
       }
     }
+    // Removed else clause - don't clear during loading to prevent jump
+    // Clearing only happens explicitly elsewhere if needed
   }, [generationsResponse, isFilterChange]);
 
   useEffect(() => {

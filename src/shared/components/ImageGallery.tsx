@@ -560,6 +560,12 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
 
   const isMobile = useIsMobile();
 
+  // Calculate minimum height to prevent layout shifts when switching between empty/full states
+  const rowsPerPage = Math.ceil(ITEMS_PER_PAGE / columnsPerRow);
+  const estimatedItemHeight = 250; // Approximate height of each grid item including aspect ratio
+  const gapHeight = 16; // gap-4 = 16px
+  const galleryMinHeight = `${rowsPerPage * estimatedItemHeight + (rowsPerPage - 1) * gapHeight}px`;
+
   return (
     <TooltipProvider>
       <div className="space-y-6 pb-8">
@@ -697,7 +703,10 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
         </div>
 
         {images.length > 0 && filteredImages.length === 0 && (filterByToolType || mediaTypeFilter !== 'all' || searchTerm.trim()) && (
-          <div className="text-center py-12 mt-8 text-muted-foreground border rounded-lg bg-card shadow-sm">
+          <div 
+            className="flex flex-col items-center justify-center text-center py-12 mt-8 text-muted-foreground border rounded-lg bg-card shadow-sm"
+            style={{ minHeight: galleryMinHeight }}
+          >
             <Filter className="mx-auto h-10 w-10 mb-3 opacity-60" />
             <p className="font-semibold">No items match the current filters.</p>
             <p className="text-sm">Adjust the filters or clear the search to see all items.</p>
@@ -705,7 +714,10 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
         )}
 
         {images.length === 0 && (
-           <div className="text-center py-12 mt-8 text-muted-foreground border rounded-lg bg-card shadow-sm">
+           <div 
+             className="flex flex-col items-center justify-center text-center py-12 mt-8 text-muted-foreground border rounded-lg bg-card shadow-sm"
+             style={{ minHeight: galleryMinHeight }}
+           >
              <Sparkles className="mx-auto h-10 w-10 mb-3 opacity-60" />
              <p className="font-semibold">No images generated yet.</p>
              <p className="text-sm">Use the controls above to generate some images.</p>
@@ -713,7 +725,10 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
         )}
 
         {paginatedImages.length > 0 && (
-            <div className={`grid gap-4 mb-12 ${columnsPerRow === 6 ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-6' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 2xl:grid-cols-5'}`}>
+            <div 
+              className={`grid gap-4 mb-12 ${columnsPerRow === 6 ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-6' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 2xl:grid-cols-5'}`}
+              style={{ minHeight: galleryMinHeight }}
+            >
             {paginatedImages.map((image, index) => {
                 const displayUrl = getDisplayUrl(image.url);
                 const metadataForDisplay = image.metadata ? formatMetadataForDisplay(image.metadata) : "No metadata available.";
