@@ -158,6 +158,7 @@ export const GenerationsPane: React.FC = () => {
                     count={12}
                     columns={{ base: 2, sm: 3, md: 4, lg: 5, xl: 6 }}
                     whiteText={true}
+                    showControls={false}
                 />
             )}
             {error && <p className="text-red-500 text-center">Error: {error.message}</p>}

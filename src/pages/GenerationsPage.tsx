@@ -45,6 +45,7 @@ const GenerationsPage: React.FC = () => {
         <SkeletonGallery 
           count={GENERATIONS_PER_PAGE}
           columns={{ base: 2, sm: 3, md: 4, lg: 5, xl: 6 }}
+          showControls={true}
         />
       ) : !selectedProjectId ? (
         <div className="text-center py-10">Please select a project to view generations.</div>
@@ -54,6 +55,7 @@ const GenerationsPage: React.FC = () => {
         <SkeletonGallery 
           count={GENERATIONS_PER_PAGE}
           columns={{ base: 2, sm: 3, md: 4, lg: 5, xl: 6 }}
+          showControls={true}
         />
       ) : (
         <ImageGallery

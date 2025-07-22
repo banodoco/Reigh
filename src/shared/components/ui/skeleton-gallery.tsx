@@ -16,6 +16,8 @@ interface SkeletonGalleryProps {
   whiteText?: boolean;
   /** Custom className for the container */
   className?: string;
+  /** Whether to show skeleton controls at the top (pagination, filters, search) */
+  showControls?: boolean;
 }
 
 /**
@@ -26,7 +28,8 @@ export function SkeletonGallery({
   count = 20, 
   columns = { base: 2, sm: 3, md: 4, lg: 5, xl: 6 },
   whiteText = false,
-  className 
+  className,
+  showControls = false
 }: SkeletonGalleryProps) {
   
   const gridCols = cn(
@@ -63,17 +66,48 @@ export function SkeletonGallery({
     columns.xl && columns.xl === 6 && 'xl:grid-cols-6'
   );
 
+  const skeletonBg = whiteText ? 'bg-zinc-700/60' : 'bg-muted';
+
   return (
-    <div className={cn(gridCols, className)}>
-      {Array.from({ length: count }).map((_, idx) => (
-        <div 
-          key={idx} 
-          className={cn(
-            'aspect-square animate-pulse rounded-lg',
-            whiteText ? 'bg-zinc-700/60' : 'bg-muted'
-          )}
-        />
-      ))}
+    <div className={cn('space-y-6 pb-8', className)}>
+      {showControls && (
+        <div className="flex flex-wrap justify-between items-center mb-4 gap-x-4 gap-y-2">
+          {/* Left side - Pagination controls skeleton */}
+          <div className="flex items-center gap-2">
+            <div className={cn('h-8 w-16 rounded animate-pulse', skeletonBg)} />
+            <div className={cn('h-4 w-40 rounded animate-pulse', skeletonBg)} />
+            <div className={cn('h-8 w-16 rounded animate-pulse', skeletonBg)} />
+          </div>
+
+          {/* Right side - Filters skeleton */}
+          <div className="flex items-center gap-x-4 gap-y-2 flex-wrap">
+            {/* Shot Filter skeleton */}
+            <div className={cn('h-8 w-[140px] rounded animate-pulse', skeletonBg)} />
+            
+            {/* Search skeleton */}
+            <div className={cn('h-8 w-8 rounded animate-pulse', skeletonBg)} />
+            
+            {/* Media Type Filter skeleton */}
+            <div className="flex items-center space-x-1.5">
+              <div className={cn('h-4 w-8 rounded animate-pulse', skeletonBg)} />
+              <div className={cn('h-8 w-[100px] rounded animate-pulse', skeletonBg)} />
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Gallery grid skeleton */}
+      <div className={gridCols}>
+        {Array.from({ length: count }).map((_, idx) => (
+          <div 
+            key={idx} 
+            className={cn(
+              'aspect-square animate-pulse rounded-lg',
+              skeletonBg
+            )}
+          />
+        ))}
+      </div>
     </div>
   );
 } 

@@ -547,6 +547,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
               <SkeletonGallery 
                 count={20}
                 columns={{ base: 2, sm: 3, md: 4, lg: 5 }}
+                showControls={true}
               />
             ) : (
               <ImageGallery
