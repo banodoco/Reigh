@@ -9,6 +9,7 @@ import { ImageGallery } from '@/shared/components/ImageGallery';
 import { usePanes } from '@/shared/contexts/PanesContext';
 import PaneControlTab from '../PaneControlTab';
 import { Skeleton } from '@/shared/components/ui/skeleton';
+import { SkeletonGallery } from '@/shared/components/ui/skeleton-gallery';
 import { ShotFilter } from '@/shared/components/ShotFilter';
 import { useGenerationsPageLogic } from '@/shared/hooks/useGenerationsPageLogic';
 
@@ -153,11 +154,11 @@ export const GenerationsPane: React.FC = () => {
         </div>
         <div className="flex-grow p-3 overflow-y-auto">
             {isLoading && (
-                <div className="grid grid-cols-2 c-sm:grid-cols-3 c-md:grid-cols-4 c-lg:grid-cols-5 c-xl:grid-cols-6 gap-4">
-                    {Array.from({ length: 12 }).map((_, idx) => (
-                        <Skeleton key={idx} className="w-full aspect-square rounded-lg bg-zinc-700/60" />
-                    ))}
-                </div>
+                <SkeletonGallery 
+                    count={12}
+                    columns={{ base: 2, sm: 3, md: 4, lg: 5, xl: 6 }}
+                    whiteText={true}
+                />
             )}
             {error && <p className="text-red-500 text-center">Error: {error.message}</p>}
             {paginatedData.items.length > 0 && (

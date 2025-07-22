@@ -29,6 +29,7 @@ import { fetchGenerations } from "@/shared/hooks/useGenerations";
 import { getDisplayUrl } from '@/shared/lib/utils';
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 import { ShotFilter } from '@/shared/components/ShotFilter';
+import { SkeletonGallery } from '@/shared/components/ui/skeleton-gallery';
 
 // Remove unnecessary environment detection - tool should work in all environments
 
@@ -543,11 +544,10 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
 
           <div ref={galleryRef} className="mt-2">
             {isLoadingGenerations ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                {Array.from({ length: 20 }).map((_, idx) => (
-                  <div key={idx} className="aspect-square bg-muted animate-pulse rounded-lg" />
-                ))}
-              </div>
+              <SkeletonGallery 
+                count={20}
+                columns={{ base: 2, sm: 3, md: 4, lg: 5 }}
+              />
             ) : (
               <ImageGallery
                 images={imagesToShow}
