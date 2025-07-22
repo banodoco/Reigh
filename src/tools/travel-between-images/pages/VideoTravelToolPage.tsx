@@ -128,15 +128,9 @@ const VideoTravelToolPage: React.FC = () => {
   
   // Memoize expensive computations
   const shouldShowShotEditor = useMemo(() => {
-    // If we have a selected shot, definitely show editor
-    if (selectedShot) return true;
-    
-    // If we navigated here via shot click and have a currentShotId, show editor immediately
-    // even before shots data loads to prevent header flash
-    if (viaShotClick && currentShotId) return true;
-    
-    // Otherwise, check if the shot exists in loaded shots data
-    return shots?.some(s => s.id === currentShotId) || false;
+    // Only show editor if we actually have a shot to edit
+    const shotExists = selectedShot || (viaShotClick && currentShotId && shots?.find(s => s.id === currentShotId));
+    return !!shotExists;
   }, [selectedShot, viaShotClick, currentShotId, shots]);
   
   const shotToEdit = useMemo(() => {

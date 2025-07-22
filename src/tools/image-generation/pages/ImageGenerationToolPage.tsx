@@ -6,7 +6,7 @@ import SettingsModal from "@/shared/components/SettingsModal";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/shared/components/ui/button";
-import { useListShots, useAddImageToShot } from "@/shared/hooks/useShots";
+import { useListShots, useAddImageToShot, usePositionExistingGenerationInShot } from "@/shared/hooks/useShots";
 import { useLastAffectedShot } from "@/shared/hooks/useLastAffectedShot";
 import { useProject } from "@/shared/contexts/ProjectContext";
 import { uploadImageToStorage } from '@/shared/lib/imageUploader';
@@ -27,6 +27,8 @@ import { timeEnd } from '@/shared/lib/logger';
 import { useIsMobile } from "@/shared/hooks/use-mobile";
 import { fetchGenerations } from "@/shared/hooks/useGenerations";
 import { getDisplayUrl } from '@/shared/lib/utils';
+import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
+import { ShotFilter } from '@/shared/components/ShotFilter';
 
 // Remove unnecessary environment detection - tool should work in all environments
 
@@ -47,6 +49,10 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [loadGenerations, setLoadGenerations] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [selectedShotFilter, setSelectedShotFilter] = useState<string>('all');
+  const [excludePositioned, setExcludePositioned] = useState(true); // Default checked
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [lastKnownTotal, setLastKnownTotal] = useState<number>(0);
   const isMobile = useIsMobile();
   
   // Early prefetch of public LoRAs to reduce loading time
@@ -69,6 +75,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   const { selectedProjectId } = useProject();
   const [searchParams] = useSearchParams();
   const { setHeader, clearHeader } = useToolPageHeader();
+  const { currentShotId } = useCurrentShot();
 
   // Set the header when component mounts and clear when unmounting
   useEffect(() => {
@@ -79,7 +86,10 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   // Track project tasks to know when they appear in the TasksPane (must be after selectedProjectId)
   const { data: projectTasks } = useListTasks({ projectId: selectedProjectId });
   const { data: shots, isLoading: isLoadingShots, error: shotsError } = useListShots(selectedProjectId);
+
+
   const addImageToShotMutation = useAddImageToShot();
+  const positionExistingGenerationMutation = usePositionExistingGenerationInShot();
   const { lastAffectedShotId, setLastAffectedShotId } = useLastAffectedShot();
   const itemsPerPage = isMobile ? 24 : 25;
   const { data: generationsResponse, isLoading: isLoadingGenerations } = useGenerations(
@@ -88,13 +98,27 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     itemsPerPage, 
     loadGenerations,
     {
-      mediaType: 'image'
+      mediaType: 'image',
+      shotId: selectedShotFilter === 'all' ? undefined : selectedShotFilter,
+      excludePositioned: selectedShotFilter !== 'all' ? excludePositioned : undefined
     }
   );
   const deleteGenerationMutation = useDeleteGeneration();
   const updateGenerationLocationMutation = useUpdateGenerationLocation();
 
   const queryClient = useQueryClient();
+
+  // Reset to page 1 when shot filter or position filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedShotFilter, excludePositioned]);
+
+  // Update last known total when we get valid data
+  useEffect(() => {
+    if (generationsResponse?.total !== undefined && generationsResponse.total > 0) {
+      setLastKnownTotal(generationsResponse.total);
+    }
+  }, [generationsResponse?.total]);
 
   // Optimized: Use the memoized imagesToShow directly instead of local state duplication
   useEffect(() => {
@@ -385,14 +409,30 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
         toast.error("No project selected. Cannot add image to shot.");
         return false;
     }
+
+    // Check if we're trying to add to the same shot that's currently filtered with excludePositioned enabled
+    const shouldPositionExisting = selectedShotFilter !== 'all' && 
+                                  selectedShotFilter === targetShotInfo.targetShotIdForButton && 
+                                  excludePositioned;
+
     try {
-      await addImageToShotMutation?.mutateAsync({
-        shot_id: targetShotInfo.targetShotIdForButton,
-        generation_id: generationId,
-        imageUrl: imageUrl,
-        thumbUrl: thumbUrl,
-        project_id: selectedProjectId, 
-      });
+      if (shouldPositionExisting) {
+        // Use the position existing function for items in the filtered list
+        await positionExistingGenerationMutation?.mutateAsync({
+          shot_id: targetShotInfo.targetShotIdForButton,
+          generation_id: generationId,
+          project_id: selectedProjectId,
+        });
+      } else {
+        // Use the regular add function
+        await addImageToShotMutation?.mutateAsync({
+          shot_id: targetShotInfo.targetShotIdForButton,
+          generation_id: generationId,
+          imageUrl: imageUrl,
+          thumbUrl: thumbUrl,
+          project_id: selectedProjectId, 
+        });
+      }
       setLastAffectedShotId(targetShotInfo.targetShotIdForButton);
       return true;
     } catch (error) {
@@ -400,7 +440,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
       toast.error("Failed to add image to shot.");
       return false;
     }
-  }, [targetShotInfo.targetShotIdForButton, selectedProjectId, addImageToShotMutation, setLastAffectedShotId]);
+  }, [targetShotInfo.targetShotIdForButton, selectedProjectId, addImageToShotMutation, positionExistingGenerationMutation, setLastAffectedShotId, selectedShotFilter, excludePositioned]);
 
   const isGenerating = isCreatingTasks;
 
@@ -522,9 +562,17 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
                 initialMediaTypeFilter="image"
                 itemsPerPage={itemsPerPage}
                 offset={(currentPage - 1) * itemsPerPage}
-                totalCount={generationsResponse?.total || 0}
+                totalCount={generationsResponse?.total ?? lastKnownTotal}
                 onServerPageChange={handleServerPageChange}
                 serverPage={currentPage}
+                showShotFilter={true}
+                initialShotFilter={selectedShotFilter}
+                onShotFilterChange={setSelectedShotFilter}
+                initialExcludePositioned={excludePositioned}
+                onExcludePositionedChange={setExcludePositioned}
+                showSearch={true}
+                initialSearchTerm={searchTerm}
+                onSearchChange={setSearchTerm}
               />
             )}
           </div>

@@ -257,8 +257,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
   // Reset mode readiness when shot changes
   useEffect(() => {
-    setIsModeReady(false);
-  }, [selectedShot.id]);
+    if (selectedShot?.id) {
+      setIsModeReady(false);
+    }
+  }, [selectedShot?.id]);
 
   // Ensure mobile users are always in batch generation mode and track readiness
   useEffect(() => {
@@ -1371,6 +1373,26 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                     />
                   )}
                   </div>
+                  
+                  {/* Unpositioned generations message */}
+                  {unpositionedGenerationsCount > 0 && (
+                    <div className="mx-1 mt-4 p-3 bg-muted/50 rounded-lg flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">
+                        There {unpositionedGenerationsCount === 1 ? 'is' : 'are'} {unpositionedGenerationsCount} generation{unpositionedGenerationsCount === 1 ? '' : 's'} associated with this shot that {unpositionedGenerationsCount === 1 ? "doesn't" : "don't"} have a position
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          // Open the generations pane and set the current shot context
+                          setIsGenerationsPaneLocked(true);
+                          // TODO: Set the shot filter in the generations pane to the current shot
+                        }}
+                      >
+                        Open Pane
+                      </Button>
+                    </div>
+                  )}
                 </CardContent>
                 <div className="p-4 border-t space-y-3">
                   <FileInput
@@ -1488,26 +1510,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           </Card>
         </div>
       </div>
-      
-      {/* Unpositioned generations message */}
-      {unpositionedGenerationsCount > 0 && (
-        <div className="w-full p-4 bg-muted/50 rounded-lg flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">
-            There {unpositionedGenerationsCount === 1 ? 'is' : 'are'} {unpositionedGenerationsCount} generation{unpositionedGenerationsCount === 1 ? '' : 's'} associated with this shot that {unpositionedGenerationsCount === 1 ? "doesn't" : "don't"} have a position
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              // Open the generations pane and set the current shot context
-              setIsGenerationsPaneLocked(true);
-              // TODO: Set the shot filter in the generations pane to the current shot
-            }}
-          >
-            Open Pane
-          </Button>
-        </div>
-      )}
       
       <LoraSelectorModal
         isOpen={isLoraModalOpen}

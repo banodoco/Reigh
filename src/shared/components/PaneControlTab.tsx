@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button } from '@/shared/components/ui/button';
-import { LockIcon, UnlockIcon, ChevronLeft, ChevronRight, ChevronUp } from 'lucide-react';
+import { LockIcon, UnlockIcon, ChevronLeft, ChevronRight, ChevronUp, Square } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 
@@ -14,9 +14,13 @@ interface PaneControlTabProps {
   bottomOffset?: number;
   handlePaneEnter: () => void;
   handlePaneLeave: () => void;
+  thirdButton?: {
+    onClick: () => void;
+    ariaLabel: string;
+  };
 }
 
-const PaneControlTab: React.FC<PaneControlTabProps> = ({ side, isLocked, isOpen, toggleLock, openPane, paneDimension, bottomOffset = 0, handlePaneEnter, handlePaneLeave }) => {
+const PaneControlTab: React.FC<PaneControlTabProps> = ({ side, isLocked, isOpen, toggleLock, openPane, paneDimension, bottomOffset = 0, handlePaneEnter, handlePaneLeave, thirdButton }) => {
   const isMobile = useIsMobile();
   const [selectionActive, setSelectionActive] = React.useState(false);
 
@@ -143,6 +147,17 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({ side, isLocked, isOpen,
         >
           <LockIcon className="h-4 w-4" />
         </Button>
+        {thirdButton && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onPointerUp={thirdButton.onClick}
+            className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
+            aria-label={thirdButton.ariaLabel}
+          >
+            <Square className="h-4 w-4" />
+          </Button>
+        )}
       </div>
     );
   }
@@ -177,6 +192,17 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({ side, isLocked, isOpen,
         >
           <UnlockIcon className="h-4 w-4" />
         </Button>
+        {thirdButton && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onPointerUp={thirdButton.onClick}
+            className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
+            aria-label={thirdButton.ariaLabel}
+          >
+            <Square className="h-4 w-4" />
+          </Button>
+        )}
       </div>
     );
   }
@@ -234,6 +260,17 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({ side, isLocked, isOpen,
       >
         <LockIcon className="h-4 w-4" />
       </Button>
+      {thirdButton && (
+        <Button
+          variant="ghost"
+          size="icon"
+          onPointerUp={thirdButton.onClick}
+          className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
+          aria-label={thirdButton.ariaLabel}
+        >
+          <Square className="h-4 w-4" />
+        </Button>
+      )}
     </div>
   );
 };

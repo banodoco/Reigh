@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Trash2, Info, Settings, CheckCircle, AlertTriangle, Download, PlusCircle, Check, Sparkles, Filter } from "lucide-react";
+import { Trash2, Info, Settings, CheckCircle, AlertTriangle, Download, PlusCircle, Check, Sparkles, Filter, Search, X } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
 import { 
   Tooltip, 
@@ -25,6 +25,7 @@ import { Label } from "@/shared/components/ui/label";
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 import { DraggableImage } from "@/shared/components/DraggableImage";
 import { getDisplayUrl } from "@/shared/lib/utils";
+import { ShotFilter } from "@/shared/components/ShotFilter";
 import { useIsMobile } from "@/shared/hooks/use-mobile";
 import { TimeStamp } from "@/shared/components/TimeStamp";
 
@@ -109,6 +110,16 @@ interface ImageGalleryProps {
   initialShotFilter?: string;
   /** Callback when shot filter changes */
   onShotFilterChange?: (shotId: string) => void;
+  /** Initial exclude positioned value */
+  initialExcludePositioned?: boolean;
+  /** Callback when exclude positioned changes */
+  onExcludePositionedChange?: (exclude: boolean) => void;
+  /** Show search functionality */
+  showSearch?: boolean;
+  /** Initial search term */
+  initialSearchTerm?: string;
+  /** Callback when search term changes */
+  onSearchChange?: (searchTerm: string) => void;
 }
 
 // Helper to format metadata for display
@@ -194,7 +205,34 @@ const InfoPopover: React.FC<{ metadata: DisplayableMetadata | undefined; metadat
   );
 };
 
-export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, isDeleting, onApplySettings, allShots, lastShotId, onAddToLastShot, currentToolType, initialFilterState = true, onImageSaved, offset = 0, totalCount, whiteText = false, columnsPerRow = 5, itemsPerPage = 45, initialMediaTypeFilter = 'all', onServerPageChange, serverPage, showShotFilter = false, initialShotFilter = 'all', onShotFilterChange }) => {
+export const ImageGallery: React.FC<ImageGalleryProps> = ({ 
+  images, 
+  onDelete, 
+  isDeleting, 
+  onApplySettings, 
+  allShots, 
+  lastShotId, 
+  onAddToLastShot, 
+  currentToolType, 
+  initialFilterState = true, 
+  onImageSaved, 
+  offset = 0, 
+  totalCount, 
+  whiteText = false, 
+  columnsPerRow = 5, 
+  itemsPerPage = 45, 
+  initialMediaTypeFilter = 'all', 
+  onServerPageChange, 
+  serverPage, 
+  showShotFilter = false, 
+  initialShotFilter = 'all', 
+  onShotFilterChange,
+  initialExcludePositioned = true,
+  onExcludePositionedChange,
+  showSearch = false,
+  initialSearchTerm = '',
+  onSearchChange
+}) => {
   const [activeLightboxMedia, setActiveLightboxMedia] = useState<GenerationRow | null>(null);
   const [downloadingImageId, setDownloadingImageId] = useState<string | null>(null);
   const { toast } = useToast();
@@ -214,6 +252,12 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
   const [mediaTypeFilter, setMediaTypeFilter] = useState<'all' | 'image' | 'video'>(initialMediaTypeFilter);
   // State for shot filter
   const [shotFilter, setShotFilter] = useState<string>(initialShotFilter);
+  const [excludePositioned, setExcludePositioned] = useState<boolean>(initialExcludePositioned);
+  
+  // Search state
+  const [searchTerm, setSearchTerm] = useState<string>(initialSearchTerm);
+  const [isSearchOpen, setIsSearchOpen] = useState<boolean>(!!initialSearchTerm);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Pagination state (45 items per page)
   const ITEMS_PER_PAGE = itemsPerPage;
@@ -223,7 +267,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
   React.useEffect(() => {
     const timer = setTimeout(() => setPage(0), 10);
     return () => clearTimeout(timer);
-  }, [filterByToolType, mediaTypeFilter]);
+  }, [filterByToolType, mediaTypeFilter, searchTerm]);
 
   const tickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
@@ -327,6 +371,16 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
     setLastAffectedShotId(shotId);
   };
 
+  const handleShotFilterChange = (shotId: string) => {
+    setShotFilter(shotId);
+    onShotFilterChange?.(shotId);
+  };
+
+  const handleExcludePositionedChange = (exclude: boolean) => {
+    setExcludePositioned(exclude);
+    onExcludePositionedChange?.(exclude);
+  };
+
   const handleShowTick = (imageId: string) => {
     setShowTickForImageId(imageId);
     if (tickTimeoutRef.current) clearTimeout(tickTimeoutRef.current);
@@ -393,66 +447,90 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
     }
   };
 
+  const handleSearchChange = (value: string) => {
+    setSearchTerm(value);
+    onSearchChange?.(value);
+  };
+
+  // Toggle search box visibility
+  const toggleSearch = () => {
+    setIsSearchOpen(!isSearchOpen);
+    if (!isSearchOpen) {
+      // Focus the input when opening
+      setTimeout(() => searchInputRef.current?.focus(), 100);
+    } else if (!searchTerm) {
+      // If closing and no search term, clear it
+      handleSearchChange('');
+    }
+  };
+
+  // Clear search
+  const clearSearch = () => {
+    handleSearchChange('');
+    setIsSearchOpen(false);
+  };
+
+  // Update search visibility based on search term
+  useEffect(() => {
+    if (searchTerm && !isSearchOpen) {
+      setIsSearchOpen(true);
+    }
+  }, [searchTerm, isSearchOpen]);
+
   const filteredImages = React.useMemo(() => {
     // Determine if we're in server-side pagination mode first
     const isServerPaginationMode = !!(onServerPageChange && serverPage);
     
-    // In server pagination mode, skip client-side filtering since the server should handle it
-    if (isServerPaginationMode) {
-      return images;
-    }
-    
-    // Client-side filtering for non-server paginated data
+    // Start with all images
     let currentFiltered = images;
 
-    // 1. Apply tool_type filter
-    if (filterByToolType && currentToolType) {
-      currentFiltered = currentFiltered.filter(image => {
-        const metadata = image.metadata;
-        if (!metadata || !metadata.tool_type) return false; // No metadata or tool_type, exclude
-        
-        // If currentToolType is 'edit-travel', we want to include anything that starts with 'edit-travel'
-        // This covers 'edit-travel', 'edit-travel-flux', 
-        // 'edit-travel-reconstructed-client', 'edit-travel-reconstructed-flux-client', etc.
-        if (currentToolType === 'edit-travel') {
-          return metadata.tool_type.startsWith('edit-travel');
-        }
-        
-        // For other tools, it's an exact match to the tool_type or its reconstructed client version
-        // (e.g., 'image-generation' or 'image-generation-reconstructed-client')
-        // This part might need adjustment if other tools also have varied reconstructed types.
-        // For now, assuming reconstructed videos from other tools might also follow a pattern.
-        // A more robust way for generic tools would be needed if they also have diverse sub-types.
-        if (metadata.tool_type === currentToolType) return true;
-        if (metadata.tool_type === `${currentToolType}-reconstructed-client`) return true; // Example for a generic tool
+    // In server pagination mode, only apply search filter (server handles shot/media filters)
+    // In client pagination mode, apply all filters
+    if (!isServerPaginationMode) {
+      // 1. Apply tool_type filter
+      if (filterByToolType && currentToolType) {
+        currentFiltered = currentFiltered.filter(image => {
+          const metadata = image.metadata;
+          if (!metadata || !metadata.tool_type) return false;
+          
+          if (currentToolType === 'edit-travel') {
+            return metadata.tool_type.startsWith('edit-travel');
+          }
+          
+          if (metadata.tool_type === currentToolType) return true;
+          if (metadata.tool_type === `${currentToolType}-reconstructed-client`) return true;
+          
+          return metadata.tool_type === currentToolType;
+        });
+      }
 
-        // Fallback for exact match if no special handling for currentToolType
-        return metadata.tool_type === currentToolType;
-      });
+      // 2. Apply mediaTypeFilter
+      if (mediaTypeFilter !== 'all') {
+        currentFiltered = currentFiltered.filter(image => {
+          const urlIsVideo = image.url && (image.url.toLowerCase().endsWith('.webm') || image.url.toLowerCase().endsWith('.mp4') || image.url.toLowerCase().endsWith('.mov'));
+          const isActuallyVideo = typeof image.isVideo === 'boolean' ? image.isVideo : urlIsVideo;
+          
+          if (mediaTypeFilter === 'image') {
+            return !isActuallyVideo;
+          }
+          if (mediaTypeFilter === 'video') {
+            return isActuallyVideo;
+          }
+          return true;
+        });
+      }
     }
 
-    // 2. Apply mediaTypeFilter
-    if (mediaTypeFilter !== 'all') {
+    // 3. Apply search filter (always apply, even in server pagination mode)
+    if (searchTerm.trim()) {
       currentFiltered = currentFiltered.filter(image => {
-        const urlIsVideo = image.url && (image.url.toLowerCase().endsWith('.webm') || image.url.toLowerCase().endsWith('.mp4') || image.url.toLowerCase().endsWith('.mov'));
-        const isActuallyVideo = typeof image.isVideo === 'boolean' ? image.isVideo : urlIsVideo;
-        
-        // console.log(
-        //     `[ImageGallery_${galleryLogId}_FilterItem_Media] ID: ${image.id}, isVideo: ${image.isVideo}, urlIsVideo: ${urlIsVideo}, isActuallyVideo: ${isActuallyVideo}, mediaTypeFilter: ${mediaTypeFilter}, Match: ${mediaTypeFilter === 'image' ? !isActuallyVideo : isActuallyVideo}`
-        // );
-
-        if (mediaTypeFilter === 'image') {
-          return !isActuallyVideo;
-        }
-        if (mediaTypeFilter === 'video') {
-          return isActuallyVideo;
-        }
-        return true; // Should not be reached if filter is 'image' or 'video'
+        const prompt = image.prompt || image.metadata?.prompt || '';
+        return prompt.toLowerCase().includes(searchTerm.toLowerCase());
       });
     }
         
     return currentFiltered;
-  }, [images, filterByToolType, currentToolType, mediaTypeFilter, onServerPageChange, serverPage]);
+  }, [images, filterByToolType, currentToolType, mediaTypeFilter, searchTerm, onServerPageChange, serverPage]);
 
   // Determine if we're in server-side pagination mode
   const isServerPagination = !!(onServerPageChange && serverPage);
@@ -483,7 +561,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
   const isMobile = useIsMobile();
 
   return (
-                <TooltipProvider>
+    <TooltipProvider>
       <div className="space-y-6 pb-8">
         <div className="flex flex-wrap justify-between items-center mb-4 gap-x-4 gap-y-2"> {/* Added gap-y-2 and flex-wrap for better responsiveness */}
             <div className="flex items-center gap-2">
@@ -533,27 +611,56 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
             <div className="flex items-center gap-x-4 gap-y-2 flex-wrap"> {/* Grouping filters, added flex-wrap */}
                 {/* Shot Filter */}
                 {showShotFilter && (
+                    <ShotFilter
+                        shots={allShots || []}
+                        selectedShotId={shotFilter}
+                        onShotChange={handleShotFilterChange}
+                        excludePositioned={excludePositioned}
+                        onExcludePositionedChange={handleExcludePositionedChange}
+                        size="sm"
+                        whiteText={whiteText}
+                        checkboxId="exclude-positioned-image-gallery"
+                        triggerWidth="w-[140px]"
+                        triggerClassName={`h-8 text-xs ${whiteText ? 'bg-zinc-800 border-zinc-600 text-white' : ''}`}
+                    />
+                )}
+
+                {/* Search */}
+                {showSearch && (
                     <div className="flex items-center space-x-1.5">
-                        <Label htmlFor="shot-filter" className={`text-sm font-medium ${whiteText ? 'text-white' : 'text-muted-foreground'}`}>Shot:</Label>
-                        <Select 
-                            value={shotFilter} 
-                            onValueChange={(value) => {
-                                setShotFilter(value);
-                                onShotFilterChange?.(value);
-                            }}
-                        >
-                            <SelectTrigger id="shot-filter" className="h-8 text-xs w-[140px]">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all" className="text-xs">All Shots</SelectItem>
-                                {allShots?.map(shot => (
-                                    <SelectItem key={shot.id} value={shot.id} className="text-xs">
-                                        {shot.name}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                        {!isSearchOpen ? (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={toggleSearch}
+                                className={`h-8 px-2 ${whiteText ? 'text-white border-zinc-600 hover:bg-zinc-700' : ''}`}
+                                aria-label="Search prompts"
+                            >
+                                <Search className="h-4 w-4" />
+                            </Button>
+                        ) : (
+                            <div className={`flex items-center space-x-2 border rounded-md px-3 py-1 h-8 ${whiteText ? 'bg-zinc-800 border-zinc-600' : 'bg-background'}`}>
+                                <Search className={`h-4 w-4 ${whiteText ? 'text-zinc-400' : 'text-muted-foreground'}`} />
+                                <input
+                                    ref={searchInputRef}
+                                    type="text"
+                                    placeholder="Search prompts..."
+                                    value={searchTerm}
+                                    onChange={(e) => handleSearchChange(e.target.value)}
+                                    className={`bg-transparent border-none outline-none text-xs w-40 ${whiteText ? 'text-white placeholder-zinc-400' : ''}`}
+                                />
+                                {searchTerm && (
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={clearSearch}
+                                        className="h-auto p-0.5"
+                                    >
+                                        <X className="h-3 w-3" />
+                                    </Button>
+                                )}
+                            </div>
+                        )}
                     </div>
                 )}
                 
@@ -589,11 +696,11 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onDelete, is
             </div>
         </div>
 
-        {images.length > 0 && filteredImages.length === 0 && (filterByToolType || mediaTypeFilter !== 'all') && (
+        {images.length > 0 && filteredImages.length === 0 && (filterByToolType || mediaTypeFilter !== 'all' || searchTerm.trim()) && (
           <div className="text-center py-12 mt-8 text-muted-foreground border rounded-lg bg-card shadow-sm">
             <Filter className="mx-auto h-10 w-10 mb-3 opacity-60" />
             <p className="font-semibold">No items match the current filters.</p>
-            <p className="text-sm">Adjust the filters or uncheck them to see all items.</p>
+            <p className="text-sm">Adjust the filters or clear the search to see all items.</p>
           </div>
         )}
 
