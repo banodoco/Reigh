@@ -30,12 +30,15 @@ Reigh uses an async task queue pattern for all AI generation workloads. This dec
 - Inserts row into `tasks` table with `status = 'Queued'`
 - Returns task ID to client
 
-### 2. Worker Polling
-- Express worker (`src/server/services/taskProcessingService.ts`) polls every **10 seconds** (see `setTimeout(..., 10000)` in `startTaskPoller`)
-- Calls `claim_next_task` Edge Function which:
+### 2. Worker Polling & Task Processing
+- **External Workers** (Headless-Wan2GP) poll via `claim_next_task` Edge Function:
   - Finds oldest `Queued` task
   - Updates to `In Progress` with `worker_id`
   - Returns task details
+- **Task Processing** now uses **Database Triggers** (instant):
+  - When task status → `Complete`: triggers `process-completed-task` Edge Function
+  - Creates generations and shot_generations automatically
+  - Broadcasts real-time updates via Supabase Realtime
 - Worker processes based on `tool_id`:
   - Image generation → FAL API
   - Video processing → FFmpeg
@@ -103,7 +106,8 @@ The worker polls the same task queue but specializes in video generation:
   - Deducts credits from user's balance
 
 ### 4. Real-time Updates
-- All task table changes broadcast via Supabase Realtime
+- **Database Triggers** automatically broadcast changes via Supabase Realtime
+- **Instant processing** when tasks complete (no 10-second delay)
 - Client subscribes using `useWebSocket` hook
 - UI updates automatically as task progresses
 
@@ -113,11 +117,16 @@ The worker polls the same task queue but specializes in video generation:
   - `create_task/index.ts` - Task creation & validation
   - `claim_next_task/index.ts` - Worker task assignment
   - `complete_task/index.ts` - Task completion handling
+  - `process-completed-task/index.ts` - **NEW**: Instant task processing via triggers
   - `calculate-task-cost/index.ts` - Credit cost calculation
 
-- **Worker** (`/src/server/`)
-  - `services/taskProcessingService.ts` - Main polling loop
-  - `services/webSocketService.ts` - Realtime broadcast setup
+- **Database Triggers** (`/supabase/migrations/`)
+  - `trigger_process_completed_tasks` - Calls Edge Function when tasks complete
+  - `trigger_broadcast_task_status` - Real-time status broadcasts
+
+- **Real-time Updates**
+  - Direct Supabase Realtime connections from client
+  - **Removed**: Express WebSocket server (no longer needed)
 
 - **Client Hooks** (`/src/shared/hooks/`)
   - `useTasks.ts` - Task creation & monitoring
@@ -125,13 +134,15 @@ The worker polls the same task queue but specializes in video generation:
 
 ## Running Workers Locally
 
-### Basic Express Worker (Development)
+### Development Setup
 ```bash
 # Ensure Supabase is running
 supabase status
 
-# Start the worker
-npm run start:api
+# Start the frontend (connects directly to Supabase)
+npm run dev
+
+# No separate server needed - all real-time updates via Supabase
 ```
 
 ### Headless-Wan2GP Worker (GPU Required)
@@ -153,8 +164,9 @@ cp .env.example .env
 python main.py
 ```
 
-**When to use which worker:**
-- **Express Worker**: Prompt enhancement, basic image generation, development
+**Architecture Components:**
+- **Database Triggers**: Instant task processing (replaces polling)
+- **Supabase Realtime**: Direct client-database real-time connections
 - **Headless-Wan2GP**: Video travel generation, production workloads, GPU-intensive tasks
 
 ## Debugging Tips
@@ -168,10 +180,10 @@ python main.py
    LIMIT 10;
    ```
 
-2. **Check worker logs**:
-   - **Express Worker**: Look for `[Task Poller]` prefixed messages
+2. **Check processing logs**:
+   - **Database Triggers**: Check Supabase logs for `[ProcessTask]` messages
    - **Headless-Wan2GP**: Check Python output for task processing status
-   - Failed claims show as "No tasks to claim"
+   - **Realtime Updates**: Monitor browser DevTools for Supabase Realtime messages
 
 3. **Test Edge Functions locally**:
    ```bash
@@ -182,6 +194,7 @@ python main.py
      -d '{"tool_id": "image-generation", "input": {...}}'
    ```
 
-4. **Force task processing**:
-   - Set a task to `Queued` manually in Supabase dashboard
-   - Worker should pick it up within **≈10 seconds** 
+4. **Test trigger processing**:
+   - Set a task to `Complete` manually in Supabase dashboard
+   - Should be processed **instantly** via database trigger
+   - Check Edge Function logs for `process-completed-task` execution 

@@ -68,7 +68,7 @@ This document is meant to serve as a comprehensive view of Reigh's architecture.
 
 ```bash
 🌐 Frontend:  http://localhost:2222  # Vite dev server  
-⚙️  Server:    http://localhost:8085  # WebSocket & Task Processing Server
+⚙️  Database:  Direct Supabase connection # Real-time via triggers + Edge Functions
 ```
 
 ### Package Managers
@@ -89,7 +89,7 @@ Reigh supports both npm and bun package managers:
 | **`/src/pages`** | Top-level pages | `ToolSelectorPage`, `HomePage`, `ShotsPage`, etc. |
 | **`/src/tools`** | Feature modules | Each tool has `pages/`, `components/`, `settings.ts` |
 | **`/src/shared`** | Shared resources | UI components, hooks, contexts, utilities |
-| **`/src/server`** | WebSocket & Task Server | Real-time updates & background task processing |
+| **`/supabase/functions`** | Edge Functions | Task processing, payments, AI integration |
 | **`/db`** | Database layer | Drizzle schema, migrations (PostgreSQL), seeds |
 | **`/supabase`** | Supabase config | Edge Functions, migrations, CLI config |
 | **`/public`** | Static assets | Images, fonts, manifests |
@@ -146,6 +146,7 @@ See `.env.example` for all variables. Key ones:
 | `steerable-motion` | Video generation | `/supabase/functions/` |
 | `ai-prompt` | Prompt enhancement | `/supabase/functions/` |
 | `calculate-task-cost` | Credit calculation | `/supabase/functions/` |
+| `process-completed-task` | **NEW**: Instant task processing via triggers | `/supabase/functions/` |
 | `stripe-checkout` | Stripe payment sessions | `/supabase/functions/` |
 | `stripe-webhook` | Stripe payment webhooks | `/supabase/functions/` |
 
@@ -246,11 +247,11 @@ VITE_DEBUG_LOGS=true npm run dev
 echo "VITE_DEBUG_LOGS=true" >> .env.local
 ```
 
-When enabled, everything tagged `PerfDebug:*` appears in the browser/Node console:
+When enabled, everything tagged `PerfDebug:*` appears in the browser console:
 
 * **React render counts** – `useRenderLogger()` flags runaway re-renders.
 * **Profiler timings** – global `<Profiler>` hooks into `logger.reactProfilerOnRender`.
-* **Task pollers** – durations + overlap warnings.
+* **Realtime connections** – Supabase broadcast message details.
 * **WebSocket flush sizes** – see batched React-Query invalidations.
 
 Full API & examples live in [debug_logging.md](structure_detail/debug_logging.md).
