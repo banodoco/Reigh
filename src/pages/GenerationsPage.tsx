@@ -2,10 +2,12 @@ import React from 'react';
 import { ImageGallery } from '@/shared/components/ImageGallery';
 import { useGenerationsPageLogic } from '@/shared/hooks/useGenerationsPageLogic';
 import { SkeletonGallery } from '@/shared/components/ui/skeleton-gallery';
+import { useProject } from '@/shared/contexts/ProjectContext';
 
 const GENERATIONS_PER_PAGE = 45; // 45 items per page for consistency
 
 const GenerationsPage: React.FC = () => {
+  const { isLoadingProjects } = useProject();
   const {
     selectedProjectId,
     shotsData,
@@ -39,7 +41,12 @@ const GenerationsPage: React.FC = () => {
         <h1 className="text-3xl font-bold">All Generations</h1>
       </div>
       
-      {!selectedProjectId ? (
+      {isLoadingProjects ? (
+        <SkeletonGallery 
+          count={GENERATIONS_PER_PAGE}
+          columns={{ base: 2, sm: 3, md: 4, lg: 5, xl: 6 }}
+        />
+      ) : !selectedProjectId ? (
         <div className="text-center py-10">Please select a project to view generations.</div>
       ) : isError ? (
         <div className="text-center py-10 text-red-500">Error loading generations: {error?.message}</div>
