@@ -14,7 +14,7 @@ export default defineConfig(({ mode }: { mode: string }) => {
       port: 2222,
       headers: {
         "Cross-Origin-Opener-Policy": "same-origin",
-        "Cross-Origin-Embedder-Policy": "require-corp",
+        "Cross-Origin-Embedder-Policy": "credentialless", // Reverted to allow cross-origin images
       },
     },
     plugins: [
