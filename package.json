@@ -16,7 +16,11 @@
     "db:migrate:pg": "drizzle-kit migrate --config=drizzle.config.ts",
     "db:push:pg": "drizzle-kit push --config=drizzle.config.ts",
     "db:seed": "tsx ./db/seed.ts",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "bun:dev": "bun run dev",
+    "bun:build": "bun run build",
+    "bun:preview": "bun run preview",
+    "bun:install": "bun install"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.1.0",

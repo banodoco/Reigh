@@ -71,6 +71,12 @@ This document is meant to serve as a comprehensive view of Reigh's architecture.
 ⚙️  Backend:   http://localhost:8085  # Express worker
 ```
 
+### Package Managers
+
+Reigh supports both npm and bun package managers:
+- **npm**: Default package manager with `package-lock.json`
+- **bun**: Fast alternative with `bun.lock` (use `bun:dev`, `bun:build`, etc.)
+
 ---
 
 ## 📁 Directory Structure
