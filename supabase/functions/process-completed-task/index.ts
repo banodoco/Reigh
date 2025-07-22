@@ -134,9 +134,7 @@ async function processCompletedStitchTask(task: any): Promise<void> {
 
     console.log(`[ProcessTask] Successfully processed task ${task.id}, created generation ${newGenerationId}`);
 
-    // Broadcast real-time updates
-    await broadcastUpdate('TASK_COMPLETED', { taskId: task.id, projectId });
-    await broadcastUpdate('GENERATIONS_UPDATED', { projectId, shotId });
+    // Removed duplicate manual broadcasts – realtime messages now sent exclusively via DB triggers.
 
   } catch (error) {
     console.error(`[ProcessTask] Error processing travel_stitch task ${task.id}:`, error);
@@ -207,35 +205,8 @@ async function processCompletedSingleImageTask(task: any): Promise<void> {
 
     console.log(`[ProcessTask] Successfully processed task ${task.id}, created generation ${newGenerationId}`);
 
-    // Broadcast real-time updates
-    await broadcastUpdate('TASK_COMPLETED', { taskId: task.id, projectId: task.project_id });
-    await broadcastUpdate('GENERATIONS_UPDATED', { projectId: task.project_id });
-
   } catch (error) {
     console.error(`[ProcessTask] Error processing single_image task ${task.id}:`, error);
-  }
-}
-
-/**
- * Broadcasts real-time updates
- */
-async function broadcastUpdate(type: string, payload: any): Promise<void> {
-  try {
-    const channelName = `task-updates:${payload.projectId}`;
-    
-    const channel = supabase.channel(channelName);
-    
-    const response = await channel.send({
-      type: 'broadcast',
-      event: 'task-update',
-      payload: { type, payload }
-    });
-
-    if (response !== 'ok') {
-      console.error(`[ProcessTask] Broadcast failed:`, response);
-    }
-  } catch (error) {
-    console.error(`[ProcessTask] Error broadcasting update:`, error);
   }
 }
 
