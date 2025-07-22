@@ -126,14 +126,14 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
 
   // Optimized: Use the memoized imagesToShow directly instead of local state duplication
   useEffect(() => {
-    if (generationsResponse?.items) {
+    if (generationsResponse?.items !== undefined) {
+      // We have a definitive response - always update when we have real data
       setGeneratedImages(generationsResponse.items);
-      // Reset filter change flag when new data arrives
       if (isFilterChange) {
         setIsFilterChange(false);
       }
     } else if (!isFilterChange) {
-      // Only clear images if this isn't a filter change (prevents layout jump)
+      // Only clear images if this isn't a filter change
       setGeneratedImages([]);
     }
   }, [generationsResponse, isFilterChange]);
@@ -559,6 +559,40 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
                 columns={{ base: 2, sm: 3, md: 4, lg: 5 }}
                 showControls={true}
               />
+            ) : imagesToShow.length === 0 ? (
+              <div className="space-y-6 pb-8">
+                {/* Render filter controls even when empty to maintain layout */}
+                <div className="flex flex-wrap justify-between items-center mb-4 gap-x-4 gap-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground whitespace-nowrap">
+                      No items found
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-x-4 gap-y-2 flex-wrap">
+                    {/* Shot Filter */}
+                    <ShotFilter
+                      shots={validShots || []}
+                      selectedShotId={selectedShotFilter}
+                      onShotChange={setSelectedShotFilter}
+                      excludePositioned={excludePositioned}
+                      onExcludePositionedChange={setExcludePositioned}
+                      size="sm"
+                      whiteText={false}
+                      checkboxId="exclude-positioned-image-generation"
+                      triggerWidth="w-[140px]"
+                      triggerClassName="h-8 text-xs"
+                    />
+                    {/* Search and Media Type Filter would go here if needed */}
+                  </div>
+                </div>
+                {/* Empty state with maintained height */}
+                <div className="min-h-[400px] flex items-center justify-center">
+                  <div className="text-center text-muted-foreground">
+                    <p className="text-lg font-medium">No generations found</p>
+                    <p className="text-sm mt-2">Try adjusting your filters or generate some images.</p>
+                  </div>
+                </div>
+              </div>
             ) : (
               <ImageGallery
                 images={imagesToShow}
