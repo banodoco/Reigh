@@ -36,8 +36,9 @@ Reigh uses an async task queue pattern for all AI generation workloads. This dec
   - Updates to `In Progress` with `worker_id`
   - Returns task details
 - **Task Processing** now uses **Database Triggers** (instant):
-  - When task status → `Complete`: triggers `process-completed-task` Edge Function
-  - Creates generations and shot_generations automatically
+  - When task status → `Complete`: SQL trigger `create_generation_on_task_complete` runs
+  - Creates generations and shot_generations automatically in the database
+  - Normalizes image paths and handles all edge cases
   - Broadcasts real-time updates via Supabase Realtime
 - Worker processes based on `tool_id`:
   - Image generation → FAL API
@@ -102,8 +103,12 @@ The worker polls the same task queue but specializes in video generation:
   - Error info (if failed)
 - Edge Function:
   - Updates task status to `Complete` or `Failed`
-  - Creates `generations` records if successful
   - Deducts credits from user's balance
+- **SQL Trigger** (`create_generation_on_task_complete`):
+  - Automatically creates `generations` records when status → `Complete`
+  - Normalizes image paths (removes local server IPs)
+  - Creates `shot_generations` links if applicable
+  - All processing happens instantly in the database
 
 ### 4. Real-time Updates
 - **Database Triggers** automatically broadcast changes via Supabase Realtime
@@ -117,11 +122,10 @@ The worker polls the same task queue but specializes in video generation:
   - `create_task/index.ts` - Task creation & validation
   - `claim_next_task/index.ts` - Worker task assignment
   - `complete_task/index.ts` - Task completion handling
-  - `process-completed-task/index.ts` - **NEW**: Instant task processing via triggers
   - `calculate-task-cost/index.ts` - Credit cost calculation
 
 - **Database Triggers** (`/supabase/migrations/`)
-  - `trigger_process_completed_tasks` - Calls Edge Function when tasks complete
+  - `create_generation_on_task_complete` - Creates generations instantly when tasks complete (replaces Edge Function)
   - `trigger_broadcast_task_status` - Real-time status broadcasts
 
 - **Real-time Updates**
@@ -165,7 +169,7 @@ python main.py
 ```
 
 **Architecture Components:**
-- **Database Triggers**: Instant task processing (replaces polling)
+- **Database Triggers**: Instant task processing and generation creation (no Edge Functions needed)
 - **Supabase Realtime**: Direct client-database real-time connections
 - **Headless-Wan2GP**: Video travel generation, production workloads, GPU-intensive tasks
 
@@ -181,7 +185,7 @@ python main.py
    ```
 
 2. **Check processing logs**:
-   - **Database Triggers**: Check Supabase logs for `[ProcessTask]` messages
+   - **Database Triggers**: Check Supabase logs for `[ProcessTask]` messages from `create_generation_on_task_complete`
    - **Headless-Wan2GP**: Check Python output for task processing status
    - **Realtime Updates**: Monitor browser DevTools for Supabase Realtime messages
 
@@ -197,4 +201,5 @@ python main.py
 4. **Test trigger processing**:
    - Set a task to `Complete` manually in Supabase dashboard
    - Should be processed **instantly** via database trigger
-   - Check Edge Function logs for `process-completed-task` execution 
+   - Check Supabase logs for `[ProcessTask]` messages showing generation creation
+   - Verify `generations` and `shot_generations` tables are populated 

@@ -146,7 +146,7 @@ See `.env.example` for all variables. Key ones:
 | `steerable-motion` | Video generation | `/supabase/functions/` |
 | `ai-prompt` | Prompt enhancement | `/supabase/functions/` |
 | `calculate-task-cost` | Credit calculation | `/supabase/functions/` |
-| `process-completed-task` | **NEW**: Instant task processing via triggers | `/supabase/functions/` |
+| ~~`process-completed-task`~~ | **REMOVED**: Replaced by SQL trigger `create_generation_on_task_complete` | ~~`/supabase/functions/`~~ |
 | `stripe-checkout` | Stripe payment sessions | `/supabase/functions/` |
 | `stripe-webhook` | Stripe payment webhooks | `/supabase/functions/` |
 
