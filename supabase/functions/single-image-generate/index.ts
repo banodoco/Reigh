@@ -40,6 +40,7 @@ interface SingleImageRequestBody {
   model_name?: string;
   seed?: number;
   loras?: Array<{ path: string; strength: number }>;
+  shot_id?: string; // Optional: associate generated image with a shot
 }
 
 // Helper for standard JSON responses with CORS headers
@@ -136,6 +137,7 @@ serve(async (req) => {
         params: {
           orchestrator_details: orchestratorPayload,
           task_id: taskId,
+          ...(body.shot_id ? { shot_id: body.shot_id } : {}),
         },
         status: "Queued",
       })

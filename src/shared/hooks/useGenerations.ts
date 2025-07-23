@@ -15,6 +15,7 @@ export async function fetchGenerations(
     mediaType?: 'all' | 'image' | 'video';
     shotId?: string;
     excludePositioned?: boolean;
+    starredOnly?: boolean;
   }
 ): Promise<{
   items: GeneratedImageWithMetadata[];
@@ -22,7 +23,6 @@ export async function fetchGenerations(
   hasMore: boolean;
 }> {
   if (!projectId) return { items: [], total: 0, hasMore: false };
-
   
   // Build count query
   let countQuery = supabase
@@ -33,7 +33,12 @@ export async function fetchGenerations(
   // Apply server-side filters to count query
   if (filters?.toolType) {
     // Filter by tool type in metadata
-    countQuery = countQuery.or(`params->>tool_type.eq.${filters.toolType},metadata->>tool_type.eq.${filters.toolType},params->>tool_type.eq.${filters.toolType}-reconstructed-client,metadata->>tool_type.eq.${filters.toolType}-reconstructed-client`);
+    if (filters.toolType === 'image-generation') {
+      // Filter by tool_type in params for image-generation
+      countQuery = countQuery.eq('params->>tool_type', 'image-generation');
+    } else {
+      countQuery = countQuery.or(`params->>tool_type.eq.${filters.toolType},metadata->>tool_type.eq.${filters.toolType},params->>tool_type.eq.${filters.toolType}-reconstructed-client,metadata->>tool_type.eq.${filters.toolType}-reconstructed-client`);
+    }
   }
 
   if (filters?.mediaType && filters.mediaType !== 'all') {
@@ -42,6 +47,11 @@ export async function fetchGenerations(
     } else if (filters.mediaType === 'image') {
       countQuery = countQuery.not('type', 'like', '%video%');
     }
+  }
+
+  // Apply starred filter if provided
+  if (filters?.starredOnly) {
+    countQuery = countQuery.eq('starred', true);
   }
 
   // Apply shot filter if provided
@@ -85,7 +95,12 @@ export async function fetchGenerations(
 
   // Apply same filters to data query
   if (filters?.toolType) {
-    dataQuery = dataQuery.or(`params->>tool_type.eq.${filters.toolType},metadata->>tool_type.eq.${filters.toolType},params->>tool_type.eq.${filters.toolType}-reconstructed-client,metadata->>tool_type.eq.${filters.toolType}-reconstructed-client`);
+    if (filters.toolType === 'image-generation') {
+      // Filter by tool_type in params for image-generation
+      dataQuery = dataQuery.eq('params->>tool_type', 'image-generation');
+    } else {
+      dataQuery = dataQuery.or(`params->>tool_type.eq.${filters.toolType},metadata->>tool_type.eq.${filters.toolType},params->>tool_type.eq.${filters.toolType}-reconstructed-client,metadata->>tool_type.eq.${filters.toolType}-reconstructed-client`);
+    }
   }
 
   if (filters?.mediaType && filters.mediaType !== 'all') {
@@ -94,6 +109,11 @@ export async function fetchGenerations(
     } else if (filters.mediaType === 'image') {
       dataQuery = dataQuery.not('type', 'like', '%video%');
     }
+  }
+
+  // Apply starred filter to data query
+  if (filters?.starredOnly) {
+    dataQuery = dataQuery.eq('starred', true);
   }
 
   // Apply shot filter to data query
@@ -242,6 +262,7 @@ export function useGenerations(
     mediaType?: 'all' | 'image' | 'video';
     shotId?: string;
     excludePositioned?: boolean;
+    starredOnly?: boolean;
   }
 ) {
   const offset = (page - 1) * limit;
@@ -329,14 +350,45 @@ export function useToggleGenerationStar() {
     mutationFn: ({ id, starred }: { id: string; starred: boolean }) => {
       return toggleGenerationStar(id, starred);
     },
-    onSuccess: (_, variables) => {
-      // Invalidate all generations queries to refetch
-      queryClient.invalidateQueries({ queryKey: ['generations'] });
-      toast.success(variables.starred ? 'Generation starred!' : 'Generation unstarred!');
+    onMutate: async ({ id, starred }) => {
+      // Cancel outgoing refetches (so they don't overwrite our optimistic update)
+      await queryClient.cancelQueries({ queryKey: ['generations'] });
+
+      // Snapshot previous values for rollback
+      const previousQueries = new Map();
+      
+      // Update all generations query caches optimistically
+      queryClient.getQueriesData({ queryKey: ['generations'] }).forEach(([queryKey, data]) => {
+        if (data && typeof data === 'object' && 'items' in data) {
+          previousQueries.set(queryKey, data);
+          
+          const updatedData = {
+            ...data,
+            items: (data as any).items.map((item: any) => 
+              item.id === id ? { ...item, starred } : item
+            )
+          };
+          
+          queryClient.setQueryData(queryKey, updatedData);
+        }
+      });
+
+      return { previousQueries };
     },
-    onError: (error: Error) => {
+    onError: (error: Error, _, context) => {
+      // Rollback optimistic updates on error
+      if (context?.previousQueries) {
+        context.previousQueries.forEach((data, queryKey) => {
+          queryClient.setQueryData(queryKey, data);
+        });
+      }
+      
       console.error('Error toggling generation star:', error);
       toast.error(error.message || 'Failed to toggle star');
+    },
+    onSettled: () => {
+      // Always refetch after error or success to ensure consistency
+      queryClient.invalidateQueries({ queryKey: ['generations'] });
     },
   });
 }

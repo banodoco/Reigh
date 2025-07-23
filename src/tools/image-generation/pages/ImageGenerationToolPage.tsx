@@ -57,6 +57,8 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   const [isPageChange, setIsPageChange] = useState(false);
   const [isFilterChange, setIsFilterChange] = useState(false);
   const [mediaTypeFilter, setMediaTypeFilter] = useState<'all' | 'image' | 'video'>('all'); // Add media type filter state
+  const [starredOnly, setStarredOnly] = useState<boolean>(false);
+  const [toolTypeFilterEnabled, setToolTypeFilterEnabled] = useState<boolean>(true); // State for the tool type filter checkbox
   const isMobile = useIsMobile();
   
   // Early prefetch of public LoRAs to reduce loading time
@@ -102,9 +104,11 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     itemsPerPage, 
     loadGenerations,
     {
+      toolType: toolTypeFilterEnabled ? 'image-generation' : undefined,
       mediaType: mediaTypeFilter, // Use dynamic mediaType instead of hardcoded 'image'
       shotId: selectedShotFilter === 'all' ? undefined : selectedShotFilter,
-      excludePositioned: selectedShotFilter !== 'all' ? excludePositioned : undefined
+      excludePositioned: selectedShotFilter !== 'all' ? excludePositioned : undefined,
+      starredOnly
     }
   );
   const deleteGenerationMutation = useDeleteGeneration();
@@ -118,11 +122,17 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     setCurrentPage(1);
   }, [selectedShotFilter, excludePositioned]);
 
-  // Reset to page 1 when media type changes
+  // Reset to page 1 when media type or starred filter changes
   useEffect(() => {
     setIsFilterChange(true);
     setCurrentPage(1);
-  }, [mediaTypeFilter]);
+  }, [mediaTypeFilter, starredOnly]);
+
+  // Reset to page 1 when tool type filter changes
+  useEffect(() => {
+    setIsFilterChange(true);
+    setCurrentPage(1);
+  }, [toolTypeFilterEnabled]);
 
   // Update last known total when we get valid data
   useEffect(() => {
@@ -238,7 +248,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
       return;
     }
 
-    const { generationMode, ...restOfFormData } = formData;
+    const { generationMode, associatedShotId, ...restOfFormData } = formData;
 
     const tasksToCreateCount = generationMode === 'wan-local'
       ? restOfFormData.prompts.length * restOfFormData.imagesPerPrompt
@@ -274,6 +284,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
             // Generate a random seed for each task to ensure diverse outputs (32-bit signed integer range)
             seed: Math.floor(Math.random() * 0x7fffffff),
             loras: lorasMapped,
+            shot_id: associatedShotId || undefined,
           };
         });
       });
@@ -486,7 +497,8 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     const filters = { 
       mediaType: mediaTypeFilter,
       shotId: selectedShotFilter === 'all' ? undefined : selectedShotFilter,
-      excludePositioned: selectedShotFilter !== 'all' ? excludePositioned : undefined
+      excludePositioned: selectedShotFilter !== 'all' ? excludePositioned : undefined,
+      starredOnly
     };
 
     const nextPage = currentPage + 1;
@@ -519,7 +531,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
         });
       });
     }
-  }, [selectedProjectId, currentPage, itemsPerPage, queryClient, loadGenerations, mediaTypeFilter, selectedShotFilter, excludePositioned]);
+  }, [selectedProjectId, currentPage, itemsPerPage, queryClient, loadGenerations, mediaTypeFilter, selectedShotFilter, excludePositioned, starredOnly]);
 
   useEffect(()=>{
     if(generationsResponse && isPageChange){
@@ -587,6 +599,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
                 lastShotId={targetShotInfo.targetShotIdForButton}
                 lastShotNameForTooltip={targetShotInfo.targetShotNameForButtonTooltip}
                 currentToolType="image-generation"
+                initialFilterState={toolTypeFilterEnabled}
                 initialMediaTypeFilter={mediaTypeFilter}
                 itemsPerPage={itemsPerPage}
                 offset={(currentPage - 1) * itemsPerPage}
@@ -602,6 +615,8 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
                 initialSearchTerm={searchTerm}
                 onSearchChange={setSearchTerm}
                 onMediaTypeFilterChange={handleMediaTypeFilterChange}
+                onStarredFilterChange={setStarredOnly}
+                onToolTypeFilterChange={setToolTypeFilterEnabled}
               />
             )}
           </div>

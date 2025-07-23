@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Trash2, Info, Settings, CheckCircle, AlertTriangle, Download, PlusCircle, Check, Sparkles, Filter, Search, X, Star } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
 import { 
@@ -21,6 +21,7 @@ import {
 } from "@/shared/components/ui/select";
 import { Checkbox } from "@/shared/components/ui/checkbox";
 import { Label } from "@/shared/components/ui/label";
+
 // Removed nanoid import to avoid random generation overhead per render
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 import { DraggableImage } from "@/shared/components/DraggableImage";
@@ -126,6 +127,10 @@ interface ImageGalleryProps {
   onMediaTypeFilterChange?: (mediaType: 'all' | 'image' | 'video') => void;
   /** Callback when a generation is starred/unstarred */
   onToggleStar?: (id: string, starred: boolean) => void;
+  /** Callback when starred filter changes */
+  onStarredFilterChange?: (starredOnly: boolean) => void;
+  /** Callback when tool type filter changes */
+  onToolTypeFilterChange?: (enabled: boolean) => void;
 }
 
 // Helper to format metadata for display
@@ -239,7 +244,9 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   initialSearchTerm = '',
   onSearchChange,
   onMediaTypeFilterChange,
-  onToggleStar
+  onToggleStar,
+  onStarredFilterChange,
+  onToolTypeFilterChange
 }) => {
   const [activeLightboxMedia, setActiveLightboxMedia] = useState<GenerationRow | null>(null);
   const [downloadingImageId, setDownloadingImageId] = useState<string | null>(null);
@@ -483,6 +490,16 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     setIsSearchOpen(false);
   };
 
+  // Handle starred filter toggle with proper event handling
+  const handleStarredFilterToggle = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const newStarredOnly = !showStarredOnly;
+    setShowStarredOnly(newStarredOnly);
+    onStarredFilterChange?.(newStarredOnly);
+  }, [showStarredOnly, onStarredFilterChange]);
+
   // Update search visibility based on search term
   useEffect(() => {
     if (searchTerm && !isSearchOpen) {
@@ -491,64 +508,57 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   }, [searchTerm, isSearchOpen]);
 
   const filteredImages = React.useMemo(() => {
-    // Determine if we're in server-side pagination mode first
-    const isServerPaginationMode = !!(onServerPageChange && serverPage);
-    
     // Start with all images
     let currentFiltered = images;
 
-    // In server pagination mode, only apply search filter (server handles shot/media filters)
-    // In client pagination mode, apply all filters
-    if (!isServerPaginationMode) {
-      // 1. Apply tool_type filter
-      if (filterByToolType && currentToolType) {
-        currentFiltered = currentFiltered.filter(image => {
-          const metadata = image.metadata;
-          if (!metadata || !metadata.tool_type) return false;
-          
-          if (currentToolType === 'edit-travel') {
-            return metadata.tool_type.startsWith('edit-travel');
-          }
-          
-          if (metadata.tool_type === currentToolType) return true;
-          if (metadata.tool_type === `${currentToolType}-reconstructed-client`) return true;
-          
-          return metadata.tool_type === currentToolType;
-        });
-      }
-
-      // 2. Apply mediaTypeFilter
-      if (mediaTypeFilter !== 'all') {
-        currentFiltered = currentFiltered.filter(image => {
-          const urlIsVideo = image.url && (image.url.toLowerCase().endsWith('.webm') || image.url.toLowerCase().endsWith('.mp4') || image.url.toLowerCase().endsWith('.mov'));
-          const isActuallyVideo = typeof image.isVideo === 'boolean' ? image.isVideo : urlIsVideo;
-          
-          if (mediaTypeFilter === 'image') {
-            return !isActuallyVideo;
-          }
-          if (mediaTypeFilter === 'video') {
-            return isActuallyVideo;
-          }
-          return true;
-        });
-      }
+    // 1. Apply tool_type filter
+    if (filterByToolType && currentToolType) {
+      currentFiltered = currentFiltered.filter(image => {
+        const metadata = image.metadata;
+        if (!metadata || !metadata.tool_type) return false;
+        
+        if (currentToolType === 'edit-travel') {
+          return metadata.tool_type.startsWith('edit-travel');
+        }
+        
+        if (metadata.tool_type === currentToolType) return true;
+        if (metadata.tool_type === `${currentToolType}-reconstructed-client`) return true;
+        
+        return metadata.tool_type === currentToolType;
+      });
     }
 
-    // 3. Apply search filter (always apply, even in server pagination mode)
+    // 2. Apply mediaTypeFilter
+    if (mediaTypeFilter !== 'all') {
+      currentFiltered = currentFiltered.filter(image => {
+        const urlIsVideo = image.url && (image.url.toLowerCase().endsWith('.webm') || image.url.toLowerCase().endsWith('.mp4') || image.url.toLowerCase().endsWith('.mov'));
+        const isActuallyVideo = typeof image.isVideo === 'boolean' ? image.isVideo : urlIsVideo;
+        
+        if (mediaTypeFilter === 'image') {
+          return !isActuallyVideo;
+        }
+        if (mediaTypeFilter === 'video') {
+          return isActuallyVideo;
+        }
+        return true;
+      });
+    }
+
+    // 3. Apply starred filter (only in client pagination mode)
+    if (showStarredOnly) {
+      currentFiltered = currentFiltered.filter(image => image.starred === true);
+    }
+
+    // 4. Apply search filter (always apply, even in server pagination mode)
     if (searchTerm.trim()) {
       currentFiltered = currentFiltered.filter(image => {
         const prompt = image.prompt || image.metadata?.prompt || '';
         return prompt.toLowerCase().includes(searchTerm.toLowerCase());
       });
     }
-
-    // 4. Apply starred filter (always apply, even in server pagination mode)
-    if (showStarredOnly) {
-      currentFiltered = currentFiltered.filter(image => image.starred === true);
-    }
         
     return currentFiltered;
-  }, [images, filterByToolType, currentToolType, mediaTypeFilter, searchTerm, showStarredOnly, onServerPageChange, serverPage]);
+  }, [images, filterByToolType, currentToolType, mediaTypeFilter, searchTerm, showStarredOnly]);
 
   // Determine if we're in server-side pagination mode
   const isServerPagination = !!(onServerPageChange && serverPage);
@@ -706,28 +716,29 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                         <Checkbox
                             id={`filter-tool-${currentToolType}`}
                             checked={filterByToolType}
-                            onCheckedChange={(checked) => setFilterByToolType(Boolean(checked))}
+                            onCheckedChange={(checked) => {
+                                const isChecked = Boolean(checked);
+                                setFilterByToolType(isChecked);
+                                onToolTypeFilterChange?.(isChecked);
+                            }}
                             aria-label={`Filter by ${currentToolType} tool`}
                         />
                         <Label htmlFor={`filter-tool-${currentToolType}`} className={`text-sm font-medium cursor-pointer ${whiteText ? 'text-white' : 'text-muted-foreground'}`}>
-                            Only from "{currentToolType}"
+                            Generated here
                         </Label>
                     </div>
                 )}
 
                 {/* Starred Filter */}
-                <div className="flex items-center space-x-2">
-                    <Checkbox
-                        id="filter-starred"
-                        checked={showStarredOnly}
-                        onCheckedChange={(checked) => setShowStarredOnly(Boolean(checked))}
-                        aria-label="Show only starred generations"
-                    />
-                    <Label htmlFor="filter-starred" className={`text-sm font-medium cursor-pointer ${whiteText ? 'text-white' : 'text-muted-foreground'}`}>
-                        <Star className="inline h-3 w-3 mr-1" />
-                        Starred only
-                    </Label>
-                </div>
+                <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={handleStarredFilterToggle}
+                    className={`h-8 w-8 p-0 ${whiteText ? 'border-zinc-600 text-white' : ''} ${showStarredOnly ? 'bg-primary text-primary-foreground border-primary' : ''}`}
+                    aria-label="Filter by starred generations"
+                >
+                    <Star className={`h-4 w-4 ${showStarredOnly ? 'fill-current' : ''}`} />
+                </Button>
             </div>
         </div>
 
@@ -927,37 +938,26 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                         <div className="absolute top-2 right-2 flex flex-col items-end gap-1.5 mt-8">
                             {/* Star button */}
                             <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <Button
-                                            variant="secondary"
-                                            size="icon"
-                                            className={`h-7 w-7 p-0 rounded-full transition-colors ${
-                                                image.starred 
-                                                    ? 'bg-yellow-500/80 hover:bg-yellow-500 text-white' 
-                                                    : 'bg-black/50 hover:bg-black/70 text-white'
-                                            }`}
-                                            onClick={() => {
-                                                if (onToggleStar) {
-                                                    onToggleStar(image.id!, !image.starred);
-                                                } else {
-                                                    toggleStarMutation.mutate({ 
-                                                        id: image.id!, 
-                                                        starred: !image.starred 
-                                                    });
-                                                }
-                                            }}
-                                            disabled={toggleStarMutation.isPending}
-                                        >
-                                            <Star 
-                                                className={`h-3.5 w-3.5 ${image.starred ? 'fill-current' : ''}`} 
-                                            />
-                                        </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                        {image.starred ? 'Unstar' : 'Star'} this generation
-                                    </TooltipContent>
-                                </Tooltip>
+                                <Button
+                                    variant="secondary"
+                                    size="icon"
+                                    className="h-7 w-7 p-0 rounded-full bg-black/50 hover:bg-black/70 text-white"
+                                    onClick={() => {
+                                        if (onToggleStar) {
+                                            onToggleStar(image.id!, !image.starred);
+                                        } else {
+                                            toggleStarMutation.mutate({ 
+                                                id: image.id!, 
+                                                starred: !image.starred 
+                                            });
+                                        }
+                                    }}
+                                    disabled={toggleStarMutation.isPending}
+                                >
+                                    <Star 
+                                        className={`h-3.5 w-3.5 ${image.starred ? 'fill-current' : ''}`} 
+                                    />
+                                </Button>
                             </div>
 
                             {/* Info button (shown on hover) */}

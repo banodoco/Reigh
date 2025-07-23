@@ -311,30 +311,21 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                 {/* Top Controls */}
                 <div className="absolute top-2 sm:top-4 right-2 sm:right-4 flex items-center space-x-1 sm:space-x-2 z-10">
                   {/* Star Button */}
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => {
-                          if (onToggleStar) {
-                            onToggleStar(media.id, !starred);
-                          } else {
-                            toggleStarMutation.mutate({ id: media.id, starred: !starred });
-                          }
-                        }}
-                        disabled={toggleStarMutation.isPending}
-                        className={`transition-colors ${
-                          starred
-                            ? 'bg-yellow-500/80 hover:bg-yellow-500 text-white'
-                            : 'bg-black/50 hover:bg-black/70 text-white'
-                        }`}
-                      >
-                        <Star className={`h-4 w-4 ${starred ? 'fill-current' : ''}`} />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>{starred ? 'Unstar' : 'Star'} this generation</TooltipContent>
-                  </Tooltip>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => {
+                      if (onToggleStar) {
+                        onToggleStar(media.id, !starred);
+                      } else {
+                        toggleStarMutation.mutate({ id: media.id, starred: !starred });
+                      }
+                    }}
+                    disabled={toggleStarMutation.isPending}
+                    className="transition-colors bg-black/50 hover:bg-black/70 text-white"
+                  >
+                    <Star className={`h-4 w-4 ${starred ? 'fill-current' : ''}`} />
+                  </Button>
 
                   {!isVideo && showMagicEdit && onMagicEdit && (
                     <Tooltip>

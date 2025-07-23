@@ -30,6 +30,9 @@ const SliderWithValue = ({
         <label className="text-sm font-medium">{label}</label>
       </div>
       <div className="flex gap-4">
+        <div className="border rounded w-16 h-10 flex items-center justify-center bg-white">
+          {Number.isInteger(value) ? value : value.toFixed(2)}
+        </div>
         <Slider
           value={[value]}
           min={min}
@@ -39,9 +42,6 @@ const SliderWithValue = ({
           className="flex-1"
           disabled={disabled}
         />
-        <div className="border rounded w-16 h-10 flex items-center justify-center bg-white">
-          {Number.isInteger(value) ? value : value.toFixed(2)}
-        </div>
       </div>
     </div>
   );

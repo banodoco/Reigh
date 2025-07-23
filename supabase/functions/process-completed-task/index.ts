@@ -88,6 +88,7 @@ async function processCompletedStitchTask(task: any): Promise<void> {
           projectId,
           outputLocation,
           originalParams: normalizedParams,
+          tool_type: 'travel-between-images',
         },
         location: outputLocation,
         type: 'video',
@@ -175,6 +176,7 @@ async function processCompletedSingleImageTask(task: any): Promise<void> {
           model: params?.orchestrator_details?.model,
           resolution: params?.orchestrator_details?.resolution,
           source: 'wan_single_image_task',
+          tool_type: 'image-generation',
         },
         location: outputLocation,
         type: 'image',
@@ -186,6 +188,26 @@ async function processCompletedSingleImageTask(task: any): Promise<void> {
     if (insertError) {
       console.error(`[ProcessTask] Error inserting generation:`, insertError);
       return;
+    }
+
+    // Check if there's an associated shot
+    const shotId = params?.shot_id;
+    if (shotId) {
+      console.log(`[ProcessTask] Creating shot_generation link for shot ${shotId}`);
+      
+      // Create shot_generation link with NULL position
+      const { error: shotGenError } = await supabase
+        .from('shot_generations')
+        .insert({
+          shot_id: shotId,
+          generation_id: newGenerationId,
+          position: null, // NULL position as requested
+        });
+
+      if (shotGenError) {
+        console.error(`[ProcessTask] Error creating shot_generation:`, shotGenError);
+        // Don't return here - generation was created successfully, just log the error
+      }
     }
 
     // Mark task as processed

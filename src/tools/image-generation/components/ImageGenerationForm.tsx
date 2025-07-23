@@ -25,6 +25,8 @@ import { useProject } from "@/shared/contexts/ProjectContext";
 import { usePersistentToolState } from "@/shared/hooks/usePersistentToolState";
 import { ImageGenerationSettings } from "../settings";
 import { useListPublicResources } from '@/shared/hooks/useResources';
+import { useListShots } from "@/shared/hooks/useShots";
+import { useCurrentShot } from "@/shared/contexts/CurrentShotContext";
 
 // Lazy load modals to improve initial bundle size and performance
 const LazyLoraSelectorModal = React.lazy(() => 
@@ -96,6 +98,7 @@ interface PersistedFormSettings {
   beforeEachPromptText?: string;
   afterEachPromptText?: string;
   selectedLorasByMode?: Record<GenerationMode, ActiveLora[]>;
+  associatedShotId?: string | null;
 }
 
 const defaultLorasConfig = [
@@ -296,7 +299,12 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
   const [beforeEachPromptText, setBeforeEachPromptText] = useState("");
   const [afterEachPromptText, setAfterEachPromptText] = useState("");
 
+  // Associated shot
+  const [associatedShotId, setAssociatedShotId] = useState<string | null>(null);
+
   const { selectedProjectId } = useProject();
+  const { currentShotId } = useCurrentShot();
+  const { data: shots } = useListShots(selectedProjectId);
 
   // Fetch public LoRAs from all users
   const { data: publicLorasData } = useListPublicResources('lora');
@@ -311,6 +319,7 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
       selectedLoras: [selectedLoras, setSelectedLoras],
       beforeEachPromptText: [beforeEachPromptText, setBeforeEachPromptText],
       afterEachPromptText: [afterEachPromptText, setAfterEachPromptText],
+      associatedShotId: [associatedShotId, setAssociatedShotId],
     }
   );
 
@@ -499,7 +508,8 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
       imagesPerPrompt, 
       loras: lorasForApi, 
       fullSelectedLoras: selectedLoras,
-      generationMode
+      generationMode,
+      associatedShotId
     };
     
     onGenerate(generationData);
@@ -701,17 +711,42 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
             </div>
           </div>
 
-          {/* Images per Prompt Slider */}
-          <div className="mt-4">
-            <SliderWithValue
-              label="Images per Prompt"
-              value={imagesPerPrompt}
-              onChange={handleSliderChange(setImagesPerPrompt)}
-              min={1}
-              max={16}
-              step={1}
-              disabled={!hasApiKey || isGenerating}
-            />
+          {/* Images per Prompt Slider and Associated Shot */}
+          <div className="mt-4 grid grid-cols-3 gap-4">
+            <div className="col-span-2">
+              <SliderWithValue
+                label="Images per Prompt"
+                value={imagesPerPrompt}
+                onChange={handleSliderChange(setImagesPerPrompt)}
+                min={1}
+                max={16}
+                step={1}
+                disabled={!hasApiKey || isGenerating}
+              />
+            </div>
+            <div className="col-span-1">
+              <Label htmlFor="associatedShot">Associated with Shot</Label>
+              <Select
+                value={associatedShotId || "none"}
+                onValueChange={(value) => {
+                  markAsInteracted();
+                  setAssociatedShotId(value === "none" ? null : value);
+                }}
+                disabled={!hasApiKey || isGenerating}
+              >
+                <SelectTrigger id="associatedShot" className="mt-1">
+                  <SelectValue placeholder="None" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None</SelectItem>
+                  {shots?.map((shot) => (
+                    <SelectItem key={shot.id} value={shot.id}>
+                      {shot.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
         </div>

@@ -97,6 +97,10 @@ export const GenerationsPane: React.FC = () => {
           toggleLock={toggleLock}
           openPane={openPane}
           paneDimension={generationsPaneHeight}
+          /* Centre within visible width taking into account any locked side panes */
+          horizontalOffset={
+            (isShotsPaneLocked ? shotsPaneWidth : 0) - (isTasksPaneLocked ? tasksPaneWidth : 0)
+          }
           handlePaneEnter={handlePaneEnter}
           handlePaneLeave={handlePaneLeave}
           thirdButton={{

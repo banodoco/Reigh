@@ -20,6 +20,7 @@ const GenerationsPage: React.FC = () => {
     selectedShotFilter,
     excludePositioned,
     searchTerm,
+    starredOnly,
     isLoading,
     isError,
     error,
@@ -27,6 +28,7 @@ const GenerationsPage: React.FC = () => {
     setSelectedShotFilter,
     setExcludePositioned,
     setSearchTerm,
+    setStarredOnly,
     handleServerPageChange,
     handleDeleteGeneration,
     handleAddToShot,
@@ -91,6 +93,7 @@ const GenerationsPage: React.FC = () => {
           serverPage={page}
           onMediaTypeFilterChange={handleMediaTypeFilterChange}
           onToggleStar={handleToggleStar}
+          onStarredFilterChange={setStarredOnly}
         />
       )}
     </div>

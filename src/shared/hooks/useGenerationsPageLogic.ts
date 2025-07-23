@@ -25,6 +25,7 @@ export function useGenerationsPageLogic({
   const [selectedShotFilter, setSelectedShotFilter] = useState<string>('all');
   const [excludePositioned, setExcludePositioned] = useState(true);
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const [starredOnly, setStarredOnly] = useState<boolean>(false);
   const [lastKnownTotal, setLastKnownTotal] = useState<number>(0);
   const [currentItems, setCurrentItems] = useState<GeneratedImageWithMetadata[]>([]);
   const [isPageChange, setIsPageChange] = useState(false);
@@ -46,10 +47,10 @@ export function useGenerationsPageLogic({
     // setCurrentItems([]) was causing layout jump
   }, [selectedShotFilter, excludePositioned]);
 
-  // Reset to page 1 when media type changes
+  // Reset to page 1 when media type or starred filter changes
   useEffect(() => {
     setPage(1);
-  }, [mediaType]);
+  }, [mediaType, starredOnly]);
 
   const { data: generationsResponse, isLoading, isError, error } = useGenerations(
     selectedProjectId, 
@@ -60,7 +61,8 @@ export function useGenerationsPageLogic({
       mediaType,
       toolType,
       shotId: selectedShotFilter === 'all' ? undefined : selectedShotFilter,
-      excludePositioned: selectedShotFilter !== 'all' ? excludePositioned : undefined
+      excludePositioned: selectedShotFilter !== 'all' ? excludePositioned : undefined,
+      starredOnly
     }
   );
 
@@ -196,12 +198,14 @@ export function useGenerationsPageLogic({
     selectedShotFilter,
     excludePositioned,
     searchTerm,
+    starredOnly,
     
     // State setters
     setPage,
     setSelectedShotFilter,
     setExcludePositioned,
     setSearchTerm,
+    setStarredOnly,
     
     // Loading states
     isLoading,

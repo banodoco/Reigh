@@ -12,6 +12,14 @@ interface PaneControlTabProps {
   openPane: () => void;
   paneDimension: number;
   bottomOffset?: number;
+  /**
+   * Horizontal offset applied when side === 'bottom'.
+   * This represents the difference between the space taken on the left and right
+   * (e.g. shots pane width minus tasks pane width). The control will shift by
+   * half of this value so that it remains centred within the visible area of
+   * the bottom pane.
+   */
+  horizontalOffset?: number;
   handlePaneEnter: () => void;
   handlePaneLeave: () => void;
   thirdButton?: {
@@ -20,7 +28,9 @@ interface PaneControlTabProps {
   };
 }
 
-const PaneControlTab: React.FC<PaneControlTabProps> = ({ side, isLocked, isOpen, toggleLock, openPane, paneDimension, bottomOffset = 0, handlePaneEnter, handlePaneLeave, thirdButton }) => {
+const PaneControlTab: React.FC<PaneControlTabProps> = ({ side, isLocked, isOpen, toggleLock, openPane, paneDimension, bottomOffset = 0, handlePaneEnter, handlePaneLeave, thirdButton,
+  horizontalOffset = 0,
+}) => {
   const isMobile = useIsMobile();
   const [selectionActive, setSelectionActive] = React.useState(false);
 
@@ -53,7 +63,11 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({ side, isLocked, isOpen,
     } else if (side === 'bottom') {
       style.left = '50%';
       style.bottom = '0px';
-      style.transform = `translateX(-50%) translateY(${isVisible ? -paneDimension : 0}px)`;
+      // Centre within visible width by shifting half the horizontalOffset.
+      // translateX(-50%) centres on viewport; additional translateX accounts for
+      // asymmetrical side panes (e.g. shots/tasks) so the control remains centred
+      // within the bottom pane itself.
+      style.transform = `translateX(-50%) translateX(${horizontalOffset / 2}px) translateY(${isVisible ? -paneDimension : 0}px)`;
     }
 
     return style;
