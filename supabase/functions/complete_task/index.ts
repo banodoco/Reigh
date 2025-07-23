@@ -163,9 +163,11 @@ serve(async (req) => {
 
     // 9) Update the database with the public URL using protected function
     const { data: updateResult, error: dbError } = await supabaseAdmin
-      .rpc('complete_task_with_timing', {
-        p_task_id: task_id,
-        p_output_location: publicUrl
+      .rpc('func_mark_task_complete', {
+        task_id_param: task_id,
+        result_data_param: {
+          output_location: publicUrl
+        }
       });
 
     if (dbError || !updateResult) {

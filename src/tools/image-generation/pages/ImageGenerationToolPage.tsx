@@ -564,7 +564,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
       {/* Render only if API key is valid */}
       {hasValidFalApiKey && (
         <>
-          <div ref={formContainerRef} className="mb-8 p-6 border rounded-lg shadow-sm bg-card">
+          <div ref={formContainerRef} className="mb-8 p-6 border rounded-lg shadow-sm bg-card w-full max-w-full">
             <ToolSettingsGate
               ready={true}
               loadingMessage="Loading image generation settings..."

@@ -25,8 +25,10 @@ import { useProject } from "@/shared/contexts/ProjectContext";
 import { usePersistentToolState } from "@/shared/hooks/usePersistentToolState";
 import { ImageGenerationSettings } from "../settings";
 import { useListPublicResources } from '@/shared/hooks/useResources';
-import { useListShots } from "@/shared/hooks/useShots";
+import { useListShots, useCreateShot } from "@/shared/hooks/useShots";
 import { useCurrentShot } from "@/shared/contexts/CurrentShotContext";
+import CreateShotModal from "@/shared/components/CreateShotModal";
+import { useQueryClient } from '@tanstack/react-query';
 
 // Lazy load modals to improve initial bundle size and performance
 const LazyLoraSelectorModal = React.lazy(() => 
@@ -90,7 +92,8 @@ interface LoraData {
 // ActiveLora interface now imported from shared component
 
 interface PersistedFormSettings {
-  prompts?: PromptEntry[];
+  // Shot-specific prompts storage
+  promptsByShot?: Record<string, PromptEntry[]>;
   imagesPerPrompt?: number;
   selectedLoras?: ActiveLora[];
   depthStrength?: number;
@@ -275,7 +278,7 @@ export const PromptInputRow: React.FC<PromptInputRowProps> = React.memo(({
   );
 });
 
-const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerationFormProps>(({
+export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerationFormProps>(({
   onGenerate,
   isGenerating = false,
   hasApiKey: incomingHasApiKey = true,
@@ -284,7 +287,8 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
   justQueued = false,
 }, ref) => {
 
-  const [prompts, setPrompts] = useState<PromptEntry[]>([]);
+  // Store prompts by shot ID (including 'none' for no shot)
+  const [promptsByShot, setPromptsByShot] = useState<Record<string, PromptEntry[]>>({});
   const promptIdCounter = useRef(1);
   const [isPromptModalOpen, setIsPromptModalOpen] = useState(false);
   const [imagesPerPrompt, setImagesPerPrompt] = useState(1);
@@ -301,20 +305,41 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
 
   // Associated shot
   const [associatedShotId, setAssociatedShotId] = useState<string | null>(null);
+  const [isCreateShotModalOpen, setIsCreateShotModalOpen] = useState(false);
 
   const { selectedProjectId } = useProject();
   const { currentShotId } = useCurrentShot();
   const { data: shots } = useListShots(selectedProjectId);
+  const createShotMutation = useCreateShot();
+  const queryClient = useQueryClient();
 
   // Fetch public LoRAs from all users
   const { data: publicLorasData } = useListPublicResources('lora');
   const availableLoras: LoraModel[] = publicLorasData?.map(resource => resource.metadata) || [];
 
+  // Get the effective shot ID for storage (use 'none' for null)
+  const effectiveShotId = associatedShotId || 'none';
+  
+  // Get current prompts for the selected shot
+  const prompts = promptsByShot[effectiveShotId] || [];
+  
+  // Helper to update prompts for the current shot
+  const setPrompts = useCallback((newPrompts: PromptEntry[] | ((prev: PromptEntry[]) => PromptEntry[])) => {
+    setPromptsByShot(prev => {
+      const currentPrompts = prev[effectiveShotId] || [];
+      const updatedPrompts = typeof newPrompts === 'function' ? newPrompts(currentPrompts) : newPrompts;
+      return {
+        ...prev,
+        [effectiveShotId]: updatedPrompts
+      };
+    });
+  }, [effectiveShotId]);
+
   const { ready, isSaving, markAsInteracted } = usePersistentToolState<PersistedFormSettings>(
     'image-generation',
     { projectId: selectedProjectId },
     {
-      prompts: [prompts, setPrompts],
+      promptsByShot: [promptsByShot, setPromptsByShot],
       imagesPerPrompt: [imagesPerPrompt, setImagesPerPrompt],
       selectedLoras: [selectedLoras, setSelectedLoras],
       beforeEachPromptText: [beforeEachPromptText, setBeforeEachPromptText],
@@ -323,19 +348,30 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
     }
   );
 
+  // Initialize prompts for a shot if they don't exist
+  useEffect(() => {
+    if (ready && !promptsByShot[effectiveShotId]) {
+      setPromptsByShot(prev => ({
+        ...prev,
+        [effectiveShotId]: [{ id: generatePromptId(), fullPrompt: "", shortPrompt: "" }]
+      }));
+    }
+  }, [ready, effectiveShotId, promptsByShot]);
+
   const hasApiKey = true; // Always true for wan-local
+
+  const generatePromptId = () => `prompt-${promptIdCounter.current++}`;
 
   // Memoize actionable prompts count to prevent recalculation on every render
   const actionablePromptsCount = useMemo(() => 
     prompts.filter(p => p.fullPrompt.trim() !== "").length, 
     [prompts]
   );
-
-  const generatePromptId = () => `prompt-${promptIdCounter.current++}`;
   
   useImperativeHandle(ref, () => ({
     applySettings: (settings: DisplayableMetadata) => {
       markAsInteracted();
+      // Apply settings to the current shot's prompts
       setPrompts([{ 
         id: generatePromptId(), 
         fullPrompt: settings.prompt || '', 
@@ -515,6 +551,33 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
     onGenerate(generationData);
   };
   
+  // Handle creating a new shot
+  const handleCreateShot = useCallback(async (shotName: string, files: File[]) => {
+    if (!selectedProjectId) {
+      toast.error("No project selected");
+      return;
+    }
+
+    try {
+      const result = await createShotMutation.mutateAsync({
+        name: shotName,
+        projectId: selectedProjectId,
+        shouldSelectAfterCreation: false
+      });
+
+      await queryClient.invalidateQueries({ queryKey: ['shots', selectedProjectId] });
+      await queryClient.refetchQueries({ queryKey: ['shots', selectedProjectId] });
+      
+      // Switch to the newly created shot
+      markAsInteracted();
+      setAssociatedShotId(result.shot.id);
+      setIsCreateShotModalOpen(false);
+    } catch (error) {
+      console.error('Error creating shot:', error);
+      toast.error("Failed to create shot");
+    }
+  }, [selectedProjectId, createShotMutation, markAsInteracted, queryClient]);
+
   // Optimize event handlers with useCallback to prevent recreating on each render
   const handleSliderChange = useCallback((setter: React.Dispatch<React.SetStateAction<number>>) => (value: number) => {
     markAsInteracted();
@@ -601,119 +664,154 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
 
   return (
     <>
-      <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Prompts Section */}
-        <div className="space-y-4">
-          <div>
-            <div className="flex justify-between items-center mb-2">
-              <Label className="text-lg font-semibold">Prompts</Label>
-              <div className="flex items-center space-x-2">
-                {/* Manage Prompts button (hidden when >3 prompts) */}
-                {prompts.length <= 3 && (
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Associated Shot Selector - Now at the top */}
+        <div className="w-1/2 flex items-center gap-2">
+          <Label htmlFor="associatedShot" className="inline-block">Associated with Shot</Label>
+          <Select
+            value={associatedShotId || "none"}
+            onValueChange={(value) => {
+              markAsInteracted();
+              setAssociatedShotId(value === "none" ? null : value);
+            }}
+            disabled={!hasApiKey || isGenerating}
+          >
+            <SelectTrigger id="associatedShot" className="inline-flex w-auto min-w-[200px]">
+              <SelectValue placeholder="None" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">None</SelectItem>
+              {shots?.map((shot) => (
+                <SelectItem key={shot.id} value={shot.id}>
+                  {shot.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setIsCreateShotModalOpen(true)}
+            disabled={!hasApiKey || isGenerating}
+            className="h-8 w-8 p-0"
+          >
+            <PlusCircle className="h-4 w-4" />
+          </Button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Prompts Section */}
+          <div className="space-y-4">
+            <div>
+              <div className="flex justify-between items-center mb-2">
+                <Label className="text-lg font-semibold">Prompts</Label>
+                <div className="flex items-center space-x-2">
+                  {/* Manage Prompts button (hidden when >3 prompts) */}
+                  {prompts.length <= 3 && (
+                    <TooltipProvider delayDuration={300}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setIsPromptModalOpen(true)}
+                            disabled={!hasApiKey || isGenerating}
+                            aria-label="Manage Prompts"
+                          >
+                            <Edit3 className="h-4 w-4 mr-0 sm:mr-2" />
+                            <span className="hidden sm:inline">Manage Prompts</span>
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">
+                          Manage Prompts
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {prompts.length <= 3 ? (
+                  prompts.map((promptEntry, index) => (
+                    <PromptInputRow
+                      key={promptEntry.id}
+                      promptEntry={promptEntry}
+                      onUpdate={handleUpdatePrompt}
+                      onRemove={handleRemovePrompt}
+                      canRemove={prompts.length > 1}
+                      isGenerating={isGenerating}
+                      hasApiKey={hasApiKey}
+                      index={index}
+                      onEditWithAI={() => { /* Placeholder for direct form AI edit */ }}
+                      aiEditButtonIcon={null} 
+                      onSetActiveForFullView={setDirectFormActivePromptId}
+                      isActiveForFullView={directFormActivePromptId === promptEntry.id}
+                    />
+                  ))
+                ) : (
+                  <div className="p-3 border rounded-md text-center bg-slate-50/50 hover:border-primary/50 cursor-pointer" onClick={() => setIsPromptModalOpen(true)}>
+                      <p className="text-sm text-muted-foreground"><span className="font-semibold text-primary">{prompts.length} prompts</span> currently active.</p>
+                      <p className="text-xs text-primary">(Click to Edit)</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Add Prompt button below list, larger, left-aligned */}
+              {prompts.length <= 3 && (
+                <div className="mt-3">
                   <TooltipProvider delayDuration={300}>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button
                           type="button"
                           variant="outline"
-                          onClick={() => setIsPromptModalOpen(true)}
+                          onClick={() => handleAddPrompt('form')}
                           disabled={!hasApiKey || isGenerating}
-                          aria-label="Manage Prompts"
+                          aria-label="Add Prompt"
                         >
-                          <Edit3 className="h-4 w-4 mr-0 sm:mr-2" />
-                          <span className="hidden sm:inline">Manage Prompts</span>
+                          <PlusCircle className="h-4 w-4 mr-2" />
+                          <span>Add Prompt</span>
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent side="top">
-                        Manage Prompts
+                        Add Prompt
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              {prompts.length <= 3 ? (
-                prompts.map((promptEntry, index) => (
-                  <PromptInputRow
-                    key={promptEntry.id}
-                    promptEntry={promptEntry}
-                    onUpdate={handleUpdatePrompt}
-                    onRemove={handleRemovePrompt}
-                    canRemove={prompts.length > 1}
-                    isGenerating={isGenerating}
-                    hasApiKey={hasApiKey}
-                    index={index}
-                    onEditWithAI={() => { /* Placeholder for direct form AI edit */ }}
-                    aiEditButtonIcon={null} 
-                    onSetActiveForFullView={setDirectFormActivePromptId}
-                    isActiveForFullView={directFormActivePromptId === promptEntry.id}
-                  />
-                ))
-              ) : (
-                <div className="p-3 border rounded-md text-center bg-slate-50/50 hover:border-primary/50 cursor-pointer" onClick={() => setIsPromptModalOpen(true)}>
-                    <p className="text-sm text-muted-foreground"><span className="font-semibold text-primary">{prompts.length} prompts</span> currently active.</p>
-                    <p className="text-xs text-primary">(Click to Edit)</p>
                 </div>
               )}
             </div>
 
-            {/* Add Prompt button below list, larger, left-aligned */}
-            {prompts.length <= 3 && (
-              <div className="mt-3">
-                <TooltipProvider delayDuration={300}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => handleAddPrompt('form')}
-                        disabled={!hasApiKey || isGenerating}
-                        aria-label="Add Prompt"
-                      >
-                        <PlusCircle className="h-4 w-4 mr-2" />
-                        <span>Add Prompt</span>
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top">
-                      Add Prompt
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+            {/* Before / After prompt modifiers */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="beforeEachPromptText">Before each prompt</Label>
+                <Textarea
+                  id="beforeEachPromptText"
+                  value={beforeEachPromptText}
+                  onChange={handleTextChange(setBeforeEachPromptText)}
+                  placeholder="Text to prepend"
+                  disabled={!hasApiKey || isGenerating}
+                  className="mt-1"
+                />
               </div>
-            )}
-          </div>
-
-          {/* Before / After prompt modifiers */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="beforeEachPromptText">Before each prompt</Label>
-              <Textarea
-                id="beforeEachPromptText"
-                value={beforeEachPromptText}
-                onChange={handleTextChange(setBeforeEachPromptText)}
-                placeholder="Text to prepend"
-                disabled={!hasApiKey || isGenerating}
-                className="mt-1"
-              />
+              <div>
+                <Label htmlFor="afterEachPromptText">After each prompt</Label>
+                <Textarea
+                  id="afterEachPromptText"
+                  value={afterEachPromptText}
+                  onChange={handleTextChange(setAfterEachPromptText)}
+                  placeholder="Text to append"
+                  disabled={!hasApiKey || isGenerating}
+                  className="mt-1"
+                />
+              </div>
             </div>
-            <div>
-              <Label htmlFor="afterEachPromptText">After each prompt</Label>
-              <Textarea
-                id="afterEachPromptText"
-                value={afterEachPromptText}
-                onChange={handleTextChange(setAfterEachPromptText)}
-                placeholder="Text to append"
-                disabled={!hasApiKey || isGenerating}
-                className="mt-1"
-              />
-            </div>
-          </div>
 
-          {/* Images per Prompt Slider and Associated Shot */}
-          <div className="mt-4 grid grid-cols-3 gap-4">
-            <div className="col-span-2">
+            {/* Images per Prompt Slider */}
+            <div className="mt-4">
               <SliderWithValue
                 label="Images per Prompt"
                 value={imagesPerPrompt}
@@ -724,53 +822,30 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
                 disabled={!hasApiKey || isGenerating}
               />
             </div>
-            <div className="col-span-1">
-              <Label htmlFor="associatedShot">Associated with Shot</Label>
-              <Select
-                value={associatedShotId || "none"}
-                onValueChange={(value) => {
-                  markAsInteracted();
-                  setAssociatedShotId(value === "none" ? null : value);
-                }}
-                disabled={!hasApiKey || isGenerating}
-              >
-                <SelectTrigger id="associatedShot" className="mt-1">
-                  <SelectValue placeholder="None" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
-                  {shots?.map((shot) => (
-                    <SelectItem key={shot.id} value={shot.id}>
-                      {shot.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+
+          </div>
+          
+          {/* LoRA Section */}
+          <div className="space-y-6 md:order-2 md:row-start-1 md:col-start-2">
+            <div>
+              <Label>LoRA Models (Wan)</Label>
+              <Button type="button" variant="outline" className="w-full mt-1" onClick={() => setIsLoraModalOpen(true)} disabled={isGenerating}>
+                Add or Manage LoRA Models
+              </Button>
+              
+              <ActiveLoRAsDisplay
+                selectedLoras={selectedLoras}
+                onRemoveLora={handleRemoveLora}
+                onLoraStrengthChange={handleLoraStrengthChange}
+                isGenerating={isGenerating}
+                availableLoras={availableLoras}
+                className="mt-4"
+              />
             </div>
           </div>
-
-        </div>
-        
-        {/* LoRA Section */}
-        <div className="space-y-6 md:order-2 md:row-start-1 md:col-start-2">
-          <div>
-            <Label>LoRA Models (Wan)</Label>
-            <Button type="button" variant="outline" className="w-full mt-1" onClick={() => setIsLoraModalOpen(true)} disabled={isGenerating}>
-              Add or Manage LoRA Models
-            </Button>
-            
-            <ActiveLoRAsDisplay
-              selectedLoras={selectedLoras}
-              onRemoveLora={handleRemoveLora}
-              onLoraStrengthChange={handleLoraStrengthChange}
-              isGenerating={isGenerating}
-              availableLoras={availableLoras}
-              className="mt-4"
-            />
-          </div>
         </div>
 
-        <div className="md:col-span-2 flex justify-center mt-4">
+        <div className="flex justify-center mt-4">
           <Button
             type="submit"
             className="w-full md:w-1/2"
@@ -816,6 +891,13 @@ const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerati
           apiKey={openaiApiKey}
         />
       </Suspense>
+
+      <CreateShotModal
+        isOpen={isCreateShotModalOpen}
+        onClose={() => setIsCreateShotModalOpen(false)}
+        onSubmit={handleCreateShot}
+        isLoading={createShotMutation.isPending}
+      />
     </>
   );
 });

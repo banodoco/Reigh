@@ -32,7 +32,7 @@ Reigh uses an async task queue pattern for all AI generation workloads. This dec
 
 ### 2. Worker Polling & Task Processing
 - **External Workers** (Headless-Wan2GP) poll via `claim_next_task` Edge Function:
-  - Finds oldest `Queued` task
+  - Finds oldest `Queued` task using `func_claim_available_task`
   - Updates to `In Progress` with `worker_id`
   - Returns task details
 - **Task Processing** now uses **Database Triggers** (instant):
@@ -102,7 +102,7 @@ The worker polls the same task queue but specializes in video generation:
   - Output data (URLs, metadata)
   - Error info (if failed)
 - Edge Function:
-  - Updates task status to `Complete` or `Failed`
+  - Updates task status using `func_mark_task_complete` or `func_mark_task_failed`
   - Deducts credits from user's balance
 - **SQL Trigger** (`create_generation_on_task_complete`):
   - Automatically creates `generations` records when status → `Complete`
@@ -120,13 +120,32 @@ The worker polls the same task queue but specializes in video generation:
 
 - **Edge Functions** (`/supabase/functions/`)
   - `create_task/index.ts` - Task creation & validation
-  - `claim_next_task/index.ts` - Worker task assignment
-  - `complete_task/index.ts` - Task completion handling
+  - `claim_next_task/index.ts` - Worker task assignment (uses `func_claim_available_task`)
+  - `complete_task/index.ts` - Task completion handling (uses `func_mark_task_complete`)
   - `calculate-task-cost/index.ts` - Credit cost calculation
 
+- **Database Functions** (cleaned up 2025-07-23)
+  - **Task Management**:
+    - `func_claim_available_task` - Primary function for claiming tasks
+    - `func_mark_task_complete` - Mark task as complete with results
+    - `func_mark_task_failed` - Mark task as failed with error
+    - `func_get_tasks_by_status` - Query tasks by status
+    - `func_update_worker_heartbeat` - Worker health monitoring
+    - `func_reset_orphaned_tasks` - Reset abandoned tasks
+  - **Generation Management**:
+    - `add_generation_to_shot` - Link generation to shot (replaced 3 older functions)
+    - `create_generation_on_task_complete` - Trigger for auto-creating generations
+    - `normalize_image_path` / `normalize_image_paths_in_jsonb` - Clean image URLs
+  - **Removed Functions** (obsolete/duplicates):
+    - `func_claim_task`, `func_claim_user_task` → use `func_claim_available_task`
+    - `complete_task_with_timing` → use `func_mark_task_complete`
+    - `associate_generation_with_shot`, `position_existing_generation_in_shot` → use `add_generation_to_shot`
+    - `noop_broadcast_*` triggers → using Supabase Realtime directly
+    - `ensure_user_exists` → use `auto_create_user_before_project`
+
 - **Database Triggers** (`/supabase/migrations/`)
-  - `create_generation_on_task_complete` - Creates generations instantly when tasks complete (replaces Edge Function)
-  - `trigger_broadcast_task_status` - Real-time status broadcasts
+  - `create_generation_on_task_complete` - Creates generations instantly when tasks complete
+  - Direct Supabase Realtime broadcasts (removed old HTTP broadcast triggers)
 
 - **Real-time Updates**
   - Direct Supabase Realtime connections from client

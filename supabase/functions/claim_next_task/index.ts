@@ -128,51 +128,38 @@ serve(async (req) => {
     if (isServiceRole) {
       // Service role: claim any task
       console.log("Claiming task as service role...");
-      rpcResponse = await supabaseAdmin.rpc("func_claim_task", {
-        p_table_name: "tasks",
-        p_worker_id: workerId
+      rpcResponse = await supabaseAdmin.rpc("func_claim_available_task", {
+        worker_id_param: workerId
       });
     } else {
-      // User token: use the user-specific claim function
+      // User token: For now, we'll use the same function but filter by user_id
       console.log(`Claiming task for user ${callerId}...`);
       
-      try {
-        // Try the user-specific function first
-        rpcResponse = await supabaseAdmin.rpc("func_claim_user_task", {
-          p_table_name: "tasks",
-          p_worker_id: workerId,
-          p_user_id: callerId
-        });
-      } catch (e) {
-        // If func_claim_user_task doesn't exist, fall back to manual filtering
-        console.log("func_claim_user_task not found, using fallback method");
+      // Use func_claim_available_task and then verify the task belongs to the user
+      rpcResponse = await supabaseAdmin.rpc("func_claim_available_task", {
+        worker_id_param: workerId
+      });
+      
+      // If we got a task, verify it belongs to the calling user
+      if (rpcResponse.data && rpcResponse.data.length > 0) {
+        const task = rpcResponse.data[0];
+        const taskUserId = task.task_data?.user_id;
         
-        // Use the regular function and filter manually
-        rpcResponse = await supabaseAdmin.rpc("func_claim_task", {
-          p_table_name: "tasks",
-          p_worker_id: workerId
-        });
-
-        // If we got a task, verify it belongs to the calling user
-        if (rpcResponse.data && rpcResponse.data.length > 0) {
-          const task = rpcResponse.data[0];
-          if (task.project_id_out !== callerId) {
-            // Wrong user's task - need to unclaim it
-            console.log(`Task ${task.task_id_out} belongs to ${task.project_id_out}, not ${callerId}. Unclaiming...`);
-            
-            // Update task back to Queued status
-            await supabaseAdmin
-              .from("tasks")
-              .update({
-                status: "Queued",
-                worker_id: null,
-                updated_at: new Date().toISOString()
-              })
-              .eq("id", task.task_id_out);
-
-            // Act as if no task was found
-            rpcResponse.data = [];
-          }
+        if (taskUserId && taskUserId !== callerId) {
+          // Task doesn't belong to this user, unclaim it
+          console.log(`Task ${task.id} belongs to user ${taskUserId}, not ${callerId}. Unclaiming...`);
+          
+          await supabaseAdmin
+            .from('tasks')
+            .update({ 
+              status: 'Queued',
+              worker_id: null,
+              generation_started_at: null
+            })
+            .eq('id', task.id);
+          
+          // Return empty result
+          rpcResponse = { data: [], error: null };
         }
       }
     }
