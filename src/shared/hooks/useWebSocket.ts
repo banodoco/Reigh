@@ -84,10 +84,9 @@ export function useWebSocket(projectId: string | null) {
           try {
             const message = payload.payload;
             
-            // No need to check projectId - we're already subscribed to the right channel!
+            // Keep broadcast handling for backwards compatibility and custom events
             switch (message.type) {
               case 'TASK_CREATED':
-                // Batch invalidations to avoid excessive synchronous work
                 scheduleInvalidation(['tasks', { projectId }]);
                 break;
 
@@ -115,9 +114,73 @@ export function useWebSocket(projectId: string | null) {
                 break;
             }
           } catch (error) {
-            console.error('[WebSocket] Error parsing message or handling event:', error);
+            console.error('[WebSocket] Error parsing broadcast message:', error);
           }
         })
+        // Listen to database changes on tasks table (primary real-time mechanism)
+        .on('postgres_changes', 
+          { 
+            event: 'UPDATE', 
+            schema: 'public', 
+            table: 'tasks',
+            filter: `project_id=eq.${projectId}`
+          }, 
+          (payload) => {
+            log('PerfDebug:DBChange', 'Task updated:', payload);
+            
+            const newRecord = payload.new as any;
+            const oldRecord = payload.old as any;
+            
+            // Invalidate tasks queries on any update
+            scheduleInvalidation(['tasks', { projectId }]);
+            scheduleInvalidation(['tasks']);
+            
+            // If task completed, also invalidate generations
+            if (newRecord?.status === 'Complete' && oldRecord?.status !== 'Complete') {
+              log('PerfDebug:DBChange', 'Task completed, invalidating generations');
+              scheduleInvalidation(['generations', projectId]);
+            }
+          }
+        )
+        // Listen to database changes on generations table (primary real-time mechanism)
+        .on('postgres_changes', 
+          { 
+            event: 'INSERT', 
+            schema: 'public', 
+            table: 'generations',
+            filter: `project_id=eq.${projectId}`
+          }, 
+          (payload) => {
+            log('PerfDebug:DBChange', 'Generation created:', payload);
+            
+            const newRecord = payload.new as any;
+            
+            // Invalidate generations and shots queries
+            scheduleInvalidation(['generations', projectId]);
+            scheduleInvalidation(['shots', projectId]);
+            
+            // If there's a shot_id in params, invalidate that specific shot
+            const shotId = newRecord?.params?.shotId || newRecord?.params?.shot_id;
+            if (shotId) {
+              scheduleInvalidation(['shots', shotId]);
+            }
+          }
+        )
+        // Listen to shot_generations changes
+        .on('postgres_changes', 
+          { 
+            event: '*', 
+            schema: 'public', 
+            table: 'shot_generations'
+          }, 
+          (payload) => {
+            log('PerfDebug:DBChange', 'Shot generation changed:', payload);
+            
+            // Invalidate shots and generations
+            scheduleInvalidation(['shots', projectId]);
+            scheduleInvalidation(['generations', projectId]);
+          }
+        )
         .subscribe((status, err) => {
           if (status === 'CHANNEL_ERROR' && err) {
             console.error('[WebSocket] Supabase Realtime channel error:', err);
