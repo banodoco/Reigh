@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Trash2, Info, Settings, CheckCircle, AlertTriangle, Download, PlusCircle, Check, Sparkles, Filter, Search, X } from "lucide-react";
+import { Trash2, Info, Settings, CheckCircle, AlertTriangle, Download, PlusCircle, Check, Sparkles, Filter, Search, X, Star } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
 import { 
   Tooltip, 
@@ -28,6 +28,7 @@ import { getDisplayUrl } from "@/shared/lib/utils";
 import { ShotFilter } from "@/shared/components/ShotFilter";
 import { useIsMobile } from "@/shared/hooks/use-mobile";
 import { TimeStamp } from "@/shared/components/TimeStamp";
+import { useToggleGenerationStar } from '@/shared/hooks/useGenerations';
 
 // Define the structure for individual LoRA details within metadata
 export interface MetadataLora {
@@ -74,6 +75,7 @@ export interface GeneratedImageWithMetadata {
   isVideo?: boolean; // To distinguish video from image in the gallery
   unsaved?: boolean; // Optional flag for images not saved to DB
   createdAt?: string; // Add a creation timestamp
+  starred?: boolean; // Whether this generation is starred
 }
 
 interface ImageGalleryProps {
@@ -122,6 +124,8 @@ interface ImageGalleryProps {
   onSearchChange?: (searchTerm: string) => void;
   /** Callback when media type filter changes */
   onMediaTypeFilterChange?: (mediaType: 'all' | 'image' | 'video') => void;
+  /** Callback when a generation is starred/unstarred */
+  onToggleStar?: (id: string, starred: boolean) => void;
 }
 
 // Helper to format metadata for display
@@ -234,7 +238,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   showSearch = false,
   initialSearchTerm = '',
   onSearchChange,
-  onMediaTypeFilterChange
+  onMediaTypeFilterChange,
+  onToggleStar
 }) => {
   const [activeLightboxMedia, setActiveLightboxMedia] = useState<GenerationRow | null>(null);
   const [downloadingImageId, setDownloadingImageId] = useState<string | null>(null);
@@ -242,6 +247,9 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   const { setLastAffectedShotId } = useLastAffectedShot();
   const { currentShotId } = useCurrentShot();
   const simplifiedShotOptions = React.useMemo(() => allShots.map(s => ({ id: s.id, name: s.name })), [allShots]);
+  
+  // Star functionality
+  const toggleStarMutation = useToggleGenerationStar();
 
   const [selectedShotIdLocal, setSelectedShotIdLocal] = useState<string>(() => 
     currentShotId || lastShotId || (simplifiedShotOptions.length > 0 ? simplifiedShotOptions[0].id : "")
@@ -256,6 +264,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   // State for shot filter
   const [shotFilter, setShotFilter] = useState<string>(initialShotFilter);
   const [excludePositioned, setExcludePositioned] = useState<boolean>(initialExcludePositioned);
+  // State for starred filter
+  const [showStarredOnly, setShowStarredOnly] = useState<boolean>(false);
   
   // Search state
   const [searchTerm, setSearchTerm] = useState<string>(initialSearchTerm);
@@ -270,7 +280,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   React.useEffect(() => {
     const timer = setTimeout(() => setPage(0), 10);
     return () => clearTimeout(timer);
-  }, [filterByToolType, mediaTypeFilter, searchTerm]);
+  }, [filterByToolType, mediaTypeFilter, searchTerm, showStarredOnly]);
 
   const tickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
@@ -531,9 +541,14 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
         return prompt.toLowerCase().includes(searchTerm.toLowerCase());
       });
     }
+
+    // 4. Apply starred filter (always apply, even in server pagination mode)
+    if (showStarredOnly) {
+      currentFiltered = currentFiltered.filter(image => image.starred === true);
+    }
         
     return currentFiltered;
-  }, [images, filterByToolType, currentToolType, mediaTypeFilter, searchTerm, onServerPageChange, serverPage]);
+  }, [images, filterByToolType, currentToolType, mediaTypeFilter, searchTerm, showStarredOnly, onServerPageChange, serverPage]);
 
   // Determine if we're in server-side pagination mode
   const isServerPagination = !!(onServerPageChange && serverPage);
@@ -699,6 +714,20 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                         </Label>
                     </div>
                 )}
+
+                {/* Starred Filter */}
+                <div className="flex items-center space-x-2">
+                    <Checkbox
+                        id="filter-starred"
+                        checked={showStarredOnly}
+                        onCheckedChange={(checked) => setShowStarredOnly(Boolean(checked))}
+                        aria-label="Show only starred generations"
+                    />
+                    <Label htmlFor="filter-starred" className={`text-sm font-medium cursor-pointer ${whiteText ? 'text-white' : 'text-muted-foreground'}`}>
+                        <Star className="inline h-3 w-3 mr-1" />
+                        Starred only
+                    </Label>
+                </div>
             </div>
         </div>
 
@@ -894,8 +923,43 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                           position="top-right"
                         />
 
-                        {/* Action buttons - Top Right (Info & Apply) */}
+                        {/* Action buttons - Top Right (Info, Star & Apply) */}
                         <div className="absolute top-2 right-2 flex flex-col items-end gap-1.5 mt-8">
+                            {/* Star button */}
+                            <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button
+                                            variant="secondary"
+                                            size="icon"
+                                            className={`h-7 w-7 p-0 rounded-full transition-colors ${
+                                                image.starred 
+                                                    ? 'bg-yellow-500/80 hover:bg-yellow-500 text-white' 
+                                                    : 'bg-black/50 hover:bg-black/70 text-white'
+                                            }`}
+                                            onClick={() => {
+                                                if (onToggleStar) {
+                                                    onToggleStar(image.id!, !image.starred);
+                                                } else {
+                                                    toggleStarMutation.mutate({ 
+                                                        id: image.id!, 
+                                                        starred: !image.starred 
+                                                    });
+                                                }
+                                            }}
+                                            disabled={toggleStarMutation.isPending}
+                                        >
+                                            <Star 
+                                                className={`h-3.5 w-3.5 ${image.starred ? 'fill-current' : ''}`} 
+                                            />
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        {image.starred ? 'Unstar' : 'Star'} this generation
+                                    </TooltipContent>
+                                </Tooltip>
+                            </div>
+
                             {/* Info button (shown on hover) */}
                                 {image.metadata && (
                                  <InfoPopover metadata={image.metadata} metadataForDisplay={metadataForDisplay} />
@@ -1040,6 +1104,9 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
           onApplySettings={onApplySettings}
           showTickForImageId={showTickForImageId}
           onShowTick={setShowTickForImageId}
+          starred={
+            filteredImages.find(img => img.id === activeLightboxMedia.id)?.starred || false
+          }
           onMagicEdit={(imageUrl, prompt, numImages) => {
             // TODO: Implement magic edit generation
             console.log('Magic Edit:', { imageUrl, prompt, numImages });

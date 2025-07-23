@@ -4,7 +4,7 @@ import { useGenerationsPageLogic } from '@/shared/hooks/useGenerationsPageLogic'
 import { SkeletonGallery } from '@/shared/components/ui/skeleton-gallery';
 import { useProject } from '@/shared/contexts/ProjectContext';
 
-const GENERATIONS_PER_PAGE = 45; // 45 items per page for consistency
+const GENERATIONS_PER_PAGE = 30; // 30 items per page for consistency
 
 const GenerationsPage: React.FC = () => {
   const { isLoadingProjects } = useProject();
@@ -30,6 +30,7 @@ const GenerationsPage: React.FC = () => {
     handleServerPageChange,
     handleDeleteGeneration,
     handleAddToShot,
+    handleToggleStar,
     page
   } = useGenerationsPageLogic({
     itemsPerPage: GENERATIONS_PER_PAGE,
@@ -89,6 +90,7 @@ const GenerationsPage: React.FC = () => {
           onServerPageChange={handleServerPageChange}
           serverPage={page}
           onMediaTypeFilterChange={handleMediaTypeFilterChange}
+          onToggleStar={handleToggleStar}
         />
       )}
     </div>

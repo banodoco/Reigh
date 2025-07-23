@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useContext } from 'react';
 import { useProject } from '@/shared/contexts/ProjectContext';
-import { useGenerations, useDeleteGeneration } from '@/shared/hooks/useGenerations';
+import { useGenerations, useDeleteGeneration, useToggleGenerationStar } from '@/shared/hooks/useGenerations';
 import { useListShots, useAddImageToShot, usePositionExistingGenerationInShot } from '@/shared/hooks/useShots';
 import { LastAffectedShotContext } from '@/shared/contexts/LastAffectedShotContext';
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
@@ -70,6 +70,7 @@ export function useGenerationsPageLogic({
   const addImageToShotMutation = useAddImageToShot();
   const positionExistingGenerationMutation = usePositionExistingGenerationInShot();
   const deleteGenerationMutation = useDeleteGeneration();
+  const toggleStarMutation = useToggleGenerationStar();
 
   // Update last known total when we get valid data
   useEffect(() => {
@@ -123,6 +124,10 @@ export function useGenerationsPageLogic({
 
   const handleDeleteGeneration = (id: string) => {
     deleteGenerationMutation.mutate(id);
+  };
+
+  const handleToggleStar = (id: string, starred: boolean) => {
+    toggleStarMutation.mutate({ id, starred });
   };
 
   const handleAddToShot = (generationId: string, imageUrl?: string) => {
@@ -208,5 +213,6 @@ export function useGenerationsPageLogic({
     handleServerPageChange,
     handleDeleteGeneration,
     handleAddToShot,
+    handleToggleStar,
   };
 } 

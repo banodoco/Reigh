@@ -134,6 +134,7 @@ export async function fetchGenerations(
     metadata: item.params || item.metadata || {},
     createdAt: item.created_at,
     isVideo: item.type?.includes('video'),
+    starred: item.starred || false,
   })) || [];
 
   const total = count || 0;
@@ -209,6 +210,20 @@ async function createGeneration(params: {
   }
 
   return data;
+}
+
+/**
+ * Star/unstar a generation using direct Supabase call
+ */
+async function toggleGenerationStar(id: string, starred: boolean): Promise<void> {
+  const { error } = await supabase
+    .from('generations')
+    .update({ starred })
+    .eq('id', id);
+
+  if (error) {
+    throw new Error(`Failed to ${starred ? 'star' : 'unstar'} generation: ${error.message}`);
+  }
 }
 
 export type GenerationsPaginatedResponse = {
@@ -306,3 +321,22 @@ export function useCreateGeneration() {
     },
             });
         }
+
+export function useToggleGenerationStar() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, starred }: { id: string; starred: boolean }) => {
+      return toggleGenerationStar(id, starred);
+    },
+    onSuccess: (_, variables) => {
+      // Invalidate all generations queries to refetch
+      queryClient.invalidateQueries({ queryKey: ['generations'] });
+      toast.success(variables.starred ? 'Generation starred!' : 'Generation unstarred!');
+    },
+    onError: (error: Error) => {
+      console.error('Error toggling generation star:', error);
+      toast.error(error.message || 'Failed to toggle star');
+    },
+  });
+}

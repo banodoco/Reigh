@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, X, FlipHorizontal, Save, Download, Trash2, Settings, PlusCircle, CheckCircle, Sparkles } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, FlipHorizontal, Save, Download, Trash2, Settings, PlusCircle, CheckCircle, Sparkles, Star } from 'lucide-react';
 import { GenerationRow } from '@/types/shots';
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Button } from '@/shared/components/ui/button';
@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/shared/compo
 import { Textarea } from '@/shared/components/ui/textarea';
 import { Label } from '@/shared/components/ui/label';
 import { SliderWithValue } from '@/shared/components/ui/slider-with-value';
+import { useToggleGenerationStar } from '@/shared/hooks/useGenerations';
 
 interface Shot {
   id: string;
@@ -41,6 +42,9 @@ interface MediaLightboxProps {
   showTickForImageId?: string | null;
   onShowTick?: (imageId: string) => void;
   onMagicEdit?: (imageUrl: string, prompt: string, numImages: number) => void;
+  // Star functionality
+  starred?: boolean;
+  onToggleStar?: (id: string, starred: boolean) => void;
 }
 
 const MediaLightbox: React.FC<MediaLightboxProps> = ({ 
@@ -64,7 +68,10 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   onApplySettings,
   showTickForImageId,
   onShowTick,
-  onMagicEdit
+  onMagicEdit,
+  // Star functionality
+  starred = false,
+  onToggleStar
 }) => {
   const [isFlippedHorizontally, setIsFlippedHorizontally] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
@@ -74,6 +81,9 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   // Ref for the dialog content so we can programmatically focus it, enabling keyboard shortcuts immediately
   const contentRef = useRef<HTMLDivElement>(null);
+  
+  // Star functionality
+  const toggleStarMutation = useToggleGenerationStar();
 
   /**
    * Global key handler
@@ -300,6 +310,32 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
                 {/* Top Controls */}
                 <div className="absolute top-2 sm:top-4 right-2 sm:right-4 flex items-center space-x-1 sm:space-x-2 z-10">
+                  {/* Star Button */}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => {
+                          if (onToggleStar) {
+                            onToggleStar(media.id, !starred);
+                          } else {
+                            toggleStarMutation.mutate({ id: media.id, starred: !starred });
+                          }
+                        }}
+                        disabled={toggleStarMutation.isPending}
+                        className={`transition-colors ${
+                          starred
+                            ? 'bg-yellow-500/80 hover:bg-yellow-500 text-white'
+                            : 'bg-black/50 hover:bg-black/70 text-white'
+                        }`}
+                      >
+                        <Star className={`h-4 w-4 ${starred ? 'fill-current' : ''}`} />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>{starred ? 'Unstar' : 'Star'} this generation</TooltipContent>
+                  </Tooltip>
+
                   {!isVideo && showMagicEdit && onMagicEdit && (
                     <Tooltip>
                       <TooltipTrigger asChild>
