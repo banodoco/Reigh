@@ -41,6 +41,17 @@ serve(async (req) => {
     return new Response("Server configuration error", { status: 500 });
   }
 
+  // Parse request body to get worker_id if provided
+  let requestBody: any = {};
+  try {
+    const bodyText = await req.text();
+    if (bodyText) {
+      requestBody = JSON.parse(bodyText);
+    }
+  } catch (e) {
+    console.log("No valid JSON body provided, using default worker_id");
+  }
+
   // Create admin client for database operations
   const supabaseAdmin = createClient(supabaseUrl, serviceKey);
 
@@ -96,71 +107,259 @@ serve(async (req) => {
 
       callerId = data.user_id;
       console.log(`Token resolved to user ID: ${callerId}`);
+      
+      // Debug: Check user's projects and tasks
+      const { data: userProjects } = await supabaseAdmin
+        .from("projects")
+        .select("id, name")
+        .eq("user_id", callerId);
+      
+      console.log(`DEBUG: User ${callerId} owns ${userProjects?.length || 0} projects`);
+      
+      if (userProjects && userProjects.length > 0) {
+        const projectIds = userProjects.map(p => p.id);
+        const { data: userTasks } = await supabaseAdmin
+          .from("tasks")
+          .select("id, status, project_id, task_type, created_at")
+          .in("project_id", projectIds);
+        
+        console.log(`DEBUG: Found ${userTasks?.length || 0} tasks across user's projects`);
+        if (userTasks && userTasks.length > 0) {
+          const queuedTasks = userTasks.filter(t => t.status === "Queued");
+          console.log(`DEBUG: ${queuedTasks.length} tasks are in 'Queued' status`);
+          console.log("DEBUG: Sample tasks:", JSON.stringify(userTasks.slice(0, 3), null, 2));
+          
+          // Show unique status values to debug enum
+          const uniqueStatuses = [...new Set(userTasks.map(t => t.status))];
+          console.log(`DEBUG: Unique status values: ${JSON.stringify(uniqueStatuses)}`);
+        }
+      } else {
+        console.log(`DEBUG: User ${callerId} has no projects - cannot claim any tasks`);
+      }
     } catch (e) {
       console.error("Error querying user_api_token:", e);
       return new Response("Token validation failed", { status: 403 });
     }
   }
 
-  // Generate a unique worker ID for this request
-  const workerId = `edge_${crypto.randomUUID()}`;
+  // Handle worker_id based on token type
+  let workerId: string | null = null;
+  if (isServiceRole) {
+    // Service role: use provided worker_id or generate one
+    workerId = requestBody.worker_id || `edge_${crypto.randomUUID()}`;
+    console.log(`Service role using worker_id: ${workerId}`);
+  } else {
+    // User/PAT: no worker_id needed (individual users don't have worker IDs)
+    console.log(`User token: not using worker_id`);
+  }
 
   try {
-    // Register this worker instance
-    const { error: workerError } = await supabaseAdmin
-      .from('workers')
-      .upsert({
-        id: workerId,
-        instance_type: 'edge',
-        last_heartbeat: new Date().toISOString(),
-        status: 'active',
-        metadata: { 'edge_function': 'claim_next_task' }
-      }, { onConflict: 'id' });
-
-    if (workerError) {
-      console.error('Failed to register worker:', workerError);
-      return new Response(`Worker registration failed: ${workerError.message}`, { status: 500 });
-    }
-
-    // Proceed with claiming
+    // Call the appropriate RPC function based on token type
     let rpcResponse;
     
     if (isServiceRole) {
-      // Service role: claim any task
-      console.log("Claiming task as service role...");
-      rpcResponse = await supabaseAdmin.rpc("func_claim_available_task", {
-        worker_id_param: workerId
-      });
+      // Service role: claim any available task from any project atomically
+      console.log("Service role: Executing atomic find-and-claim for all tasks");
+      
+      const serviceUpdatePayload = {
+        status: "In Progress" as const,
+        worker_id: workerId,  // Service role gets worker_id for tracking
+        updated_at: new Date().toISOString()
+      };
+
+      // Get all queued tasks and manually check dependencies
+      const { data: queuedTasks, error: findError } = await supabaseAdmin
+        .from("tasks")
+        .select("id, params, task_type, project_id, created_at, dependant_on")
+        .eq("status", "Queued")
+        .order("created_at", { ascending: true });
+
+      if (findError) {
+        throw findError;
+      }
+
+      // Manual dependency checking for service role
+      const readyTasks: any[] = [];
+      for (const task of (queuedTasks || [])) {
+        if (!task.dependant_on) {
+          // No dependency - task is ready
+          readyTasks.push(task);
+        } else {
+          // Check if dependency is complete
+          const { data: depData } = await supabaseAdmin
+            .from("tasks")
+            .select("status")
+            .eq("id", task.dependant_on)
+            .single();
+          
+          if (depData?.status === "Complete") {
+            readyTasks.push(task);
+          }
+        }
+      }
+      
+      console.log(`Service role dependency check: ${queuedTasks?.length || 0} queued, ${readyTasks.length} ready`);
+
+      let updateData: any = null;
+      let updateError: any = null;
+
+      if (readyTasks.length > 0) {
+        const taskToTake = readyTasks[0];
+        
+        // Atomically claim the first eligible task
+        const result = await supabaseAdmin
+          .from("tasks")
+          .update(serviceUpdatePayload)
+          .eq("id", taskToTake.id)
+          .eq("status", "Queued") // Double-check it's still queued
+          .select()
+          .single();
+          
+        updateData = result.data;
+        updateError = result.error;
+      } else {
+        // No eligible tasks found - set error to indicate no rows
+        updateError = { code: "PGRST116", message: "No eligible tasks found" };
+      }
+
+      console.log(`Service role atomic claim result - error: ${updateError?.message || updateError?.code || 'none'}, data: ${updateData ? 'claimed task ' + updateData.id : 'no data'}`);
+
+      if (updateError && updateError.code !== "PGRST116") { // PGRST116 = no rows
+        console.error("Service role atomic claim failed:", updateError);
+        throw updateError;
+      }
+
+      if (updateData) {
+        console.log(`Service role successfully claimed task ${updateData.id} atomically`);
+        rpcResponse = {
+          data: [{
+            task_id_out: updateData.id,
+            params_out: updateData.params,
+            task_type_out: updateData.task_type,
+            project_id_out: updateData.project_id
+          }],
+          error: null
+        };
+      } else {
+        console.log("Service role: No queued tasks available for atomic claiming");
+        rpcResponse = { data: [], error: null };
+      }
     } else {
-      // User token: For now, we'll use the same function but filter by user_id
+      // User token: use the user-specific claim function
       console.log(`Claiming task for user ${callerId}...`);
       
-      // Use func_claim_available_task and then verify the task belongs to the user
-      rpcResponse = await supabaseAdmin.rpc("func_claim_available_task", {
-        worker_id_param: workerId
-      });
-      
-      // If we got a task, verify it belongs to the calling user
-      if (rpcResponse.data && rpcResponse.data.length > 0) {
-        const task = rpcResponse.data[0];
-        const taskUserId = task.task_data?.user_id;
-        
-        if (taskUserId && taskUserId !== callerId) {
-          // Task doesn't belong to this user, unclaim it
-          console.log(`Task ${task.id} belongs to user ${taskUserId}, not ${callerId}. Unclaiming...`);
-          
-          await supabaseAdmin
-            .from('tasks')
-            .update({ 
-              status: 'Queued',
-              worker_id: null,
-              generation_started_at: null
-            })
-            .eq('id', task.id);
-          
-          // Return empty result
+      try {
+        // Try the user-specific function first
+        // First get user's project IDs, then query tasks
+        const { data: userProjects } = await supabaseAdmin
+          .from("projects")
+          .select("id")
+          .eq("user_id", callerId);
+
+        if (!userProjects || userProjects.length === 0) {
+          console.log("User has no projects");
           rpcResponse = { data: [], error: null };
+        } else {
+                    const projectIds = userProjects.map(p => p.id);
+          console.log(`DEBUG: Claiming from ${projectIds.length} project IDs: [${projectIds.slice(0, 3).join(', ')}...]`);
+          
+          if (projectIds.length === 0) {
+            console.log("No project IDs to search - user has projects but they have no IDs?");
+            rpcResponse = { data: [], error: null };
+          } else {
+            // Get queued tasks for user projects and manually check dependencies
+            console.log(`DEBUG: Finding eligible tasks with dependency checking for ${projectIds.length} projects`);
+            
+            const { data: userQueuedTasks, error: userFindError } = await supabaseAdmin
+              .from("tasks")
+              .select("id, params, task_type, project_id, created_at, dependant_on")
+              .eq("status", "Queued")
+              .in("project_id", projectIds)
+              .order("created_at", { ascending: true });
+
+            if (userFindError) {
+              throw userFindError;
+            }
+
+            // Manual dependency checking for user tasks
+            const userReadyTasks: any[] = [];
+            for (const task of (userQueuedTasks || [])) {
+              if (!task.dependant_on) {
+                // No dependency - task is ready
+                userReadyTasks.push(task);
+              } else {
+                // Check if dependency is complete
+                const { data: depData } = await supabaseAdmin
+                  .from("tasks")
+                  .select("status")
+                  .eq("id", task.dependant_on)
+                  .single();
+                
+                if (depData?.status === "Complete") {
+                  userReadyTasks.push(task);
+                }
+              }
+            }
+
+            console.log(`DEBUG: User dependency check: ${userQueuedTasks?.length || 0} queued, ${userReadyTasks.length} ready`);
+
+            const updatePayload: any = {
+              status: "In Progress",
+              updated_at: new Date().toISOString()
+              // Note: No worker_id for user claims - individual users don't have worker IDs
+            };
+            
+            let updateData: any = null;
+            let updateError: any = null;
+
+            if (userReadyTasks.length > 0) {
+              const taskToTake = userReadyTasks[0];
+              
+              // Atomically claim the first eligible task
+              const result = await supabaseAdmin
+                .from("tasks")
+                .update(updatePayload)
+                .eq("id", taskToTake.id)
+                .eq("status", "Queued") // Double-check it's still queued
+                .select()
+                .single();
+                
+              updateData = result.data;
+              updateError = result.error;
+            } else {
+              // No eligible tasks found
+              updateError = { code: "PGRST116", message: "No eligible tasks found for user" };
+            }
+
+            console.log(`DEBUG: User atomic claim result - error: ${updateError?.message || updateError?.code || 'none'}, data: ${updateData ? 'claimed task ' + updateData.id : 'no data'}`);
+            
+            if (updateError && updateError.code !== "PGRST116") { // PGRST116 = no rows
+              console.error("User atomic claim failed:", updateError);
+              throw updateError;
+            }
+
+            if (updateData) {
+              // Successfully claimed atomically
+              console.log(`Successfully claimed task ${updateData.id} atomically for user`);
+              rpcResponse = {
+                data: [{
+                  task_id_out: updateData.id,
+                  params_out: updateData.params,
+                  task_type_out: updateData.task_type,
+                  project_id_out: updateData.project_id
+                }],
+                error: null
+              };
+            } else {
+              // No tasks available or all were claimed by others
+              console.log("No queued tasks available for user atomic claiming");
+              rpcResponse = { data: [], error: null };
+            }
+         }
         }
+      } catch (e) {
+        console.error("Error claiming user task:", e);
+        rpcResponse = { data: [], error: null };
       }
     }
 

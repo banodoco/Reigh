@@ -170,9 +170,22 @@ export const useListTasks = (params: ListTasksParams) => {
 
 /**
  * Cancel a task using direct Supabase call
+ * For travel_orchestrator tasks, also cancels all subtasks
  */
 async function cancelTask(taskId: string): Promise<void> {
-  const { error } = await supabase
+  // First, get the task to check if it's an orchestrator
+  const { data: task, error: fetchError } = await supabase
+    .from('tasks')
+    .select('*')
+    .eq('id', taskId)
+    .single();
+
+  if (fetchError) {
+    throw new Error(`Failed to fetch task: ${fetchError.message}`);
+  }
+
+  // Cancel the main task
+  const { error: cancelError } = await supabase
     .from('tasks')
     .update({ 
       status: 'Cancelled',
@@ -180,34 +193,111 @@ async function cancelTask(taskId: string): Promise<void> {
     })
     .eq('id', taskId);
 
-  if (error) {
-    throw new Error(`Failed to cancel task: ${error.message}`);
+  if (cancelError) {
+    throw new Error(`Failed to cancel task: ${cancelError.message}`);
+  }
+
+  // If it's a travel_orchestrator, cancel all subtasks
+  if (task && task.task_type === 'travel_orchestrator') {
+    // Find all subtasks that reference this orchestrator
+    const { data: subtasks, error: subtaskFetchError } = await supabase
+      .from('tasks')
+      .select('id, params')
+      .eq('project_id', task.project_id)
+      .in('status', ['Queued', 'In Progress']);
+
+    if (!subtaskFetchError && subtasks) {
+      const subtaskIds = subtasks.filter(subtask => {
+        const params = subtask.params as any;
+        return params?.orchestrator_task_id_ref === taskId || 
+               params?.orchestrator_task_id === taskId;
+      }).map(subtask => subtask.id);
+
+      if (subtaskIds.length > 0) {
+        // Cancel all subtasks
+        const { error: subtaskCancelError } = await supabase
+          .from('tasks')
+          .update({ 
+            status: 'Cancelled',
+            updated_at: new Date().toISOString()
+          })
+          .in('id', subtaskIds);
+
+        if (subtaskCancelError) {
+          console.error('Failed to cancel subtasks:', subtaskCancelError);
+        }
+      }
+    }
   }
 }
 
 /**
  * Cancel all pending tasks for a project using direct Supabase call
+ * For travel_orchestrator tasks, also cancels their subtasks
  */
 async function cancelPendingTasks(projectId: string): Promise<CancelAllPendingTasksResponse> {
-  const { data, error } = await supabase
+  // First, get all pending tasks to check for orchestrators
+  const { data: pendingTasks, error: fetchError } = await supabase
     .from('tasks')
-    .update({ 
-      status: 'Cancelled',
-      updated_at: new Date().toISOString()
-    })
+    .select('id, task_type')
     .eq('project_id', projectId)
-    .eq('status', 'Queued')
-    .select('id');
+    .in('status', ['Queued', 'In Progress']);
 
-  if (error) {
-    throw new Error(`Failed to cancel pending tasks: ${error.message}`);
+  if (fetchError) {
+    throw new Error(`Failed to fetch pending tasks: ${fetchError.message}`);
   }
 
-  const cancelledCount = data?.length || 0;
+  // Collect all task IDs to cancel (including subtasks)
+  const tasksToCancel = new Set<string>();
   
+  // Add all pending tasks
+  pendingTasks?.forEach(task => tasksToCancel.add(task.id));
+
+  // Find orchestrator tasks
+  const orchestratorIds = pendingTasks
+    ?.filter(task => task.task_type === 'travel_orchestrator')
+    .map(task => task.id) || [];
+
+  // If there are orchestrators, find their subtasks
+  if (orchestratorIds.length > 0) {
+    const { data: allProjectTasks, error: allTasksError } = await supabase
+      .from('tasks')
+      .select('id, params')
+      .eq('project_id', projectId)
+      .in('status', ['Queued', 'In Progress']);
+
+    if (!allTasksError && allProjectTasks) {
+      allProjectTasks.forEach(task => {
+        const params = task.params as any;
+        const orchestratorRef = params?.orchestrator_task_id_ref || params?.orchestrator_task_id;
+        
+        if (orchestratorRef && orchestratorIds.includes(orchestratorRef)) {
+          tasksToCancel.add(task.id);
+        }
+      });
+    }
+  }
+
+  // Cancel all collected tasks
+  const taskIdsArray = Array.from(tasksToCancel);
+  
+  if (taskIdsArray.length > 0) {
+    const { error: cancelError } = await supabase
+      .from('tasks')
+      .update({ 
+        status: 'Cancelled',
+        updated_at: new Date().toISOString()
+      })
+      .in('id', taskIdsArray);
+
+    if (cancelError) {
+      throw new Error(`Failed to cancel tasks: ${cancelError.message}`);
+    }
+  }
+
   return {
-    cancelledCount,
-    message: `${cancelledCount} pending tasks cancelled`,
+    cancelledCount: taskIdsArray.length,
+    message: `${taskIdsArray.length} tasks cancelled (including subtasks)`,
   };
 }
 

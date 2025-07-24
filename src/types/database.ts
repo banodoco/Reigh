@@ -71,16 +71,16 @@ export interface ShotGeneration {
 
 export interface Task {
   id: string;
-  task_type: string;
+  taskType: string;
   params: Record<string, unknown>;
   status: TaskStatus;
-  dependant_on?: string[];
-  output_location?: string;
-  created_at: string;
-  updated_at?: string;
-  project_id: string;
-  cost_cents?: number;
-  generation_started_at?: string;
+  dependantOn?: string[];
+  outputLocation?: string;
+  createdAt: string;
+  updatedAt?: string;
+  projectId: string;
+  costCents?: number;
+  generationStartedAt?: string;
 }
 
 export interface Worker {

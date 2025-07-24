@@ -42,7 +42,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
   // Mutations
   const cancelTaskMutation = useCancelTask(selectedProjectId);
 
-  // Access all tasks for project (used for orchestrator logic)
+  // Access all tasks for project (used for progress checking)
   const { data: allProjectTasks, refetch: refetchAllTasks } = useListTasks({ projectId: selectedProjectId });
 
   // Map certain task types to more user-friendly names for display purposes
@@ -68,7 +68,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
   const [progressPercent, setProgressPercent] = useState<number | null>(null);
 
   const handleCancel = () => {
-    // Cancel main task first
+    // Cancel task (subtasks will be automatically cancelled if this is an orchestrator)
     cancelTaskMutation.mutate(task.id, {
       onError: (error) => {
         toast({
@@ -78,23 +78,6 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
         });
       },
     });
-
-    // If this is an orchestrator task, also cancel its subtasks
-    if (task.taskType === 'travel_orchestrator' && allProjectTasks) {
-      const pRoot: any = typeof task.params === 'string' ? JSON.parse(task.params) : task.params || {};
-      const orchestratorDetails = pRoot.orchestrator_details || {};
-      const orchestratorId = orchestratorDetails.orchestrator_task_id || pRoot.orchestrator_task_id || pRoot.task_id || task.id;
-      const orchestratorRunId = orchestratorDetails.run_id || pRoot.orchestrator_run_id;
-      
-      const subtasks = allProjectTasks.filter((t) => {
-        const p: any = typeof t.params === 'string' ? JSON.parse(t.params) : t.params || {};
-        return (p.orchestrator_task_id_ref === orchestratorId || p.orchestrator_task_id === orchestratorId) && ['Queued', 'In Progress'].includes(t.status);
-      });
-      
-      subtasks.forEach((sub) => {
-        cancelTaskMutation.mutate(sub.id);
-      });
-    }
   };
 
   // Handler wrapper

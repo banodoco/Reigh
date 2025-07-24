@@ -76,15 +76,23 @@ const TaskList: React.FC = () => {
   const filteredTasks = useMemo(() => {
     if (!tasks) return [] as Task[];
     const visibleTasks = filterVisibleTasks(tasks);
-    // Sort: In Progress first, then by createdAt desc
+    // Sort: In Progress first, then by status-specific ordering
     return visibleTasks.sort((a, b) => {
       const aInProgress = a.status === 'In Progress';
       const bInProgress = b.status === 'In Progress';
       if (aInProgress && !bInProgress) return -1;
       if (!aInProgress && bInProgress) return 1;
+      
       // Handle both createdAt and created_at field names
       const aDate = new Date((a.createdAt || (a as any).created_at) || 0);
       const bDate = new Date((b.createdAt || (b as any).created_at) || 0);
+      
+      // For Queued tasks, sort in ascending order (oldest first)
+      if (a.status === 'Queued' && b.status === 'Queued') {
+        return aDate.getTime() - bDate.getTime();
+      }
+      
+      // For all other tasks, sort in descending order (newest first)
       return bDate.getTime() - aDate.getTime();
     });
   }, [tasks]);
