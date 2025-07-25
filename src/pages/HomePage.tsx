@@ -432,9 +432,9 @@ export default function HomePage() {
                 <div className="group">
                   <button
                     onClick={handleDiscordSignIn}
-                    className="gradient-flow-button flex items-center space-x-2 px-6 py-4 bg-gradient-to-r from-wes-vintage-gold to-wes-coral rounded-full border-2 border-wes-vintage-gold/40 hover:border-wes-vintage-gold/60 transition-all duration-300 shadow-wes-vintage hover:shadow-wes-hover text-white text-lg font-medium mx-auto relative overflow-hidden"
+                    className="flex items-center space-x-2 px-6 py-4 bg-gradient-to-r from-wes-vintage-gold to-wes-coral rounded-full border-2 border-wes-vintage-gold/40 hover:border-wes-vintage-gold/60 transition-all duration-300 shadow-wes-vintage hover:shadow-wes-hover text-white text-lg font-medium mx-auto relative overflow-hidden"
                   >
-                    <div className="relative z-10">
+                    <div className="relative">
                       {/* Paint particles - behind the brush - arranged in clockwise circle */}
                       <PaintParticles />
                       
@@ -449,16 +449,16 @@ export default function HomePage() {
                         </div>
                       </div>
                     </div>
-                    <span className="relative z-10">Sign in with Discord</span>
+                    <span>Sign in with Discord</span>
                   </button>
                 </div>
               ) : (
                 <div className="group">
                   <button
                     onPointerUp={() => navigate('/tools')}
-                    className="gradient-flow-button flex items-center space-x-2 px-6 py-4 bg-gradient-to-r from-wes-vintage-gold to-wes-coral rounded-full border-2 border-wes-vintage-gold/40 hover:border-wes-vintage-gold/60 transition-all duration-300 shadow-wes-vintage hover:shadow-wes-hover text-white text-lg font-medium mx-auto relative overflow-hidden"
+                    className="flex items-center space-x-2 px-6 py-4 bg-gradient-to-r from-wes-vintage-gold to-wes-coral rounded-full border-2 border-wes-vintage-gold/40 hover:border-wes-vintage-gold/60 transition-all duration-300 shadow-wes-vintage hover:shadow-wes-hover text-white text-lg font-medium mx-auto relative overflow-hidden"
                   >
-                    <div className="relative z-10">
+                    <div className="relative">
                       {/* Paint particles - behind the brush - arranged in clockwise circle */}
                       <PaintParticles />
                       
@@ -473,7 +473,7 @@ export default function HomePage() {
                         </div>
                       </div>
                     </div>
-                    <span className="relative z-10">Go to Tools</span>
+                    <span>Go to Tools</span>
                   </button>
                 </div>
               )}

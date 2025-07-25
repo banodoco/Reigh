@@ -1476,77 +1476,12 @@
   50% { transform: translateY(-1.5px); }
 }
 
-@keyframes gradientFlowSmooth {
-  0% {
-    background: conic-gradient(
-      from 0deg,
-      hsl(var(--wes-vintage-gold)),
-      hsl(var(--wes-coral)),
-      hsl(var(--wes-vintage-gold)) 50%,
-      hsl(var(--wes-coral)),
-      hsl(var(--wes-vintage-gold))
-    );
-  }
-  100% {
-    background: conic-gradient(
-      from 360deg,
-      hsl(var(--wes-vintage-gold)),
-      hsl(var(--wes-coral)),
-      hsl(var(--wes-vintage-gold)) 50%,
-      hsl(var(--wes-coral)),
-      hsl(var(--wes-vintage-gold))
-    );
-  }
-}
-
-@keyframes gradientWave {
-  0% {
-    background-position: -200% 50%;
-  }
-  100% {
-    background-position: 200% 50%;
-  }
-}
-
-/* Gradient flow button with smooth animated overlay */
-.gradient-flow-button {
-  position: relative;
-  overflow: hidden;
-}
-
-.gradient-flow-button::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  transition: opacity 0.4s ease;
-  border-radius: inherit;
-  pointer-events: none;
-  background: linear-gradient(
-    90deg,
-    hsl(var(--wes-vintage-gold)),
-    hsl(var(--wes-coral)),
-    hsl(var(--wes-vintage-gold)),
-    hsl(var(--wes-coral))
-  );
-  background-size: 300% 100%;
-}
-
-.gradient-flow-button:hover::before {
-  opacity: 1;
-  animation: gradientWave 6s linear infinite;
-}
-
 .animate-sway-x {
   animation: swayX 0.6s ease-in-out infinite;
 }
 
 .animate-sway-y {
   animation: swayY 0.6s ease-in-out infinite;
-}
-
-.animate-gradient-flow {
-  animation: gradientFlow 3s ease-in-out infinite;
 }
 
 /* Group-hover variant for sway-x animation */

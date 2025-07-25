@@ -141,10 +141,14 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
   // Handler for visiting shot
   const handleVisitShot = (e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent any parent click handlers
+    e.preventDefault(); // Prevent default behavior
     if (!shotId) return;
     
-    setCurrentShotId(shotId);
-    navigate('/tools/travel-between-images', { state: { fromShotClick: true } });
+    // Small delay to ensure state updates properly
+    setTimeout(() => {
+      setCurrentShotId(shotId);
+      navigate('/tools/travel-between-images', { state: { fromShotClick: true } });
+    }, 50);
   };
 
   const containerClass = cn(
@@ -199,7 +203,10 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
           </div>
           {/* Visit Shot button overlay on hover */}
           {isHoveringImages && shotId && (
-            <div className="absolute inset-0 bg-black/20 backdrop-blur-[1px] rounded flex items-center justify-center">
+            <div 
+              className="absolute inset-0 bg-black/20 backdrop-blur-[1px] rounded flex items-center justify-center"
+              onClick={(e) => e.stopPropagation()} // Prevent click from bubbling to parent
+            >
               <Button
                 variant="ghost"
                 size="sm"
