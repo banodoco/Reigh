@@ -18,6 +18,7 @@ export default defineConfig(({ mode }: { mode: string }) => {
     preview: {
       host: "0.0.0.0",
       port: port,
+      allowedHosts: ["healthcheck.railway.app"],
     },
     plugins: [
       react(),
