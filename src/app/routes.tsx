@@ -5,6 +5,7 @@ import HomePage from '@/pages/HomePage';
 import ArtPage from '@/pages/ArtPage';
 import PaymentSuccessPage from '@/pages/PaymentSuccessPage';
 import PaymentCancelPage from '@/pages/PaymentCancelPage';
+import { DiagnosticsPage } from '@/pages/DiagnosticsPage';
 // Import ImageGenerationToolPage directly to prevent lazy loading issues with TanStack Query
 import ImageGenerationToolPage from '@/tools/image-generation/pages/ImageGenerationToolPage';
 // Lazy load other tool pages for better performance
@@ -59,6 +60,13 @@ const router = createBrowserRouter([
   {
     path: '/payments/cancel',
     element: <PaymentCancelPage />,
+    errorElement: <NotFoundPage />,
+  },
+  
+  // Diagnostics page (outside of Layout for easier access)
+  {
+    path: '/diagnostics',
+    element: <DiagnosticsPage />,
     errorElement: <NotFoundPage />,
   },
   
