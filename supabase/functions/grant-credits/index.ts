@@ -49,25 +49,10 @@ serve(async (req) => {
     return new Response("Server configuration error", { status: 500 });
   }
 
-  // ─── 3. Create Supabase client with user's JWT for auth check ───
-  const userSupabase = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
-    global: {
-      headers: { Authorization: authHeader },
-    },
-  });
-
-  // ─── 4. Verify user authentication ──────────────────────────────
-  const { data: { user }, error: userError } = await userSupabase.auth.getUser();
-  if (userError || !user) {
-    return new Response("Authentication failed", { status: 401 });
-  }
-
-  // ─── 5. Check admin permissions ─────────────────────────────────
-  // TODO: Add proper admin role check
-  // For now, only allow in development mode
-  const isAdmin = Deno.env.get("NODE_ENV") === 'development';
-  if (!isAdmin) {
-    return new Response("Admin access required", { status: 403 });
+  // ─── 3. Check if using service role (ONLY allow service role) ───
+  const isServiceRole = authHeader === `Bearer ${supabaseServiceKey}`;
+  if (!isServiceRole) {
+    return new Response("Service role access required", { status: 403 });
   }
 
   // ─── 6. Create admin Supabase client ────────────────────────────
@@ -83,7 +68,7 @@ serve(async (req) => {
         type: 'manual',
         metadata: {
           description: description || 'Admin credit grant',
-          granted_by: user.id,
+          granted_by: 'service_role',
           granted_at: new Date().toISOString(),
         },
       })
@@ -95,7 +80,7 @@ serve(async (req) => {
       return new Response(`Failed to grant credits: ${ledgerError.message}`, { status: 500 });
     }
 
-    console.log(`Credits granted: ${amount} to user ${userId} by admin ${user.id}`);
+    console.log(`Credits granted: ${amount} to user ${userId} by service_role`);
     
     return new Response(JSON.stringify({
       success: true,
