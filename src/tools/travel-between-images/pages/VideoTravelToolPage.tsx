@@ -126,6 +126,7 @@ const VideoTravelToolPage: React.FC = () => {
   const [videoPairConfigs, setVideoPairConfigs] = useState<any[]>([]);
   const [generationMode, setGenerationMode] = useState<'batch' | 'by-pair' | 'timeline'>('batch');
   const [pairConfigs, setPairConfigs] = useState<any[]>([]);
+  const [afterEachPromptText, setAfterEachPromptText] = useState<string>('');
   
   // Memoize expensive computations
   const shouldShowShotEditor = useMemo(() => {
@@ -812,6 +813,11 @@ const VideoTravelToolPage: React.FC = () => {
               hasNext={hasNext}
               onUpdateShotName={handleUpdateShotName}
               settingsLoading={isLoadingSettings}
+              afterEachPromptText={isLoadingSettings ? '' : afterEachPromptText}
+              onAfterEachPromptTextChange={isLoadingSettings ? () => {} : (text) => {
+                userHasInteracted.current = true;
+                setAfterEachPromptText(text);
+              }}
             />
           </PageFadeIn>
         </Suspense>

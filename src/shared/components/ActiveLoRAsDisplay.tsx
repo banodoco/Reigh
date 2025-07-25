@@ -4,7 +4,7 @@ import { Label } from "@/shared/components/ui/label";
 import { SliderWithValue } from "@/shared/components/ui/slider-with-value";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/shared/components/ui/tooltip";
 import HoverScrubVideo from "@/shared/components/HoverScrubVideo";
-import { X } from "lucide-react";
+import { X, Plus } from "lucide-react";
 
 export interface ActiveLora {
   id: string;
@@ -22,6 +22,7 @@ interface ActiveLoRAsDisplayProps {
   isGenerating?: boolean;
   availableLoras?: any[]; // For video detection logic
   className?: string;
+  onAddTriggerWord?: (triggerWord: string) => void;
 }
 
 const ActiveLoRAsDisplayComponent: React.FC<ActiveLoRAsDisplayProps> = ({
@@ -31,6 +32,7 @@ const ActiveLoRAsDisplayComponent: React.FC<ActiveLoRAsDisplayProps> = ({
   isGenerating = false,
   availableLoras = [],
   className = "",
+  onAddTriggerWord,
 }) => {
   if (selectedLoras.length === 0) {
     return null;
@@ -89,9 +91,29 @@ const ActiveLoRAsDisplayComponent: React.FC<ActiveLoRAsDisplayProps> = ({
                           availableLoras.find(l => l["Model ID"] === lora.id)?.trigger_word;
                         
                         return triggerWord ? (
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            Trigger words: <span className="font-mono text-foreground">"{triggerWord}"</span>
-                          </p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <p className="text-xs text-muted-foreground">
+                              Trigger words: <span className="font-mono text-foreground">"{triggerWord}"</span>
+                            </p>
+                            {onAddTriggerWord && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => onAddTriggerWord(triggerWord)}
+                                    className="h-4 w-4 p-0 text-muted-foreground hover:text-foreground"
+                                    disabled={isGenerating}
+                                  >
+                                    <Plus className="h-3 w-3" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Add after prompt</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
+                          </div>
                         ) : null;
                       })()}
                     </div>

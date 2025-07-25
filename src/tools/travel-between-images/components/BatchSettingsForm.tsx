@@ -39,6 +39,8 @@ interface BatchSettingsFormProps {
 
   selectedLoras?: ActiveLora[];
   availableLoras?: LoraModel[];
+  afterEachPromptText?: string;
+  onAfterEachPromptTextChange?: (value: string) => void;
 }
 
 const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
@@ -63,6 +65,8 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
   isTimelineMode,
   selectedLoras,
   availableLoras,
+  afterEachPromptText,
+  onAfterEachPromptTextChange,
 }) => {
     const [showAdvanced, setShowAdvanced] = React.useState(false);
 
@@ -115,6 +119,30 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                   />
                 </div>
             </div>
+            
+            {onAfterEachPromptTextChange && (
+              <div className="relative">
+                <Label htmlFor="afterEachPromptText" className="text-sm font-medium block mb-1.5">After each prompt:</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">
+                      <Info className="h-4 w-4" />
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Text to append to each prompt, <br /> like trigger words or style modifiers.</p>
+                  </TooltipContent>
+                </Tooltip>
+                <Textarea
+                  id="afterEachPromptText"
+                  value={afterEachPromptText || ''}
+                  onChange={(e) => onAfterEachPromptTextChange(e.target.value)}
+                  placeholder="e.g., walgro style, cinematic lighting"
+                  className="min-h-[70px] text-sm"
+                  rows={3}
+                />
+              </div>
+            )}
             
             <div className={`grid grid-cols-1 gap-4 ${!isTimelineMode ? 'md:grid-cols-2' : ''}`}>
                 {!isTimelineMode && (

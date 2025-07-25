@@ -509,6 +509,10 @@ export default {
           '0%, 100%': { transform: 'scaleX(1) translateX(0)', opacity: '0.8' },
           '50%': { transform: 'scaleX(1.2) translateX(2px)', opacity: '1' },
         },
+        'pulse-sweep': {
+          '0%': { transform: 'translate(-50%, 50%) rotate(-45deg)' },
+          '100%': { transform: 'translate(300%, -200%) rotate(-45deg)' },
+        },
         // New diverse paper plane animations
         'paper-plane-diagonal-tl-br': {
           '0%': { top: '-40px', left: '-40px', transform: 'rotate(45deg)' },
@@ -648,6 +652,7 @@ export default {
         'pulse-glow': 'pulse-glow 2s ease-in-out infinite',
         'pulse-breathe': 'pulse-breathe 3s ease-in-out infinite',
         'pulse-wave': 'pulse-wave 2.5s ease-in-out infinite',
+        'pulse-sweep': 'pulse-sweep 2s ease-out infinite',
 			},
 			boxShadow: {
 				'wes': '0 10px 40px -10px hsl(var(--primary) / 0.2), 0 4px 20px -4px hsl(var(--accent) / 0.1)',

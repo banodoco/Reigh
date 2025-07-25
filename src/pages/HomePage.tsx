@@ -434,6 +434,9 @@ export default function HomePage() {
                     onClick={handleDiscordSignIn}
                     className="flex items-center space-x-2 px-6 py-4 bg-gradient-to-r from-wes-vintage-gold to-wes-coral rounded-full border-2 border-wes-vintage-gold/40 hover:border-wes-vintage-gold/60 transition-all duration-300 shadow-wes-vintage hover:shadow-wes-hover text-white text-lg font-medium mx-auto relative overflow-hidden"
                   >
+                    {/* Pulsing effect on hover */}
+                    <div className="absolute -bottom-1/2 -left-1/2 w-1/2 h-[200%] group-hover:animate-pulse-sweep bg-gradient-to-r from-transparent via-wes-vintage-gold/40 to-transparent pointer-events-none -rotate-45" />
+                    
                     <div className="relative">
                       {/* Paint particles - behind the brush - arranged in clockwise circle */}
                       <PaintParticles />
@@ -458,6 +461,9 @@ export default function HomePage() {
                     onPointerUp={() => navigate('/tools')}
                     className="flex items-center space-x-2 px-6 py-4 bg-gradient-to-r from-wes-vintage-gold to-wes-coral rounded-full border-2 border-wes-vintage-gold/40 hover:border-wes-vintage-gold/60 transition-all duration-300 shadow-wes-vintage hover:shadow-wes-hover text-white text-lg font-medium mx-auto relative overflow-hidden"
                   >
+                    {/* Pulsing effect on hover */}
+                    <div className="absolute -bottom-1/2 -left-1/2 w-1/2 h-[200%] group-hover:animate-pulse-sweep bg-gradient-to-r from-transparent via-wes-vintage-gold/40 to-transparent pointer-events-none -rotate-45" />
+                    
                     <div className="relative">
                       {/* Paint particles - behind the brush - arranged in clockwise circle */}
                       <PaintParticles />

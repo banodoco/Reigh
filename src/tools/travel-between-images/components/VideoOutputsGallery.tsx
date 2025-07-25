@@ -62,9 +62,9 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
 
   const sortedVideoOutputs = useMemo(() => {
     return [...videoOutputs].sort((a, b) => {
-      const aTime = new Date(a.createdAt || 0).getTime();
-      const bTime = new Date(b.createdAt || 0).getTime();
-      return bTime - aTime;
+      const aTime = new Date((a.createdAt || (a as any).created_at) || 0).getTime();
+      const bTime = new Date((b.createdAt || (b as any).created_at) || 0).getTime();
+      return bTime - aTime; // newest first
     });
   }, [videoOutputs]);
 

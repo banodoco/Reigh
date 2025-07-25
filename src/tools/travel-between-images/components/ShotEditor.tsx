@@ -158,6 +158,9 @@ export interface ShotEditorProps {
   hasNext?: boolean;
   // Shot name editing
   onUpdateShotName?: (newName: string) => void;
+  // After each prompt text
+  afterEachPromptText?: string;
+  onAfterEachPromptTextChange?: (text: string) => void;
 
   // Indicates if parent is still loading settings. Manage Shot Images should wait until this is false.
   settingsLoading?: boolean;
@@ -226,6 +229,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   hasNext,
   onUpdateShotName,
   settingsLoading,
+  afterEachPromptText,
+  onAfterEachPromptTextChange,
 }) => {
   // Call all hooks first (Rules of Hooks)
   const { selectedProjectId, projects } = useProject();
@@ -1442,6 +1447,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                             selectedLoras={selectedLoras}
                             availableLoras={availableLoras}
                             isTimelineMode={generationMode === 'timeline'}
+                            afterEachPromptText={afterEachPromptText}
+                            onAfterEachPromptTextChange={onAfterEachPromptTextChange}
                         />
                         
                         {/* LoRA Settings (Mobile) */}
@@ -1459,6 +1466,11 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                                     onLoraStrengthChange={onLoraStrengthChange}
                                     availableLoras={availableLoras}
                                     className="mt-4"
+                                    onAddTriggerWord={onAfterEachPromptTextChange ? (triggerWord) => {
+                                      const currentText = afterEachPromptText || '';
+                                      const newText = currentText.trim() ? `${currentText}, ${triggerWord}` : triggerWord;
+                                      onAfterEachPromptTextChange(newText);
+                                    } : undefined}
                                 />
                             </div>
                         </div>
@@ -1502,6 +1514,11 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                                 onLoraStrengthChange={onLoraStrengthChange}
                                 availableLoras={availableLoras}
                                 className="mt-4"
+                                onAddTriggerWord={onAfterEachPromptTextChange ? (triggerWord) => {
+                                  const currentText = afterEachPromptText || '';
+                                  const newText = currentText.trim() ? `${currentText}, ${triggerWord}` : triggerWord;
+                                  onAfterEachPromptTextChange(newText);
+                                } : undefined}
                             />
                         </div>
                     </div>
