@@ -9,6 +9,8 @@ import { useState } from 'react';
 import { cn } from '@/shared/lib/utils';
 import { getTaskDisplayName, taskSupportsProgress } from '@/shared/lib/taskConfig';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
+import { useNavigate } from 'react-router-dom';
+import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 
 interface TaskItemProps {
   task: Task;
@@ -63,6 +65,19 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
   }, [task]);
   const imagesToShow = imageUrls.slice(0, 4);
   const extraImageCount = Math.max(0, imageUrls.length - imagesToShow.length);
+
+  // Extract shot_id for Travel Between Images tasks
+  const shotId: string | null = React.useMemo(() => {
+    if (task.taskType !== 'travel_orchestrator') return null;
+    return (task.params as any)?.orchestrator_details?.shot_id || null;
+  }, [task]);
+
+  // Navigation setup
+  const navigate = useNavigate();
+  const { setCurrentShotId } = useCurrentShot();
+  
+  // State for hover functionality
+  const [hoveredImageIndex, setHoveredImageIndex] = useState<number | null>(null);
 
   // Local state to show progress percentage temporarily
   const [progressPercent, setProgressPercent] = useState<number | null>(null);
@@ -123,6 +138,15 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
     setTimeout(() => setProgressPercent(null), 5000);
   };
 
+  // Handler for visiting shot
+  const handleVisitShot = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent any parent click handlers
+    if (!shotId) return;
+    
+    setCurrentShotId(shotId);
+    navigate('/tools/travel-between-images', { state: { fromShotClick: true } });
+  };
+
   const containerClass = cn(
     "p-3 mb-2 bg-zinc-800/95 rounded-md shadow border transition-colors",
     isNew ? "border-teal-400 animate-[flash_3s_ease-in-out]" : "border-zinc-600 hover:border-zinc-400"
@@ -157,12 +181,31 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
       {imagesToShow.length > 0 && (
         <div className="flex items-center overflow-x-auto mb-1 mt-2">
           {imagesToShow.map((url, idx) => (
-            <img
+            <div 
               key={idx}
-              src={url}
-              alt={`input-${idx}`}
-              className="w-12 h-12 object-cover rounded mr-1 border border-zinc-700"
-            />
+              className="relative mr-1"
+              onMouseEnter={() => setHoveredImageIndex(idx)}
+              onMouseLeave={() => setHoveredImageIndex(null)}
+            >
+              <img
+                src={url}
+                alt={`input-${idx}`}
+                className="w-12 h-12 object-cover rounded border border-zinc-700"
+              />
+              {/* Visit Shot button on hover */}
+              {hoveredImageIndex === idx && shotId && (
+                <div className="absolute inset-0 bg-black/60 rounded flex items-center justify-center">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleVisitShot}
+                    className="text-xs px-2 py-1 h-auto bg-blue-600 hover:bg-blue-500 text-white border-0"
+                  >
+                    Visit Shot
+                  </Button>
+                </div>
+              )}
+            </div>
           ))}
           {extraImageCount > 0 && (
             <span className="text-xs text-zinc-400 ml-1">+ {extraImageCount}</span>

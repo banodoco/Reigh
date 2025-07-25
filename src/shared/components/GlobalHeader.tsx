@@ -108,12 +108,6 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                 <div className="flex items-center space-x-4">
                   {/* Project Selector Skeleton */}
                   <div className="w-[280px] h-12 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 animate-pulse rounded-lg border-2 border-wes-vintage-gold/30"></div>
-                  
-                  {/* Settings Button Skeleton */}
-                  <div className="h-12 w-12 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 animate-pulse rounded-lg border-2 border-wes-vintage-gold/30"></div>
-                  
-                  {/* Create Project Button Skeleton */}
-                  <div className="h-12 w-12 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 animate-pulse rounded-lg border-2 border-wes-vintage-gold/30"></div>
                 </div>
               ) : projects.length === 0 && !isLoadingProjects ? (
                 <div className="w-[280px] text-center">
@@ -150,31 +144,31 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                       ))}
                     </SelectContent>
                   </Select>
-                  
-                  {selectedProjectId && projects.length > 0 && ( 
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setIsProjectSettingsModalOpen(true)}
-                      className="h-12 w-12 wes-button bg-gradient-to-br from-wes-coral to-wes-salmon border-2 border-wes-vintage-gold/30 hover:from-wes-coral-dark hover:to-wes-salmon-dark shadow-wes-vintage hover:shadow-wes-hover group [&::before]:bg-gradient-to-t [&::before]:from-transparent [&::before]:via-white/20 [&::before]:to-transparent [&::before]:translate-y-[100%] [&::before]:translate-x-0 [&::before]:transition-transform [&::before]:duration-0 [&:hover::before]:translate-y-[-100%] [&:hover::before]:translate-x-0 [&:hover::before]:duration-700"
-                      title="Project settings"
-                      disabled={!selectedProject}
-                    >
-                      <Wrench className="h-5 w-5 text-white transition-transform duration-300 group-hover:rotate-12" />
-                    </Button>
-                  )}
-                  
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    onClick={() => setIsCreateProjectModalOpen(true)} 
-                    className="h-12 w-12 wes-button bg-gradient-to-br from-wes-yellow to-wes-salmon border-2 border-wes-vintage-gold/30 hover:from-wes-yellow-dark hover:to-wes-salmon shadow-wes-vintage hover:shadow-wes-hover group"
-                    title="Create new project"
-                  >
-                    <PlusCircle className="h-5 w-5 text-white transition-transform duration-300 group-hover:scale-110" />
-                  </Button>
                 </div>
               )}
+              
+              {/* Project Settings Button - Always visible but disabled when appropriate */}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsProjectSettingsModalOpen(true)}
+                className="h-12 w-12 wes-button bg-gradient-to-br from-wes-coral to-wes-salmon border-2 border-wes-vintage-gold/30 hover:from-wes-coral-dark hover:to-wes-salmon-dark shadow-wes-vintage hover:shadow-wes-hover group [&::before]:bg-gradient-to-t [&::before]:from-transparent [&::before]:via-white/20 [&::before]:to-transparent [&::before]:translate-y-[100%] [&::before]:translate-x-0 [&::before]:transition-transform [&::before]:duration-0 [&:hover::before]:translate-y-[-100%] [&:hover::before]:translate-x-0 [&:hover::before]:duration-700 disabled:cursor-not-allowed"
+                title={isLoadingProjects ? "Loading projects..." : !selectedProject ? "Select a project first" : "Project settings"}
+                disabled={isLoadingProjects || !selectedProject}
+              >
+                <Wrench className="h-5 w-5 text-white transition-transform duration-300 group-hover:rotate-12" />
+              </Button>
+              
+              {/* Create Project Button - Always visible */}
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => setIsCreateProjectModalOpen(true)} 
+                className="h-12 w-12 wes-button bg-gradient-to-br from-wes-yellow to-wes-salmon border-2 border-wes-vintage-gold/30 hover:from-wes-yellow-dark hover:to-wes-salmon shadow-wes-vintage hover:shadow-wes-hover group"
+                title="Create new project"
+              >
+                <PlusCircle className="h-5 w-5 text-white transition-transform duration-300 group-hover:scale-110" />
+              </Button>
             </div>
           </div>
 
@@ -244,40 +238,28 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
               </div>
 
               {/* Project Buttons */}
-              {isLoadingProjects && projects.length === 0 ? (
-                <div className="flex items-center space-x-2">
-                  {/* Settings Button Skeleton */}
-                  <div className="h-10 w-10 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 animate-pulse rounded-lg border-2 border-wes-vintage-gold/30"></div>
-                  
-                  {/* Create Project Button Skeleton */}
-                  <div className="h-10 w-10 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 animate-pulse rounded-lg border-2 border-wes-vintage-gold/30"></div>
-                </div>
-              ) : (
-                <>
-                  {selectedProjectId && projects.length > 0 && ( 
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setIsProjectSettingsModalOpen(true)}
-                      className="h-10 w-10 wes-button bg-gradient-to-br from-wes-coral to-wes-salmon border-2 border-wes-vintage-gold/30 hover:from-wes-coral-dark hover:to-wes-salmon-dark shadow-wes-vintage hover:shadow-wes-hover group [&::before]:bg-gradient-to-t [&::before]:from-transparent [&::before]:via-white/20 [&::before]:to-transparent [&::before]:translate-y-[100%] [&::before]:translate-x-0 [&::before]:transition-transform [&::before]:duration-0 [&:hover::before]:translate-y-[-100%] [&:hover::before]:translate-x-0 [&:hover::before]:duration-700"
-                      title="Project settings"
-                      disabled={!selectedProject}
-                    >
-                      <Wrench className="h-4 w-4 text-white transition-transform duration-300 group-hover:rotate-12" />
-                    </Button>
-                  )}
-                  
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    onClick={() => setIsCreateProjectModalOpen(true)} 
-                    className="h-10 w-10 wes-button bg-gradient-to-br from-wes-yellow to-wes-salmon border-2 border-wes-vintage-gold/30 hover:from-wes-yellow-dark hover:to-wes-salmon shadow-wes-vintage hover:shadow-wes-hover group"
-                    title="Create new project"
-                  >
-                    <PlusCircle className="h-4 w-4 text-white transition-transform duration-300 group-hover:scale-110" />
-                  </Button>
-                </>
-              )}
+              {/* Project Settings Button - Always visible but disabled when appropriate */}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsProjectSettingsModalOpen(true)}
+                className="h-10 w-10 wes-button bg-gradient-to-br from-wes-coral to-wes-salmon border-2 border-wes-vintage-gold/30 hover:from-wes-coral-dark hover:to-wes-salmon-dark shadow-wes-vintage hover:shadow-wes-hover group [&::before]:bg-gradient-to-t [&::before]:from-transparent [&::before]:via-white/20 [&::before]:to-transparent [&::before]:translate-y-[100%] [&::before]:translate-x-0 [&::before]:transition-transform [&::before]:duration-0 [&:hover::before]:translate-y-[-100%] [&:hover::before]:translate-x-0 [&:hover::before]:duration-700 disabled:cursor-not-allowed"
+                title={isLoadingProjects ? "Loading projects..." : !selectedProject ? "Select a project first" : "Project settings"}
+                disabled={isLoadingProjects || !selectedProject}
+              >
+                <Wrench className="h-4 w-4 text-white transition-transform duration-300 group-hover:rotate-12" />
+              </Button>
+              
+              {/* Create Project Button - Always visible */}
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => setIsCreateProjectModalOpen(true)} 
+                className="h-10 w-10 wes-button bg-gradient-to-br from-wes-yellow to-wes-salmon border-2 border-wes-vintage-gold/30 hover:from-wes-yellow-dark hover:to-wes-salmon shadow-wes-vintage hover:shadow-wes-hover group"
+                title="Create new project"
+              >
+                <PlusCircle className="h-4 w-4 text-white transition-transform duration-300 group-hover:scale-110" />
+              </Button>
             </div>
 
             {/* Right side - App Settings */}
