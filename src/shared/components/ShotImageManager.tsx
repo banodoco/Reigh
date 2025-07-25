@@ -134,10 +134,25 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
     }),
   );
 
+  // Preserve multi-selection when initiating a drag with ⌘/Ctrl pressed
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
+
+    // Record the item being dragged so we can show a preview
     setActiveId(active.id as string);
-    if (!selectedIds.includes(active.id as string)) {
+
+    // If the drag was started while the modifier key (⌘ on macOS, Ctrl on Windows/Linux)
+    // is pressed we **do not** clear the existing selection. This allows users to
+    // Command/Ctrl-click multiple images and then drag the whole group in one go.
+    // `activatorEvent` is the original pointer/mouse event that triggered the drag.
+    // See: https://docs.dndkit.com/6.0.x/api-documentation/dnd-context#events
+    // Casting to `any` so we can safely access `activatorEvent`.
+    const activatorEvent = (event as any)?.activatorEvent as (MouseEvent | PointerEvent | undefined);
+
+    const isModifierPressed = activatorEvent?.metaKey || activatorEvent?.ctrlKey;
+
+    if (!isModifierPressed && !selectedIds.includes(active.id as string)) {
+      // Starting a regular drag on an un-selected item -> clear previous selection
       setSelectedIds([]);
     }
   };
@@ -632,6 +647,17 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
               key={image.shotImageEntryId}
               image={image}
               isSelected={isMobile && generationMode === 'batch' ? mobileSelectedIds.includes(image.shotImageEntryId) : selectedIds.includes(image.shotImageEntryId)}
+              onPointerDown={(e) => {
+                // Capture modifier key state ASAP to avoid losing it if the user releases before click fires
+                if (isMobile) return; // desktop-only multi-select enhancement
+                if (e.metaKey || e.ctrlKey) {
+                  setSelectedIds(prev =>
+                    prev.includes(image.shotImageEntryId)
+                      ? prev.filter(id => id !== image.shotImageEntryId)
+                      : [...prev, image.shotImageEntryId]
+                  );
+                }
+              }}
               onClick={(e) => handleItemClick(image.shotImageEntryId, e)}
               onDelete={() => onImageDelete(image.shotImageEntryId)}
               onDoubleClick={() => isMobile && generationMode === 'batch' ? handleMobileDoubleClick(index) : setLightboxIndex(index)}

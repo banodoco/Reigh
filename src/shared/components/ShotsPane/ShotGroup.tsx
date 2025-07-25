@@ -190,7 +190,7 @@ const ShotGroup: React.FC<ShotGroupProps> = ({ shot }) => {
       return;
     }
     setCurrentShotId(shot.id);
-    navigate('/tools/travel-between-images', { state: { fromShotClick: true } });
+    navigate(`/tools/travel-between-images#${shot.id}`, { state: { fromShotClick: true } });
 
     // Scroll to top when navigating to a shot
     setTimeout(() => {

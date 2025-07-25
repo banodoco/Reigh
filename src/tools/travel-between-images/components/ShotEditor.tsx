@@ -267,33 +267,28 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     }
   }, [selectedShot?.id]);
 
-  // Ensure mobile users are always in batch generation mode and track readiness
+  // Handle generation mode setup and readiness
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (settingsLoading) {
-        // Wait until settings finish loading before showing content
-        return;
-      }
+    // Wait for settings to load
+    if (settingsLoading) {
+      return;
+    }
 
-      if (isMobile && generationMode !== 'batch') {
-        onGenerationModeChange('batch');
-      } else {
-        setIsModeReady(true);
-      }
-    }, 100); // Show skeleton for at least 100ms
+    // For mobile users, ensure batch mode
+    if (isMobile && generationMode !== 'batch') {
+      onGenerationModeChange('batch');
+      // Don't set ready yet - the mode change will trigger this effect again
+      return;
+    }
+
+    // At this point, settings are loaded and mode is correct (or we're not on mobile)
+    // Use a small timeout to prevent flicker but make it consistent
+    const timer = setTimeout(() => {
+      setIsModeReady(true);
+    }, 50);
 
     return () => clearTimeout(timer);
-  }, [isMobile, generationMode, settingsLoading]);
-
-  // Mark mode as ready after mobile mode adjustments are complete
-  useEffect(() => {
-    if (settingsLoading) return;
-
-    if (isMobile && generationMode === 'batch') {
-      const timer = setTimeout(() => setIsModeReady(true), 50);
-      return () => clearTimeout(timer);
-    }
-  }, [isMobile, generationMode, settingsLoading]);
+  }, [isMobile, generationMode, settingsLoading, onGenerationModeChange]);
 
   
   // Shot name editing state
@@ -1336,7 +1331,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                           ? 'Tap to select and move multiple images.'
                           : generationMode === 'timeline' 
                             ? 'Drag images to precise frame positions. Drop on other images to reorder.'
-                            : 'Drag to reorder. Cmd+click to select and move multiple images.'
+                            : 'Drag to reorder. Ctrl+click to select and move multiple images.'
                         }
                       </p>
                     </>

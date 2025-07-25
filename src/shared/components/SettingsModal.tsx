@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Settings, Key, Copy, Trash2, AlertCircle, Terminal, Coins, Monitor, LogOut, HelpCircle } from "lucide-react";
 import {
   Dialog,
@@ -18,8 +18,6 @@ import { toast } from "sonner";
 import { useApiKeys } from "@/shared/hooks/useApiKeys";
 import { useApiTokens } from "@/shared/hooks/useApiTokens";
 import usePersistentState from "@/shared/hooks/usePersistentState";
-import { usePaneAwareModalStyle } from "@/shared/hooks/usePaneAwareModalStyle";
-import { useUserUIState } from "@/shared/hooks/useUserUIState";
 import { useCredits } from "@/shared/hooks/useCredits";
 import { supabase } from "@/integrations/supabase/client";
 import { useIsMobile } from "@/shared/hooks/use-mobile";
@@ -36,7 +34,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/shared/components/ui/tooltip";
-import { formatDistanceToNow } from "date-fns";
 import CreditsManagement from "./CreditsManagement";
 
 interface SettingsModalProps {
@@ -52,7 +49,11 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   initialTab = "generate-locally",
   creditsTab = "purchase",
 }) => {
-  const modalStyle = usePaneAwareModalStyle();
+  // Use a fixed maxHeight so the modal always floats above panes without shrinking.
+  const modalStyle = useMemo(() => ({
+    // 64px gives a bit of breathing room above and below the viewport
+    maxHeight: `calc(100vh - 64px)`,
+  }), []);
   const isMobile = useIsMobile();
   const { apiKeys, isLoading: isLoadingKeys, saveApiKeys, isUpdating } = useApiKeys();
   const { 

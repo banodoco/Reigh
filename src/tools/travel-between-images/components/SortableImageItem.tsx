@@ -25,6 +25,7 @@ interface SortableImageItemProps {
   onDelete: (shotImageEntryId: string) => void;
   onDoubleClick: () => void;
   onClick: (event: React.MouseEvent) => void;
+  onPointerDown?: (event: React.PointerEvent) => void;
   isSelected: boolean;
   isDragDisabled?: boolean;
 }
@@ -36,6 +37,7 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
   onDelete,
   onDoubleClick,
   onClick,
+  onPointerDown,
   isSelected,
   isDragDisabled = false,
 }) => {
@@ -87,12 +89,13 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
       style={style}
       className={cn(
         "group relative border rounded-lg overflow-hidden cursor-pointer bg-card hover:ring-2 hover:ring-primary/50 transition-colors",
-        isSelected && "ring-2 ring-primary",
+        isSelected && "ring-2 ring-blue-500 bg-blue-500/20",
         isDragDisabled && "cursor-default"
       )}
       {...(!isDragDisabled ? attributes : {})}
       {...(!isDragDisabled ? listeners : {})}
       onClick={onClick}
+      onPointerDown={onPointerDown}
       onDoubleClick={onDoubleClick}
     >
       <img

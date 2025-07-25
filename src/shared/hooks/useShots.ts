@@ -381,11 +381,13 @@ export const usePositionExistingGenerationInShot = () => {
       generation_id: string; 
       project_id: string;
     }) => {
-      // Use RPC function to position existing generation with NULL position
+      // Use the updated add_generation_to_shot function with positioning enabled
+      // This will find existing records with NULL position and assign them a position
       const { data: shotGeneration, error: rpcError } = await supabase
-        .rpc('position_existing_generation_in_shot', {
+        .rpc('add_generation_to_shot', {
           p_shot_id: shot_id,
-          p_generation_id: generation_id
+          p_generation_id: generation_id,
+          p_with_position: true
         })
         .single();
       

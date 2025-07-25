@@ -130,14 +130,27 @@ const VideoTravelToolPage: React.FC = () => {
   
   // Memoize expensive computations
   const shouldShowShotEditor = useMemo(() => {
+    // Check if we have a hash in the URL (direct navigation to a shot)
+    const hashShotId = location.hash?.replace('#', '');
+    if (hashShotId && !isLoading) {
+      return true; // Show editor immediately if we have a hash
+    }
+    
     // Only show editor if we actually have a shot to edit
     const shotExists = selectedShot || (viaShotClick && currentShotId && shots?.find(s => s.id === currentShotId));
     return !!shotExists;
-  }, [selectedShot, viaShotClick, currentShotId, shots]);
+  }, [selectedShot, viaShotClick, currentShotId, shots, location.hash, isLoading]);
   
   const shotToEdit = useMemo(() => {
+    // Check if we have a hash in the URL
+    const hashShotId = location.hash?.replace('#', '');
+    if (hashShotId && shots) {
+      const hashShot = shots.find(s => s.id === hashShotId);
+      if (hashShot) return hashShot;
+    }
+    
     return selectedShot || (viaShotClick && currentShotId ? shots?.find(s => s.id === currentShotId) : null);
-  }, [selectedShot, viaShotClick, currentShotId, shots]);
+  }, [selectedShot, viaShotClick, currentShotId, shots, location.hash]);
   
   // Calculate navigation state with memoization
   const navigationState = useMemo(() => {

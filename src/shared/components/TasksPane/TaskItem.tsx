@@ -144,11 +144,8 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
     e.preventDefault(); // Prevent default behavior
     if (!shotId) return;
     
-    // Small delay to ensure state updates properly
-    setTimeout(() => {
-      setCurrentShotId(shotId);
-      navigate('/tools/travel-between-images', { state: { fromShotClick: true } });
-    }, 50);
+    setCurrentShotId(shotId);
+    navigate(`/tools/travel-between-images#${shotId}`, { state: { fromShotClick: true } });
   };
 
   const containerClass = cn(

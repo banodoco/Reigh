@@ -457,7 +457,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   };
   const handleLoraStrengthChange = (loraId: string, newStrength: number) => {
     markAsInteracted();
-    console.log('[LoRA] Changing strength for', loraId, 'to', newStrength);
     const updatedLoras = selectedLoras.map(lora => 
       lora.id === loraId ? { ...lora, strength: newStrength } : lora
     );

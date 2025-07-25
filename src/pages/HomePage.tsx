@@ -590,8 +590,12 @@ export default function HomePage() {
             </div>
             
             <div className="space-y-6 text-muted-foreground">
+            <p className="text-sm leading-relaxed">
+              Reigh is an open source tool built on top of open models.
+            </p>
+
               <p className="text-sm leading-relaxed">
-                When you sign up to Reigh, you'll notice something strange:&nbsp; if you have a decent computer, you can run it for free!
+                As a result, when you sign up to Reigh, you'll notice something strange:&nbsp; if you have a decent computer, you can run it for free!
               </p>
               
 
@@ -605,7 +609,7 @@ export default function HomePage() {
               </div>
               
               <p className="text-sm leading-relaxed">
-                This isn't just possible, but we make it exceedingly easy&nbsp;&mdash;&nbsp;you can use the app in any browser while the tasks process at home.
+                This isn't just possible, but we make it very easy&nbsp;&mdash;&nbsp;you can use the app in any browser while the tasks process at home.
               </p>
               
               <div className="space-y-4">
@@ -658,6 +662,28 @@ export default function HomePage() {
                   Accessible, cheap/free capabilities delivered through great tools = a flourishing ecosystem for all artists.
                 </p>
               </div>
+              
+              {/* Divider */}
+              <div className="w-12 h-px bg-muted/30"></div>
+
+              {/* CTA */}
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => navigate('/tools')}
+                  className="text-muted-foreground hover:text-primary text-xs underline transition-colors duration-200"
+                >
+                  Start creating for free
+                </button>
+                <span className="text-muted-foreground/50">|</span>
+                <a
+                  href="https://discord.gg/D5K2c6kfhy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-muted-foreground hover:text-primary text-xs underline transition-colors duration-200"
+                >
+                  Join the community
+                </a>
+              </div>
             </div>
           </div>
         </div>
@@ -689,9 +715,16 @@ export default function HomePage() {
               <div className="w-16 h-1 bg-gradient-to-r from-wes-vintage-gold to-wes-coral rounded-full animate-pulse-breathe"></div>
             </div>
 
-            <div className="space-y-12 pb-4 text-left">
+            <div className="space-y-6 pb-4 text-left">
+              {/* New intro paragraphs */}
+              <p className="text-sm leading-relaxed">
+                There are many tools that aim to be a 'one-stop-shop' for creating with AI- a kind of 'Amazon for art'. 
+              </p>
+              <p className="text-sm leading-relaxed">
+              Reigh isn't one of them. It's a tool <em>just</em> for travelling between images:
+              </p>
               {/* Section 1 */}
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {/* Inputs row */}
                 <div className="flex gap-4">
                   {imagePairIndices.map(i => (
@@ -709,8 +742,10 @@ export default function HomePage() {
               </div>
 
               {/* Section 2 */}
-              <div className="space-y-3">
-                <h3 className="font-semibold text-primary text-lg">You can travel between batches of images of any size – with seamless transitions</h3>
+              <div className="space-y-4">
+                <p className="text-sm leading-relaxed">
+                  Just as a songwriter who sticks to only guitar might uncover infinite nuance to be found in six strings, we believe an entire artform lies waiting in the AI-driven journey between images:
+                </p>
                 <div className="grid grid-cols-2 items-stretch gap-4">
                   {/* Left part: 4 inputs in 2x2 grid */}
                   <div className="grid grid-cols-2 gap-3">
@@ -729,7 +764,9 @@ export default function HomePage() {
 
               {/* Section 3 */}
               <div className="space-y-4">
-                <h3 className="font-semibold text-primary text-lg">You can use LoRAs to achieve all kinds of weird and interesting motion</h3>
+                <p className="text-sm leading-relaxed">
+                  Using combinations of images with LoRAs and other control mechanisms can allow for a high-degree of intentionality - and for artists to discover a style of creation and outcome that's truly unique:
+                </p>
                 <div className="grid grid-cols-2 gap-4">
                   {motionExamples.map(example => (
                     <div key={example.id} className="relative">
@@ -747,36 +784,37 @@ export default function HomePage() {
               </div>
 
               {/* Closing message & CTA */}
-              <div className="space-y-8 mb-8">
-                {/* Message */}
+              <div className="space-y-4 mb-8">
                 <div className="space-y-6">
                   <p className="text-sm leading-relaxed">
-                    We believe that there's endless potential in this approach waiting to be unlocked.
+                    Reigh is a tool just for exploring this artform. By creating with it and endlessly refining every element, I want to make it extremely good, and build a community of people who want to explore it with me.
                   </p>
                   <p className="text-sm leading-relaxed">
-                    However, reaching it requires two things:
-                  </p>
-                  <ol className="list-decimal pl-4 md:pl-6 space-y-2 text-sm leading-relaxed">
-                    <li><span className="font-medium">A powerful tool</span> that's cheap or free to use</li>
-                    <li><span className="font-medium">A community</span> and scene that pushes one another artistically</li>
-                  </ol>
-                  <p className="text-sm leading-relaxed">
-                    On top of the open source community's work, I've built the tool&nbsp;&mdash;&nbsp;you can run it for free on your computer, or for very cheap on our service&nbsp;&mdash;&nbsp;and am now building the community.
-                  </p>
-                  <p className="text-sm leading-relaxed">
-                    If you're interested in exploring with us, you're very welcome&nbsp;to join.
+                    If you're interested in joining, you're very welcome! If we're successful, I hope that we can inspire a whole ecosystem of similar tools and communities focusing on discovering and creating their own artforms.
                   </p>
                   <p className="font-serif text-lg italic transform -rotate-1">POM</p>
                 </div>
 
+                {/* Divider */}
+                <div className="w-12 h-px bg-muted/30"></div>
+
                 {/* CTA */}
-                <div>
+                <div className="flex items-center space-x-2">
                   <button
-                    onClick={handleDiscordSignIn}
-                    className="inline-flex items-center px-5 py-2 bg-white/80 backdrop-blur-sm text-primary rounded-full border-2 border-wes-vintage-gold/60 hover:border-wes-vintage-gold/80 hover:bg-white/90 transition-colors duration-200 shadow-sm"
+                    onClick={() => navigate('/tools')}
+                    className="text-muted-foreground hover:text-primary text-xs underline transition-colors duration-200"
                   >
-                    Join us
+                    Try the tool
                   </button>
+                  <span className="text-muted-foreground/50">|</span>
+                  <a
+                    href="https://discord.gg/D5K2c6kfhy"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-muted-foreground hover:text-primary text-xs underline transition-colors duration-200"
+                  >
+                    Join the community
+                  </a>
                 </div>
               </div>
             </div>
@@ -868,12 +906,27 @@ export default function HomePage() {
         {/* Closing line + Join Us Button */}
         <div className="text-center space-y-8 mb-6">
           <p className="text-base md:text-lg font-medium text-primary m-0 max-w-2xl mx-auto">We believe that there's endless potential in this approach waiting to be unlocked&nbsp;&mdash; and that a tool and community focusing exclusively on it can unleash its promise.</p>
-          <button
-            onClick={handleDiscordSignIn}
-            className="inline-flex items-center px-5 py-2 bg-white/80 backdrop-blur-sm text-primary rounded-full border-2 border-wes-vintage-gold/60 hover:border-wes-vintage-gold/80 hover:bg-white/90 transition-colors duration-200 shadow-sm"
-          >
-            Join us
-          </button>
+          
+          {/* Divider */}
+          <div className="w-12 h-px bg-muted/30 mx-auto"></div>
+          
+          <div className="flex items-center space-x-2 justify-center">
+            <button
+              onClick={() => navigate('/tools')}
+              className="text-muted-foreground hover:text-primary text-xs underline transition-colors duration-200"
+            >
+              Try the tool
+            </button>
+            <span className="text-muted-foreground/50">|</span>
+            <a
+              href="https://discord.gg/D5K2c6kfhy"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-muted-foreground hover:text-primary text-xs underline transition-colors duration-200"
+            >
+              Join the community
+            </a>
+          </div>
         </div>
             </div>
           </div>

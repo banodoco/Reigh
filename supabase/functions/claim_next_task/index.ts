@@ -52,6 +52,18 @@ serve(async (req) => {
     console.log("No valid JSON body provided, using default worker_id");
   }
 
+  // ─── Dry-run flag ───────────────────────────────────────────────
+  // If dry_run === true we DON’T update the DB – we only compute how
+  // many tasks *could* be claimed given the current constraints.
+  const isDryRun = requestBody.dry_run === true;
+  const includeActive = requestBody.include_active === true;
+  if (isDryRun) {
+    console.log("⚙️  Dry-run mode enabled – no tasks will be claimed, only counted.");
+  }
+  if (includeActive) {
+    console.log("⚙️  Include active mode – counting both Queued AND In Progress tasks.");
+  }
+
   // Create admin client for database operations
   const supabaseAdmin = createClient(supabaseUrl, serviceKey);
 
@@ -168,11 +180,61 @@ serve(async (req) => {
         generation_started_at: new Date().toISOString() // ADD THIS - needed for cost calculation
       };
 
+      // ─────────────────────────────────────────────────────────────
+      // Per-user concurrency limit helpers (max 5 tasks In Progress)
+      // ─────────────────────────────────────────────────────────────
+      const MAX_CONCURRENT_TASKS_PER_USER = 5;
+      // Cache project IDs and in-progress counts to avoid duplicate DB hits
+      const userProjectCache = new Map<string, string[]>();
+      const userInProgressCountCache = new Map<string, number>();
+      const userCreditsCache = new Map<string, number>(); // Cache user credit balances
+
+      async function getProjectIdsForUser(userId: string): Promise<string[]> {
+        if (userProjectCache.has(userId)) return userProjectCache.get(userId)!;
+        const { data } = await supabaseAdmin
+          .from("projects")
+          .select("id")
+          .eq("user_id", userId);
+        const ids = data?.map((p: any) => p.id) ?? [];
+        userProjectCache.set(userId, ids);
+        return ids;
+      }
+
+      async function getInProgressCount(userId: string): Promise<number> {
+        if (userInProgressCountCache.has(userId)) return userInProgressCountCache.get(userId)!;
+        const projectIds = await getProjectIdsForUser(userId);
+        if (projectIds.length === 0) {
+          userInProgressCountCache.set(userId, 0);
+          return 0;
+        }
+        const { count } = await supabaseAdmin
+          .from("tasks")
+          .select("id", { head: true, count: "exact" })
+          .in("project_id", projectIds)
+          .eq("status", "In Progress");
+        const cnt = count ?? 0;
+        userInProgressCountCache.set(userId, cnt);
+        return cnt;
+      }
+
+      async function getUserCredits(userId: string): Promise<number> {
+        if (userCreditsCache.has(userId)) return userCreditsCache.get(userId)!;
+        const { data } = await supabaseAdmin
+          .from("users")
+          .select("credits")
+          .eq("id", userId)
+          .single();
+        const credits = data?.credits ?? 0;
+        userCreditsCache.set(userId, credits);
+        return credits;
+      }
+
       // Get all queued tasks and manually check dependencies
-      const { data: queuedTasks, error: findError } = await supabaseAdmin
+      const statusFilter = includeActive ? ["Queued", "In Progress"] : ["Queued"];
+      const { data: eligibleTasks, error: findError } = await supabaseAdmin
         .from("tasks")
-        .select("id, params, task_type, project_id, created_at, dependant_on")
-        .eq("status", "Queued")
+        .select("id, params, task_type, project_id, created_at, dependant_on, status")
+        .in("status", statusFilter)
         .order("created_at", { ascending: true });
 
       if (findError) {
@@ -181,10 +243,93 @@ serve(async (req) => {
 
       // Manual dependency checking for service role
       const readyTasks: any[] = [];
-      for (const task of (queuedTasks || [])) {
+      const userClaimedCounts = new Map<string, number>(); // Track how many we're adding per user
+      const projectOwnerCache = new Map<string, string>(); // Cache project→owner mapping
+
+      for (const task of (eligibleTasks || [])) {
+        // For include_active mode, "In Progress" tasks are already active - count them directly
+        if (includeActive && task.status === "In Progress") {
+          let taskOwnerId: string | null = null;
+          try {
+            // Look up owning user via the task's project (with caching)
+            if (projectOwnerCache.has(task.project_id)) {
+              taskOwnerId = projectOwnerCache.get(task.project_id)!;
+            } else {
+              const { data: projRow } = await supabaseAdmin
+                .from("projects")
+                .select("user_id")
+                .eq("id", task.project_id)
+                .single();
+              if (projRow?.user_id) {
+                taskOwnerId = projRow.user_id;
+                projectOwnerCache.set(task.project_id, projRow.user_id);
+              }
+            }
+            
+            if (taskOwnerId) {
+              const userCredits = await getUserCredits(taskOwnerId);
+              console.log(`✅ In Progress task ${task.id} counted - user ${taskOwnerId} has ${userCredits} credits (counting regardless of credit balance since already active)`);
+            } else {
+              console.log(`⚠️ In Progress task ${task.id} skipped - no owner found`);
+            }
+            
+            // In Progress tasks are already active - count them regardless of concurrency limits
+            // (concurrency limits only apply to claiming new tasks, not counting active ones)
+            readyTasks.push(task);
+          } catch (error) {
+            console.log(`❌ In Progress task ${task.id} skipped - lookup error:`, error);
+            // In case of lookup errors, skip task to be safe
+            continue;
+          }
+          continue;
+        }
+
+        // For Queued tasks, apply the full claiming logic
+        let taskOwnerId: string | null = null;
+        try {
+          // Look up owning user via the task's project (with caching)
+          if (projectOwnerCache.has(task.project_id)) {
+            taskOwnerId = projectOwnerCache.get(task.project_id)!;
+          } else {
+            const { data: projRow } = await supabaseAdmin
+              .from("projects")
+              .select("user_id")
+              .eq("id", task.project_id)
+              .single();
+            if (projRow?.user_id) {
+              taskOwnerId = projRow.user_id;
+              projectOwnerCache.set(task.project_id, projRow.user_id);
+            }
+          }
+          
+          if (taskOwnerId) {
+            // Check if user has credits
+            const userCredits = await getUserCredits(taskOwnerId);
+            if (userCredits <= 0) {
+              // Skip this task – user has no credits
+              continue;
+            }
+
+            const currentTotal = await getInProgressCount(taskOwnerId);
+            const alreadyAdded = userClaimedCounts.get(taskOwnerId) || 0;
+            
+            if (currentTotal + alreadyAdded >= MAX_CONCURRENT_TASKS_PER_USER) {
+              // Skip this task – user already at concurrency limit
+              continue;
+            }
+          }
+        } catch (_) {
+          // In case of lookup errors, skip task to be safe
+          continue;
+        }
+
         if (!task.dependant_on) {
           // No dependency - task is ready
           readyTasks.push(task);
+          // Track that we're adding this task for the user
+          if (taskOwnerId) {
+            userClaimedCounts.set(taskOwnerId, (userClaimedCounts.get(taskOwnerId) || 0) + 1);
+          }
         } else {
           // Check if dependency is complete
           const { data: depData } = await supabaseAdmin
@@ -195,11 +340,138 @@ serve(async (req) => {
           
           if (depData?.status === "Complete") {
             readyTasks.push(task);
+            // Track that we're adding this task for the user
+            if (taskOwnerId) {
+              userClaimedCounts.set(taskOwnerId, (userClaimedCounts.get(taskOwnerId) || 0) + 1);
+            }
           }
         }
       }
       
-      console.log(`Service role dependency check: ${queuedTasks?.length || 0} queued, ${readyTasks.length} ready`);
+      const statusLabel = includeActive ? "queued + in progress" : "queued";
+      console.log(`Service role dependency check: ${eligibleTasks?.length || 0} ${statusLabel}, ${readyTasks.length} ready`);
+      
+      if (includeActive && eligibleTasks) {
+        const inProgressCount = eligibleTasks.filter(t => t.status === "In Progress").length;
+        const queuedCount = eligibleTasks.filter(t => t.status === "Queued").length;
+        console.log(`📊 Status breakdown: ${queuedCount} Queued, ${inProgressCount} In Progress`);
+      }
+
+      // ── Detailed logging for debugging ──
+      console.log(`\n🔍 DETAILED ANALYSIS:`);
+      console.log(`Found ${eligibleTasks?.length || 0} ${statusLabel} tasks total`);
+      console.log(`After filtering: ${readyTasks.length} tasks are ready to claim`);
+      
+      if (readyTasks.length === 0 && eligibleTasks && eligibleTasks.length > 0) {
+        console.log(`\n❌ WHY NO TASKS ARE READY:`);
+        
+        // Count reasons for rejection
+        let concurrencyBlocked = 0;
+        let dependencyBlocked = 0;
+        let lookupErrors = 0;
+        let creditsBlocked = 0;
+        const userStats = new Map<string, {inProgress: number, queued: number, total: number}>();
+        
+        for (const task of eligibleTasks) {
+          try {
+            let taskOwnerId: string | null = null;
+            if (projectOwnerCache.has(task.project_id)) {
+              taskOwnerId = projectOwnerCache.get(task.project_id)!;
+            } else {
+              const { data: projRow } = await supabaseAdmin
+                .from("projects")
+                .select("user_id")
+                .eq("id", task.project_id)
+                .single();
+              if (projRow?.user_id) {
+                taskOwnerId = projRow.user_id;
+                projectOwnerCache.set(task.project_id, projRow.user_id);
+              }
+            }
+            
+            if (taskOwnerId) {
+              // Check credits first
+              const userCredits = await getUserCredits(taskOwnerId);
+              if (userCredits <= 0) {
+                creditsBlocked++;
+                continue;
+              }
+
+              const currentTotal = await getInProgressCount(taskOwnerId);
+              const alreadyAdded = userClaimedCounts.get(taskOwnerId) || 0;
+              
+              // Track user stats
+              if (!userStats.has(taskOwnerId)) {
+                const projectIds = await getProjectIdsForUser(taskOwnerId);
+                const { count: inProg } = await supabaseAdmin
+                  .from("tasks")
+                  .select("id", { head: true, count: "exact" })
+                  .in("project_id", projectIds)
+                  .eq("status", "In Progress");
+                const { count: queued } = await supabaseAdmin
+                  .from("tasks")
+                  .select("id", { head: true, count: "exact" })
+                  .in("project_id", projectIds)
+                  .eq("status", "Queued");
+                
+                userStats.set(taskOwnerId, {
+                  inProgress: inProg || 0,
+                  queued: queued || 0,
+                  total: inProg || 0
+                });
+              }
+              
+              if (currentTotal + alreadyAdded >= MAX_CONCURRENT_TASKS_PER_USER) {
+                concurrencyBlocked++;
+              } else {
+                // Check dependency
+                if (task.dependant_on) {
+                  const { data: depData } = await supabaseAdmin
+                    .from("tasks")
+                    .select("status")
+                    .eq("id", task.dependant_on)
+                    .single();
+                  
+                  if (depData?.status !== "Complete") {
+                    dependencyBlocked++;
+                  }
+                } else if (!includeActive && task.status === "In Progress") {
+                  // Task is already in progress - not an error in include_active mode
+                  console.log(`ℹ️  Task ${task.id} is already In Progress`);
+                } else {
+                  // This should have been added to readyTasks - something went wrong
+                  console.log(`⚠️  Task ${task.id} should be ready but wasn't added!`);
+                }
+              }
+            } else {
+              lookupErrors++;
+            }
+          } catch (_) {
+            lookupErrors++;
+          }
+        }
+        
+        console.log(`  📊 Rejection reasons:`);
+        console.log(`     • No credits: ${creditsBlocked} tasks`);
+        console.log(`     • Concurrency limit (≥5 tasks): ${concurrencyBlocked} tasks`);
+        console.log(`     • Dependency not complete: ${dependencyBlocked} tasks`);
+        console.log(`     • User lookup errors: ${lookupErrors} tasks`);
+        
+        console.log(`\n  👥 User breakdown:`);
+        for (const [userId, stats] of userStats.entries()) {
+          const credits = await getUserCredits(userId);
+          const status = stats.total >= MAX_CONCURRENT_TASKS_PER_USER ? '❌ AT LIMIT' : '✅ Under limit';
+          console.log(`     • User ${userId}: ${stats.inProgress} In Progress, ${stats.queued} Queued, ${credits} credits ${status}`);
+        }
+      }
+
+      // ── Dry-run early return (service role) ─────────────────────
+      if (isDryRun) {
+        return new Response(JSON.stringify({ available_tasks: readyTasks.length }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
 
       let updateData: any = null;
       let updateError: any = null;
@@ -261,103 +533,128 @@ serve(async (req) => {
           console.log("User has no projects");
           rpcResponse = { data: [], error: null };
         } else {
-                    const projectIds = userProjects.map(p => p.id);
+          const projectIds = userProjects.map(p => p.id);
           console.log(`DEBUG: Claiming from ${projectIds.length} project IDs: [${projectIds.slice(0, 3).join(', ')}...]`);
           
+          // User-specific concurrency limit
+          const MAX_CONCURRENT_TASKS_PER_USER = 5;
+
           if (projectIds.length === 0) {
             console.log("No project IDs to search - user has projects but they have no IDs?");
             rpcResponse = { data: [], error: null };
           } else {
-            // Get queued tasks for user projects and manually check dependencies
-            console.log(`DEBUG: Finding eligible tasks with dependency checking for ${projectIds.length} projects`);
-            
-            const { data: userQueuedTasks, error: userFindError } = await supabaseAdmin
+            // ── Enforce per-user concurrency limit (max 5 In Progress) ──
+            const { count: inProgressCount } = await supabaseAdmin
               .from("tasks")
-              .select("id, params, task_type, project_id, created_at, dependant_on")
-              .eq("status", "Queued")
+              .select("id", { head: true, count: "exact" })
               .in("project_id", projectIds)
-              .order("created_at", { ascending: true });
+              .eq("status", "In Progress");
 
-            if (userFindError) {
-              throw userFindError;
-            }
+            if ((inProgressCount ?? 0) >= MAX_CONCURRENT_TASKS_PER_USER) {
+              console.log(`User ${callerId} already has ${inProgressCount} tasks In Progress – at limit.`);
+              rpcResponse = { data: [], error: null };
+            } else {
+              // Get queued tasks for user projects and manually check dependencies
+              console.log(`DEBUG: Finding eligible tasks with dependency checking for ${projectIds.length} projects`);
+              
+              const userStatusFilter = includeActive ? ["Queued", "In Progress"] : ["Queued"];
+              const { data: userEligibleTasks, error: userFindError } = await supabaseAdmin
+                .from("tasks")
+                .select("id, params, task_type, project_id, created_at, dependant_on, status")
+                .in("status", userStatusFilter)
+                .in("project_id", projectIds)
+                .order("created_at", { ascending: true });
 
-            // Manual dependency checking for user tasks
-            const userReadyTasks: any[] = [];
-            for (const task of (userQueuedTasks || [])) {
-              if (!task.dependant_on) {
-                // No dependency - task is ready
-                userReadyTasks.push(task);
-              } else {
-                // Check if dependency is complete
-                const { data: depData } = await supabaseAdmin
-                  .from("tasks")
-                  .select("status")
-                  .eq("id", task.dependant_on)
-                  .single();
-                
-                if (depData?.status === "Complete") {
+              if (userFindError) {
+                throw userFindError;
+              }
+
+              // Manual dependency checking for user tasks
+              const userReadyTasks: any[] = [];
+              for (const task of (userEligibleTasks || [])) {
+                if (!task.dependant_on) {
+                  // No dependency - task is ready
                   userReadyTasks.push(task);
+                } else {
+                  // Check if dependency is complete
+                  const { data: depData } = await supabaseAdmin
+                    .from("tasks")
+                    .select("status")
+                    .eq("id", task.dependant_on)
+                    .single();
+                  
+                  if (depData?.status === "Complete") {
+                    userReadyTasks.push(task);
+                  }
                 }
               }
-            }
 
-            console.log(`DEBUG: User dependency check: ${userQueuedTasks?.length || 0} queued, ${userReadyTasks.length} ready`);
+              const userStatusLabel = includeActive ? "eligible" : "queued";
+              console.log(`DEBUG: User dependency check: ${userEligibleTasks?.length || 0} ${userStatusLabel}, ${userReadyTasks.length} ready`);
 
-            const updatePayload: any = {
-              status: "In Progress",
-              updated_at: new Date().toISOString(),
-              generation_started_at: new Date().toISOString() // ADD THIS - needed for cost calculation
-              // Note: No worker_id for user claims - individual users don't have worker IDs
-            };
-            
-            let updateData: any = null;
-            let updateError: any = null;
+              // ── Dry-run early return (user path) ──────────────────
+              if (isDryRun) {
+                return new Response(JSON.stringify({ available_tasks: userReadyTasks.length }), {
+                  status: 200,
+                  headers: { "Content-Type": "application/json" }
+                });
+              }
 
-            if (userReadyTasks.length > 0) {
-              const taskToTake = userReadyTasks[0];
-              
-              // Atomically claim the first eligible task
-              const result = await supabaseAdmin
-                .from("tasks")
-                .update(updatePayload)
-                .eq("id", taskToTake.id)
-                .eq("status", "Queued") // Double-check it's still queued
-                .select()
-                .single();
-                
-              updateData = result.data;
-              updateError = result.error;
-            } else {
-              // No eligible tasks found
-              updateError = { code: "PGRST116", message: "No eligible tasks found for user" };
-            }
-
-            console.log(`DEBUG: User atomic claim result - error: ${updateError?.message || updateError?.code || 'none'}, data: ${updateData ? 'claimed task ' + updateData.id : 'no data'}`);
-            
-            if (updateError && updateError.code !== "PGRST116") { // PGRST116 = no rows
-              console.error("User atomic claim failed:", updateError);
-              throw updateError;
-            }
-
-            if (updateData) {
-              // Successfully claimed atomically
-              console.log(`Successfully claimed task ${updateData.id} atomically for user`);
-              rpcResponse = {
-                data: [{
-                  task_id_out: updateData.id,
-                  params_out: updateData.params,
-                  task_type_out: updateData.task_type,
-                  project_id_out: updateData.project_id
-                }],
-                error: null
+              const updatePayload: any = {
+                status: "In Progress",
+                updated_at: new Date().toISOString(),
+                generation_started_at: new Date().toISOString() // ADD THIS - needed for cost calculation
+                // Note: No worker_id for user claims - individual users don't have worker IDs
               };
-            } else {
-              // No tasks available or all were claimed by others
-              console.log("No queued tasks available for user atomic claiming");
-              rpcResponse = { data: [], error: null };
+              
+              let updateData: any = null;
+              let updateError: any = null;
+
+              if (userReadyTasks.length > 0) {
+                const taskToTake = userReadyTasks[0];
+                
+                // Atomically claim the first eligible task
+                const result = await supabaseAdmin
+                  .from("tasks")
+                  .update(updatePayload)
+                  .eq("id", taskToTake.id)
+                  .eq("status", "Queued") // Double-check it's still queued
+                  .select()
+                  .single();
+                  
+                updateData = result.data;
+                updateError = result.error;
+              } else {
+                // No eligible tasks found
+                updateError = { code: "PGRST116", message: "No eligible tasks found for user" };
+              }
+
+              console.log(`DEBUG: User atomic claim result - error: ${updateError?.message || updateError?.code || 'none'}, data: ${updateData ? 'claimed task ' + updateData.id : 'no data'}`);
+              
+              if (updateError && updateError.code !== "PGRST116") { // PGRST116 = no rows
+                console.error("User atomic claim failed:", updateError);
+                throw updateError;
+              }
+
+              if (updateData) {
+                // Successfully claimed atomically
+                console.log(`Successfully claimed task ${updateData.id} atomically for user`);
+                rpcResponse = {
+                  data: [{
+                    task_id_out: updateData.id,
+                    params_out: updateData.params,
+                    task_type_out: updateData.task_type,
+                    project_id_out: updateData.project_id
+                  }],
+                  error: null
+                };
+              } else {
+                // No tasks available or all were claimed by others
+                console.log("No queued tasks available for user atomic claiming");
+                rpcResponse = { data: [], error: null };
+              }
             }
-         }
+          }
         }
       } catch (e) {
         console.error("Error claiming user task:", e);
