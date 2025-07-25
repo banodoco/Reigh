@@ -165,6 +165,7 @@ See `.env.example` for all variables. Key ones:
 | **GenerationsPage** | `/generations` | Media gallery with filtering (type/shot/search) & pagination |
 | **PaymentSuccessPage** | `/payments/success` | Stripe payment confirmation |
 | **PaymentCancelPage** | `/payments/cancel` | Stripe payment cancellation |
+| **DiagnosticsPage** | `/diagnostics` | Supabase connection diagnostics & debugging |
 | **NotFoundPage** | `*` | 404 error handler |
 
 ---
