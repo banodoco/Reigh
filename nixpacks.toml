@@ -1,2 +1,7 @@
-[providers]
-node = "18" 
+providers = ["node"]
+
+[phases.build]
+cmd = "npm run build"
+
+[phases.start]
+cmd = "npm run serve" 
