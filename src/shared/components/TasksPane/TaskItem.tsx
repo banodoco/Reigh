@@ -199,12 +199,12 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
           </div>
           {/* Visit Shot button overlay on hover */}
           {isHoveringImages && shotId && (
-            <div className="absolute inset-0 bg-black/60 rounded flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/20 backdrop-blur-[1px] rounded flex items-center justify-center">
               <Button
-                variant="secondary"
+                variant="ghost"
                 size="sm"
                 onClick={handleVisitShot}
-                className="text-xs px-3 py-1.5 h-auto bg-blue-600 hover:bg-blue-500 text-white border-0"
+                className="text-xs px-2 py-1 h-auto bg-white/10 hover:bg-white/20 text-white border border-white/20 hover:border-white/30 transition-all"
               >
                 Visit Shot
               </Button>
