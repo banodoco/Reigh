@@ -18,7 +18,12 @@ export default defineConfig(({ mode }: { mode: string }) => {
     preview: {
       host: "0.0.0.0",
       port: port,
-      allowedHosts: ["healthcheck.railway.app", "reigh-production.up.railway.app"],
+      allowedHosts: [
+        "healthcheck.railway.app", 
+        "reigh-production.up.railway.app",
+        "reigh.art",
+        "www.reigh.art"
+      ],
     },
     plugins: [
       react(),
