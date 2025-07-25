@@ -10,6 +10,8 @@
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "preview:full": "npm run preview --port 5001",
+    "start:railway": "npm run build && npm run serve",
+    "serve": "vite preview --host 0.0.0.0 --port $PORT",
     "db:seed": "tsx ./db/seed.ts",
     "bun:dev": "bun run dev",
     "bun:build": "bun run build",

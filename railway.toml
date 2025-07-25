@@ -1,0 +1,10 @@
+[build]
+builder = "nixpacks"
+
+[deploy]
+healthcheckPath = "/"
+restartPolicyType = "on_failure"
+startCommand = "npm run start:railway"
+
+[environments.production.variables]
+NODE_ENV = "production" 
