@@ -77,7 +77,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
   const { setCurrentShotId } = useCurrentShot();
   
   // State for hover functionality
-  const [hoveredImageIndex, setHoveredImageIndex] = useState<number | null>(null);
+  const [isHoveringImages, setIsHoveringImages] = useState<boolean>(false);
 
   // Local state to show progress percentage temporarily
   const [progressPercent, setProgressPercent] = useState<number | null>(null);
@@ -179,36 +179,36 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
       </div>
       {/* Image previews for Travel Between Images task */}
       {imagesToShow.length > 0 && (
-        <div className="flex items-center overflow-x-auto mb-1 mt-2">
-          {imagesToShow.map((url, idx) => (
-            <div 
-              key={idx}
-              className="relative mr-1"
-              onMouseEnter={() => setHoveredImageIndex(idx)}
-              onMouseLeave={() => setHoveredImageIndex(null)}
-            >
+        <div 
+          className="relative flex items-center overflow-x-auto mb-1 mt-2"
+          onMouseEnter={() => setIsHoveringImages(true)}
+          onMouseLeave={() => setIsHoveringImages(false)}
+        >
+          <div className="flex items-center">
+            {imagesToShow.map((url, idx) => (
               <img
+                key={idx}
                 src={url}
                 alt={`input-${idx}`}
-                className="w-12 h-12 object-cover rounded border border-zinc-700"
+                className="w-12 h-12 object-cover rounded mr-1 border border-zinc-700"
               />
-              {/* Visit Shot button on hover */}
-              {hoveredImageIndex === idx && shotId && (
-                <div className="absolute inset-0 bg-black/60 rounded flex items-center justify-center">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={handleVisitShot}
-                    className="text-xs px-2 py-1 h-auto bg-blue-600 hover:bg-blue-500 text-white border-0"
-                  >
-                    Visit Shot
-                  </Button>
-                </div>
-              )}
+            ))}
+            {extraImageCount > 0 && (
+              <span className="text-xs text-zinc-400 ml-1">+ {extraImageCount}</span>
+            )}
+          </div>
+          {/* Visit Shot button overlay on hover */}
+          {isHoveringImages && shotId && (
+            <div className="absolute inset-0 bg-black/60 rounded flex items-center justify-center">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleVisitShot}
+                className="text-xs px-3 py-1.5 h-auto bg-blue-600 hover:bg-blue-500 text-white border-0"
+              >
+                Visit Shot
+              </Button>
             </div>
-          ))}
-          {extraImageCount > 0 && (
-            <span className="text-xs text-zinc-400 ml-1">+ {extraImageCount}</span>
           )}
         </div>
       )}
