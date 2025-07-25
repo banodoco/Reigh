@@ -33,10 +33,12 @@ export function useGenerationsPageLogic({
   const { data: shotsData } = useListShots(selectedProjectId);
   const { currentShotId } = useCurrentShot();
 
-  // Set shot filter to current shot when it changes
+  // Set shot filter to current shot when it changes, or reset to 'all' when no shot is selected
   useEffect(() => {
     if (currentShotId && shotsData?.length && shotsData.some(shot => shot.id === currentShotId)) {
       setSelectedShotFilter(currentShotId);
+    } else if (!currentShotId) {
+      setSelectedShotFilter('all');
     }
   }, [currentShotId, shotsData]);
 

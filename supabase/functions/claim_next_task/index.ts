@@ -164,7 +164,8 @@ serve(async (req) => {
       const serviceUpdatePayload = {
         status: "In Progress" as const,
         worker_id: workerId,  // Service role gets worker_id for tracking
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
+        generation_started_at: new Date().toISOString() // ADD THIS - needed for cost calculation
       };
 
       // Get all queued tasks and manually check dependencies
@@ -305,7 +306,8 @@ serve(async (req) => {
 
             const updatePayload: any = {
               status: "In Progress",
-              updated_at: new Date().toISOString()
+              updated_at: new Date().toISOString(),
+              generation_started_at: new Date().toISOString() // ADD THIS - needed for cost calculation
               // Note: No worker_id for user claims - individual users don't have worker IDs
             };
             

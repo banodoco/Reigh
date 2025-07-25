@@ -13,6 +13,7 @@ import { ReighLoading } from '@/shared/components/ReighLoading';
 import SettingsModal from '@/shared/components/SettingsModal';
 import { useHeaderState } from '@/shared/contexts/ToolPageHeaderContext';
 import { GlobalProcessingWarning } from '@/shared/components/ProcessingWarnings';
+import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 
 // Scroll to top component
 function ScrollToTop() {
@@ -35,6 +36,7 @@ const Layout: React.FC = () => {
     generationsPaneHeight 
   } = usePanes();
   const { header } = useHeaderState();
+  const { setCurrentShotId } = useCurrentShot();
 
   // Get content-responsive breakpoints for app-wide use
   const { isSm, isMd, isLg, isXl, is2Xl, contentWidth, contentHeight } = useContentResponsive();
@@ -76,6 +78,11 @@ const Layout: React.FC = () => {
       subscription?.unsubscribe();
     };
   }, []);
+
+  // Reset currentShotId when navigating to a new page
+  useEffect(() => {
+    setCurrentShotId(null);
+  }, [location.pathname, setCurrentShotId]);
 
   // Show loading spinner while determining auth state
   if (session === undefined) {

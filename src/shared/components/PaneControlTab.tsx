@@ -25,6 +25,7 @@ interface PaneControlTabProps {
   thirdButton?: {
     onClick: () => void;
     ariaLabel: string;
+    content?: React.ReactNode; // Optional custom content, defaults to Square icon
   };
 }
 
@@ -169,7 +170,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({ side, isLocked, isOpen,
             className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
             aria-label={thirdButton.ariaLabel}
           >
-            <Square className="h-4 w-4" />
+            {thirdButton.content || <Square className="h-4 w-4" />}
           </Button>
         )}
       </div>
@@ -214,7 +215,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({ side, isLocked, isOpen,
             className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
             aria-label={thirdButton.ariaLabel}
           >
-            <Square className="h-4 w-4" />
+            {thirdButton.content || <Square className="h-4 w-4" />}
           </Button>
         )}
       </div>
@@ -282,7 +283,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({ side, isLocked, isOpen,
           className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
           aria-label={thirdButton.ariaLabel}
         >
-          <Square className="h-4 w-4" />
+          {thirdButton.content || <Square className="h-4 w-4" />}
         </Button>
       )}
     </div>

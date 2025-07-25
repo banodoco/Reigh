@@ -12,8 +12,9 @@ import { useCancelAllPendingTasks, useListTasks } from '@/shared/hooks/useTasks'
 import { useToast } from '@/shared/hooks/use-toast';
 import { filterVisibleTasks } from '@/shared/lib/taskConfig';
 import { TasksPaneProcessingWarning } from '../ProcessingWarnings';
+import { TASK_STATUS, TaskStatus } from '@/types/database';
 
-const CANCELLABLE_TASK_STATUSES = ['Queued', 'In Progress'];
+const CANCELLABLE_TASK_STATUSES: TaskStatus[] = [TASK_STATUS.QUEUED, TASK_STATUS.IN_PROGRESS];
 
 interface TasksPaneProps {
   onOpenSettings: () => void;
@@ -85,6 +86,11 @@ export const TasksPane: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
         bottomOffset={isGenerationsPaneLocked ? generationsPaneHeight : 0}
         handlePaneEnter={handlePaneEnter}
         handlePaneLeave={handlePaneLeave}
+        thirdButton={{
+          onClick: openPane,
+          ariaLabel: `Open Tasks pane (${visibleCancellableCount} active tasks)`,
+          content: <span className="text-xs font-medium">{visibleCancellableCount}</span>
+        }}
       />
       <div
         className="pointer-events-none"

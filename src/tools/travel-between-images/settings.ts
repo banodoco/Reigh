@@ -32,8 +32,8 @@ export const videoTravelSettings = {
   defaults: {
     videoControlMode: 'batch' as const,
     batchVideoPrompt: '',
-    batchVideoFrames: 24,
-    batchVideoContext: 16,
+    batchVideoFrames: 60,
+    batchVideoContext: 10,
     batchVideoSteps: 20,
     dimensionSource: 'firstImage' as const,
     generationMode: 'batch' as const,

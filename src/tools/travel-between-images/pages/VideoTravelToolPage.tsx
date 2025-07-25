@@ -67,6 +67,7 @@ const VideoTravelToolPage: React.FC = () => {
   const { selectedProjectId } = useProject();
   const [selectedShot, setSelectedShot] = useState<Shot | null>(null);
   const { currentShotId, setCurrentShotId } = useCurrentShot();
+  // URL hash sync effects will be added below once shots/isLoading are declared.
   
   // Use parallelized data fetching for better performance
   const {
@@ -115,7 +116,7 @@ const VideoTravelToolPage: React.FC = () => {
   // Add state for video generation settings - wait for settings to load before initializing
   const [videoControlMode, setVideoControlMode] = useState<'individual' | 'batch'>('batch');
   const [batchVideoPrompt, setBatchVideoPrompt] = useState('');
-  const [batchVideoFrames, setBatchVideoFrames] = useState(30);
+  const [batchVideoFrames, setBatchVideoFrames] = useState(60);
   const [batchVideoContext, setBatchVideoContext] = useState(10);
   const [batchVideoSteps, setBatchVideoSteps] = useState(4);
   const [dimensionSource, setDimensionSource] = useState<'project' | 'firstImage' | 'custom'>('firstImage');
@@ -146,6 +147,38 @@ const VideoTravelToolPage: React.FC = () => {
       hasNext: currentShotIndex >= 0 && currentShotIndex < (shots?.length ?? 0) - 1,
     };
   }, [shots, selectedShot?.id]);
+  // ------------------------------------------------------------------
+  // URL Hash Synchronization (Combined Init + Sync)
+  // ------------------------------------------------------------------
+  useEffect(() => {
+    if (isLoading || !shots) return;
+
+    const hashShotId = location.hash?.replace('#', '');
+
+    // Init: Try to select shot from hash if not already selected
+    if (hashShotId && selectedShot?.id !== hashShotId) {
+      const matchingShot = shots.find((s) => s.id === hashShotId);
+      if (matchingShot) {
+        setSelectedShot(matchingShot);
+        setCurrentShotId(matchingShot.id);
+        // Return early to allow state update before sync
+        return;
+      }
+    }
+
+    // Sync: Update URL hash to match current selection
+    const basePath = location.pathname + (location.search || '');
+
+    if (selectedShot) {
+      const desiredHash = `#${selectedShot.id}`;
+      if (location.hash !== desiredHash) {
+        window.history.replaceState(null, '', `${basePath}${desiredHash}`);
+      }
+    } else if (location.hash) {
+      window.history.replaceState(null, '', basePath);
+    }
+  }, [isLoading, shots, selectedShot, location.pathname, location.search, location.hash]);
+  
   const [steerableMotionSettings, setSteerableMotionSettings] = useState<SteerableMotionSettings>({
     negative_prompt: '',
     model_name: 'vace_14B',
@@ -224,7 +257,7 @@ const VideoTravelToolPage: React.FC = () => {
       
       setVideoControlMode(settings.videoControlMode || 'batch');
       setBatchVideoPrompt(settings.batchVideoPrompt || '');
-      setBatchVideoFrames(settings.batchVideoFrames || 30);
+      setBatchVideoFrames(settings.batchVideoFrames || 60);
       setBatchVideoContext(settings.batchVideoContext || 10);
       setBatchVideoSteps(settings.batchVideoSteps || 4);
       setDimensionSource(settings.dimensionSource || 'firstImage');
@@ -319,8 +352,10 @@ const VideoTravelToolPage: React.FC = () => {
   }, [computedVideoPairConfigs]);
 
   // Clear any previously selected shot unless this navigation explicitly came from a shot click
+  // OR if there's a hash in the URL (direct navigation to a specific shot)
   useEffect(() => {
-    if (!viaShotClick) {
+    const hasHashShotId = !!location.hash?.replace('#', '');
+    if (!viaShotClick && !hasHashShotId) {
       if (currentShotId) {
         setCurrentShotId(null);
       }
@@ -687,7 +722,7 @@ const VideoTravelToolPage: React.FC = () => {
               videoPairConfigs={videoPairConfigs}
               videoControlMode={isLoadingSettings ? 'batch' : videoControlMode}
               batchVideoPrompt={isLoadingSettings ? '' : batchVideoPrompt}
-              batchVideoFrames={isLoadingSettings ? 30 : batchVideoFrames}
+              batchVideoFrames={isLoadingSettings ? 60 : batchVideoFrames}
               batchVideoContext={isLoadingSettings ? 10 : batchVideoContext}
               orderedShotImages={shotToEdit?.images || []}
               onShotImagesUpdate={handleShotImagesUpdate}

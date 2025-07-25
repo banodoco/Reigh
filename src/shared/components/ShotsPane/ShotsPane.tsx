@@ -103,6 +103,18 @@ export const ShotsPane: React.FC = () => {
         bottomOffset={isGenerationsPaneLocked ? generationsPaneHeight : 0}
         handlePaneEnter={handlePaneEnter}
         handlePaneLeave={handlePaneLeave}
+        thirdButton={{
+          onClick: () => {
+            setIsShotsPaneLocked(false); // Unlock and close the pane immediately
+            setCurrentShotId(null);
+            navigate('/tools/travel-between-images'); // Then navigate to travel between images
+
+            if (isMobile) {
+              window.dispatchEvent(new CustomEvent('mobilePaneOpen', { detail: { side: null } }));
+            }
+          },
+          ariaLabel: "Open Travel Between Images tool"
+        }}
       />
       <div
         className="pointer-events-none"

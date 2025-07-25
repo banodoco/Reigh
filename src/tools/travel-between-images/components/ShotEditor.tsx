@@ -845,8 +845,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       const settings = {
         videoControlMode: 'batch' as const,
         batchVideoPrompt: orchestratorDetails?.base_prompts?.[0] || params?.prompt || '',
-        batchVideoFrames: orchestratorDetails?.segment_frames?.[0] || params?.frames || 24,
-        batchVideoContext: orchestratorDetails?.frame_overlap?.[0] || params?.context || 16,
+        batchVideoFrames: orchestratorDetails?.segment_frames?.[0] || params?.frames || 60,
+        batchVideoContext: orchestratorDetails?.frame_overlap?.[0] || params?.context || 10,
         batchVideoSteps: (() => {
           // Priority: explicit params.steps, override JSON, orchestratorDetails fields, fallback 20
           if (typeof params?.steps === 'number') return params.steps;
@@ -917,8 +917,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       // Apply the settings
       onVideoControlModeChange(settings.videoControlMode || 'batch');
       onBatchVideoPromptChange(settings.batchVideoPrompt || '');
-      onBatchVideoFramesChange(settings.batchVideoFrames || 24);
-      onBatchVideoContextChange(settings.batchVideoContext || 16);
+      onBatchVideoFramesChange(settings.batchVideoFrames || 60);
+      onBatchVideoContextChange(settings.batchVideoContext || 10);
       onBatchVideoStepsChange(settings.batchVideoSteps || 20);
       onDimensionSourceChange(settings.dimensionSource || 'custom');
       if (settings.customWidth) onCustomWidthChange(settings.customWidth);
