@@ -1,0 +1,22 @@
+# Supabase Edge Functions (use Deno, not needed for frontend build)
+supabase/functions/
+supabase/migrations/
+register_worker.sql
+
+# Database and backend files
+db/
+tasks/
+
+# Documentation
+doc/
+structure_detail/
+DEPLOY_RAILWAY.md
+*.md
+
+# Development files
+.env*
+!.env.production
+
+# Build artifacts that might confuse detection
+dist/
+node_modules/ 
