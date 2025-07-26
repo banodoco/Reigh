@@ -260,6 +260,27 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // Track if generation mode has been determined
   const [isModeReady, setIsModeReady] = useState(false);
 
+  // Detect if settings never finish loading (e.g., network hiccup on mobile)
+  const [settingsError, setSettingsError] = useState<string | null>(null);
+
+  // If settings stay in the loading state for too long, assume failure and continue with defaults
+  useEffect(() => {
+    if (!settingsLoading) {
+      // Reset any existing error once loading completes successfully
+      setSettingsError(null);
+      return;
+    }
+
+    // Give the settings query a reasonable grace period before timing-out
+    const fallbackTimer = setTimeout(() => {
+      console.warn('[ShotEditor] Settings failed to load within expected time. Falling back to defaults.');
+      setSettingsError('Failed to load saved settings – using defaults.');
+      setIsModeReady(true);
+    }, 3500); // 3.5 s chosen to balance UX and real-world mobile latency
+
+    return () => clearTimeout(fallbackTimer);
+  }, [settingsLoading]);
+
   // Reset mode readiness when shot changes
   useEffect(() => {
     if (selectedShot?.id) {
@@ -271,6 +292,11 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   useEffect(() => {
     // Wait for settings to load
     if (settingsLoading) {
+      return;
+    }
+
+    // If we previously bailed out due to a settings load error, we're already ready
+    if (settingsError) {
       return;
     }
 
@@ -288,7 +314,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     }, 50);
 
     return () => clearTimeout(timer);
-  }, [isMobile, generationMode, settingsLoading, onGenerationModeChange]);
+  }, [isMobile, generationMode, settingsLoading, onGenerationModeChange, settingsError]);
 
   
   // Shot name editing state
@@ -1308,6 +1334,11 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             ) : (
               <>
                 <CardHeader>
+                  {settingsError && (
+                    <div className="mb-4 p-3 rounded bg-yellow-100 text-yellow-800 text-sm">
+                      {settingsError}
+                    </div>
+                  )}
                   <div className="flex items-center justify-between">
                     <CardTitle>Manage Shot Images</CardTitle>
                     {!isMobile && (
