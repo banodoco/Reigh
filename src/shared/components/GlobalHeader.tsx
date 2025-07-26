@@ -192,7 +192,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
 
         {/* Mobile Layout (below lg) */}
         <div 
-          className="lg:hidden w-full"
+          className="lg:hidden w-full pt-2"
           style={{
             position: 'relative',
             zIndex: 10,
@@ -203,7 +203,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
           }}
         >
           {/* Top row - Brand + Project Buttons + App Settings */}
-          <div className="flex items-center justify-between h-12 w-full" style={{ paddingLeft: '20px', paddingRight: '16px' }}>
+          <div className="flex items-center justify-between h-16 w-full" style={{ paddingLeft: '20px', paddingRight: '16px' }}>
             {/* Left side - Brand + Project Buttons */}
             <div className="flex items-center space-x-2">
               {/* Brand */}
@@ -275,7 +275,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
           </div>
 
           {/* Bottom row - Project Selector */}
-          <div className="flex items-center h-14 w-full border-t border-wes-vintage-gold/20" style={{ paddingLeft: '16px', paddingRight: '16px' }}>
+          <div className="flex items-center h-[4.5rem] w-full border-t border-wes-vintage-gold/20" style={{ paddingLeft: '16px', paddingRight: '16px' }}>
             <div className="flex-1 p-2 border-2 border-wes-vintage-gold/30 rounded-xl bg-white/50 shadow-wes-vintage">
               {isLoadingProjects && projects.length === 0 ? (
                 <div className="w-full h-10 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 animate-pulse rounded-lg border-2 border-wes-vintage-gold/30"></div>

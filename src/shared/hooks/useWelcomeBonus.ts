@@ -16,14 +16,14 @@ export function useWelcomeBonus() {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
-          console.log('[WelcomeBonus] No authenticated user');
+          // No authenticated user
           return;
         }
 
         // Check if we've already attempted welcome bonus for this user in this session
         const attemptedKey = `welcome_bonus_attempted_${user.id}`;
         if (sessionStorage.getItem(attemptedKey)) {
-          console.log('[WelcomeBonus] Already attempted in this session - previous attempt was at:', sessionStorage.getItem(attemptedKey));
+          // Welcome bonus already attempted this session
           return;
         }
 
@@ -39,12 +39,12 @@ export function useWelcomeBonus() {
           return;
         }
 
-        console.log('[WelcomeBonus] User data:', { userId: user.id, given_credits: userData.given_credits });
+        // Welcome bonus user data available but logging removed
 
         // If user hasn't received welcome credits yet, grant them
         // This includes: false, null, undefined (for existing users before migration)
         if (!userData.given_credits) {
-          console.log('[WelcomeBonus] User eligible for welcome bonus, attempting to grant...');
+          // User eligible for welcome bonus, attempting to grant
           try {
             // Get the user's auth token
             const { data: { session } } = await supabase.auth.getSession();
@@ -76,10 +76,10 @@ export function useWelcomeBonus() {
                 setShowModal(true);
               }, 1000);
               
-              console.log('[WelcomeBonus] Welcome bonus granted successfully:', result);
+              // Welcome bonus granted successfully
             } else {
               const errorText = await response.text();
-              console.log('[WelcomeBonus] Response error:', errorText);
+              // Response error handled
               
               // If user already has credits, that's fine - don't show error
               if (!errorText.includes('already given')) {
@@ -93,7 +93,7 @@ export function useWelcomeBonus() {
             sessionStorage.setItem(attemptedKey, new Date().toISOString());
           }
         } else {
-          console.log('[WelcomeBonus] User already has welcome credits, skipping');
+          // User already has welcome credits, skipping
         }
       } catch (error) {
         console.error('Error in welcome bonus check:', error);

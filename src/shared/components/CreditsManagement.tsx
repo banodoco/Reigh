@@ -287,24 +287,27 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
           <TabsList className="grid w-full grid-cols-3 bg-gray-100 border border-gray-200">
             <TabsTrigger 
               value="purchase"
-              className="data-[state=active]:bg-white data-[state=active]:shadow-sm"
+              className="data-[state=active]:bg-white data-[state=active]:shadow-sm flex flex-col sm:flex-row items-center justify-center gap-0.5 py-2 text-xs sm:text-sm"
+              style={{ whiteSpace: 'normal' }}
             >
-              <CreditCard className="w-4 h-4 mr-2" />
-              Add Credits
+              <CreditCard className="w-4 h-4 mb-0.5 sm:mb-0 sm:mr-2" />
+              <span className="text-center leading-tight">Add<br className="sm:hidden" />Credits</span>
             </TabsTrigger>
             <TabsTrigger 
               value="history"
-              className="data-[state=active]:bg-white data-[state=active]:shadow-sm"
+              className="data-[state=active]:bg-white data-[state=active]:shadow-sm flex flex-col sm:flex-row items-center justify-center gap-0.5 py-2 text-xs sm:text-sm"
+              style={{ whiteSpace: 'normal' }}
             >
-              <History className="w-4 h-4 mr-2" />
-              Transaction History
+              <History className="w-4 h-4 mb-0.5 sm:mb-0 sm:mr-2" />
+              <span className="text-center leading-tight">Transaction<br className="sm:hidden" />History</span>
             </TabsTrigger>
             <TabsTrigger 
               value="task-log"
-              className="data-[state=active]:bg-white data-[state=active]:shadow-sm"
+              className="data-[state=active]:bg-white data-[state=active]:shadow-sm flex flex-col sm:flex-row items-center justify-center gap-0.5 py-2 text-xs sm:text-sm"
+              style={{ whiteSpace: 'normal' }}
             >
-              <Activity className="w-4 h-4 mr-2" />
-              Task Log
+              <Activity className="w-4 h-4 mb-0.5 sm:mb-0 sm:mr-2" />
+              <span className="text-center leading-tight">Task<br className="sm:hidden" />Log</span>
             </TabsTrigger>
           </TabsList>
 

@@ -20,8 +20,9 @@ if (import.meta.env.VITE_APP_ENV === 'dev') {
       email: DEV_USER_EMAIL,
       password: DEV_USER_PASSWORD,
     }).then(({ error }) => {
-      if (error) console.error('Dev auto-login failed:', error);
-      else console.log('Dev user auto-logged in');
+      if (error) {
+        console.error('Dev auto-login failed:', error);
+      }
     });
   }
 }
