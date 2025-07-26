@@ -27,7 +27,8 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
     setEditableName(shot.name); // Reset editable name if shot prop changes
   }, [shot.name]);
 
-  const handleNameEditToggle = () => {
+  const handleNameEditToggle = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
     if (isEditingName) {
       // If was editing and toggling off without saving via button, consider it a cancel
       setEditableName(shot.name); // Reset to original name
@@ -70,7 +71,13 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
     }
   };
 
-  const handleDeleteShot = async () => {
+  const handleSaveNameClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    handleSaveName();
+  };
+
+  const handleDeleteShot = async (e?: React.MouseEvent) => {
+    e?.stopPropagation();
     if (!currentProjectId) {
       toast.error('Cannot delete shot: Project ID is missing.');
       return;
@@ -107,7 +114,8 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
     }
   };
 
-  const handleDuplicateShot = async () => {
+  const handleDuplicateShot = async (e?: React.MouseEvent) => {
+    e?.stopPropagation();
     if (!currentProjectId) {
       toast.error('Cannot duplicate shot: Project ID is missing.');
       return;
@@ -131,7 +139,7 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
       <div 
         key={shot.id} 
         className="mb-6 p-4 border rounded-lg hover:shadow-lg transition-shadow duration-200 relative cursor-pointer"
-        onPointerUp={() => onSelectShot(shot.id)}
+        onClick={() => onSelectShot(shot.id)}
       >
         <div className="flex justify-between items-start mb-3">
           {isEditingName ? (
@@ -151,7 +159,7 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
                 autoFocus
                 maxLength={30}
               />
-              <Button variant="ghost" size="icon" onClick={handleSaveName} className="h-9 w-9">
+              <Button variant="ghost" size="icon" onClick={handleSaveNameClick} className="h-9 w-9">
                 <Check className="h-4 w-4" />
               </Button>
               <Button variant="ghost" size="icon" onClick={handleNameEditToggle} className="h-9 w-9">

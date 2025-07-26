@@ -179,6 +179,22 @@ export const useDuplicateShot = () => {
 
       return { previousShots, projectId };
     },
+    onSuccess: (newShot, { projectId }) => {
+      if (projectId) {
+        // First, explicitly remove any optimistic shots and replace with real data
+        queryClient.setQueryData<Shot[]>(['shots', projectId], (oldShots = []) => {
+          // Remove ALL optimistic shots (in case there are multiple)
+          const shotsWithoutOptimistic = oldShots.filter(shot => 
+            !shot.id.startsWith('optimistic-duplicate-') && 
+            !shot.id.startsWith('optimistic-')
+          );
+          return [newShot, ...shotsWithoutOptimistic];
+        });
+        
+        // Also ensure the shot is properly cached individually
+        queryClient.setQueryData(['shot', newShot.id], newShot);
+      }
+    },
     onError: (err, { projectId }, context) => {
       console.error('Optimistic update failed, rolling back for duplicateShot:', err);
       if (context?.previousShots && projectId) {
@@ -186,11 +202,9 @@ export const useDuplicateShot = () => {
       }
     },
     onSettled: (data, error, { projectId }) => {
-      if (projectId) {
+      // Only invalidate on error - success case is handled in onSuccess
+      if (error && projectId) {
         queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
-      }
-      if (!error && data) {
-  
       }
     },
   });

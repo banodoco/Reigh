@@ -1,6 +1,10 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+.mb-8 {
+    margin-top: 2rem;
+}
 /* Reigh App Styles */
 @layer base {
   :root {
