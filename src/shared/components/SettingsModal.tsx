@@ -210,7 +210,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     const token = generatedToken || getActiveToken()?.token || 'your-api-token';
     
     if (computerType === "windows") {
-      return `git clone https://github.com/peteromallet/Headless-Wan2GP && \\
+      return `git clone --recursive https://github.com/peteromallet/Headless-Wan2GP && \\
 cd Headless-Wan2GP && \\
 python -m venv venv && \\
 venv\\Scripts\\activate && \\
@@ -228,7 +228,7 @@ REM - Git from https://git-scm.com/download/win
 REM - FFmpeg from https://ffmpeg.org/download.html (add to PATH)`;
     } else {
       // Linux command (existing)
-      return `git clone https://github.com/peteromallet/Headless-Wan2GP && \\
+      return `git clone --recursive https://github.com/peteromallet/Headless-Wan2GP && \\
 cd /workspace/Headless-Wan2GP && \\
 apt-get update && apt-get install -y python3.10-venv ffmpeg && \\
 python3.10 -m venv venv && \\
@@ -249,6 +249,7 @@ python headless.py --db-type supabase \\
     
     if (computerType === "windows") {
       return `cd /path/to/your/Headless-Wan2GP && \\
+git pull --recurse-submodules && \\
 venv\\Scripts\\activate && \\
 python headless.py --db-type supabase \\
   --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
@@ -256,7 +257,8 @@ python headless.py --db-type supabase \\
   --supabase-access-token ${token}`;
     } else {
       // Linux / Mac command
-      return `source venv/bin/activate && \\
+      return `git pull --recurse-submodules && \\
+source venv/bin/activate && \\
 python headless.py --db-type supabase \\
   --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
   --supabase-anon-key ${SUPABASE_ANON_KEY} \\
