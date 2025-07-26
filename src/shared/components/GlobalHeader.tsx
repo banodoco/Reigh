@@ -198,7 +198,6 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
             zIndex: 10,
             padding: 0,
             margin: 0,
-            paddingTop: '8px',
             paddingRight: contentOffsetRight ? `${contentOffsetRight}px` : undefined,
             paddingLeft: contentOffsetLeft ? `${contentOffsetLeft}px` : undefined,
           }}
