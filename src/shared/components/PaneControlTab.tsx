@@ -107,11 +107,25 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({ side, isLocked, isOpen,
         data-pane-control
         style={getDynamicStyle()}
         className={cn(
-          'fixed z-[102] flex items-center p-1 bg-zinc-800/80 backdrop-blur-sm border border-zinc-700 rounded-md gap-1 transition-[transform,top] duration-300 ease-smooth',
+          'fixed z-[102] flex flex-col items-center p-1 bg-zinc-800/80 backdrop-blur-sm border border-zinc-700 rounded-md gap-1 transition-[transform,top] duration-300 ease-smooth',
           getPositionClasses(),
           'opacity-100'
         )}
       >
+        {thirdButton && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onPointerUp={thirdButton.onClick}
+            className={cn(
+              'text-zinc-300 hover:text-white hover:bg-zinc-700',
+              side === 'bottom' ? 'h-8 w-16' : 'h-16 w-8'
+            )}
+            aria-label={thirdButton.ariaLabel}
+          >
+            {thirdButton.content || <Square className="h-4 w-4" />}
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="icon"
@@ -258,6 +272,15 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({ side, isLocked, isOpen,
       <Button
         variant="ghost"
         size="icon"
+        onPointerUp={() => toggleLock(true)}
+        className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
+        aria-label="Lock pane"
+      >
+        <LockIcon className="h-4 w-4" />
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon"
         onPointerUp={() => openPane()}
         className={cn(
           'text-zinc-300 hover:text-white hover:bg-zinc-700 h-8 w-8'
@@ -265,15 +288,6 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({ side, isLocked, isOpen,
         aria-label="Open pane"
       >
         {getIcon()}
-      </Button>
-      <Button
-        variant="ghost"
-        size="icon"
-        onPointerUp={() => toggleLock(true)}
-        className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
-        aria-label="Lock pane"
-      >
-        <LockIcon className="h-4 w-4" />
       </Button>
       {thirdButton && (
         <Button
