@@ -14,6 +14,7 @@ import SettingsModal from '@/shared/components/SettingsModal';
 import { useHeaderState } from '@/shared/contexts/ToolPageHeaderContext';
 import { GlobalProcessingWarning } from '@/shared/components/ProcessingWarnings';
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
+import { useWelcomeBonus } from '@/shared/hooks/useWelcomeBonus';
 
 // Scroll to top component
 function ScrollToTop() {
@@ -83,6 +84,9 @@ const Layout: React.FC = () => {
   useEffect(() => {
     setCurrentShotId(null);
   }, [location.pathname, setCurrentShotId]);
+
+  // Check for welcome bonus when user is authenticated
+  useWelcomeBonus();
 
   // Show loading spinner while determining auth state
   if (session === undefined) {
