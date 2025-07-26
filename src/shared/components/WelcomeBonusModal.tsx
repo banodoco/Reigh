@@ -27,19 +27,18 @@ export const WelcomeBonusModal: React.FC<WelcomeBonusModalProps> = ({
         <div className="text-center space-y-4">
           <div className="flex items-center justify-center space-x-2 text-lg">
             <Sparkles className="w-5 h-5 text-yellow-500" />
-            <span className="font-semibold">We've added $5 to your account!</span>
+            <span className="font-semibold">We've added $5 to your account to help test our cloud service!</span>
             <Sparkles className="w-5 h-5 text-yellow-500" />
           </div>
           
           <p className="text-muted-foreground">
-            Your credits are ready to use. Start creating amazing content with our AI-powered tools!
+            Your credits are ready to use. If anything isn't working for you, please let me know in <a href="https://discord.gg/D5K2c6kfhy" className="underline">the Discord</a>!
           </p>
-          
-          <div className="bg-muted/50 rounded-lg p-4">
+          {/* <div className="bg-muted/50 rounded-lg p-4">
             <p className="text-sm text-muted-foreground">
               💡 <strong>Tip:</strong> Credits are used for AI generation tasks. Check your balance anytime in Settings.
             </p>
-          </div>
+          </div> */}
         </div>
         
         <div className="flex justify-center pt-4">
