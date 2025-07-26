@@ -137,82 +137,127 @@ interface ImageGalleryProps {
 const formatMetadataForDisplay = (metadata: DisplayableMetadata): string => {
   
   let displayText = "";
-  if (metadata.prompt) displayText += `Prompt: ${metadata.prompt}\n`;
-  if (metadata.seed) displayText += `Seed: ${metadata.seed}\n`;
-  if (metadata.imagesPerPrompt) displayText += `Images/Prompt: ${metadata.imagesPerPrompt}\n`;
-  if (metadata.width && metadata.height) displayText += `Dimensions: ${metadata.width}x${metadata.height}\n`;
-  if (metadata.num_inference_steps) displayText += `Steps: ${metadata.num_inference_steps}\n`;
-  if (metadata.guidance_scale) displayText += `Guidance: ${metadata.guidance_scale}\n`;
-  if (metadata.scheduler) displayText += `Scheduler: ${metadata.scheduler}\n`;
-  if (metadata.tool_type) displayText += `Tool: ${metadata.tool_type}\n`; // Display tool_type
   
-  if (metadata.activeLoras && metadata.activeLoras.length > 0) {
-    displayText += "Active LoRAs:\n";
-    metadata.activeLoras.forEach(lora => {
-      // Now using lora.name and lora.strength directly
-      const displayName = lora.name || lora.id; // Fallback to ID if name is missing
-      displayText += `  - ${displayName} (Strength: ${lora.strength}%)\n`;
-    });
+  // PROMPT SECTION
+  const prompt = metadata.prompt || 
+                 (metadata as any).originalParams?.orchestrator_details?.prompt;
+  if (prompt) {
+    displayText += `📝 PROMPT\n`;
+    displayText += `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    displayText += `"${prompt}"\n\n`;
   }
-  if (metadata.depthStrength !== undefined) displayText += `Depth Strength: ${(metadata.depthStrength * 100).toFixed(0)}%\n`;
-  if (metadata.softEdgeStrength !== undefined) displayText += `Soft Edge Strength: ${(metadata.softEdgeStrength * 100).toFixed(0)}%\n`;
-  if (metadata.userProvidedImageUrl) {
-    const urlParts = metadata.userProvidedImageUrl.split('/');
-    const imageName = urlParts[urlParts.length -1] || metadata.userProvidedImageUrl;
-    displayText += `User Image: ${imageName}\n`;
+  
+  // GENERATION DETAILS SECTION
+  displayText += `⚙️ GENERATION DETAILS\n`;
+  displayText += `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+  
+  // Extract model from nested structure
+  const model = (metadata as any).originalParams?.orchestrator_details?.model || metadata.model;
+  if (model) displayText += `Model:       ${model}\n`;
+  
+  // Extract seed from nested structure if needed
+  const seed = metadata.seed || (metadata as any).originalParams?.orchestrator_details?.seed;
+  if (seed) displayText += `Seed:        ${seed}\n`;
+  
+  // Extract dimensions from multiple possible locations
+  const resolution = (metadata as any).originalParams?.orchestrator_details?.resolution;
+  if (metadata.width && metadata.height) {
+    displayText += `Dimensions:  ${metadata.width}×${metadata.height}\n`;
+  } else if (resolution) {
+    displayText += `Dimensions:  ${resolution}\n`;
+  }
+  
+  if (metadata.num_inference_steps) displayText += `Steps:       ${metadata.num_inference_steps}\n`;
+  if (metadata.guidance_scale) displayText += `Guidance:    ${metadata.guidance_scale}\n`;
+  if (metadata.scheduler) displayText += `Scheduler:   ${metadata.scheduler}\n`;
+  
+  // LORAS SECTION
+  const additionalLoras = (metadata as any).originalParams?.orchestrator_details?.additional_loras;
+  const activeLoras = metadata.activeLoras;
+  
+  if ((additionalLoras && Object.keys(additionalLoras).length > 0) || (activeLoras && activeLoras.length > 0)) {
+    displayText += `\n🎨 LORAS\n`;
+    displayText += `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    displayText += `Name                         │ Strength\n`;
+    displayText += `─────────────────────────────┼──────────\n`;
+    
+    if (activeLoras && activeLoras.length > 0) {
+      // Use structured activeLoras if available
+      activeLoras.forEach(lora => {
+        const displayName = lora.name || lora.id || 'Unknown';
+        const paddedName = displayName.padEnd(28, ' ').substring(0, 28);
+        const strengthText = `${lora.strength}%`.padStart(8, ' ');
+        displayText += `${paddedName} │ ${strengthText}\n`;
+      });
+    } else if (additionalLoras) {
+      // Fall back to additional_loras from orchestrator_details
+      Object.entries(additionalLoras).forEach(([url, strength]) => {
+        // Extract a display name from the URL
+        const urlParts = url.split('/');
+        const filename = urlParts[urlParts.length - 1] || url;
+        const displayName = filename.replace(/\.(safetensors|ckpt|pt).*$/i, '').replace(/_/g, ' ');
+        const paddedName = displayName.padEnd(28, ' ').substring(0, 28);
+        const strengthText = `${((strength as number) * 100).toFixed(0)}%`.padStart(8, ' ');
+        displayText += `${paddedName} │ ${strengthText}\n`;
+      });
+    }
+  }
+  
+  // ADDITIONAL SETTINGS SECTION (if any)
+  const hasAdditionalSettings = metadata.depthStrength !== undefined || 
+                               metadata.softEdgeStrength !== undefined || 
+                               metadata.userProvidedImageUrl;
+  
+  if (hasAdditionalSettings) {
+    displayText += `\n🔧 ADDITIONAL SETTINGS\n`;
+    displayText += `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    
+    if (metadata.depthStrength !== undefined) 
+      displayText += `Depth Strength:      ${(metadata.depthStrength * 100).toFixed(0)}%\n`;
+    
+    if (metadata.softEdgeStrength !== undefined) 
+      displayText += `Soft Edge Strength:  ${(metadata.softEdgeStrength * 100).toFixed(0)}%\n`;
+    
+    if (metadata.userProvidedImageUrl) {
+      const urlParts = metadata.userProvidedImageUrl.split('/');
+      const imageName = urlParts[urlParts.length -1] || metadata.userProvidedImageUrl;
+      displayText += `User Image:          ${imageName}\n`;
+    }
   }
   
   return displayText.trim() || "No metadata available.";
 };
 
 // Add helper component below imports (before ImageGallery component) or inside file near top: create InfoPopover
-const InfoPopover: React.FC<{ metadata: DisplayableMetadata | undefined; metadataForDisplay: string }> = ({ metadata, metadataForDisplay }) => {
-  const [isOpen, setIsOpen] = useState(false);
-
-  // Close popover when pointer leaves both trigger and content
-  const closePopover = () => setIsOpen(false);
-
+const InfoPopover: React.FC<{ 
+  metadata: DisplayableMetadata | undefined; 
+  metadataForDisplay: string;
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+}> = ({ metadata, metadataForDisplay, isOpen, onOpenChange }) => {
   return (
-    <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-      <Popover open={isOpen} onOpenChange={setIsOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            variant="secondary"
-            size="icon"
-            className="h-7 w-7 p-0 rounded-full bg-black/50 hover:bg-black/70 text-white"
-            onClick={() => setIsOpen((prev) => !prev)}
-            onPointerLeave={(e) => {
-              // If pointer leaves the button and not heading into popover content, close after a short delay
-              // Use setTimeout to allow entering the content without closing immediately
-              // Use requestAnimationFrame for better performance than setTimeout
-              requestAnimationFrame(() => {
-                if (!document.querySelector(':hover')?.closest('[data-info-popover]')) {
-                  closePopover();
-                }
-              });
-            }}
-          >
-            <Info className="h-3.5 w-3.5" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent
-          side="bottom"
-          className="max-w-md text-xs p-3 leading-relaxed shadow-lg bg-background border max-h-80 overflow-y-auto"
-          onPointerLeave={closePopover}
-          data-info-popover="true"
-        >
-          {metadata?.userProvidedImageUrl && (
-            <img
-              src={metadata.userProvidedImageUrl}
-              alt="User provided image preview"
-              className="w-full h-auto max-h-24 object-contain rounded-sm mb-2 border"
-              loading="lazy"
-            />
-          )}
-          <pre className="font-sans whitespace-pre-wrap">{metadataForDisplay}</pre>
-        </PopoverContent>
-      </Popover>
-    </div>
+    <Popover open={isOpen} onOpenChange={onOpenChange}>
+      <PopoverTrigger asChild>
+        <div className="absolute inset-0 pointer-events-none" />
+      </PopoverTrigger>
+      <PopoverContent
+        side="right"
+        align="start"
+        className="max-w-md text-xs p-3 leading-relaxed shadow-lg bg-background border max-h-80 overflow-y-auto z-50"
+        onPointerLeave={() => onOpenChange(false)}
+        data-info-popover="true"
+      >
+        {metadata?.userProvidedImageUrl && (
+          <img
+            src={metadata.userProvidedImageUrl}
+            alt="User provided image preview"
+            className="w-full h-auto max-h-24 object-contain rounded-sm mb-2 border"
+            loading="lazy"
+          />
+        )}
+        <pre className="font-sans whitespace-pre-wrap">{metadataForDisplay}</pre>
+      </PopoverContent>
+    </Popover>
   );
 };
 
@@ -552,7 +597,10 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     // 4. Apply search filter (always apply, even in server pagination mode)
     if (searchTerm.trim()) {
       currentFiltered = currentFiltered.filter(image => {
-        const prompt = image.prompt || image.metadata?.prompt || '';
+        const prompt = image.prompt || 
+                      image.metadata?.prompt || 
+                      (image.metadata as any)?.originalParams?.orchestrator_details?.prompt || 
+                      '';
         return prompt.toLowerCase().includes(searchTerm.toLowerCase());
       });
     }
@@ -780,8 +828,25 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                 
                 let aspectRatioPadding = '100%'; 
                 let minHeight = '120px'; // Minimum height for very small images
-                if (image.metadata?.width && image.metadata?.height) {
-                  const calculatedPadding = (image.metadata.height / image.metadata.width) * 100;
+                
+                // Try to get dimensions from multiple sources
+                let width = image.metadata?.width;
+                let height = image.metadata?.height;
+                
+                // If not found, try to extract from resolution string
+                if (!width || !height) {
+                  const resolution = (image.metadata as any)?.originalParams?.orchestrator_details?.resolution;
+                  if (resolution && typeof resolution === 'string' && resolution.includes('x')) {
+                    const [w, h] = resolution.split('x').map(Number);
+                    if (!isNaN(w) && !isNaN(h)) {
+                      width = w;
+                      height = h;
+                    }
+                  }
+                }
+                
+                if (width && height) {
+                  const calculatedPadding = (height / width) * 100;
                   // Ensure reasonable aspect ratio bounds
                   const minPadding = 60; // Minimum 60% height (for very wide images)
                   const maxPadding = 200; // Maximum 200% height (for very tall images)
@@ -806,10 +871,15 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                   );
                 }
 
+                // State for hover popover
+                const [isHovered, setIsHovered] = useState(false);
+
                 // Conditionally wrap with DraggableImage only on desktop to avoid interfering with mobile scrolling
                 const imageContent = (
                   <div 
                       className="border rounded-lg overflow-hidden hover:shadow-md transition-shadow relative group bg-card"
+                      onMouseEnter={() => setIsHovered(true)}
+                      onMouseLeave={() => setIsHovered(false)}
                   >
                     <div className="relative w-full">
                     <div 
@@ -960,9 +1030,21 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                                 </Button>
                             </div>
 
-                            {/* Info button (shown on hover) */}
+                            {/* Info popover (shown on hover) */}
                                 {image.metadata && (
-                                 <InfoPopover metadata={image.metadata} metadataForDisplay={metadataForDisplay} />
+                                 <>
+                                   <InfoPopover 
+                                     metadata={image.metadata} 
+                                     metadataForDisplay={metadataForDisplay}
+                                     isOpen={isHovered}
+                                     onOpenChange={setIsHovered}
+                                   />
+                                   <div className="opacity-40 group-hover:opacity-70 transition-opacity">
+                                     <div className="h-7 w-7 rounded-full bg-black/30 flex items-center justify-center">
+                                       <Info className="h-3.5 w-3.5 text-white" />
+                                     </div>
+                                   </div>
+                                 </>
                                  )}
 
                             {/* Apply settings button temporarily disabled */}

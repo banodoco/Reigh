@@ -582,8 +582,11 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
           </div>
 
           <div ref={galleryRef} className="mt-2">
-            {isLoadingGenerations ? (
-              <SkeletonGallery 
+            {/* Show SkeletonGallery only on the very first load when no images are available yet.
+               During subsequent page changes we keep the existing gallery visible so its
+               header/controls do not disappear. */}
+            {isLoadingGenerations && imagesToShow.length === 0 ? (
+              <SkeletonGallery
                 count={20}
                 columns={{ base: 2, sm: 3, md: 4, lg: 5 }}
                 showControls={true}

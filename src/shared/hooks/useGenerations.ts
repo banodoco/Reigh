@@ -150,7 +150,10 @@ export async function fetchGenerations(
   const items = data?.map((item: any) => ({
     id: item.id,
     url: item.location,
-    prompt: item.params?.prompt || item.metadata?.prompt || 'No prompt',
+    prompt: item.params?.originalParams?.orchestrator_details?.prompt || 
+            item.params?.prompt || 
+            item.metadata?.prompt || 
+            'No prompt',
     metadata: item.params || item.metadata || {},
     createdAt: item.created_at,
     isVideo: item.type?.includes('video'),

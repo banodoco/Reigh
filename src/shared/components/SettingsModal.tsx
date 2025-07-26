@@ -210,16 +210,16 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     const token = generatedToken || getActiveToken()?.token || 'your-api-token';
     
     if (computerType === "windows") {
-      return `git clone --recursive https://github.com/peteromallet/Headless-Wan2GP && \\
-cd Headless-Wan2GP && \\
-python -m venv venv && \\
-venv\\Scripts\\activate && \\
-pip install --no-cache-dir torch==2.6.0 torchvision torchaudio -f https://download.pytorch.org/whl/cu124 && \\
-pip install --no-cache-dir -r Wan2GP/requirements.txt && \\
-pip install --no-cache-dir -r requirements.txt && \\
-python headless.py --db-type supabase \\
-  --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
-  --supabase-anon-key ${SUPABASE_ANON_KEY} \\
+      return `git clone --recursive https://github.com/peteromallet/Headless-Wan2GP; \`
+cd Headless-Wan2GP; \`
+python -m venv venv; \`
+& venv\\Scripts\\Activate.ps1; \`
+pip install --no-cache-dir torch==2.6.0 torchvision torchaudio -f https://download.pytorch.org/whl/cu124; \`
+pip install --no-cache-dir -r Wan2GP/requirements.txt; \`
+pip install --no-cache-dir -r requirements.txt; \`
+python headless.py --db-type supabase \`
+  --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \`
+  --supabase-anon-key ${SUPABASE_ANON_KEY} \`
   --supabase-access-token ${token}
 
 REM Prerequisites (install manually if not already installed):
@@ -248,12 +248,11 @@ python headless.py --db-type supabase \\
     const token = generatedToken || getActiveToken()?.token || 'your-api-token';
     
     if (computerType === "windows") {
-      return `
-git pull --recurse-submodules && \\
-venv\\Scripts\\activate && \\
-python headless.py --db-type supabase \\
-  --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
-  --supabase-anon-key ${SUPABASE_ANON_KEY} \\
+      return `git pull --recurse-submodules; \`
+& venv\\Scripts\\Activate.ps1; \`
+python headless.py --db-type supabase \`
+  --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \`
+  --supabase-anon-key ${SUPABASE_ANON_KEY} \`
   --supabase-access-token ${token}`;
     } else {
       // Linux / Mac command
