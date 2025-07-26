@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useRenderLogger } from '@/shared/hooks/useRenderLogger';
 import ShotGroup from './ShotGroup';
 import NewGroupDropZone from './NewGroupDropZone';
@@ -26,13 +26,27 @@ export const ShotsPane: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
 
   useRenderLogger('ShotsPane', { shotsCount: shots?.length, currentPage });
+  
+  // Filter shots to only include images with positions (similar to ShotEditor.tsx approach)
+  const filteredShots = useMemo(() => {
+    if (!shots) return [];
+    
+    return shots.map(shot => ({
+      ...shot,
+      images: (shot.images || []).filter(img => 
+        (img as any).position !== null && (img as any).position !== undefined
+      )
+    }));
+  }, [shots]);
+  
   // Adjust currentPage if shots length changes (e.g., after create/delete)
   useEffect(() => {
-    const totalPages = Math.max(1, Math.ceil((shots?.length ?? 0) / pageSize));
+    const totalPages = Math.max(1, Math.ceil((filteredShots?.length ?? 0) / pageSize));
     if (currentPage > totalPages) {
       setCurrentPage(totalPages);
     }
-  }, [shots?.length]);
+  }, [filteredShots?.length]);
+  
   const createShotMutation = useCreateShot();
   const handleExternalImageDropMutation = useHandleExternalImageDrop();
   const navigate = useNavigate();
@@ -164,12 +178,12 @@ export const ShotsPane: React.FC = () => {
               ))
             )}
             {error && <p className="text-red-500">Error loading shots: {error.message}</p>}
-            {shots && shots
+            {filteredShots && filteredShots
               .slice((currentPage - 1) * pageSize, currentPage * pageSize)
               .map(shot => <ShotGroup key={shot.id} shot={shot} />)}
           </div>
           {/* Pagination Controls */}
-          {shots && shots.length > pageSize && (
+          {filteredShots && filteredShots.length > pageSize && (
             <div className="p-2 border-t border-zinc-800 flex items-center justify-between flex-shrink-0">
               <Button
                 variant="ghost"
@@ -181,14 +195,14 @@ export const ShotsPane: React.FC = () => {
                 Previous
               </Button>
               <span className="text-zinc-400 text-sm">
-                Page {currentPage} of {Math.ceil(shots.length / pageSize)}
+                Page {currentPage} of {Math.ceil(filteredShots.length / pageSize)}
               </span>
               <Button
                 variant="ghost"
                 size="sm"
                 className="text-zinc-400 hover:text-zinc-100 hover:bg-zinc-700/50 active:bg-zinc-600/60"
-                disabled={currentPage === Math.ceil(shots.length / pageSize)}
-                onClick={() => setCurrentPage((p) => Math.min(Math.ceil(shots.length / pageSize), p + 1))}
+                disabled={currentPage === Math.ceil(filteredShots.length / pageSize)}
+                onClick={() => setCurrentPage((p) => Math.min(Math.ceil(filteredShots.length / pageSize), p + 1))}
               >
                 Next
               </Button>
