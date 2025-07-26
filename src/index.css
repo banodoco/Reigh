@@ -1626,8 +1626,12 @@
 }
 
 @layer utilities {
+  /* Override Tailwind's min-h-screen to account for mobile dynamic viewport height */
   .min-h-screen {
-    min-height: 85vh;
+    /* Fallback for older browsers */
+    min-height: 100vh;
+    /* Use dynamic viewport unit where supported to avoid address-bar shift issues */
+    min-height: 100dvh;
   }
 }
 
