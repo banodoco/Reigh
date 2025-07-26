@@ -3,47 +3,81 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
 /**
- * Hook to detect when a user has received the welcome bonus and show a notification
+ * Hook to check for new users and grant welcome bonus
  */
 export function useWelcomeBonus() {
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
 
-    const checkForWelcomeBonus = async () => {
+    const checkAndGrantWelcomeBonus = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        // Check if we've already shown the welcome message for this user
-        const welcomeShownKey = `welcome_bonus_shown_${user.id}`;
-        if (localStorage.getItem(welcomeShownKey)) return;
+        // Check if we've already attempted welcome bonus for this user in this session
+        const attemptedKey = `welcome_bonus_attempted_${user.id}`;
+        if (sessionStorage.getItem(attemptedKey)) return;
 
-        // Check if user has a welcome bonus transaction
-        const { data: welcomeBonus, error } = await supabase
-          .from('credits_ledger')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('type', 'manual')
-          .eq('metadata->description', 'Welcome bonus')
+        // Check if user has already received welcome credits
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('given_credits')
+          .eq('id', user.id)
           .single();
 
-        if (error && error.code !== 'PGRST116') {
-          console.error('Error checking welcome bonus:', error);
+        if (userError) {
+          console.error('Error checking user welcome status:', userError);
           return;
         }
 
-        // If welcome bonus exists and we haven't shown the notification yet
-        if (welcomeBonus) {
-          // Small delay to ensure the UI is ready
-          timeoutId = setTimeout(() => {
-            toast.success("We've added $5 to your account!", {
-              description: "Welcome to Reigh! Your credits are ready to use.",
-              duration: 5000,
+        // If user hasn't received welcome credits yet, grant them
+        if (!userData.given_credits) {
+          try {
+            // Get the user's auth token
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session?.access_token) return;
+
+            // Call the grant-credits function
+            const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/grant-credits`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${session.access_token}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                userId: user.id,
+                amount: 5, // $5
+                isWelcomeBonus: true,
+              }),
             });
-            
-            // Mark as shown so we don't show it again
-            localStorage.setItem(welcomeShownKey, 'true');
-          }, 1000);
+
+            if (response.ok) {
+              const result = await response.json();
+              
+              // Small delay to ensure the UI is ready
+              timeoutId = setTimeout(() => {
+                toast.success("We've added $5 to your account!", {
+                  description: "Welcome to Reigh! Your credits are ready to use.",
+                  duration: 5000,
+                });
+              }, 1000);
+              
+              console.log('Welcome bonus granted:', result);
+            } else {
+              const errorText = await response.text();
+              console.log('Welcome bonus response:', errorText);
+              
+              // If user already has credits, that's fine - don't show error
+              if (!errorText.includes('already given')) {
+                console.error('Error granting welcome bonus:', errorText);
+              }
+            }
+          } catch (error) {
+            console.error('Error calling grant-credits function:', error);
+          } finally {
+            // Mark as attempted regardless of success/failure to avoid spam
+            sessionStorage.setItem(attemptedKey, 'true');
+          }
         }
       } catch (error) {
         console.error('Error in welcome bonus check:', error);
@@ -51,7 +85,7 @@ export function useWelcomeBonus() {
     };
 
     // Check for welcome bonus when the hook mounts
-    checkForWelcomeBonus();
+    checkAndGrantWelcomeBonus();
 
     // Cleanup timeout on unmount
     return () => {
