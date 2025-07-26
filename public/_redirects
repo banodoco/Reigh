@@ -1,0 +1,13 @@
+# Static assets should be served directly
+/assets/*  /assets/:splat  200
+/favicon.ico  /favicon.ico  200
+/manifest.json  /manifest.json  200
+/sw.js  /sw.js  200
+/robots.txt  /robots.txt  200
+/*.png  /:splat  200
+/*.svg  /:splat  200
+/*.webp  /:splat  200
+/*.ico  /:splat  200
+
+# SPA fallback for all other routes
+/*  /index.html  200 

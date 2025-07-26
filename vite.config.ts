@@ -24,6 +24,11 @@ export default defineConfig(({ mode }: { mode: string }) => {
         "reigh.art",
         "www.reigh.art"
       ],
+      // Fix SPA fallback to not interfere with static assets
+      cors: true,
+      headers: {
+        'Cache-Control': 'no-cache'
+      }
     },
     plugins: [
       react(),
@@ -37,6 +42,16 @@ export default defineConfig(({ mode }: { mode: string }) => {
     build: {
       outDir: "dist",
       sourcemap: true,
+      // Ensure proper asset handling
+      assetsDir: "assets",
+      rollupOptions: {
+        output: {
+          // Ensure proper MIME types for chunked files
+          entryFileNames: "assets/[name]-[hash].js",
+          chunkFileNames: "assets/[name]-[hash].js",
+          assetFileNames: "assets/[name]-[hash].[ext]"
+        }
+      }
     },
     optimizeDeps: {
       exclude: ["@ffmpeg/ffmpeg", "@ffmpeg/util"],
