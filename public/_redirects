@@ -1,13 +1,18 @@
-# Static assets should be served directly
-/assets/*  /assets/:splat  200
+# Static assets and user content should be served directly
+/assets/*  /assets/$1  200
+/files/*  /files/$1  200
+/lovable-uploads/*  /lovable-uploads/$1  200
+/data/*  /data/$1  200
+/ffmpeg/*  /ffmpeg/$1  200
+
+# Specific static files
 /favicon.ico  /favicon.ico  200
+/favicon-*.png  /favicon-$1.png  200
 /manifest.json  /manifest.json  200
 /sw.js  /sw.js  200
 /robots.txt  /robots.txt  200
-/*.png  /:splat  200
-/*.svg  /:splat  200
-/*.webp  /:splat  200
-/*.ico  /:splat  200
+/placeholder.svg  /placeholder.svg  200
+/brush-paintbrush-icon.webp  /brush-paintbrush-icon.webp  200
 
-# SPA fallback for all other routes
+# SPA fallback for all other routes (must be last)
 /*  /index.html  200 

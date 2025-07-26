@@ -24,11 +24,8 @@ export default defineConfig(({ mode }: { mode: string }) => {
         "reigh.art",
         "www.reigh.art"
       ],
-      // Fix SPA fallback to not interfere with static assets
-      cors: true,
-      headers: {
-        'Cache-Control': 'no-cache'
-      }
+      // Remove aggressive no-cache to prevent mobile network stalls
+      cors: true
     },
     plugins: [
       react(),
