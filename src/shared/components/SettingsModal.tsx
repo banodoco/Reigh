@@ -229,7 +229,7 @@ REM - FFmpeg from https://ffmpeg.org/download.html (add to PATH)`;
     } else {
       // Linux command (existing)
       return `git clone --recursive https://github.com/peteromallet/Headless-Wan2GP && \\
-cd /workspace/Headless-Wan2GP && \\
+cd Headless-Wan2GP && \\
 apt-get update && apt-get install -y python3.10-venv ffmpeg && \\
 python3.10 -m venv venv && \\
 source venv/bin/activate && \\
@@ -248,7 +248,7 @@ python headless.py --db-type supabase \\
     const token = generatedToken || getActiveToken()?.token || 'your-api-token';
     
     if (computerType === "windows") {
-      return `cd /path/to/your/Headless-Wan2GP && \\
+      return `
 git pull --recurse-submodules && \\
 venv\\Scripts\\activate && \\
 python headless.py --db-type supabase \\
