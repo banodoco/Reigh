@@ -22,6 +22,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/shar
 import { Info, X } from 'lucide-react';
 import HoverScrubVideo from '@/shared/components/HoverScrubVideo';
 import { Slider } from "@/shared/components/ui/slider";
+import { supabase } from '@/integrations/supabase/client';
 
 // Description Modal Component
 const DescriptionModal: React.FC<{
@@ -571,7 +572,7 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
     const [addForm, setAddForm] = useState({
         name: '',
         description: '',
-        created_by_is_you: true,
+        created_by_is_you: false,
         created_by_username: '',
         huggingface_url: '',
         base_model: 'Wan 2.1 T2V',
@@ -584,6 +585,7 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [previewUrls, setPreviewUrls] = useState<string[]>([]);
     const [fileInputKey, setFileInputKey] = useState<number>(0); // Used to reset FileInput
+    const [userName, setUserName] = useState<string>('');
 
     // Local Wan LoRAs (files dropped into Headless-Wan2GP/loras)
     const [localWanLoras, setLocalWanLoras] = useState<LoraModel[]>([]);
@@ -607,6 +609,33 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
             newUrls.forEach(url => URL.revokeObjectURL(url));
         };
     }, [sampleFiles, mainGenerationIndex]); // Removed previewUrls from dependencies to prevent infinite loop
+
+    // Fetch current user's name
+    useEffect(() => {
+        const fetchUserName = async () => {
+            try {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user) return;
+
+                const { data, error } = await supabase
+                    .from('users')
+                    .select('name')
+                    .eq('id', user.id)
+                    .single();
+
+                if (error) {
+                    console.error('Error fetching user name:', error);
+                    return;
+                }
+
+                setUserName(data?.name || '');
+            } catch (error) {
+                console.error('Error in fetchUserName:', error);
+            }
+        };
+
+        fetchUserName();
+    }, []);
 
     const extractFilenameFromUrl = (url: string) => {
         try {
@@ -720,7 +749,7 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
             const newLora: LoraModel = {
                 "Model ID": uniqueFilename,
                 Name: addForm.name,
-                Author: addForm.created_by_is_you ? 'You' : (addForm.created_by_username || 'Unknown'),
+                Author: addForm.created_by_is_you ? (userName || 'You') : (addForm.created_by_username || 'Unknown'),
                 Description: addForm.description || undefined,
                 Images: uploadedSamples.map(sample => ({
                     url: sample.url,
@@ -752,7 +781,7 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
             setAddForm({
                 name: '',
                 description: '',
-                created_by_is_you: true,
+                created_by_is_you: false,
                 created_by_username: '',
                 huggingface_url: '',
                 base_model: 'Wan 2.1 T2V',

@@ -224,7 +224,7 @@ export default function HomePage() {
   }
 
     return (
-    <PageFadeIn className="h-screen wes-texture relative overflow-hidden">
+    <PageFadeIn className="wes-texture relative">
       <WesAndersonBackground />
       
       {/* Top Navigation Links */}
@@ -282,9 +282,9 @@ export default function HomePage() {
         </button>
       </div> */}
 
-      <div className="container mx-auto px-4 relative z-10 h-screen flex items-center justify-center">
+      <div className="container mx-auto px-4 relative z-10 flex items-center justify-center min-h-screen py-16">
         {/* Hero Section */}
-        <div className="text-center w-full -mt-16">
+        <div className="text-center w-full">
           <div className="max-w-4xl mx-auto">
 
 
@@ -487,7 +487,7 @@ export default function HomePage() {
 
             {/* See Examples Trigger */}
             <FadeInSection delayMs={350}>
-              <div className="mt-12 flex justify-center">
+              <div className="mt-8 mb-6 flex justify-center">
                 {/* Placeholder icon to balance the design */}
                 <Infinity className="w-9 h-9 text-wes-vintage-gold/80" />
                 {/*

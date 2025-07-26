@@ -26,7 +26,6 @@ interface PersistedEditorControlsSettings {
   generationSettings?: GenerationControlValues;
   bulkEditSettings?: BulkEditControlValues;
   activeTab?: EditorMode;
-  isAIPromptSectionExpanded?: boolean;
 }
 
 interface PromptToEditState {
@@ -99,7 +98,6 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
       generationSettings: [generationControlValues, setGenerationControlValues],
       bulkEditSettings: [bulkEditControlValues, setBulkEditControlValues],
       activeTab: [activeTab, setActiveTab],
-      isAIPromptSectionExpanded: [isAIPromptSectionExpanded, setIsAIPromptSectionExpanded],
     }
   );
 
@@ -113,6 +111,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
       setPromptToEdit(null);
       setInternalPrompts(initialPrompts.map(p => ({ ...p })));
       setActivePromptIdForFullView(null);
+      setIsAIPromptSectionExpanded(false); // Always start with AI section closed
     }
   }, [isOpen, initialPrompts]);
 
@@ -336,8 +335,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
 
   const handleToggleAIPromptSection = useCallback(() => {
     setIsAIPromptSectionExpanded(prev => !prev);
-    markAsInteracted();
-  }, [markAsInteracted]);
+  }, []);
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleFinalSaveAndClose()}>

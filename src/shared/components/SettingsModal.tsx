@@ -255,8 +255,9 @@ python headless.py --db-type supabase \\
   --supabase-anon-key ${SUPABASE_ANON_KEY} \\
   --supabase-access-token ${token}`;
     } else {
-      // Linux command (existing)
-      return `python headless.py --db-type supabase \\
+      // Linux / Mac command
+      return `source venv/bin/activate && \\
+python headless.py --db-type supabase \\
   --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
   --supabase-anon-key ${SUPABASE_ANON_KEY} \\
   --supabase-access-token ${token}`;
