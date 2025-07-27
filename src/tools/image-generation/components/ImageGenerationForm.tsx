@@ -9,7 +9,6 @@ import { UploadCloud, PlusCircle, Edit3, Trash2 } from "lucide-react";
 import { ActiveLoRAsDisplay, ActiveLora } from "@/shared/components/ActiveLoRAsDisplay";
 import { toast } from "sonner";
 import { cropImageToClosestAspectRatio, CropResult } from "@/shared/lib/imageCropper";
-import PromptEditorModal from "@/shared/components/PromptEditorModal";
 import { 
   Tooltip, 
   TooltipContent, 
@@ -40,6 +39,44 @@ const LazyLoraSelectorModal = React.lazy(() =>
 const LazyPromptEditorModal = React.lazy(() => 
   import("@/shared/components/PromptEditorModal")
 );
+
+// Error boundary for dynamic import failures
+class DynamicImportErrorBoundary extends React.Component<
+  { children: React.ReactNode; fallback: () => React.ReactNode },
+  { hasError: boolean; retryCount: number }
+> {
+  constructor(props: { children: React.ReactNode; fallback: () => React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, retryCount: 0 };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error) {
+    // Check if it's a dynamic import error
+    if (error.message.includes('Failed to fetch dynamically imported module') || 
+        error.message.includes('Loading chunk')) {
+      console.warn('Dynamic import failed, this is often due to deployment/cache issues:', error);
+    }
+  }
+
+  handleRetry = () => {
+    this.setState({ 
+      hasError: false, 
+      retryCount: this.state.retryCount + 1 
+    });
+  };
+
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback();
+    }
+
+    return this.props.children;
+  }
+}
 
 type GenerationMode = 'wan-local'; // Only wan-local is supported now
 
@@ -882,14 +919,25 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       </Suspense>
         
       <Suspense fallback={<div>Loading PromptEditorModal...</div>}>
-        <LazyPromptEditorModal
-          isOpen={isPromptModalOpen}
-          onClose={() => setIsPromptModalOpen(false)}
-          prompts={prompts}
-          onSave={handleSavePromptsFromModal}
-          generatePromptId={generatePromptId}
-          apiKey={openaiApiKey}
-        />
+        <DynamicImportErrorBoundary
+          fallback={() => (
+            <div>
+              Failed to load PromptEditorModal. Please try again later.
+              <button onClick={() => window.location.reload()} className="ml-2 text-primary hover:underline">
+                Retry
+              </button>
+            </div>
+          )}
+        >
+          <LazyPromptEditorModal
+            isOpen={isPromptModalOpen}
+            onClose={() => setIsPromptModalOpen(false)}
+            prompts={prompts}
+            onSave={handleSavePromptsFromModal}
+            generatePromptId={generatePromptId}
+            apiKey={openaiApiKey}
+          />
+        </DynamicImportErrorBoundary>
       </Suspense>
 
       <CreateShotModal

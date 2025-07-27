@@ -304,18 +304,9 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
   return (
     <div className={containerClass}>
       <div className="flex justify-between items-center mb-1 gap-2">
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="text-sm font-semibold text-zinc-200 flex-1 whitespace-nowrap overflow-hidden text-ellipsis cursor-default min-w-0">
-                {abbreviatedTaskType}
-              </span>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>{displayTaskType}</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        <span className="text-sm font-semibold text-zinc-200 flex-1 whitespace-nowrap overflow-hidden text-ellipsis cursor-default min-w-0">
+          {abbreviatedTaskType}
+        </span>
         <span
           className={`px-2 py-0.5 text-xs rounded-full flex-shrink-0 ${
             task.status === 'In Progress' ? 'bg-blue-500 text-blue-100' :

@@ -89,7 +89,7 @@ const PaginationControls: React.FC<PaginationControlsProps> = ({
   };
 
   return (
-    <div className="flex items-center justify-between px-4 py-2 text-xs text-zinc-400">
+    <div className="flex items-center justify-between px-4 py-2 text-[11px] text-zinc-400">
       <span>
         {totalItems} {getFilterLabel()}, showing {ITEMS_PER_PAGE} per page
       </span>
@@ -103,7 +103,7 @@ const PaginationControls: React.FC<PaginationControlsProps> = ({
         >
           <ChevronLeft className="h-4 w-4" />
         </Button>
-        <span className="text-zinc-300">
+        <span className="text-zinc-300 text-[11px]">
           Page {currentPage} of {totalPages}
         </span>
         <Button
@@ -201,13 +201,13 @@ export const TasksPane: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
     if (type === 'Succeeded') {
       toast({
         title: 'Recent Successes',
-        description: `${count} generation${count === 1 ? '' : 's'} succeeded in the past hour`,
+        description: `${count} generation${count === 1 ? '' : 's'} in past hour`,
         variant: 'default',
       });
     } else if (type === 'Failed') {
       toast({
         title: 'Recent Failures',
-        description: `${count} generation${count === 1 ? '' : 's'} failed in the past hour`,
+        description: `${count} generation${count === 1 ? '' : 's'} in past hour`,
         variant: 'destructive',
       });
     }
@@ -381,7 +381,7 @@ export const TasksPane: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
             </div>
           </div>
 
-          {/* Top Pagination Controls */}
+          {/* Pagination Controls */}
           <PaginationControls
             currentPage={currentPage}
             totalPages={totalPages}
