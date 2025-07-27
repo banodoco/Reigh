@@ -109,7 +109,10 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
     return displayUrl;
   }, [displayUrl, image.thumbUrl, image.url, imageRetryCount]);
 
-  const metadataForDisplay = image.metadata ? formatMetadataForDisplay(image.metadata) : "No metadata available.";
+  // Expensive formatting – memoise so it only recalculates when the metadata object actually changes
+  const metadataForDisplay = useMemo(() => {
+    return image.metadata ? formatMetadataForDisplay(image.metadata) : "No metadata available.";
+  }, [image.metadata]);
   const isCurrentDeleting = isDeleting;
   const imageKey = image.id || `image-${actualDisplayUrl}-${index}`;
 
