@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/shared/components/ui/button";
 import {
   Dialog,
@@ -37,8 +37,18 @@ const ASPECT_RATIOS = Object.keys(ASPECT_RATIO_TO_RESOLUTION)
 
 export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, onOpenChange }) => {
   const [projectName, setProjectName] = useState('');
-  const [aspectRatio, setAspectRatio] = useState<string>(ASPECT_RATIOS[0].value);
-  const { addNewProject, isCreatingProject } = useProject();
+  const [aspectRatio, setAspectRatio] = useState<string>('16:9');
+  const { addNewProject, isCreatingProject, projects, selectedProjectId } = useProject();
+
+  // Get current project to use its aspect ratio as default
+  const currentProject = projects.find(p => p.id === selectedProjectId);
+  
+  // Update default aspect ratio when modal opens or current project changes
+  useEffect(() => {
+    if (isOpen && currentProject?.aspectRatio) {
+      setAspectRatio(currentProject.aspectRatio);
+    }
+  }, [isOpen, currentProject?.aspectRatio]);
 
   const handleCreateProject = async () => {
     let finalProjectName = projectName.trim();
@@ -55,7 +65,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, 
       if (newProject) {
   
         setProjectName('');
-        setAspectRatio(ASPECT_RATIOS[0].value);
+        setAspectRatio(currentProject?.aspectRatio || '16:9');
         onOpenChange(false);
       }
     } catch (error) {
