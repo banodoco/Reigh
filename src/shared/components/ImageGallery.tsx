@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Trash2, Info, Settings, CheckCircle, AlertTriangle, Download, PlusCircle, Check, Sparkles, Filter, Search, X, Star } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
 import { 
@@ -30,6 +30,7 @@ import { ShotFilter } from "@/shared/components/ShotFilter";
 import { useIsMobile } from "@/shared/hooks/use-mobile";
 import { TimeStamp } from "@/shared/components/TimeStamp";
 import { useToggleGenerationStar } from '@/shared/hooks/useGenerations';
+import * as PopoverPrimitive from "@radix-ui/react-popover";
 
 // Define the structure for individual LoRA details within metadata
 export interface MetadataLora {
@@ -67,6 +68,7 @@ export interface DisplayableMetadata extends Record<string, any> {
 export interface GeneratedImageWithMetadata {
   id: string;
   url: string; // This will now be a relative path for DB-sourced images
+  thumbUrl?: string; // Thumbnail URL for faster loading
   prompt?: string;
   seed?: number;
   metadata?: DisplayableMetadata;
@@ -281,6 +283,10 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   const [excludePositioned, setExcludePositioned] = useState<boolean>(initialExcludePositioned);
   // State for starred filter
   const [showStarredOnly, setShowStarredOnly] = useState<boolean>(false);
+  // Mobile-only: track which image should show action controls (e.g., Info button)
+  const [mobileActiveImageId, setMobileActiveImageId] = useState<string | null>(null);
+  // Mobile-only: track which image has popover open
+  const [mobilePopoverOpenImageId, setMobilePopoverOpenImageId] = useState<string | null>(null);
   
   // Search state
   const [searchTerm, setSearchTerm] = useState<string>(initialSearchTerm);
@@ -296,12 +302,6 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     const timer = setTimeout(() => setPage(0), 10);
     return () => clearTimeout(timer);
   }, [filterByToolType, mediaTypeFilter, searchTerm, showStarredOnly]);
-
-  const tickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  
-  // Touch handling for mobile double-tap detection
-  const lastTouchTimeRef = useRef<number>(0);
-  const doubleTapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     const newSelectedShotId = currentShotId || lastShotId || (simplifiedShotOptions.length > 0 ? simplifiedShotOptions[0].id : "");
@@ -345,8 +345,12 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
         clearTimeout(doubleTapTimeoutRef.current);
       }
       doubleTapTimeoutRef.current = setTimeout(() => {
-        // Single tap action could go here if needed
-        // For now, we'll just clear the timeout
+        // Single tap (mobile): reveal action controls for this image
+        // Close any existing popover if tapping a different image
+        if (mobilePopoverOpenImageId && mobilePopoverOpenImageId !== image.id) {
+          setMobilePopoverOpenImageId(null);
+        }
+        setMobileActiveImageId(image.id);
         doubleTapTimeoutRef.current = null;
       }, 300);
     }
@@ -599,6 +603,37 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
 
   const isMobile = useIsMobile();
 
+  // Close mobile popover on scroll or when clicking outside
+  React.useEffect(() => {
+    if (!isMobile || !mobilePopoverOpenImageId) return;
+
+    const handleScroll = () => {
+      setMobilePopoverOpenImageId(null);
+    };
+
+    const handleClickOutside = (event: MouseEvent) => {
+      // Close if clicking outside any popover content
+      const target = event.target as Element;
+      if (!target.closest('[data-radix-popover-content]')) {
+        setMobilePopoverOpenImageId(null);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    document.addEventListener('mousedown', handleClickOutside);
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isMobile, mobilePopoverOpenImageId]);
+  
+  const tickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Touch handling for mobile double-tap detection
+  const lastTouchTimeRef = useRef<number>(0);
+  const doubleTapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   return (
     <TooltipProvider>
       <div className="space-y-6 pb-8">
@@ -774,19 +809,52 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
           {paginatedImages.length > 0 && (
               <div className={`grid gap-4 mb-12 ${columnsPerRow === 6 ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-6' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 2xl:grid-cols-5'}`}>
             {paginatedImages.map((image, index) => {
-                const displayUrl = getDisplayUrl(image.url);
+                const displayUrl = getDisplayUrl(image.thumbUrl || image.url);
+                // Track loading state for this specific image
+                const [imageLoadError, setImageLoadError] = useState<boolean>(false);
+                const [imageRetryCount, setImageRetryCount] = useState<number>(0);
+                const MAX_RETRIES = 2;
+
+                // Handle image load error with retry mechanism
+                const handleImageError = useCallback(() => {
+                  console.warn(`Image load failed for ${image.id}: ${displayUrl}, retry ${imageRetryCount + 1}/${MAX_RETRIES}`);
+                  
+                  if (imageRetryCount < MAX_RETRIES) {
+                    // Retry with cache busting
+                    setTimeout(() => {
+                      setImageRetryCount(prev => prev + 1);
+                    }, 1000 * (imageRetryCount + 1)); // Exponential backoff
+                  } else {
+                    setImageLoadError(true);
+                  }
+                }, [displayUrl, image.id, imageRetryCount]);
+
+                // Reset error state when URL changes (new image)
+                useEffect(() => {
+                  setImageLoadError(false);
+                  setImageRetryCount(0);
+                }, [displayUrl]);
+
+                // Generate display URL with retry cache busting
+                const actualDisplayUrl = useMemo(() => {
+                  if (imageRetryCount > 0) {
+                    return getDisplayUrl(image.thumbUrl || image.url, true); // Force refresh with cache busting
+                  }
+                  return displayUrl;
+                }, [displayUrl, image.thumbUrl, image.url, imageRetryCount]);
+
                 const metadataForDisplay = image.metadata ? formatMetadataForDisplay(image.metadata) : "No metadata available.";
                 const isCurrentDeleting = isDeleting === image.id;
-                const imageKey = image.id || `image-${displayUrl}-${index}`;
+                const imageKey = image.id || `image-${actualDisplayUrl}-${index}`;
                 // Removed unused render log ID
 
                 // Determine if it's a video by checking the URL extension if isVideo prop is not explicitly set
-                const urlIsVideo = displayUrl && (displayUrl.toLowerCase().endsWith('.webm') || displayUrl.toLowerCase().endsWith('.mp4') || displayUrl.toLowerCase().endsWith('.mov'));
+                const urlIsVideo = actualDisplayUrl && (actualDisplayUrl.toLowerCase().endsWith('.webm') || actualDisplayUrl.toLowerCase().endsWith('.mp4') || actualDisplayUrl.toLowerCase().endsWith('.mov'));
                 const isActuallyVideo = typeof image.isVideo === 'boolean' ? image.isVideo : urlIsVideo;
 
                 // Placeholder check should ideally rely on more than just !image.id if placeholders are actual objects in the array
                 // For this implementation, we assume placeholders passed to `images` prop might not have `id`
-                const isPlaceholder = !image.id && displayUrl === "/placeholder.svg";
+                const isPlaceholder = !image.id && actualDisplayUrl === "/placeholder.svg";
                 const currentTargetShotName = selectedShotIdLocal ? simplifiedShotOptions.find(s => s.id === selectedShotIdLocal)?.name : undefined;
                 
                 let aspectRatioPadding = '100%'; 
@@ -834,16 +902,10 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                   );
                 }
 
-                // State for hover popover
-                const [isHovered, setIsHovered] = useState(false);
-                const [isInfoHovered, setIsInfoHovered] = useState(false);
-
                 // Conditionally wrap with DraggableImage only on desktop to avoid interfering with mobile scrolling
                 const imageContent = (
                   <div 
                       className="border rounded-lg overflow-hidden hover:shadow-md transition-shadow relative group bg-card"
-                      onMouseEnter={() => setIsHovered(true)}
-                      onMouseLeave={() => setIsHovered(false)}
                   >
                     <div className="relative w-full">
                     <div 
@@ -855,7 +917,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                     >
                         {isActuallyVideo ? (
                             <video
-                                src={displayUrl}
+                                src={actualDisplayUrl}
                                 controls
                                 playsInline
                                 loop
@@ -867,10 +929,29 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                                   handleMobileTap(image);
                                 } : undefined}
                                 style={{ cursor: 'pointer' }}
+                                onError={handleImageError}
                             />
                         ) : (
+                           imageLoadError ? (
+                             // Fallback when image fails to load after retries
+                             <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-gray-100 text-gray-500">
+                               <div className="text-center">
+                                 <AlertTriangle className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                                 <p className="text-xs">Failed to load image</p>
+                                 <button 
+                                   onClick={() => {
+                                     setImageLoadError(false);
+                                     setImageRetryCount(0);
+                                   }}
+                                   className="text-xs underline hover:no-underline mt-1"
+                                 >
+                                   Retry
+                                 </button>
+                               </div>
+                             </div>
+                           ) : (
                             <img
-                                src={displayUrl}
+                                src={actualDisplayUrl}
                                 alt={image.prompt || `Generated image ${index + 1}`}
                                 className="absolute inset-0 w-full h-full object-cover group-hover:opacity-80 transition-opacity duration-300"
                                 onDoubleClick={isMobile ? undefined : () => handleOpenLightbox(image)}
@@ -880,7 +961,9 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                                 } : undefined}
                                 style={{ cursor: 'pointer' }}
                                 loading="lazy"
+                                onError={handleImageError}
                             />
+                           )
                         )}
                     </div>
                     </div>
@@ -980,35 +1063,74 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
 
                                                         {/* Info tooltip (shown on hover) */}
                                 {image.metadata && (
-                                  <Tooltip open={isInfoHovered} onOpenChange={setIsInfoHovered}>
-                                    <TooltipTrigger asChild>
-                                      <div 
-                                        className="opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                                        onMouseEnter={() => setIsInfoHovered(true)}
-                                        onMouseLeave={() => setIsInfoHovered(false)}
-                                      >
-                                        <div className="h-7 w-7 rounded-full bg-black/30 flex items-center justify-center">
-                                          <Info className="h-3.5 w-3.5 text-white" />
+                                  isMobile ? (
+                                    <PopoverPrimitive.Root open={mobilePopoverOpenImageId === image.id} onOpenChange={(open) => {
+                                      if (!open) {
+                                        setMobilePopoverOpenImageId(null);
+                                      }
+                                    }}>
+                                      <PopoverPrimitive.Trigger asChild>
+                                        <div
+                                          className={`${mobileActiveImageId === image.id ? 'opacity-100' : 'opacity-0'} group-hover:opacity-100 transition-opacity cursor-pointer`}
+                                          onClick={() => {
+                                            setMobileActiveImageId(image.id);
+                                            setMobilePopoverOpenImageId(image.id);
+                                          }}
+                                        >
+                                          <div className="h-7 w-7 rounded-full bg-black/30 flex items-center justify-center">
+                                            <Info className="h-3.5 w-3.5 text-white" />
+                                          </div>
                                         </div>
-                                      </div>
-                                    </TooltipTrigger>
-                                                                         <TooltipContent
-                                       side="right"
-                                       align="start"
-                                       className="max-w-48 text-xs p-3 leading-relaxed shadow-lg bg-background border max-h-80 overflow-y-auto"
-                                       onPointerLeave={() => setIsInfoHovered(false)}
-                                     >
-                                      {image.metadata?.userProvidedImageUrl && (
-                                        <img
-                                          src={image.metadata.userProvidedImageUrl}
-                                          alt="User provided image preview"
-                                          className="w-full h-auto max-h-24 object-contain rounded-sm mb-2 border"
-                                          loading="lazy"
-                                        />
-                                      )}
-                                      <pre className="font-sans whitespace-pre-wrap">{metadataForDisplay}</pre>
-                                    </TooltipContent>
-                                  </Tooltip>
+                                      </PopoverPrimitive.Trigger>
+                                      <PopoverPrimitive.Portal>
+                                        <PopoverPrimitive.Content
+                                          side="right"
+                                          align="start"
+                                          sideOffset={4}
+                                          className="z-[10010] max-w-48 text-xs p-3 leading-relaxed shadow-lg bg-background border max-h-80 overflow-y-auto rounded-md"
+                                        >
+                                          {image.metadata?.userProvidedImageUrl && (
+                                            <img
+                                              src={image.metadata.userProvidedImageUrl}
+                                              alt="User provided image preview"
+                                              className="w-full h-auto max-h-24 object-contain rounded-sm mb-2 border"
+                                              loading="lazy"
+                                            />
+                                          )}
+                                          <pre className="font-sans whitespace-pre-wrap">{metadataForDisplay}</pre>
+                                        </PopoverPrimitive.Content>
+                                      </PopoverPrimitive.Portal>
+                                    </PopoverPrimitive.Root>
+                                  ) : (
+                                    <Tooltip open={mobilePopoverOpenImageId === image.id} onOpenChange={(open) => {
+                                      if (!open) {
+                                        setMobilePopoverOpenImageId(null);
+                                      }
+                                    }}>
+                                      <TooltipTrigger asChild>
+                                        <div className="opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                                          <div className="h-7 w-7 rounded-full bg-black/30 flex items-center justify-center">
+                                            <Info className="h-3.5 w-3.5 text-white" />
+                                          </div>
+                                        </div>
+                                      </TooltipTrigger>
+                                      <TooltipContent
+                                        side="right"
+                                        align="start"
+                                        className="max-w-48 text-xs p-3 leading-relaxed shadow-lg bg-background border max-h-80 overflow-y-auto"
+                                      >
+                                        {image.metadata?.userProvidedImageUrl && (
+                                          <img
+                                            src={image.metadata.userProvidedImageUrl}
+                                            alt="User provided image preview"
+                                            className="w-full h-auto max-h-24 object-contain rounded-sm mb-2 border"
+                                            loading="lazy"
+                                          />
+                                        )}
+                                        <pre className="font-sans whitespace-pre-wrap">{metadataForDisplay}</pre>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  )
                                 )}
 
                             {/* Apply settings button temporarily disabled */}

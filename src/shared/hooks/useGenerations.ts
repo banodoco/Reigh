@@ -150,6 +150,7 @@ export async function fetchGenerations(
   const items = data?.map((item: any) => ({
     id: item.id,
     url: item.location,
+    thumbUrl: item.thumb_url,
     prompt: item.params?.originalParams?.orchestrator_details?.prompt || 
             item.params?.prompt || 
             item.metadata?.prompt || 
