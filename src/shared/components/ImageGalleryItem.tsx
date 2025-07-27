@@ -7,9 +7,17 @@ import {
   TooltipProvider, 
   TooltipTrigger 
 } from "@/shared/components/ui/tooltip";
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/shared/components/ui/select";
 import { DraggableImage } from "@/shared/components/DraggableImage";
 import { getDisplayUrl } from "@/shared/lib/utils";
 import { TimeStamp } from "@/shared/components/TimeStamp";
+import { useToast } from "@/shared/hooks/use-toast";
 import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { GeneratedImageWithMetadata, DisplayableMetadata, formatMetadataForDisplay } from "./ImageGallery";
 
@@ -35,6 +43,9 @@ interface ImageGalleryItemProps {
   mobilePopoverOpenImageId: string | null;
   onMobileTap: (image: GeneratedImageWithMetadata) => void;
   setMobilePopoverOpenImageId: (id: string | null) => void;
+  setSelectedShotIdLocal: (id: string) => void;
+  setLastAffectedShotId: (id: string) => void;
+  toggleStarMutation: any;
 }
 
 export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
@@ -59,7 +70,11 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   mobilePopoverOpenImageId,
   onMobileTap,
   setMobilePopoverOpenImageId,
+  setSelectedShotIdLocal,
+  setLastAffectedShotId,
+  toggleStarMutation,
 }) => {
+  const { toast } = useToast();
   const displayUrl = getDisplayUrl(image.thumbUrl || image.url);
   // Track loading state for this specific image
   const [imageLoadError, setImageLoadError] = useState<boolean>(false);
@@ -149,238 +164,295 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
     );
   }
 
-  const handleAddToShot = async () => {
-    setAddingToShotImageId(image.id);
-    try {
-      const success = await onAddToLastShot(image.id, image.url, image.thumbUrl);
-      if (success) {
-        onShowTick(image.id);
-      }
-    } finally {
-      setAddingToShotImageId(null);
-    }
-  };
-
+  // Conditionally wrap with DraggableImage only on desktop to avoid interfering with mobile scrolling
   const imageContent = (
     <div 
-      className={`border rounded-lg overflow-hidden transition-all duration-300 relative group ${
-        isCurrentDeleting 
-          ? 'opacity-50 scale-95 cursor-not-allowed' 
-          : 'hover:shadow-xl hover:border-primary/50 cursor-pointer'
-      } ${mobileActiveImageId === image.id ? 'ring-2 ring-primary' : ''}`}
+        className="border rounded-lg overflow-hidden hover:shadow-md transition-shadow relative group bg-card"
     >
-      {/* Image/Video display */}
+      <div className="relative w-full">
       <div 
-        className="relative bg-muted"
-        style={{ paddingBottom: aspectRatioPadding, minHeight }}
-        onDoubleClick={isMobile ? undefined : () => onOpenLightbox(image)}
-        onTouchEnd={isMobile ? (e) => {
-          e.preventDefault();
-          onMobileTap(image);
-        } : undefined}
+        style={{ 
+          paddingBottom: aspectRatioPadding,
+          minHeight: minHeight 
+        }} 
+        className="relative bg-gray-200"
       >
-        {imageLoadError ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center">
-            <AlertTriangle className="h-8 w-8 text-destructive mb-2" />
-            <p className="text-sm text-muted-foreground">Failed to load image</p>
-            <p className="text-xs text-muted-foreground mt-1">ID: {image.id}</p>
-          </div>
-        ) : isActuallyVideo ? (
-          <video
-            src={actualDisplayUrl}
-            className="absolute inset-0 w-full h-full object-contain"
-            controls={false}
-            muted
-            loop
-            playsInline
-            onError={handleImageError}
-            onDoubleClick={isMobile ? undefined : () => onOpenLightbox(image)}
-            onTouchEnd={isMobile ? (e) => {
-              e.preventDefault();
-              onMobileTap(image);
-            } : undefined}
-          />
-        ) : (
-          <img 
-            src={actualDisplayUrl}
-            alt={image.prompt || "Generated image"} 
-            className="absolute inset-0 w-full h-full object-contain"
-            loading="lazy"
-            onError={handleImageError}
-          />
-        )}
-        
-        {/* Error message overlay */}
-        {image.error && (
-          <div className="absolute inset-0 bg-black/50 flex items-center justify-center p-4">
-            <div className="bg-destructive/90 text-destructive-foreground rounded-md p-3 text-sm text-center">
-              <AlertTriangle className="h-5 w-5 mx-auto mb-2" />
-              {image.error}
-            </div>
-          </div>
-        )}
-
-        {/* Success tick overlay */}
-        {showTickForImageId === image.id && (
-          <div className="absolute inset-0 bg-black/50 flex items-center justify-center pointer-events-none animate-in fade-in duration-200">
-            <div className="bg-green-500 rounded-full p-3 animate-in zoom-in duration-300">
-              <Check className="h-8 w-8 text-white" />
-            </div>
-          </div>
-        )}
-
-        {/* Timestamp in corner */}
-        {image.createdAt && (
-          <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
-            <TimeStamp 
-              timestamp={image.createdAt} 
-              className="text-xs bg-black/70 text-white px-2 py-1 rounded"
-            />
-          </div>
-        )}
-
-        {/* Starred indicator */}
-        {image.starred && (
-          <div className="absolute top-2 right-2">
-            <Star className="h-5 w-5 text-yellow-500 fill-yellow-500 drop-shadow-md" />
-          </div>
-        )}
-      </div>
-
-      {/* Action buttons */}
-      {(!isMobile || mobileActiveImageId === image.id) && (
-        <>
-          <div className={`absolute bottom-2 right-2 flex gap-1 ${
-            isMobile ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-          } transition-opacity`}>
-            {/* Info/Metadata button */}
-            <PopoverPrimitive.Root 
-              open={mobilePopoverOpenImageId === image.id}
-              onOpenChange={(open) => {
-                if (isMobile) {
-                  setMobilePopoverOpenImageId(open ? image.id : null);
-                }
-              }}
-            >
-              <PopoverPrimitive.Trigger asChild>
-                <Button
-                  size="icon"
-                  variant="secondary"
-                  className="h-8 w-8 bg-black/70 hover:bg-black/90 text-white border-0"
-                  disabled={isCurrentDeleting}
-                >
-                  <Info className="h-4 w-4" />
-                </Button>
-              </PopoverPrimitive.Trigger>
-              <PopoverPrimitive.Portal>
-                <PopoverPrimitive.Content
-                  className="z-50 w-80 rounded-md border bg-popover p-4 text-popover-foreground shadow-md outline-none animate-in fade-in-0 zoom-in-95"
-                  sideOffset={5}
-                  side={isMobile ? "top" : "left"}
-                  align="end"
-                >
-                  <div className="space-y-2">
-                    <h4 className="font-medium text-sm">Image Details</h4>
-                    <pre className="text-xs bg-muted p-2 rounded overflow-auto max-h-64 whitespace-pre-wrap break-words">
-                      {metadataForDisplay}
-                    </pre>
-                    {onApplySettings && image.metadata && (
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        className="w-full"
-                        onClick={() => onApplySettings(image.metadata!)}
-                      >
-                        <Settings className="h-4 w-4 mr-2" />
-                        Apply Settings
-                      </Button>
-                    )}
-                  </div>
-                </PopoverPrimitive.Content>
-              </PopoverPrimitive.Portal>
-            </PopoverPrimitive.Root>
-
-            {/* Add to shot button */}
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    size="icon"
-                    variant="secondary"
-                    className="h-8 w-8 bg-black/70 hover:bg-black/90 text-white border-0"
-                    onClick={handleAddToShot}
-                    disabled={isCurrentDeleting || addingToShotImageId === image.id || !currentTargetShotName}
-                  >
-                    {addingToShotImageId === image.id ? (
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    ) : (
-                      <PlusCircle className="h-4 w-4" />
-                    )}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="top">
-                  <p>{currentTargetShotName ? `Add to shot: ${currentTargetShotName}` : 'Select a shot first'}</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-
-            {/* Download button */}
-            <Button
-              size="icon"
-              variant="secondary"
-              className="h-8 w-8 bg-black/70 hover:bg-black/90 text-white border-0"
-              onClick={() => onDownloadImage(
-                image.url,
-                `generated-${image.id || 'image'}`,
-                image.id,
-                isActuallyVideo,
-                image.metadata?.content_type
-              )}
-              disabled={isCurrentDeleting || downloadingImageId === image.id}
-            >
-              {downloadingImageId === image.id ? (
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-              ) : (
-                <Download className="h-4 w-4" />
-              )}
-            </Button>
-
-            {/* Delete button */}
-            {onDelete && (
-              <Button
-                size="icon"
-                variant="secondary"
-                className="h-8 w-8 bg-black/70 hover:bg-red-600 text-white border-0"
-                onClick={() => onDelete(image.id)}
-                disabled={isCurrentDeleting}
-              >
-                {isCurrentDeleting ? (
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                ) : (
-                  <Trash2 className="h-4 w-4" />
-                )}
-              </Button>
-            )}
-          </div>
-
-          {/* Star button - separate from other actions */}
-          <div className={`absolute bottom-2 left-2 ${
-            isMobile ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-          } transition-opacity`}>
-            <Button
-              size="icon"
-              variant="secondary"
-              className="h-8 w-8 bg-black/70 hover:bg-black/90 text-white border-0"
-              onClick={() => onToggleStar?.(image.id, !image.starred)}
-              disabled={isCurrentDeleting}
-            >
-              <Star 
-                className={`h-3.5 w-3.5 ${image.starred ? 'fill-current' : ''}`} 
+          {isActuallyVideo ? (
+              <video
+                  src={actualDisplayUrl}
+                  controls
+                  playsInline
+                  loop
+                  muted
+                  className="absolute inset-0 w-full h-full object-contain group-hover:opacity-80 transition-opacity duration-300 bg-black"
+                  onDoubleClick={isMobile ? undefined : () => onOpenLightbox(image)}
+                  onTouchEnd={isMobile ? (e) => {
+                    e.preventDefault();
+                    onMobileTap(image);
+                  } : undefined}
+                  style={{ cursor: 'pointer' }}
+                  onError={handleImageError}
               />
-            </Button>
+          ) : (
+             imageLoadError ? (
+               // Fallback when image fails to load after retries
+               <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-gray-100 text-gray-500">
+                 <div className="text-center">
+                   <AlertTriangle className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                   <p className="text-xs">Failed to load image</p>
+                   <button 
+                     onClick={() => {
+                       setImageLoadError(false);
+                       setImageRetryCount(0);
+                     }}
+                     className="text-xs underline hover:no-underline mt-1"
+                   >
+                     Retry
+                   </button>
+                 </div>
+               </div>
+             ) : (
+              <img
+                  src={actualDisplayUrl}
+                  alt={image.prompt || `Generated image ${index + 1}`}
+                  className="absolute inset-0 w-full h-full object-cover group-hover:opacity-80 transition-opacity duration-300"
+                  onDoubleClick={isMobile ? undefined : () => onOpenLightbox(image)}
+                  onTouchEnd={isMobile ? (e) => {
+                    e.preventDefault();
+                    onMobileTap(image);
+                  } : undefined}
+                  style={{ cursor: 'pointer' }}
+                  loading="lazy"
+                  onError={handleImageError}
+              />
+             )
+          )}
+      </div>
+      </div>
+      
+      {/* Action buttons and UI elements */}
+      {image.id && ( // Ensure image has ID for actions
+      <>
+          {/* Add to Shot UI - Top Left */}
+          {simplifiedShotOptions.length > 0 && onAddToLastShot && (
+          <div className="absolute top-2 left-2 flex flex-col items-start gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+              <Select
+                  value={selectedShotIdLocal}
+                  onValueChange={(value) => {
+                      setSelectedShotIdLocal(value);
+                      setLastAffectedShotId(value);
+                  }}
+              >
+                  <SelectTrigger
+                      className="h-7 px-2 py-1 rounded-md bg-black/50 hover:bg-black/70 text-white text-xs min-w-[70px] max-w-[90px] truncate focus:ring-0 focus:ring-offset-0"
+                      aria-label="Select target shot"
+                      onMouseEnter={(e) => e.stopPropagation()}
+                      onMouseLeave={(e) => e.stopPropagation()}
+                      onPointerDown={(e) => e.stopPropagation()}
+                  >
+                      <SelectValue placeholder="Shot...">
+                          {selectedShotIdLocal ? (
+                              (() => {
+                                  const shotName = simplifiedShotOptions.find(s => s.id === selectedShotIdLocal)?.name || '';
+                                  return shotName.length > 10 ? `${shotName.substring(0, 10)}...` : shotName;
+                              })()
+                          ) : 'Shot...'}
+                      </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent className="z-[9999]" style={{ zIndex: 10000 }}>
+                      {simplifiedShotOptions.map(shot => (
+                          <SelectItem key={shot.id} value={shot.id} className="text-xs">
+                              {shot.name}
+                          </SelectItem>
+                      ))}
+                  </SelectContent>
+              </Select>
+
+              <Tooltip>
+                  <TooltipTrigger asChild>
+                      <Button
+                          variant="outline"
+                          size="icon"
+                          className={`h-7 w-7 p-0 rounded-full bg-black/50 hover:bg-black/70 text-white ${showTickForImageId === image.id ? 'bg-green-500 hover:bg-green-600 !text-white' : ''}`}
+                          onClick={async () => {
+                              if (!selectedShotIdLocal) {
+                                  toast({ title: "Select a Shot", description: "Please select a shot first to add this image.", variant: "destructive" });
+                                  return;
+                              }
+                              setAddingToShotImageId(image.id!);
+                              try {
+                                  const success = await onAddToLastShot(image.id!, displayUrl, displayUrl);
+                                  if (success) {
+                                      onShowTick(image.id!);
+                                  }
+                              } finally {
+                                  setAddingToShotImageId(null);
+                              }
+                          }}
+                          disabled={!selectedShotIdLocal || showTickForImageId === image.id || addingToShotImageId === image.id}
+                          aria-label={showTickForImageId === image.id ? `Added to ${currentTargetShotName}` : (currentTargetShotName ? `Add to shot: ${currentTargetShotName}` : "Add to selected shot")}
+                          onPointerDown={(e) => e.stopPropagation()}
+                      >
+                          {addingToShotImageId === image.id ? (
+                              <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-white"></div>
+                          ) : showTickForImageId === image.id ? (
+                              <Check className="h-4 w-4" />
+                          ) : (
+                              <PlusCircle className="h-4 w-4" />
+                          )}
+                      </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                      {showTickForImageId === image.id ? `Added to ${currentTargetShotName || 'shot'}` :
+                      (selectedShotIdLocal && currentTargetShotName ? `Add to: ${currentTargetShotName}` : "Select a shot then click to add")}
+                  </TooltipContent>
+              </Tooltip>
           </div>
-        </>
-      )}
+          )}
+
+          {/* Timestamp - Top Right */}
+          <TimeStamp 
+            createdAt={image.createdAt} 
+            position="top-right"
+          />
+
+          {/* Action buttons - Top Right (Info & Apply) */}
+          <div className="absolute top-2 right-2 flex flex-col items-end gap-1.5 mt-8">
+              {/* Info tooltip (shown on hover) */}
+              {image.metadata && (
+                isMobile ? (
+                  <PopoverPrimitive.Root open={mobilePopoverOpenImageId === image.id} onOpenChange={(open) => {
+                    if (!open) {
+                      setMobilePopoverOpenImageId(null);
+                    }
+                  }}>
+                    <PopoverPrimitive.Trigger asChild>
+                      <div
+                        className={`${mobileActiveImageId === image.id ? 'opacity-100' : 'opacity-0'} group-hover:opacity-100 transition-opacity cursor-pointer`}
+                        onClick={() => {
+                          setMobilePopoverOpenImageId(image.id);
+                        }}
+                      >
+                        <div className="h-7 w-7 rounded-full bg-black/30 flex items-center justify-center">
+                          <Info className="h-3.5 w-3.5 text-white" />
+                        </div>
+                      </div>
+                    </PopoverPrimitive.Trigger>
+                    <PopoverPrimitive.Portal>
+                      <PopoverPrimitive.Content
+                        side="right"
+                        align="start"
+                        sideOffset={4}
+                        className="z-[10010] max-w-48 text-xs p-3 leading-relaxed shadow-lg bg-background border max-h-80 overflow-y-auto rounded-md"
+                      >
+                        {image.metadata?.userProvidedImageUrl && (
+                          <img
+                            src={image.metadata.userProvidedImageUrl}
+                            alt="User provided image preview"
+                            className="w-full h-auto max-h-24 object-contain rounded-sm mb-2 border"
+                            loading="lazy"
+                          />
+                        )}
+                        <pre className="font-sans whitespace-pre-wrap">{metadataForDisplay}</pre>
+                      </PopoverPrimitive.Content>
+                    </PopoverPrimitive.Portal>
+                  </PopoverPrimitive.Root>
+                ) : (
+                  <Tooltip open={mobilePopoverOpenImageId === image.id} onOpenChange={(open) => {
+                    if (!open) {
+                      setMobilePopoverOpenImageId(null);
+                    }
+                  }}>
+                    <TooltipTrigger asChild>
+                      <div className="opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                        <div className="h-7 w-7 rounded-full bg-black/30 flex items-center justify-center">
+                          <Info className="h-3.5 w-3.5 text-white" />
+                        </div>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent
+                      side="right"
+                      align="start"
+                      className="max-w-48 text-xs p-3 leading-relaxed shadow-lg bg-background border max-h-80 overflow-y-auto"
+                    >
+                      {image.metadata?.userProvidedImageUrl && (
+                        <img
+                          src={image.metadata.userProvidedImageUrl}
+                          alt="User provided image preview"
+                          className="w-full h-auto max-h-24 object-contain rounded-sm mb-2 border"
+                          loading="lazy"
+                        />
+                      )}
+                      <pre className="font-sans whitespace-pre-wrap">{metadataForDisplay}</pre>
+                    </TooltipContent>
+                  </Tooltip>
+                )
+              )}
+
+          {/* Apply settings button temporarily disabled */}
+          {false && image.metadata && onApplySettings && (
+              <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Tooltip>
+                      <TooltipTrigger asChild>
+                          <Button 
+                              variant="outline"
+                              size="icon" 
+                              className="h-7 w-7 p-0 rounded-full bg-black/50 hover:bg-black/70 text-white"
+                              onClick={() => onApplySettings(image.metadata!)}
+                          >
+                              <Settings className="h-4 w-4 mr-1" /> Apply
+                          </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Apply these generation settings to the form</TooltipContent>
+                  </Tooltip>
+              </div>
+              )}
+          </div>
+
+          {/* Delete button - Bottom Right */}
+              {onDelete && (
+              <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button 
+                          variant="destructive" 
+                          size="icon" 
+                          className="h-7 w-7 p-0 rounded-full"
+                          onClick={() => onDelete(image.id!)}
+                          disabled={isCurrentDeleting}
+                      >
+                          {isCurrentDeleting ? (
+                              <div className="h-3 w-3 animate-spin rounded-full border-b-2 border-white"></div>
+                          ) : (
+                              <Trash2 className="h-3.5 w-3.5" />
+                          )}
+                      </Button>
+              </div>
+          )}
+
+          {/* Star button - Bottom Left */}
+          <div className="absolute bottom-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
+              <Button
+                  variant="secondary"
+                  size="icon"
+                  className="h-7 w-7 p-0 rounded-full bg-black/50 hover:bg-black/70 text-white"
+                  onClick={() => {
+                      if (onToggleStar) {
+                          onToggleStar(image.id!, !image.starred);
+                      } else {
+                          toggleStarMutation.mutate({ 
+                              id: image.id!, 
+                              starred: !image.starred 
+                          });
+                      }
+                  }}
+                  disabled={toggleStarMutation.isPending}
+              >
+                  <Star 
+                      className={`h-3.5 w-3.5 ${image.starred ? 'fill-current' : ''}`} 
+                  />
+              </Button>
+          </div>
+      </>)
+      }
     </div>
   );
 

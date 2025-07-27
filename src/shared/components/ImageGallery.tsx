@@ -831,6 +831,9 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                 mobilePopoverOpenImageId={mobilePopoverOpenImageId}
                 onMobileTap={handleMobileTap}
                 setMobilePopoverOpenImageId={setMobilePopoverOpenImageId}
+                setSelectedShotIdLocal={setSelectedShotIdLocal}
+                setLastAffectedShotId={setLastAffectedShotId}
+                toggleStarMutation={toggleStarMutation}
               />
             ))}
             </div>
