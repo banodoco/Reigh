@@ -113,20 +113,29 @@ const TaskList: React.FC<TaskListProps> = ({
 
   const summaryMessage = useMemo(() => {
     if (!statusCounts) return null;
+    
+    // Only show summary message when pagination controls are not visible
+    // Pagination controls are only shown when there are multiple pages
+    const hasPagination = paginatedData && paginatedData.totalPages > 1;
+    
+    if (hasPagination) {
+      return null; // Don't show summary when pagination is visible
+    }
+    
     if (activeFilter === 'Succeeded') {
       const count = statusCounts.recentSuccesses;
       if (count > 0) {
-        return `${count} generation${count === 1 ? '' : 's'} succeeded in the past hour.`;
+        return `${count} succeeded in the past hour.`;
       }
     }
     if (activeFilter === 'Failed') {
       const count = statusCounts.recentFailures;
       if (count > 0) {
-        return `${count} generation${count === 1 ? '' : 's'} failed in the past hour.`;
+        return `${count} fails in the past hour.`;
       }
     }
     return null;
-  }, [activeFilter, statusCounts]);
+  }, [activeFilter, statusCounts, paginatedData]);
 
   // Generate filter-specific empty message
   const getEmptyMessage = () => {

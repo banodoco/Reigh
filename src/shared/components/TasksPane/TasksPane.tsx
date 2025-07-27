@@ -62,6 +62,7 @@ interface PaginationControlsProps {
   totalItems: number;
   isLoading?: boolean;
   filterType: FilterGroup;
+  recentCount?: number;
 }
 
 const PaginationControls: React.FC<PaginationControlsProps> = ({ 
@@ -70,7 +71,8 @@ const PaginationControls: React.FC<PaginationControlsProps> = ({
   onPageChange, 
   totalItems,
   isLoading = false,
-  filterType
+  filterType,
+  recentCount
 }) => {
   // Only show pagination when there are multiple pages
   if (totalPages <= 1) return null;
@@ -88,10 +90,19 @@ const PaginationControls: React.FC<PaginationControlsProps> = ({
     }
   };
 
+  // Show recent count info if available and it's a filter that has recent data
+  const showRecentInfo = recentCount && recentCount > 0 && (filterType === 'Succeeded' || filterType === 'Failed');
+
   return (
     <div className="flex items-center justify-between px-4 py-2 text-[11px] text-zinc-400">
       <span>
-        {totalItems} {getFilterLabel()}, showing {ITEMS_PER_PAGE} per page
+        {showRecentInfo ? (
+          filterType === 'Succeeded' ? 
+            `${recentCount} succeeded in the past hour, ${totalItems} in total.` :
+            `${recentCount} fails in the past hour, ${totalItems} in total.`
+        ) : (
+          `${totalItems} ${getFilterLabel()}, showing ${ITEMS_PER_PAGE} per page`
+        )}
       </span>
       <div className="flex items-center gap-2">
         <Button
@@ -198,6 +209,14 @@ export const TasksPane: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
     setSelectedFilter(type);
     setCurrentPage(1);
     
+    // Don't show toast for Succeeded/Failed filters when there are recent counts
+    // because the pagination controls will show this information when they're visible
+    // and when they're not visible, the user can see the results directly
+    if ((type === 'Succeeded' || type === 'Failed') && count > 0) {
+      return; // No toast needed
+    }
+    
+    // Show toast for other cases (like when there are no recent items)
     if (type === 'Succeeded') {
       toast({
         title: 'Recent Successes',
@@ -327,9 +346,6 @@ export const TasksPane: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
                       count={count}
                       type={filter}
                       isSelected={selectedFilter === filter}
-                      onClick={() => {
-                        handleStatusIndicatorClick(filter, count);
-                      }}
                     />
                   </Button>
                 );
@@ -389,6 +405,11 @@ export const TasksPane: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
             totalItems={totalTasks}
             isLoading={isPaginatedLoading}
             filterType={selectedFilter}
+            recentCount={
+              selectedFilter === 'Succeeded' ? displayStatusCounts?.recentSuccesses :
+              selectedFilter === 'Failed' ? displayStatusCounts?.recentFailures :
+              undefined
+            }
           />
 
           <TasksPaneProcessingWarning onOpenSettings={onOpenSettings} />
