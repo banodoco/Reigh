@@ -3,6 +3,7 @@ import { Task, TaskStatus } from '@/types/tasks';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useProject } from '../contexts/ProjectContext';
+import { filterVisibleTasks } from '@/shared/lib/taskConfig';
 
 const TASKS_QUERY_KEY = 'tasks';
 
@@ -23,6 +24,20 @@ interface CreateTaskParams {
 interface CancelAllPendingTasksResponse {
   cancelledCount: number;
   message: string;
+}
+
+interface PaginatedTasksParams {
+  projectId?: string | null;
+  status?: TaskStatus[];
+  limit?: number;
+  offset?: number;
+}
+
+export interface PaginatedTasksResponse {
+  tasks: Task[];
+  total: number;
+  hasMore: boolean;
+  totalPages: number;
 }
 
 // Helper to convert DB row (snake_case) to Task interface (camelCase)
@@ -163,6 +178,56 @@ export const useListTasks = (params: ListTasksParams) => {
 
       if (error) throw error;
       return (data || []).map(mapDbTaskToTask);
+    },
+    enabled: !!projectId, // Only run the query if projectId is available
+  });
+};
+
+// Hook to list tasks with pagination
+export const usePaginatedTasks = (params: PaginatedTasksParams) => {
+  const { projectId, status, limit = 50, offset = 0 } = params;
+  
+  return useQuery<PaginatedTasksResponse, Error>({
+    queryKey: [TASKS_QUERY_KEY, 'paginated', projectId, status, limit, offset],
+    queryFn: async () => {
+      if (!projectId) {
+        return { tasks: [], total: 0, hasMore: false, totalPages: 0 }; 
+      }
+      
+      // First, get ALL visible tasks for this filter to get accurate count
+      let allTasksQuery = supabase
+        .from('tasks')
+        .select('*')
+        .eq('project_id', projectId)
+        .is('params->orchestrator_task_id_ref', null) // Only parent tasks
+        .order('created_at', { ascending: false });
+
+      // Apply status filter if provided
+      if (status && status.length > 0) {
+        allTasksQuery = allTasksQuery.in('status', status);
+      }
+
+      const { data: allTasksData, error: allTasksError } = await allTasksQuery;
+      
+      if (allTasksError) throw allTasksError;
+      
+      // Convert and filter to only visible tasks
+      const allTasks = (allTasksData || []).map(mapDbTaskToTask);
+      const allVisibleTasks = filterVisibleTasks(allTasks);
+      
+      // Get the paginated slice
+      const paginatedTasks = allVisibleTasks.slice(offset, offset + limit);
+      
+      const total = allVisibleTasks.length;
+      const totalPages = Math.ceil(total / limit);
+      const hasMore = offset + limit < total;
+
+      return {
+        tasks: paginatedTasks,
+        total,
+        hasMore,
+        totalPages,
+      };
     },
     enabled: !!projectId, // Only run the query if projectId is available
   });
@@ -337,3 +402,58 @@ export const useCancelPendingTasks = () => {
 
 // Export alias for backward compatibility
 export const useCancelAllPendingTasks = useCancelPendingTasks; 
+
+// Hook to get status counts for indicators
+export const useTaskStatusCounts = (projectId: string | null) => {
+  return useQuery({
+    queryKey: ['task-status-counts', projectId],
+    queryFn: async () => {
+      if (!projectId) {
+        return { processing: 0, recentSuccesses: 0, recentFailures: 0 };
+      }
+
+      // Get 15 minutes ago timestamp
+      const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+
+      // Query for processing tasks (any time)
+      const { count: processingCount, error: processingError } = await supabase
+        .from('tasks')
+        .select('id', { count: 'exact', head: true })
+        .eq('project_id', projectId)
+        .in('status', ['Queued', 'In Progress'])
+        .is('params->orchestrator_task_id_ref', null); // Only parent tasks
+
+      if (processingError) throw processingError;
+
+      // Query for recent successes (last 15 minutes)
+      const { count: successCount, error: successError } = await supabase
+        .from('tasks')
+        .select('id', { count: 'exact', head: true })
+        .eq('project_id', projectId)
+        .eq('status', 'Complete')
+        .gte('updated_at', fifteenMinutesAgo)
+        .is('params->orchestrator_task_id_ref', null); // Only parent tasks
+
+      if (successError) throw successError;
+
+      // Query for recent failures (last 15 minutes)
+      const { count: failureCount, error: failureError } = await supabase
+        .from('tasks')
+        .select('id', { count: 'exact', head: true })
+        .eq('project_id', projectId)
+        .in('status', ['Failed', 'Cancelled'])
+        .gte('updated_at', fifteenMinutesAgo)
+        .is('params->orchestrator_task_id_ref', null); // Only parent tasks
+
+      if (failureError) throw failureError;
+
+      return {
+        processing: processingCount || 0,
+        recentSuccesses: successCount || 0,
+        recentFailures: failureCount || 0,
+      };
+    },
+    enabled: !!projectId,
+    refetchInterval: 5000, // Refresh every 5 seconds for live updates
+  });
+}; 

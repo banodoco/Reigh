@@ -1,53 +1,59 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { useListTasks } from '@/shared/hooks/useTasks';
+import { useListTasks, type PaginatedTasksResponse } from '@/shared/hooks/useTasks';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import TaskItem from './TaskItem';
 import { TaskStatus, Task } from '@/types/tasks';
 import { Button } from '@/shared/components/ui/button';
-import { Checkbox } from "@/shared/components/ui/checkbox";
-import { 
-  DropdownMenu, 
-  DropdownMenuTrigger, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuLabel, 
-  DropdownMenuSeparator 
-} from "@/shared/components/ui/dropdown-menu";
 import { ScrollArea } from "@/shared/components/ui/scroll-area"
 import { filterVisibleTasks } from '@/shared/lib/taskConfig';
 import { RefreshCw } from 'lucide-react';
 import { Skeleton } from '@/shared/components/ui/skeleton';
+import { FilterGroup } from './TasksPane';
 
-// Define the status values as an array (matching the enum values in the schema)
-const ALL_POSSIBLE_STATUSES: TaskStatus[] = ['Queued', 'In Progress', 'Complete', 'Failed', 'Cancelled'];
+interface TaskListProps {
+  filterStatuses: TaskStatus[];
+  activeFilter: FilterGroup;
+  statusCounts: {
+    processing: number;
+    recentSuccesses: number;
+    recentFailures: number;
+  } | undefined;
+  paginatedData?: PaginatedTasksResponse;
+  isLoading?: boolean;
+  currentPage?: number; // Add current page to track pagination changes
+}
 
-const TaskList: React.FC = () => {
+const TaskList: React.FC<TaskListProps> = ({ 
+  filterStatuses, 
+  activeFilter, 
+  statusCounts,
+  paginatedData,
+  isLoading = false,
+  currentPage = 1
+}) => {
   const { selectedProjectId } = useProject();
-  // Default selected statuses: Queued and In Progress
-  const [selectedStatuses, setSelectedStatuses] = useState<TaskStatus[]>(['Queued', 'In Progress']);
-
-  const { data: tasks, isLoading, error, refetch } = useListTasks({
-    projectId: selectedProjectId,
-    // If all selectable statuses are selected or no status is selected, fetch all (undefined).
-    // Otherwise, fetch tasks matching the selected statuses.
-    status: selectedStatuses.length === 0 || selectedStatuses.length === ALL_POSSIBLE_STATUSES.length 
-            ? undefined 
-            : selectedStatuses,
-  });
 
   // State to track tasks that have just been added for flash effect
   const [newTaskIds, setNewTaskIds] = useState<Set<string>>(new Set());
   const prevTaskIdsRef = React.useRef<Set<string>>(new Set());
   const hasInitializedRef = React.useRef(false);
+  const prevPageRef = React.useRef<number>(currentPage);
+
+  // Use paginated data instead of fetching tasks directly
+  const tasks = paginatedData?.tasks || [];
 
   useEffect(() => {
     if (!tasks || tasks.length === 0) return;
     
     const currentIds = new Set(tasks.map(t => t.id));
     
-    // On the very first load with tasks, just set the previous IDs without marking anything as new
-    if (!hasInitializedRef.current) {
+    // Check if this is a pagination change
+    const isPaginationChange = prevPageRef.current !== currentPage;
+    
+    // On the very first load with tasks, or on pagination change, just set the previous IDs without marking anything as new
+    if (!hasInitializedRef.current || isPaginationChange) {
       prevTaskIdsRef.current = currentIds;
+      prevPageRef.current = currentPage;
       hasInitializedRef.current = true;
       return;
     }
@@ -70,7 +76,15 @@ const TaskList: React.FC = () => {
 
     // Update previous IDs ref even if no new tasks
     prevTaskIdsRef.current = currentIds;
-  }, [tasks]);
+  }, [tasks, currentPage]);
+
+  // Effect to reset pagination baseline when filter changes
+  useEffect(() => {
+    // Reset the baseline so tasks loaded by a filter switch are not considered new
+    prevTaskIdsRef.current = new Set();
+    prevPageRef.current = currentPage;
+    hasInitializedRef.current = false;
+  }, [filterStatuses, currentPage]);
 
   // Filter out travel_segment and travel_stitch tasks so they do not appear in the sidebar
   const filteredTasks = useMemo(() => {
@@ -97,87 +111,31 @@ const TaskList: React.FC = () => {
     });
   }, [tasks]);
 
-  const handleSelectAll = (checked: boolean | 'indeterminate') => {
-    if (checked === true) {
-      setSelectedStatuses([...ALL_POSSIBLE_STATUSES]);
-    } else {
-      setSelectedStatuses([]);
+  const summaryMessage = useMemo(() => {
+    if (!statusCounts) return null;
+
+    if (activeFilter === 'Succeeded') {
+      const count = statusCounts.recentSuccesses;
+      if (count > 0) {
+        return `${count} generation${count === 1 ? '' : 's'} succeeded in the past 15 minutes.`;
+      }
     }
-  };
-
-  const handleStatusToggle = (status: TaskStatus) => {
-    setSelectedStatuses(prev =>
-      prev.includes(status)
-        ? prev.filter(s => s !== status)
-        : [...prev, status]
-    );
-  };
-  
-  const getSelectedStatusText = () => {
-    if (selectedStatuses.length === 0) return "None selected";
-    if (selectedStatuses.length === ALL_POSSIBLE_STATUSES.length) return "All statuses";
-    if (selectedStatuses.length <= 2) return selectedStatuses.join(', ');
-    return `${selectedStatuses.length} statuses selected`;
-  };
-
-  // Effect to refetch tasks when selectedStatuses changes
-  useEffect(() => {
-    refetch();
-  }, [selectedStatuses, refetch]);
-
-
-
-  const availableStatuses: (TaskStatus | 'All')[] = ['All', ...ALL_POSSIBLE_STATUSES];
+    if (activeFilter === 'Failed') {
+      const count = statusCounts.recentFailures;
+      if (count > 0) {
+        return `${count} generation${count === 1 ? '' : 's'} failed in the past 15 minutes.`;
+      }
+    }
+    return null;
+  }, [activeFilter, statusCounts]);
 
   return (
     <div className="p-4 h-full flex flex-col text-zinc-200">
-      <div className="mb-4">
-        <div className="flex gap-2 items-center">
-            {/* Multi-select Dropdown for Status Filter */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="w-[200px] justify-between bg-zinc-700 border-zinc-600 hover:bg-zinc-600">
-                  {getSelectedStatusText()}
-                  <span className="ml-2">▼</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-[200px] bg-zinc-700 text-zinc-200 border-zinc-600 z-[70]">
-                <DropdownMenuLabel>Filter by status</DropdownMenuLabel>
-                <DropdownMenuItem
-                  onSelect={(e) => e.preventDefault()} // Prevent menu closing on item click
-                  className="hover:bg-zinc-600"
-                >
-                  <Checkbox
-                    id="select-all-status"
-                    checked={selectedStatuses.length === ALL_POSSIBLE_STATUSES.length ? true : selectedStatuses.length === 0 ? false : 'indeterminate'}
-                    onCheckedChange={handleSelectAll}
-                    className="mr-2"
-                  />
-                  <label htmlFor="select-all-status" className="cursor-pointer flex-grow">All</label>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator className="bg-zinc-600"/>
-                {ALL_POSSIBLE_STATUSES.map(status => (
-                  <DropdownMenuItem
-                    key={status}
-                    onSelect={(e) => e.preventDefault()} // Prevent menu closing
-                    className="hover:bg-zinc-600"
-                  >
-                    <Checkbox
-                      id={`status-${status}`}
-                      checked={selectedStatuses.includes(status)}
-                      onCheckedChange={() => handleStatusToggle(status)}
-                      className="mr-2"
-                    />
-                    <label htmlFor={`status-${status}`} className="cursor-pointer flex-grow">{status}</label>
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          <Button onClick={() => refetch()} variant="outline" size="sm" className="bg-zinc-700 border-zinc-600 hover:bg-zinc-600">
-            <RefreshCw className="h-4 w-4" />
-          </Button>
+      {summaryMessage && (
+        <div className="p-3 mb-4 bg-zinc-800/95 rounded-md text-sm text-zinc-300 border border-zinc-700">
+          {summaryMessage}
         </div>
-      </div>
+      )}
 
       {isLoading && (
         <div className="space-y-4">
@@ -186,20 +144,19 @@ const TaskList: React.FC = () => {
           ))}
         </div>
       )}
-      {error && <p className="text-red-500">Error loading tasks: {error.message}</p>}
       
-      {!isLoading && !error && filteredTasks.length === 0 && (
+      {!isLoading && filteredTasks.length === 0 && !summaryMessage && (
         <p className="text-zinc-400">No tasks found for the selected criteria.</p>
       )}
 
-      {!isLoading && !error && filteredTasks.length > 0 && (
+      {!isLoading && filteredTasks.length > 0 && (
         <div className="flex-grow -mr-4">
           <ScrollArea className="h-full pr-4">
               {filteredTasks.map((task: Task, idx: number) => (
                   <React.Fragment key={task.id}>
                     <TaskItem task={task} isNew={newTaskIds.has(task.id)} />
                     {idx < filteredTasks.length - 1 && (
-                      <hr className="my-2 border-zinc-700" />
+                      <div className="h-0 border-b border-zinc-700/40 my-1" />
                     )}
                   </React.Fragment>
               ))}

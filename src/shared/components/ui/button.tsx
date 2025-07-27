@@ -22,6 +22,7 @@ const buttonVariants = cva(
         "wes-ghost": "wes-nav-item bg-transparent border-2 border-transparent hover:border-primary/20 hover:bg-accent/30",
         "wes-outline": "border-2 border-primary/30 bg-white/80 hover:bg-accent/20 hover:border-primary/50 text-primary font-inter tracking-wide transition-all duration-300",
         "wes-soft": "bg-gradient-to-br from-wes-pink to-wes-lavender border-2 border-primary/10 text-primary hover:from-wes-pink-dark hover:to-wes-lavender-dark shadow-wes hover:shadow-wes-hover",
+        success: "bg-gradient-to-r from-wes-mint to-wes-mint-dark border-2 border-wes-mint-dark/50 text-wes-forest hover:from-wes-mint-dark hover:to-wes-mint shadow-wes hover:shadow-wes-hover transition-all duration-300",
       },
       size: {
         default: "h-10 px-4 py-2",

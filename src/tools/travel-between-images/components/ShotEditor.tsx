@@ -164,6 +164,10 @@ export interface ShotEditorProps {
 
   // Indicates if parent is still loading settings. Manage Shot Images should wait until this is false.
   settingsLoading?: boolean;
+  
+  // Video generation success feedback
+  justQueued?: boolean;
+  triggerQueued?: () => void;
 }
 
 const DEFAULT_RESOLUTION = '840x552';
@@ -231,6 +235,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   settingsLoading,
   afterEachPromptText,
   onAfterEachPromptTextChange,
+  justQueued = false,
+  triggerQueued,
 }) => {
   // Call all hooks first (Rules of Hooks)
   const { selectedProjectId, projects } = useProject();
@@ -248,7 +254,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // Timeline frame positions for task creation
   const [timelineFramePositions, setTimelineFramePositions] = useState<Map<string, number>>(new Map());
   
-  const { mutate: createTask, isPending: isCreatingTask } = useCreateTask();
+  const { mutateAsync: createTaskAsync, isPending: isCreatingTask } = useCreateTask();
 
   const [creatingTaskId, setCreatingTaskId] = useState<string | null>(null);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
@@ -762,7 +768,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     // IMPORTANT: Use nonVideoImages to exclude generated video outputs
     const absoluteImageUrls = nonVideoImages
       .map((img) => getDisplayUrl(img.imageUrl)) // Use getDisplayUrl here
-      .filter((url): url is string => Boolean(url) && url !== '/placeholder.svg'); // Ensure it's a valid, non-placeholder URL
+      .filter((url): url is string => Boolean(url) && url !== '/placeholder.svg');
 
     if (absoluteImageUrls.length < 2) {
       toast.error('Not enough valid image URLs to generate video. Ensure images are processed correctly.');
@@ -839,10 +845,20 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       requestBody.resolution = resolution;
     }
     
-    createTask({
-      functionName: 'steerable-motion',
-      payload: requestBody,
-    });
+    try {
+      await createTaskAsync({
+        functionName: 'steerable-motion',
+        payload: requestBody,
+      });
+      
+      // Trigger success feedback
+      if (triggerQueued) {
+        triggerQueued();
+      }
+    } catch (error) {
+      console.error('Error creating video generation task:', error);
+      // Error handling is done by the useCreateTask hook
+    }
   };
 
   const handleGenerateAll = () => {
@@ -1505,10 +1521,15 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                             <Button 
                                 size="lg" 
                                 className="w-full" 
+                                variant={justQueued ? "success" : "default"}
                                 onClick={handleGenerateBatch} 
                                 disabled={isGenerationDisabled}
                             >
-                                {isCreatingTask ? 'Creating Tasks...' : 'Generate Video'}
+                                {justQueued
+                                  ? "Added to queue!"
+                                  : isCreatingTask 
+                                    ? 'Creating Tasks...' 
+                                    : 'Generate Video'}
                             </Button>
                             {nonVideoImages.length < 2 && <p className="text-xs text-center text-muted-foreground mt-2">You need at least two images to generate videos.</p>}
                             {isGenerationDisabledDueToApiKey && (

@@ -848,6 +848,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
           <Button
             type="submit"
             className="w-full md:w-1/2"
+            variant={justQueued ? "success" : "default"}
             disabled={isGenerating || !hasApiKey || actionablePromptsCount === 0}
           >
             {justQueued

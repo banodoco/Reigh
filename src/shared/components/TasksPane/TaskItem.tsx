@@ -1,16 +1,37 @@
-import React from 'react';
+import React, { useState, useEffect, useMemo, useRef } from "react";
+import { Settings, Key, Copy, Trash2, AlertCircle, Terminal, Coins, Monitor, LogOut, HelpCircle, MoreHorizontal } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/shared/components/ui/tooltip";
+import { Button } from "@/shared/components/ui/button";
 import { Task } from '@/types/tasks';
-import { Button } from '@/shared/components/ui/button';
-import { useCancelTask, useListTasks } from '@/shared/hooks/useTasks';
-import { useToast } from '@/shared/hooks/use-toast'; // For user feedback
-import { formatDistanceToNow, isValid } from 'date-fns';
-import { useProject } from '@/shared/contexts/ProjectContext';
-import { useState } from 'react';
-import { cn } from '@/shared/lib/utils';
 import { getTaskDisplayName, taskSupportsProgress } from '@/shared/lib/taskConfig';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
+import { useListTasks, useCancelTask } from '@/shared/hooks/useTasks';
+import { useProject } from '@/shared/contexts/ProjectContext';
+import { useToast } from '@/shared/hooks/use-toast';
+import { toast } from 'sonner';
+import { cn } from '@/shared/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
+import { formatDistanceToNow, isValid } from 'date-fns';
+
+// Function to create abbreviated task names for tight spaces
+const getAbbreviatedTaskName = (fullName: string): string => {
+  const abbreviations: Record<string, string> = {
+    'Travel Between Images': 'Travel Video',
+    'Image Generation': 'Image Gen',
+    'Edit Travel (Kontext)': 'Edit Travel (K)',
+    'Edit Travel (Flux)': 'Edit Travel (F)',
+    'Training Data Helper': 'Training Data',
+    'Video Generation': 'Video Gen',
+    'Style Transfer': 'Style Transfer',
+  };
+  
+  return abbreviations[fullName] || fullName;
+};
 
 interface TaskItemProps {
   task: Task;
@@ -49,6 +70,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
 
   // Map certain task types to more user-friendly names for display purposes
   const displayTaskType = getTaskDisplayName(task.taskType);
+  const abbreviatedTaskType = getAbbreviatedTaskName(displayTaskType);
 
   // Extract prompt for Image Generation tasks (single_image)
   const promptText: string = React.useMemo(() => {
@@ -149,17 +171,19 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
   };
 
   const containerClass = cn(
-    "p-3 mb-2 bg-zinc-800/95 rounded-md shadow border transition-colors",
+    "p-3 mb-2 bg-zinc-800/95 rounded-md shadow border transition-colors overflow-hidden",
     isNew ? "border-teal-400 animate-[flash_3s_ease-in-out]" : "border-zinc-600 hover:border-zinc-400"
   );
 
   return (
     <div className={containerClass}>
-      <div className="flex justify-between items-center mb-1">
+      <div className="flex justify-between items-center mb-1 gap-2">
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <span className="text-sm font-semibold text-zinc-200 flex-1 whitespace-nowrap overflow-hidden text-ellipsis pr-2 cursor-default">{displayTaskType}</span>
+              <span className="text-sm font-semibold text-zinc-200 flex-1 whitespace-nowrap overflow-hidden text-ellipsis cursor-default min-w-0">
+                {abbreviatedTaskType}
+              </span>
             </TooltipTrigger>
             <TooltipContent>
               <p>{displayTaskType}</p>
@@ -167,7 +191,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
           </Tooltip>
         </TooltipProvider>
         <span
-          className={`px-2 py-0.5 text-xs rounded-full ${
+          className={`px-2 py-0.5 text-xs rounded-full flex-shrink-0 ${
             task.status === 'In Progress' ? 'bg-blue-500 text-blue-100' :
             task.status === 'Complete' ? 'bg-green-500 text-green-100' :
             task.status === 'Failed' ? 'bg-red-500 text-red-100' :
