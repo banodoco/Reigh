@@ -179,6 +179,7 @@ export const GenerationsPane: React.FC = () => {
                     whiteText
                     columnsPerRow={6}
                     initialMediaTypeFilter="image"
+                    initialStarredFilter={false}
                 />
             )}
             {paginatedData.items.length === 0 && !isLoading && (

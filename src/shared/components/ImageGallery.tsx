@@ -130,6 +130,8 @@ interface ImageGalleryProps {
   onMediaTypeFilterChange?: (mediaType: 'all' | 'image' | 'video') => void;
   /** Callback when a generation is starred/unstarred */
   onToggleStar?: (id: string, starred: boolean) => void;
+  /** Initial starred filter value */
+  initialStarredFilter?: boolean;
   /** Callback when starred filter changes */
   onStarredFilterChange?: (starredOnly: boolean) => void;
   /** Callback when tool type filter changes */
@@ -257,7 +259,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   onMediaTypeFilterChange,
   onToggleStar,
   onStarredFilterChange,
-  onToolTypeFilterChange
+  onToolTypeFilterChange,
+  initialStarredFilter = false
 }) => {
   const [activeLightboxMedia, setActiveLightboxMedia] = useState<GenerationRow | null>(null);
   const [downloadingImageId, setDownloadingImageId] = useState<string | null>(null);
@@ -284,7 +287,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   const [shotFilter, setShotFilter] = useState<string>(initialShotFilter);
   const [excludePositioned, setExcludePositioned] = useState<boolean>(initialExcludePositioned);
   // State for starred filter
-  const [showStarredOnly, setShowStarredOnly] = useState<boolean>(false);
+  const [showStarredOnly, setShowStarredOnly] = useState<boolean>(initialStarredFilter);
   // Mobile-only: track which image should show action controls (e.g., Info button)
   const [mobileActiveImageId, setMobileActiveImageId] = useState<string | null>(null);
   // Mobile-only: track which image has popover open
@@ -317,6 +320,11 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     // When the component mounts or initialFilterState prop changes, update the filter state
     setFilterByToolType(initialFilterState);
   }, [initialFilterState]);
+
+  useEffect(() => {
+    // When the component mounts or initialStarredFilter prop changes, update the starred filter state
+    setShowStarredOnly(initialStarredFilter);
+  }, [initialStarredFilter]);
 
   useEffect(() => {
     return () => {

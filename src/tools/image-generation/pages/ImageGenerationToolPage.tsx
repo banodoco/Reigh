@@ -618,6 +618,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
                 initialSearchTerm={searchTerm}
                 onSearchChange={setSearchTerm}
                 onMediaTypeFilterChange={handleMediaTypeFilterChange}
+                initialStarredFilter={starredOnly}
                 onStarredFilterChange={setStarredOnly}
                 onToolTypeFilterChange={setToolTypeFilterEnabled}
               />

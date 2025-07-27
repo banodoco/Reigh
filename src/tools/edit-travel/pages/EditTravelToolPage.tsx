@@ -338,6 +338,7 @@ const EditTravelToolPage: React.FC = () => {
         lastShotId={lastAffectedShotId}
         currentToolType="edit-travel" 
         initialFilterState={true}
+        initialStarredFilter={false}
       />
       
       <MemoizedShotsPane />

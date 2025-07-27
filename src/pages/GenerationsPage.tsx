@@ -93,6 +93,7 @@ const GenerationsPage: React.FC = () => {
           serverPage={page}
           onMediaTypeFilterChange={handleMediaTypeFilterChange}
           onToggleStar={handleToggleStar}
+          initialStarredFilter={starredOnly}
           onStarredFilterChange={setStarredOnly}
         />
       )}
