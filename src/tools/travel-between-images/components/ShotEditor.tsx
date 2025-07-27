@@ -1430,8 +1430,14 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          // Open the generations pane and set the current shot context
-                          setIsGenerationsPaneLocked(true);
+                          if (isMobile) {
+                            // On mobile, just open the pane normally (no locking)
+                            const evt = new CustomEvent('mobilePaneOpen', { detail: { side: 'bottom' } });
+                            window.dispatchEvent(evt);
+                          } else {
+                            // On desktop, open the generations pane and set the locked state
+                            setIsGenerationsPaneLocked(true);
+                          }
                           // TODO: Set the shot filter in the generations pane to the current shot
                         }}
                       >
