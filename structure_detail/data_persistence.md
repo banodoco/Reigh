@@ -60,10 +60,14 @@ const { uiState, updateUIState } = useUserUIState();
 {
   "ui": { 
     "paneLocks": { 
-      "shots": true,
-      "generations": false 
+      "gens": false,
+      "shots": false,
+      "tasks": true
     },
     "theme": "dark"
+  },
+  "user-preferences": {
+    "lastOpenedProjectId": "project-uuid"
   },
   "image-generation": { 
     "imagesPerPrompt": 4,

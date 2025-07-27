@@ -89,7 +89,16 @@ async function getOrCreateUser(db: ReturnType<typeof drizzle>): Promise<string> 
       email: 'seed@example.com',
       credits: '100.000', // Start with 100 credits
       apiKeys: {},
-      settings: {},
+      settings: {
+        ui: {
+          paneLocks: {
+            gens: false,
+            shots: false,
+            tasks: true
+          }
+        },
+        "user-preferences": {}
+      },
     });
     user = (await db.select().from(schema.users).where(eq(schema.users.id, userId)).limit(1))[0];
   } else {
