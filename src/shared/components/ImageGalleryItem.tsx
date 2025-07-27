@@ -358,11 +358,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                     </PopoverPrimitive.Portal>
                   </PopoverPrimitive.Root>
                 ) : (
-                  <Tooltip open={mobilePopoverOpenImageId === image.id} onOpenChange={(open) => {
-                    if (!open) {
-                      setMobilePopoverOpenImageId(null);
-                    }
-                  }}>
+                  <Tooltip>
                     <TooltipTrigger asChild>
                       <div className="opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
                         <div className="h-7 w-7 rounded-full bg-black/30 flex items-center justify-center">
