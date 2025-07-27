@@ -86,7 +86,7 @@ ORDER BY table_name, ordinal_position;
 
 | Table | Purpose | Key Columns | Relationships |
 |-------|---------|-------------|---------------|
-| **`users`** | User accounts | `id`, `email`, `settings` (JSONB), `total_credits` | → projects, credits_ledger |
+| **`users`** | User accounts | `id`, `email`, `settings` (JSONB), `onboarding` (JSONB), `credits` | → projects, credits_ledger |
 | **`projects`** | Creative projects | `id`, `user_id`, `name`, `settings` | → shots, generations |
 | **`shots`** | Project scenes | `id`, `project_id`, `name`, `order`, `settings` | → shot_generations |
 | **`generations`** | AI outputs | `id`, `type`, `url`, `metadata`, `task_id` | → tasks, shots |

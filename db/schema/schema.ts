@@ -17,6 +17,7 @@ export const users = pgTable('users', {
   email: text('email'),
   apiKeys: jsonb('api_keys'), // Store API keys as JSONB
   settings: jsonb('settings'), // Store tool settings as JSONB
+  onboarding: jsonb('onboarding').default('{}').notNull(), // Store onboarding progress as JSONB
   credits: numeric('credits', { precision: 10, scale: 3 }).default('0').notNull(), // Cached credit balance - supports fractional values
 });
 

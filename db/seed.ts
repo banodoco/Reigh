@@ -99,6 +99,7 @@ async function getOrCreateUser(db: ReturnType<typeof drizzle>): Promise<string> 
         },
         "user-preferences": {}
       },
+      onboarding: {},
     });
     user = (await db.select().from(schema.users).where(eq(schema.users.id, userId)).limit(1))[0];
   } else {

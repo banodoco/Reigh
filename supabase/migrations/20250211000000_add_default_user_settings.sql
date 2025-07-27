@@ -53,8 +53,8 @@ BEGIN
   
   -- Create user record with SECURITY DEFINER privileges
   -- No automatic credits - will be handled by grant-credits function
-  INSERT INTO users (id, name, email, credits, given_credits, settings)
-  VALUES (current_user_id, user_name, user_email, 0, false, default_settings)
+  INSERT INTO users (id, name, email, credits, given_credits, settings, onboarding)
+  VALUES (current_user_id, user_name, user_email, 0, false, default_settings, '{}'::jsonb)
   ON CONFLICT (id) DO NOTHING;
   
 END;

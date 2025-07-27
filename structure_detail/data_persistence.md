@@ -74,6 +74,15 @@ const { uiState, updateUIState } = useUserUIState();
     "defaultModel": "wan-local" 
   }
 }
+
+-- Example: users.onboarding column (JSONB)
+{
+  "completed": false,
+  "currentStep": "welcome",
+  "stepsCompleted": ["welcome", "profile"],
+  "dismissedTips": ["pane-locks", "shot-creation"],
+  "lastActiveDate": "2025-02-11T10:30:00Z"
+}
 ```
 
 ### Scope Hierarchy
