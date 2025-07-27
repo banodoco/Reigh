@@ -5,6 +5,7 @@ import { Database } from '@/integrations/supabase/types';
 import { uploadImageToStorage } from '@/shared/lib/imageUploader';
 import { toast } from 'sonner';
 import React from 'react';
+import { log } from '@/shared/lib/logger';
 
 // Define the type for the new shot data returned by Supabase
 // This should align with your 'shots' table structure from `supabase/types.ts`
@@ -327,6 +328,18 @@ const createGenerationForUploadedImage = async (
   return newGeneration;
 };
 
+// Helper function to detect server overload or rate limiting issues
+const isQuotaOrServerError = (error: any): boolean => {
+  const message = error?.message?.toLowerCase() || '';
+  const code = error?.code || error?.status;
+  return message.includes('quota') || 
+         message.includes('rate limit') || 
+         message.includes('too many requests') ||
+         code === 429 || 
+         code === 503 || 
+         code === 502;
+};
+
 // Add image to shot VIA API
 export const useAddImageToShot = () => {
   const queryClient = useQueryClient();
@@ -339,6 +352,10 @@ export const useAddImageToShot = () => {
       thumbUrl?: string;
       project_id: string;
     }) => {
+      log('MobileNetworkDebug', `Starting add image to shot - ShotID: ${shot_id}, GenerationID: ${generation_id}, ImageURL: ${imageUrl?.substring(0, 100)}...`);
+      
+      const startTime = Date.now();
+      
       // First create generation if imageUrl is provided
       if (imageUrl && !generation_id) {
         const { data: newGeneration, error: genError } = await supabase
@@ -364,8 +381,12 @@ export const useAddImageToShot = () => {
         })
         .single();
       
-      if (rpcError) throw rpcError;
+      if (rpcError) {
+        log('MobileNetworkDebug', `RPC Error after ${Date.now() - startTime}ms:`, rpcError);
+        throw rpcError;
+      }
       
+      log('MobileNetworkDebug', `Successfully added image to shot in ${Date.now() - startTime}ms`);
       return shotGeneration;
     },
     onSuccess: (_, variables) => {
@@ -380,7 +401,18 @@ export const useAddImageToShot = () => {
     },
     onError: (error: Error) => {
       console.error('Error adding image to shot:', error);
-      toast.error(`Failed to add image to shot: ${error.message}`);
+      
+      // Provide more helpful error messages for common mobile issues
+      let userMessage = error.message;
+      if (error.message.includes('Load failed') || error.message.includes('TypeError')) {
+        userMessage = 'Network connection issue. Please check your internet connection and try again.';
+      } else if (error.message.includes('fetch')) {
+        userMessage = 'Unable to connect to server. Please try again in a moment.';
+      } else if (isQuotaOrServerError(error)) {
+        userMessage = 'Server is temporarily busy. Please wait a moment before trying again.';
+      }
+      
+      toast.error(`Failed to add image to shot: ${userMessage}`);
     },
   });
 };

@@ -20,6 +20,7 @@ import { TimeStamp } from "@/shared/components/TimeStamp";
 import { useToast } from "@/shared/hooks/use-toast";
 import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { GeneratedImageWithMetadata, DisplayableMetadata, formatMetadataForDisplay } from "./ImageGallery";
+import { log } from '@/shared/lib/logger';
 
 interface ImageGalleryItemProps {
   image: GeneratedImageWithMetadata;
@@ -284,9 +285,74 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                               }
                               setAddingToShotImageId(image.id!);
                               try {
-                                  const success = await onAddToLastShot(image.id!, displayUrl, displayUrl);
-                                  if (success) {
-                                      onShowTick(image.id!);
+                                  // Add limited retry logic for mobile network issues
+                                  let success = false;
+                                  let retryCount = 0;
+                                  const maxRetries = isMobile ? 2 : 1; // Reduced from 3 to 2 retries on mobile
+                                  
+                                  // Mobile-specific debugging - detect network state if available (only when debugging enabled)
+                                  if (isMobile && 'connection' in navigator && import.meta.env.VITE_DEBUG_LOGS) {
+                                      const conn = (navigator as any).connection;
+                                      log('MobileAddToShot', `Network state - Type: ${conn.effectiveType}, Downlink: ${conn.downlink}Mbps, RTT: ${conn.rtt}ms`);
+                                  }
+                                  
+                                  while (!success && retryCount < maxRetries) {
+                                      try {
+                                          // Use the image URL directly instead of displayUrl to avoid potential URL resolution issues
+                                          const imageUrlToUse = image.url || displayUrl;
+                                          const thumbUrlToUse = image.thumbUrl || imageUrlToUse;
+                                          
+                                          log('MobileAddToShot', `Attempt ${retryCount + 1}/${maxRetries} for image ${image.id} with URL: ${imageUrlToUse?.substring(0, 80)}...`);
+                                          
+                                          success = await onAddToLastShot(image.id!, imageUrlToUse, thumbUrlToUse);
+                                          
+                                          if (success) {
+                                              onShowTick(image.id!);
+                                              log('MobileAddToShot', `Success on attempt ${retryCount + 1} for image ${image.id}`);
+                                          }
+                                      } catch (error) {
+                                          retryCount++;
+                                          log('MobileAddToShot', `Attempt ${retryCount} failed for image ${image.id}:`, error);
+                                          
+                                          // Don't retry for certain error types that won't benefit from retrying
+                                          const isRetryableError = (err: any): boolean => {
+                                              const message = err?.message?.toLowerCase() || '';
+                                              const isNetworkError = message.includes('load failed') || 
+                                                                    message.includes('network error') || 
+                                                                    message.includes('fetch') ||
+                                                                    message.includes('timeout');
+                                              const isServerError = message.includes('unauthorized') || 
+                                                                   message.includes('forbidden') || 
+                                                                   message.includes('not found') ||
+                                                                   message.includes('quota') ||
+                                                                   err?.status === 401 || 
+                                                                   err?.status === 403 || 
+                                                                   err?.status === 404;
+                                              return isNetworkError && !isServerError;
+                                          };
+                                          
+                                          if (retryCount < maxRetries && isRetryableError(error)) {
+                                              // Show user feedback on retry
+                                              if (retryCount === 1) {
+                                                  toast({ title: "Retrying...", description: "Network issue detected, trying again.", duration: 1500 });
+                                              }
+                                              
+                                              // Wait before retry, with shorter delay to improve UX
+                                              const waitTime = 800; // Fixed 800ms delay instead of exponential
+                                              log('MobileAddToShot', `Waiting ${waitTime}ms before retry ${retryCount + 1}`);
+                                              await new Promise(resolve => setTimeout(resolve, waitTime));
+                                          } else {
+                                              // Final retry failed, show user-friendly error
+                                              const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                                              log('MobileAddToShot', `All retries failed for image ${image.id}. Final error:`, error);
+                                              toast({ 
+                                                  title: "Network Error", 
+                                                  description: `Could not add image to shot. ${isMobile ? 'Please check your connection and try again.' : errorMessage}`,
+                                                  variant: "destructive" 
+                                              });
+                                              throw error;
+                                          }
+                                      }
                                   }
                               } finally {
                                   setAddingToShotImageId(null);
