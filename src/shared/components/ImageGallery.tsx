@@ -7,7 +7,7 @@ import {
   TooltipProvider, 
   TooltipTrigger 
 } from "@/shared/components/ui/tooltip";
-import { Popover, PopoverTrigger, PopoverContent } from "@/shared/components/ui/popover";
+
 import MediaLightbox from "@/shared/components/MediaLightbox";
 import { useToast } from "@/shared/hooks/use-toast";
 import { Shot, GenerationRow } from "@/types/shots";
@@ -178,16 +178,12 @@ const formatMetadataForDisplay = (metadata: DisplayableMetadata): string => {
   if ((additionalLoras && Object.keys(additionalLoras).length > 0) || (activeLoras && activeLoras.length > 0)) {
     displayText += `\n🎨 LORAS\n`;
     displayText += `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-    displayText += `Name                         │ Strength\n`;
-    displayText += `─────────────────────────────┼──────────\n`;
     
     if (activeLoras && activeLoras.length > 0) {
       // Use structured activeLoras if available
       activeLoras.forEach(lora => {
         const displayName = lora.name || lora.id || 'Unknown';
-        const paddedName = displayName.padEnd(28, ' ').substring(0, 28);
-        const strengthText = `${lora.strength}%`.padStart(8, ' ');
-        displayText += `${paddedName} │ ${strengthText}\n`;
+        displayText += `${displayName} - ${lora.strength}%\n`;
       });
     } else if (additionalLoras) {
       // Fall back to additional_loras from orchestrator_details
@@ -196,9 +192,7 @@ const formatMetadataForDisplay = (metadata: DisplayableMetadata): string => {
         const urlParts = url.split('/');
         const filename = urlParts[urlParts.length - 1] || url;
         const displayName = filename.replace(/\.(safetensors|ckpt|pt).*$/i, '').replace(/_/g, ' ');
-        const paddedName = displayName.padEnd(28, ' ').substring(0, 28);
-        const strengthText = `${((strength as number) * 100).toFixed(0)}%`.padStart(8, ' ');
-        displayText += `${paddedName} │ ${strengthText}\n`;
+        displayText += `${displayName} - ${((strength as number) * 100).toFixed(0)}%\n`;
       });
     }
   }
@@ -228,38 +222,7 @@ const formatMetadataForDisplay = (metadata: DisplayableMetadata): string => {
   return displayText.trim() || "No metadata available.";
 };
 
-// Add helper component below imports (before ImageGallery component) or inside file near top: create InfoPopover
-const InfoPopover: React.FC<{ 
-  metadata: DisplayableMetadata | undefined; 
-  metadataForDisplay: string;
-  isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
-}> = ({ metadata, metadataForDisplay, isOpen, onOpenChange }) => {
-  return (
-    <Popover open={isOpen} onOpenChange={onOpenChange}>
-      <PopoverTrigger asChild>
-        <div className="absolute inset-0 pointer-events-none" />
-      </PopoverTrigger>
-      <PopoverContent
-        side="right"
-        align="start"
-        className="max-w-md text-xs p-3 leading-relaxed shadow-lg bg-background border max-h-80 overflow-y-auto z-50"
-        onPointerLeave={() => onOpenChange(false)}
-        data-info-popover="true"
-      >
-        {metadata?.userProvidedImageUrl && (
-          <img
-            src={metadata.userProvidedImageUrl}
-            alt="User provided image preview"
-            className="w-full h-auto max-h-24 object-contain rounded-sm mb-2 border"
-            loading="lazy"
-          />
-        )}
-        <pre className="font-sans whitespace-pre-wrap">{metadataForDisplay}</pre>
-      </PopoverContent>
-    </Popover>
-  );
-};
+
 
 export const ImageGallery: React.FC<ImageGalleryProps> = ({ 
   images, 
@@ -873,6 +836,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
 
                 // State for hover popover
                 const [isHovered, setIsHovered] = useState(false);
+                const [isInfoHovered, setIsInfoHovered] = useState(false);
 
                 // Conditionally wrap with DraggableImage only on desktop to avoid interfering with mobile scrolling
                 const imageContent = (
@@ -935,13 +899,20 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                                 }}
                             >
                                 <SelectTrigger
-                                    className="h-7 px-2 py-1 rounded-md bg-black/50 hover:bg-black/70 text-white text-xs min-w-[70px] max-w-[120px] truncate focus:ring-0 focus:ring-offset-0"
+                                    className="h-7 px-2 py-1 rounded-md bg-black/50 hover:bg-black/70 text-white text-xs min-w-[70px] max-w-[90px] truncate focus:ring-0 focus:ring-offset-0"
                                     aria-label="Select target shot"
                                     onMouseEnter={(e) => e.stopPropagation()}
                                     onMouseLeave={(e) => e.stopPropagation()}
                                     onPointerDown={(e) => e.stopPropagation()}
                                 >
-                                    <SelectValue placeholder="Shot..." />
+                                    <SelectValue placeholder="Shot...">
+                                        {selectedShotIdLocal ? (
+                                            (() => {
+                                                const shotName = simplifiedShotOptions.find(s => s.id === selectedShotIdLocal)?.name || '';
+                                                return shotName.length > 10 ? `${shotName.substring(0, 10)}...` : shotName;
+                                            })()
+                                        ) : 'Shot...'}
+                                    </SelectValue>
                                 </SelectTrigger>
                                 <SelectContent className="z-[9999]" style={{ zIndex: 10000 }}>
                                     {simplifiedShotOptions.map(shot => (
@@ -1004,48 +975,41 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                           position="top-right"
                         />
 
-                        {/* Action buttons - Top Right (Info, Star & Apply) */}
+                        {/* Action buttons - Top Right (Info & Apply) */}
                         <div className="absolute top-2 right-2 flex flex-col items-end gap-1.5 mt-8">
-                            {/* Star button */}
-                            <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                                <Button
-                                    variant="secondary"
-                                    size="icon"
-                                    className="h-7 w-7 p-0 rounded-full bg-black/50 hover:bg-black/70 text-white"
-                                    onClick={() => {
-                                        if (onToggleStar) {
-                                            onToggleStar(image.id!, !image.starred);
-                                        } else {
-                                            toggleStarMutation.mutate({ 
-                                                id: image.id!, 
-                                                starred: !image.starred 
-                                            });
-                                        }
-                                    }}
-                                    disabled={toggleStarMutation.isPending}
-                                >
-                                    <Star 
-                                        className={`h-3.5 w-3.5 ${image.starred ? 'fill-current' : ''}`} 
-                                    />
-                                </Button>
-                            </div>
 
-                            {/* Info popover (shown on hover) */}
+                                                        {/* Info tooltip (shown on hover) */}
                                 {image.metadata && (
-                                 <>
-                                   <InfoPopover 
-                                     metadata={image.metadata} 
-                                     metadataForDisplay={metadataForDisplay}
-                                     isOpen={isHovered}
-                                     onOpenChange={setIsHovered}
-                                   />
-                                   <div className="opacity-40 group-hover:opacity-70 transition-opacity">
-                                     <div className="h-7 w-7 rounded-full bg-black/30 flex items-center justify-center">
-                                       <Info className="h-3.5 w-3.5 text-white" />
-                                     </div>
-                                   </div>
-                                 </>
-                                 )}
+                                  <Tooltip open={isInfoHovered} onOpenChange={setIsInfoHovered}>
+                                    <TooltipTrigger asChild>
+                                      <div 
+                                        className="opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                                        onMouseEnter={() => setIsInfoHovered(true)}
+                                        onMouseLeave={() => setIsInfoHovered(false)}
+                                      >
+                                        <div className="h-7 w-7 rounded-full bg-black/30 flex items-center justify-center">
+                                          <Info className="h-3.5 w-3.5 text-white" />
+                                        </div>
+                                      </div>
+                                    </TooltipTrigger>
+                                                                         <TooltipContent
+                                       side="right"
+                                       align="start"
+                                       className="max-w-48 text-xs p-3 leading-relaxed shadow-lg bg-background border max-h-80 overflow-y-auto"
+                                       onPointerLeave={() => setIsInfoHovered(false)}
+                                     >
+                                      {image.metadata?.userProvidedImageUrl && (
+                                        <img
+                                          src={image.metadata.userProvidedImageUrl}
+                                          alt="User provided image preview"
+                                          className="w-full h-auto max-h-24 object-contain rounded-sm mb-2 border"
+                                          loading="lazy"
+                                        />
+                                      )}
+                                      <pre className="font-sans whitespace-pre-wrap">{metadataForDisplay}</pre>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                )}
 
                             {/* Apply settings button temporarily disabled */}
                             {false && image.metadata && onApplySettings && (
@@ -1086,26 +1050,27 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                             </div>
                         )}
 
-                        {/* Download button - Bottom Left */}
+                        {/* Star button - Bottom Left */}
                         <div className="absolute bottom-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
                             <Button
-                                variant="outline"
+                                variant="secondary"
                                 size="icon"
                                 className="h-7 w-7 p-0 rounded-full bg-black/50 hover:bg-black/70 text-white"
-                                onClick={() => handleDownloadImage(
-                                    displayUrl, 
-                                    `artful_pane_craft_${isActuallyVideo ? 'video' : 'image'}_${image.id || index}`,
-                                    image.id || imageKey,
-                                    isActuallyVideo,
-                                    image.metadata?.content_type
-                                )}
-                                disabled={downloadingImageId === (image.id || imageKey)}
+                                onClick={() => {
+                                    if (onToggleStar) {
+                                        onToggleStar(image.id!, !image.starred);
+                                    } else {
+                                        toggleStarMutation.mutate({ 
+                                            id: image.id!, 
+                                            starred: !image.starred 
+                                        });
+                                    }
+                                }}
+                                disabled={toggleStarMutation.isPending}
                             >
-                                {downloadingImageId === (image.id || imageKey) ? (
-                                    <div className="h-3 w-3 animate-spin rounded-full border-b-2 border-current"></div>
-                                ) : (
-                                    <Download className="h-3.5 w-3.5" />
-                                )}
+                                <Star 
+                                    className={`h-3.5 w-3.5 ${image.starred ? 'fill-current' : ''}`} 
+                                />
                             </Button>
                         </div>
                     </>)

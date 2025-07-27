@@ -113,21 +113,34 @@ const TaskList: React.FC<TaskListProps> = ({
 
   const summaryMessage = useMemo(() => {
     if (!statusCounts) return null;
-
     if (activeFilter === 'Succeeded') {
       const count = statusCounts.recentSuccesses;
       if (count > 0) {
-        return `${count} generation${count === 1 ? '' : 's'} succeeded in the past 15 minutes.`;
+        return `${count} generation${count === 1 ? '' : 's'} succeeded in the past hour.`;
       }
     }
     if (activeFilter === 'Failed') {
       const count = statusCounts.recentFailures;
       if (count > 0) {
-        return `${count} generation${count === 1 ? '' : 's'} failed in the past 15 minutes.`;
+        return `${count} generation${count === 1 ? '' : 's'} failed in the past hour.`;
       }
     }
     return null;
   }, [activeFilter, statusCounts]);
+
+  // Generate filter-specific empty message
+  const getEmptyMessage = () => {
+    switch (activeFilter) {
+      case 'Processing':
+        return 'No tasks processing';
+      case 'Succeeded':
+        return 'No tasks succeeded';
+      case 'Failed':
+        return 'No tasks failed';
+      default:
+        return 'No tasks found';
+    }
+  };
 
   return (
     <div className="p-4 h-full flex flex-col text-zinc-200">
@@ -136,7 +149,7 @@ const TaskList: React.FC<TaskListProps> = ({
           {summaryMessage}
         </div>
       )}
-
+      
       {isLoading && (
         <div className="space-y-4">
           {Array.from({ length: 4 }).map((_, idx) => (
@@ -146,7 +159,7 @@ const TaskList: React.FC<TaskListProps> = ({
       )}
       
       {!isLoading && filteredTasks.length === 0 && !summaryMessage && (
-        <p className="text-zinc-400">No tasks found for the selected criteria.</p>
+        <p className="text-zinc-400 text-center">{getEmptyMessage()}</p>
       )}
 
       {!isLoading && filteredTasks.length > 0 && (

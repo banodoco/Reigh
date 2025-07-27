@@ -412,8 +412,8 @@ export const useTaskStatusCounts = (projectId: string | null) => {
         return { processing: 0, recentSuccesses: 0, recentFailures: 0 };
       }
 
-      // Get 15 minutes ago timestamp
-      const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+      // Get 1 hour ago timestamp
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
 
       // Query for processing tasks (any time)
       const { count: processingCount, error: processingError } = await supabase
@@ -425,24 +425,24 @@ export const useTaskStatusCounts = (projectId: string | null) => {
 
       if (processingError) throw processingError;
 
-      // Query for recent successes (last 15 minutes)
+      // Query for recent successes (last hour)
       const { count: successCount, error: successError } = await supabase
         .from('tasks')
         .select('id', { count: 'exact', head: true })
         .eq('project_id', projectId)
         .eq('status', 'Complete')
-        .gte('updated_at', fifteenMinutesAgo)
+        .gte('updated_at', oneHourAgo)
         .is('params->orchestrator_task_id_ref', null); // Only parent tasks
 
       if (successError) throw successError;
 
-      // Query for recent failures (last 15 minutes)
+      // Query for recent failures (last hour)
       const { count: failureCount, error: failureError } = await supabase
         .from('tasks')
         .select('id', { count: 'exact', head: true })
         .eq('project_id', projectId)
         .in('status', ['Failed', 'Cancelled'])
-        .gte('updated_at', fifteenMinutesAgo)
+        .gte('updated_at', oneHourAgo)
         .is('params->orchestrator_task_id_ref', null); // Only parent tasks
 
       if (failureError) throw failureError;

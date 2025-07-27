@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRenderLogger } from '@/shared/hooks/useRenderLogger';
 import TaskList from './TaskList';
 import { cn } from '@/shared/lib/utils'; // For conditional classnames
@@ -72,6 +72,7 @@ const PaginationControls: React.FC<PaginationControlsProps> = ({
   isLoading = false,
   filterType
 }) => {
+  // Only show pagination when there are multiple pages
   if (totalPages <= 1) return null;
 
   const getFilterLabel = () => {
@@ -142,7 +143,7 @@ export const TasksPane: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
   const { selectedProjectId } = useProject();
   const { data: cancellableTasks } = useListTasks({ projectId: selectedProjectId, status: CANCELLABLE_TASK_STATUSES });
   
-  // Get paginated tasks for the current filter
+  // Get paginated tasks
   const { data: paginatedData, isLoading: isPaginatedLoading } = usePaginatedTasks({
     projectId: selectedProjectId,
     status: STATUS_GROUPS[selectedFilter],
@@ -150,8 +151,28 @@ export const TasksPane: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
     offset: (currentPage - 1) * ITEMS_PER_PAGE,
   });
   
+  // Store previous pagination data to avoid flickering during loading
+  const [displayPaginatedData, setDisplayPaginatedData] = useState<typeof paginatedData>(paginatedData);
+  
+  // Only update display data when we have new data (not during loading) or when initializing
+  useEffect(() => {
+    if ((!isPaginatedLoading && paginatedData) || (!displayPaginatedData && paginatedData)) {
+      setDisplayPaginatedData(paginatedData);
+    }
+  }, [paginatedData, isPaginatedLoading, displayPaginatedData]);
+  
   // Get status counts for indicators
-  const { data: statusCounts } = useTaskStatusCounts(selectedProjectId);
+  const { data: statusCounts, isLoading: isStatusCountsLoading } = useTaskStatusCounts(selectedProjectId);
+  
+  // Store previous status counts to avoid flickering during loading
+  const [displayStatusCounts, setDisplayStatusCounts] = useState<typeof statusCounts>(statusCounts);
+  
+  // Only update display counts when we have new data (not during loading) or when initializing
+  useEffect(() => {
+    if ((!isStatusCountsLoading && statusCounts) || (!displayStatusCounts && statusCounts)) {
+      setDisplayStatusCounts(statusCounts);
+    }
+  }, [statusCounts, isStatusCountsLoading, displayStatusCounts]);
   
   // Count only visible tasks (exclude travel_segment and travel_stitch) for display
   const visibleCancellableCount = filterVisibleTasks(cancellableTasks || []).length;
@@ -174,22 +195,19 @@ export const TasksPane: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
 
   // Handler for status indicator clicks
   const handleStatusIndicatorClick = (type: FilterGroup, count: number) => {
-    if (type === 'Processing') {
-      toast({
-        title: 'Processing Tasks',
-        description: `${count} task${count === 1 ? '' : 's'} currently processing`,
-        variant: 'default',
-      });
-    } else if (type === 'Succeeded') {
+    setSelectedFilter(type);
+    setCurrentPage(1);
+    
+    if (type === 'Succeeded') {
       toast({
         title: 'Recent Successes',
-        description: `${count} generation${count === 1 ? '' : 's'} succeeded in the past 15 minutes`,
+        description: `${count} generation${count === 1 ? '' : 's'} succeeded in the past hour`,
         variant: 'default',
       });
     } else if (type === 'Failed') {
       toast({
         title: 'Recent Failures',
-        description: `${count} generation${count === 1 ? '' : 's'} failed in the past 15 minutes`,
+        description: `${count} generation${count === 1 ? '' : 's'} failed in the past hour`,
         variant: 'destructive',
       });
     }
@@ -228,9 +246,9 @@ export const TasksPane: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
 
   const bottomOffset = isGenerationsPaneLocked ? generationsPaneHeight : 0;
 
-  // Calculate pagination info
-  const totalTasks = paginatedData?.total || 0;
-  const totalPages = paginatedData?.totalPages || 0;
+  // Calculate pagination info using display data to avoid flickering
+  const totalTasks = displayPaginatedData?.total || 0;
+  const totalPages = displayPaginatedData?.totalPages || 0;
 
   return (
     <>
@@ -278,30 +296,18 @@ export const TasksPane: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
                   onClick={handleCancelAllPending}
                   disabled={cancelAllPendingMutation.isPending}
                 >
-                  {cancelAllPendingMutation.isPending ? 'Cancelling All...' : `Cancel All (${visibleCancellableCount})`}
+                  {cancelAllPendingMutation.isPending ? 'Cancelling All...' : 'Cancel All'}
                 </Button>
               )}
           </div>
           
           {/* Status Filter Toggle */}
           <div className="p-4 border-b border-zinc-800 flex-shrink-0">
-            <div className="flex gap-1 bg-zinc-800 rounded-lg p-1 flex-wrap">
-              {(Object.keys(STATUS_GROUPS) as FilterGroup[]).map((filter) => {
-                const getCount = () => {
-                  if (!statusCounts) return 0;
-                  switch (filter) {
-                    case 'Processing':
-                      return statusCounts.processing;
-                    case 'Succeeded':
-                      return statusCounts.recentSuccesses;
-                    case 'Failed':
-                      return statusCounts.recentFailures;
-                    default:
-                      return 0;
-                  }
-                };
-                
-                const count = getCount();
+            <div className="bg-zinc-800 rounded-lg p-1 space-y-1">
+              {/* Processing button - full width on top */}
+              {(() => {
+                const filter = 'Processing' as FilterGroup;
+                const count = displayStatusCounts?.processing || 0;
                 
                 return (
                   <Button
@@ -310,7 +316,7 @@ export const TasksPane: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
                     size="sm"
                     onClick={() => handleFilterChange(filter)}
                     className={cn(
-                      "flex-1 text-xs flex items-center justify-center",
+                      "w-full text-xs flex items-center justify-center",
                       selectedFilter === filter 
                         ? "bg-zinc-600 text-zinc-100 hover:bg-zinc-500" 
                         : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700"
@@ -327,7 +333,51 @@ export const TasksPane: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
                     />
                   </Button>
                 );
-              })}
+              })()}
+              
+              {/* Succeeded and Failed buttons - side by side */}
+              <div className="flex gap-1">
+                {(['Succeeded', 'Failed'] as FilterGroup[]).map((filter) => {
+                  const getCount = () => {
+                    if (!displayStatusCounts) return 0;
+                    switch (filter) {
+                      case 'Succeeded':
+                        return displayStatusCounts.recentSuccesses;
+                      case 'Failed':
+                        return displayStatusCounts.recentFailures;
+                      default:
+                        return 0;
+                    }
+                  };
+                  
+                  const count = getCount();
+                  
+                  return (
+                    <Button
+                      key={filter}
+                      variant={selectedFilter === filter ? "default" : "ghost"}
+                      size="sm"
+                      onClick={() => handleFilterChange(filter)}
+                      className={cn(
+                        "flex-1 text-xs flex items-center justify-center",
+                        selectedFilter === filter 
+                          ? "bg-zinc-600 text-zinc-100 hover:bg-zinc-500" 
+                          : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700"
+                      )}
+                    >
+                      <span>{filter}</span>
+                      <StatusIndicator
+                        count={count}
+                        type={filter}
+                        isSelected={selectedFilter === filter}
+                        onClick={() => {
+                          handleStatusIndicatorClick(filter, count);
+                        }}
+                      />
+                    </Button>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
@@ -346,8 +396,8 @@ export const TasksPane: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
             <TaskList
               filterStatuses={STATUS_GROUPS[selectedFilter]}
               activeFilter={selectedFilter}
-              statusCounts={statusCounts}
-              paginatedData={paginatedData}
+              statusCounts={displayStatusCounts}
+              paginatedData={displayPaginatedData}
               isLoading={isPaginatedLoading}
               currentPage={currentPage}
             />

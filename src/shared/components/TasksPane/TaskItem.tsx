@@ -17,6 +17,12 @@ import { cn } from '@/shared/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 import { formatDistanceToNow, isValid } from 'date-fns';
+import MediaLightbox from '@/shared/components/MediaLightbox';
+import { GenerationRow } from '@/types/shots';
+import { useListShots, useAddImageToShot } from '@/shared/hooks/useShots';
+import { useLastAffectedShot } from '@/shared/hooks/useLastAffectedShot';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 // Function to create abbreviated task names for tight spaces
 const getAbbreviatedTaskName = (fullName: string): string => {
@@ -68,6 +74,76 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
   // Access all tasks for project (used for progress checking)
   const { data: allProjectTasks, refetch: refetchAllTasks } = useListTasks({ projectId: selectedProjectId });
 
+  // Shot-related hooks
+  const { data: shots } = useListShots(selectedProjectId);
+  const { currentShotId } = useCurrentShot();
+  const { lastAffectedShotId, setLastAffectedShotId } = useLastAffectedShot();
+  const addImageToShotMutation = useAddImageToShot();
+
+  // State for MediaLightbox
+  const [showLightbox, setShowLightbox] = useState(false);
+  const [selectedShotId, setSelectedShotId] = useState<string>('');
+  const [showTickForImageId, setShowTickForImageId] = useState<string | null>(null);
+
+  // Create simplified shot options for MediaLightbox
+  const simplifiedShotOptions = React.useMemo(() => shots?.map(s => ({ id: s.id, name: s.name })) || [], [shots]);
+
+  // Set initial selected shot
+  useEffect(() => {
+    const newSelectedShotId = currentShotId || lastAffectedShotId || (simplifiedShotOptions.length > 0 ? simplifiedShotOptions[0].id : "");
+    setSelectedShotId(newSelectedShotId);
+  }, [currentShotId, lastAffectedShotId, simplifiedShotOptions]);
+
+  // Handler for adding image to shot
+  const handleAddToShot = async (generationId: string, imageUrl?: string, thumbUrl?: string): Promise<boolean> => {
+    if (!selectedShotId) {
+      toast({
+        title: "No shot selected",
+        description: "Please select a shot to add to.",
+        variant: "destructive",
+      });
+      return false;
+    }
+    if (!selectedProjectId) {
+      toast({
+        title: "No project selected",
+        description: "Please select a project first.",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    try {
+      await addImageToShotMutation.mutateAsync({
+        shot_id: selectedShotId,
+        generation_id: generationId,
+        project_id: selectedProjectId,
+      });
+      
+      setLastAffectedShotId(selectedShotId);
+      return true;
+    } catch (error) {
+      console.error('Failed to add image to shot:', error);
+      toast({
+        title: "Failed to add image to shot",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+      return false;
+    }
+  };
+
+  // Handler for shot selection change
+  const handleShotChange = (shotId: string) => {
+    setSelectedShotId(shotId);
+  };
+
+  // Handler for tick display
+  const handleShowTick = (imageId: string) => {
+    setShowTickForImageId(imageId);
+    setTimeout(() => setShowTickForImageId(null), 2000);
+  };
+
   // Map certain task types to more user-friendly names for display purposes
   const displayTaskType = getTaskDisplayName(task.taskType);
   const abbreviatedTaskType = getAbbreviatedTaskName(displayTaskType);
@@ -78,6 +154,56 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
     const params = typeof task.params === 'string' ? JSON.parse(task.params) : task.params || {};
     return params?.orchestrator_details?.prompt || '';
   }, [task]);
+
+  // Check if this is a successful Image Generation task with output
+  const hasGeneratedImage = React.useMemo(() => {
+    return (
+      task.taskType === 'single_image' && 
+      task.status === 'Complete' && 
+      task.outputLocation
+    );
+  }, [task.taskType, task.status, task.outputLocation]);
+
+  // Fetch the actual generation record for this task
+  const { data: actualGeneration } = useQuery({
+    queryKey: ['generation-for-task', task.id, task.outputLocation],
+    queryFn: async () => {
+      if (!hasGeneratedImage || !task.outputLocation) return null;
+      
+      const { data, error } = await supabase
+        .from('generations')
+        .select('*')
+        .eq('location', task.outputLocation)
+        .eq('project_id', task.projectId)
+        .single();
+      
+      if (error) {
+        console.error('Error fetching generation for task:', error);
+        return null;
+      }
+      
+      return data;
+    },
+    enabled: hasGeneratedImage && !!task.outputLocation,
+  });
+
+  // Create GenerationRow data for MediaLightbox using the actual generation
+  const generationData: GenerationRow | null = React.useMemo(() => {
+    if (!hasGeneratedImage || !actualGeneration) return null;
+    
+    return {
+      id: actualGeneration.id, // Use the real generation ID
+      location: actualGeneration.location,
+      imageUrl: actualGeneration.location,
+      thumbUrl: actualGeneration.thumb_url || actualGeneration.location,
+      type: actualGeneration.type || 'image',
+      created_at: actualGeneration.created_at,
+      metadata: actualGeneration.metadata || {},
+      params: actualGeneration.params || {},
+      project_id: actualGeneration.project_id,
+      tasks: actualGeneration.tasks || [task.id],
+    } as GenerationRow;
+  }, [hasGeneratedImage, actualGeneration, task.id]);
 
   // Extract image URLs for Travel Between Images tasks (travel_orchestrator)
   const imageUrls: string[] = React.useMemo(() => {
@@ -243,10 +369,32 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
       {/* Show prompt for Image Generation tasks */}
       {promptText && (
         <div className="mb-1 mt-3">
-          <div className="bg-blue-500/10 border border-blue-400/20 rounded px-2 py-1.5">
-            <div className="text-xs text-zinc-200">
+          <div className="bg-blue-500/10 border border-blue-400/20 rounded px-2 py-1.5 flex items-center justify-between">
+            <div className="text-xs text-zinc-200 flex-1 min-w-0 pr-2">
               "{promptText.length > 50 ? `${promptText.substring(0, 50)}...` : promptText}"
             </div>
+            {/* Tiny thumbnail for successful Image Generation tasks */}
+            {generationData && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => setShowLightbox(true)}
+                      className="w-8 h-8 rounded border border-zinc-500 overflow-hidden hover:border-zinc-400 transition-colors flex-shrink-0"
+                    >
+                      <img
+                        src={generationData.imageUrl}
+                        alt="Generated image"
+                        className="w-full h-full object-cover"
+                      />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Click to view image</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
           </div>
         </div>
       )}
@@ -263,6 +411,8 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
             return abbreviateDistance(formatDistanceToNow(date, { addSuffix: true }));
           })()}
         </span>
+        
+        {/* Action buttons for queued/in progress tasks */}
         {(task.status === 'Queued' || task.status === 'In Progress') && (
           <div className="flex items-center gap-2 flex-shrink-0">
             {taskSupportsProgress(task.taskType) && task.status === 'In Progress' && (
@@ -287,9 +437,28 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
             </Button>
           </div>
         )}
+        
       </div>
       {/* Add more task details as needed, e.g., from task.params */}
       {/* <pre className="text-xs text-zinc-500 whitespace-pre-wrap break-all">{JSON.stringify(task.params, null, 2)}</pre> */}
+      
+      {/* MediaLightbox for viewing generated images */}
+      {showLightbox && generationData && (
+        <MediaLightbox
+          media={generationData}
+          onClose={() => setShowLightbox(false)}
+          showNavigation={false}
+          showImageEditTools={true}
+          showDownload={true}
+          showMagicEdit={false}
+          allShots={simplifiedShotOptions}
+          selectedShotId={selectedShotId}
+          onShotChange={handleShotChange}
+          onAddToShot={handleAddToShot}
+          showTickForImageId={showTickForImageId}
+          onShowTick={handleShowTick}
+        />
+      )}
     </div>
   );
 };
