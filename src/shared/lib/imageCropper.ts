@@ -98,24 +98,39 @@ export const cropImageToClosestAspectRatio = async (
           canvas.height // destination height
         );
 
+        const outputMime = /^(image\/(jpeg|png|webp))$/i.test(inputFile.type)
+          ? inputFile.type
+          : 'image/jpeg';
+
         canvas.toBlob(
-          (blob) => {
-            if (blob) {
-              const croppedFile = new File([blob], inputFile.name, {
-                type: inputFile.type,
-                lastModified: Date.now(),
-              });
-              const croppedImageUrl = URL.createObjectURL(croppedFile);
-              resolve({
-                croppedFile,
-                apiImageSize: closestTarget.apiString,
-                croppedImageUrl,
-              });
-            } else {
-              reject(new Error("Failed to create blob from canvas"));
+          async (blob) => {
+            if (!blob) {
+              // Some browsers (especially mobile Safari/Chrome) return null when asked
+              // to encode to an unsupported format (e.g. HEIC). Fallback by creating a
+              // Data URL and converting that back into a Blob encoded as JPEG.
+              try {
+                const dataUrl = canvas.toDataURL(outputMime, 0.95);
+                blob = await (await fetch(dataUrl)).blob();
+              } catch (err) {
+                reject(new Error("Failed to create blob from canvas"));
+                return;
+              }
             }
+
+            const fileExt = outputMime === 'image/png' ? 'png' : outputMime === 'image/webp' ? 'webp' : 'jpg';
+            const safeName = inputFile.name.replace(/\.[^/.]+$/, `.${fileExt}`);
+            const croppedFile = new File([blob], safeName, {
+              type: outputMime,
+              lastModified: Date.now(),
+            });
+            const croppedImageUrl = URL.createObjectURL(croppedFile);
+            resolve({
+              croppedFile,
+              apiImageSize: closestTarget.apiString,
+              croppedImageUrl,
+            });
           },
-          inputFile.type,
+          outputMime,
           0.95 // quality
         );
       };
@@ -206,23 +221,35 @@ export const cropImageToProjectAspectRatio = async (
           canvas.height // destination height
         );
 
+        const outputMime = /^(image\/(jpeg|png|webp))$/i.test(inputFile.type)
+          ? inputFile.type
+          : 'image/jpeg';
+
         canvas.toBlob(
-          (blob) => {
-            if (blob) {
-              const croppedFile = new File([blob], inputFile.name, {
-                type: inputFile.type,
-                lastModified: Date.now(),
-              });
-              const croppedImageUrl = URL.createObjectURL(croppedFile);
-              resolve({
-                croppedFile,
-                croppedImageUrl,
-              });
-            } else {
-              reject(new Error("Failed to create blob from canvas"));
+          async (blob) => {
+            if (!blob) {
+              try {
+                const dataUrl = canvas.toDataURL(outputMime, 0.95);
+                blob = await (await fetch(dataUrl)).blob();
+              } catch (err) {
+                reject(new Error("Failed to create blob from canvas"));
+                return;
+              }
             }
+
+            const fileExt = outputMime === 'image/png' ? 'png' : outputMime === 'image/webp' ? 'webp' : 'jpg';
+            const safeName = inputFile.name.replace(/\.[^/.]+$/, `.${fileExt}`);
+            const croppedFile = new File([blob], safeName, {
+              type: outputMime,
+              lastModified: Date.now(),
+            });
+            const croppedImageUrl = URL.createObjectURL(croppedFile);
+            resolve({
+              croppedFile,
+              croppedImageUrl,
+            });
           },
-          inputFile.type,
+          outputMime,
           0.95 // quality
         );
       };
