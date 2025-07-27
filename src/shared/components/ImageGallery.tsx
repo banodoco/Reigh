@@ -31,6 +31,7 @@ import { useIsMobile } from "@/shared/hooks/use-mobile";
 import { TimeStamp } from "@/shared/components/TimeStamp";
 import { useToggleGenerationStar } from '@/shared/hooks/useGenerations';
 import * as PopoverPrimitive from "@radix-ui/react-popover";
+import { ImageGalleryItem } from "./ImageGalleryItem";
 
 // Define the structure for individual LoRA details within metadata
 export interface MetadataLora {
@@ -136,7 +137,7 @@ interface ImageGalleryProps {
 }
 
 // Helper to format metadata for display
-const formatMetadataForDisplay = (metadata: DisplayableMetadata): string => {
+export const formatMetadataForDisplay = (metadata: DisplayableMetadata): string => {
   
   let displayText = "";
   
@@ -263,6 +264,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   const { toast } = useToast();
   const { setLastAffectedShotId } = useLastAffectedShot();
   const { currentShotId } = useCurrentShot();
+  const isMobile = useIsMobile();
   const simplifiedShotOptions = React.useMemo(() => allShots.map(s => ({ id: s.id, name: s.name })), [allShots]);
   
   // Star functionality
@@ -502,15 +504,14 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     setIsSearchOpen(false);
   };
 
-  // Handle starred filter toggle with proper event handling
-  const handleStarredFilterToggle = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    const newStarredOnly = !showStarredOnly;
-    setShowStarredOnly(newStarredOnly);
-    onStarredFilterChange?.(newStarredOnly);
-  }, [showStarredOnly, onStarredFilterChange]);
+  // Handle starred filter toggle - simplified to avoid stale closure issues
+  const handleStarredFilterToggle = useCallback(() => {
+    setShowStarredOnly(prev => {
+      const newStarredOnly = !prev;
+      onStarredFilterChange?.(newStarredOnly);
+      return newStarredOnly;
+    });
+  }, [onStarredFilterChange]);
 
   // Update search visibility based on search term
   useEffect(() => {
@@ -600,8 +601,6 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
       setPage(Math.max(0, totalPages - 1));
     }
   }, [totalPages, page]);
-
-  const isMobile = useIsMobile();
 
   // Close mobile popover on scroll or when clicking outside
   React.useEffect(() => {
@@ -808,408 +807,32 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
 
           {paginatedImages.length > 0 && (
               <div className={`grid gap-4 mb-12 ${columnsPerRow === 6 ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-6' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 2xl:grid-cols-5'}`}>
-            {paginatedImages.map((image, index) => {
-                const displayUrl = getDisplayUrl(image.thumbUrl || image.url);
-                // Track loading state for this specific image
-                const [imageLoadError, setImageLoadError] = useState<boolean>(false);
-                const [imageRetryCount, setImageRetryCount] = useState<number>(0);
-                const MAX_RETRIES = 2;
-
-                // Handle image load error with retry mechanism
-                const handleImageError = useCallback(() => {
-                  console.warn(`Image load failed for ${image.id}: ${displayUrl}, retry ${imageRetryCount + 1}/${MAX_RETRIES}`);
-                  
-                  if (imageRetryCount < MAX_RETRIES) {
-                    // Retry with cache busting
-                    setTimeout(() => {
-                      setImageRetryCount(prev => prev + 1);
-                    }, 1000 * (imageRetryCount + 1)); // Exponential backoff
-                  } else {
-                    setImageLoadError(true);
-                  }
-                }, [displayUrl, image.id, imageRetryCount]);
-
-                // Reset error state when URL changes (new image)
-                useEffect(() => {
-                  setImageLoadError(false);
-                  setImageRetryCount(0);
-                }, [displayUrl]);
-
-                // Generate display URL with retry cache busting
-                const actualDisplayUrl = useMemo(() => {
-                  if (imageRetryCount > 0) {
-                    return getDisplayUrl(image.thumbUrl || image.url, true); // Force refresh with cache busting
-                  }
-                  return displayUrl;
-                }, [displayUrl, image.thumbUrl, image.url, imageRetryCount]);
-
-                const metadataForDisplay = image.metadata ? formatMetadataForDisplay(image.metadata) : "No metadata available.";
-                const isCurrentDeleting = isDeleting === image.id;
-                const imageKey = image.id || `image-${actualDisplayUrl}-${index}`;
-                // Removed unused render log ID
-
-                // Determine if it's a video by checking the URL extension if isVideo prop is not explicitly set
-                const urlIsVideo = actualDisplayUrl && (actualDisplayUrl.toLowerCase().endsWith('.webm') || actualDisplayUrl.toLowerCase().endsWith('.mp4') || actualDisplayUrl.toLowerCase().endsWith('.mov'));
-                const isActuallyVideo = typeof image.isVideo === 'boolean' ? image.isVideo : urlIsVideo;
-
-                // Placeholder check should ideally rely on more than just !image.id if placeholders are actual objects in the array
-                // For this implementation, we assume placeholders passed to `images` prop might not have `id`
-                const isPlaceholder = !image.id && actualDisplayUrl === "/placeholder.svg";
-                const currentTargetShotName = selectedShotIdLocal ? simplifiedShotOptions.find(s => s.id === selectedShotIdLocal)?.name : undefined;
-                
-                let aspectRatioPadding = '100%'; 
-                let minHeight = '120px'; // Minimum height for very small images
-                
-                // Try to get dimensions from multiple sources
-                let width = image.metadata?.width;
-                let height = image.metadata?.height;
-                
-                // If not found, try to extract from resolution string
-                if (!width || !height) {
-                  const resolution = (image.metadata as any)?.originalParams?.orchestrator_details?.resolution;
-                  if (resolution && typeof resolution === 'string' && resolution.includes('x')) {
-                    const [w, h] = resolution.split('x').map(Number);
-                    if (!isNaN(w) && !isNaN(h)) {
-                      width = w;
-                      height = h;
-                    }
-                  }
-                }
-                
-                if (width && height) {
-                  const calculatedPadding = (height / width) * 100;
-                  // Ensure reasonable aspect ratio bounds
-                  const minPadding = 60; // Minimum 60% height (for very wide images)
-                  const maxPadding = 200; // Maximum 200% height (for very tall images)
-                  aspectRatioPadding = `${Math.min(Math.max(calculatedPadding, minPadding), maxPadding)}%`;
-                }
-
-                // If it's a placeholder (e.g. from Array(4).fill for loading state), render simplified placeholder item
-                // This specific placeholder rendering should only occur if filteredImages actually contains such placeholders.
-                // The filter logic above might already exclude them if they don't have metadata.tool_type
-                if (isPlaceholder) {
-                  return (
-                    <div 
-                      key={imageKey}
-                      className="border rounded-lg overflow-hidden bg-muted animate-pulse"
-                    >
-                      <div style={{ paddingBottom: aspectRatioPadding }} className="relative">
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <Sparkles className="h-12 w-12 text-muted-foreground opacity-30" />
-                        </div>
-                      </div>
-                    </div>
-                  );
-                }
-
-                // Conditionally wrap with DraggableImage only on desktop to avoid interfering with mobile scrolling
-                const imageContent = (
-                  <div 
-                      className="border rounded-lg overflow-hidden hover:shadow-md transition-shadow relative group bg-card"
-                  >
-                    <div className="relative w-full">
-                    <div 
-                      style={{ 
-                        paddingBottom: aspectRatioPadding,
-                        minHeight: minHeight 
-                      }} 
-                      className="relative bg-gray-200"
-                    >
-                        {isActuallyVideo ? (
-                            <video
-                                src={actualDisplayUrl}
-                                controls
-                                playsInline
-                                loop
-                                muted
-                                className="absolute inset-0 w-full h-full object-contain group-hover:opacity-80 transition-opacity duration-300 bg-black"
-                                onDoubleClick={isMobile ? undefined : () => handleOpenLightbox(image)}
-                                onTouchEnd={isMobile ? (e) => {
-                                  e.preventDefault();
-                                  handleMobileTap(image);
-                                } : undefined}
-                                style={{ cursor: 'pointer' }}
-                                onError={handleImageError}
-                            />
-                        ) : (
-                           imageLoadError ? (
-                             // Fallback when image fails to load after retries
-                             <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-gray-100 text-gray-500">
-                               <div className="text-center">
-                                 <AlertTriangle className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                                 <p className="text-xs">Failed to load image</p>
-                                 <button 
-                                   onClick={() => {
-                                     setImageLoadError(false);
-                                     setImageRetryCount(0);
-                                   }}
-                                   className="text-xs underline hover:no-underline mt-1"
-                                 >
-                                   Retry
-                                 </button>
-                               </div>
-                             </div>
-                           ) : (
-                            <img
-                                src={actualDisplayUrl}
-                                alt={image.prompt || `Generated image ${index + 1}`}
-                                className="absolute inset-0 w-full h-full object-cover group-hover:opacity-80 transition-opacity duration-300"
-                                onDoubleClick={isMobile ? undefined : () => handleOpenLightbox(image)}
-                                onTouchEnd={isMobile ? (e) => {
-                                  e.preventDefault();
-                                  handleMobileTap(image);
-                                } : undefined}
-                                style={{ cursor: 'pointer' }}
-                                loading="lazy"
-                                onError={handleImageError}
-                            />
-                           )
-                        )}
-                    </div>
-                    </div>
-                    
-                    {/* Action buttons and UI elements */}
-                    {image.id && ( // Ensure image has ID for actions
-                    <>
-                        {/* Add to Shot UI - Top Left */}
-                        {simplifiedShotOptions.length > 0 && onAddToLastShot && (
-                        <div className="absolute top-2 left-2 flex flex-col items-start gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                            <Select
-                                value={selectedShotIdLocal}
-                                onValueChange={(value) => {
-                                    setSelectedShotIdLocal(value);
-                                    setLastAffectedShotId(value);
-                                }}
-                            >
-                                <SelectTrigger
-                                    className="h-7 px-2 py-1 rounded-md bg-black/50 hover:bg-black/70 text-white text-xs min-w-[70px] max-w-[90px] truncate focus:ring-0 focus:ring-offset-0"
-                                    aria-label="Select target shot"
-                                    onMouseEnter={(e) => e.stopPropagation()}
-                                    onMouseLeave={(e) => e.stopPropagation()}
-                                    onPointerDown={(e) => e.stopPropagation()}
-                                >
-                                    <SelectValue placeholder="Shot...">
-                                        {selectedShotIdLocal ? (
-                                            (() => {
-                                                const shotName = simplifiedShotOptions.find(s => s.id === selectedShotIdLocal)?.name || '';
-                                                return shotName.length > 10 ? `${shotName.substring(0, 10)}...` : shotName;
-                                            })()
-                                        ) : 'Shot...'}
-                                    </SelectValue>
-                                </SelectTrigger>
-                                <SelectContent className="z-[9999]" style={{ zIndex: 10000 }}>
-                                    {simplifiedShotOptions.map(shot => (
-                                        <SelectItem key={shot.id} value={shot.id} className="text-xs">
-                                            {shot.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button
-                                        variant="outline"
-                                        size="icon"
-                                        className={`h-7 w-7 p-0 rounded-full bg-black/50 hover:bg-black/70 text-white ${showTickForImageId === image.id ? 'bg-green-500 hover:bg-green-600 !text-white' : ''}`}
-                                        onClick={async () => {
-                                            if (!selectedShotIdLocal) {
-                                                toast({ title: "Select a Shot", description: "Please select a shot first to add this image.", variant: "destructive" });
-                                                return;
-                                            }
-                                            setAddingToShotImageId(image.id!);
-                                            try {
-                                                const success = await onAddToLastShot(image.id!, displayUrl, displayUrl);
-                                                if (success) {
-                                                    setShowTickForImageId(image.id!);
-                                                    if (tickTimeoutRef.current) clearTimeout(tickTimeoutRef.current);
-                                                    tickTimeoutRef.current = setTimeout(() => {
-                                                        setShowTickForImageId(null);
-                                                    }, 2000);
-                                                }
-                                            } finally {
-                                                setAddingToShotImageId(null);
-                                            }
-                                        }}
-                                        disabled={!selectedShotIdLocal || showTickForImageId === image.id || addingToShotImageId === image.id}
-                                        aria-label={showTickForImageId === image.id ? `Added to ${currentTargetShotName}` : (currentTargetShotName ? `Add to shot: ${currentTargetShotName}` : "Add to selected shot")}
-                                        onPointerDown={(e) => e.stopPropagation()}
-                                    >
-                                        {addingToShotImageId === image.id ? (
-                                            <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-white"></div>
-                                        ) : showTickForImageId === image.id ? (
-                                            <Check className="h-4 w-4" />
-                                        ) : (
-                                            <PlusCircle className="h-4 w-4" />
-                                        )}
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent side="bottom">
-                                    {showTickForImageId === image.id ? `Added to ${currentTargetShotName || 'shot'}` :
-                                    (selectedShotIdLocal && currentTargetShotName ? `Add to: ${currentTargetShotName}` : "Select a shot then click to add")}
-                                </TooltipContent>
-                            </Tooltip>
-                        </div>
-                        )}
-
-                        {/* Timestamp - Top Right */}
-                        <TimeStamp 
-                          createdAt={image.createdAt} 
-                          position="top-right"
-                        />
-
-                        {/* Action buttons - Top Right (Info & Apply) */}
-                        <div className="absolute top-2 right-2 flex flex-col items-end gap-1.5 mt-8">
-
-                                                        {/* Info tooltip (shown on hover) */}
-                                {image.metadata && (
-                                  isMobile ? (
-                                    <PopoverPrimitive.Root open={mobilePopoverOpenImageId === image.id} onOpenChange={(open) => {
-                                      if (!open) {
-                                        setMobilePopoverOpenImageId(null);
-                                      }
-                                    }}>
-                                      <PopoverPrimitive.Trigger asChild>
-                                        <div
-                                          className={`${mobileActiveImageId === image.id ? 'opacity-100' : 'opacity-0'} group-hover:opacity-100 transition-opacity cursor-pointer`}
-                                          onClick={() => {
-                                            setMobileActiveImageId(image.id);
-                                            setMobilePopoverOpenImageId(image.id);
-                                          }}
-                                        >
-                                          <div className="h-7 w-7 rounded-full bg-black/30 flex items-center justify-center">
-                                            <Info className="h-3.5 w-3.5 text-white" />
-                                          </div>
-                                        </div>
-                                      </PopoverPrimitive.Trigger>
-                                      <PopoverPrimitive.Portal>
-                                        <PopoverPrimitive.Content
-                                          side="right"
-                                          align="start"
-                                          sideOffset={4}
-                                          className="z-[10010] max-w-48 text-xs p-3 leading-relaxed shadow-lg bg-background border max-h-80 overflow-y-auto rounded-md"
-                                        >
-                                          {image.metadata?.userProvidedImageUrl && (
-                                            <img
-                                              src={image.metadata.userProvidedImageUrl}
-                                              alt="User provided image preview"
-                                              className="w-full h-auto max-h-24 object-contain rounded-sm mb-2 border"
-                                              loading="lazy"
-                                            />
-                                          )}
-                                          <pre className="font-sans whitespace-pre-wrap">{metadataForDisplay}</pre>
-                                        </PopoverPrimitive.Content>
-                                      </PopoverPrimitive.Portal>
-                                    </PopoverPrimitive.Root>
-                                  ) : (
-                                    <Tooltip open={mobilePopoverOpenImageId === image.id} onOpenChange={(open) => {
-                                      if (!open) {
-                                        setMobilePopoverOpenImageId(null);
-                                      }
-                                    }}>
-                                      <TooltipTrigger asChild>
-                                        <div className="opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-                                          <div className="h-7 w-7 rounded-full bg-black/30 flex items-center justify-center">
-                                            <Info className="h-3.5 w-3.5 text-white" />
-                                          </div>
-                                        </div>
-                                      </TooltipTrigger>
-                                      <TooltipContent
-                                        side="right"
-                                        align="start"
-                                        className="max-w-48 text-xs p-3 leading-relaxed shadow-lg bg-background border max-h-80 overflow-y-auto"
-                                      >
-                                        {image.metadata?.userProvidedImageUrl && (
-                                          <img
-                                            src={image.metadata.userProvidedImageUrl}
-                                            alt="User provided image preview"
-                                            className="w-full h-auto max-h-24 object-contain rounded-sm mb-2 border"
-                                            loading="lazy"
-                                          />
-                                        )}
-                                        <pre className="font-sans whitespace-pre-wrap">{metadataForDisplay}</pre>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  )
-                                )}
-
-                            {/* Apply settings button temporarily disabled */}
-                            {false && image.metadata && onApplySettings && (
-                                <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <Button 
-                                                variant="outline"
-                                                size="icon" 
-                                                className="h-7 w-7 p-0 rounded-full bg-black/50 hover:bg-black/70 text-white"
-                                                onClick={() => onApplySettings(image.metadata!)}
-                                            >
-                                                <Settings className="h-4 w-4 mr-1" /> Apply
-                                            </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent>Apply these generation settings to the form</TooltipContent>
-                                    </Tooltip>
-                                </div>
-                                )}
-                            </div>
-
-                        {/* Delete button - Bottom Right */}
-                            {onDelete && (
-                            <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <Button 
-                                        variant="destructive" 
-                                        size="icon" 
-                                        className="h-7 w-7 p-0 rounded-full"
-                                        onClick={() => onDelete(image.id!)}
-                                        disabled={isCurrentDeleting}
-                                    >
-                                        {isCurrentDeleting ? (
-                                            <div className="h-3 w-3 animate-spin rounded-full border-b-2 border-white"></div>
-                                        ) : (
-                                            <Trash2 className="h-3.5 w-3.5" />
-                                        )}
-                                    </Button>
-                            </div>
-                        )}
-
-                        {/* Star button - Bottom Left */}
-                        <div className="absolute bottom-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Button
-                                variant="secondary"
-                                size="icon"
-                                className="h-7 w-7 p-0 rounded-full bg-black/50 hover:bg-black/70 text-white"
-                                onClick={() => {
-                                    if (onToggleStar) {
-                                        onToggleStar(image.id!, !image.starred);
-                                    } else {
-                                        toggleStarMutation.mutate({ 
-                                            id: image.id!, 
-                                            starred: !image.starred 
-                                        });
-                                    }
-                                }}
-                                disabled={toggleStarMutation.isPending}
-                            >
-                                <Star 
-                                    className={`h-3.5 w-3.5 ${image.starred ? 'fill-current' : ''}`} 
-                                />
-                            </Button>
-                        </div>
-                    </>)
-                    }
-                  </div>
-                );
-
-                return isMobile ? (
-                  <React.Fragment key={imageKey}>
-                    {imageContent}
-                  </React.Fragment>
-                ) : (
-                  <DraggableImage key={`draggable-${imageKey}`} image={image}>
-                    {imageContent}
-                  </DraggableImage>
-                );
-            })}
+            {paginatedImages.map((image, index) => (
+              <ImageGalleryItem
+                key={image.id || `image-${index}`}
+                image={image}
+                index={index}
+                isDeleting={isDeleting === image.id}
+                onDelete={onDelete}
+                onApplySettings={onApplySettings}
+                onOpenLightbox={handleOpenLightbox}
+                onAddToLastShot={onAddToLastShot}
+                onDownloadImage={handleDownloadImage}
+                onToggleStar={onToggleStar}
+                selectedShotIdLocal={selectedShotIdLocal}
+                simplifiedShotOptions={simplifiedShotOptions}
+                showTickForImageId={showTickForImageId}
+                onShowTick={handleShowTick}
+                addingToShotImageId={addingToShotImageId}
+                setAddingToShotImageId={setAddingToShotImageId}
+                downloadingImageId={downloadingImageId}
+                isMobile={isMobile}
+                mobileActiveImageId={mobileActiveImageId}
+                mobilePopoverOpenImageId={mobilePopoverOpenImageId}
+                onMobileTap={handleMobileTap}
+                setMobilePopoverOpenImageId={setMobilePopoverOpenImageId}
+              />
+            ))}
             </div>
           )}
         </div>
