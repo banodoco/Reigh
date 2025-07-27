@@ -24,6 +24,7 @@ import { useContentResponsive, useContentResponsiveColumns } from '@/shared/hook
 import { timeEnd } from '@/shared/lib/logger';
 import { useQueuedFeedback } from '@/shared/hooks/useQueuedFeedback';
 // import { useLastAffectedShot } from '@/shared/hooks/useLastAffectedShot';
+import ShotEditor from '../components/ShotEditor';
 
 // Custom hook to parallelize data fetching for better performance
 const useVideoTravelData = (selectedProjectId: string | null, selectedShotId?: string) => {
@@ -58,8 +59,7 @@ const useVideoTravelData = (selectedProjectId: string | null, selectedShotId?: s
   };
 };
 
-// Lazy load the heavy ShotEditor component
-const LazyShotEditor = React.lazy(() => import('../components/ShotEditor'));
+// ShotEditor is imported eagerly to avoid dynamic import issues on certain mobile browsers.
 
 const VideoTravelToolPage: React.FC = () => {
   const navigate = useNavigate();
@@ -734,7 +734,7 @@ const VideoTravelToolPage: React.FC = () => {
           </PageFadeIn>
         }>
           <PageFadeIn className="pt-5">
-            <LazyShotEditor
+            <ShotEditor
               selectedShot={shotToEdit}
               projectId={selectedProjectId}
               videoPairConfigs={videoPairConfigs}

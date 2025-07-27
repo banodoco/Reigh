@@ -1,4 +1,4 @@
-import React, { Suspense } from 'react';
+import React, { lazy, Suspense } from 'react';
 import { createBrowserRouter, RouterProvider, redirect } from 'react-router-dom';
 import ToolSelectorPage from '@/pages/ToolSelectorPage';
 import HomePage from '@/pages/HomePage';
@@ -8,10 +8,11 @@ import PaymentCancelPage from '@/pages/PaymentCancelPage';
 
 // Import ImageGenerationToolPage directly to prevent lazy loading issues with TanStack Query
 import ImageGenerationToolPage from '@/tools/image-generation/pages/ImageGenerationToolPage';
-// Lazy load other tool pages for better performance
-const VideoTravelToolPage = React.lazy(() => import('@/tools/travel-between-images/pages/VideoTravelToolPage'));
-const EditTravelToolPage = React.lazy(() => import('@/tools/edit-travel/pages/EditTravelToolPage'));
-const TrainingDataHelperPage = React.lazy(() => import('@/tools/training-data-helper/pages/TrainingDataHelperPage'));
+// Import VideoTravelToolPage eagerly to avoid dynamic import issues on some mobile browsers (e.g. Safari)
+import VideoTravelToolPage from '@/tools/travel-between-images/pages/VideoTravelToolPage';
+// Keep other heavy tools lazy-loaded to preserve bundle size
+const EditTravelToolPage = lazy(() => import('@/tools/edit-travel/pages/EditTravelToolPage'));
+const TrainingDataHelperPage = lazy(() => import('@/tools/training-data-helper/pages/TrainingDataHelperPage'));
 import NotFoundPage from '@/pages/NotFoundPage'; // Assuming NotFoundPage will be moved here or created
 import { LastAffectedShotProvider } from '@/shared/contexts/LastAffectedShotContext';
 import ShotsPage from "@/pages/ShotsPage";
@@ -83,11 +84,7 @@ const router = createBrowserRouter([
       },
       {
         path: '/tools/travel-between-images',
-        element: (
-          <Suspense fallback={<LazyLoadingFallback />}>
-            <VideoTravelToolPage />
-          </Suspense>
-        ),
+        element: <VideoTravelToolPage />, // No Suspense wrapper needed – component is loaded synchronously
       },
       {
         path: '/tools/edit-travel',

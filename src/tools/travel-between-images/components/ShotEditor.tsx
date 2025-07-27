@@ -30,7 +30,7 @@ import { cropImageToProjectAspectRatio } from '@/shared/lib/imageCropper';
 import { parseRatio } from '@/shared/lib/aspectRatios';
 import { Skeleton } from '@/shared/components/ui/skeleton';
 import { usePanes } from '@/shared/contexts/PanesContext';
-// (Timeline related imports removed – now provided within the Timeline component file)
+import Timeline from '@/tools/travel-between-images/components/Timeline';
 
 import { useToolSettings } from '@/shared/hooks/useToolSettings';
 import { ToggleGroup, ToggleGroupItem } from "@/shared/components/ui/toggle-group";
@@ -39,8 +39,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from '@tanstack/react-query';
 
 import SettingsModal from '@/shared/components/SettingsModal';
-// Lazy load the heavy Timeline component
-const LazyTimeline = React.lazy(() => import("@/tools/travel-between-images/components/Timeline"));
+// Removed React.lazy for Timeline – imported above eagerly.
 import { useCreateGeneration, useUpdateGenerationLocation } from '@/shared/hooks/useGenerations';
 
 // Add the missing type definition
@@ -1392,7 +1391,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                           <div className="text-sm text-muted-foreground">Loading Timeline...</div>
                         </div>
                       }>
-                        <LazyTimeline
+                        <Timeline
                           shotId={selectedShot.id}
                           images={nonVideoImages}
                           frameSpacing={batchVideoFrames}

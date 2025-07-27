@@ -656,7 +656,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                       Prev
                     </Button>
                     <span className={`text-sm ${whiteText ? 'text-white' : 'text-muted-foreground'} whitespace-nowrap mx-4`}>
-                      Showing {rangeStart}-{rangeEnd} (out of {totalFilteredItems})
+                      {rangeStart}-{rangeEnd} (out of {totalFilteredItems})
                     </span>
                     <Button
                       variant="outline"
@@ -676,7 +676,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                 )}
                 {totalPages === 1 && (
                   <span className={`text-sm ${whiteText ? 'text-white' : 'text-muted-foreground'} whitespace-nowrap ml-auto`}>
-                    Showing {rangeStart}-{rangeEnd} (out of {totalFilteredItems})
+                    {rangeStart}-{rangeEnd} (out of {totalFilteredItems})
                   </span>
                 )}
               </div>
@@ -857,7 +857,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
               Prev
             </Button>
             <span className={`text-sm ${whiteText ? 'text-white' : 'text-muted-foreground'} whitespace-nowrap mx-4`}>
-              Showing {rangeStart}-{rangeEnd} (out of {totalFilteredItems})
+              {rangeStart}-{rangeEnd} (out of {totalFilteredItems})
             </span>
             <Button
               variant="outline"
