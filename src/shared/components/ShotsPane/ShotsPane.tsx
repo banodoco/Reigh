@@ -27,16 +27,34 @@ export const ShotsPane: React.FC = () => {
 
   useRenderLogger('ShotsPane', { shotsCount: shots?.length, currentPage });
   
+  // Log raw shots data
+  console.log('[ShotsPane] Data from useListShots:', {
+    selectedProjectId,
+    isLoading,
+    error,
+    shotsCount: shots?.length,
+    shots: shots,
+    firstShot: shots?.[0]
+  });
+  
   // Filter shots to only include images with positions (similar to ShotEditor.tsx approach)
   const filteredShots = useMemo(() => {
     if (!shots) return [];
     
-    return shots.map(shot => ({
+    const filtered = shots.map(shot => ({
       ...shot,
       images: (shot.images || []).filter(img => 
         (img as any).position !== null && (img as any).position !== undefined
       )
     }));
+    
+    console.log('[ShotsPane] Filtered shots:', {
+      originalCount: shots.length,
+      filteredCount: filtered.length,
+      firstFilteredShot: filtered[0]
+    });
+    
+    return filtered;
   }, [shots]);
   
   // Adjust currentPage if shots length changes (e.g., after create/delete)
@@ -65,6 +83,14 @@ export const ShotsPane: React.FC = () => {
     side: 'left',
     isLocked: isShotsPaneLocked,
     onToggleLock: () => setIsShotsPaneLocked(!isShotsPaneLocked),
+  });
+  
+  console.log('[ShotsPane] Pane state:', {
+    isShotsPaneLocked,
+    isLocked,
+    isOpen,
+    transformClass,
+    shotsPaneWidth
   });
 
   const handleCreateShot = async (shotName: string, files: File[]) => {
@@ -150,6 +176,10 @@ export const ShotsPane: React.FC = () => {
         >
           <div className="p-2 border-b border-zinc-800 flex items-center justify-between flex-shrink-0">
             <h2 className="text-xl font-semibold text-zinc-200 ml-2">Shots</h2>
+            {/* DEBUG: Visible indicator */}
+            <div style={{ background: 'green', color: 'white', padding: '5px', fontSize: '12px' }}>
+              Pane Open: {isOpen ? 'YES' : 'NO'}
+            </div>
             <div className="flex items-center">
               <Button 
                 variant="ghost" 
@@ -178,9 +208,17 @@ export const ShotsPane: React.FC = () => {
               ))
             )}
             {error && <p className="text-red-500">Error loading shots: {error.message}</p>}
-            {filteredShots && filteredShots
-              .slice((currentPage - 1) * pageSize, currentPage * pageSize)
-              .map(shot => <ShotGroup key={shot.id} shot={shot} />)}
+            {(() => {
+              const paginated = filteredShots?.slice((currentPage - 1) * pageSize, currentPage * pageSize) || [];
+              console.log('[ShotsPane] Rendering shots:', {
+                filteredShotsCount: filteredShots?.length,
+                currentPage,
+                pageSize,
+                paginatedCount: paginated.length,
+                firstPaginatedShot: paginated[0]
+              });
+              return paginated.map(shot => <ShotGroup key={shot.id} shot={shot} />);
+            })()}
           </div>
           {/* Pagination Controls */}
           {filteredShots && filteredShots.length > pageSize && (

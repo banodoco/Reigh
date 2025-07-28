@@ -7,7 +7,7 @@ import { useToast } from '@/shared/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 import { getDisplayUrl } from '@/shared/lib/utils';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronsDown, ChevronsUp } from 'lucide-react';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 
 interface ShotGroupProps {
@@ -15,6 +15,21 @@ interface ShotGroupProps {
 }
 
 const ShotGroup: React.FC<ShotGroupProps> = ({ shot }) => {
+  const navigate = useNavigate();
+  const { currentShotId, setCurrentShotId } = useCurrentShot();
+  const updateShotNameMutation = useUpdateShotName();
+  const [currentName, setCurrentName] = useState(shot.name || 'Unnamed Shot');
+  const [isEditing, setIsEditing] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const isMobile = useIsMobile();
+  
+  console.log('[ShotGroup] Rendering shot:', {
+    shotId: shot.id,
+    shotName: shot.name,
+    imagesCount: shot.images?.length,
+    firstImage: shot.images?.[0]
+  });
+
   const { isOver: isDndKitOver, setNodeRef } = useDroppable({
     id: shot.id,
     data: {
@@ -23,20 +38,14 @@ const ShotGroup: React.FC<ShotGroupProps> = ({ shot }) => {
     }
   });
 
-  const [isEditing, setIsEditing] = useState(false);
-  const [currentName, setCurrentName] = useState(shot.name || 'Unnamed Shot');
-  const inputRef = useRef<HTMLInputElement>(null);
   const [isFileOver, setIsFileOver] = useState(false);
 
-  const updateShotNameMutation = useUpdateShotName();
   const handleExternalImageDropMutation = useHandleExternalImageDrop();
   const { toast } = useToast();
-  const navigate = useNavigate();
-  const { setCurrentShotId } = useCurrentShot();
-  const isMobile = useIsMobile();
 
   const isGenerationVideo = (gen: GenerationRow): boolean => {
-    return gen.type === 'video_travel_output' ||
+    return gen.type === 'video' ||
+           gen.type === 'video_travel_output' ||
            (gen.location && gen.location.endsWith('.mp4')) ||
            (gen.imageUrl && gen.imageUrl.endsWith('.mp4'));
   };
@@ -277,11 +286,12 @@ const ShotGroup: React.FC<ShotGroupProps> = ({ shot }) => {
                   setIsExpanded(true);
                 }}
               >
-                Show All <ChevronDown className="w-3 h-3" />
+                <ChevronsDown className="h-3 w-3" />
+                {allImages.length - IMAGES_PER_ROW} more
               </button>
             )}
 
-            {isExpanded && (
+            {hasMultipleRows && isExpanded && (
               <button
                 className="absolute bottom-1 right-1 text-xs bg-black/60 hover:bg-black/80 text-white px-2 py-0.5 rounded flex items-center gap-1"
                 onClick={(e) => {
@@ -289,13 +299,14 @@ const ShotGroup: React.FC<ShotGroupProps> = ({ shot }) => {
                   setIsExpanded(false);
                 }}
               >
-                Hide <ChevronUp className="w-3 h-3" />
+                <ChevronsUp className="h-3 w-3" />
+                Show less
               </button>
             )}
           </>
         ) : (
-          <div className="flex items-center justify-center h-full text-xs text-zinc-500">
-            Drop images here
+          <div className="flex items-center justify-center h-full p-4">
+            <p className="text-xs text-zinc-500 italic">No images yet</p>
           </div>
         )}
       </div>

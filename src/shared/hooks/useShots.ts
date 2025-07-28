@@ -211,70 +211,80 @@ export const useDuplicateShot = () => {
   });
 };
 
-// List all shots with their full image details for a specific project VIA API
-export const useListShots = (projectId: string | null): UseQueryResult<Shot[], Error> => {
+// List all shots for a specific project (without loading all generations)
+export const useListShots = (
+  projectId: string | null
+): UseQueryResult<Shot[]> => {
   return useQuery({
     queryKey: ['shots', projectId],
     enabled: !!projectId,
-    staleTime: 2 * 60 * 1000, // increased from 30s to 2 minutes - shots don't change very frequently
-    gcTime: 5 * 60 * 1000, // keep in cache for 5 minutes
-    refetchOnWindowFocus: false,
     queryFn: async () => {
-      if (!projectId) return [];
+      console.log('[useListShots] Starting query for projectId:', projectId);
       
-      // First get all shots for the project
-      const { data: shots, error: shotsError } = await supabase
+      // First try with shot_statistics view for better performance
+      try {
+        const { data: shotsWithStats, error: statsError } = await supabase
+          .from('shots')
+          .select(`
+            *,
+            shot_statistics(
+              total_generations,
+              positioned_count,
+              unpositioned_count,
+              video_count
+            )
+          `)
+          .eq('project_id', projectId!)
+          .order('created_at', { ascending: false });
+
+        console.log('[useListShots] Stats query result:', { 
+          error: statsError, 
+          dataCount: shotsWithStats?.length,
+          firstShot: shotsWithStats?.[0]
+        });
+
+        if (!statsError && shotsWithStats) {
+          const mapped = shotsWithStats.map(shot => ({
+            ...shot,
+            images: [], // Images loaded on demand per shot
+            stats: (shot.shot_statistics as any)?.[0] || undefined,
+          }));
+          console.log('[useListShots] Returning shots with stats:', mapped.length, 'shots');
+          return mapped;
+        }
+      } catch (e) {
+        // View might not exist, fall through to basic query
+        console.log('[useListShots] Shot statistics view not available, error:', e);
+      }
+
+      // Fallback: Basic query without statistics
+      console.log('[useListShots] Using fallback basic query');
+      const { data: shots, error } = await supabase
         .from('shots')
         .select('*')
-        .eq('project_id', projectId)
+        .eq('project_id', projectId!)
         .order('created_at', { ascending: false });
-      
-      if (shotsError) throw shotsError;
-      
-      // Then get shot_generations with generation details for each shot
-      const shotIds = shots.map(s => s.id);
-      
-      if (shotIds.length === 0) return [];
-      
-      const { data: shotGenerations, error: sgError } = await supabase
-        .from('shot_generations')
-        .select(`
-          *,
-          generation:generations(*)
-        `)
-        .in('shot_id', shotIds)
-        .order('position', { ascending: true });
-      
-            if (sgError) throw sgError;
-      
-      // Group generations by shot_id
-      const generationsByShot = shotGenerations.reduce((acc, sg) => {
-        if (!acc[sg.shot_id]) acc[sg.shot_id] = [];
-        if (sg.generation) {
-          acc[sg.shot_id].push({
-            ...sg.generation,
-            shotImageEntryId: sg.id,
-            shot_generation_id: sg.id,
-            position: sg.position,
-            imageUrl: sg.generation?.location || sg.generation?.imageUrl,
-            thumbUrl: sg.generation?.thumb_url || sg.generation?.thumbUrl,
-          });
-        }
-        return acc;
-      }, {} as Record<string, any[]>);
-      
-      // Transform to match Shot interface
-      const transformedShots = shots.map(shot => ({
-        id: shot.id,
-        name: shot.name,
-        created_at: shot.created_at,
-        updated_at: shot.updated_at,
-        project_id: shot.project_id,
-        images: generationsByShot[shot.id] || []
+
+      console.log('[useListShots] Basic query result:', { 
+        error, 
+        dataCount: shots?.length,
+        firstShot: shots?.[0]
+      });
+
+      if (error) {
+        console.error('[useListShots] Query error:', error);
+        throw error;
+      }
+
+      const result = (shots || []).map(shot => ({
+        ...shot,
+        images: [], // Images loaded on demand per shot
       }));
       
-      return transformedShots;
+      console.log('[useListShots] Returning basic shots:', result.length, 'shots');
+      return result;
     },
+    staleTime: 30 * 1000, // 30 seconds
   });
 };
 
@@ -467,12 +477,14 @@ export const useDuplicateImageInShot = () => {
       shot_id, 
       generation_id, 
       position,
-      project_id 
+      project_id,
+      silent 
     }: { 
       shot_id: string; 
       generation_id: string;
       position: number;
       project_id: string;
+      silent?: boolean;
     }) => {
       // First, shift all images at or after the target position up by 1
       const { data: existingImages, error: fetchError } = await supabase
@@ -509,7 +521,7 @@ export const useDuplicateImageInShot = () => {
       
       return newShotGeneration;
     },
-    onMutate: async ({ shot_id, generation_id, position, project_id }) => {
+    onMutate: async ({ shot_id, generation_id, position, project_id, silent }) => {
       // Cancel outgoing refetches
       await queryClient.cancelQueries({ queryKey: ['shots', project_id] });
       
@@ -554,18 +566,22 @@ export const useDuplicateImageInShot = () => {
       
       return { previousShots };
     },
-    onError: (err, { project_id }, context) => {
+    onError: (err, { project_id, silent }, context) => {
       // Rollback on error
       if (context?.previousShots) {
         queryClient.setQueryData(['shots', project_id], context.previousShots);
       }
       console.error('Error duplicating image in shot:', err);
-      toast.error('Failed to duplicate image');
+      if (!silent) {
+        toast.error('Failed to duplicate image');
+      }
     },
-    onSuccess: (_, { project_id }) => {
+    onSuccess: (_, { project_id, silent }) => {
       // Invalidate to get fresh data
       queryClient.invalidateQueries({ queryKey: ['shots', project_id] });
-      toast.success('Image duplicated successfully');
+      if (!silent) {
+        toast.success('Image duplicated successfully');
+      }
     }
   });
 };

@@ -41,6 +41,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import SettingsModal from '@/shared/components/SettingsModal';
 // Removed React.lazy for Timeline – imported above eagerly.
 import { useCreateGeneration, useUpdateGenerationLocation } from '@/shared/hooks/useGenerations';
+import { useUnpositionedGenerationsCount } from '@/shared/hooks/useShotGenerations';
 
 // Add the missing type definition
 export interface SegmentGenerationParams {
@@ -181,7 +182,8 @@ const getDimensions = (url: string): Promise<{ width: number; height: number }> 
 };
 
 const isGenerationVideo = (gen: GenerationRow): boolean => {
-  return gen.type === 'video_travel_output' ||
+  return gen.type === 'video' ||
+         gen.type === 'video_travel_output' ||
          (gen.location && gen.location.endsWith('.mp4')) ||
          (gen.imageUrl && gen.imageUrl.endsWith('.mp4'));
 };
@@ -325,13 +327,13 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   
   // Shot name editing state
   const [isEditingName, setIsEditingName] = useState(false);
-  const [editingName, setEditingName] = useState(selectedShot.name);
+  const [editingName, setEditingName] = useState(selectedShot?.name || '');
 
   // Update editing name when selected shot changes
   useEffect(() => {
-    setEditingName(selectedShot.name);
+    setEditingName(selectedShot?.name || '');
     setIsEditingName(false);
-  }, [selectedShot.id, selectedShot.name]);
+  }, [selectedShot?.id, selectedShot?.name]);
 
   const handleNameClick = () => {
     if (onUpdateShotName) {
@@ -340,14 +342,14 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   };
 
   const handleNameSave = () => {
-    if (onUpdateShotName && editingName.trim() && editingName.trim() !== selectedShot.name) {
+    if (onUpdateShotName && editingName.trim() && editingName.trim() !== selectedShot?.name) {
       onUpdateShotName(editingName.trim());
     }
     setIsEditingName(false);
   };
 
   const handleNameCancel = () => {
-    setEditingName(selectedShot.name);
+    setEditingName(selectedShot?.name || '');
     setIsEditingName(false);
   };
 
@@ -362,15 +364,42 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // Use local state for optimistic updates on image list
   const [localOrderedShotImages, setLocalOrderedShotImages] = useState(orderedShotImages || []);
   
-  // Filter out generations without position
-  const filteredOrderedShotImages = useMemo(() => {
-    return localOrderedShotImages.filter(img => (img as any).position !== null && (img as any).position !== undefined);
+  // Separate video outputs for display in the gallery
+  const videoOutputs = useMemo(() => {
+    const videos = localOrderedShotImages.filter(isGenerationVideo);
+    console.log('[ShotEditor] Video outputs:', {
+      totalImages: localOrderedShotImages.length,
+      videoCount: videos.length,
+      videos: videos.map(v => ({
+        id: v.id,
+        type: v.type,
+        position: (v as any).position,
+        location: v.location,
+        imageUrl: v.imageUrl
+      }))
+    });
+    return videos;
   }, [localOrderedShotImages]);
   
-  // Count unpositioned generations for this shot
-  const unpositionedGenerationsCount = useMemo(() => {
-    return localOrderedShotImages.filter(img => (img as any).position === null || (img as any).position === undefined).length;
+  // Filter to only include positioned images (but still include videos)
+  const filteredOrderedShotImages = useMemo(() => {
+    const filtered = localOrderedShotImages.filter(img => {
+      const hasPosition = (img as any).position !== null && (img as any).position !== undefined;
+      const isVideo = isGenerationVideo(img);
+      return hasPosition || isVideo; // Show if positioned OR if it's a video
+    });
+    
+    console.log('[ShotEditor] Filtered images:', {
+      totalBeforeFilter: localOrderedShotImages.length,
+      totalAfterFilter: filtered.length,
+      videosIncluded: filtered.filter(isGenerationVideo).length
+    });
+    
+    return filtered;
   }, [localOrderedShotImages]);
+  
+  // Count unpositioned generations for this shot (excluding videos, which are expected to have null positions)
+  const { data: unpositionedGenerationsCount = 0 } = useUnpositionedGenerationsCount(selectedShot?.id);
   
   useEffect(() => {
     // Skip sync if we just finished uploading to prevent flicker
@@ -395,10 +424,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     return filteredOrderedShotImages.filter(g => !isGenerationVideo(g));
   }, [filteredOrderedShotImages]);
   
-  const videoOutputs = useMemo(() => {
-    return filteredOrderedShotImages.filter(g => isGenerationVideo(g));
-  }, [filteredOrderedShotImages]);
-
   useEffect(() => {
     const newPairConfigs = nonVideoImages.slice(0, -1).map((image, index) => {
       const nextImage = nonVideoImages[index + 1];

@@ -13,6 +13,7 @@ import { Textarea } from '@/shared/components/ui/textarea';
 import { Label } from '@/shared/components/ui/label';
 import { SliderWithValue } from '@/shared/components/ui/slider-with-value';
 import { useToggleGenerationStar } from '@/shared/hooks/useGenerations';
+import { toast } from 'sonner';
 
 interface Shot {
   id: string;
@@ -24,7 +25,7 @@ interface MediaLightboxProps {
   onClose: () => void;
   onNext?: () => void;
   onPrevious?: () => void;
-  onImageSaved?: (newImageUrl: string, createNew?: boolean) => void;
+  onImageSaved?: (newImageUrl: string, createNew?: boolean) => Promise<void>;
   // Configuration props to control features
   showNavigation?: boolean;
   showImageEditTools?: boolean;
@@ -87,15 +88,20 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   // Star functionality
   const toggleStarMutation = useToggleGenerationStar();
 
-  const isVideo = media.type === 'video_travel_output' || media.location?.endsWith('.mp4');
+  // Safety check - if media is undefined, return early to prevent crashes
+  if (!media) {
+    return null;
+  }
+
+  const isVideo = media.type === 'video' || media.type === 'video_travel_output' || media.location?.endsWith('.mp4');
   const displayUrl = getDisplayUrl(media.location || media.imageUrl);
 
-  // Clear saving state when URL changes (indicating new image is ready)
-  useEffect(() => {
-    if (isSaving) {
-      setIsSaving(false);
-    }
-  }, [displayUrl, isSaving]);
+  // This useEffect is no longer needed as the finally block in handleSave is more reliable.
+  // useEffect(() => {
+  //   if (isSaving) {
+  //     setIsSaving(false);
+  //   }
+  // }, [displayUrl]);
 
   /**
    * Global key handler
@@ -141,66 +147,58 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       const canvas = canvasRef.current;
       const ctx = canvas.getContext('2d');
       if (!ctx) {
-        console.error('Failed to get canvas context');
-        setIsSaving(false);
-        return;
+        throw new Error('Failed to get canvas context');
       }
 
-      // Store the current flip state
-      const wasFlipped = isFlippedHorizontally;
-
-      // Create a new image element to load the original image
-      const img = new Image();
-      img.crossOrigin = 'anonymous'; // Enable CORS for cross-origin images
-      
-      img.onload = () => {
-        // Set canvas dimensions to match the image
-        canvas.width = img.width;
-        canvas.height = img.height;
-
-        // Clear the canvas
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        // Save the current context state
-        ctx.save();
-
-        // Apply horizontal flip transformation if needed
-        if (wasFlipped) {
-          // Move to the center, flip, then move back
-          ctx.translate(canvas.width, 0);
-          ctx.scale(-1, 1);
-        }
-
-        // Draw the image
-        ctx.drawImage(img, 0, 0);
-
-        // Restore the context state
-        ctx.restore();
-
-        // Convert canvas to blob
-        canvas.toBlob((blob) => {
-          if (blob && onImageSaved) {
-            const url = URL.createObjectURL(blob);
-            // Reset flip state BEFORE calling onImageSaved
-            // This ensures the UI is ready for the flipped image
-            setIsFlippedHorizontally(false);
-            setHasChanges(false);
-            // Pass true to indicate this should create a new image
-            // Don't clear isSaving here - let the parent handle it when new image is ready
-            onImageSaved(url, true);
+      // Create a promise that resolves with the blob
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        
+        img.onload = () => {
+          canvas.width = img.naturalWidth;
+          canvas.height = img.naturalHeight;
+          ctx.save();
+          if (isFlippedHorizontally) {
+            ctx.translate(canvas.width, 0);
+            ctx.scale(-1, 1);
           }
-        }, 'image/png');
-      };
+          ctx.drawImage(img, 0, 0);
+          ctx.restore();
+          canvas.toBlob(blob => {
+            if (blob) {
+              resolve(blob);
+            } else {
+              reject(new Error('Canvas to Blob conversion failed'));
+            }
+          }, 'image/png');
+        };
 
-      img.onerror = (error) => {
-        console.error('Error loading image:', error);
-        setIsSaving(false);
-      };
+        img.onerror = (err) => {
+          reject(err);
+        };
 
-      // Start loading the image
-      img.src = displayUrl;
+        img.src = displayUrl;
+      });
+
+      if (onImageSaved) {
+        const url = URL.createObjectURL(blob);
+        
+        // Reset state
+        setIsFlippedHorizontally(false);
+        setHasChanges(false);
+
+        // Await parent handler
+        await onImageSaved(url, true);
+
+        // Close the lightbox on successful save
+        onClose();
+      }
     } catch (error) {
       console.error('Error saving image:', error);
+      toast.error('Failed to save image.');
+    } finally {
+      // This will now run after onImageSaved has completed
       setIsSaving(false);
     }
   };

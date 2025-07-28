@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, Suspense, useMemo, useLayoutEffect 
 import { useNavigate, useLocation } from 'react-router-dom';
 import { SteerableMotionSettings } from '../components/ShotEditor';
 import { useListShots, useCreateShot, useHandleExternalImageDrop, useUpdateShotName } from '@/shared/hooks/useShots';
+import { useAllShotGenerations } from '@/shared/hooks/useShotGenerations';
 import { Shot } from '@/types/shots';
 import { Button } from '@/shared/components/ui/button';
 import { useProject } from "@/shared/contexts/ProjectContext";
@@ -31,6 +32,9 @@ const useVideoTravelData = (selectedProjectId: string | null, selectedShotId?: s
   // Fetch shots data
   const shotsQuery = useListShots(selectedProjectId);
   
+  // Fetch generations for selected shot
+  const shotGenerationsQuery = useAllShotGenerations(selectedShotId || null);
+  
   // Fetch public LoRAs data
   const publicLorasQuery = useListPublicResources('lora');
   
@@ -46,6 +50,10 @@ const useVideoTravelData = (selectedProjectId: string | null, selectedShotId?: s
     shotsLoading: shotsQuery.isLoading,
     shotsError: shotsQuery.error,
     refetchShots: shotsQuery.refetch,
+    
+    // Shot generations
+    shotGenerations: shotGenerationsQuery.data,
+    shotGenerationsLoading: shotGenerationsQuery.isLoading,
     
     // LoRAs data
     availableLoras: (publicLorasQuery.data?.map(resource => resource.metadata) || []) as LoraModel[],
@@ -76,9 +84,11 @@ const VideoTravelToolPage: React.FC = () => {
   // Use parallelized data fetching for better performance
   const {
     shots,
-    shotsLoading: isLoading,
-    shotsError: error,
+    shotsLoading,
+    shotsError,
     refetchShots,
+    shotGenerations,
+    shotGenerationsLoading,
     availableLoras,
     lorasLoading,
     settings,
@@ -87,6 +97,22 @@ const VideoTravelToolPage: React.FC = () => {
     settingsUpdating: isUpdating
   } = useVideoTravelData(selectedProjectId, selectedShot?.id);
   
+  const isLoading = shotsLoading;
+  const error = shotsError;
+  
+  // Log the shots data
+  console.log('[VideoTravelToolPage] Data state:', {
+    selectedProjectId,
+    shotsLoading,
+    shotsError,
+    shotsCount: shots?.length,
+    shots,
+    shotGenerations,
+    shotGenerationsLoading,
+    selectedShot,
+    shotToEdit: selectedShot || (viaShotClick && currentShotId ? shots?.find(s => s.id === currentShotId) : null)
+  });
+
   const createShotMutation = useCreateShot();
   const handleExternalImageDropMutation = useHandleExternalImageDrop();
   const updateShotNameMutation = useUpdateShotName();
@@ -116,7 +142,7 @@ const VideoTravelToolPage: React.FC = () => {
   };
 
   // Data fetching is now handled by the useVideoTravelData hook above
-
+  
   // Add state for video generation settings - wait for settings to load before initializing
   const [videoControlMode, setVideoControlMode] = useState<'individual' | 'batch'>('batch');
   const [batchVideoPrompt, setBatchVideoPrompt] = useState('');
@@ -136,14 +162,14 @@ const VideoTravelToolPage: React.FC = () => {
   const shouldShowShotEditor = useMemo(() => {
     // Check if we have a hash in the URL (direct navigation to a shot)
     const hashShotId = location.hash?.replace('#', '');
-    if (hashShotId && !isLoading) {
+    if (hashShotId && !isLoadingSettings) {
       return true; // Show editor immediately if we have a hash
     }
     
     // Only show editor if we actually have a shot to edit
     const shotExists = selectedShot || (viaShotClick && currentShotId && shots?.find(s => s.id === currentShotId));
     return !!shotExists;
-  }, [selectedShot, viaShotClick, currentShotId, shots, location.hash, isLoading]);
+  }, [selectedShot, viaShotClick, currentShotId, shots, location.hash, isLoadingSettings]);
   
   const shotToEdit = useMemo(() => {
     // Check if we have a hash in the URL
@@ -169,7 +195,7 @@ const VideoTravelToolPage: React.FC = () => {
   // URL Hash Synchronization (Combined Init + Sync)
   // ------------------------------------------------------------------
   useEffect(() => {
-    if (isLoading || !shots) return;
+    if (isLoadingSettings || !shots) return;
 
     const hashShotId = location.hash?.replace('#', '');
 
@@ -195,7 +221,7 @@ const VideoTravelToolPage: React.FC = () => {
     } else if (location.hash) {
       window.history.replaceState(null, '', basePath);
     }
-  }, [isLoading, shots, selectedShot, location.pathname, location.search, location.hash]);
+  }, [isLoadingSettings, shots, selectedShot, location.pathname, location.search, location.hash]);
   
   const [steerableMotionSettings, setSteerableMotionSettings] = useState<SteerableMotionSettings>({
     negative_prompt: '',
@@ -249,12 +275,14 @@ const VideoTravelToolPage: React.FC = () => {
     } else {
       // Show header when in shot list view
       const headerContent = (
-        <ToolPageHeader title="Travel Between Images">
-          {/* Only show header button when there are shots */}
+        <div className="mb-8 flex items-center justify-between">
+          <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+            Travel Between Images
+          </h1>
           {(!isLoading && shots && shots.length > 0) && (
             <Button onClick={() => setIsCreateShotModalOpen(true)}>New Shot</Button>
           )}
-        </ToolPageHeader>
+        </div>
       );
       setHeader(headerContent);
     }
@@ -335,12 +363,12 @@ const VideoTravelToolPage: React.FC = () => {
           setCurrentShotId(null);
         }
       }
-    } else if (!isLoading && selectedShot) {
+    } else if (!isLoadingSettings && selectedShot) {
       setSelectedShot(null);
       setVideoPairConfigs([]);
       setCurrentShotId(null);
     }
-  }, [shots, selectedShot, selectedProjectId, isLoading, setCurrentShotId]);
+  }, [shots, selectedShot, selectedProjectId, isLoadingSettings, setCurrentShotId]);
 
   // Memoize video pair configs calculation
   const computedVideoPairConfigs = useMemo(() => {
@@ -564,6 +592,15 @@ const VideoTravelToolPage: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['shots', selectedProjectId] });
     }
   };
+  
+  // Debug: Manual refresh function
+  // const handleManualRefresh = () => {
+  //   if (selectedProjectId) {
+  //     console.log(`[ManualRefresh] Force refreshing shots data for project ${selectedProjectId}`);
+  //     queryClient.invalidateQueries({ queryKey: ['shots', selectedProjectId] });
+  //     refetchShots();
+  //   }
+  // };
 
   const handleSteerableMotionSettingsChange = (settings: Partial<typeof steerableMotionSettings>) => {
     userHasInteracted.current = true;
@@ -691,7 +728,7 @@ const VideoTravelToolPage: React.FC = () => {
   }
 
   // Show consistent skeleton for both project loading and shots loading
-  if (isLoading) {
+  if (isLoadingSettings) {
     return (
       <div 
         className="grid gap-4"
@@ -742,7 +779,7 @@ const VideoTravelToolPage: React.FC = () => {
               batchVideoPrompt={isLoadingSettings ? '' : batchVideoPrompt}
               batchVideoFrames={isLoadingSettings ? 60 : batchVideoFrames}
               batchVideoContext={isLoadingSettings ? 10 : batchVideoContext}
-              orderedShotImages={shotToEdit?.images || []}
+              orderedShotImages={shotGenerations || []}
               onShotImagesUpdate={handleShotImagesUpdate}
               onBack={handleBackToShotList}
               onVideoControlModeChange={isLoadingSettings ? () => {} : (mode) => {

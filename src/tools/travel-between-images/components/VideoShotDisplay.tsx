@@ -131,7 +131,7 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
     }
   };
 
-  const imagesOnly = shot.images?.filter(image => image.type !== 'video_travel_output') || [];
+  const imagesOnly = shot.images?.filter(image => image.type !== 'video' && image.type !== 'video_travel_output') || [];
   const imagesToShow: GenerationRow[] = imagesOnly.slice(0, 5);
 
   return (
