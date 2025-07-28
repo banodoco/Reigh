@@ -403,6 +403,12 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     return filteredOrderedShotImages.filter(g => isGenerationVideo(g));
   }, [filteredOrderedShotImages]);
 
+  // Ref to always have the latest nonVideoImages inside async callbacks
+  const nonVideoImagesRef = useRef<GenerationRow[]>(nonVideoImages);
+  useEffect(() => {
+    nonVideoImagesRef.current = nonVideoImages;
+  }, [nonVideoImages]);
+
   const {
     settings: uploadSettings,
   } = useToolSettings<{ cropToProjectSize?: boolean }>('upload', { projectId: selectedProjectId });
@@ -820,7 +826,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         
         // Create a function to retry finding the images and update with actual shotImageEntryIds
         const tryUpdateFramePositions = (retryCount = 0) => {
-          const currentImages = nonVideoImages;
+          const currentImages = nonVideoImagesRef.current;
           console.log(`[Timeline Drop] Retry ${retryCount}, Current images count:`, currentImages.length);
           
           const newShotImageEntries = currentImages.filter(image => 
