@@ -746,13 +746,25 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         });
 
         // Add it to the shot (it will be positioned at the end)
-        await addImageToShotMutation.mutateAsync({
+        const addedShotImage = await addImageToShotMutation.mutateAsync({
           shot_id: selectedShot.id,
           generation_id: newGeneration.id,
           project_id: selectedProjectId,
           imageUrl: finalImageUrl,
           thumbUrl: finalImageUrl,
         });
+
+        // Remove the original image from the shot to avoid duplicates
+        if (originalImage?.shotImageEntryId) {
+          await removeImageFromShotMutation.mutateAsync({
+            shot_id: selectedShot.id,
+            shotImageEntryId: originalImage.shotImageEntryId,
+            project_id: selectedProjectId,
+          });
+        }
+
+        // Force refresh the shot images in parent
+        onShotImagesUpdate();
 
         console.log('[ShotEditor-HandleImageSaved] New flipped image created and added to shot');
         toast.success('Flipped image saved as new generation');
