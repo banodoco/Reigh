@@ -25,6 +25,7 @@ interface SortableImageItemProps {
   onDelete: (shotImageEntryId: string) => void;
   onDuplicate?: (generationId: string, position: number) => void;
   onDoubleClick: () => void;
+  onMobileTap?: () => void;
   onClick: (event: React.MouseEvent) => void;
   onPointerDown?: (event: React.PointerEvent) => void;
   isSelected: boolean;
@@ -39,6 +40,7 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
   onDelete,
   onDuplicate,
   onDoubleClick,
+  onMobileTap,
   onClick,
   onPointerDown,
   isSelected,
@@ -108,13 +110,18 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
       {...(!isDragDisabled ? listeners : {})}
       onClick={onClick}
       onPointerDown={onPointerDown}
-      onDoubleClick={onDoubleClick}
+      onDoubleClick={isMobile ? undefined : onDoubleClick}
     >
       <img
-        src={displayUrl}
-        alt="Shot image"
+        src={getDisplayUrl(image.imageUrl)}
+        alt={`Generated image ${(position ?? 0) + 1}`}
+        className="w-full h-full object-cover transition-opacity duration-200"
+        onTouchEnd={isMobile && onMobileTap ? (e) => {
+          e.preventDefault();
+          onMobileTap();
+        } : undefined}
         loading="lazy"
-        className="w-full h-full object-cover"
+        draggable={false}
         onError={(e) => {
           // Fallback to original URL if display URL fails
           const target = e.target as HTMLImageElement;

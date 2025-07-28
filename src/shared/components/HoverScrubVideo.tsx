@@ -1,7 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import { cn, getDisplayUrl } from '@/shared/lib/utils';
 
-interface HoverScrubVideoProps extends React.HTMLAttributes<HTMLDivElement> {
+interface HoverScrubVideoProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'onTouchEnd'> {
   /**
    * Source URL for the video. Can be a full URL or relative path handled by getDisplayUrl.
    */
@@ -26,6 +26,14 @@ interface HoverScrubVideoProps extends React.HTMLAttributes<HTMLDivElement> {
    * Mute the video (defaults to true).
    */
   muted?: boolean;
+  /**
+   * Handle double-click events (desktop only).
+   */
+  onDoubleClick?: () => void;
+  /**
+   * Handle touch end events (mobile only).
+   */
+  onTouchEnd?: (e: React.TouchEvent<HTMLVideoElement>) => void;
 }
 
 /**
@@ -38,6 +46,8 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
   videoClassName,
   loop = true,
   muted = true,
+  onDoubleClick,
+  onTouchEnd,
   ...rest
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -98,6 +108,8 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
         muted={muted}
         playsInline
         className={cn('w-full h-full object-contain', videoClassName)}
+        onDoubleClick={onDoubleClick}
+        onTouchEnd={onTouchEnd}
       >
         Your browser does not support the video tag.
       </video>

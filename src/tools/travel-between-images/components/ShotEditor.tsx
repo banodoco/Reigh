@@ -234,6 +234,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const createGenerationMutation = useCreateGeneration();
   const updateGenerationLocationMutation = useUpdateGenerationLocation();
   const duplicateImageInShotMutation = useDuplicateImageInShot();
+  const handleExternalImageDropMutation = useHandleExternalImageDrop();
   const [fileInputKey, setFileInputKey] = useState<number>(Date.now());
   const [deletingVideoId, setDeletingVideoId] = useState<string | null>(null);
   
@@ -777,6 +778,58 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     } catch (error) {
       console.error("[ShotEditor-HandleImageSaved] Unexpected error:", error);
       toast.error("Failed to save image.");
+    }
+  };
+
+  // Handle image drop on timeline
+  const handleTimelineImageDrop = async (files: File[], targetFrame?: number) => {
+    if (!selectedShot?.id || !selectedProjectId) {
+      toast.error("Cannot add images: No shot or project selected.");
+      return;
+    }
+
+    try {
+      await handleExternalImageDropMutation.mutateAsync({
+        imageFiles: files,
+        targetShotId: selectedShot.id,
+        currentProjectQueryKey: selectedProjectId,
+        currentShotCount: 0 // Not needed when adding to existing shot
+      });
+
+      // If a target frame was specified, update the frame positions
+      if (targetFrame !== undefined && files.length > 0) {
+        // Wait a moment for the images to be added to the database and state to update
+        setTimeout(() => {
+          const updatedPositions = new Map(timelineFramePositions);
+          
+          // Get the most recently added images (assuming they are the last ones)
+          const allImages = nonVideoImages;
+          const newImages = allImages.slice(-files.length);
+          
+          // Set frame positions for new images starting at target frame
+          newImages.forEach((image, index) => {
+            const framePosition = targetFrame + (index * batchVideoFrames);
+            updatedPositions.set(image.shotImageEntryId, framePosition);
+          });
+          
+          setTimelineFramePositions(updatedPositions);
+          
+          // Save to localStorage
+          localStorage.setItem(
+            `timelineFramePositions_${selectedShot.id}`, 
+            JSON.stringify(Array.from(updatedPositions.entries()))
+          );
+        }, 500);
+      }
+
+      const frameText = targetFrame !== undefined ? ` at frame ${targetFrame}` : '';
+      toast.success(`Successfully added ${files.length} image(s) to the timeline${frameText}.`);
+      
+      // Refresh the shot data
+      onShotImagesUpdate();
+    } catch (error) {
+      console.error('Error adding images to timeline:', error);
+      throw error; // Re-throw to let Timeline component handle the error display
     }
   };
 
@@ -1375,6 +1428,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                           onImageSaved={handleImageSaved}
                           onContextFramesChange={onBatchVideoContextChange}
                           onFramePositionsChange={setTimelineFramePositions}
+                          onImageDrop={handleTimelineImageDrop}
                         />
                       </Suspense>
                     ) : (

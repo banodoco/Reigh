@@ -10,6 +10,7 @@ import { Pagination, PaginationContent, PaginationItem, PaginationLink, Paginati
 import MediaLightbox from '@/shared/components/MediaLightbox';
 import TaskDetailsModal from '@/tools/travel-between-images/components/TaskDetailsModal';
 import { TimeStamp } from '@/shared/components/TimeStamp';
+import { useIsMobile } from '@/shared/hooks/use-mobile';
 
 interface VideoOutputsGalleryProps {
   videoOutputs: GenerationRow[];
@@ -37,7 +38,7 @@ interface VideoOutputsGalleryProps {
    * Alternative apply handler that operates using the original task id (server-side extraction).
    */
   onApplySettingsFromTask: (taskId: string, replaceImages: boolean, inputImages: string[]) => void;
-  onImageSaved?: (newImageUrl: string) => void;
+  onImageSaved?: (newImageUrl: string, createNew?: boolean) => Promise<void>;
 }
 
 const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
@@ -53,12 +54,52 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   const [selectedVideoForDetails, setSelectedVideoForDetails] = useState<GenerationRow | null>(null);
   const itemsPerPage = 6;
   const taskDetailsButtonRef = useRef<HTMLButtonElement>(null);
+  const isMobile = useIsMobile();
+
+  // Mobile double-tap detection refs
+  const lastTouchTimeRef = useRef<number>(0);
+  const doubleTapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (selectedVideoForDetails && taskDetailsButtonRef.current) {
       taskDetailsButtonRef.current.click();
     }
   }, [selectedVideoForDetails]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (doubleTapTimeoutRef.current) {
+        clearTimeout(doubleTapTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Handle mobile double-tap detection for video lightbox
+  const handleMobileTap = (originalIndex: number) => {
+    const currentTime = Date.now();
+    const timeSinceLastTap = currentTime - lastTouchTimeRef.current;
+    
+    if (timeSinceLastTap < 300 && timeSinceLastTap > 0) {
+      // This is a double-tap, clear any pending timeout and open lightbox
+      if (doubleTapTimeoutRef.current) {
+        clearTimeout(doubleTapTimeoutRef.current);
+        doubleTapTimeoutRef.current = null;
+      }
+      setLightboxIndex(originalIndex);
+    } else {
+      // This is a single tap, set a timeout to handle it if no second tap comes
+      if (doubleTapTimeoutRef.current) {
+        clearTimeout(doubleTapTimeoutRef.current);
+      }
+      doubleTapTimeoutRef.current = setTimeout(() => {
+        // Single tap on mobile - you could add single tap behavior here if needed
+        doubleTapTimeoutRef.current = null;
+      }, 300);
+    }
+    
+    lastTouchTimeRef.current = currentTime;
+  };
 
   const sortedVideoOutputs = useMemo(() => {
     return [...videoOutputs].sort((a, b) => {
@@ -125,9 +166,13 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
                     src={getDisplayUrl(video.location || video.imageUrl)}
                     poster={video.thumbUrl}
                     className="w-full h-full object-cover cursor-pointer"
-                    onDoubleClick={() => {
+                    onDoubleClick={isMobile ? undefined : () => {
                       setLightboxIndex(originalIndex);
                     }}
+                    onTouchEnd={isMobile ? (e) => {
+                      e.preventDefault();
+                      handleMobileTap(originalIndex);
+                    } : undefined}
                   />
                 </div>
                 

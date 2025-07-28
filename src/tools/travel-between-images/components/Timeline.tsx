@@ -9,6 +9,7 @@ import MediaLightbox from "@/shared/components/MediaLightbox";
 import { Info } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/components/ui/tooltip";
 import { log } from "@/shared/lib/logger";
+import { useIsMobile } from "@/shared/hooks/use-mobile";
 
 // Props for individual timeline items
 interface TimelineItemProps {
@@ -18,7 +19,8 @@ interface TimelineItemProps {
   isSwapTarget: boolean;
   dragOffset: { x: number; y: number } | null;
   onMouseDown: (e: React.MouseEvent, imageId: string) => void;
-  onDoubleClick: () => void;
+  onDoubleClick?: () => void;
+  onMobileTap?: () => void;
   zoomLevel: number;
   timelineWidth: number;
   fullMinFrames: number;
@@ -38,6 +40,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
   dragOffset,
   onMouseDown,
   onDoubleClick,
+  onMobileTap,
   zoomLevel,
   timelineWidth,
   fullMinFrames,
@@ -82,7 +85,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
       onMouseDown={(e) => onMouseDown(e, image.shotImageEntryId)}
       onDoubleClick={(e) => {
         e.stopPropagation();
-        onDoubleClick();
+        onDoubleClick?.();
       }}
       className={isSwapTarget ? "ring-4 ring-primary/60" : ""}
     >
@@ -121,6 +124,10 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
             alt={`Frame ${displayFrame}`}
             className="w-full h-full object-cover"
             draggable={false}
+            onTouchEnd={onMobileTap ? (e) => {
+              e.preventDefault();
+              onMobileTap();
+            } : undefined}
           />
           <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] leading-none text-center py-0.5">
             {displayFrame}
@@ -141,6 +148,7 @@ export interface TimelineProps {
   shotId: string;
   onContextFramesChange: (context: number) => void;
   onFramePositionsChange?: (framePositions: Map<string, number>) => void;
+  onImageDrop?: (files: File[], targetFrame?: number) => Promise<void>;
 }
 
 /**
@@ -154,14 +162,15 @@ const Timeline: React.FC<TimelineProps> = ({
   onImageSaved,
   shotId,
   onContextFramesChange,
-  onFramePositionsChange
+  onFramePositionsChange,
+  onImageDrop
 }) => {
   // Core state
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [zoomLevel, setZoomLevel] = useState(1);
   const [zoomCenter, setZoomCenter] = useState(0);
 
-  // Drag state
+  // Drag state for timeline item reordering
   const [dragState, setDragState] = useState<{
     isDragging: boolean;
     activeId: string | null;
@@ -187,6 +196,10 @@ const Timeline: React.FC<TimelineProps> = ({
     leftGap: 0,
     rightGap: 0,
   });
+
+  // File drop state
+  const [isFileOver, setIsFileOver] = useState(false);
+  const [dropTargetFrame, setDropTargetFrame] = useState<number | null>(null);
 
   // Refs
   const timelineRef = useRef<HTMLDivElement>(null);
@@ -426,11 +439,8 @@ const Timeline: React.FC<TimelineProps> = ({
     const validFrame = findClosestValidPosition(targetFrame, dragState.activeId);
 
     // Apply the final positions from the dynamic preview
-    // Get the current dynamic positions which already include Command+drag logic
-    const currentDynamic = dynamicPositions();
-
-    // Update the dragged item to its final valid position
-    const updatedMap = new Map(currentDynamic);
+    // Start with current frame positions
+    const updatedMap = new Map(framePositions);
     const originalPos = framePositions.get(dragState.activeId) ?? 0;
 
     // Debug: log drop details and tentative updated positions
@@ -730,7 +740,7 @@ const Timeline: React.FC<TimelineProps> = ({
 
     const newPositions = new Map(framePositions);
     const originalPos = framePositions.get(dragState.activeId) ?? 0;
-    let frameDiff = currentDragFrame - originalPos; // raw cursor diff
+    const frameDiff = currentDragFrame - originalPos; // raw cursor diff
 
     // Modifier-driven push logic ------------------------------------
     if ((dragState.isCommandPressed || dragState.isOptionPressed) && frameDiff !== 0) {
@@ -832,7 +842,7 @@ const Timeline: React.FC<TimelineProps> = ({
     }
 
     return newPositions;
-  }, [framePositions, dragState.isDragging, dragState.activeId, dragState.isCommandPressed, dragState.isOptionPressed, currentDragFrame, calculateMaxGap, findClosestValidPosition]);
+  }, [framePositions, dragState.isDragging, dragState.activeId, dragState.isCommandPressed, dragState.isOptionPressed, dragState.leftGap, dragState.rightGap, currentDragFrame, calculateMaxGap, findClosestValidPosition]);
 
   // Prepare data
   const currentPositions = dynamicPositions();
@@ -842,6 +852,122 @@ const Timeline: React.FC<TimelineProps> = ({
   const containerWidth = containerRef.current?.clientWidth || 1000;
 
   // Debug logging removed
+
+  const isMobile = useIsMobile();
+
+  // Mobile double-tap detection refs
+  const lastTouchTimeRef = useRef<number>(0);
+  const doubleTapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (doubleTapTimeoutRef.current) {
+        clearTimeout(doubleTapTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // File drop handlers
+  const handleDragEnter = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer.types.includes('Files') && onImageDrop) {
+      setIsFileOver(true);
+    }
+  }, [onImageDrop]);
+
+  const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer.types.includes('Files') && onImageDrop && containerRef.current) {
+      setIsFileOver(true);
+      e.dataTransfer.dropEffect = 'copy';
+      
+      // Calculate target frame position based on mouse position
+      const rect = containerRef.current.getBoundingClientRect();
+      const relativeX = e.clientX - rect.left;
+      const targetFrame = Math.max(0, pixelToFrame(relativeX, rect.width));
+      setDropTargetFrame(targetFrame);
+    } else {
+      e.dataTransfer.dropEffect = 'none';
+      setDropTargetFrame(null);
+    }
+  }, [onImageDrop, pixelToFrame]);
+
+  const handleDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.currentTarget.contains(e.relatedTarget as Node)) {
+      return;
+    }
+    setIsFileOver(false);
+    setDropTargetFrame(null);
+  }, []);
+
+  const handleDrop = useCallback(async (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const targetFrame = dropTargetFrame;
+    setIsFileOver(false);
+    setDropTargetFrame(null);
+
+    if (!onImageDrop) {
+      return;
+    }
+
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length === 0) {
+      return;
+    }
+
+    const validImageTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    const validFiles = files.filter(file => {
+      if (validImageTypes.includes(file.type)) {
+        return true;
+      }
+      toast.error(`Invalid file type for ${file.name}. Only JPEG, PNG, and WebP are supported.`);
+      return false;
+    });
+
+    if (validFiles.length === 0) {
+      return;
+    }
+
+    try {
+      await onImageDrop(validFiles, targetFrame ?? undefined);
+    } catch (error) {
+      console.error('Error handling image drop:', error);
+      toast.error(`Failed to add images: ${(error as Error).message}`);
+    }
+  }, [onImageDrop, dropTargetFrame]);
+
+  // Handle mobile double-tap detection for image lightbox
+  const handleMobileTap = (idx: number) => {
+    const currentTime = Date.now();
+    const timeSinceLastTap = currentTime - lastTouchTimeRef.current;
+    
+    if (timeSinceLastTap < 300 && timeSinceLastTap > 0) {
+      // This is a double-tap, clear any pending timeout and open lightbox
+      if (doubleTapTimeoutRef.current) {
+        clearTimeout(doubleTapTimeoutRef.current);
+        doubleTapTimeoutRef.current = null;
+      }
+      setLightboxIndex(idx);
+    } else {
+      // This is a single tap, set a timeout to handle it if no second tap comes
+      if (doubleTapTimeoutRef.current) {
+        clearTimeout(doubleTapTimeoutRef.current);
+      }
+      doubleTapTimeoutRef.current = setTimeout(() => {
+        // Single tap on mobile - you could add single tap behavior here if needed
+        doubleTapTimeoutRef.current = null;
+      }, 300);
+    }
+    
+    lastTouchTimeRef.current = currentTime;
+  };
 
   return (
     <div className="w-full overflow-x-hidden">
@@ -899,10 +1025,48 @@ const Timeline: React.FC<TimelineProps> = ({
       {/* Timeline */}
       <div
         ref={timelineRef}
-        className={`timeline-scroll relative bg-muted/20 border rounded-lg p-4 overflow-x-auto mb-6 ${zoomLevel <= 1 ? 'no-scrollbar' : ''}`}
+        className={`timeline-scroll relative bg-muted/20 border rounded-lg p-4 overflow-x-auto mb-6 ${zoomLevel <= 1 ? 'no-scrollbar' : ''} ${
+          isFileOver ? 'ring-2 ring-primary bg-primary/5' : ''
+        }`}
         style={{ minHeight: "200px", paddingBottom: "3rem" }}
         onWheel={handleWheel}
+        onDragEnter={handleDragEnter}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
       >
+        {/* File drop overlay */}
+        {isFileOver && (
+          <div className="absolute inset-0 bg-primary/10 border-2 border-dashed border-primary rounded-lg flex items-center justify-center z-50">
+            <div className="bg-background/95 backdrop-blur-sm border border-primary rounded-lg px-6 py-4 shadow-lg">
+              <div className="text-center">
+                <div className="text-lg font-semibold text-primary mb-1">Drop Images Here</div>
+                <div className="text-sm text-muted-foreground">
+                  {dropTargetFrame !== null 
+                    ? `Add images at frame ${dropTargetFrame}`
+                    : 'Add images to the timeline'
+                  }
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Drop position indicator */}
+        {isFileOver && dropTargetFrame !== null && (
+          <div
+            className="absolute top-0 bottom-0 w-1 bg-primary z-40 pointer-events-none"
+            style={{
+              left: `${((dropTargetFrame - fullMin) / fullRange) * 100}%`,
+              transform: 'translateX(-50%)',
+            }}
+          >
+            <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 bg-primary text-primary-foreground text-xs px-2 py-1 rounded whitespace-nowrap">
+              Frame {dropTargetFrame}
+            </div>
+          </div>
+        )}
+
         {/* Ruler */}
         <div
           className="absolute left-0 h-8 border-t"
@@ -1065,7 +1229,8 @@ const Timeline: React.FC<TimelineProps> = ({
                 isSwapTarget={swapTargetId === image.shotImageEntryId}
                 dragOffset={isDragging ? dragOffset : null}
                 onMouseDown={handleMouseDown}
-                onDoubleClick={() => setLightboxIndex(idx)}
+                onDoubleClick={isMobile ? undefined : () => setLightboxIndex(idx)}
+                onMobileTap={isMobile ? () => handleMobileTap(idx) : undefined}
                 zoomLevel={zoomLevel}
                 timelineWidth={containerWidth}
                 fullMinFrames={fullMin}

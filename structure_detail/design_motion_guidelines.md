@@ -252,6 +252,84 @@ export function MyComponent({
 
 ---
 
+## 📱 Mobile Touch Interactions
+
+### Double-Tap Detection Pattern
+
+For components that need to respond to double-tap on mobile (where `onDoubleClick` is unreliable), use this standardized pattern:
+
+```typescript
+// Mobile double-tap detection refs
+const lastTouchTimeRef = useRef<number>(0);
+const doubleTapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+// Cleanup timeout on unmount
+useEffect(() => {
+  return () => {
+    if (doubleTapTimeoutRef.current) {
+      clearTimeout(doubleTapTimeoutRef.current);
+    }
+  };
+}, []);
+
+// Handle mobile double-tap detection
+const handleMobileTap = (item: any) => {
+  const currentTime = Date.now();
+  const timeSinceLastTap = currentTime - lastTouchTimeRef.current;
+  
+  if (timeSinceLastTap < 300 && timeSinceLastTap > 0) {
+    // This is a double-tap, clear any pending timeout and execute action
+    if (doubleTapTimeoutRef.current) {
+      clearTimeout(doubleTapTimeoutRef.current);
+      doubleTapTimeoutRef.current = null;
+    }
+    // Execute double-tap action (e.g., open lightbox)
+    handleDoubleAction(item);
+  } else {
+    // This is a single tap, set a timeout to handle it if no second tap comes
+    if (doubleTapTimeoutRef.current) {
+      clearTimeout(doubleTapTimeoutRef.current);
+    }
+    doubleTapTimeoutRef.current = setTimeout(() => {
+      // Handle single tap action (e.g., selection in batch mode)
+      handleSingleTapAction(item);
+      doubleTapTimeoutRef.current = null;
+    }, 300);
+  }
+  
+  lastTouchTimeRef.current = currentTime;
+};
+```
+
+### Implementation Guidelines
+
+- **Desktop**: Use standard `onDoubleClick` events
+- **Mobile**: Use `onTouchEnd` with the double-tap detection pattern above
+- **Timing**: 300ms window for detecting double-taps
+- **Conditional**: Always use `isMobile` detection to conditionally apply touch vs. mouse handlers
+- **Selection Conflict**: When implementing in components with selection (like batch mode), ensure the mobile tap handler manages both single-tap selection and double-tap actions to prevent interference
+
+**Preventing Click Handler Interference on Mobile:**
+
+```typescript
+// Disable onClick on mobile to prevent interference with touch detection
+<Component
+  onClick={isMobile ? undefined : handleClick}
+  onMobileTap={isMobile ? handleMobileTap : undefined}
+  onDoubleClick={isMobile ? undefined : handleDoubleClick}
+/>
+```
+
+### Components Using This Pattern
+
+- `ImageGallery` - Double-tap to open image lightbox
+- `VideoOutputsGallery` - Double-tap to open video lightbox  
+- `ShotImageManager` - Double-tap to open image editor
+- `Timeline` - Double-tap to open image lightbox
+- `HoverScrubVideo` - Supports both `onDoubleClick` and `onTouchEnd` props
+
+---
+
 <div align="center">
 
 **🔗 Quick References**

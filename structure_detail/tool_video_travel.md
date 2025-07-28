@@ -50,10 +50,13 @@ src/tools/travel-between-images/
 **Frame-accurate timeline component**
 - **Features**:
   - Drag-and-drop image positioning
+  - External image file dropping with frame-specific positioning
   - Gap validation between frames
   - Zoomable ruler overlay
   - `MediaLightbox` preview on click
   - Persistent position storage
+- **File Support**: JPEG, PNG, WebP images via drag and drop
+- **Drop Targeting**: Visual indicator shows exact frame position during drag
 - **Precision**: Frame-level accuracy for video timing
 
 ### `BatchSettingsForm.tsx`

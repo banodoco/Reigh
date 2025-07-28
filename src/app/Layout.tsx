@@ -89,6 +89,23 @@ const Layout: React.FC = () => {
   // Check for welcome bonus when user is authenticated
   const { showWelcomeModal, closeWelcomeModal } = useWelcomeBonus();
 
+  // Listen for settings open event from welcome modal
+  useEffect(() => {
+    const handleOpenSettings = (event: CustomEvent) => {
+      const { tab } = event.detail;
+      setIsSettingsModalOpen(true);
+      if (tab) {
+        setSettingsInitialTab(tab);
+      }
+    };
+
+    window.addEventListener('openSettings', handleOpenSettings as EventListener);
+    
+    return () => {
+      window.removeEventListener('openSettings', handleOpenSettings as EventListener);
+    };
+  }, []);
+
   // Show loading spinner while determining auth state
   if (session === undefined) {
     return (
