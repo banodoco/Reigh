@@ -23,7 +23,6 @@ import { SortableImageItem } from '@/tools/travel-between-images/components/Sort
 import MediaLightbox from './MediaLightbox';
 import { cn, getDisplayUrl } from '@/shared/lib/utils';
 import { MultiImagePreview, SingleImagePreview } from './ImageDragPreview';
-import { PairConfig } from '@/tools/travel-between-images/components/ShotEditor';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
@@ -44,9 +43,7 @@ export interface ShotImageManagerProps {
   onImageDuplicate?: (generationId: string, position: number) => void;
   onImageReorder: (orderedShotGenerationIds: string[]) => void;
   columns?: 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
-  generationMode: 'batch' | 'by-pair' | 'timeline';
-  pairConfigs: PairConfig[];
-  onPairConfigChange: (id: string, field: 'prompt' | 'frames' | 'negativePrompt' | 'context', value: string | number) => void;
+  generationMode: 'batch' | 'timeline';
   onImageSaved?: (imageId: string, newImageUrl: string, createNew?: boolean) => Promise<void>; // Callback when image is saved with changes
   onMagicEdit?: (imageUrl: string, prompt: string, numImages: number) => void;
 }
@@ -58,8 +55,6 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
   onImageReorder,
   columns = 4,
   generationMode,
-  pairConfigs,
-  onPairConfigChange,
   onImageSaved,
   onMagicEdit,
 }) => {
@@ -73,6 +68,10 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
   const isMobile = useIsMobile();
   const outerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+
+  // Mobile double-tap detection refs
+  const lastTouchTimeRef = useRef<number>(0);
+  const doubleTapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const { value: imageDeletionSettings, update: updateImageDeletionSettings } = useUserUIState('imageDeletion', { skipConfirmation: false });
 
@@ -97,6 +96,53 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
       window.dispatchEvent(new CustomEvent('mobileSelectionActive', { detail: false }));
     };
   }, [mobileSelectedIds.length, isMobile]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (doubleTapTimeoutRef.current) {
+        clearTimeout(doubleTapTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Handle mobile double-tap detection for image lightbox
+  const handleMobileTap = (index: number) => {
+    const currentTime = Date.now();
+    const timeSinceLastTap = currentTime - lastTouchTimeRef.current;
+    const image = images[index];
+    const imageId = image.shotImageEntryId;
+    
+    if (timeSinceLastTap < 300 && timeSinceLastTap > 0) {
+      // This is a double-tap, clear any pending timeout and open lightbox
+      if (doubleTapTimeoutRef.current) {
+        clearTimeout(doubleTapTimeoutRef.current);
+        doubleTapTimeoutRef.current = null;
+      }
+      setLightboxIndex(index);
+      setMobileSelectedIds([]); // Clear selection when opening lightbox
+    } else {
+      // This is a single tap, set a timeout to handle selection if no second tap comes
+      if (doubleTapTimeoutRef.current) {
+        clearTimeout(doubleTapTimeoutRef.current);
+      }
+      doubleTapTimeoutRef.current = setTimeout(() => {
+        // Handle single tap selection logic for mobile batch mode
+        if (generationMode === 'batch') {
+          if (mobileSelectedIds.includes(imageId)) {
+            // Clicking on selected image deselects it
+            setMobileSelectedIds(prev => prev.filter(selectedId => selectedId !== imageId));
+          } else {
+            // Add to selection
+            setMobileSelectedIds(prev => [...prev, imageId]);
+          }
+        }
+        doubleTapTimeoutRef.current = null;
+      }, 300);
+    }
+    
+    lastTouchTimeRef.current = currentTime;
+  };
 
   // Batch delete function - hoisted to top level to survive re-renders
   const performBatchDelete = React.useCallback(
@@ -305,189 +351,6 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
     );
   }
 
-  if (generationMode === 'by-pair') {
-    const imagePairs = images.slice(0, -1).map((image, index) => {
-      const nextImage = images[index + 1];
-      const pairId = `${image.id}-${nextImage.id}`;
-      const config = pairConfigs.find(p => p.id === pairId) || { 
-        prompt: '', 
-        frames: 30, 
-        negativePrompt: '', 
-        context: 16 
-      };
-
-      return {
-        id: pairId,
-        imageA: image,
-        imageB: nextImage,
-        config: config,
-        isFirstPair: index === 0,
-        pairNumber: index + 1,
-      };
-    });
-
-    // Group pairs into rows of 2
-    const pairRows: Array<Array<typeof imagePairs[0]>> = [];
-    for (let i = 0; i < imagePairs.length; i += 2) {
-      pairRows.push(imagePairs.slice(i, i + 2));
-    }
-
-    return (
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
-      >
-        <SortableContext items={images.map((img) => img.shotImageEntryId)} strategy={rectSortingStrategy}>
-          <div className="space-y-6">
-            {pairRows.map((row, rowIndex) => (
-              <div key={rowIndex} className="space-y-4">
-                {/* Row with pairs */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {row.map((pair, pairIndex) => (
-                    <div key={pair.id} className="space-y-3">
-                      {/* Pair Header */}
-                      <div className="flex items-center justify-center">
-                        <h3 className="text-sm font-semibold text-center px-3 py-1 bg-muted rounded-md">
-                          Pair {pair.pairNumber}
-                        </h3>
-                      </div>
-                      
-                      {/* Pair Content */}
-                      <div className="p-4 border rounded-lg bg-card shadow-sm">
-                        <div className="flex space-x-4 mb-4">
-                          <div className="flex-1">
-                            <SortableImageItem
-                              image={pair.imageA}
-                              isSelected={selectedIds.includes(pair.imageA.shotImageEntryId)}
-                              onClick={(e) => handleItemClick(pair.imageA.shotImageEntryId, e)}
-                              onDelete={() => onImageDelete(pair.imageA.shotImageEntryId)}
-                              onDuplicate={onImageDuplicate}
-                              position={images.findIndex(img => img.id === pair.imageA.id)}
-                              onDoubleClick={() => {
-                                const imageIndex = images.findIndex(img => img.id === pair.imageA.id);
-                                if (imageIndex >= 0) setLightboxIndex(imageIndex);
-                              }}
-                              skipConfirmation={imageDeletionSettings.skipConfirmation}
-                              onSkipConfirmationSave={() => updateImageDeletionSettings({ skipConfirmation: true })}
-                            />
-                          </div>
-                          <div className="flex-1">
-                            <SortableImageItem
-                              image={pair.imageB}
-                              isSelected={selectedIds.includes(pair.imageB.shotImageEntryId)}
-                              onClick={(e) => handleItemClick(pair.imageB.shotImageEntryId, e)}
-                              onDelete={() => onImageDelete(pair.imageB.shotImageEntryId)}
-                              onDuplicate={onImageDuplicate}
-                              position={images.findIndex(img => img.id === pair.imageB.id)}
-                              onDoubleClick={() => {
-                                const imageIndex = images.findIndex(img => img.id === pair.imageB.id);
-                                if (imageIndex >= 0) setLightboxIndex(imageIndex);
-                              }}
-                              skipConfirmation={imageDeletionSettings.skipConfirmation}
-                              onSkipConfirmationSave={() => updateImageDeletionSettings({ skipConfirmation: true })}
-                            />
-                          </div>
-                        </div>
-                        
-                        <div className="space-y-3">
-                          <div className="grid grid-cols-1 gap-4">
-                            <div>
-                              <Label htmlFor={`prompt-${pair.id}`}>Prompt Per Pair:</Label>
-                              <Textarea
-                                id={`prompt-${pair.id}`}
-                                value={pair.config.prompt}
-                                onChange={e => onPairConfigChange(pair.id, 'prompt', e.target.value)}
-                                placeholder="e.g., cinematic transition"
-                                className="min-h-[70px] text-sm"
-                                rows={3}
-                              />
-                            </div>
-                            <div>
-                              <Label htmlFor={`negative-prompt-${pair.id}`}>Negative Prompt Per Pair:</Label>
-                              <Textarea
-                                id={`negative-prompt-${pair.id}`}
-                                value={pair.config.negativePrompt}
-                                onChange={e => onPairConfigChange(pair.id, 'negativePrompt', e.target.value)}
-                                placeholder="e.g., blurry, low quality"
-                                className="min-h-[70px] text-sm"
-                                rows={3}
-                              />
-                            </div>
-                          </div>
-                          <div className={pair.isFirstPair ? "grid grid-cols-1 gap-4" : "grid grid-cols-1 md:grid-cols-2 gap-4"}>
-                            <div>
-                              <Label htmlFor={`frames-${pair.id}`}>Frames per pair: {pair.config.frames}</Label>
-                              <Slider
-                                id={`frames-${pair.id}`}
-                                min={10}
-                                max={82}
-                                step={1}
-                                value={[pair.config.frames]}
-                                onValueChange={([value]) => onPairConfigChange(pair.id, 'frames', value)}
-                              />
-                            </div>
-                            {!pair.isFirstPair && (
-                              <div>
-                                <Label htmlFor={`context-${pair.id}`}>Context Frames Per Pair: {pair.config.context}</Label>
-                                <Slider
-                                  id={`context-${pair.id}`}
-                                  min={0}
-                                  max={60}
-                                  step={1}
-                                  value={[pair.config.context]}
-                                  onValueChange={([value]) => onPairConfigChange(pair.id, 'context', value)}
-                                />
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                
-                {/* Vertical separator line between rows (not after the last row) */}
-                {rowIndex < pairRows.length - 1 && (
-                  <div className="flex justify-center">
-                    <div className="w-px h-8 bg-border"></div>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </SortableContext>
-        <DragOverlay>
-          {activeId && activeImage ? (
-            <>
-              {selectedIds.length > 1 && selectedIds.includes(activeId) ? (
-                <MultiImagePreview count={selectedIds.length} image={activeImage} />
-              ) : (
-                <SingleImagePreview image={activeImage} />
-              )}
-            </>
-          ) : null}
-        </DragOverlay>
-        {lightboxIndex !== null && images[lightboxIndex] && (
-          <MediaLightbox
-            media={images[lightboxIndex]}
-            onClose={() => setLightboxIndex(null)}
-            onNext={handleNext}
-            onPrevious={handlePrevious}
-            onImageSaved={onImageSaved ? async (newImageUrl: string, createNew?: boolean) => await onImageSaved(images[lightboxIndex].id, newImageUrl, createNew) : undefined}
-            showNavigation={true}
-            showImageEditTools={true}
-            showDownload={true}
-            showMagicEdit={true}
-            videoPlayerComponent="hover-scrub"
-            onMagicEdit={onMagicEdit}
-          />
-        )}
-      </DndContext>
-    );
-  }
-
   const gridColsClass = {
     2: 'grid-cols-2',
     3: 'grid-cols-3',
@@ -500,7 +363,7 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
     10: 'grid-cols-10',
     11: 'grid-cols-11',
     12: 'grid-cols-12',
-  };
+  }[columns] || 'grid-cols-4';
 
   // Mobile batch mode with selection
   if (isMobile && generationMode === 'batch') {
@@ -540,8 +403,7 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
                   <MobileImageItem
                      image={image}
                      isSelected={isSelected}
-                     onClick={(e) => handleItemClick(image.shotImageEntryId, e)}
-                     onDoubleClick={() => handleMobileDoubleClick(index)}
+                     onMobileTap={() => handleMobileTap(index)}
                      onDelete={() => onImageDelete(image.shotImageEntryId)}
                      hideDeleteButton={mobileSelectedIds.length > 0}
                    />
@@ -664,12 +526,13 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
       onDragEnd={handleDragEnd}
     >
       <SortableContext items={images.map((img) => img.shotImageEntryId)} strategy={rectSortingStrategy}>
-        <div className={cn("grid gap-3", isMobile ? "grid-cols-3" : gridColsClass[columns])}>
+        <div className={cn("grid gap-3", isMobile ? "grid-cols-3" : gridColsClass)}>
           {images.map((image, index) => (
             <SortableImageItem
               key={image.shotImageEntryId}
               image={image}
-              isSelected={isMobile && generationMode === 'batch' ? mobileSelectedIds.includes(image.shotImageEntryId) : selectedIds.includes(image.shotImageEntryId)}
+              isSelected={selectedIds.includes(image.shotImageEntryId) || mobileSelectedIds.includes(image.shotImageEntryId)}
+              isDragDisabled={isMobile}
               onPointerDown={(e) => {
                 // Capture modifier key state ASAP to avoid losing it if the user releases before click fires
                 if (isMobile) return; // desktop-only multi-select enhancement
@@ -681,11 +544,12 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
                   );
                 }
               }}
-              onClick={(e) => handleItemClick(image.shotImageEntryId, e)}
+              onClick={isMobile ? undefined : (e) => handleItemClick(image.shotImageEntryId, e)}
               onDelete={() => onImageDelete(image.shotImageEntryId)}
               onDuplicate={onImageDuplicate}
               position={index}
-              onDoubleClick={() => isMobile && generationMode === 'batch' ? handleMobileDoubleClick(index) : setLightboxIndex(index)}
+              onDoubleClick={isMobile ? () => {} : () => setLightboxIndex(index)}
+              onMobileTap={isMobile ? () => handleMobileTap(index) : undefined}
               skipConfirmation={imageDeletionSettings.skipConfirmation}
               onSkipConfirmationSave={() => updateImageDeletionSettings({ skipConfirmation: true })}
             />
@@ -727,8 +591,9 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
 interface MobileImageItemProps {
   image: GenerationRow;
   isSelected: boolean;
-  onClick: (event: React.MouseEvent) => void;
-  onDoubleClick: () => void;
+  onClick?: (event: React.MouseEvent) => void;
+  onDoubleClick?: () => void;
+  onMobileTap?: () => void;
   onDelete: () => void; // Add this
   hideDeleteButton?: boolean;
 }
@@ -738,6 +603,7 @@ const MobileImageItem: React.FC<MobileImageItemProps> = ({
   isSelected,
   onClick,
   onDoubleClick,
+  onMobileTap,
   onDelete, // Add this
   hideDeleteButton,
 }) => {
@@ -758,6 +624,10 @@ const MobileImageItem: React.FC<MobileImageItemProps> = ({
         src={displayUrl}
         alt={`Image ${image.id}`}
         className="max-w-full max-h-full object-contain rounded-sm"
+        onTouchEnd={onMobileTap ? (e) => {
+          e.preventDefault();
+          onMobileTap();
+        } : undefined}
       />
       {!hideDeleteButton && (
         <Button

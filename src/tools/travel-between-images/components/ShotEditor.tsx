@@ -72,14 +72,6 @@ export interface VideoPairConfig {
   generatedVideoUrl?: string;
 }
 
-export interface PairConfig {
-  id: string;
-  prompt: string;
-  frames: number;
-  negativePrompt: string;
-  context: number;
-}
-
 export interface SteerableMotionSettings {
   negative_prompt: string;
   model_name: string;
@@ -107,8 +99,7 @@ interface ShotSettings {
   customHeight?: number;
   steerableMotionSettings: SteerableMotionSettings;
   enhancePrompt: boolean;
-  generationMode?: 'batch' | 'by-pair';
-  pairConfigs?: PairConfig[];
+  generationMode?: 'batch' | 'timeline';
 }
 
 export interface ShotEditorProps {
@@ -146,12 +137,10 @@ export interface ShotEditorProps {
   isLoraModalOpen: boolean;
   setIsLoraModalOpen: (isOpen: boolean) => void;
 
-  generationMode: 'batch' | 'by-pair' | 'timeline';
-  onGenerationModeChange: (mode: 'batch' | 'by-pair' | 'timeline') => void;
+  generationMode: 'batch' | 'timeline';
+  onGenerationModeChange: (mode: 'batch' | 'timeline') => void;
   enhancePrompt: boolean;
   onEnhancePromptChange: (enhance: boolean) => void;
-  pairConfigs: PairConfig[];
-  onPairConfigsChange: (configs: PairConfig[]) => void;
   // Navigation props
   onPreviousShot?: () => void;
   onNextShot?: () => void;
@@ -225,8 +214,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   onEnhancePromptChange,
   generationMode,
   onGenerationModeChange,
-  pairConfigs,
-  onPairConfigsChange,
   onPreviousShot,
   onNextShot,
   hasPrevious,
@@ -290,7 +277,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       console.warn('[ShotEditor] Settings failed to load within expected time. Falling back to defaults.');
       setSettingsError('Failed to load saved settings – using defaults.');
       setIsModeReady(true);
-    }, 3500); // 3.5 s chosen to balance UX and real-world mobile latency
+    }, 3500); // 3.5 s chosen to balance UX and real-world mobile latency
 
     return () => clearTimeout(fallbackTimer);
   }, [settingsLoading]);
@@ -414,30 +401,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const videoOutputs = useMemo(() => {
     return filteredOrderedShotImages.filter(g => isGenerationVideo(g));
   }, [filteredOrderedShotImages]);
-
-  useEffect(() => {
-    const newPairConfigs = nonVideoImages.slice(0, -1).map((image, index) => {
-      const nextImage = nonVideoImages[index + 1];
-      const pairId = `${image.id}-${nextImage.id}`;
-      
-      const existingConfig = pairConfigs.find(p => p.id === pairId);
-      
-      return existingConfig || {
-        id: pairId,
-        prompt: '',
-        frames: batchVideoFrames,
-        negativePrompt: '',
-        context: 16,
-      };
-    });
-    
-    // Only update if the configs have actually changed
-    const newConfigsStr = JSON.stringify(newPairConfigs);
-    const currentConfigsStr = JSON.stringify(pairConfigs);
-    if (newConfigsStr !== currentConfigsStr) {
-      onPairConfigsChange(newPairConfigs);
-    }
-  }, [nonVideoImages, batchVideoFrames, batchVideoContext]); // Remove pairConfigs from deps to prevent loop
 
   const {
     settings: uploadSettings,
@@ -889,17 +852,12 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       segmentFrames = frameGaps.length > 0 ? frameGaps : [batchVideoFrames];
       frameOverlap = frameGaps.length > 0 ? frameGaps.map(() => batchVideoContext) : [batchVideoContext];
       negativePrompts = frameGaps.length > 0 ? frameGaps.map(() => steerableMotionSettings.negative_prompt) : [steerableMotionSettings.negative_prompt];
-    } else if (generationMode === 'batch') {
+    } else {
+      // batch mode
       basePrompts = [batchVideoPrompt];
       segmentFrames = [batchVideoFrames];
       frameOverlap = [batchVideoContext];
       negativePrompts = [steerableMotionSettings.negative_prompt];
-    } else {
-      // by-pair mode
-      basePrompts = pairConfigs.map((cfg) => cfg.prompt);
-      segmentFrames = pairConfigs.map((cfg) => cfg.frames);
-      frameOverlap = pairConfigs.map((cfg) => cfg.context);
-      negativePrompts = pairConfigs.map((cfg) => cfg.negativePrompt);
     }
 
     const requestBody: any = {
@@ -1033,17 +991,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           after_first_post_generation_brightness: params?.after_first_post_generation_brightness ?? 0,
           show_input_images: params?.show_input_images ?? false,
         },
-        // Check if this is a by-pair generation
-        ...(orchestratorDetails?.base_prompts_expanded && orchestratorDetails.base_prompts_expanded.length > 1 ? {
-          generationMode: 'by-pair' as const,
-          pairConfigs: orchestratorDetails.base_prompts_expanded.map((prompt: string, i: number) => ({
-            id: `pair-${i}`,
-            prompt,
-            frames: orchestratorDetails.segment_frames_expanded?.[i] || 24,
-            negativePrompt: orchestratorDetails.negative_prompts_expanded?.[i] || '',
-            context: orchestratorDetails.frame_overlap_expanded?.[i] || 16,
-          }))
-        } : {})
       };
       
       // Apply the settings
@@ -1057,7 +1004,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       if (settings.customHeight) onCustomHeightChange(settings.customHeight);
       onEnhancePromptChange(settings.enhancePrompt || false);
       onGenerationModeChange(settings.generationMode || 'batch');
-      if (settings.pairConfigs) onPairConfigsChange(settings.pairConfigs);
       if (settings.steerableMotionSettings) {
         onSteerableMotionSettingsChange(settings.steerableMotionSettings);
       }
@@ -1123,51 +1069,22 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     replaceImages?: boolean;
     inputImages?: string[];
   }) => {
-    // Check if there are multiple unique prompts or frame counts
-    const uniquePrompts = settings.prompts ? [...new Set(settings.prompts)] : [];
-    const uniqueFrames = settings.frames ? [...new Set(settings.frames)] : [];
+    // Default to batch mode for timeline or single settings
+    onGenerationModeChange('batch');
     
-    const isByPair = uniquePrompts.length > 1 || uniqueFrames.length > 1;
-
-    if (isByPair) {
-      onGenerationModeChange('by-pair');
-      
-      // Create pair configs from the settings
-      const imagePairsCount = Math.max(0, nonVideoImages.length - 1);
-      const newPairConfigs: PairConfig[] = [];
-      
-      for (let i = 0; i < imagePairsCount; i++) {
-        const pairId = i < nonVideoImages.length - 1 ? 
-          `${nonVideoImages[i].id}-${nonVideoImages[i + 1].id}` : 
-          `pair-${i}`;
-        
-        newPairConfigs.push({
-          id: pairId,
-          prompt: settings.prompts?.[i] || settings.prompt || '',
-          frames: settings.frames?.[i] || settings.frame || batchVideoFrames,
-          negativePrompt: settings.negativePrompts?.[i] || settings.negativePrompt || '',
-          context: settings.contexts?.[i] || settings.context || 16,
-        });
-      }
-              onPairConfigsChange(newPairConfigs);
-    } else {
-      // Default to batch mode for timeline or single settings
-      onGenerationModeChange('batch');
-      
-      // Apply single values to batch settings
-      if (settings.prompt) {
-        onBatchVideoPromptChange(settings.prompt);
-      }
-      if (settings.frame !== undefined) {
-        onBatchVideoFramesChange(settings.frame);
-      }
-      if (settings.context !== undefined) {
-        onBatchVideoContextChange(settings.context);
-      }
+    // Apply single values to batch settings
+    if (settings.prompt) {
+      onBatchVideoPromptChange(settings.prompt);
+    }
+    if (settings.frame !== undefined) {
+      onBatchVideoFramesChange(settings.frame);
+    }
+    if (settings.context !== undefined) {
+      onBatchVideoContextChange(settings.context);
     }
 
     // Apply other settings
-    if (settings.negativePrompt && !isByPair) {
+    if (settings.negativePrompt) {
       onSteerableMotionSettingsChange({ negative_prompt: settings.negativePrompt });
     }
     if (settings.steps) {
@@ -1183,7 +1100,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     if (settings.replaceImages && settings.inputImages && settings.inputImages.length > 0) {
       handleReplaceImagesFromTask(settings.inputImages);
     }
-
 
   };
 
@@ -1291,38 +1207,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const openaiApiKey = getApiKey('openai_api_key');
   const isGenerationDisabledDueToApiKey = enhancePrompt && (!openaiApiKey || openaiApiKey.trim() === '');
   const isGenerationDisabled = isEnqueuing || nonVideoImages.length < 2 || isGenerationDisabledDueToApiKey;
-
-  const handleUpdatePairConfig = (
-    id: string,
-    field: 'prompt' | 'frames' | 'negativePrompt' | 'context',
-    value: string | number
-  ) => {
-    let updatedConfigs: PairConfig[];
-
-    // Find if the pair already exists
-    const existingIndex = pairConfigs.findIndex((p) => p.id === id);
-
-    if (existingIndex !== -1) {
-      // Update the existing pair config
-      updatedConfigs = pairConfigs.map((pair) =>
-        pair.id === id ? { ...pair, [field]: value } : pair
-      );
-    } else {
-      // Create a new pair config with sensible defaults, then apply the field
-      const newConfig: PairConfig = {
-        id,
-        prompt: '',
-        negativePrompt: '',
-        frames: 30,
-        context: 16,
-      };
-      (newConfig as any)[field] = value; // apply the first edited field
-
-      updatedConfigs = [...pairConfigs, newConfig];
-    }
-
-    onPairConfigsChange(updatedConfigs);
-  };
 
   // Skeleton component for image manager
   const ImageManagerSkeleton = () => (
@@ -1449,7 +1333,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                     <CardTitle>Manage Shot Images</CardTitle>
                     {!isMobile && (
                       <div className="flex items-center space-x-2">
-                        <ToggleGroup type="single" value={generationMode} onValueChange={(value: 'batch' | 'by-pair' | 'timeline') => value && onGenerationModeChange(value)} size="sm">
+                        <ToggleGroup type="single" value={generationMode} onValueChange={(value: 'batch' | 'timeline') => value && onGenerationModeChange(value)} size="sm">
                           <ToggleGroupItem value="batch" aria-label="Toggle batch">
                             Batch
                           </ToggleGroupItem>
@@ -1501,8 +1385,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                       onImageReorder={handleReorderImagesInShot}
                       columns={isMobile ? 3 : 6}
                       generationMode={isMobile ? 'batch' : generationMode}
-                      pairConfigs={pairConfigs}
-                      onPairConfigChange={handleUpdatePairConfig}
                       onImageSaved={handleImageSaved}
                       onMagicEdit={(imageUrl, prompt, numImages) => {
                         // TODO: Implement magic edit generation
