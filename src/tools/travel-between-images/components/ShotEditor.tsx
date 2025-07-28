@@ -10,7 +10,7 @@ import { useProject } from "@/shared/contexts/ProjectContext";
 import { toast } from "sonner";
 import FileInput from "@/shared/components/FileInput";
 import { uploadImageToStorage } from "@/shared/lib/imageUploader";
-import { useAddImageToShot, useRemoveImageFromShot, useUpdateShotImageOrder, useHandleExternalImageDrop } from "@/shared/hooks/useShots";
+import { useAddImageToShot, useRemoveImageFromShot, useUpdateShotImageOrder, useHandleExternalImageDrop, useDuplicateImageInShot } from "@/shared/hooks/useShots";
 import { useDeleteGeneration } from "@/shared/hooks/useGenerations";
 import ShotImageManager from '@/shared/components/ShotImageManager';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/components/ui/collapsible";
@@ -247,6 +247,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const deleteGenerationMutation = useDeleteGeneration();
   const createGenerationMutation = useCreateGeneration();
   const updateGenerationLocationMutation = useUpdateGenerationLocation();
+  const duplicateImageInShotMutation = useDuplicateImageInShot();
   const [fileInputKey, setFileInputKey] = useState<number>(Date.now());
   const [deletingVideoId, setDeletingVideoId] = useState<string | null>(null);
   
@@ -647,6 +648,20 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     });
   };
 
+  const handleDuplicateImage = async (generationId: string, position: number) => {
+    if (!selectedShot || !selectedProjectId) {
+      toast.error("Cannot duplicate image: No shot or project selected.");
+      return;
+    }
+
+    duplicateImageInShotMutation.mutate({
+      shot_id: selectedShot.id,
+      generation_id: generationId,
+      position: position,
+      project_id: selectedProjectId,
+    });
+  };
+
   const handleReorderImagesInShot = (orderedShotGenerationIds: string[]) => {
     if (!selectedShot || !selectedProjectId) {
       console.error('Cannot reorder images: No shot or project selected.');
@@ -687,19 +702,43 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     console.log(`[ShotEditor-HandleImageSaved] Starting image update process:`, { imageId, newImageUrl, shotId: selectedShot.id });
     
     try {
+      // If the new image is a temporary Blob URL (from in-browser edits), upload it to storage first
+      let finalImageUrl = newImageUrl;
+      if (newImageUrl.startsWith('blob:')) {
+        console.log('[ShotEditor-HandleImageSaved] Detected blob URL – uploading edited image to storage');
+        try {
+          const response = await fetch(newImageUrl);
+          const blob = await response.blob();
+
+          // Derive a filename / extension from the blob type (fallback to png)
+          const mimeType = blob.type || 'image/png';
+          const ext = mimeType.split('/').pop() || 'png';
+          const file = new File([blob], `edited-${imageId}.${ext}`, { type: mimeType });
+
+          finalImageUrl = await uploadImageToStorage(file);
+
+          // Release the local object URL – it is no longer needed
+          URL.revokeObjectURL(newImageUrl);
+          console.log('[ShotEditor-HandleImageSaved] Upload complete. Public URL:', finalImageUrl);
+        } catch (uploadErr) {
+          console.error('[ShotEditor-HandleImageSaved] Failed to upload edited image:', uploadErr);
+          toast.error('Failed to upload edited image.');
+          return;
+        }
+      }
+
       // Update the database record via local API
       console.log(`[ShotEditor-HandleImageSaved] Updating database record for image:`, imageId);
       await updateGenerationLocationMutation.mutateAsync({
         id: imageId,
-        location: newImageUrl,
+        location: finalImageUrl,
       });
 
       console.log(`[ShotEditor-HandleImageSaved] Database update successful for image:`, imageId);
 
       // Update local state with cache-busting for immediate UI update
       console.log(`[ShotEditor-HandleImageSaved] Updating local state...`);
-      // Use getDisplayUrl with forceRefresh to ensure immediate update
-      const cacheBustedUrl = getDisplayUrl(newImageUrl, true);
+      const cacheBustedUrl = getDisplayUrl(finalImageUrl, true);
       setLocalOrderedShotImages(prevImages => {
         const updated = prevImages.map(img => 
           img.id === imageId 
@@ -716,7 +755,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       queryClient.invalidateQueries({ queryKey: ['generations', selectedProjectId] });
 
       console.log(`[ShotEditor-HandleImageSaved] Complete process finished successfully`);
-    
     } catch (error) {
       console.error("[ShotEditor-HandleImageSaved] Unexpected error:", error);
       toast.error("Failed to update image.");
@@ -1406,6 +1444,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                     <ShotImageManager
                       images={nonVideoImages}
                       onImageDelete={handleDeleteImageFromShot}
+                      onImageDuplicate={handleDuplicateImage}
                       onImageReorder={handleReorderImagesInShot}
                       columns={isMobile ? 3 : 6}
                       generationMode={isMobile ? 'batch' : generationMode}

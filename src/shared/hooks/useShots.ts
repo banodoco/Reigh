@@ -458,6 +458,118 @@ export const usePositionExistingGenerationInShot = () => {
   });
 };
 
+// Duplicate image in shot at specific position
+export const useDuplicateImageInShot = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ 
+      shot_id, 
+      generation_id, 
+      position,
+      project_id 
+    }: { 
+      shot_id: string; 
+      generation_id: string;
+      position: number;
+      project_id: string;
+    }) => {
+      // First, shift all images at or after the target position up by 1
+      const { data: existingImages, error: fetchError } = await supabase
+        .from('shot_generations')
+        .select('id, position')
+        .eq('shot_id', shot_id)
+        .gte('position', position)
+        .order('position', { ascending: false });
+      
+      if (fetchError) throw fetchError;
+      
+      // Update positions in reverse order to avoid conflicts
+      for (const img of existingImages || []) {
+        const { error: updateError } = await supabase
+          .from('shot_generations')
+          .update({ position: (img.position || 0) + 1 })
+          .eq('id', img.id);
+        
+        if (updateError) throw updateError;
+      }
+      
+      // Insert the duplicate at the target position
+      const { data: newShotGeneration, error: insertError } = await supabase
+        .from('shot_generations')
+        .insert({
+          shot_id,
+          generation_id,
+          position
+        })
+        .select()
+        .single();
+      
+      if (insertError) throw insertError;
+      
+      return newShotGeneration;
+    },
+    onMutate: async ({ shot_id, generation_id, position, project_id }) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['shots', project_id] });
+      
+      // Snapshot the previous value
+      const previousShots = queryClient.getQueryData<Shot[]>(['shots', project_id]);
+      
+      // Optimistically update
+      if (previousShots) {
+        const updatedShots = previousShots.map(shot => {
+          if (shot.id === shot_id) {
+            // Find the generation to duplicate
+            const genToDuplicate = shot.images.find(img => img.id === generation_id);
+            if (!genToDuplicate) return shot;
+            
+            // Create a new shot generation entry
+            const duplicatedImage = {
+              ...genToDuplicate,
+              shotImageEntryId: `temp-${Date.now()}`, // Temporary ID for optimistic update
+              shot_generation_id: `temp-${Date.now()}`,
+              position: position
+            };
+            
+            // Update positions and insert duplicate
+            const updatedImages = shot.images.map(img => {
+              const imgPosition = (img as any).position;
+              if (imgPosition !== null && imgPosition !== undefined && imgPosition >= position) {
+                return { ...img, position: imgPosition + 1 } as any;
+              }
+              return img;
+            });
+            
+            // Insert the duplicate at the correct position
+            updatedImages.splice(position, 0, duplicatedImage);
+            
+            return { ...shot, images: updatedImages };
+          }
+          return shot;
+        });
+        
+        queryClient.setQueryData(['shots', project_id], updatedShots);
+      }
+      
+      return { previousShots };
+    },
+    onError: (err, { project_id }, context) => {
+      // Rollback on error
+      if (context?.previousShots) {
+        queryClient.setQueryData(['shots', project_id], context.previousShots);
+      }
+      console.error('Error duplicating image in shot:', err);
+      toast.error('Failed to duplicate image');
+    },
+    onSuccess: (_, { project_id }) => {
+      // Invalidate to get fresh data
+      queryClient.invalidateQueries({ queryKey: ['shots', project_id] });
+      toast.success('Image duplicated successfully');
+    }
+  });
+};
+
 // Type for the arguments of useRemoveImageFromShot mutation
 interface RemoveImageFromShotArgs {
   shot_id: string;

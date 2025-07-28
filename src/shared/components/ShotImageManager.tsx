@@ -40,6 +40,7 @@ const SKIP_CONFIRMATION_KEY = 'skipImageDeletionConfirmation';
 export interface ShotImageManagerProps {
   images: GenerationRow[];
   onImageDelete: (shotImageEntryId: string) => void;
+  onImageDuplicate?: (generationId: string, position: number) => void;
   onImageReorder: (orderedShotGenerationIds: string[]) => void;
   columns?: 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
   generationMode: 'batch' | 'by-pair' | 'timeline';
@@ -52,6 +53,7 @@ export interface ShotImageManagerProps {
 const ShotImageManager: React.FC<ShotImageManagerProps> = ({
   images,
   onImageDelete,
+  onImageDuplicate,
   onImageReorder,
   columns = 4,
   generationMode,
@@ -350,6 +352,8 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
                               isSelected={selectedIds.includes(pair.imageA.shotImageEntryId)}
                               onClick={(e) => handleItemClick(pair.imageA.shotImageEntryId, e)}
                               onDelete={() => onImageDelete(pair.imageA.shotImageEntryId)}
+                              onDuplicate={onImageDuplicate}
+                              position={images.findIndex(img => img.id === pair.imageA.id)}
                               onDoubleClick={() => {
                                 const imageIndex = images.findIndex(img => img.id === pair.imageA.id);
                                 if (imageIndex >= 0) setLightboxIndex(imageIndex);
@@ -362,6 +366,8 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
                               isSelected={selectedIds.includes(pair.imageB.shotImageEntryId)}
                               onClick={(e) => handleItemClick(pair.imageB.shotImageEntryId, e)}
                               onDelete={() => onImageDelete(pair.imageB.shotImageEntryId)}
+                              onDuplicate={onImageDuplicate}
+                              position={images.findIndex(img => img.id === pair.imageB.id)}
                               onDoubleClick={() => {
                                 const imageIndex = images.findIndex(img => img.id === pair.imageB.id);
                                 if (imageIndex >= 0) setLightboxIndex(imageIndex);
@@ -660,6 +666,8 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
               }}
               onClick={(e) => handleItemClick(image.shotImageEntryId, e)}
               onDelete={() => onImageDelete(image.shotImageEntryId)}
+              onDuplicate={onImageDuplicate}
+              position={index}
               onDoubleClick={() => isMobile && generationMode === 'batch' ? handleMobileDoubleClick(index) : setLightboxIndex(index)}
             />
           ))}

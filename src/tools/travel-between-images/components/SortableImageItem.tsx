@@ -3,7 +3,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { GenerationRow } from '@/types/shots';
 import { Button } from '@/shared/components/ui/button';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Copy } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,11 +23,13 @@ import { useIsMobile } from '@/shared/hooks/use-mobile';
 interface SortableImageItemProps {
   image: GenerationRow;
   onDelete: (shotImageEntryId: string) => void;
+  onDuplicate?: (generationId: string, position: number) => void;
   onDoubleClick: () => void;
   onClick: (event: React.MouseEvent) => void;
   onPointerDown?: (event: React.PointerEvent) => void;
   isSelected: boolean;
   isDragDisabled?: boolean;
+  position?: number;
 }
 
 const SKIP_CONFIRMATION_KEY = 'skipImageDeletionConfirmation';
@@ -35,11 +37,13 @@ const SKIP_CONFIRMATION_KEY = 'skipImageDeletionConfirmation';
 export const SortableImageItem: React.FC<SortableImageItemProps> = ({
   image,
   onDelete,
+  onDuplicate,
   onDoubleClick,
   onClick,
   onPointerDown,
   isSelected,
   isDragDisabled = false,
+  position,
 }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: image.shotImageEntryId,
@@ -77,6 +81,13 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
     setIsConfirmDeleteDialogOpen(false);
   };
 
+  const handleDuplicateClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onDuplicate && position !== undefined) {
+      onDuplicate(image.id, position + 1);
+    }
+  };
+
   // Add cache-busting parameter to ensure updated images are displayed
   const imageUrl = image.thumbUrl || image.imageUrl;
   // Use forceRefresh for flipped images to ensure immediate display update
@@ -112,15 +123,28 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
         }}
       />
       {(!isMobile || !isDragDisabled) && (
-        <Button
-          variant="destructive"
-          size="icon"
-          className="absolute top-1 right-1 h-7 w-7 p-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10"
-          onClick={handleDeleteClick}
-          title="Remove image from shot"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </Button>
+        <>
+          {onDuplicate && position !== undefined && (
+            <Button
+              variant="secondary"
+              size="icon"
+              className="absolute top-1 right-9 h-7 w-7 p-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10"
+              onClick={handleDuplicateClick}
+              title="Duplicate image"
+            >
+              <Copy className="h-3.5 w-3.5" />
+            </Button>
+          )}
+          <Button
+            variant="destructive"
+            size="icon"
+            className="absolute top-1 right-1 h-7 w-7 p-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10"
+            onClick={handleDeleteClick}
+            title="Remove image from shot"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        </>
       )}
       <AlertDialog open={isConfirmDeleteDialogOpen} onOpenChange={setIsConfirmDeleteDialogOpen}>
         <AlertDialogOverlay

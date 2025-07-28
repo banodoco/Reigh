@@ -75,6 +75,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 }) => {
   const [isFlippedHorizontally, setIsFlippedHorizontally] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
   const [isMagicEditOpen, setIsMagicEditOpen] = useState(false);
   const [magicEditPrompt, setMagicEditPrompt] = useState('');
   const [magicEditNumImages, setMagicEditNumImages] = useState(4);
@@ -84,6 +86,16 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   
   // Star functionality
   const toggleStarMutation = useToggleGenerationStar();
+
+  const isVideo = media.type === 'video_travel_output' || media.location?.endsWith('.mp4');
+  const displayUrl = getDisplayUrl(media.location || media.imageUrl);
+
+  // Clear saving state when URL changes (indicating save completed)
+  useEffect(() => {
+    if (isSaving) {
+      setIsSaving(false);
+    }
+  }, [displayUrl]);
 
   /**
    * Global key handler
@@ -114,9 +126,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     window.addEventListener('keydown', handleWindowKeyDown);
     return () => window.removeEventListener('keydown', handleWindowKeyDown);
   }, [onNext, onPrevious, onClose]);
-  
-  const isVideo = media.type === 'video_travel_output' || media.location?.endsWith('.mp4');
-  const displayUrl = getDisplayUrl(media.location || media.imageUrl);
 
   const handleFlip = () => {
     setIsFlippedHorizontally(!isFlippedHorizontally);
@@ -124,19 +133,73 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   };
 
   const handleSave = async () => {
-    if (!hasChanges || !canvasRef.current) return;
+    if (!hasChanges || !canvasRef.current || isSaving) return;
+
+    setIsSaving(true);
 
     try {
       const canvas = canvasRef.current;
-      canvas.toBlob((blob) => {
-        if (blob && onImageSaved) {
-          const url = URL.createObjectURL(blob);
-          onImageSaved(url);
-          setHasChanges(false);
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        console.error('Failed to get canvas context');
+        setIsSaving(false);
+        return;
+      }
+
+      // Store the current flip state
+      const wasFlipped = isFlippedHorizontally;
+
+      // Create a new image element to load the original image
+      const img = new Image();
+      img.crossOrigin = 'anonymous'; // Enable CORS for cross-origin images
+      
+      img.onload = () => {
+        // Set canvas dimensions to match the image
+        canvas.width = img.width;
+        canvas.height = img.height;
+
+        // Clear the canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Save the current context state
+        ctx.save();
+
+        // Apply horizontal flip transformation if needed
+        if (wasFlipped) {
+          // Move to the center, flip, then move back
+          ctx.translate(canvas.width, 0);
+          ctx.scale(-1, 1);
         }
-      }, 'image/png');
+
+        // Draw the image
+        ctx.drawImage(img, 0, 0);
+
+        // Restore the context state
+        ctx.restore();
+
+        // Convert canvas to blob
+        canvas.toBlob((blob) => {
+          if (blob && onImageSaved) {
+            const url = URL.createObjectURL(blob);
+            // Reset flip state BEFORE calling onImageSaved
+            // This ensures the UI is ready for the flipped image
+            setIsFlippedHorizontally(false);
+            setHasChanges(false);
+            onImageSaved(url);
+          }
+        }, 'image/png');
+      };
+
+      img.onerror = (error) => {
+        console.error('Error loading image:', error);
+        setIsSaving(false);
+      };
+
+      // Start loading the image
+      img.src = displayUrl;
     } catch (error) {
       console.error('Error saving image:', error);
+      setIsSaving(false);
     }
   };
 
@@ -284,26 +347,51 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   )
                 ) : (
                   <div className="relative">
-                    <img 
-                      src={displayUrl} 
-                      alt="Media content"
-                      className={`w-full h-full object-contain ${
-                        isFlippedHorizontally ? 'scale-x-[-1]' : ''
-                      }`}
-                      style={{ 
-                        maxHeight: '85vh',
-                        maxWidth: '95vw',
-                        width: 'auto',
-                        height: 'auto',
-                        transform: isFlippedHorizontally ? 'scaleX(-1)' : 'none'
-                      }}
-                    />
+                    {isSaving ? (
+                      <div 
+                        className="flex items-center justify-center bg-black/20 rounded-lg object-contain"
+                        style={{ 
+                          width: 'auto',
+                          height: 'auto',
+                          maxHeight: '85vh',
+                          maxWidth: '95vw',
+                          aspectRatio: imageDimensions ? `${imageDimensions.width}/${imageDimensions.height}` : '1',
+                          minWidth: '300px',
+                          minHeight: '300px'
+                        }}
+                      >
+                        <div className="text-white text-center">
+                          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-2"></div>
+                          <p>Saving image...</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <img 
+                        src={displayUrl} 
+                        alt="Media content"
+                        className={`w-full h-full object-contain ${
+                          isFlippedHorizontally ? 'scale-x-[-1]' : ''
+                        }`}
+                        style={{ 
+                          maxHeight: '85vh',
+                          maxWidth: '95vw',
+                          width: 'auto',
+                          height: 'auto',
+                          transform: isFlippedHorizontally ? 'scaleX(-1)' : 'none'
+                        }}
+                        onLoad={(e) => {
+                          const img = e.target as HTMLImageElement;
+                          setImageDimensions({
+                            width: img.naturalWidth,
+                            height: img.naturalHeight
+                          });
+                        }}
+                      />
+                    )}
                     {/* Hidden canvas for image processing */}
                     <canvas 
                       ref={canvasRef}
                       className="hidden"
-                      width={800}
-                      height={600}
                     />
                   </div>
                 )}
@@ -366,12 +454,13 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                               variant="secondary"
                               size="sm"
                               onClick={handleSave}
-                              className="bg-green-600/80 hover:bg-green-600 text-white"
+                              disabled={isSaving}
+                              className="bg-green-600/80 hover:bg-green-600 text-white disabled:opacity-50"
                             >
                               <Save className="h-4 w-4" />
                             </Button>
                           </TooltipTrigger>
-                          <TooltipContent>Save changes</TooltipContent>
+                          <TooltipContent>{isSaving ? 'Saving...' : 'Save changes'}</TooltipContent>
                         </Tooltip>
                       )}
                     </>
