@@ -149,6 +149,8 @@ export interface TimelineProps {
   onContextFramesChange: (context: number) => void;
   onFramePositionsChange?: (framePositions: Map<string, number>) => void;
   onImageDrop?: (files: File[], targetFrame?: number) => Promise<void>;
+  pendingPositions?: Map<string, number>;
+  onPendingPositionApplied?: (generationId: string) => void;
 }
 
 /**
@@ -163,7 +165,9 @@ const Timeline: React.FC<TimelineProps> = ({
   shotId,
   onContextFramesChange,
   onFramePositionsChange,
-  onImageDrop
+  onImageDrop,
+  pendingPositions,
+  onPendingPositionApplied
 }) => {
   // Core state
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
@@ -207,58 +211,63 @@ const Timeline: React.FC<TimelineProps> = ({
   const initialContextFrames = useRef(contextFrames);
 
   // Frame positions state
-  const [framePositions, setFramePositions] = useState<Map<string, number>>(() => {
+  const [framePositions, setFramePositions] = useState<Map<string, number>>(new Map());
+
+  // Load positions from localStorage on mount and when shotId changes
+  useEffect(() => {
     const stored = localStorage.getItem(`timelineFramePositions_${shotId}`);
-    const initial = new Map<string, number>();
-    
     if (stored) {
       try {
-        const storedMap = new Map(JSON.parse(stored));
-        
-        // Handle temporary keys from recent drops
-        const tempKeys = [...storedMap.keys()].filter((key): key is string => 
-          typeof key === 'string' && key.startsWith('temp_')
-        );
-        tempKeys.forEach(tempKey => {
-          const generationId = tempKey.replace('temp_', '');
-          const matchingImage = images.find(img => img.id === generationId);
-          if (matchingImage) {
-            // Transfer the position from temp key to actual shotImageEntryId
-            const position = storedMap.get(tempKey);
-            if (typeof position === 'number') {
-              initial.set(matchingImage.shotImageEntryId, position);
-              console.log(`[Timeline Init] Converted temp position for ${generationId} to ${matchingImage.shotImageEntryId} at frame ${position}`);
-            }
-          } else {
-            // Keep temp key for now, image might not be loaded yet
-            const position = storedMap.get(tempKey);
-            if (typeof position === 'number') {
-              initial.set(tempKey, position);
-            }
-          }
-        });
-        
-        // Add regular stored positions
-        storedMap.forEach((position, key) => {
-          if (typeof key === 'string' && typeof position === 'number' && !key.startsWith('temp_')) {
-            initial.set(key, position);
-          }
-        });
-        
+        setFramePositions(new Map(JSON.parse(stored)));
       } catch {
-        /* ignore parsing errors */
+        // ignore parsing errors
       }
-    }
-    
-    // Set default positions for images that don't have positions yet
-    images.forEach((img, idx) => {
-      if (!initial.has(img.shotImageEntryId)) {
+    } else {
+      // If no stored positions, initialize with defaults
+      const initial = new Map<string, number>();
+      images.forEach((img, idx) => {
         initial.set(img.shotImageEntryId, idx * frameSpacing);
-      }
+      });
+      setFramePositions(initial);
+    }
+  }, [shotId]);
+
+  // Sync frame positions when images change
+  useEffect(() => {
+    setFramePositions(prev => {
+      const map = new Map(prev);
+      let positionsApplied = false;
+
+      images.forEach((img, idx) => {
+        const pendingFrame = pendingPositions?.get(img.id);
+
+        if (pendingFrame !== undefined) {
+          // A specific position was requested for this new image
+          map.set(img.shotImageEntryId, pendingFrame);
+          console.log(`[Timeline] Applied pending position for gen ${img.id} to frame ${pendingFrame}`);
+          if (onPendingPositionApplied) {
+            onPendingPositionApplied(img.id);
+          }
+          positionsApplied = true;
+        } else if (!map.has(img.shotImageEntryId)) {
+          // No pending position, assign a default
+          const defaultPos = (images.length - 1) * frameSpacing + frameSpacing;
+          map.set(img.shotImageEntryId, defaultPos);
+          console.log(`[Timeline] Applied default position for new image ${img.shotImageEntryId} to frame ${defaultPos}`);
+          positionsApplied = true;
+        }
+      });
+
+      // Clean up positions for images that no longer exist
+      [...map.keys()].forEach(key => {
+        if (!images.some(img => img.shotImageEntryId === key)) {
+          map.delete(key);
+        }
+      });
+      
+      return positionsApplied ? new Map(map) : prev;
     });
-    
-    return initial;
-  });
+  }, [images, frameSpacing, pendingPositions, onPendingPositionApplied]);
 
   // Save positions to localStorage
   useEffect(() => {
@@ -270,45 +279,6 @@ const Timeline: React.FC<TimelineProps> = ({
     }, 100);
     return () => clearTimeout(timer);
   }, [framePositions, shotId, onFramePositionsChange]);
-
-  // Sync frame positions when images change
-  useEffect(() => {
-    setFramePositions(prev => {
-      const map = new Map(prev);
-      
-      // Handle temporary keys from dropped images
-      const tempKeys = [...map.keys()].filter(key => key.startsWith('temp_'));
-      tempKeys.forEach(tempKey => {
-        const generationId = tempKey.replace('temp_', '');
-        const matchingImage = images.find(img => img.id === generationId);
-        if (matchingImage) {
-          // Transfer the position from temp key to actual shotImageEntryId
-          const position = map.get(tempKey);
-          if (position !== undefined) {
-            map.set(matchingImage.shotImageEntryId, position);
-            map.delete(tempKey);
-            console.log(`[Timeline] Converted temp position for ${generationId} to ${matchingImage.shotImageEntryId} at frame ${position}`);
-          }
-        }
-      });
-      
-      // Set default positions for images that don't have positions yet
-      images.forEach((img, idx) => {
-        if (!map.has(img.shotImageEntryId)) {
-          map.set(img.shotImageEntryId, idx * frameSpacing);
-        }
-      });
-      
-      // Clean up positions for images that no longer exist
-      [...map.keys()].forEach(key => {
-        if (!key.startsWith('temp_') && !images.some(img => img.shotImageEntryId === key)) {
-          map.delete(key);
-        }
-      });
-      
-      return map;
-    });
-  }, [images, frameSpacing]);
 
   // Calculate dimensions
   const getTimelineDimensions = useCallback(() => {
@@ -1097,23 +1067,6 @@ const Timeline: React.FC<TimelineProps> = ({
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
-        {/* File drop overlay */}
-        {isFileOver && (
-          <div className="absolute inset-0 bg-primary/10 border-2 border-dashed border-primary rounded-lg flex items-center justify-center z-50">
-            <div className="bg-background/95 backdrop-blur-sm border border-primary rounded-lg px-6 py-4 shadow-lg">
-              <div className="text-center">
-                <div className="text-lg font-semibold text-primary mb-1">Drop Images Here</div>
-                <div className="text-sm text-muted-foreground">
-                  {dropTargetFrame !== null 
-                    ? `Add images at frame ${dropTargetFrame}`
-                    : 'Add images to the timeline'
-                  }
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Drop position indicator */}
         {isFileOver && dropTargetFrame !== null && (
           <div
