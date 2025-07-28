@@ -745,21 +745,13 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           prompt: 'Flipped image',
         });
 
-        // Add it to the shot right after the original
+        // Add it to the shot (it will be positioned at the end)
         await addImageToShotMutation.mutateAsync({
           shot_id: selectedShot.id,
           generation_id: newGeneration.id,
           project_id: selectedProjectId,
           imageUrl: finalImageUrl,
           thumbUrl: finalImageUrl,
-        });
-
-        // Duplicate it at the correct position (right after the original)
-        await duplicateImageInShotMutation.mutateAsync({
-          shot_id: selectedShot.id,
-          generation_id: newGeneration.id,
-          position: originalPosition + 1,
-          project_id: selectedProjectId!,
         });
 
         console.log('[ShotEditor-HandleImageSaved] New flipped image created and added to shot');
