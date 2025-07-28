@@ -308,16 +308,14 @@ export const TasksPane: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
         >
           <div className="p-2 border-b border-zinc-800 flex items-center justify-between flex-shrink-0">
               <h2 className="text-xl font-semibold text-zinc-200 ml-2">Tasks</h2>
-              {visibleCancellableCount > 0 && (
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={handleCancelAllPending}
-                  disabled={cancelAllPendingMutation.isPending}
-                >
-                  {cancelAllPendingMutation.isPending ? 'Cancelling All...' : 'Cancel All'}
-                </Button>
-              )}
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleCancelAllPending}
+                disabled={cancelAllPendingMutation.isPending || visibleCancellableCount === 0}
+              >
+                {cancelAllPendingMutation.isPending ? 'Cancelling All...' : 'Cancel All'}
+              </Button>
           </div>
           
           {/* Status Filter Toggle */}

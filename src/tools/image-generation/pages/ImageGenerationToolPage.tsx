@@ -14,11 +14,11 @@ import { nanoid } from 'nanoid';
 import { useGenerations, useDeleteGeneration, useUpdateGenerationLocation, GenerationsPaginatedResponse } from "@/shared/hooks/useGenerations";
 import { Settings } from "lucide-react";
 import { useApiKeys } from '@/shared/hooks/useApiKeys';
-import { useQueuedFeedback } from '@/shared/hooks/useQueuedFeedback';
+import { useTaskQueueNotifier } from '@/shared/hooks/useTaskQueueNotifier';
 import { useQueryClient } from '@tanstack/react-query';
 import { useListPublicResources } from '@/shared/hooks/useResources';
 
-import { useCreateTask, useListTasks } from "@/shared/hooks/useTasks";
+import { useListTasks } from "@/shared/hooks/useTasks";
 import { PageFadeIn } from '@/shared/components/transitions';
 import { useSearchParams } from 'react-router-dom';
 import { ToolPageHeader } from '@/shared/components/ToolPageHeader';
@@ -64,21 +64,18 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   // Early prefetch of public LoRAs to reduce loading time
   useListPublicResources('lora');
   
-  // Suppress per-task success toasts; we'll show a single aggregated toast
-  const { mutateAsync: createTaskAsync } = useCreateTask({ showToast: false });
-
-  const [isCreatingTasks, setIsCreatingTasks] = useState(false);
-  const [pendingTasksInfo, setPendingTasksInfo] = useState<{ initial: number; expected: number } | null>(null);
-
-  // Transient "Added to queue!" feedback handler
-  const { justQueued, triggerQueued } = useQueuedFeedback();
+  // Use the new task queue notifier hook
+  const { selectedProjectId } = useProject();
+  const { enqueueTasks, isEnqueuing, justQueued } = useTaskQueueNotifier({ 
+    projectId: selectedProjectId,
+    suppressPerTaskToast: true 
+  });
 
   // Always use hooks - no environment-based disabling
   const { apiKeys, getApiKey } = useApiKeys();
   const imageGenerationFormRef = useRef<ImageGenerationFormHandles>(null);
   const galleryRef = useRef<HTMLDivElement>(null);
   const formContainerRef = useRef<HTMLDivElement>(null);
-  const { selectedProjectId } = useProject();
   const [searchParams] = useSearchParams();
   const { setHeader, clearHeader } = useToolPageHeader();
   const { currentShotId } = useCurrentShot();
@@ -243,6 +240,13 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   };
 
   const handleNewGenerate = async (formData: any) => {
+    console.log('[ImageGeneration] handleNewGenerate called with:', {
+      selectedProjectId,
+      generationMode: formData.generationMode,
+      promptCount: formData.prompts?.length,
+      imagesPerPrompt: formData.imagesPerPrompt,
+    });
+
     if (!selectedProjectId) {
       toast.error("No project selected. Please select a project before generating images.");
       return;
@@ -250,16 +254,6 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
 
     const { generationMode, associatedShotId, ...restOfFormData } = formData;
 
-    const tasksToCreateCount = generationMode === 'wan-local'
-      ? restOfFormData.prompts.length * restOfFormData.imagesPerPrompt
-      : 1;
-
-    // Record current task count so we can detect when new tasks have appeared
-    const initialTaskCount = projectTasks?.length || 0;
-    setPendingTasksInfo({ initial: initialTaskCount, expected: tasksToCreateCount });
-
-    setIsCreatingTasks(true);
-    
     // Clear existing images and reset to page 1 if needed
     if (restOfFormData.prompts.length * restOfFormData.imagesPerPrompt > 0) {
       setGeneratedImages([]);
@@ -274,62 +268,38 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
       }));
 
       // Build an array of payloads – one per image task
-      const taskPayloads: any[] = restOfFormData.prompts.flatMap((promptEntry: PromptEntry, promptIdx: number) => {
+      const taskPayloads = restOfFormData.prompts.flatMap((promptEntry: PromptEntry, promptIdx: number) => {
         return Array.from({ length: restOfFormData.imagesPerPrompt }, (_, imgIdx) => {
           const globalIndex = promptIdx * restOfFormData.imagesPerPrompt + imgIdx;
           return {
-            project_id: selectedProjectId,
-            prompt: promptEntry.fullPrompt,
-            resolution: restOfFormData.determinedApiImageSize || undefined,
-            // Generate a random seed for each task to ensure diverse outputs (32-bit signed integer range)
-            seed: Math.floor(Math.random() * 0x7fffffff),
-            loras: lorasMapped,
-            shot_id: associatedShotId || undefined,
+            functionName: 'single-image-generate',
+            payload: {
+              project_id: selectedProjectId,
+              prompt: promptEntry.fullPrompt,
+              resolution: restOfFormData.determinedApiImageSize || undefined,
+              // Generate a random seed for each task to ensure diverse outputs (32-bit signed integer range)
+              seed: Math.floor(Math.random() * 0x7fffffff),
+              loras: lorasMapped,
+              shot_id: associatedShotId || undefined,
+            }
           };
         });
       });
 
-      // Fire off all requests concurrently and wait for them to finish
-      let successfulCreations = 0;
-      const results = await Promise.allSettled(
-        taskPayloads.map(payload => createTaskAsync({ functionName: 'single-image-generate', payload }))
-      );
-
-      results.forEach(r => {
-        if (r.status === 'fulfilled') successfulCreations += 1;
-      });
-
-      const failedCreations = taskPayloads.length - successfulCreations;
-
-      if (failedCreations > 0) {
-        toast.error(`${failedCreations} of ${taskPayloads.length} tasks failed to create.`);
+      // Use the new unified task queue notifier
+      try {
+        await enqueueTasks(taskPayloads);
+        // Also invalidate generations to ensure they refresh when tasks complete
+        queryClient.invalidateQueries({ queryKey: ['generations', selectedProjectId] });
+      } catch (error) {
+        console.error('[ImageGeneration] Error creating tasks:', error);
+        toast.error(error instanceof Error ? error.message : 'Failed to create tasks.');
       }
-
-      if (successfulCreations === 0) {
-        setIsCreatingTasks(false);
-        setPendingTasksInfo(null);
-        return;
-      }
-
-      // Ensure the task list is refreshed so the user sees the new tasks
-      await queryClient.invalidateQueries({ queryKey: ['tasks', selectedProjectId] });
-      await queryClient.refetchQueries({ queryKey: ['tasks', selectedProjectId] });
-
-      // Also invalidate generations to ensure they refresh when tasks complete
-      queryClient.invalidateQueries({ queryKey: ['generations', selectedProjectId] });
-
-      // Indicate to the form that tasks were queued successfully (set before clearing loading state to avoid label flash)
-      triggerQueued();
-
-      // Now clear loading state
-      setIsCreatingTasks(false);
-
-      setPendingTasksInfo(null);
 
     } else {
       // Single task for API-based modes
       try {
-        await createTaskAsync({
+        await enqueueTasks([{
           functionName: 'single-image-generate',
           payload: {
             project_id: selectedProjectId,
@@ -338,44 +308,19 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
             loras: restOfFormData.loras,
             generation_mode: generationMode,
           }
-        });
-
-        // Refresh tasks and then clear loading state
-        await queryClient.invalidateQueries({ queryKey: ['tasks', selectedProjectId] });
-        await queryClient.refetchQueries({ queryKey: ['tasks', selectedProjectId] });
+        }]);
 
         // Also invalidate generations to ensure they refresh when tasks complete
         queryClient.invalidateQueries({ queryKey: ['generations', selectedProjectId] });
 
-        // Indicate to the form that tasks were queued successfully (call first to avoid flash)
-        triggerQueued();
-
-        setIsCreatingTasks(false);
-
-        setPendingTasksInfo(null);
-
       } catch (err) {
         console.error('[ImageGeneration] Error creating task:', err);
-        toast.error('Failed to create task.');
-        setIsCreatingTasks(false);
-        setPendingTasksInfo(null);
-        return;
+        toast.error(err instanceof Error ? err.message : 'Failed to create task.');
       }
     }
   };
 
-  // When tasks list updates, check if we've reached the expected count
-  useEffect(() => {
-    if (isCreatingTasks && pendingTasksInfo && projectTasks) {
-      if (projectTasks.length >= pendingTasksInfo.initial + pendingTasksInfo.expected) {
-        // All expected tasks have appeared – stop loading and show success message
-        triggerQueued();
-
-        setIsCreatingTasks(false);
-        setPendingTasksInfo(null);
-      }
-    }
-  }, [projectTasks, isCreatingTasks, pendingTasksInfo]);
+  // Remove the old task tracking effect - it's now handled by useTaskQueueNotifier
 
   const handleImageSaved = useCallback(async (imageId: string, newImageUrl: string) => {
     try {
@@ -469,7 +414,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     }
   }, [targetShotInfo.targetShotIdForButton, selectedProjectId, addImageToShotMutation, positionExistingGenerationMutation, setLastAffectedShotId, selectedShotFilter, excludePositioned]);
 
-  const isGenerating = isCreatingTasks;
+  const isGenerating = isEnqueuing;
 
   const scrollPosRef = useRef<number>(0);
 

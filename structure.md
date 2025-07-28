@@ -191,6 +191,14 @@ tool-name/
 | **Edit Travel** | ⚠️ Hidden | [`tool_edit_travel.md`](structure_detail/tool_edit_travel.md) | Text-guided transformations |
 | **Training Data** | ⚠️ Hidden | [`tool_training_data_helper.md`](structure_detail/tool_training_data_helper.md) | Video upload & segmentation |
 
+#### Recent Architecture Updates
+
+**Task Queue Refactor (Latest):**
+- **New Hook**: Added `useTaskQueueNotifier` to `src/shared/hooks/` for centralized task creation with realtime feedback
+- **Enhanced UX**: Replaced individual `useCreateTask` patterns across Image Generation and Video Travel tools
+- **Better Monitoring**: Added comprehensive debug logging throughout task lifecycle for improved troubleshooting
+- **UI Improvements**: TasksPane now shows "Cancel All" button consistently (disabled when no cancellable tasks)
+
 ---
 
 ### 🔄 Shared Elements (`/src/shared/`)
@@ -213,6 +221,7 @@ For the complete catalog, see [`shared_hooks_contexts.md`](structure_detail/shar
 | **useToolSettings** | Tool config management | Fetches & merges settings across scopes |
 | **usePersistentState** | LocalStorage sync | Persists UI state locally |
 | **useTasks** | Task queue | Real-time task status & updates |
+| **useTaskQueueNotifier** | Centralized task creation | Unified task enqueueing with realtime feedback |
 | **useWebSocket** | Real-time updates | Supabase broadcast subscriptions |
 
 #### 🧮 Services & Utilities

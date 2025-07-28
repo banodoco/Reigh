@@ -22,7 +22,7 @@ import { ActiveLora } from '@/shared/components/ActiveLoRAsDisplay';
 import { useToolPageHeader } from '@/shared/contexts/ToolPageHeaderContext';
 import { useContentResponsive, useContentResponsiveColumns } from '@/shared/hooks/useContentResponsive';
 import { timeEnd } from '@/shared/lib/logger';
-import { useQueuedFeedback } from '@/shared/hooks/useQueuedFeedback';
+
 import { useShotNavigation } from '@/shared/hooks/useShotNavigation';
 // import { useLastAffectedShot } from '@/shared/hooks/useLastAffectedShot';
 import ShotEditor from '../components/ShotEditor';
@@ -70,8 +70,7 @@ const VideoTravelToolPage: React.FC = () => {
   const [selectedShot, setSelectedShot] = useState<Shot | null>(null);
   const { currentShotId, setCurrentShotId } = useCurrentShot();
   
-  // Add video generation success feedback
-  const { justQueued, triggerQueued } = useQueuedFeedback();
+  // Task queue notifier is now handled inside ShotEditor component
   
   // Use parallelized data fetching for better performance
   const {
@@ -835,8 +834,6 @@ const VideoTravelToolPage: React.FC = () => {
                 userHasInteracted.current = true;
                 setAfterEachPromptText(text);
               }}
-              justQueued={justQueued}
-              triggerQueued={triggerQueued}
             />
           </PageFadeIn>
         </Suspense>

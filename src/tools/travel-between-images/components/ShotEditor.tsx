@@ -34,7 +34,8 @@ import Timeline from '@/tools/travel-between-images/components/Timeline';
 
 import { useToolSettings } from '@/shared/hooks/useToolSettings';
 import { ToggleGroup, ToggleGroupItem } from "@/shared/components/ui/toggle-group";
-import { useListTasks, useCancelTask, useCreateTask } from "@/shared/hooks/useTasks";
+import { useListTasks, useCancelTask } from "@/shared/hooks/useTasks";
+import { useTaskQueueNotifier } from "@/shared/hooks/useTaskQueueNotifier";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -164,10 +165,6 @@ export interface ShotEditorProps {
 
   // Indicates if parent is still loading settings. Manage Shot Images should wait until this is false.
   settingsLoading?: boolean;
-  
-  // Video generation success feedback
-  justQueued?: boolean;
-  triggerQueued?: () => void;
 }
 
 const DEFAULT_RESOLUTION = '840x552';
@@ -238,8 +235,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   settingsLoading,
   afterEachPromptText,
   onAfterEachPromptTextChange,
-  justQueued = false,
-  triggerQueued,
 }) => {
   // Call all hooks first (Rules of Hooks)
   const { selectedProjectId, projects } = useProject();
@@ -261,7 +256,14 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // Timeline frame positions for task creation
   const [timelineFramePositions, setTimelineFramePositions] = useState<Map<string, number>>(new Map());
   
-  const { mutateAsync: createTaskAsync, isPending: isCreatingTask } = useCreateTask();
+  // Use the new task queue notifier hook
+  const { enqueueTasks, isEnqueuing, justQueued: localJustQueued } = useTaskQueueNotifier({ 
+    projectId: selectedProjectId,
+    suppressPerTaskToast: true 
+  });
+
+  // Use the local hook's justQueued state instead of the prop
+  const actualJustQueued = localJustQueued;
 
   const [creatingTaskId, setCreatingTaskId] = useState<string | null>(null);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
@@ -937,18 +939,15 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     }
     
     try {
-      await createTaskAsync({
+      await enqueueTasks([{
         functionName: 'steerable-motion',
         payload: requestBody,
-      });
+      }]);
       
-      // Trigger success feedback
-      if (triggerQueued) {
-        triggerQueued();
-      }
+      // Success feedback is now handled by useTaskQueueNotifier
     } catch (error) {
       console.error('Error creating video generation task:', error);
-      // Error handling is done by the useCreateTask hook
+      // Error handling is done by the useTaskQueueNotifier hook
     }
   };
 
@@ -1291,7 +1290,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // Check if generation should be disabled due to missing OpenAI API key for enhance prompt
   const openaiApiKey = getApiKey('openai_api_key');
   const isGenerationDisabledDueToApiKey = enhancePrompt && (!openaiApiKey || openaiApiKey.trim() === '');
-  const isGenerationDisabled = isCreatingTask || nonVideoImages.length < 2 || isGenerationDisabledDueToApiKey;
+  const isGenerationDisabled = isEnqueuing || nonVideoImages.length < 2 || isGenerationDisabledDueToApiKey;
 
   const handleUpdatePairConfig = (
     id: string,
@@ -1619,13 +1618,13 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                             <Button 
                                 size="lg" 
                                 className="w-full" 
-                                variant={justQueued ? "success" : "default"}
+                                variant={actualJustQueued ? "success" : "default"}
                                 onClick={handleGenerateBatch} 
                                 disabled={isGenerationDisabled}
                             >
-                                {justQueued
+                                {actualJustQueued
                                   ? "Added to queue!"
-                                  : isCreatingTask 
+                                  : isEnqueuing 
                                     ? 'Creating Tasks...' 
                                     : 'Generate Video'}
                             </Button>

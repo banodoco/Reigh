@@ -14,10 +14,16 @@ import { useCallback, useState } from 'react';
 export const useQueuedFeedback = (displayMs: number = 3000) => {
   const [justQueued, setJustQueued] = useState(false);
 
+  console.log('[QueuedFeedback] Current state:', { justQueued });
+
   const triggerQueued = useCallback(() => {
+    console.log('[QueuedFeedback] triggerQueued called, setting justQueued to true');
     setJustQueued(true);
     // Reset the flag after the specified duration so the normal label returns.
-    const timeout = setTimeout(() => setJustQueued(false), displayMs);
+    const timeout = setTimeout(() => {
+      console.log('[QueuedFeedback] Timeout reached, resetting justQueued to false');
+      setJustQueued(false);
+    }, displayMs);
     return () => clearTimeout(timeout);
   }, [displayMs]);
 

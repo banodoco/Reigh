@@ -78,6 +78,12 @@ export const useCreateTask = (options?: { showToast?: boolean }) => {
       return data;
     },
     onSuccess: (data, variables) => {
+      console.log('[useCreateTask] Task created successfully:', {
+        functionName: variables.functionName,
+        data,
+        selectedProjectId,
+      });
+      
       // Show per-task success toast only if not suppressed
       if (showToast) {
   
@@ -86,10 +92,12 @@ export const useCreateTask = (options?: { showToast?: boolean }) => {
       // Invalidate the tasks query to trigger a refetch
       // This ensures the TasksPane updates automatically
       if (selectedProjectId) {
+        console.log('[useCreateTask] Invalidating tasks query for projectId:', selectedProjectId);
         queryClient.invalidateQueries({ queryKey: ['tasks', selectedProjectId] });
       } else {
         // If there's no project context, invalidate the generic 'tasks' query
         // which might be used in other parts of the app
+        console.log('[useCreateTask] Invalidating generic tasks query');
         queryClient.invalidateQueries({ queryKey: ['tasks'] });
       }
     },
@@ -158,6 +166,7 @@ export const useListTasks = (params: ListTasksParams) => {
   return useQuery<Task[], Error>({
     queryKey: [TASKS_QUERY_KEY, projectId, status],
     queryFn: async () => {
+      console.log('[useListTasks] Query function executing for:', { projectId, status });
       if (!projectId) {
         return []; 
       }
@@ -177,7 +186,14 @@ export const useListTasks = (params: ListTasksParams) => {
       const { data, error } = await query;
 
       if (error) throw error;
-      return (data || []).map(mapDbTaskToTask);
+      const tasks = (data || []).map(mapDbTaskToTask);
+      console.log('[useListTasks] Fetched tasks:', {
+        projectId,
+        status,
+        count: tasks.length,
+        taskIds: tasks.map(t => t.id),
+      });
+      return tasks;
     },
     enabled: !!projectId, // Only run the query if projectId is available
   });
@@ -373,7 +389,12 @@ export const useCancelTask = (projectId: string | null) => {
   return useMutation({
     mutationFn: cancelTask,
     onSuccess: (_, taskId) => {
+      console.log(`[${Date.now()}] [useCancelTask] Task cancelled, invalidating queries for projectId:`, projectId);
       queryClient.invalidateQueries({ queryKey: [TASKS_QUERY_KEY] });
+      // Also invalidate status counts since cancelling changes the processing count
+      if (projectId) {
+        queryClient.invalidateQueries({ queryKey: ['task-status-counts', projectId] });
+      }
     },
     onError: (error: Error) => {
       console.error('Error cancelling task:', error);
@@ -389,9 +410,12 @@ export const useCancelPendingTasks = () => {
   return useMutation({
     mutationFn: cancelPendingTasks,
     onSuccess: (data, projectId) => {
+      console.log(`[${Date.now()}] [useCancelPendingTasks] Tasks cancelled, invalidating queries for projectId:`, projectId);
       queryClient.invalidateQueries({ queryKey: [TASKS_QUERY_KEY, projectId] });
       queryClient.invalidateQueries({ queryKey: [TASKS_QUERY_KEY, projectId, ['Queued']] });
-      queryClient.invalidateQueries({ queryKey: [TASKS_QUERY_KEY, projectId, ['Cancelled']] });      
+      queryClient.invalidateQueries({ queryKey: [TASKS_QUERY_KEY, projectId, ['Cancelled']] });
+      // Also invalidate status counts since cancelling changes the processing count  
+      queryClient.invalidateQueries({ queryKey: ['task-status-counts', projectId] });
     },
     onError: (error: Error) => {
       console.error('Error cancelling pending tasks:', error);
@@ -447,11 +471,18 @@ export const useTaskStatusCounts = (projectId: string | null) => {
 
       if (failureError) throw failureError;
 
-      return {
+      const result = {
         processing: processingCount || 0,
         recentSuccesses: successCount || 0,
         recentFailures: failureCount || 0,
       };
+      
+      console.log(`[${Date.now()}] [useTaskStatusCounts] Fetched counts:`, {
+        projectId,
+        ...result,
+      });
+      
+      return result;
     },
     enabled: !!projectId,
     refetchInterval: 5000, // Refresh every 5 seconds for live updates

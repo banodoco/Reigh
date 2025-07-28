@@ -127,6 +127,12 @@ export function useWebSocket(projectId: string | null) {
           }, 
           (payload) => {
             log('PerfDebug:DBChange', 'Task updated:', payload);
+            console.log(`[${Date.now()}] [WebSocket] Task status changed:`, {
+              taskId: payload.new?.id,
+              oldStatus: payload.old?.status,
+              newStatus: payload.new?.status,
+              projectId,
+            });
             
             const newRecord = payload.new as any;
             const oldRecord = payload.old as any;
@@ -134,6 +140,10 @@ export function useWebSocket(projectId: string | null) {
             // Invalidate tasks queries on any update
             scheduleInvalidation(['tasks', { projectId }]);
             scheduleInvalidation(['tasks']);
+            
+            // Also invalidate task status counts since any status change affects counts
+            console.log(`[${Date.now()}] [WebSocket] Invalidating task status counts for projectId:`, projectId);
+            scheduleInvalidation(['task-status-counts', projectId]);
             
             // If task completed, also invalidate generations
             if (newRecord?.status === 'Complete' && oldRecord?.status !== 'Complete') {
