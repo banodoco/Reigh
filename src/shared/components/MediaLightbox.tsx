@@ -24,7 +24,7 @@ interface MediaLightboxProps {
   onClose: () => void;
   onNext?: () => void;
   onPrevious?: () => void;
-  onImageSaved?: (newImageUrl: string) => void;
+  onImageSaved?: (newImageUrl: string, createNew?: boolean) => void;
   // Configuration props to control features
   showNavigation?: boolean;
   showImageEditTools?: boolean;
@@ -185,7 +185,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
             // This ensures the UI is ready for the flipped image
             setIsFlippedHorizontally(false);
             setHasChanges(false);
-            onImageSaved(url);
+            // Pass true to indicate this should create a new image
+            onImageSaved(url, true);
           }
         }, 'image/png');
       };

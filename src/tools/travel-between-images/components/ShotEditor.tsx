@@ -698,8 +698,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     });
   };
 
-  const handleImageSaved = async (imageId: string, newImageUrl: string) => {
-    console.log(`[ShotEditor-HandleImageSaved] Starting image update process:`, { imageId, newImageUrl, shotId: selectedShot.id });
+  const handleImageSaved = async (imageId: string, newImageUrl: string, createNew?: boolean) => {
+    console.log(`[ShotEditor-HandleImageSaved] Starting image ${createNew ? 'creation' : 'update'} process:`, { imageId, newImageUrl, shotId: selectedShot.id, createNew });
     
     try {
       // If the new image is a temporary Blob URL (from in-browser edits), upload it to storage first
@@ -713,7 +713,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           // Derive a filename / extension from the blob type (fallback to png)
           const mimeType = blob.type || 'image/png';
           const ext = mimeType.split('/').pop() || 'png';
-          const file = new File([blob], `edited-${imageId}.${ext}`, { type: mimeType });
+          const file = new File([blob], `${createNew ? 'flipped' : 'edited'}-${imageId}.${ext}`, { type: mimeType });
 
           finalImageUrl = await uploadImageToStorage(file);
 
@@ -727,27 +727,66 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         }
       }
 
-      // Update the database record via local API
-      console.log(`[ShotEditor-HandleImageSaved] Updating database record for image:`, imageId);
-      await updateGenerationLocationMutation.mutateAsync({
-        id: imageId,
-        location: finalImageUrl,
-      });
+      if (createNew) {
+        // Create a new generation and add it to the shot
+        console.log('[ShotEditor-HandleImageSaved] Creating new generation for flipped image');
+        
+        // Get the original image to find its position
+        const originalImage = filteredOrderedShotImages.find(img => img.id === imageId);
+        const originalPosition = originalImage ? filteredOrderedShotImages.indexOf(originalImage) : filteredOrderedShotImages.length;
+        
+        // Create a new generation
+        const newGeneration = await createGenerationMutation.mutateAsync({
+          imageUrl: finalImageUrl,
+          fileName: `flipped-${imageId}`,
+          fileType: 'image/png',
+          fileSize: 0, // We don't have the exact size, but it's not critical
+          projectId: selectedProjectId!,
+          prompt: 'Flipped image',
+        });
 
-      console.log(`[ShotEditor-HandleImageSaved] Database update successful for image:`, imageId);
+        // Add it to the shot right after the original
+        await addImageToShotMutation.mutateAsync({
+          shot_id: selectedShot.id,
+          generation_id: newGeneration.id,
+          project_id: selectedProjectId,
+          imageUrl: finalImageUrl,
+          thumbUrl: finalImageUrl,
+        });
 
-      // Update local state with cache-busting for immediate UI update
-      console.log(`[ShotEditor-HandleImageSaved] Updating local state...`);
-      const cacheBustedUrl = getDisplayUrl(finalImageUrl, true);
-      setLocalOrderedShotImages(prevImages => {
-        const updated = prevImages.map(img => 
-          img.id === imageId 
-            ? { ...img, imageUrl: cacheBustedUrl, thumbUrl: cacheBustedUrl } 
-            : img
-        );
-        console.log(`[ShotEditor-HandleImageSaved] Local state updated. Found image to update:`, updated.some(img => img.id === imageId));
-        return updated;
-      });
+        // Duplicate it at the correct position (right after the original)
+        await duplicateImageInShotMutation.mutateAsync({
+          shot_id: selectedShot.id,
+          generation_id: newGeneration.id,
+          position: originalPosition + 1,
+          project_id: selectedProjectId!,
+        });
+
+        console.log('[ShotEditor-HandleImageSaved] New flipped image created and added to shot');
+        toast.success('Flipped image saved as new generation');
+      } else {
+        // Update the existing image
+        console.log(`[ShotEditor-HandleImageSaved] Updating database record for image:`, imageId);
+        await updateGenerationLocationMutation.mutateAsync({
+          id: imageId,
+          location: finalImageUrl,
+        });
+
+        console.log(`[ShotEditor-HandleImageSaved] Database update successful for image:`, imageId);
+
+        // Update local state with cache-busting for immediate UI update
+        console.log(`[ShotEditor-HandleImageSaved] Updating local state...`);
+        const cacheBustedUrl = getDisplayUrl(finalImageUrl, true);
+        setLocalOrderedShotImages(prevImages => {
+          const updated = prevImages.map(img => 
+            img.id === imageId 
+              ? { ...img, imageUrl: cacheBustedUrl, thumbUrl: cacheBustedUrl } 
+              : img
+          );
+          console.log(`[ShotEditor-HandleImageSaved] Local state updated. Found image to update:`, updated.some(img => img.id === imageId));
+          return updated;
+        });
+      }
 
       // Invalidate relevant queries to ensure fresh data
       console.log(`[ShotEditor-HandleImageSaved] Invalidating React Query cache...`);
@@ -757,7 +796,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       console.log(`[ShotEditor-HandleImageSaved] Complete process finished successfully`);
     } catch (error) {
       console.error("[ShotEditor-HandleImageSaved] Unexpected error:", error);
-      toast.error("Failed to update image.");
+      toast.error("Failed to save image.");
     }
   };
 

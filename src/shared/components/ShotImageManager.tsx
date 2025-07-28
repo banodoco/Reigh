@@ -46,7 +46,7 @@ export interface ShotImageManagerProps {
   generationMode: 'batch' | 'by-pair' | 'timeline';
   pairConfigs: PairConfig[];
   onPairConfigChange: (id: string, field: 'prompt' | 'frames' | 'negativePrompt' | 'context', value: string | number) => void;
-  onImageSaved?: (imageId: string, newImageUrl: string) => void; // Callback when image is saved with changes
+  onImageSaved?: (imageId: string, newImageUrl: string, createNew?: boolean) => void; // Callback when image is saved with changes
   onMagicEdit?: (imageUrl: string, prompt: string, numImages: number) => void;
 }
 
@@ -460,7 +460,7 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
             onClose={() => setLightboxIndex(null)}
             onNext={handleNext}
             onPrevious={handlePrevious}
-            onImageSaved={onImageSaved ? (newImageUrl: string) => onImageSaved(images[lightboxIndex].id, newImageUrl) : undefined}
+            onImageSaved={onImageSaved ? (newImageUrl: string, createNew?: boolean) => onImageSaved(images[lightboxIndex].id, newImageUrl, createNew) : undefined}
             showNavigation={true}
             showImageEditTools={true}
             showDownload={true}
@@ -626,7 +626,7 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
             onClose={() => setLightboxIndex(null)}
             onNext={handleNext}
             onPrevious={handlePrevious}
-            onImageSaved={onImageSaved ? (newImageUrl: string) => onImageSaved(images[lightboxIndex].id, newImageUrl) : undefined}
+            onImageSaved={onImageSaved ? (newImageUrl: string, createNew?: boolean) => onImageSaved(images[lightboxIndex].id, newImageUrl, createNew) : undefined}
             showNavigation={true}
             showImageEditTools={true}
             showDownload={true}
@@ -690,7 +690,7 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
           onClose={() => setLightboxIndex(null)}
           onNext={handleNext}
           onPrevious={handlePrevious}
-          onImageSaved={onImageSaved ? (newImageUrl: string) => onImageSaved(images[lightboxIndex].id, newImageUrl) : undefined}
+          onImageSaved={onImageSaved ? (newImageUrl: string, createNew?: boolean) => onImageSaved(images[lightboxIndex].id, newImageUrl, createNew) : undefined}
           showNavigation={true}
           showImageEditTools={true}
           showDownload={true}

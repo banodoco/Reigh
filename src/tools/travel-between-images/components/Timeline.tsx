@@ -137,7 +137,7 @@ export interface TimelineProps {
   frameSpacing: number;
   contextFrames: number;
   onImageReorder: (orderedIds: string[]) => void;
-  onImageSaved: (imageId: string, newImageUrl: string) => void;
+  onImageSaved: (imageId: string, newImageUrl: string, createNew?: boolean) => void;
   shotId: string;
   onContextFramesChange: (context: number) => void;
   onFramePositionsChange?: (framePositions: Map<string, number>) => void;
@@ -1109,7 +1109,7 @@ const Timeline: React.FC<TimelineProps> = ({
                 onClose={() => setLightboxIndex(null)}
                 onNext={images.length > 1 ? goNext : undefined}
                 onPrevious={images.length > 1 ? goPrev : undefined}
-                onImageSaved={(newUrl: string) => onImageSaved(images[lightboxIndex].id, newUrl)}
+                onImageSaved={(newUrl: string, createNew?: boolean) => onImageSaved(images[lightboxIndex].id, newUrl, createNew)}
                 showNavigation={true}
                 showMagicEdit={true}
                 onMagicEdit={(imageUrl, prompt, numImages) => {
