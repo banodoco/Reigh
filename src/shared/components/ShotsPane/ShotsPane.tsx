@@ -36,10 +36,18 @@ export const ShotsPane: React.FC = () => {
     
     const filtered = shots.map(shot => {
       const originalImageCount = shot.images?.length || 0;
-      const filteredImages = (shot.images || []).filter(img => {
-        const hasPosition = (img as any).position !== null && (img as any).position !== undefined;
-        return hasPosition;
-      });
+      const filteredImages = (shot.images || [])
+        // Keep only images that have a valid position value
+        .filter(img => {
+          const hasPosition = (img as any).position !== null && (img as any).position !== undefined;
+          return hasPosition;
+        })
+        // Order the images by their position so they appear in the intended sequence
+        .sort((a, b) => {
+          const posA = (a as any).position as number;
+          const posB = (b as any).position as number;
+          return posA - posB;
+        });
       
       return {
         ...shot,

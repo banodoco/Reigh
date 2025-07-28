@@ -31,11 +31,12 @@ import { Slider } from './ui/slider';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { Button } from './ui/button';
 import { ArrowDown } from 'lucide-react';
-import { AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel } from "@/shared/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel, AlertDialogOverlay } from "@/shared/components/ui/alert-dialog";
 import { Checkbox } from "@/shared/components/ui/checkbox";
 import { Trash2 } from 'lucide-react';
+import { useUserUIState } from '@/shared/hooks/useUserUIState';
 
-const SKIP_CONFIRMATION_KEY = 'skipImageDeletionConfirmation';
+// Removed legacy sessionStorage key constant now that setting is persisted in DB
 
 export interface ShotImageManagerProps {
   images: GenerationRow[];
@@ -72,6 +73,16 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
   const isMobile = useIsMobile();
   const outerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+
+  const { value: imageDeletionSettings, update: updateImageDeletionSettings } = useUserUIState('imageDeletion', { skipConfirmation: false });
+
+  // Sync visual state with database state when it loads
+  useEffect(() => {
+    if (imageDeletionSettings.skipConfirmation) {
+      setSkipConfirmationNextTimeVisual(true);
+      currentDialogSkipChoiceRef.current = true;
+    }
+  }, [imageDeletionSettings.skipConfirmation]);
 
   // Notify other components (e.g., PaneControlTab) when mobile selection is active
   useEffect(() => {
@@ -358,6 +369,8 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
                                 const imageIndex = images.findIndex(img => img.id === pair.imageA.id);
                                 if (imageIndex >= 0) setLightboxIndex(imageIndex);
                               }}
+                              skipConfirmation={imageDeletionSettings.skipConfirmation}
+                              onSkipConfirmationSave={() => updateImageDeletionSettings({ skipConfirmation: true })}
                             />
                           </div>
                           <div className="flex-1">
@@ -372,6 +385,8 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
                                 const imageIndex = images.findIndex(img => img.id === pair.imageB.id);
                                 if (imageIndex >= 0) setLightboxIndex(imageIndex);
                               }}
+                              skipConfirmation={imageDeletionSettings.skipConfirmation}
+                              onSkipConfirmationSave={() => updateImageDeletionSettings({ skipConfirmation: true })}
                             />
                           </div>
                         </div>
@@ -492,7 +507,7 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
     const mobileColumns = 3; // Always use 3 columns on mobile
     const itemsPerRow = mobileColumns;
     
-    const shouldSkipConfirmation = typeof window !== 'undefined' && sessionStorage.getItem(SKIP_CONFIRMATION_KEY) === 'true';
+    const shouldSkipConfirmation = imageDeletionSettings.skipConfirmation;
 
     const handleDeleteTrigger = () => {
       if (mobileSelectedIds.length === 0) return;
@@ -585,8 +600,10 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
 
         {/* Confirmation dialog rendered outside the conditional so it persists through unmounts */}
         <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+          <AlertDialogOverlay onPointerDown={(e) => e.stopPropagation()} />
           <AlertDialogContent
             onPointerDown={(e)=>e.stopPropagation()}
+            onClick={(e)=>e.stopPropagation()}
           >
             <AlertDialogHeader>
               <AlertDialogTitle>Delete Image{mobileSelectedIds.length > 1 ? 's' : ''}</AlertDialogTitle>
@@ -612,7 +629,7 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
               <AlertDialogCancel onClick={() => setConfirmOpen(false)}>Cancel</AlertDialogCancel>
               <AlertDialogAction onClick={()=>{
                 if (currentDialogSkipChoiceRef.current) {
-                  sessionStorage.setItem(SKIP_CONFIRMATION_KEY,'true');
+                  updateImageDeletionSettings({ skipConfirmation: true });
                 }
                 performBatchDelete(mobileSelectedIds);
               }}>Delete</AlertDialogAction>
@@ -669,6 +686,8 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
               onDuplicate={onImageDuplicate}
               position={index}
               onDoubleClick={() => isMobile && generationMode === 'batch' ? handleMobileDoubleClick(index) : setLightboxIndex(index)}
+              skipConfirmation={imageDeletionSettings.skipConfirmation}
+              onSkipConfirmationSave={() => updateImageDeletionSettings({ skipConfirmation: true })}
             />
           ))}
         </div>

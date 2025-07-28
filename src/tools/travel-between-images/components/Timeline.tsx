@@ -841,29 +841,7 @@ const Timeline: React.FC<TimelineProps> = ({
   const maxAllowedGap = calculateMaxGap();
   const containerWidth = containerRef.current?.clientWidth || 1000;
 
-  // -----------------------------
-  // Debug logging for zoom behaviour
-  // -----------------------------
-  useEffect(() => {
-    if (process.env.NODE_ENV === "development") {
-      const viewportInfo = getZoomViewport();
-      console.groupCollapsed("[Timeline] Zoom Debug");
-      console.table([
-        {
-          zoomLevel,
-          zoomCenter,
-          fullMin,
-          fullMax,
-          fullRange,
-          viewportMin: viewportInfo.min,
-          viewportMax: viewportInfo.max,
-          rulerWidthStyle: zoomLevel > 1 ? `${zoomLevel * 100}%` : "100%",
-          containerClientWidth: containerRef.current?.clientWidth ?? "N/A",
-        },
-      ]);
-      console.groupEnd();
-    }
-  }, [zoomLevel, zoomCenter, fullMin, fullMax, fullRange, getZoomViewport]);
+  // Debug logging removed
 
   return (
     <div className="w-full overflow-x-hidden">

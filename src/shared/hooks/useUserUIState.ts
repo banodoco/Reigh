@@ -13,6 +13,9 @@ interface UISettings {
   videoTravelWidescreen: {
     enabled: boolean;
   };
+  imageDeletion?: {
+    skipConfirmation: boolean;
+  };
 }
 
 export function useUserUIState<K extends keyof UISettings>(
@@ -54,6 +57,9 @@ export function useUserUIState<K extends keyof UISettings>(
         
         if (keyValue !== undefined) {
           setValue(keyValue);
+          // Loading successful – debug logs removed
+        } else {
+          // No value found – debug logs removed
         }
         
         setIsLoading(false);
@@ -112,6 +118,8 @@ export function useUserUIState<K extends keyof UISettings>(
 
         if (error) {
           console.error('[useUserUIState] Error saving settings:', error);
+        } else {
+          // No value found – debug logs removed
         }
       } catch (error) {
         console.error('[useUserUIState] Error in update:', error);

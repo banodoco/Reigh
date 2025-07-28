@@ -323,11 +323,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   openaiApiKey,
   justQueued = false,
 }, ref) => {
-  console.log('[ImageGenerationForm] Render with props:', {
-    isGenerating,
-    justQueued,
-  });
-
   // Store prompts by shot ID (including 'none' for no shot)
   const [promptsByShot, setPromptsByShot] = useState<Record<string, PromptEntry[]>>({});
   const promptIdCounter = useRef(1);

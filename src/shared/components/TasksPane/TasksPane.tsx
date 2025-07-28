@@ -187,8 +187,22 @@ export const TasksPane: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
     }
   }, [statusCounts, isStatusCountsLoading, displayStatusCounts]);
   
-  // Count only visible tasks (exclude travel_segment and travel_stitch) for display
-  const visibleCancellableCount = filterVisibleTasks(cancellableTasks || []).length;
+  // --- Determine cancellable task count quickly so the "Cancel All" button enables immediately ---
+  const visibleCancellableCount = React.useMemo(() => {
+    // 1️⃣ Use the tasks already loaded in the paginated list (fast, already in cache)
+    const fromPaginated = filterVisibleTasks(
+      (displayPaginatedData?.tasks || []).filter(task =>
+        CANCELLABLE_TASK_STATUSES.includes(task.status)
+      )
+    ).length;
+
+    if (fromPaginated > 0) {
+      return fromPaginated;
+    }
+
+    // 2️⃣ Fallback to the value derived from status-count query (may be a second slower)
+    return displayStatusCounts?.processing || 0;
+  }, [displayPaginatedData, displayStatusCounts]);
 
   const cancelAllPendingMutation = useCancelAllPendingTasks();
   const { toast } = useToast();

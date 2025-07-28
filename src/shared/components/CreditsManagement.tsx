@@ -299,7 +299,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
               style={{ whiteSpace: 'normal' }}
             >
               <History className="w-4 h-4 mb-0.5 sm:mb-0 sm:mr-2" />
-              <span className="text-center leading-tight">Transaction<br className="sm:hidden" />History</span>
+              <span className="text-center leading-tight">Transaction<br className="sm:hidden" /> History</span>
             </TabsTrigger>
             <TabsTrigger 
               value="task-log"

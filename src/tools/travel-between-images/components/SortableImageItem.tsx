@@ -30,9 +30,9 @@ interface SortableImageItemProps {
   isSelected: boolean;
   isDragDisabled?: boolean;
   position?: number;
+  skipConfirmation: boolean;
+  onSkipConfirmationSave: () => void;
 }
-
-const SKIP_CONFIRMATION_KEY = 'skipImageDeletionConfirmation';
 
 export const SortableImageItem: React.FC<SortableImageItemProps> = ({
   image,
@@ -44,14 +44,16 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
   isSelected,
   isDragDisabled = false,
   position,
+  skipConfirmation,
+  onSkipConfirmationSave,
 }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: image.shotImageEntryId,
     disabled: isDragDisabled,
   });
   const [isConfirmDeleteDialogOpen, setIsConfirmDeleteDialogOpen] = useState(false);
-  const [skipConfirmationNextTimeVisual, setSkipConfirmationNextTimeVisual] = useState(false);
-  const currentDialogSkipChoiceRef = useRef(false);
+  const [skipConfirmationNextTimeVisual, setSkipConfirmationNextTimeVisual] = useState(skipConfirmation);
+  const currentDialogSkipChoiceRef = useRef(skipConfirmation);
   const isMobile = useIsMobile();
 
   const style = {
@@ -63,8 +65,7 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
 
   const handleDeleteClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    const shouldSkipConfirmation = sessionStorage.getItem(SKIP_CONFIRMATION_KEY) === 'true';
-    if (shouldSkipConfirmation) {
+    if (skipConfirmation) {
       onDelete(image.shotImageEntryId);
     } else {
       setSkipConfirmationNextTimeVisual(false);
@@ -76,7 +77,7 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
   const handleConfirmDelete = () => {
     onDelete(image.shotImageEntryId);
     if (currentDialogSkipChoiceRef.current) {
-      sessionStorage.setItem(SKIP_CONFIRMATION_KEY, 'true');
+      onSkipConfirmationSave();
     }
     setIsConfirmDeleteDialogOpen(false);
   };

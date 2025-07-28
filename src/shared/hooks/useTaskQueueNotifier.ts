@@ -28,13 +28,7 @@ export const useTaskQueueNotifier = ({
   const [isEnqueuing, setIsEnqueuing] = useState(false);
   const [targetTotal, setTargetTotal] = useState<number | null>(null);
 
-  console.log(`[${Date.now()}] [TaskQueueNotifier] Hook state:`, {
-    projectId,
-    currentTasksLength: currentTasks?.length,
-    isEnqueuing,
-    targetTotal,
-    justQueued,
-  });
+  // debug log removed
 
   /* Realtime helpers */
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -44,7 +38,6 @@ export const useTaskQueueNotifier = ({
   useEffect(() => {
     return () => {
       if (channelRef.current) {
-        console.log(`[${Date.now()}] [TaskQueueNotifier] Cleaning up realtime channel`);
         channelRef.current.unsubscribe();
         channelRef.current = null;
       }

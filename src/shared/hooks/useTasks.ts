@@ -166,7 +166,6 @@ export const useListTasks = (params: ListTasksParams) => {
   return useQuery<Task[], Error>({
     queryKey: [TASKS_QUERY_KEY, projectId, status],
     queryFn: async () => {
-      console.log('[useListTasks] Query function executing for:', { projectId, status });
       if (!projectId) {
         return []; 
       }
@@ -187,12 +186,6 @@ export const useListTasks = (params: ListTasksParams) => {
 
       if (error) throw error;
       const tasks = (data || []).map(mapDbTaskToTask);
-      console.log('[useListTasks] Fetched tasks:', {
-        projectId,
-        status,
-        count: tasks.length,
-        taskIds: tasks.map(t => t.id),
-      });
       return tasks;
     },
     enabled: !!projectId, // Only run the query if projectId is available
@@ -476,11 +469,6 @@ export const useTaskStatusCounts = (projectId: string | null) => {
         recentSuccesses: successCount || 0,
         recentFailures: failureCount || 0,
       };
-      
-      console.log(`[${Date.now()}] [useTaskStatusCounts] Fetched counts:`, {
-        projectId,
-        ...result,
-      });
       
       return result;
     },
