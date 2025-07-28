@@ -209,15 +209,54 @@ const Timeline: React.FC<TimelineProps> = ({
   // Frame positions state
   const [framePositions, setFramePositions] = useState<Map<string, number>>(() => {
     const stored = localStorage.getItem(`timelineFramePositions_${shotId}`);
+    const initial = new Map<string, number>();
+    
     if (stored) {
       try {
-        return new Map(JSON.parse(stored));
+        const storedMap = new Map(JSON.parse(stored));
+        
+        // Handle temporary keys from recent drops
+        const tempKeys = [...storedMap.keys()].filter((key): key is string => 
+          typeof key === 'string' && key.startsWith('temp_')
+        );
+        tempKeys.forEach(tempKey => {
+          const generationId = tempKey.replace('temp_', '');
+          const matchingImage = images.find(img => img.id === generationId);
+          if (matchingImage) {
+            // Transfer the position from temp key to actual shotImageEntryId
+            const position = storedMap.get(tempKey);
+            if (typeof position === 'number') {
+              initial.set(matchingImage.shotImageEntryId, position);
+              console.log(`[Timeline Init] Converted temp position for ${generationId} to ${matchingImage.shotImageEntryId} at frame ${position}`);
+            }
+          } else {
+            // Keep temp key for now, image might not be loaded yet
+            const position = storedMap.get(tempKey);
+            if (typeof position === 'number') {
+              initial.set(tempKey, position);
+            }
+          }
+        });
+        
+        // Add regular stored positions
+        storedMap.forEach((position, key) => {
+          if (typeof key === 'string' && typeof position === 'number' && !key.startsWith('temp_')) {
+            initial.set(key, position);
+          }
+        });
+        
       } catch {
-        /* ignore */
+        /* ignore parsing errors */
       }
     }
-    const initial = new Map<string, number>();
-    images.forEach((img, idx) => initial.set(img.shotImageEntryId, idx * frameSpacing));
+    
+    // Set default positions for images that don't have positions yet
+    images.forEach((img, idx) => {
+      if (!initial.has(img.shotImageEntryId)) {
+        initial.set(img.shotImageEntryId, idx * frameSpacing);
+      }
+    });
+    
     return initial;
   });
 
@@ -236,14 +275,37 @@ const Timeline: React.FC<TimelineProps> = ({
   useEffect(() => {
     setFramePositions(prev => {
       const map = new Map(prev);
+      
+      // Handle temporary keys from dropped images
+      const tempKeys = [...map.keys()].filter(key => key.startsWith('temp_'));
+      tempKeys.forEach(tempKey => {
+        const generationId = tempKey.replace('temp_', '');
+        const matchingImage = images.find(img => img.id === generationId);
+        if (matchingImage) {
+          // Transfer the position from temp key to actual shotImageEntryId
+          const position = map.get(tempKey);
+          if (position !== undefined) {
+            map.set(matchingImage.shotImageEntryId, position);
+            map.delete(tempKey);
+            console.log(`[Timeline] Converted temp position for ${generationId} to ${matchingImage.shotImageEntryId} at frame ${position}`);
+          }
+        }
+      });
+      
+      // Set default positions for images that don't have positions yet
       images.forEach((img, idx) => {
         if (!map.has(img.shotImageEntryId)) {
           map.set(img.shotImageEntryId, idx * frameSpacing);
         }
       });
+      
+      // Clean up positions for images that no longer exist
       [...map.keys()].forEach(key => {
-        if (!images.some(img => img.shotImageEntryId === key)) map.delete(key);
+        if (!key.startsWith('temp_') && !images.some(img => img.shotImageEntryId === key)) {
+          map.delete(key);
+        }
       });
+      
       return map;
     });
   }, [images, frameSpacing]);

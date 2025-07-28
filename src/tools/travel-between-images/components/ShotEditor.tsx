@@ -789,37 +789,85 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     }
 
     try {
-      await handleExternalImageDropMutation.mutateAsync({
+      const result = await handleExternalImageDropMutation.mutateAsync({
         imageFiles: files,
         targetShotId: selectedShot.id,
         currentProjectQueryKey: selectedProjectId,
         currentShotCount: 0 // Not needed when adding to existing shot
       });
 
-      // If a target frame was specified, update the frame positions
-      if (targetFrame !== undefined && files.length > 0) {
-        // Wait a moment for the images to be added to the database and state to update
-        setTimeout(() => {
-          const updatedPositions = new Map(timelineFramePositions);
+      // If a target frame was specified and we got generation IDs back, update the frame positions
+      if (targetFrame !== undefined && result && result.generationIds && result.generationIds.length > 0) {
+        console.log(`[Timeline Drop] Target frame: ${targetFrame}, Generation IDs:`, result.generationIds);
+        
+        // Immediately set positions in localStorage using generation IDs
+        // This will persist even if the component state gets reset
+        const storedPositions = localStorage.getItem(`timelineFramePositions_${selectedShot.id}`);
+        const currentStoredPositions = storedPositions ? new Map(JSON.parse(storedPositions)) : new Map();
+        
+        // Pre-set positions for the generation IDs we expect
+        result.generationIds.forEach((generationId, index) => {
+          const framePosition = targetFrame + (index * batchVideoFrames);
+          // We'll use a temporary key format until we get the actual shotImageEntryId
+          currentStoredPositions.set(`temp_${generationId}`, framePosition);
+          console.log(`[Timeline Drop] Pre-setting position for generation ${generationId} to frame ${framePosition}`);
+        });
+        
+        localStorage.setItem(
+          `timelineFramePositions_${selectedShot.id}`, 
+          JSON.stringify(Array.from(currentStoredPositions.entries()))
+        );
+        
+        // Create a function to retry finding the images and update with actual shotImageEntryIds
+        const tryUpdateFramePositions = (retryCount = 0) => {
+          const currentImages = nonVideoImages;
+          console.log(`[Timeline Drop] Retry ${retryCount}, Current images count:`, currentImages.length);
           
-          // Get the most recently added images (assuming they are the last ones)
-          const allImages = nonVideoImages;
-          const newImages = allImages.slice(-files.length);
-          
-          // Set frame positions for new images starting at target frame
-          newImages.forEach((image, index) => {
-            const framePosition = targetFrame + (index * batchVideoFrames);
-            updatedPositions.set(image.shotImageEntryId, framePosition);
-          });
-          
-          setTimelineFramePositions(updatedPositions);
-          
-          // Save to localStorage
-          localStorage.setItem(
-            `timelineFramePositions_${selectedShot.id}`, 
-            JSON.stringify(Array.from(updatedPositions.entries()))
+          const newShotImageEntries = currentImages.filter(image => 
+            result.generationIds.includes(image.id)
           );
-        }, 500);
+          
+          console.log(`[Timeline Drop] Found ${newShotImageEntries.length} matching images out of ${result.generationIds.length} expected`);
+          
+          if (newShotImageEntries.length === result.generationIds.length) {
+            // Found all images, update their positions with actual shotImageEntryIds
+            const updatedPositions = new Map(timelineFramePositions);
+            
+            newShotImageEntries.forEach((image, index) => {
+              const framePosition = targetFrame + (index * batchVideoFrames);
+              updatedPositions.set(image.shotImageEntryId, framePosition);
+              // Remove the temporary key
+              updatedPositions.delete(`temp_${image.id}`);
+              console.log(`[Timeline Drop] Setting frame position for image ${image.shotImageEntryId} (gen: ${image.id}) to frame ${framePosition}`);
+            });
+            
+            setTimelineFramePositions(updatedPositions);
+            
+            // Update localStorage with actual shotImageEntryIds
+            const finalStoredPositions = new Map();
+            updatedPositions.forEach((position, key) => {
+              if (!key.startsWith('temp_')) {
+                finalStoredPositions.set(key, position);
+              }
+            });
+            
+            localStorage.setItem(
+              `timelineFramePositions_${selectedShot.id}`, 
+              JSON.stringify(Array.from(finalStoredPositions.entries()))
+            );
+            
+            console.log(`[Timeline Drop] Successfully set positions for ${newShotImageEntries.length} images`);
+          } else if (retryCount < 8) {
+            // Retry after a short delay
+            console.log(`[Timeline Drop] Retrying in 300ms (attempt ${retryCount + 1}/8)`);
+            setTimeout(() => tryUpdateFramePositions(retryCount + 1), 300);
+          } else {
+            console.warn(`[Timeline Drop] Failed to find all images after 8 retries. Found ${newShotImageEntries.length}/${result.generationIds.length}`);
+          }
+        };
+        
+        // Start trying to update positions
+        tryUpdateFramePositions();
       }
 
       const frameText = targetFrame !== undefined ? ` at frame ${targetFrame}` : '';
