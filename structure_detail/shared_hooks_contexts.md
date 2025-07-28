@@ -151,3 +151,33 @@ Located in `/ui/` - Full shadcn-ui component library including:
 [Back to Structure](../structure.md)
 
 </div> 
+
+#### Navigation & Routing
+
+| Hook | Purpose | Key Methods |
+|------|---------|-------------|
+| **useShotNavigation** | Universal shot navigation | `navigateToShot()`, `navigateToShotEditor()`, `navigateToNextShot()`, `navigateToPreviousShot()` |
+
+**useShotNavigation** provides consistent navigation to shots across all components:
+```typescript
+const { navigateToShot, navigateToShotEditor, navigateToNextShot, navigateToPreviousShot } = useShotNavigation();
+
+// Navigate to specific shot with options
+navigateToShot(shot, { 
+  scrollToTop: true, 
+  closeMobilePanes: true, 
+  replace: true 
+});
+
+// Navigate between shots in a list
+navigateToNextShot(shots, currentShot);
+```
+
+Features:
+- **Consistent URL patterns**: Uses `/tools/travel-between-images#${shotId}` with `fromShotClick: true` state
+- **Mobile support**: Automatically closes panes on mobile devices
+- **Scroll management**: Configurable scroll-to-top behavior with timing control
+- **History management**: Uses `replace: true` for Previous/Next to avoid history pollution
+- **State sync**: Handles `CurrentShotContext` updates and URL hash synchronization
+
+Used in: `VideoTravelToolPage`, `ShotGroup`, `ShotsPane`, and any component that navigates to shots. 

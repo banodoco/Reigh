@@ -182,10 +182,12 @@ const getDimensions = (url: string): Promise<{ width: number; height: number }> 
 };
 
 const isGenerationVideo = (gen: GenerationRow): boolean => {
-  return gen.type === 'video' ||
+  const result = gen.type === 'video' ||
          gen.type === 'video_travel_output' ||
          (gen.location && gen.location.endsWith('.mp4')) ||
          (gen.imageUrl && gen.imageUrl.endsWith('.mp4'));
+  
+  return result;
 };
 
 const ShotEditor: React.FC<ShotEditorProps> = ({
@@ -253,6 +255,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const [fileInputKey, setFileInputKey] = useState<number>(Date.now());
   const [deletingVideoId, setDeletingVideoId] = useState<string | null>(null);
   
+  // Flag to skip next prop sync after successful operations
+  const skipNextSyncRef = useRef(false);
+  
   // Timeline frame positions for task creation
   const [timelineFramePositions, setTimelineFramePositions] = useState<Map<string, number>>(new Map());
   
@@ -261,7 +266,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const [creatingTaskId, setCreatingTaskId] = useState<string | null>(null);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const queryClient = useQueryClient();
-  const skipNextSyncRef = useRef(false);
   const isMobile = useIsMobile();
   const { setIsGenerationsPaneLocked } = usePanes();
 
@@ -327,13 +331,13 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   
   // Shot name editing state
   const [isEditingName, setIsEditingName] = useState(false);
-  const [editingName, setEditingName] = useState(selectedShot?.name || '');
+  const [editingName, setEditingName] = useState(selectedShot.name);
 
   // Update editing name when selected shot changes
   useEffect(() => {
-    setEditingName(selectedShot?.name || '');
+    setEditingName(selectedShot.name);
     setIsEditingName(false);
-  }, [selectedShot?.id, selectedShot?.name]);
+  }, [selectedShot.id, selectedShot.name]);
 
   const handleNameClick = () => {
     if (onUpdateShotName) {
@@ -342,14 +346,14 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   };
 
   const handleNameSave = () => {
-    if (onUpdateShotName && editingName.trim() && editingName.trim() !== selectedShot?.name) {
+    if (onUpdateShotName && editingName.trim() && editingName.trim() !== selectedShot.name) {
       onUpdateShotName(editingName.trim());
     }
     setIsEditingName(false);
   };
 
   const handleNameCancel = () => {
-    setEditingName(selectedShot?.name || '');
+    setEditingName(selectedShot.name);
     setIsEditingName(false);
   };
 
@@ -364,35 +368,16 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // Use local state for optimistic updates on image list
   const [localOrderedShotImages, setLocalOrderedShotImages] = useState(orderedShotImages || []);
   
-  // Separate video outputs for display in the gallery
-  const videoOutputs = useMemo(() => {
-    const videos = localOrderedShotImages.filter(isGenerationVideo);
-    console.log('[ShotEditor] Video outputs:', {
-      totalImages: localOrderedShotImages.length,
-      videoCount: videos.length,
-      videos: videos.map(v => ({
-        id: v.id,
-        type: v.type,
-        position: (v as any).position,
-        location: v.location,
-        imageUrl: v.imageUrl
-      }))
-    });
-    return videos;
-  }, [localOrderedShotImages]);
-  
-  // Filter to only include positioned images (but still include videos)
+  // Filter out generations without position
   const filteredOrderedShotImages = useMemo(() => {
     const filtered = localOrderedShotImages.filter(img => {
       const hasPosition = (img as any).position !== null && (img as any).position !== undefined;
       const isVideo = isGenerationVideo(img);
-      return hasPosition || isVideo; // Show if positioned OR if it's a video
-    });
-    
-    console.log('[ShotEditor] Filtered images:', {
-      totalBeforeFilter: localOrderedShotImages.length,
-      totalAfterFilter: filtered.length,
-      videosIncluded: filtered.filter(isGenerationVideo).length
+      
+      // Include if it has a position OR if it's a video (videos can have null positions)
+      const shouldInclude = hasPosition || isVideo;
+      
+      return shouldInclude;
     });
     
     return filtered;
@@ -424,6 +409,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     return filteredOrderedShotImages.filter(g => !isGenerationVideo(g));
   }, [filteredOrderedShotImages]);
   
+  const videoOutputs = useMemo(() => {
+    return filteredOrderedShotImages.filter(g => isGenerationVideo(g));
+  }, [filteredOrderedShotImages]);
+
   useEffect(() => {
     const newPairConfigs = nonVideoImages.slice(0, -1).map((image, index) => {
       const nextImage = nonVideoImages[index + 1];
@@ -688,27 +677,33 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   };
 
   const handleReorderImagesInShot = (orderedShotGenerationIds: string[]) => {
+    
     if (!selectedShot || !selectedProjectId) {
       console.error('Cannot reorder images: No shot or project selected.');
       return;
     }
 
     // Optimistic update of local state
-    const imageMap = new Map(filteredOrderedShotImages.map(img => [img.shotImageEntryId, img]));
+    // Create a map of shotImageEntryId -> image for quick lookup
+    const imageMap = new Map(localOrderedShotImages.map(img => [img.shotImageEntryId, img]));
+    
+    // Reorder the images based on the new order
     const reorderedImages = orderedShotGenerationIds
       .map(id => imageMap.get(id))
       .filter((img): img is GenerationRow => !!img);
 
-    // Preserve existing video outputs so they don't disappear during re-order
-    const videoImages = filteredOrderedShotImages.filter(img => isGenerationVideo(img));
+    // Preserve existing video outputs and unpositioned images
+    const videoImages = localOrderedShotImages.filter(img => isGenerationVideo(img));
+    const unpositionedImages = localOrderedShotImages.filter(img => 
+      (img as any).position === null || (img as any).position === undefined
+    );
     
-    // Also preserve unpositioned generations
-    const unpositionedImages = localOrderedShotImages.filter(img => (img as any).position === null || (img as any).position === undefined);
-    
+    // Combine reordered positioned images with videos and unpositioned images
     const combinedImages = [...reorderedImages, ...videoImages, ...unpositionedImages];
+    
     setLocalOrderedShotImages(combinedImages);
 
-    // Include video images when sending the new order to the backend so their positions remain stable
+    // Send the new order to the backend (include video images to preserve their positions)
     const combinedIds = [...orderedShotGenerationIds, ...videoImages.map(v => v.shotImageEntryId)];
 
     updateShotImageOrderMutation.mutate({
@@ -716,21 +711,24 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       orderedShotGenerationIds: combinedIds,
       projectId: selectedProjectId,
     }, {
-      onError: () => {
+      onError: (error) => {
+        console.error('Failed to reorder images:', error);
         // Rollback on error
         setLocalOrderedShotImages(orderedShotImages);
+      },
+      onSuccess: () => {
+        // Skip the next prop sync to prevent overriding our reorder
+        skipNextSyncRef.current = true;
       }
     });
   };
 
   const handleImageSaved = async (imageId: string, newImageUrl: string, createNew?: boolean) => {
-    console.log(`[ShotEditor-HandleImageSaved] Starting image ${createNew ? 'creation' : 'update'} process:`, { imageId, newImageUrl, shotId: selectedShot.id, createNew });
     
     try {
       // If the new image is a temporary Blob URL (from in-browser edits), upload it to storage first
       let finalImageUrl = newImageUrl;
       if (newImageUrl.startsWith('blob:')) {
-        console.log('[ShotEditor-HandleImageSaved] Detected blob URL – uploading edited image to storage');
         try {
           const response = await fetch(newImageUrl);
           const blob = await response.blob();
@@ -744,7 +742,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
           // Release the local object URL – it is no longer needed
           URL.revokeObjectURL(newImageUrl);
-          console.log('[ShotEditor-HandleImageSaved] Upload complete. Public URL:', finalImageUrl);
         } catch (uploadErr) {
           console.error('[ShotEditor-HandleImageSaved] Failed to upload edited image:', uploadErr);
           toast.error('Failed to upload edited image.');
@@ -754,7 +751,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
       if (createNew) {
         // Create a new generation and add it to the shot
-        console.log('[ShotEditor-HandleImageSaved] Creating new generation for flipped image');
         
         // Get the original image to find its position
         const originalImage = filteredOrderedShotImages.find(img => img.id === imageId);
@@ -787,24 +783,17 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             project_id: selectedProjectId,
           });
         }
-
         // Force refresh the shot images in parent
         onShotImagesUpdate();
-
-        console.log('[ShotEditor-HandleImageSaved] New flipped image created and added to shot');
-        toast.success('Flipped image saved as new generation');
       } else {
         // Update the existing image
-        console.log(`[ShotEditor-HandleImageSaved] Updating database record for image:`, imageId);
+        
         await updateGenerationLocationMutation.mutateAsync({
           id: imageId,
           location: finalImageUrl,
         });
 
-        console.log(`[ShotEditor-HandleImageSaved] Database update successful for image:`, imageId);
-
         // Update local state with cache-busting for immediate UI update
-        console.log(`[ShotEditor-HandleImageSaved] Updating local state...`);
         const cacheBustedUrl = getDisplayUrl(finalImageUrl, true);
         setLocalOrderedShotImages(prevImages => {
           const updated = prevImages.map(img => 
@@ -812,17 +801,14 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
               ? { ...img, imageUrl: cacheBustedUrl, thumbUrl: cacheBustedUrl } 
               : img
           );
-          console.log(`[ShotEditor-HandleImageSaved] Local state updated. Found image to update:`, updated.some(img => img.id === imageId));
           return updated;
         });
       }
 
       // Invalidate relevant queries to ensure fresh data
-      console.log(`[ShotEditor-HandleImageSaved] Invalidating React Query cache...`);
       queryClient.invalidateQueries({ queryKey: ['shots', selectedProjectId] });
       queryClient.invalidateQueries({ queryKey: ['generations', selectedProjectId] });
 
-      console.log(`[ShotEditor-HandleImageSaved] Complete process finished successfully`);
     } catch (error) {
       console.error("[ShotEditor-HandleImageSaved] Unexpected error:", error);
       toast.error("Failed to save image.");

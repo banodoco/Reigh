@@ -16,6 +16,7 @@ import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 import PaneControlTab from '../PaneControlTab';
 import { Skeleton } from '@/shared/components/ui/skeleton';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
+import { useShotNavigation } from '@/shared/hooks/useShotNavigation';
 
 export const ShotsPane: React.FC = () => {
   const { selectedProjectId } = useProject();
@@ -27,31 +28,23 @@ export const ShotsPane: React.FC = () => {
 
   useRenderLogger('ShotsPane', { shotsCount: shots?.length, currentPage });
   
-  // Log raw shots data
-  console.log('[ShotsPane] Data from useListShots:', {
-    selectedProjectId,
-    isLoading,
-    error,
-    shotsCount: shots?.length,
-    shots: shots,
-    firstShot: shots?.[0]
-  });
-  
   // Filter shots to only include images with positions (similar to ShotEditor.tsx approach)
   const filteredShots = useMemo(() => {
-    if (!shots) return [];
+    if (!shots) {
+      return [];
+    }
     
-    const filtered = shots.map(shot => ({
-      ...shot,
-      images: (shot.images || []).filter(img => 
-        (img as any).position !== null && (img as any).position !== undefined
-      )
-    }));
-    
-    console.log('[ShotsPane] Filtered shots:', {
-      originalCount: shots.length,
-      filteredCount: filtered.length,
-      firstFilteredShot: filtered[0]
+    const filtered = shots.map(shot => {
+      const originalImageCount = shot.images?.length || 0;
+      const filteredImages = (shot.images || []).filter(img => {
+        const hasPosition = (img as any).position !== null && (img as any).position !== undefined;
+        return hasPosition;
+      });
+      
+      return {
+        ...shot,
+        images: filteredImages
+      };
     });
     
     return filtered;
@@ -70,6 +63,7 @@ export const ShotsPane: React.FC = () => {
   const navigate = useNavigate();
   const { setCurrentShotId } = useCurrentShot();
   const isMobile = useIsMobile();
+  const { navigateToShotEditor } = useShotNavigation();
 
   const {
     isGenerationsPaneLocked,
@@ -83,14 +77,6 @@ export const ShotsPane: React.FC = () => {
     side: 'left',
     isLocked: isShotsPaneLocked,
     onToggleLock: () => setIsShotsPaneLocked(!isShotsPaneLocked),
-  });
-  
-  console.log('[ShotsPane] Pane state:', {
-    isShotsPaneLocked,
-    isLocked,
-    isOpen,
-    transformClass,
-    shotsPaneWidth
   });
 
   const handleCreateShot = async (shotName: string, files: File[]) => {
@@ -146,12 +132,7 @@ export const ShotsPane: React.FC = () => {
         thirdButton={{
           onClick: () => {
             setIsShotsPaneLocked(false); // Unlock and close the pane immediately
-            setCurrentShotId(null);
-            navigate('/tools/travel-between-images'); // Then navigate to travel between images
-
-            if (isMobile) {
-              window.dispatchEvent(new CustomEvent('mobilePaneOpen', { detail: { side: null } }));
-            }
+            navigateToShotEditor({ closeMobilePanes: true });
           },
           ariaLabel: "Open Travel Between Images tool"
         }}
@@ -176,10 +157,6 @@ export const ShotsPane: React.FC = () => {
         >
           <div className="p-2 border-b border-zinc-800 flex items-center justify-between flex-shrink-0">
             <h2 className="text-xl font-semibold text-zinc-200 ml-2">Shots</h2>
-            {/* DEBUG: Visible indicator */}
-            <div style={{ background: 'green', color: 'white', padding: '5px', fontSize: '12px' }}>
-              Pane Open: {isOpen ? 'YES' : 'NO'}
-            </div>
             <div className="flex items-center">
               <Button 
                 variant="ghost" 
@@ -187,12 +164,7 @@ export const ShotsPane: React.FC = () => {
                 className="text-zinc-400 hover:text-zinc-100 hover:bg-zinc-700/50 active:bg-zinc-600/60"
                 onClick={() => {
                   toggleLock(false);
-                  setCurrentShotId(null);
-                  navigate('/tools/travel-between-images');
-
-                  if (isMobile) {
-                    window.dispatchEvent(new CustomEvent('mobilePaneOpen', { detail: { side: null } }));
-                  }
+                  navigateToShotEditor({ closeMobilePanes: true });
                 }}
               >
                 See All
@@ -208,17 +180,9 @@ export const ShotsPane: React.FC = () => {
               ))
             )}
             {error && <p className="text-red-500">Error loading shots: {error.message}</p>}
-            {(() => {
-              const paginated = filteredShots?.slice((currentPage - 1) * pageSize, currentPage * pageSize) || [];
-              console.log('[ShotsPane] Rendering shots:', {
-                filteredShotsCount: filteredShots?.length,
-                currentPage,
-                pageSize,
-                paginatedCount: paginated.length,
-                firstPaginatedShot: paginated[0]
-              });
-              return paginated.map(shot => <ShotGroup key={shot.id} shot={shot} />);
-            })()}
+            {filteredShots && filteredShots
+              .slice((currentPage - 1) * pageSize, currentPage * pageSize)
+              .map(shot => <ShotGroup key={shot.id} shot={shot} />)}
           </div>
           {/* Pagination Controls */}
           {filteredShots && filteredShots.length > pageSize && (

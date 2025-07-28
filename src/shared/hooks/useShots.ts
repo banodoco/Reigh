@@ -212,79 +212,98 @@ export const useDuplicateShot = () => {
 };
 
 // List all shots for a specific project (without loading all generations)
-export const useListShots = (
-  projectId: string | null
-): UseQueryResult<Shot[]> => {
+export const useListShots = (projectId?: string | null) => {
   return useQuery({
     queryKey: ['shots', projectId],
-    enabled: !!projectId,
     queryFn: async () => {
-      console.log('[useListShots] Starting query for projectId:', projectId);
-      
-      // First try with shot_statistics view for better performance
-      try {
-        const { data: shotsWithStats, error: statsError } = await supabase
-          .from('shots')
-          .select(`
-            *,
-            shot_statistics(
-              total_generations,
-              positioned_count,
-              unpositioned_count,
-              video_count
-            )
-          `)
-          .eq('project_id', projectId!)
-          .order('created_at', { ascending: false });
-
-        console.log('[useListShots] Stats query result:', { 
-          error: statsError, 
-          dataCount: shotsWithStats?.length,
-          firstShot: shotsWithStats?.[0]
-        });
-
-        if (!statsError && shotsWithStats) {
-          const mapped = shotsWithStats.map(shot => ({
-            ...shot,
-            images: [], // Images loaded on demand per shot
-            stats: (shot.shot_statistics as any)?.[0] || undefined,
-          }));
-          console.log('[useListShots] Returning shots with stats:', mapped.length, 'shots');
-          return mapped;
-        }
-      } catch (e) {
-        // View might not exist, fall through to basic query
-        console.log('[useListShots] Shot statistics view not available, error:', e);
+      if (!projectId) {
+        return [];
       }
-
-      // Fallback: Basic query without statistics
-      console.log('[useListShots] Using fallback basic query');
-      const { data: shots, error } = await supabase
+        
+      // Just get shots simple query
+      const { data: shots, error: shotsError } = await supabase
         .from('shots')
         .select('*')
-        .eq('project_id', projectId!)
+        .eq('project_id', projectId)
         .order('created_at', { ascending: false });
-
-      console.log('[useListShots] Basic query result:', { 
-        error, 
-        dataCount: shots?.length,
-        firstShot: shots?.[0]
-      });
-
-      if (error) {
-        console.error('[useListShots] Query error:', error);
-        throw error;
-      }
-
-      const result = (shots || []).map(shot => ({
-        ...shot,
-        images: [], // Images loaded on demand per shot
-      }));
       
-      console.log('[useListShots] Returning basic shots:', result.length, 'shots');
+      if (shotsError) {
+        throw shotsError;
+      }
+      
+      if (!shots || shots.length === 0) {
+        return [];
+      }
+      
+      // Get all shot IDs for batch fetching generations
+      const shotIds = shots.map(shot => shot.id);
+      
+      // Fetch shot_generations in batches to handle large datasets
+      let allShotGenerations: any[] = [];
+      const BATCH_SIZE = 1000;
+      let hasMore = true;
+      let offset = 0;
+      
+      while (hasMore) {
+        const { data: shotGenerationsBatch, error: sgError } = await supabase
+          .from('shot_generations')
+          .select(`*, generation:generations(*)`)
+          .in('shot_id', shotIds)
+          .range(offset, offset + BATCH_SIZE - 1);
+        
+        if (sgError) {
+          throw sgError;
+        }
+        
+        const batchSize = shotGenerationsBatch?.length || 0;
+        
+        if (shotGenerationsBatch) {
+          allShotGenerations = allShotGenerations.concat(shotGenerationsBatch);
+        }
+        
+        // Check if we got a full batch (if not, we've reached the end)
+        hasMore = batchSize === BATCH_SIZE;
+        offset += BATCH_SIZE;
+      }
+      
+      // Sort by generation creation date (newest first)
+      allShotGenerations.sort((a, b) => {
+        const aTime = a.generation?.created_at ? new Date(a.generation.created_at).getTime() : 0;
+        const bTime = b.generation?.created_at ? new Date(b.generation.created_at).getTime() : 0;
+        return bTime - aTime; // Newest first
+      });
+      
+      // Group by shot ID
+      const shotGenerationsMap = new Map<string, any[]>();
+      for (const sg of allShotGenerations) {
+        if (!shotGenerationsMap.has(sg.shot_id)) {
+          shotGenerationsMap.set(sg.shot_id, []);
+        }
+        shotGenerationsMap.get(sg.shot_id)!.push(sg);
+      }
+      
+      // Transform shots to include their generations
+      const result = shots.map(shot => {
+        const shotGenerations = shotGenerationsMap.get(shot.id) || [];
+        
+        const transformedImages = shotGenerations.map(sg => ({
+          ...sg.generation,
+          shotImageEntryId: sg.id,
+          position: sg.position,
+          // Ensure imageUrl is set from location for display purposes
+          imageUrl: sg.generation.imageUrl || sg.generation.location,
+          thumbUrl: sg.generation.thumbUrl || sg.generation.location,
+        }));
+        
+        return {
+          ...shot,
+          images: transformedImages,
+        };
+      });
+      
       return result;
     },
-    staleTime: 30 * 1000, // 30 seconds
+    enabled: !!projectId,
   });
 };
 
@@ -576,12 +595,9 @@ export const useDuplicateImageInShot = () => {
         toast.error('Failed to duplicate image');
       }
     },
-    onSuccess: (_, { project_id, silent }) => {
+    onSuccess: (_, { project_id }) => {
       // Invalidate to get fresh data
       queryClient.invalidateQueries({ queryKey: ['shots', project_id] });
-      if (!silent) {
-        toast.success('Image duplicated successfully');
-      }
     }
   });
 };

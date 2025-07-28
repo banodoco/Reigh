@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef, Suspense, useMemo, useLayoutEffect 
 import { useNavigate, useLocation } from 'react-router-dom';
 import { SteerableMotionSettings } from '../components/ShotEditor';
 import { useListShots, useCreateShot, useHandleExternalImageDrop, useUpdateShotName } from '@/shared/hooks/useShots';
-import { useAllShotGenerations } from '@/shared/hooks/useShotGenerations';
 import { Shot } from '@/types/shots';
 import { Button } from '@/shared/components/ui/button';
 import { useProject } from "@/shared/contexts/ProjectContext";
@@ -24,6 +23,7 @@ import { useToolPageHeader } from '@/shared/contexts/ToolPageHeaderContext';
 import { useContentResponsive, useContentResponsiveColumns } from '@/shared/hooks/useContentResponsive';
 import { timeEnd } from '@/shared/lib/logger';
 import { useQueuedFeedback } from '@/shared/hooks/useQueuedFeedback';
+import { useShotNavigation } from '@/shared/hooks/useShotNavigation';
 // import { useLastAffectedShot } from '@/shared/hooks/useLastAffectedShot';
 import ShotEditor from '../components/ShotEditor';
 
@@ -31,9 +31,6 @@ import ShotEditor from '../components/ShotEditor';
 const useVideoTravelData = (selectedProjectId: string | null, selectedShotId?: string) => {
   // Fetch shots data
   const shotsQuery = useListShots(selectedProjectId);
-  
-  // Fetch generations for selected shot
-  const shotGenerationsQuery = useAllShotGenerations(selectedShotId || null);
   
   // Fetch public LoRAs data
   const publicLorasQuery = useListPublicResources('lora');
@@ -50,10 +47,6 @@ const useVideoTravelData = (selectedProjectId: string | null, selectedShotId?: s
     shotsLoading: shotsQuery.isLoading,
     shotsError: shotsQuery.error,
     refetchShots: shotsQuery.refetch,
-    
-    // Shot generations
-    shotGenerations: shotGenerationsQuery.data,
-    shotGenerationsLoading: shotGenerationsQuery.isLoading,
     
     // LoRAs data
     availableLoras: (publicLorasQuery.data?.map(resource => resource.metadata) || []) as LoraModel[],
@@ -76,7 +69,6 @@ const VideoTravelToolPage: React.FC = () => {
   const { selectedProjectId } = useProject();
   const [selectedShot, setSelectedShot] = useState<Shot | null>(null);
   const { currentShotId, setCurrentShotId } = useCurrentShot();
-  // URL hash sync effects will be added below once shots/isLoading are declared.
   
   // Add video generation success feedback
   const { justQueued, triggerQueued } = useQueuedFeedback();
@@ -84,11 +76,9 @@ const VideoTravelToolPage: React.FC = () => {
   // Use parallelized data fetching for better performance
   const {
     shots,
-    shotsLoading,
-    shotsError,
+    shotsLoading: isLoading,
+    shotsError: error,
     refetchShots,
-    shotGenerations,
-    shotGenerationsLoading,
     availableLoras,
     lorasLoading,
     settings,
@@ -97,22 +87,6 @@ const VideoTravelToolPage: React.FC = () => {
     settingsUpdating: isUpdating
   } = useVideoTravelData(selectedProjectId, selectedShot?.id);
   
-  const isLoading = shotsLoading;
-  const error = shotsError;
-  
-  // Log the shots data
-  console.log('[VideoTravelToolPage] Data state:', {
-    selectedProjectId,
-    shotsLoading,
-    shotsError,
-    shotsCount: shots?.length,
-    shots,
-    shotGenerations,
-    shotGenerationsLoading,
-    selectedShot,
-    shotToEdit: selectedShot || (viaShotClick && currentShotId ? shots?.find(s => s.id === currentShotId) : null)
-  });
-
   const createShotMutation = useCreateShot();
   const handleExternalImageDropMutation = useHandleExternalImageDrop();
   const updateShotNameMutation = useUpdateShotName();
@@ -122,6 +96,9 @@ const VideoTravelToolPage: React.FC = () => {
   const [isLoraModalOpen, setIsLoraModalOpen] = useState(false);
   const [selectedLoras, setSelectedLoras] = useState<ActiveLora[]>([]);
   const { setHeader, clearHeader } = useToolPageHeader();
+  
+  // Use the shot navigation hook
+  const { navigateToPreviousShot, navigateToNextShot, navigateToShot } = useShotNavigation();
 
   // Content-responsive breakpoints for dynamic layout
   const { isSm, isLg } = useContentResponsive();
@@ -133,13 +110,6 @@ const VideoTravelToolPage: React.FC = () => {
 
   // Add ref for main container to enable scroll-to-top functionality
   const mainContainerRef = useRef<HTMLDivElement>(null);
-
-  // Function to smoothly scroll the window all the way to the very top.
-  // Using window.scrollTo guarantees we align with the absolute top of the page,
-  // eliminating the slight offset seen with scrollIntoView.
-  const scrollToTop = () => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
 
   // Data fetching is now handled by the useVideoTravelData hook above
   
@@ -162,24 +132,31 @@ const VideoTravelToolPage: React.FC = () => {
   const shouldShowShotEditor = useMemo(() => {
     // Check if we have a hash in the URL (direct navigation to a shot)
     const hashShotId = location.hash?.replace('#', '');
-    if (hashShotId && !isLoadingSettings) {
+    
+    if (hashShotId && !isLoading) {
       return true; // Show editor immediately if we have a hash
     }
     
     // Only show editor if we actually have a shot to edit
     const shotExists = selectedShot || (viaShotClick && currentShotId && shots?.find(s => s.id === currentShotId));
-    return !!shotExists;
-  }, [selectedShot, viaShotClick, currentShotId, shots, location.hash, isLoadingSettings]);
+    
+    const result = !!shotExists;
+    return result;
+  }, [selectedShot, viaShotClick, currentShotId, shots, location.hash, isLoading]);
   
   const shotToEdit = useMemo(() => {
     // Check if we have a hash in the URL
     const hashShotId = location.hash?.replace('#', '');
+    
     if (hashShotId && shots) {
       const hashShot = shots.find(s => s.id === hashShotId);
-      if (hashShot) return hashShot;
+      if (hashShot) {
+        return hashShot;
+      }
     }
     
-    return selectedShot || (viaShotClick && currentShotId ? shots?.find(s => s.id === currentShotId) : null);
+    const fallbackShot = selectedShot || (viaShotClick && currentShotId ? shots?.find(s => s.id === currentShotId) : null);
+    return fallbackShot;
   }, [selectedShot, viaShotClick, currentShotId, shots, location.hash]);
   
   // Calculate navigation state with memoization
@@ -195,7 +172,10 @@ const VideoTravelToolPage: React.FC = () => {
   // URL Hash Synchronization (Combined Init + Sync)
   // ------------------------------------------------------------------
   useEffect(() => {
-    if (isLoadingSettings || !shots) return;
+    
+    if (isLoading || !shots) {
+      return;
+    }
 
     const hashShotId = location.hash?.replace('#', '');
 
@@ -221,7 +201,7 @@ const VideoTravelToolPage: React.FC = () => {
     } else if (location.hash) {
       window.history.replaceState(null, '', basePath);
     }
-  }, [isLoadingSettings, shots, selectedShot, location.pathname, location.search, location.hash]);
+  }, [isLoading, shots, selectedShot, location.pathname, location.search, location.hash]);
   
   const [steerableMotionSettings, setSteerableMotionSettings] = useState<SteerableMotionSettings>({
     negative_prompt: '',
@@ -275,10 +255,9 @@ const VideoTravelToolPage: React.FC = () => {
     } else {
       // Show header when in shot list view
       const headerContent = (
-        <div className="mb-8 flex items-center justify-between">
-          <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-            Travel Between Images
-          </h1>
+        <div className="flex items-center justify-between">
+          <ToolPageHeader title="Travel Between Images" />
+          {/* Only show header button when there are shots */}
           {(!isLoading && shots && shots.length > 0) && (
             <Button onClick={() => setIsCreateShotModalOpen(true)}>New Shot</Button>
           )}
@@ -363,12 +342,12 @@ const VideoTravelToolPage: React.FC = () => {
           setCurrentShotId(null);
         }
       }
-    } else if (!isLoadingSettings && selectedShot) {
+    } else if (!isLoading && selectedShot) {
       setSelectedShot(null);
       setVideoPairConfigs([]);
       setCurrentShotId(null);
     }
-  }, [shots, selectedShot, selectedProjectId, isLoadingSettings, setCurrentShotId]);
+  }, [shots, selectedShot, selectedProjectId, isLoading, setCurrentShotId]);
 
   // Memoize video pair configs calculation
   const computedVideoPairConfigs = useMemo(() => {
@@ -458,10 +437,7 @@ const VideoTravelToolPage: React.FC = () => {
   }, [viaShotClick, currentShotId, shots, selectedShot]);
 
   const handleShotSelect = (shot: Shot) => {
-    setSelectedShot(shot);
-    setCurrentShotId(shot.id);
-    // Scroll to top when selecting a shot
-    scrollToTop();
+    navigateToShot(shot);
   };
 
   // Deselect the current shot if the global currentShotId is cleared elsewhere (e.g., "See All")
@@ -485,26 +461,14 @@ const VideoTravelToolPage: React.FC = () => {
 
   // Navigation handlers
   const handlePreviousShot = () => {
-    if (!shots || !selectedShot) return;
-    const currentIndex = shots.findIndex(shot => shot.id === selectedShot.id);
-    if (currentIndex > 0) {
-      const previousShot = shots[currentIndex - 1];
-      setSelectedShot(previousShot);
-      setCurrentShotId(previousShot.id);
-      // Scroll to the very top of the page
-      scrollToTop();
+    if (shots && selectedShot) {
+      navigateToPreviousShot(shots, selectedShot);
     }
   };
 
   const handleNextShot = () => {
-    if (!shots || !selectedShot) return;
-    const currentIndex = shots.findIndex(shot => shot.id === selectedShot.id);
-    if (currentIndex < shots.length - 1) {
-      const nextShot = shots[currentIndex + 1];
-      setSelectedShot(nextShot);
-      setCurrentShotId(nextShot.id);
-      // Scroll to the very top of the page
-      scrollToTop();
+    if (shots && selectedShot) {
+      navigateToNextShot(shots, selectedShot);
     }
   };
 
@@ -673,7 +637,6 @@ const VideoTravelToolPage: React.FC = () => {
 
   const handleAddLora = (loraToAdd: LoraModel) => {
     if (selectedLoras.find(sl => sl.id === loraToAdd["Model ID"])) {
-      console.log(`LoRA already added.`);
       return;
     }
     if (loraToAdd["Model Files"] && loraToAdd["Model Files"].length > 0) {
@@ -728,7 +691,7 @@ const VideoTravelToolPage: React.FC = () => {
   }
 
   // Show consistent skeleton for both project loading and shots loading
-  if (isLoadingSettings) {
+  if (isLoading) {
     return (
       <div 
         className="grid gap-4"
@@ -779,7 +742,7 @@ const VideoTravelToolPage: React.FC = () => {
               batchVideoPrompt={isLoadingSettings ? '' : batchVideoPrompt}
               batchVideoFrames={isLoadingSettings ? 60 : batchVideoFrames}
               batchVideoContext={isLoadingSettings ? 10 : batchVideoContext}
-              orderedShotImages={shotGenerations || []}
+              orderedShotImages={shotToEdit?.images || []}
               onShotImagesUpdate={handleShotImagesUpdate}
               onBack={handleBackToShotList}
               onVideoControlModeChange={isLoadingSettings ? () => {} : (mode) => {

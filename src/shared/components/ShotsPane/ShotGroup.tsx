@@ -1,35 +1,23 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useDroppable } from '@dnd-kit/core';
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { Shot } from '@/types/shots';
 import type { GenerationRow } from '@/types/shots';
-import { useUpdateShotName, useHandleExternalImageDrop } from '@/shared/hooks/useShots';
+import { useUpdateShotName, useHandleExternalImageDrop, useDeleteShot } from '@/shared/hooks/useShots';
 import { useToast } from '@/shared/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 import { getDisplayUrl } from '@/shared/lib/utils';
-import { ChevronsDown, ChevronsUp } from 'lucide-react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
+import { useShotNavigation } from '@/shared/hooks/useShotNavigation';
 
 interface ShotGroupProps {
   shot: Shot;
 }
 
 const ShotGroup: React.FC<ShotGroupProps> = ({ shot }) => {
-  const navigate = useNavigate();
-  const { currentShotId, setCurrentShotId } = useCurrentShot();
-  const updateShotNameMutation = useUpdateShotName();
-  const [currentName, setCurrentName] = useState(shot.name || 'Unnamed Shot');
-  const [isEditing, setIsEditing] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const isMobile = useIsMobile();
-  
-  console.log('[ShotGroup] Rendering shot:', {
-    shotId: shot.id,
-    shotName: shot.name,
-    imagesCount: shot.images?.length,
-    firstImage: shot.images?.[0]
-  });
-
   const { isOver: isDndKitOver, setNodeRef } = useDroppable({
     id: shot.id,
     data: {
@@ -38,10 +26,18 @@ const ShotGroup: React.FC<ShotGroupProps> = ({ shot }) => {
     }
   });
 
-  const [isFileOver, setIsFileOver] = useState(false);
-
-  const handleExternalImageDropMutation = useHandleExternalImageDrop();
+  const navigate = useNavigate();
+  const { setCurrentShotId } = useCurrentShot();
+  const { navigateToShot } = useShotNavigation();
   const { toast } = useToast();
+  const handleExternalImageDropMutation = useHandleExternalImageDrop();
+  const updateShotNameMutation = useUpdateShotName();
+  const isMobile = useIsMobile();
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [currentName, setCurrentName] = useState(shot.name || 'Unnamed Shot');
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [isFileOver, setIsFileOver] = useState(false);
 
   const isGenerationVideo = (gen: GenerationRow): boolean => {
     return gen.type === 'video' ||
@@ -198,18 +194,7 @@ const ShotGroup: React.FC<ShotGroupProps> = ({ shot }) => {
     if (isEditing || (e.target as HTMLElement).closest('input, button, a')) {
       return;
     }
-    setCurrentShotId(shot.id);
-    navigate(`/tools/travel-between-images#${shot.id}`, { state: { fromShotClick: true } });
-
-    // Scroll to top when navigating to a shot
-    setTimeout(() => {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }, 100); // Small delay to ensure navigation has completed
-
-    // On mobile, close any open pane after selecting a shot
-    if (isMobile) {
-      window.dispatchEvent(new CustomEvent('mobilePaneOpen', { detail: { side: null } }));
-    }
+    navigateToShot(shot);
   };
 
   return (
@@ -286,12 +271,11 @@ const ShotGroup: React.FC<ShotGroupProps> = ({ shot }) => {
                   setIsExpanded(true);
                 }}
               >
-                <ChevronsDown className="h-3 w-3" />
-                {allImages.length - IMAGES_PER_ROW} more
+                Show All <ChevronDown className="w-3 h-3" />
               </button>
             )}
 
-            {hasMultipleRows && isExpanded && (
+            {isExpanded && (
               <button
                 className="absolute bottom-1 right-1 text-xs bg-black/60 hover:bg-black/80 text-white px-2 py-0.5 rounded flex items-center gap-1"
                 onClick={(e) => {
@@ -299,14 +283,13 @@ const ShotGroup: React.FC<ShotGroupProps> = ({ shot }) => {
                   setIsExpanded(false);
                 }}
               >
-                <ChevronsUp className="h-3 w-3" />
-                Show less
+                Hide <ChevronUp className="w-3 h-3" />
               </button>
             )}
           </>
         ) : (
-          <div className="flex items-center justify-center h-full p-4">
-            <p className="text-xs text-zinc-500 italic">No images yet</p>
+          <div className="flex items-center justify-center h-full text-xs text-zinc-500">
+            Drop images here
           </div>
         )}
       </div>

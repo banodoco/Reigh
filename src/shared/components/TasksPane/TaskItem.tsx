@@ -175,11 +175,26 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
         .select('*')
         .eq('location', task.outputLocation)
         .eq('project_id', task.projectId)
-        .single();
+        .maybeSingle();
       
       if (error) {
-        console.error('Error fetching generation for task:', error);
+        console.error('[TaskFetchGeneration] Error fetching generation for task:', {
+          taskId: task.id,
+          taskType: task.taskType,
+          outputLocation: task.outputLocation,
+          projectId: task.projectId,
+          error
+        });
         return null;
+      }
+      
+      if (!data) {
+        console.warn('[TaskFetchGeneration] No generation found for completed task:', {
+          taskId: task.id,
+          taskType: task.taskType,
+          outputLocation: task.outputLocation,
+          projectId: task.projectId
+        });
       }
       
       return data;

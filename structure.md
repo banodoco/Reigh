@@ -272,4 +272,4 @@ See [README.md](README.md) for:
 
 [Back to Top](#-reigh-developer-onboarding) • [Add a Tool](structure_detail/adding_new_tool.md) • [Database & Storage](structure_detail/db_and_storage.md) • [Persistence](structure_detail/data_persistence.md)
 
-</div>
+  </div>

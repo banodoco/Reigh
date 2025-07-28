@@ -59,7 +59,9 @@ export const dataURLtoFile = (dataUrl: string, filename: string, fileType?: stri
  * @returns A full, usable URL for display in img/video src tags.
  */
 export const getDisplayUrl = (relativePath: string | undefined | null, forceRefresh: boolean = false): string => {
-  if (!relativePath) return '/placeholder.svg';
+  if (!relativePath) {
+    return '/placeholder.svg';
+  }
 
   // Already a full or special URL – return unchanged (but add cache-busting if requested)
   if (/^(https?:|blob:|data:)/.test(relativePath)) {

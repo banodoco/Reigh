@@ -151,6 +151,52 @@ graph TD
 
 ---
 
+## Implementation Details
+
+### Navigation & State Management
+
+The Video Travel tool uses a universal navigation pattern via `useShotNavigation()`:
+
+```typescript
+const { navigateToShot, navigateToNextShot, navigateToPreviousShot } = useShotNavigation();
+
+// Previous/Next buttons in ShotEditor
+const handleNextShot = () => {
+  if (shots && selectedShot) {
+    navigateToNextShot(shots, selectedShot);
+  }
+};
+```
+
+**URL Hash Synchronization**: The tool maintains shot selection via URL hash (`#shotId`) with automatic synchronization between:
+- URL changes (browser back/forward, direct links)
+- Programmatic navigation (Previous/Next buttons)
+- Shot selection from other components (ShotsPane, ShotGroup)
+
+### Scalability Optimizations
+
+**Client-Side Batch Fetching**: Handles projects with 1000+ generations by fetching `shot_generations` in batches:
+```typescript
+// useListShots implements batching for large datasets
+const BATCH_SIZE = 1000;
+while (hasMore) {
+  const batch = await supabase
+    .from('shot_generations')
+    .select('*, generation:generations(*)')
+    .range(offset, offset + BATCH_SIZE - 1);
+  // Concatenate and continue...
+}
+```
+
+**Database Optimizations**:
+- `count_unpositioned_generations()` SQL function for efficient counts
+- Performance indexes on `shot_id`, `position`, and `created_at`
+- Client-side sorting instead of database ordering for flexibility
+
+**Optimistic Updates**: ShotEditor uses optimistic state updates with conflict resolution to prevent UI flickering during reordering and editing operations.
+
+---
+
 <div align="center">
 
 **🔗 Related Documentation**

@@ -48,17 +48,6 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   onApplySettingsFromTask,
   onImageSaved,
 }) => {
-  console.log('[VideoOutputsGallery] Props received:', {
-    videoOutputsCount: videoOutputs.length,
-    videoOutputs: videoOutputs.map(v => ({
-      id: v.id,
-      type: v.type,
-      location: v.location,
-      imageUrl: v.imageUrl,
-      tasks: (v as any).tasks
-    })),
-    firstVideo: videoOutputs[0]
-  });
   const [currentPage, setCurrentPage] = useState(1);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [selectedVideoForDetails, setSelectedVideoForDetails] = useState<GenerationRow | null>(null);
@@ -112,11 +101,6 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
 
   return (
     <Card className="p-4 sm:p-6">
-      {/* DEBUG: Visible indicator */}
-      <div style={{ background: 'red', color: 'white', padding: '10px', marginBottom: '10px' }}>
-        VideoOutputsGallery is rendering! Videos: {sortedVideoOutputs.length}
-      </div>
-      
       <div className="flex flex-col space-y-2 sm:space-y-3">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <h3 className="text-base sm:text-lg font-semibold">Output Videos ({sortedVideoOutputs.length})</h3>
@@ -134,20 +118,11 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
         <div className="flex flex-wrap -mx-1 sm:-mx-1.5 md:-mx-2">
           {currentVideoOutputs.map((video, index) => {
             const originalIndex = startIndex + index;
-            const videoUrl = getDisplayUrl(video.location || video.imageUrl);
-            console.log('[VideoOutputsGallery] Rendering video item:', {
-              id: video.id,
-              url: videoUrl,
-              thumbUrl: video.thumbUrl,
-              type: video.type,
-              location: video.location,
-              imageUrl: video.imageUrl
-            });
             return (
               <div key={video.id} className="w-1/2 lg:w-1/3 px-1 sm:px-1.5 md:px-2 mb-2 sm:mb-3 md:mb-4 relative group">
                 <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden shadow-sm border">
                   <HoverScrubVideo
-                    src={videoUrl}
+                    src={getDisplayUrl(video.location || video.imageUrl)}
                     poster={video.thumbUrl}
                     className="w-full h-full object-cover cursor-pointer"
                     onDoubleClick={() => {
@@ -226,7 +201,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
             onClose={() => setLightboxIndex(null)}
             onNext={handleNext}
             onPrevious={handlePrevious}
-            onImageSaved={onImageSaved ? async (newImageUrl: string) => { onImageSaved(newImageUrl); } : undefined}
+            onImageSaved={onImageSaved}
             showNavigation={true}
             showImageEditTools={false}
             showDownload={true}

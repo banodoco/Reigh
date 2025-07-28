@@ -188,6 +188,102 @@ export function MyTool() {
 
 ---
 
+## 7. Scalable Data Architecture Patterns
+
+### Client-Side Batch Fetching
+
+For components that need to handle large datasets (1000+ records), Reigh implements client-side batch fetching to overcome database query limits:
+
+```typescript
+// Example: useListShots with batch fetching for shot_generations
+let allShotGenerations: any[] = [];
+const BATCH_SIZE = 1000;
+let hasMore = true;
+let offset = 0;
+
+while (hasMore) {
+  const { data: batch } = await supabase
+    .from('shot_generations')
+    .select('*, generation:generations(*)')
+    .in('shot_id', shotIds)
+    .range(offset, offset + BATCH_SIZE - 1);
+  
+  if (batch) allShotGenerations = allShotGenerations.concat(batch);
+  hasMore = batch?.length === BATCH_SIZE;
+  offset += BATCH_SIZE;
+}
+```
+
+### Database-Side Optimizations
+
+For performance-critical operations, computation is offloaded to the database:
+
+#### SQL Functions for Aggregations
+```sql
+-- Example: count_unpositioned_generations
+CREATE OR REPLACE FUNCTION count_unpositioned_generations(shot_id_param UUID)
+RETURNS INTEGER AS $$
+BEGIN
+  RETURN (
+    SELECT COUNT(*)::INTEGER
+    FROM shot_generations sg
+    WHERE sg.shot_id = shot_id_param 
+    AND sg.position IS NULL
+  );
+END;
+$$ LANGUAGE plpgsql;
+```
+
+#### Views for Complex Queries
+```sql
+-- Example: shot_statistics view
+CREATE VIEW shot_statistics AS
+SELECT 
+  s.id as shot_id,
+  COUNT(sg.id)::INTEGER as total_generations,
+  COUNT(sg.position)::INTEGER as positioned_count,
+  -- More aggregated statistics...
+FROM shots s
+LEFT JOIN shot_generations sg ON s.id = sg.shot_id
+GROUP BY s.id;
+```
+
+### Performance Indexes
+
+Critical indexes for high-performance queries:
+```sql
+-- Optimize shot generation queries
+CREATE INDEX idx_shot_generations_shot_id_position 
+ON shot_generations(shot_id, position);
+
+CREATE INDEX idx_shot_generations_shot_id_created_at 
+ON shot_generations(shot_id, created_at DESC);
+```
+
+### Optimistic Updates with Conflict Resolution
+
+Components use optimistic updates with proper rollback mechanisms:
+
+```typescript
+// Optimistic update
+setLocalState(newState);
+
+// Backend mutation with rollback on error
+mutation.mutate(data, {
+  onError: () => {
+    setLocalState(originalState); // Rollback
+  },
+  onSuccess: () => {
+    // Skip next prop sync to prevent conflicts
+    skipNextSyncRef.current = true;
+  }
+});
+```
+
+This pattern prevents UI flickering while ensuring data consistency.
+
+---
+
 <div align="center">
 
 **📚 Related Documentation**

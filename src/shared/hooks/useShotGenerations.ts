@@ -1,0 +1,153 @@
+import { useInfiniteQuery, useQuery, UseInfiniteQueryResult, UseQueryResult } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { GenerationRow } from '@/types/shots';
+
+interface ShotGenerationsPage {
+  items: GenerationRow[];
+  nextCursor: number | null;
+}
+
+const PAGE_SIZE = 100; // Reasonable page size for UI performance
+
+// Hook for paginated shot generations
+export const useShotGenerations = (
+  shotId: string | null
+): UseInfiniteQueryResult<ShotGenerationsPage> => {
+  return useInfiniteQuery({
+    queryKey: ['shot-generations', shotId],
+    enabled: !!shotId,
+    initialPageParam: 0,
+    queryFn: async ({ pageParam }: { pageParam: number }) => {
+      const { data, error } = await supabase
+        .from('shot_generations')
+        .select(`
+          *,
+          generation:generations(*)
+        `)
+        .eq('shot_id', shotId!)
+        .order('position', { ascending: true, nullsFirst: false })
+        .order('created_at', { ascending: false }) // Secondary sort by created_at
+        .range(pageParam, pageParam + PAGE_SIZE - 1);
+
+      if (error) throw error;
+
+      // Transform to match GenerationRow interface
+      const items: GenerationRow[] = (data || [])
+        .filter(sg => sg.generation)
+        .map(sg => ({
+          ...sg.generation,
+          shotImageEntryId: sg.id,
+          shot_generation_id: sg.id,
+          position: sg.position,
+          imageUrl: sg.generation?.location || sg.generation?.imageUrl,
+          thumbUrl: sg.generation?.thumb_url || sg.generation?.thumbUrl,
+        }));
+
+      return {
+        items,
+        nextCursor: data?.length === PAGE_SIZE ? pageParam + PAGE_SIZE : null,
+      };
+    },
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    staleTime: 60 * 1000, // 1 minute
+    gcTime: 5 * 60 * 1000, // 5 minutes
+  });
+};
+
+// Hook for getting unpositioned count
+export const useUnpositionedGenerationsCount = (
+  shotId: string | null
+): UseQueryResult<number> => {
+  return useQuery({
+    queryKey: ['unpositioned-count', shotId],
+    enabled: !!shotId,
+    queryFn: async () => {
+      // Try to use the database function first
+      const { data, error } = await supabase
+        .rpc('count_unpositioned_generations', { p_shot_id: shotId! });
+
+      if (!error && data !== null) {
+        return data as number;
+      }
+
+      // Fallback to manual count if function doesn't exist
+      const { count, error: countError } = await supabase
+        .from('shot_generations')
+        .select('generation_id', { count: 'exact', head: true })
+        .eq('shot_id', shotId!)
+        .is('position', null);
+
+      if (countError) throw countError;
+
+      // We need to filter out videos, so fetch the actual records
+      const { data: unpositioned } = await supabase
+        .from('shot_generations')
+        .select('generation:generations(type)')
+        .eq('shot_id', shotId!)
+        .is('position', null);
+
+      const nonVideoCount = (unpositioned || []).filter(
+        sg => !(sg.generation as any)?.type?.includes('video')
+      ).length;
+
+      return nonVideoCount;
+    },
+    staleTime: 30 * 1000, // 30 seconds
+  });
+};
+
+// Hook for getting all generations for a shot (non-paginated, for backward compatibility)
+export const useAllShotGenerations = (
+  shotId: string | null
+): UseQueryResult<GenerationRow[]> => {
+  return useQuery({
+    queryKey: ['all-shot-generations', shotId],
+    enabled: !!shotId,
+    queryFn: async () => {
+      let allGenerations: any[] = [];
+      let offset = 0;
+      const BATCH_SIZE = 1000;
+
+      // Fetch in batches to handle large datasets
+      while (true) {
+        const { data, error } = await supabase
+          .from('shot_generations')
+          .select(`
+            *,
+            generation:generations(*)
+          `)
+          .eq('shot_id', shotId!)
+          .order('position', { ascending: true, nullsFirst: false })
+          .order('created_at', { ascending: false })
+          .range(offset, offset + BATCH_SIZE - 1);
+
+        if (error) throw error;
+
+        if (!data || data.length === 0) break;
+
+        allGenerations = allGenerations.concat(data);
+        
+        if (data.length < BATCH_SIZE) break;
+        
+        offset += BATCH_SIZE;
+        
+        // Safety limit
+        if (offset > 10000) break;
+      }
+
+      // Transform to match GenerationRow interface
+      return allGenerations
+        .filter(sg => sg.generation)
+        .map(sg => ({
+          ...sg.generation,
+          shotImageEntryId: sg.id,
+          shot_generation_id: sg.id,
+          position: sg.position,
+          imageUrl: sg.generation?.location || sg.generation?.imageUrl,
+          thumbUrl: sg.generation?.thumb_url || sg.generation?.thumbUrl,
+        }));
+    },
+    staleTime: 2 * 60 * 1000, // 2 minutes
+    gcTime: 5 * 60 * 1000, // 5 minutes
+  });
+}; 
