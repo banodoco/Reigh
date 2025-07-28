@@ -420,16 +420,28 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
         
         {/* Action buttons for queued/in progress tasks */}
         {(task.status === 'Queued' || task.status === 'In Progress') && (
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center flex-shrink-0">
             {taskSupportsProgress(task.taskType) && task.status === 'In Progress' && (
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={handleCheckProgress}
                 disabled={progressPercent !== null}
-                className="px-2 py-0.5 min-w-[120px] text-blue-400 hover:bg-blue-900/20 hover:text-blue-300"
+                className="px-1 py-1 min-w-[120px] h-auto text-blue-400 hover:bg-blue-900/20 hover:text-blue-300 flex flex-col items-center justify-center"
               >
-                {progressPercent === null ? 'Check Progress' : `${progressPercent}% Complete`}
+                <div className="text-xs leading-tight">
+                  {progressPercent === null ? (
+                    <>
+                      <div>Check</div>
+                      <div>Progress</div>
+                    </>
+                  ) : (
+                    <>
+                      <div>{progressPercent}%</div>
+                      <div>Complete</div>
+                    </>
+                  )}
+                </div>
               </Button>
             )}
             <Button
