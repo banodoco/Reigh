@@ -90,12 +90,9 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   const isVideo = media.type === 'video_travel_output' || media.location?.endsWith('.mp4');
   const displayUrl = getDisplayUrl(media.location || media.imageUrl);
 
-  // Clear saving state when URL changes (indicating save completed)
-  useEffect(() => {
-    if (isSaving) {
-      setIsSaving(false);
-    }
-  }, [displayUrl]);
+  // Note: We don't clear isSaving based on URL changes anymore
+  // because when creating a new image, the URL doesn't change.
+  // Instead, we clear it explicitly in the save callback.
 
   /**
    * Global key handler
@@ -187,6 +184,12 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
             setHasChanges(false);
             // Pass true to indicate this should create a new image
             onImageSaved(url, true);
+            // Clear saving state and close lightbox for new images
+            setIsSaving(false);
+            // Close the lightbox after creating a new flipped image
+            setTimeout(() => onClose(), 100);
+          } else {
+            setIsSaving(false);
           }
         }, 'image/png');
       };
