@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useRenderLogger } from '@/shared/hooks/useRenderLogger';
 import TaskList from './TaskList';
 import { cn } from '@/shared/lib/utils'; // For conditional classnames
@@ -136,6 +137,7 @@ interface TasksPaneProps {
 }
 
 export const TasksPane: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
+  const queryClient = useQueryClient();
   const {
     isGenerationsPaneLocked,
     generationsPaneHeight,
@@ -245,6 +247,13 @@ export const TasksPane: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
           description: `Cancelled ${Array.isArray(data) ? data.length : 0} pending tasks.`,
           variant: 'default',
         });
+        
+        // Force refresh of all task-related queries to ensure UI updates immediately
+        // Note: The useCancelPendingTasks hook already invalidates basic task queries,
+        // but we need to also invalidate paginated queries and ensure they refetch
+        queryClient.invalidateQueries({ queryKey: ['tasks', 'paginated', selectedProjectId] });
+        // Force refetch of current paginated data to immediately update the UI
+        queryClient.refetchQueries({ queryKey: ['tasks', 'paginated', selectedProjectId] });
       },
       onError: (error) => {
         console.error('Cancel-All failed:', error);
