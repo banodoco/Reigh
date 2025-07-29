@@ -296,27 +296,16 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     try {
       // Create multiple tasks - one for each image requested
       const tasks = Array.from({ length: magicEditNumImages }, (_, index) => {
-        const runId = new Date().toISOString().replace(/[-:.TZ]/g, "");
-        const taskId = `magic_edit_${runId.substring(2, 10)}_${crypto.randomUUID().slice(0, 6)}`;
-        
         return {
-          functionName: 'create_task',
+          functionName: 'magic-edit',
           payload: {
-            task_id: taskId,
-            task_type: 'magic-edit',
             project_id: selectedProjectId,
-            params: {
-              orchestrator_details: {
-                seed: 11111,
-                model: "flux-kontext",
-                prompt: magicEditPrompt,
-                run_id: runId,
-                resolution: imageDimensions ? `${imageDimensions.width}x${imageDimensions.height}` : "768x576",
-                negative_prompt: "",
-                use_causvid_lora: true,
-                image_url: displayUrl, // For image-to-image editing
-              }
-            }
+            prompt: magicEditPrompt,
+            negative_prompt: "",
+            resolution: imageDimensions ? `${imageDimensions.width}x${imageDimensions.height}` : undefined,
+            model_name: "flux-kontext",
+            seed: 11111,
+            image_url: displayUrl, // Source image for magic edit
           }
         };
       });
