@@ -6,7 +6,7 @@ import { Shot } from '@/types/shots';
 import type { GenerationRow } from '@/types/shots';
 import { useUpdateShotName, useHandleExternalImageDrop, useDeleteShot } from '@/shared/hooks/useShots';
 import { useToast } from '@/shared/hooks/use-toast';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 import { getDisplayUrl } from '@/shared/lib/utils';
 import { ChevronDown, ChevronUp } from 'lucide-react';
@@ -18,16 +18,12 @@ interface ShotGroupProps {
 }
 
 const ShotGroup: React.FC<ShotGroupProps> = ({ shot }) => {
-  const location = useLocation();
-  const isOnTimelinePage = location.pathname === '/tools/travel-between-images';
-  
   const { isOver: isDndKitOver, setNodeRef } = useDroppable({
     id: shot.id,
     data: {
       type: 'shot-group',
       shotId: shot.id,
-    },
-    disabled: isOnTimelinePage // Disable when on timeline page to prevent interference
+    }
   });
 
   const navigate = useNavigate();

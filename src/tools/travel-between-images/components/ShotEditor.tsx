@@ -43,6 +43,7 @@ import SettingsModal from '@/shared/components/SettingsModal';
 // Removed React.lazy for Timeline – imported above eagerly.
 import { useCreateGeneration, useUpdateGenerationLocation } from '@/shared/hooks/useGenerations';
 import { useUnpositionedGenerationsCount } from '@/shared/hooks/useShotGenerations';
+import usePersistentState from '@/shared/hooks/usePersistentState';
 
 // Add the missing type definition
 export interface SegmentGenerationParams {
@@ -50,6 +51,12 @@ export interface SegmentGenerationParams {
   frames: number[];
   context: number[];
   generatedVideoUrl?: string;
+}
+
+// Interface for per-shot GenerationsPane settings (matches useGenerationsPageLogic.ts)
+interface GenerationsPaneSettings {
+  selectedShotFilter: string;
+  excludePositioned: boolean;
 }
 
 // Local definition for Json type to remove dependency on supabase client types
@@ -270,6 +277,20 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
   const { setIsGenerationsPaneLocked } = usePanes();
+
+  // Persistent state for GenerationsPane settings (shared with useGenerationsPageLogic)
+  const [shotSettings, setShotSettings] = usePersistentState<Record<string, GenerationsPaneSettings>>(
+    'generations-pane-shot-settings',
+    {}
+  );
+
+  // Function to update GenerationsPane settings for current shot
+  const updateGenerationsPaneSettings = (settings: GenerationsPaneSettings) => {
+    setShotSettings(prev => ({
+      ...prev,
+      [selectedShot.id]: settings
+    }));
+  };
 
   // Track if generation mode has been determined
   const [isModeReady, setIsModeReady] = useState(false);
@@ -833,29 +854,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       throw error; 
     }
   };
-
-  // Listen for generations dropped from the generations pane
-  useEffect(() => {
-    const handleGenerationDropped = (event: CustomEvent) => {
-      const { generationId, targetFrame, shotId } = event.detail;
-      
-      // Only handle if this is for our current shot
-      if (shotId === selectedShot?.id && targetFrame !== undefined) {
-        setPendingFramePositions(prev => {
-          const newMap = new Map(prev);
-          newMap.set(generationId, targetFrame);
-          console.log('[ShotEditor] Set pending position for dropped generation:', generationId, targetFrame);
-          return newMap;
-        });
-      }
-    };
-
-    window.addEventListener('timeline-generation-dropped', handleGenerationDropped as EventListener);
-    
-    return () => {
-      window.removeEventListener('timeline-generation-dropped', handleGenerationDropped as EventListener);
-    };
-  }, [selectedShot?.id]);
 
   const handleGenerateBatch = async () => {
     if (!projectId) {
@@ -1484,6 +1482,12 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                         variant="outline"
                         size="sm"
                         onClick={() => {
+                          // Set the GenerationsPane filter to current shot and exclude positioned
+                          updateGenerationsPaneSettings({
+                            selectedShotFilter: selectedShot.id,
+                            excludePositioned: true
+                          });
+                          
                           if (isMobile) {
                             // On mobile, just open the pane normally (no locking)
                             const evt = new CustomEvent('mobilePaneOpen', { detail: { side: 'bottom' } });
@@ -1492,7 +1496,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                             // On desktop, open the generations pane and set the locked state
                             setIsGenerationsPaneLocked(true);
                           }
-                          // TODO: Set the shot filter in the generations pane to the current shot
                         }}
                       >
                         Open Pane

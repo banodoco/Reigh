@@ -1,34 +1,33 @@
 import React from "react";
 
 interface DropIndicatorProps {
-  frame: number;
+  isVisible: boolean;
+  dropTargetFrame: number | null;
   fullMin: number;
   fullRange: number;
-  timelineWidth: number;
-  color?: 'blue' | 'green';
 }
 
-const DropIndicator: React.FC<DropIndicatorProps> = ({ 
-  frame, 
-  fullMin, 
-  fullRange, 
-  timelineWidth,
-  color = 'blue'
+const DropIndicator: React.FC<DropIndicatorProps> = ({
+  isVisible,
+  dropTargetFrame,
+  fullMin,
+  fullRange,
 }) => {
-  const position = ((frame - fullMin) / fullRange) * timelineWidth;
-  const leftPercent = (position / timelineWidth) * 100;
-  
-  const colorClasses = color === 'green' 
-    ? 'border-green-500 bg-green-500' 
-    : 'border-sky-500 bg-sky-500';
+  if (!isVisible || dropTargetFrame === null) {
+    return null;
+  }
 
   return (
     <div
-      className={`absolute top-0 bottom-0 w-0.5 ${colorClasses} border-dashed border-2 z-30 pointer-events-none`}
-      style={{ left: `${leftPercent}%` }}
+      className="absolute top-0 bottom-0 w-1 bg-primary z-40 pointer-events-none"
+      style={{
+        left: `${((dropTargetFrame - fullMin) / fullRange) * 100}%`,
+        transform: 'translateX(-50%)',
+      }}
     >
-      <div className={`absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 ${colorClasses} rounded-full`} />
-      <div className={`absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 ${colorClasses} rounded-full`} />
+      <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 bg-primary text-primary-foreground text-xs px-2 py-1 rounded whitespace-nowrap">
+        Frame {dropTargetFrame}
+      </div>
     </div>
   );
 };

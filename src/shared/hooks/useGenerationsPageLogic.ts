@@ -6,12 +6,19 @@ import { LastAffectedShotContext } from '@/shared/contexts/LastAffectedShotConte
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 import { toast } from 'sonner';
 import { GeneratedImageWithMetadata } from '@/shared/components/ImageGallery';
+import usePersistentState from '@/shared/hooks/usePersistentState';
 
 interface UseGenerationsPageLogicOptions {
   itemsPerPage?: number;
   mediaType?: 'all' | 'image' | 'video';
   toolType?: string;
   enableDataLoading?: boolean;
+}
+
+// Interface for per-shot GenerationsPane settings
+interface GenerationsPaneSettings {
+  selectedShotFilter: string;
+  excludePositioned: boolean;
 }
 
 export function useGenerationsPageLogic({
@@ -22,8 +29,11 @@ export function useGenerationsPageLogic({
 }: UseGenerationsPageLogicOptions = {}) {
   const { selectedProjectId } = useProject();
   const [page, setPage] = useState(1);
+  
+  // Use regular state for the current filter values
   const [selectedShotFilter, setSelectedShotFilter] = useState<string>('all');
   const [excludePositioned, setExcludePositioned] = useState(true);
+  
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [starredOnly, setStarredOnly] = useState<boolean>(false);
   const [lastKnownTotal, setLastKnownTotal] = useState<number>(0);
@@ -33,14 +43,52 @@ export function useGenerationsPageLogic({
   const { data: shotsData } = useListShots(selectedProjectId);
   const { currentShotId } = useCurrentShot();
 
-  // Set shot filter to current shot when it changes, or reset to 'all' when no shot is selected
+  // Use persistent state to store per-shot settings
+  const [shotSettings, setShotSettings] = usePersistentState<Record<string, GenerationsPaneSettings>>(
+    'generations-pane-shot-settings',
+    {}
+  );
+
+  // Function to get settings for a specific shot
+  const getShotSettings = (shotId: string): GenerationsPaneSettings => {
+    return shotSettings[shotId] || {
+      selectedShotFilter: shotId,
+      excludePositioned: true
+    };
+  };
+
+  // Function to save settings for a specific shot
+  const saveShotSettings = (shotId: string, settings: GenerationsPaneSettings) => {
+    setShotSettings(prev => ({
+      ...prev,
+      [shotId]: settings
+    }));
+  };
+
+  // Set shot filter to current shot when it changes, but respect saved settings
   useEffect(() => {
     if (currentShotId && shotsData?.length && shotsData.some(shot => shot.id === currentShotId)) {
-      setSelectedShotFilter(currentShotId);
+      // Load saved settings for this shot, or use defaults
+      const savedSettings = getShotSettings(currentShotId);
+      setSelectedShotFilter(savedSettings.selectedShotFilter);
+      setExcludePositioned(savedSettings.excludePositioned);
     } else if (!currentShotId) {
+      // When no shot is selected, revert to 'all' shots
       setSelectedShotFilter('all');
+      setExcludePositioned(true);
     }
   }, [currentShotId, shotsData]);
+
+  // Save settings whenever the user changes them (only when viewing a specific shot)
+  useEffect(() => {
+    if (currentShotId && shotsData?.some(shot => shot.id === currentShotId)) {
+      const currentSettings: GenerationsPaneSettings = {
+        selectedShotFilter,
+        excludePositioned
+      };
+      saveShotSettings(currentShotId, currentSettings);
+    }
+  }, [currentShotId, selectedShotFilter, excludePositioned, shotsData]);
 
   // Reset to page 1 when shot filter or position filter changes
   useEffect(() => {
