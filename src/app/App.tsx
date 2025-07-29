@@ -2,7 +2,7 @@ import React, { useContext } from 'react';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { TooltipProvider } from "@/shared/components/ui/tooltip";
 import { Toaster as Sonner } from "@/shared/components/ui/sonner";
-import { DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent, DragStartEvent, DragOverlay, rectIntersection } from '@dnd-kit/core';
+import { DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent, DragStartEvent, DragOverlay, rectIntersection, pointerWithin } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { useCreateShot, useAddImageToShot, useListShots, useHandleExternalImageDrop } from "@/shared/hooks/useShots";
 import { NEW_GROUP_DROPPABLE_ID } from '@/shared/components/ShotsPane/NewGroupDropZone';
@@ -64,15 +64,25 @@ const AppInternalContent = () => {
 
   // Custom collision detection that prioritizes timeline
   const customCollisionDetection = (args: any) => {
-    const intersections = rectIntersection(args);
-    if (intersections.length > 0) {
-      const timeline = intersections.find(c => c.id === 'timeline-dropzone');
-      if (timeline) {
-        console.log('[DnD] Timeline rect intersection detected');
-        return [timeline];
-      }
+    // First, use pointerWithin (fast and pointer-based)
+    let pointerCollisions = pointerWithin(args);
+
+    // If any collisions, prioritise timeline if present
+    if (pointerCollisions.length) {
+      const timeline = pointerCollisions.find(c => c.id === 'timeline-dropzone');
+      if (timeline) return [timeline];
+      return pointerCollisions;
     }
-    return intersections;
+
+    // Fallback: rect intersection (useful when draggable is larger)
+    const rectCollisions = rectIntersection(args);
+    if (rectCollisions.length) {
+      const timeline = rectCollisions.find(c => c.id === 'timeline-dropzone');
+      if (timeline) return [timeline];
+      return rectCollisions;
+    }
+
+    return [];
   };
 
   const getDisplayUrl = (relativePath: string | undefined): string => {
