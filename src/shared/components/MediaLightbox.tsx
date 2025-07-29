@@ -16,6 +16,7 @@ import { Checkbox } from '@/shared/components/ui/checkbox';
 import { useToggleGenerationStar } from '@/shared/hooks/useGenerations';
 import { useTaskQueueNotifier } from '@/shared/hooks/useTaskQueueNotifier';
 import { useProject } from '@/shared/contexts/ProjectContext';
+import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 import { toast } from 'sonner';
 
 interface Shot {
@@ -91,6 +92,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   
   // Project context and task queue functionality
   const { selectedProjectId } = useProject();
+  const { currentShotId } = useCurrentShot();
   
   // Only use task queue notifier when magic edit is enabled and modal is open
   const taskQueueParams = useMemo(() => ({
@@ -309,6 +311,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
             seed: 11111,
             image_url: displayUrl, // Source image for magic edit
             in_scene: magicEditInSceneBoost,
+            shot_id: currentShotId || undefined, // Associate with current shot if in shot context
           }
         };
       });
