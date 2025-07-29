@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, X, FlipHorizontal, Save, Download, Trash2, Settings, PlusCircle, CheckCircle, Sparkles, Star } from 'lucide-react';
 import { GenerationRow } from '@/types/shots';
 import * as DialogPrimitive from "@radix-ui/react-dialog";
@@ -89,10 +89,14 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   
   // Project context and task queue functionality
   const { selectedProjectId } = useProject();
-  const { enqueueTasks, isEnqueuing, justQueued } = useTaskQueueNotifier({
-    projectId: selectedProjectId || undefined,
+  
+  // Only use task queue notifier when magic edit is enabled and modal is open
+  const taskQueueParams = useMemo(() => ({
+    projectId: (showMagicEdit && isMagicEditOpen) ? selectedProjectId || undefined : undefined,
     suppressPerTaskToast: true,
-  });
+  }), [showMagicEdit, isMagicEditOpen, selectedProjectId]);
+  
+  const { enqueueTasks, isEnqueuing, justQueued } = useTaskQueueNotifier(taskQueueParams);
   
   // Star functionality
   const toggleStarMutation = useToggleGenerationStar();
@@ -283,26 +287,52 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       return;
     }
 
+    // Ensure task queue is available
+    if (!enqueueTasks) {
+      toast.error('Task system not available');
+      return;
+    }
+
     try {
-      await enqueueTasks([{
-        functionName: 'single-image-generate',
-        payload: {
-          project_id: selectedProjectId,
-          prompt: magicEditPrompt,
-          resolution: imageDimensions ? `${imageDimensions.width}x${imageDimensions.height}` : undefined,
-          image_url: displayUrl, // For image-to-image editing
-          num_images: magicEditNumImages,
-          task_type: 'magic_edit',
-        },
-      }]);
+      // Create multiple tasks - one for each image requested
+      const tasks = Array.from({ length: magicEditNumImages }, (_, index) => {
+        const runId = new Date().toISOString().replace(/[-:.TZ]/g, "");
+        const taskId = `magic_edit_${runId.substring(2, 10)}_${crypto.randomUUID().slice(0, 6)}`;
+        
+        return {
+          functionName: 'create_task',
+          payload: {
+            project_id: selectedProjectId,
+            task_type: 'magic-edit',
+            params: {
+              task_id: taskId,
+              orchestrator_details: {
+                seed: 11111,
+                model: "flux-kontext",
+                prompt: magicEditPrompt,
+                run_id: runId,
+                resolution: imageDimensions ? `${imageDimensions.width}x${imageDimensions.height}` : "768x576",
+                negative_prompt: "",
+                use_causvid_lora: true,
+                image_url: displayUrl, // For image-to-image editing
+              }
+            }
+          }
+        };
+      });
+
+      await enqueueTasks(tasks);
       
-      // Success feedback is handled by useTaskQueueNotifier
-      setIsMagicEditOpen(false);
-      setMagicEditPrompt('');
-      setMagicEditNumImages(4);
+      // Don't close modal immediately - let success state show
+      // Reset form only after success state is shown
+      setTimeout(() => {
+        setIsMagicEditOpen(false);
+        setMagicEditPrompt('');
+        setMagicEditNumImages(4);
+      }, 2000); // Wait 2 seconds to show success state
     } catch (error) {
       console.error('Error creating magic-edit task:', error);
-      // Error handling is done by the useTaskQueueNotifier hook
+      toast.error('Failed to create magic-edit task');
     }
   };
 
@@ -697,13 +727,13 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
             {/* Generate Button */}
             <Button 
               onClick={handleMagicEditGenerate}
-              disabled={!magicEditPrompt.trim() || isEnqueuing}
+              disabled={!magicEditPrompt.trim() || (isEnqueuing ?? false)}
               className="w-full"
-              variant={justQueued ? "success" : "default"}
+              variant={(justQueued ?? false) ? "success" : "default"}
             >
-              {justQueued
+              {(justQueued ?? false)
                 ? "Added to queue!"
-                : isEnqueuing 
+                : (isEnqueuing ?? false)
                   ? 'Creating Task...' 
                   : 'Generate'}
             </Button>

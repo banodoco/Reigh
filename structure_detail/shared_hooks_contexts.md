@@ -118,6 +118,10 @@ Located in `/ui/` - Full shadcn-ui component library including:
   - Prompt search functionality
   - Drag-and-drop support for desktop
 - **`MediaLightbox`** - Full-screen media viewer
+  - Magic-edit task creation with loading/success states
+  - Star/unstar functionality
+  - Navigation, download, editing tools
+  - Shot workflow integration
 - **`HoverScrubVideo`** - Video preview on hover
 - **`DraggableImage`** - Drag-and-drop images
 - **`TimeStamp`** - Consistent relative time display ("X mins ago")
