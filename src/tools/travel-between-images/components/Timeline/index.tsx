@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { GenerationRow } from "@/types/shots";
 import { toast } from "sonner";
 import MediaLightbox from "@/shared/components/MediaLightbox";
@@ -9,6 +9,8 @@ import { useFramePositions } from "./hooks/useFramePositions";
 import { useZoom } from "./hooks/useZoom";
 import { useFileDrop } from "./hooks/useFileDrop";
 import { useTimelineDrag } from "./hooks/useTimelineDrag";
+import { useDroppable } from "@dnd-kit/core";
+import { useCurrentShot } from "@/shared/contexts/CurrentShotContext";
 
 // Import components
 import TimelineControls from "./TimelineControls";
@@ -21,7 +23,8 @@ import TimelineItem from "./TimelineItem";
 import { 
   getTimelineDimensions, 
   calculateMaxGap, 
-  getPairInfo 
+  getPairInfo,
+  pixelToFrame
 } from "./utils/timeline-utils";
 
 // Main Timeline component props
@@ -57,6 +60,10 @@ const Timeline: React.FC<TimelineProps> = ({
 }) => {
   // Core state
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [zoomLevel, setZoomLevel] = useState(1);
+  const [isDndDragging, setIsDndDragging] = useState(false);
+  const [dndDropFrame, setDndDropFrame] = useState<number | null>(null);
+  const { currentShotId } = useCurrentShot();
 
   // Refs
   const timelineRef = useRef<HTMLDivElement>(null);
@@ -78,7 +85,6 @@ const Timeline: React.FC<TimelineProps> = ({
 
   // Zoom hook
   const {
-    zoomLevel,
     handleZoomIn,
     handleZoomOut,
     handleZoomReset,
@@ -117,6 +123,54 @@ const Timeline: React.FC<TimelineProps> = ({
     fullMin,
     fullRange,
   });
+
+  // Add DnD-kit droppable functionality
+  const { isOver, setNodeRef: setDroppableNodeRef } = useDroppable({
+    id: 'timeline-dropzone',
+    data: {
+      type: 'timeline',
+      shotId: currentShotId,
+      dropFrame: dndDropFrame,
+    }
+  });
+
+  // Combine refs
+  const combinedRef = useCallback((node: HTMLDivElement | null) => {
+    containerRef.current = node;
+    setDroppableNodeRef(node);
+  }, [setDroppableNodeRef]);
+
+  // Track pointer position during DnD-kit drag
+  useEffect(() => {
+    if (!isOver || !containerRef.current) {
+      setDndDropFrame(null);
+      return;
+    }
+
+    const handlePointerMove = (e: PointerEvent) => {
+      const rect = containerRef.current!.getBoundingClientRect();
+      const relativeX = e.clientX - rect.left;
+      const targetFrame = Math.max(0, pixelToFrame(relativeX, rect.width, fullMin, fullRange));
+      setDndDropFrame(targetFrame);
+    };
+
+    const handlePointerLeave = () => {
+      setDndDropFrame(null);
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    containerRef.current.addEventListener('pointerleave', handlePointerLeave);
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      containerRef.current?.removeEventListener('pointerleave', handlePointerLeave);
+    };
+  }, [isOver, fullMin, fullRange]);
+
+  // Update isDndDragging state
+  useEffect(() => {
+    setIsDndDragging(isOver);
+  }, [isOver]);
 
   // Set up global mouse event listeners for drag
   useEffect(() => {
@@ -187,7 +241,7 @@ const Timeline: React.FC<TimelineProps> = ({
 
   // Mobile double-tap detection refs
   const lastTouchTimeRef = useRef<number>(0);
-  const doubleTapTimeoutRef = useRef<number | null>(null);
+  const doubleTapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -250,14 +304,6 @@ const Timeline: React.FC<TimelineProps> = ({
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
-        {/* Drop position indicator */}
-        <DropIndicator
-          isVisible={isFileOver}
-          dropTargetFrame={dropTargetFrame}
-          fullMin={fullMin}
-          fullRange={fullRange}
-        />
-
         {/* Ruler */}
         <TimelineRuler
           fullMin={fullMin}
@@ -268,9 +314,11 @@ const Timeline: React.FC<TimelineProps> = ({
 
         {/* Timeline container */}
         <div
-          ref={containerRef}
+          ref={combinedRef}
           id="timeline-container"
-          className="relative h-32 mb-8"
+          className={`relative h-32 mb-8 ${
+            isFileOver ? 'border-2 border-sky-500' : (isDndDragging ? 'border-2 border-green-500' : 'border-2 border-transparent')
+          } transition-colors duration-200 rounded-lg`}
           onDoubleClick={(e) => handleTimelineDoubleClick(e, containerRef)}
           style={{
             width: zoomLevel > 1 ? `${zoomLevel * 100}%` : '100%',
@@ -278,6 +326,44 @@ const Timeline: React.FC<TimelineProps> = ({
             userSelect: 'none',
           }}
         >
+          {/* File drop overlay */}
+          {isFileOver && (
+            <div className="absolute inset-0 bg-sky-500/20 z-20 pointer-events-none flex items-center justify-center rounded-lg">
+              <p className="text-white text-sm font-medium bg-black/50 px-3 py-1 rounded">
+                Drop to add at frame {dropTargetFrame}
+              </p>
+            </div>
+          )}
+
+          {/* DnD-kit drop overlay */}
+          {isDndDragging && dndDropFrame !== null && (
+            <div className="absolute inset-0 bg-green-500/20 z-20 pointer-events-none flex items-center justify-center rounded-lg">
+              <p className="text-white text-sm font-medium bg-black/50 px-3 py-1 rounded">
+                Drop to add at frame {dndDropFrame}
+              </p>
+            </div>
+          )}
+
+          {/* Drop indicators */}
+          {isFileOver && dropTargetFrame !== null && (
+            <DropIndicator
+              frame={dropTargetFrame}
+              fullMin={fullMin}
+              fullRange={fullRange}
+              timelineWidth={containerWidth}
+            />
+          )}
+
+          {isDndDragging && dndDropFrame !== null && (
+            <DropIndicator
+              frame={dndDropFrame}
+              fullMin={fullMin}
+              fullRange={fullRange}
+              timelineWidth={containerWidth}
+              color="green"
+            />
+          )}
+
           {/* Pair visualizations */}
           {pairInfo.map((pair, index) => {
             // Build sorted positions array with id for pixel calculations

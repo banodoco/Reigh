@@ -834,6 +834,29 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     }
   };
 
+  // Listen for generations dropped from the generations pane
+  useEffect(() => {
+    const handleGenerationDropped = (event: CustomEvent) => {
+      const { generationId, targetFrame, shotId } = event.detail;
+      
+      // Only handle if this is for our current shot
+      if (shotId === selectedShot?.id && targetFrame !== undefined) {
+        setPendingFramePositions(prev => {
+          const newMap = new Map(prev);
+          newMap.set(generationId, targetFrame);
+          console.log('[ShotEditor] Set pending position for dropped generation:', generationId, targetFrame);
+          return newMap;
+        });
+      }
+    };
+
+    window.addEventListener('timeline-generation-dropped', handleGenerationDropped as EventListener);
+    
+    return () => {
+      window.removeEventListener('timeline-generation-dropped', handleGenerationDropped as EventListener);
+    };
+  }, [selectedShot?.id]);
+
   const handleGenerateBatch = async () => {
     if (!projectId) {
       toast.error('No project selected. Please select a project first.');

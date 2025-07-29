@@ -2,9 +2,10 @@ import React, { useContext } from 'react';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { TooltipProvider } from "@/shared/components/ui/tooltip";
 import { Toaster as Sonner } from "@/shared/components/ui/sonner";
-import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent, DragStartEvent, DragOverlay } from '@dnd-kit/core';
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent, DragStartEvent, DragOverlay, pointerWithin, rectIntersection } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { useHandleExternalImageDrop, useCreateShot, useAddImageToShot, useListShots } from "@/shared/hooks/useShots";
+import { useCreateShot, useAddImageToShot, useListShots, useHandleExternalImageDrop } from "@/shared/hooks/useShots";
+import { usePositionExistingGenerationInShot } from "@/shared/hooks/useShots";
 import { NEW_GROUP_DROPPABLE_ID } from '@/shared/components/ShotsPane/NewGroupDropZone';
 import { LastAffectedShotProvider, LastAffectedShotContext } from '@/shared/contexts/LastAffectedShotContext';
 import { AppRoutes } from "./routes";
@@ -13,6 +14,7 @@ import { useWebSocket } from '@/shared/hooks/useWebSocket';
 import { PanesProvider } from '@/shared/contexts/PanesContext';
 import { CurrentShotProvider } from '@/shared/contexts/CurrentShotContext';
 import { ToolPageHeaderProvider } from '@/shared/contexts/ToolPageHeaderContext';
+import { toast } from "sonner";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -57,9 +59,31 @@ const AppInternalContent = () => {
   const createShotMutation = useCreateShot();
   const addImageToShotMutation = useAddImageToShot();
   const handleExternalImageDropMutation = useHandleExternalImageDrop();
+  const positionExistingGenerationMutation = usePositionExistingGenerationInShot();
 
   const [activeDragData, setActiveDragData] = React.useState<any | null>(null);
   const [dropAnimation, setDropAnimation] = React.useState(false);
+
+  // Custom collision detection that prioritizes timeline
+  const customCollisionDetection = (args: any) => {
+    // First, check if pointer is over timeline
+    const pointerCollisions = pointerWithin(args);
+    const timelineCollision = pointerCollisions.find(
+      collision => collision.id === 'timeline-dropzone'
+    );
+    
+    if (timelineCollision) {
+      console.log('[DnD] Timeline collision detected');
+      return [timelineCollision];
+    }
+    
+    // Otherwise, use closest center for other drop zones
+    const centerCollisions = closestCenter(args);
+    if (centerCollisions.length > 0) {
+      console.log('[DnD] Other collisions:', centerCollisions.map(c => c.id));
+    }
+    return centerCollisions;
+  };
 
   const getDisplayUrl = (relativePath: string | undefined): string => {
     if (!relativePath) return '';
@@ -74,12 +98,14 @@ const AppInternalContent = () => {
 
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
+    console.log('[DnD] Drag started:', active.id);
     setActiveDragData(active?.data?.current || null);
     setDropAnimation(false);
   };
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
+    console.log('[DnD] Drag ended. Over:', over?.id, 'Data:', over?.data?.current);
 
     if (!selectedProjectId) {
       return;
@@ -130,7 +156,46 @@ const AppInternalContent = () => {
     console.log(`Attempting to process drop: generationId=${generationId}, droppableType=${droppableZone.type}, droppableId=${over.id}, shotId=${droppableZone.shotId}`);
 
     try {
-      if (droppableZone.type === 'shot-group') {
+      if (droppableZone.type === 'timeline') {
+        const targetFrame = droppableZone.dropFrame;
+        const shotId = droppableZone.shotId;
+        
+        if (!shotId) {
+          console.warn('Missing shotId for timeline drop');
+          return;
+        }
+
+        // Just add the generation to the shot - the timeline will handle positioning
+        await addImageToShotMutation.mutateAsync({ 
+          shot_id: shotId, 
+          generation_id: generationId,
+          imageUrl: imageUrl,
+          thumbUrl: thumbUrl,
+          project_id: selectedProjectId,
+        });
+
+        setLastAffectedShotId(shotId);
+        
+        // Notify about the drop with frame information
+        if (targetFrame !== null && targetFrame !== undefined) {
+          // Emit a custom event that the timeline can listen to
+          window.dispatchEvent(new CustomEvent('timeline-generation-dropped', {
+            detail: {
+              generationId,
+              targetFrame,
+              shotId
+            }
+          }));
+          
+          toast.success(`Added to timeline at frame ${targetFrame}`);
+        }
+        
+        console.log(`Successfully dropped generation ${generationId} to timeline shot ${shotId}. Target frame: ${targetFrame}`);
+        
+        // Note: The timeline component will handle positioning the image at the target frame
+        // through its own pending positions system
+        
+      } else if (droppableZone.type === 'shot-group') {
         const shotId = droppableZone.shotId;
         if (!shotId) {
           console.warn('shotId missing from shot-group droppable', droppableZone);
@@ -179,7 +244,7 @@ const AppInternalContent = () => {
 
   return (
     <TooltipProvider>
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+      <DndContext sensors={sensors} collisionDetection={customCollisionDetection} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <AppRoutes />
         <DragOverlay zIndex={10000} style={{ pointerEvents: 'none' }}>
           {activeDragData && activeDragData.imageUrl ? (

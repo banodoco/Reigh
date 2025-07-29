@@ -4,6 +4,7 @@ import { useHandleExternalImageDrop } from '@/shared/hooks/useShots';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { useToast } from '@/shared/hooks/use-toast';
 import { useListShots } from '@/shared/hooks/useShots';
+import { useLocation } from 'react-router-dom';
 
 const NEW_GROUP_DROPPABLE_ID = 'new-shot-group-dropzone';
 
@@ -17,12 +18,15 @@ const NewGroupDropZone: React.FC<NewGroupDropZoneProps> = ({ onZoneClick }) => {
   const handleExternalImageDropMutation = useHandleExternalImageDrop();
   const { toast } = useToast();
   const [isFileOver, setIsFileOver] = useState(false);
+  const location = useLocation();
+  const isOnTimelinePage = location.pathname === '/tools/travel-between-images';
 
   const { isOver: isDndKitOver, setNodeRef } = useDroppable({
     id: NEW_GROUP_DROPPABLE_ID,
     data: {
       type: 'new-group-zone',
-    }
+    },
+    disabled: isOnTimelinePage // Disable when on timeline page
   });
 
   const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
