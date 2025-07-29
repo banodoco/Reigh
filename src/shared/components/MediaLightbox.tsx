@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, X, FlipHorizontal, Save, Download, Trash2, Settings, PlusCircle, CheckCircle, Sparkles, Star } from 'lucide-react';
 import { GenerationRow } from '@/types/shots';
 import * as DialogPrimitive from "@radix-ui/react-dialog";
@@ -17,6 +17,9 @@ import { useToggleGenerationStar } from '@/shared/hooks/useGenerations';
 import { useTaskQueueNotifier } from '@/shared/hooks/useTaskQueueNotifier';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
+import { useListShots, useCreateShot } from '@/shared/hooks/useShots';
+import CreateShotModal from '@/shared/components/CreateShotModal';
+import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 interface Shot {
@@ -86,6 +89,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   const [magicEditPrompt, setMagicEditPrompt] = useState('');
   const [magicEditNumImages, setMagicEditNumImages] = useState(4);
   const [magicEditInSceneBoost, setMagicEditInSceneBoost] = useState(false);
+  const [magicEditShotId, setMagicEditShotId] = useState<string | null>(null);
+  const [isCreateShotModalOpen, setIsCreateShotModalOpen] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   // Ref for the dialog content so we can programmatically focus it, enabling keyboard shortcuts immediately
   const contentRef = useRef<HTMLDivElement>(null);
@@ -93,6 +98,9 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   // Project context and task queue functionality
   const { selectedProjectId } = useProject();
   const { currentShotId } = useCurrentShot();
+  const { data: shots } = useListShots(selectedProjectId);
+  const createShotMutation = useCreateShot();
+  const queryClient = useQueryClient();
   
   // Only use task queue notifier when magic edit is enabled and modal is open
   const taskQueueParams = useMemo(() => ({
@@ -311,7 +319,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
             seed: 11111,
             image_url: displayUrl, // Source image for magic edit
             in_scene: magicEditInSceneBoost,
-            shot_id: currentShotId || undefined, // Associate with current shot if in shot context
+            shot_id: currentShotId || magicEditShotId || undefined, // Associate with current shot if in shot context
           }
         };
       });
@@ -325,12 +333,40 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
         setMagicEditPrompt('');
         setMagicEditNumImages(4);
         setMagicEditInSceneBoost(false);
+        setMagicEditShotId(null);
       }, 2000); // Wait 2 seconds to show success state
     } catch (error) {
       console.error('Error creating magic-edit task:', error);
       toast.error('Failed to create magic-edit task');
     }
   };
+
+  // Handle creating a new shot for magic edit
+  const handleCreateShotForMagicEdit = useCallback(async (shotName: string, files: File[]) => {
+    if (!selectedProjectId) {
+      toast.error("No project selected");
+      return;
+    }
+
+    try {
+      const result = await createShotMutation.mutateAsync({
+        name: shotName,
+        projectId: selectedProjectId,
+        shouldSelectAfterCreation: false
+      });
+
+      await queryClient.invalidateQueries({ queryKey: ['shots', selectedProjectId] });
+      await queryClient.refetchQueries({ queryKey: ['shots', selectedProjectId] });
+      
+      // Switch to the newly created shot
+      setMagicEditShotId(result.shot.id);
+      setIsCreateShotModalOpen(false);
+      toast.success(`Shot "${shotName}" created and selected`);
+    } catch (error) {
+      console.error('Error creating shot:', error);
+      toast.error("Failed to create shot");
+    }
+  }, [selectedProjectId, createShotMutation, queryClient]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'ArrowLeft' && onPrevious) {
@@ -695,6 +731,38 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               </div>
             </div>
 
+            {/* Shot Selector - only show when not in a shot context */}
+            {!currentShotId && (
+              <div className="flex items-center gap-2">
+                <Label htmlFor="magic-edit-shot" className="inline-block">Associate with Shot</Label>
+                <Select
+                  value={magicEditShotId || "none"}
+                  onValueChange={(value) => setMagicEditShotId(value === "none" ? null : value)}
+                >
+                  <SelectTrigger id="magic-edit-shot" className="inline-flex w-auto min-w-[200px]">
+                    <SelectValue placeholder="None" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {shots?.map((shot) => (
+                      <SelectItem key={shot.id} value={shot.id}>
+                        {shot.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsCreateShotModalOpen(true)}
+                  className="h-8 w-8 p-0"
+                >
+                  <PlusCircle className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+
             {/* Prompt Input */}
             <div className="space-y-2">
               <Label htmlFor="magic-edit-prompt">Prompt</Label>
@@ -748,6 +816,14 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Create Shot Modal for Magic Edit */}
+      <CreateShotModal
+        isOpen={isCreateShotModalOpen}
+        onClose={() => setIsCreateShotModalOpen(false)}
+        onSubmit={handleCreateShotForMagicEdit}
+        isLoading={createShotMutation.isPending}
+      />
     </TooltipProvider>
   );
 };
