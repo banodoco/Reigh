@@ -302,10 +302,10 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
         return {
           functionName: 'create_task',
           payload: {
-            project_id: selectedProjectId,
+            task_id: taskId,
             task_type: 'magic-edit',
+            project_id: selectedProjectId,
             params: {
-              task_id: taskId,
               orchestrator_details: {
                 seed: 11111,
                 model: "flux-kontext",
