@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/shared/compo
 import { Textarea } from '@/shared/components/ui/textarea';
 import { Label } from '@/shared/components/ui/label';
 import { SliderWithValue } from '@/shared/components/ui/slider-with-value';
+import { Checkbox } from '@/shared/components/ui/checkbox';
 import { useToggleGenerationStar } from '@/shared/hooks/useGenerations';
 import { useTaskQueueNotifier } from '@/shared/hooks/useTaskQueueNotifier';
 import { useProject } from '@/shared/contexts/ProjectContext';
@@ -83,6 +84,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   const [isMagicEditOpen, setIsMagicEditOpen] = useState(false);
   const [magicEditPrompt, setMagicEditPrompt] = useState('');
   const [magicEditNumImages, setMagicEditNumImages] = useState(4);
+  const [magicEditInSceneBoost, setMagicEditInSceneBoost] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   // Ref for the dialog content so we can programmatically focus it, enabling keyboard shortcuts immediately
   const contentRef = useRef<HTMLDivElement>(null);
@@ -306,6 +308,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
             model_name: "flux-kontext",
             seed: 11111,
             image_url: displayUrl, // Source image for magic edit
+            in_scene: magicEditInSceneBoost,
           }
         };
       });
@@ -318,6 +321,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
         setIsMagicEditOpen(false);
         setMagicEditPrompt('');
         setMagicEditNumImages(4);
+        setMagicEditInSceneBoost(false);
       }, 2000); // Wait 2 seconds to show success state
     } catch (error) {
       console.error('Error creating magic-edit task:', error);
@@ -711,6 +715,18 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                 max={16}
                 step={1}
               />
+            </div>
+
+            {/* In-Scene Boost Checkbox */}
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="magic-edit-in-scene"
+                checked={magicEditInSceneBoost}
+                onCheckedChange={(checked) => setMagicEditInSceneBoost(checked === true)}
+              />
+              <Label htmlFor="magic-edit-in-scene" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                In-Scene Boost
+              </Label>
             </div>
 
             {/* Generate Button */}

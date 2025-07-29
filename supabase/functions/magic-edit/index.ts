@@ -40,6 +40,7 @@ interface MagicEditRequestBody {
   model_name?: string;
   seed?: number;
   image_url: string; // Source image for magic edit
+  in_scene?: boolean; // In-Scene Boost parameter
   shot_id?: string; // Optional: associate generated image with a shot
 }
 
@@ -118,6 +119,7 @@ serve(async (req) => {
       negative_prompt: body.negative_prompt ?? "",
       use_causvid_lora: true,
       image_url: body.image_url, // Source image for editing
+      in_scene: body.in_scene ?? false, // In-Scene Boost parameter
     };
 
     // 3. Insert task row
