@@ -177,6 +177,31 @@ export function MyTool() {
 }
 ```
 
+### Per-Entity State Persistence
+
+For UI state that varies by entity (shot, project, etc.), use `usePersistentState` with entity-scoped keys:
+
+```typescript
+// Example: GenerationsPane filter settings per shot
+const [shotSettings, setShotSettings] = usePersistentState<Record<string, FilterSettings>>(
+  'generations-pane-shot-settings',
+  {}
+);
+
+// Save settings for specific shot
+const updateShotSettings = (shotId: string, settings: FilterSettings) => {
+  setShotSettings(prev => ({
+    ...prev,
+    [shotId]: settings
+  }));
+};
+
+// Load settings for specific shot
+const getShotSettings = (shotId: string): FilterSettings => {
+  return shotSettings[shotId] || defaultSettings;
+};
+```
+
 ---
 
 ## 🚀 Quick Start for New Tools
