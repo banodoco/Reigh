@@ -5,24 +5,24 @@ import MediaLightbox from "@/shared/components/MediaLightbox";
 import { useIsMobile } from "@/shared/hooks/use-mobile";
 
 // Import hooks
-import { useFramePositions } from "./Timeline/hooks/useFramePositions";
-import { useZoom } from "./Timeline/hooks/useZoom";
-import { useFileDrop } from "./Timeline/hooks/useFileDrop";
-import { useTimelineDrag } from "./Timeline/hooks/useTimelineDrag";
+import { useFramePositions } from "./hooks/useFramePositions";
+import { useZoom } from "./hooks/useZoom";
+import { useFileDrop } from "./hooks/useFileDrop";
+import { useTimelineDrag } from "./hooks/useTimelineDrag";
 
 // Import components
-import TimelineControls from "./Timeline/TimelineControls";
-import TimelineRuler from "./Timeline/TimelineRuler";
-import DropIndicator from "./Timeline/DropIndicator";
-import PairRegion from "./Timeline/PairRegion";
-import TimelineItem from "./Timeline/TimelineItem";
+import TimelineControls from "./TimelineControls";
+import TimelineRuler from "./TimelineRuler";
+import DropIndicator from "./DropIndicator";
+import PairRegion from "./PairRegion";
+import TimelineItem from "./TimelineItem";
 
 // Import utils
 import { 
   getTimelineDimensions, 
   calculateMaxGap, 
   getPairInfo 
-} from "./Timeline/utils/timeline-utils";
+} from "./utils/timeline-utils";
 
 // Main Timeline component props
 export interface TimelineProps {
@@ -187,7 +187,7 @@ const Timeline: React.FC<TimelineProps> = ({
 
   // Mobile double-tap detection refs
   const lastTouchTimeRef = useRef<number>(0);
-  const doubleTapTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const doubleTapTimeoutRef = useRef<number | null>(null);
 
   // Cleanup timeout on unmount
   useEffect(() => {

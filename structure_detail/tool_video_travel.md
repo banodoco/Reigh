@@ -14,7 +14,20 @@ src/tools/travel-between-images/
 │   └── VideoTravelToolPage.tsx        # Main tool UI
 ├── components/
 │   ├── ShotEditor.tsx                 # Core editing environment
-│   ├── Timeline.tsx                   # Frame-accurate timeline
+│   ├── Timeline/                      # Frame-accurate timeline (refactored)
+│   │   ├── index.tsx                  # Main Timeline component
+│   │   ├── TimelineItem.tsx           # Individual timeline items
+│   │   ├── TimelineControls.tsx       # Zoom & context controls
+│   │   ├── TimelineRuler.tsx          # Frame ruler display
+│   │   ├── DropIndicator.tsx          # File drop visual feedback
+│   │   ├── PairRegion.tsx             # Video pair visualization
+│   │   ├── hooks/
+│   │   │   ├── useFileDrop.ts         # File drag/drop logic
+│   │   │   ├── useFramePositions.ts   # Frame position management
+│   │   │   ├── useTimelineDrag.ts     # Timeline drag interactions
+│   │   │   └── useZoom.ts             # Zoom & pan functionality
+│   │   └── utils/
+│   │       └── timeline-utils.ts      # Timeline calculations
 │   ├── BatchSettingsForm.tsx          # Video generation settings
 │   ├── VideoOutputsGallery.tsx        # Generated video display
 │   ├── SimpleVideoPlayer.tsx          # Lightweight player
@@ -46,13 +59,29 @@ src/tools/travel-between-images/
 - Offers "Crop to project size" helper
 - Manages shot state and updates
 
-### `Timeline.tsx`
-**Frame-accurate timeline component**
+### `Timeline/` (Modular Timeline System)
+**Frame-accurate timeline component (refactored into modular architecture)**
+- **Main Component** (`index.tsx`):
+  - Orchestrates all timeline functionality
+  - Integrates drag/drop, zoom, and positioning logic
+  - Manages frame validation and constraints
+- **Sub-Components**:
+  - `TimelineItem.tsx`: Individual draggable image items with visual feedback
+  - `TimelineControls.tsx`: Context frames slider & zoom controls
+  - `TimelineRuler.tsx`: Frame number ruler display
+  - `DropIndicator.tsx`: Visual feedback for file drop targeting
+  - `PairRegion.tsx`: Video pair visualization with context frames
+- **Custom Hooks**:
+  - `useFileDrop.ts`: File drag/drop validation and positioning
+  - `useFramePositions.ts`: Frame position state management
+  - `useTimelineDrag.ts`: Complex drag interactions with modifier key support
+  - `useZoom.ts`: Zoom and pan functionality
+- **Utilities**: `timeline-utils.ts` for frame calculations and constraints
 - **Features**:
-  - Drag-and-drop image positioning
+  - Drag-and-drop image positioning with modifier key support (⌘/⌥)
   - External image file dropping with frame-specific positioning
-  - Gap validation between frames
-  - Zoomable ruler overlay
+  - Gap validation between frames with visual feedback
+  - Zoomable ruler overlay with pan support
   - `MediaLightbox` preview on click
   - Persistent position storage
 - **File Support**: JPEG, PNG, WebP images via drag and drop
