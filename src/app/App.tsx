@@ -2,10 +2,9 @@ import React, { useContext } from 'react';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { TooltipProvider } from "@/shared/components/ui/tooltip";
 import { Toaster as Sonner } from "@/shared/components/ui/sonner";
-import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent, DragStartEvent, DragOverlay, pointerWithin, rectIntersection } from '@dnd-kit/core';
+import { DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent, DragStartEvent, DragOverlay, rectIntersection } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { useCreateShot, useAddImageToShot, useListShots, useHandleExternalImageDrop } from "@/shared/hooks/useShots";
-import { usePositionExistingGenerationInShot } from "@/shared/hooks/useShots";
 import { NEW_GROUP_DROPPABLE_ID } from '@/shared/components/ShotsPane/NewGroupDropZone';
 import { LastAffectedShotProvider, LastAffectedShotContext } from '@/shared/contexts/LastAffectedShotContext';
 import { AppRoutes } from "./routes";
@@ -59,30 +58,21 @@ const AppInternalContent = () => {
   const createShotMutation = useCreateShot();
   const addImageToShotMutation = useAddImageToShot();
   const handleExternalImageDropMutation = useHandleExternalImageDrop();
-  const positionExistingGenerationMutation = usePositionExistingGenerationInShot();
 
   const [activeDragData, setActiveDragData] = React.useState<any | null>(null);
   const [dropAnimation, setDropAnimation] = React.useState(false);
 
   // Custom collision detection that prioritizes timeline
   const customCollisionDetection = (args: any) => {
-    // First, check if pointer is over timeline
-    const pointerCollisions = pointerWithin(args);
-    const timelineCollision = pointerCollisions.find(
-      collision => collision.id === 'timeline-dropzone'
-    );
-    
-    if (timelineCollision) {
-      console.log('[DnD] Timeline collision detected');
-      return [timelineCollision];
+    const intersections = rectIntersection(args);
+    if (intersections.length > 0) {
+      const timeline = intersections.find(c => c.id === 'timeline-dropzone');
+      if (timeline) {
+        console.log('[DnD] Timeline rect intersection detected');
+        return [timeline];
+      }
     }
-    
-    // Otherwise, use closest center for other drop zones
-    const centerCollisions = closestCenter(args);
-    if (centerCollisions.length > 0) {
-      console.log('[DnD] Other collisions:', centerCollisions.map(c => c.id));
-    }
-    return centerCollisions;
+    return intersections;
   };
 
   const getDisplayUrl = (relativePath: string | undefined): string => {
