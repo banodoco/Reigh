@@ -187,7 +187,7 @@ const Timeline: React.FC<TimelineProps> = ({
 
   // Mobile double-tap detection refs
   const lastTouchTimeRef = useRef<number>(0);
-  const doubleTapTimeoutRef = useRef<number | null>(null);
+  const doubleTapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -310,9 +310,9 @@ const Timeline: React.FC<TimelineProps> = ({
             const startPercent = (startPixel / containerWidth) * 100;
             const endPercent = (endPixel / containerWidth) * 100;
 
-            const contextStartFrameUnclipped = actualEndFrame - contextFrames;
-            const contextStartFrame = Math.max(0, contextStartFrameUnclipped);
-            const visibleContextFrames = Math.max(0, actualEndFrame - contextStartFrame);
+            // Fix: Base context frames on actual pair length, not just end frame
+            const contextStartFrame = Math.max(actualStartFrame, actualEndFrame - contextFrames);
+            const visibleContextFrames = Math.min(contextFrames, actualFrames);
             
             const contextStartPixel = ((contextStartFrame - fullMin) / fullRange) * containerWidth;
             const contextStartPercent = (contextStartPixel / containerWidth) * 100;

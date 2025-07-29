@@ -123,7 +123,7 @@ const VideoTravelToolPage: React.FC = () => {
   const [customHeight, setCustomHeight] = useState<number | undefined>(undefined);
   const [enhancePrompt, setEnhancePrompt] = useState<boolean>(false);
   const [videoPairConfigs, setVideoPairConfigs] = useState<any[]>([]);
-  const [generationMode, setGenerationMode] = useState<'batch' | 'by-pair' | 'timeline'>('batch');
+  const [generationMode, setGenerationMode] = useState<'batch' | 'timeline'>('batch');
   const [pairConfigs, setPairConfigs] = useState<any[]>([]);
   const [afterEachPromptText, setAfterEachPromptText] = useState<string>('');
   
@@ -289,7 +289,7 @@ const VideoTravelToolPage: React.FC = () => {
       setCustomHeight(settings.customHeight);
       setEnhancePrompt(settings.enhancePrompt || false);
       setVideoPairConfigs(settings.pairConfigs || []);
-      setGenerationMode(settings.generationMode || 'batch');
+      setGenerationMode(settings.generationMode === 'by-pair' ? 'batch' : (settings.generationMode || 'batch'));
       setPairConfigs(settings.pairConfigs || []);
       setSelectedLoras(settings.selectedLoras || []);
       setSteerableMotionSettings(settings.steerableMotionSettings || {
@@ -818,11 +818,7 @@ const VideoTravelToolPage: React.FC = () => {
                 userHasInteracted.current = true;
                 setGenerationMode(mode);
               }}
-              pairConfigs={isLoadingSettings ? [] : pairConfigs}
-              onPairConfigsChange={isLoadingSettings ? () => {} : (configs) => {
-                userHasInteracted.current = true;
-                setPairConfigs(configs);
-              }}
+
               onPreviousShot={handlePreviousShot}
               onNextShot={handleNextShot}
               hasPrevious={hasPrevious}

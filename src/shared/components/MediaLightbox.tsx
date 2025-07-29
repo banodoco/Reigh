@@ -13,6 +13,8 @@ import { Textarea } from '@/shared/components/ui/textarea';
 import { Label } from '@/shared/components/ui/label';
 import { SliderWithValue } from '@/shared/components/ui/slider-with-value';
 import { useToggleGenerationStar } from '@/shared/hooks/useGenerations';
+import { useTaskQueueNotifier } from '@/shared/hooks/useTaskQueueNotifier';
+import { useProject } from '@/shared/contexts/ProjectContext';
 import { toast } from 'sonner';
 
 interface Shot {
@@ -84,6 +86,13 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   // Ref for the dialog content so we can programmatically focus it, enabling keyboard shortcuts immediately
   const contentRef = useRef<HTMLDivElement>(null);
+  
+  // Project context and task queue functionality
+  const { selectedProjectId } = useProject();
+  const { enqueueTasks, isEnqueuing, justQueued } = useTaskQueueNotifier({
+    projectId: selectedProjectId || undefined,
+    suppressPerTaskToast: true,
+  });
   
   // Star functionality
   const toggleStarMutation = useToggleGenerationStar();
@@ -263,12 +272,37 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     }
   };
 
-  const handleMagicEditGenerate = () => {
-    if (onMagicEdit && magicEditPrompt.trim()) {
-      onMagicEdit(displayUrl, magicEditPrompt, magicEditNumImages);
+  const handleMagicEditGenerate = async () => {
+    if (!selectedProjectId) {
+      toast.error('No project selected');
+      return;
+    }
+
+    if (!magicEditPrompt.trim()) {
+      toast.error('Please enter a prompt');
+      return;
+    }
+
+    try {
+      await enqueueTasks([{
+        functionName: 'single-image-generate',
+        payload: {
+          project_id: selectedProjectId,
+          prompt: magicEditPrompt,
+          resolution: imageDimensions ? `${imageDimensions.width}x${imageDimensions.height}` : undefined,
+          image_url: displayUrl, // For image-to-image editing
+          num_images: magicEditNumImages,
+          task_type: 'magic_edit',
+        },
+      }]);
+      
+      // Success feedback is handled by useTaskQueueNotifier
       setIsMagicEditOpen(false);
       setMagicEditPrompt('');
       setMagicEditNumImages(4);
+    } catch (error) {
+      console.error('Error creating magic-edit task:', error);
+      // Error handling is done by the useTaskQueueNotifier hook
     }
   };
 
@@ -663,10 +697,15 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
             {/* Generate Button */}
             <Button 
               onClick={handleMagicEditGenerate}
-              disabled={!magicEditPrompt.trim()}
+              disabled={!magicEditPrompt.trim() || isEnqueuing}
               className="w-full"
+              variant={justQueued ? "success" : "default"}
             >
-              Generate
+              {justQueued
+                ? "Added to queue!"
+                : isEnqueuing 
+                  ? 'Creating Task...' 
+                  : 'Generate'}
             </Button>
           </div>
         </DialogContent>
