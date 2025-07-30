@@ -46,6 +46,10 @@ interface BatchSettingsFormProps {
   accelerated: boolean;
   onAcceleratedChange: (value: boolean) => void;
   showStepsNotification?: boolean;
+  
+  // Random seed props  
+  randomSeed: boolean;
+  onRandomSeedChange: (value: boolean) => void;
 }
 
 const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
@@ -75,6 +79,8 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
   accelerated,
   onAcceleratedChange,
   showStepsNotification,
+  randomSeed,
+  onRandomSeedChange,
 }) => {
     const [showAdvanced, setShowAdvanced] = React.useState(false);
 
@@ -201,29 +207,26 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                 )}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
               <div className="relative">
-                <Label htmlFor="accelerated" className="text-sm font-medium block mb-1">Accelerated</Label>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">
-                      <Info className="h-4 w-4" />
-                    </span>
+                    <div className="flex items-center space-x-2 pt-2">
+                      <Switch
+                        id="accelerated"
+                        checked={accelerated}
+                        onCheckedChange={onAcceleratedChange}
+                      />
+                      <Label htmlFor="accelerated" className="text-sm cursor-help">Enable Accelerated Mode</Label>
+                      <Info className="h-4 w-4 text-muted-foreground" />
+                    </div>
                   </TooltipTrigger>
                   <TooltipContent>
                     <p>Accelerating speeds up the generation but loses prompt-adherence and motion quality.</p>
                   </TooltipContent>
                 </Tooltip>
-                <div className="flex items-center space-x-2 pt-2">
-                  <Switch
-                    id="accelerated"
-                    checked={accelerated}
-                    onCheckedChange={onAcceleratedChange}
-                  />
-                  <Label htmlFor="accelerated" className="text-sm">Enable Accelerated Mode</Label>
-                </div>
               </div>
-              <div className="relative">
+              <div className="relative md:col-span-3">
                 <Label htmlFor="batchVideoSteps" className="text-sm font-medium block mb-1">Generation Steps: {batchVideoSteps}</Label>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -253,7 +256,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
             <div>
               <Label className="text-sm font-medium block mb-2">Dimension Source</Label>
               <RadioGroup
-                value={dimensionSource || 'firstImage'}
+                value={dimensionSource || 'project'}
                 onValueChange={(value) => {
                   const newSource = value as 'project' | 'firstImage' | 'custom';
                   onDimensionSourceChange(newSource);
@@ -272,12 +275,12 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                 className="flex flex-wrap gap-x-4 gap-y-2"
               >
                 <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="firstImage" id="r_firstImage" />
-                  <Label htmlFor="r_firstImage">Use First Image Dimensions</Label>
-                </div>
-                <div className="flex items-center space-x-2">
                   <RadioGroupItem value="project" id="r_project" />
                   <Label htmlFor="r_project">Use Project Dimensions</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="firstImage" id="r_firstImage" />
+                  <Label htmlFor="r_firstImage">Use First Image Dimensions</Label>
                 </div>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="custom" id="r_custom" />
@@ -321,24 +324,18 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                 </Button>
               </CollapsibleTrigger>
               <CollapsibleContent className="space-y-4 pt-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="model_name">Model Name</Label>
-                    <Input
-                      id="model_name"
-                      value={steerableMotionSettings.model_name}
-                      onChange={(e) => onSteerableMotionSettingsChange({ model_name: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="seed">Seed</Label>
-                    <Input
-                      id="seed"
-                      type="number"
-                      value={steerableMotionSettings.seed}
-                      onChange={(e) => onSteerableMotionSettingsChange({ seed: parseInt(e.target.value, 10) || 0 })}
-                    />
-                  </div>
+                <div className="flex items-center space-x-2 mb-4">
+                  <Switch
+                    id="random-seed"
+                    checked={randomSeed}
+                    onCheckedChange={onRandomSeedChange}
+                  />
+                  <Label htmlFor="random-seed">Random Seed</Label>
+                  {!randomSeed && (
+                    <span className="text-sm text-muted-foreground ml-2">
+                      (Using seed: {steerableMotionSettings.seed})
+                    </span>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4 items-center">

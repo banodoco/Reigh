@@ -361,6 +361,22 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const [accelerated, setAccelerated] = useState(false);
   const [showStepsNotification, setShowStepsNotification] = useState(false);
   
+  // Random seed state
+  const [randomSeed, setRandomSeed] = useState(false);
+  
+  // Handle random seed changes
+  const handleRandomSeedChange = useCallback((value: boolean) => {
+    setRandomSeed(value);
+    if (value) {
+      // Generate a random seed
+      const newSeed = Math.floor(Math.random() * 1000000);
+      onSteerableMotionSettingsChange({ seed: newSeed });
+    } else {
+      // Set to default seed
+      onSteerableMotionSettingsChange({ seed: 789 });
+    }
+  }, [onSteerableMotionSettingsChange]);
+  
   // Handle accelerated mode changes
   const handleAcceleratedChange = useCallback((value: boolean) => {
     setAccelerated(value);
@@ -916,7 +932,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
     let resolution: string | undefined = undefined;
 
-    if ((dimensionSource || 'firstImage') === 'firstImage' && nonVideoImages.length > 0) {
+    if ((dimensionSource || 'project') === 'firstImage' && nonVideoImages.length > 0) {
       try {
         const firstImage = nonVideoImages[0];
         const imageUrl = getDisplayUrl(firstImage.imageUrl);
@@ -1001,6 +1017,11 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       enhance_prompt: enhancePrompt,
       openai_api_key: enhancePrompt ? openaiApiKey : '',
       show_input_images: steerableMotionSettings.show_input_images,
+      // Save UI state settings
+      dimension_source: dimensionSource,
+      generation_mode: generationMode,
+      accelerated_mode: accelerated,
+      random_seed: randomSeed,
     };
 
     if (selectedLoras && selectedLoras.length > 0) {
@@ -1616,6 +1637,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                             accelerated={accelerated}
                             onAcceleratedChange={handleAcceleratedChange}
                             showStepsNotification={showStepsNotification}
+                            randomSeed={randomSeed}
+                            onRandomSeedChange={handleRandomSeedChange}
                         />
                         
                         {/* LoRA Settings (Mobile) */}
