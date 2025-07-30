@@ -15,7 +15,7 @@ import { useDeleteGeneration } from "@/shared/hooks/useGenerations";
 import ShotImageManager from '@/shared/components/ShotImageManager';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/components/ui/collapsible";
 import { Input } from "@/shared/components/ui/input";
-import { ChevronsUpDown, Info, X, Save } from 'lucide-react';
+import { ChevronsUpDown, Info, X } from 'lucide-react';
 import { useIsMobile } from "@/shared/hooks/use-mobile";
 import { arrayMove } from '@dnd-kit/sortable';
 import { getDisplayUrl } from '@/shared/lib/utils';
@@ -25,6 +25,7 @@ import VideoOutputsGallery from "./VideoOutputsGallery";
 import BatchSettingsForm from "./BatchSettingsForm";
 import { LoraModel, LoraSelectorModal } from '@/shared/components/LoraSelectorModal';
 import { ActiveLoRAsDisplay, ActiveLora } from '@/shared/components/ActiveLoRAsDisplay';
+import { useLoraManager } from '@/shared/hooks/useLoraManager';
 import { useApiKeys } from '@/shared/hooks/useApiKeys';
 import { cropImageToProjectAspectRatio } from '@/shared/lib/imageCropper';
 import { parseRatio } from '@/shared/lib/aspectRatios';
@@ -137,13 +138,7 @@ export interface ShotEditorProps {
   steerableMotionSettings: SteerableMotionSettings;
   onSteerableMotionSettingsChange: (settings: Partial<SteerableMotionSettings>) => void;
   onGenerateAllSegments: () => void;
-  selectedLoras: ActiveLora[];
-  onAddLora: (lora: LoraModel) => void;
-  onRemoveLora: (loraId: string) => void;
-  onLoraStrengthChange: (loraId: string, strength: number) => void;
   availableLoras: LoraModel[];
-  isLoraModalOpen: boolean;
-  setIsLoraModalOpen: (isOpen: boolean) => void;
 
   generationMode: 'batch' | 'timeline';
   onGenerationModeChange: (mode: 'batch' | 'timeline') => void;
@@ -208,13 +203,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   customHeight,
   onCustomHeightChange,
   onGenerateAllSegments,
-  selectedLoras,
-  onAddLora,
-  onRemoveLora,
-  onLoraStrengthChange,
   availableLoras,
-  isLoraModalOpen,
-  setIsLoraModalOpen,
   enhancePrompt,
   onEnhancePromptChange,
   generationMode,
@@ -359,16 +348,14 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // Random seed state
   const [randomSeed, setRandomSeed] = useState(false);
   
-  // Success state for save button
-  const [saveSuccess, setSaveSuccess] = useState(false);
-  
-  // Project LoRA settings for save/load functionality
-  const { 
-    settings: projectLoraSettings, 
-    update: updateProjectLoraSettings,
-    isUpdating: isSavingLoras 
-  } = useToolSettings<{ loras?: { id: string; strength: number }[] }>('travel-between-images-loras', { 
-    projectId: selectedProjectId 
+  // LoRA management using the modularized hook
+  const loraManager = useLoraManager(availableLoras, {
+    projectId: selectedProjectId,
+    enableProjectPersistence: true,
+    persistenceKey: 'travel-between-images-loras',
+    enableTriggerWords: true,
+    onPromptUpdate: onBatchVideoPromptChange,
+    currentPrompt: batchVideoPrompt,
   });
   
   // Handle random seed changes
@@ -384,91 +371,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     }
   }, [onSteerableMotionSettingsChange]);
   
-  // Ref to track the latest prompt value to avoid stale state issues
-  const latestPromptRef = useRef(batchVideoPrompt);
-  
-  // Update ref whenever prompt changes
-  useEffect(() => {
-    latestPromptRef.current = batchVideoPrompt;
-  }, [batchVideoPrompt]);
-  
-  // Handle adding trigger words to prompt - ensures we always get the latest prompt value
-  const handleAddTriggerWord = useCallback((triggerWord: string) => {
-    const currentPrompt = latestPromptRef.current || '';
-    const newPrompt = currentPrompt.trim() ? `${currentPrompt}, ${triggerWord}` : triggerWord;
-    onBatchVideoPromptChange(newPrompt);
-    // Update ref immediately to handle rapid clicks
-    latestPromptRef.current = newPrompt;
-  }, [onBatchVideoPromptChange]);
-  
-  // Save current LoRAs to project settings
-  const handleSaveProjectLoras = useCallback(async () => {
-    if (!selectedProjectId) {
-      return;
-    }
-    
-    try {
-      const lorasToSave = selectedLoras.map(lora => ({
-        id: lora.id,
-        strength: lora.strength
-      }));
-      
-      await updateProjectLoraSettings('project', { loras: lorasToSave });
-      
-      // Show success state
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 2000); // Clear after 2 seconds
-    } catch (error) {
-      console.error('Error saving LoRAs:', error);
-    }
-  }, [selectedLoras, selectedProjectId, updateProjectLoraSettings]);
-  
-  // Load saved LoRAs from project settings
-  const handleLoadProjectLoras = useCallback(async () => {
-    const savedLoras = projectLoraSettings?.loras;
-    if (!savedLoras || savedLoras.length === 0) {
-      return;
-    }
-    
-    try {
-      // Get saved LoRA IDs for comparison
-      const savedLoraIds = new Set(savedLoras.map(lora => lora.id));
-      const currentLoraIds = new Set(selectedLoras.map(lora => lora.id));
-      
-      // Remove LoRAs that are not in the saved list
-      const lorasToRemove = selectedLoras.filter(lora => !savedLoraIds.has(lora.id));
-      lorasToRemove.forEach(lora => onRemoveLora(lora.id));
-      
-      // Add LoRAs that are not currently selected
-      const lorasToAdd = savedLoras.filter(savedLora => !currentLoraIds.has(savedLora.id));
-      
-      // Add missing LoRAs
-      for (const savedLora of lorasToAdd) {
-        const availableLora = availableLoras.find(lora => lora['Model ID'] === savedLora.id);
-        if (availableLora) {
-          onAddLora(availableLora);
-        } else {
-          console.warn(`LoRA ${savedLora.id} not found in available LoRAs`);
-        }
-      }
-      
-      // Update strengths for all saved LoRAs (including ones already selected)
-      // Use a longer timeout to ensure all add operations are processed
-      setTimeout(() => {
-        savedLoras.forEach(savedLora => {
-          const availableLora = availableLoras.find(lora => lora['Model ID'] === savedLora.id);
-          if (availableLora) {
-            onLoraStrengthChange(savedLora.id, savedLora.strength);
-          }
-        });
-      }, 50);
-    } catch (error) {
-      console.error('Error loading LoRAs:', error);
-    }
-  }, [projectLoraSettings?.loras, selectedLoras, onRemoveLora, availableLoras, onAddLora, onLoraStrengthChange]);
-  
-  // Check if there are saved LoRAs to show the Load button
-  const hasSavedLoras = projectLoraSettings?.loras && projectLoraSettings.loras.length > 0;
+
   
   // Handle accelerated mode changes
   const handleAcceleratedChange = useCallback((value: boolean) => {
@@ -1118,8 +1021,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       random_seed: randomSeed,
     };
 
-    if (selectedLoras && selectedLoras.length > 0) {
-      requestBody.loras = selectedLoras.map(l => ({ 
+    if (loraManager.selectedLoras && loraManager.selectedLoras.length > 0) {
+      requestBody.loras = loraManager.selectedLoras.map(l => ({ 
         path: l.path, 
         strength: parseFloat(l.strength?.toString() ?? '0') || 0.0 
       }));
@@ -1269,14 +1172,14 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           );
 
           if (matching) {
-            onAddLora(matching);
+            loraManager.handleAddLora(matching);
             // Wait a tick so it's added before updating strength
-            setTimeout(() => onLoraStrengthChange(matching["Model ID"], strength), 0);
+            setTimeout(() => loraManager.handleLoraStrengthChange(matching["Model ID"], strength), 0);
           } else {
             // Fallback: derive a name from filename and add a minimal LoraModel-like object
             const fileName = url.split('/').pop() || url;
             const derivedId = fileName.replace(/\.(safetensors|ckpt|pt)$/i, '');
-            onAddLora({
+            loraManager.handleAddLora({
               "Model ID": derivedId,
               Name: derivedId,
               Author: 'Imported',
@@ -1285,7 +1188,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
               huggingface_url: url,
               lora_type: 'motion',
             } as any);
-            setTimeout(() => onLoraStrengthChange(derivedId, strength), 0);
+            setTimeout(() => loraManager.handleLoraStrengthChange(derivedId, strength), 0);
           }
         });
       }
@@ -1739,7 +1642,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                             onSteerableMotionSettingsChange={onSteerableMotionSettingsChange}
                             projects={projects}
                             selectedProjectId={selectedProjectId}
-                            selectedLoras={selectedLoras}
+                            selectedLoras={loraManager.selectedLoras}
                             availableLoras={availableLoras}
                             isTimelineMode={generationMode === 'timeline'}
                             accelerated={accelerated}
@@ -1755,42 +1658,18 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                             <div className="space-y-4 p-4 border rounded-lg bg-card">
                                 <h3 className="font-semibold text-sm">LoRA Models</h3>
                                 
-                                <Button type="button" variant="outline" className="w-full" onClick={() => setIsLoraModalOpen(true)}>
+                                <Button type="button" variant="outline" className="w-full" onClick={() => loraManager.setIsLoraModalOpen(true)}>
                                     Add or Manage LoRAs
                                 </Button>
                                 
                                 <ActiveLoRAsDisplay
-                                    selectedLoras={selectedLoras}
-                                    onRemoveLora={onRemoveLora}
-                                    onLoraStrengthChange={onLoraStrengthChange}
+                                    selectedLoras={loraManager.selectedLoras}
+                                    onRemoveLora={loraManager.handleRemoveLora}
+                                    onLoraStrengthChange={loraManager.handleLoraStrengthChange}
                                     availableLoras={availableLoras}
                                     className="mt-4"
-                                    onAddTriggerWord={handleAddTriggerWord}
-                                    renderHeaderActions={() => (
-                                        <div className="flex gap-1 ml-2">
-                                            {hasSavedLoras && (
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={handleLoadProjectLoras}
-                                                    className="flex-[3] text-xs px-2 py-1 h-7"
-                                                >
-                                                    Load LoRAs
-                                                </Button>
-                                            )}
-                                            <Button
-                                                type="button"
-                                                variant={saveSuccess ? "default" : "outline"}
-                                                size="sm"
-                                                onClick={handleSaveProjectLoras}
-                                                disabled={selectedLoras.length === 0 || isSavingLoras}
-                                                className={`flex-1 text-xs px-1 py-1 h-7 ${saveSuccess ? 'bg-green-600 hover:bg-green-700 border-green-600' : ''}`}
-                                            >
-                                                <Save className="h-3 w-3" />
-                                            </Button>
-                                        </div>
-                                    )}
+                                    onAddTriggerWord={loraManager.handleAddTriggerWord}
+                                    renderHeaderActions={loraManager.renderHeaderActions}
                                 />
                             </div>
                         </div>
@@ -1828,42 +1707,18 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                         <div className="space-y-4 p-4 border rounded-lg bg-card">
                             <h3 className="font-semibold text-sm">LoRA Models</h3>
                             
-                            <Button type="button" variant="outline" className="w-full" onClick={() => setIsLoraModalOpen(true)}>
+                            <Button type="button" variant="outline" className="w-full" onClick={() => loraManager.setIsLoraModalOpen(true)}>
                                 Add or Manage LoRAs
                             </Button>
                             
                             <ActiveLoRAsDisplay
-                                selectedLoras={selectedLoras}
-                                onRemoveLora={onRemoveLora}
-                                onLoraStrengthChange={onLoraStrengthChange}
+                                selectedLoras={loraManager.selectedLoras}
+                                onRemoveLora={loraManager.handleRemoveLora}
+                                onLoraStrengthChange={loraManager.handleLoraStrengthChange}
                                 availableLoras={availableLoras}
                                 className="mt-4"
-                                onAddTriggerWord={handleAddTriggerWord}
-                                renderHeaderActions={() => (
-                                    <div className="flex gap-1 ml-2">
-                                        {hasSavedLoras && (
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={handleLoadProjectLoras}
-                                                className="flex-[3] text-xs px-2 py-1 h-7"
-                                            >
-                                                Load LoRAs
-                                            </Button>
-                                        )}
-                                        <Button
-                                            type="button"
-                                            variant={saveSuccess ? "default" : "outline"}
-                                            size="sm"
-                                            onClick={handleSaveProjectLoras}
-                                            disabled={selectedLoras.length === 0 || isSavingLoras}
-                                            className={`flex-1 text-xs px-1 py-1 h-7 ${saveSuccess ? 'bg-green-600 hover:bg-green-700 border-green-600' : ''}`}
-                                        >
-                                            <Save className="h-3 w-3" />
-                                        </Button>
-                                    </div>
-                                )}
+                                onAddTriggerWord={loraManager.handleAddTriggerWord}
+                                renderHeaderActions={loraManager.renderHeaderActions}
                             />
                         </div>
                     </div>
@@ -1874,13 +1729,13 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       </div>
       
       <LoraSelectorModal
-        isOpen={isLoraModalOpen}
-        onClose={() => setIsLoraModalOpen(false)}
+        isOpen={loraManager.isLoraModalOpen}
+        onClose={() => loraManager.setIsLoraModalOpen(false)}
         loras={availableLoras}
-        onAddLora={onAddLora}
-        onRemoveLora={onRemoveLora}
-        onUpdateLoraStrength={onLoraStrengthChange}
-        selectedLoras={selectedLoras.map(lora => {
+        onAddLora={loraManager.handleAddLora}
+        onRemoveLora={loraManager.handleRemoveLora}
+        onUpdateLoraStrength={loraManager.handleLoraStrengthChange}
+        selectedLoras={loraManager.selectedLoras.map(lora => {
           const fullLora = availableLoras.find(l => l['Model ID'] === lora.id);
           return {
             ...fullLora,
