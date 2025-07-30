@@ -220,7 +220,7 @@ export const useLoraManager = (
   const renderHeaderActions = useCallback(() => {
     if (!enableProjectPersistence) return null;
 
-    return React.createElement('div', { className: "flex gap-1 ml-2" }, [
+    return React.createElement('div', { className: "flex gap-1 ml-2 w-1/2" }, [
       hasSavedLoras && React.createElement('button', {
         key: 'load',
         type: "button",

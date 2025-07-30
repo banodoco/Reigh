@@ -103,13 +103,14 @@ const ActiveLoRAsDisplayComponent: React.FC<ActiveLoRAsDisplayProps> = ({
                             {onAddTriggerWord && (
                               <Tooltip>
                                 <TooltipTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => onAddTriggerWord(triggerWord)}
-                                    className="h-4 w-4 p-0 text-muted-foreground hover:text-foreground"
-                                    disabled={isGenerating}
-                                  >
+                                                                <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => onAddTriggerWord(triggerWord)}
+                                className="h-4 w-4 p-0 text-muted-foreground hover:text-foreground"
+                                disabled={isGenerating}
+                              >
                                     <Plus className="h-3 w-3" />
                                   </Button>
                                 </TooltipTrigger>
