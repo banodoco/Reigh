@@ -15,7 +15,7 @@ import { useDeleteGeneration } from "@/shared/hooks/useGenerations";
 import ShotImageManager from '@/shared/components/ShotImageManager';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/components/ui/collapsible";
 import { Input } from "@/shared/components/ui/input";
-import { ChevronsUpDown, Info, X } from 'lucide-react';
+import { ChevronsUpDown, Info, X, Save } from 'lucide-react';
 import { useIsMobile } from "@/shared/hooks/use-mobile";
 import { arrayMove } from '@dnd-kit/sortable';
 import { getDisplayUrl } from '@/shared/lib/utils';
@@ -1752,37 +1752,42 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                                     Add or Manage LoRAs
                                 </Button>
                                 
-                                {/* Save/Load LoRAs */}
-                                <div className="flex gap-2">
-                                    {hasSavedLoras && (
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={handleLoadProjectLoras}
-                                            className="flex-1"
-                                        >
-                                            Load LoRAs
-                                        </Button>
-                                    )}
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={handleSaveProjectLoras}
-                                        disabled={selectedLoras.length === 0 || isSavingLoras}
-                                        className="flex-1"
-                                    >
-                                        {isSavingLoras ? 'Saving...' : 'Save'}
-                                    </Button>
-                                </div>
+                                {/* Active LoRAs Header with Save/Load buttons */}
+                                {selectedLoras.length > 0 && (
+                                    <div className="flex items-center justify-between pt-2">
+                                        <h3 className="text-md font-semibold">Active LoRAs:</h3>
+                                        <div className="flex gap-1 ml-2">
+                                            {hasSavedLoras && (
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={handleLoadProjectLoras}
+                                                    className="flex-[3] text-xs px-2 py-1 h-7"
+                                                >
+                                                    Load LoRAs
+                                                </Button>
+                                            )}
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={handleSaveProjectLoras}
+                                                disabled={selectedLoras.length === 0 || isSavingLoras}
+                                                className="flex-1 text-xs px-1 py-1 h-7"
+                                            >
+                                                <Save className="h-3 w-3" />
+                                            </Button>
+                                        </div>
+                                    </div>
+                                )}
                                 
                                 <ActiveLoRAsDisplay
                                     selectedLoras={selectedLoras}
                                     onRemoveLora={onRemoveLora}
                                     onLoraStrengthChange={onLoraStrengthChange}
                                     availableLoras={availableLoras}
-                                    className="mt-4"
+                                    className="mt-4 [&>div>h3]:hidden"
                                     onAddTriggerWord={handleAddTriggerWord}
                                 />
                             </div>
@@ -1825,37 +1830,42 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                                 Add or Manage LoRAs
                             </Button>
                             
-                            {/* Save/Load LoRAs */}
-                            <div className="flex gap-2">
-                                {hasSavedLoras && (
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={handleLoadProjectLoras}
-                                        className="flex-1"
-                                    >
-                                        Load LoRAs
-                                    </Button>
-                                )}
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={handleSaveProjectLoras}
-                                    disabled={selectedLoras.length === 0 || isSavingLoras}
-                                    className="flex-1"
-                                >
-                                    {isSavingLoras ? 'Saving...' : 'Save'}
-                                </Button>
-                            </div>
+                            {/* Active LoRAs Header with Save/Load buttons */}
+                            {selectedLoras.length > 0 && (
+                                <div className="flex items-center justify-between pt-2">
+                                    <h3 className="text-md font-semibold">Active LoRAs:</h3>
+                                    <div className="flex gap-1 ml-2">
+                                        {hasSavedLoras && (
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={handleLoadProjectLoras}
+                                                className="flex-[3] text-xs px-2 py-1 h-7"
+                                            >
+                                                Load LoRAs
+                                            </Button>
+                                        )}
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={handleSaveProjectLoras}
+                                            disabled={selectedLoras.length === 0 || isSavingLoras}
+                                            className="flex-1 text-xs px-1 py-1 h-7"
+                                        >
+                                            <Save className="h-3 w-3" />
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
                             
                             <ActiveLoRAsDisplay
                                 selectedLoras={selectedLoras}
                                 onRemoveLora={onRemoveLora}
                                 onLoraStrengthChange={onLoraStrengthChange}
                                 availableLoras={availableLoras}
-                                className="mt-4"
+                                className="mt-4 [&>div>h3]:hidden"
                                 onAddTriggerWord={handleAddTriggerWord}
                             />
                         </div>
