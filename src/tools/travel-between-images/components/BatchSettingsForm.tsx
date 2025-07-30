@@ -245,7 +245,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                 />
                 {showStepsNotification && (
                   <p className="text-sm text-yellow-600 mt-1">
-                    Note: Manual step changes in Accelerated mode may affect performance.
+                    Note: We recommend {accelerated ? '8' : '20'} steps for {accelerated ? 'Accelerated' : 'Normal'} mode
                   </p>
                 )}
               </div>
