@@ -23,6 +23,7 @@ interface ActiveLoRAsDisplayProps {
   availableLoras?: any[]; // For video detection logic
   className?: string;
   onAddTriggerWord?: (triggerWord: string) => void;
+  renderHeaderActions?: () => React.ReactNode;
 }
 
 const ActiveLoRAsDisplayComponent: React.FC<ActiveLoRAsDisplayProps> = ({
@@ -33,15 +34,19 @@ const ActiveLoRAsDisplayComponent: React.FC<ActiveLoRAsDisplayProps> = ({
   availableLoras = [],
   className = "",
   onAddTriggerWord,
+  renderHeaderActions,
 }) => {
   if (selectedLoras.length === 0) {
     return null;
   }
 
-  return (
+      return (
     <TooltipProvider>
       <div className={`space-y-4 pt-2 ${className}`}>
-        <h3 className="text-md font-semibold">Active LoRAs:</h3>
+        <div className="flex items-center justify-between">
+          <h3 className="text-md font-semibold">Active LoRAs:</h3>
+          {renderHeaderActions && renderHeaderActions()}
+        </div>
         {selectedLoras.map((lora) => {
           // Check if preview is a video based on file extension or type
           const isVideo = lora.previewImageUrl && (
