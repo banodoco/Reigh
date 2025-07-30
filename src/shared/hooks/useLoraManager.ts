@@ -2,7 +2,6 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
 import { useToolSettings } from './useToolSettings';
 import { ActiveLora } from '@/shared/components/ActiveLoRAsDisplay';
-import { Tooltip, TooltipTrigger, TooltipContent } from '@/shared/components/ui/tooltip';
 
 // Re-export the LoraModel type for convenience
 export type { LoraModel } from '@/shared/components/LoraSelectorModal';
@@ -224,7 +223,7 @@ export const useLoraManager = (
     }
   }, [enableProjectPersistence, hasSavedLoras, selectedLoras.length, handleLoadProjectLoras]);
 
-  // Create a proper styled tooltip button using Radix UI Tooltip components
+  // Create a simple button with HTML title tooltip
   const createTooltipButton = (config: {
     key: string;
     onClick: () => void;
@@ -238,31 +237,14 @@ export const useLoraManager = (
       key: config.key + '-wrapper', 
       className: config.wrapperClassName 
     }, [
-      // Create proper Radix UI Tooltip
-      React.createElement(Tooltip, {
-        key: config.key + '-tooltip'
-      }, [
-        React.createElement(TooltipTrigger, {
-          key: config.key + '-trigger',
-          asChild: true
-        }, [
-          React.createElement('button', {
-            key: config.key,
-            type: "button",
-            onClick: config.onClick,
-            disabled: config.disabled,
-            className: config.className
-          }, config.children)
-        ]),
-        React.createElement(TooltipContent, {
-          key: config.key + '-content'
-        }, [
-          React.createElement('div', {
-            key: config.key + '-content-text',
-            style: { whiteSpace: 'pre-line' }
-          }, config.tooltipContent)
-        ])
-      ])
+      React.createElement('button', {
+        key: config.key,
+        type: "button",
+        onClick: config.onClick,
+        disabled: config.disabled,
+        className: config.className,
+        title: config.tooltipContent
+      }, config.children)
     ]);
   };
 
@@ -270,10 +252,10 @@ export const useLoraManager = (
   const renderHeaderActions = useCallback(() => {
     if (!enableProjectPersistence) return null;
 
-    // Format saved LoRAs for tooltip
+    // Format saved LoRAs for tooltip (single line for HTML title)
     const savedLorasContent = projectLoraSettings?.loras && projectLoraSettings.loras.length > 0
-      ? `Saved LoRAs (${projectLoraSettings.loras.length}):\n` + 
-        projectLoraSettings.loras.map(lora => `• ${lora.id} (strength: ${lora.strength})`).join('\n')
+      ? `Saved LoRAs (${projectLoraSettings.loras.length}): ` + 
+        projectLoraSettings.loras.map(lora => `${lora.id} (${lora.strength})`).join(', ')
       : 'No saved LoRAs available';
 
     return React.createElement('div', { className: "flex gap-1 ml-2 w-1/2" }, [
