@@ -238,7 +238,7 @@ export const useLoraManager = (
             : 'border-input bg-background hover:bg-accent hover:text-accent-foreground'
         }`
       }, React.createElement('svg', {
-        className: "h-3 w-3",
+        className: "h-4 w-4",
         fill: "none",
         stroke: "currentColor",
         viewBox: "0 0 24 24"
