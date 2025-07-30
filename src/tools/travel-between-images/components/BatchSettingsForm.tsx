@@ -338,57 +338,13 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 items-center">
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="debug"
-                      checked={steerableMotionSettings.debug ?? true}
-                      onCheckedChange={(v) => onSteerableMotionSettingsChange({ debug: v })}
-                    />
-                    <Label htmlFor="debug">Debug Mode</Label>
-                  </div>
-                  {!accelerated && (
-                    <>
-                      <div className="flex items-center space-x-2">
-                        <Switch
-                          id="apply_reward_lora"
-                          checked={steerableMotionSettings.apply_reward_lora ?? true}
-                          onCheckedChange={(v) => onSteerableMotionSettingsChange({ apply_reward_lora: v })}
-                        />
-                        <Label htmlFor="apply_reward_lora">Apply Reward LoRA</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Switch
-                          id="apply-causvid"
-                          checked={steerableMotionSettings.apply_causvid ?? true}
-                          onCheckedChange={(v) => onSteerableMotionSettingsChange({ 
-                            apply_causvid: v, 
-                            use_lighti2x_lora: v ? false : steerableMotionSettings.use_lighti2x_lora 
-                          })}
-                        />
-                        <Label htmlFor="apply-causvid">Apply Causvid</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Switch
-                          id="use-lighti2x-lora"
-                          checked={steerableMotionSettings.use_lighti2x_lora ?? false}
-                          onCheckedChange={(v) => onSteerableMotionSettingsChange({ 
-                            use_lighti2x_lora: v,
-                            apply_causvid: v ? false : steerableMotionSettings.apply_causvid
-                          })}
-                        />
-                        <Label htmlFor="use-lighti2x-lora">Use LightI2X LoRA</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Switch
-                          id="show-input-images"
-                          checked={steerableMotionSettings.show_input_images ?? false}
-                          onCheckedChange={(v) => onSteerableMotionSettingsChange({ show_input_images: v })}
-                        />
-                        <Label htmlFor="show-input-images">Show Input Images</Label>
-                      </div>
-                    </>
-                  )}
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="debug"
+                    checked={steerableMotionSettings.debug ?? true}
+                    onCheckedChange={(v) => onSteerableMotionSettingsChange({ debug: v })}
+                  />
+                  <Label htmlFor="debug">Debug Mode</Label>
                 </div>
               </CollapsibleContent>
             </Collapsible>

@@ -383,20 +383,13 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     setShowStepsNotification(false); // Reset notification
     
     if (value) {
-      // Enable accelerated mode
+      // Enable accelerated mode - just set steps to 8
       onBatchVideoStepsChange(8);
-      onSteerableMotionSettingsChange({
-        apply_causvid: true,
-        apply_reward_lora: false,
-        use_lighti2x_lora: false,
-        show_input_images: false,
-      });
     } else {
-      // Disable accelerated mode
+      // Disable accelerated mode - set steps to 20
       onBatchVideoStepsChange(20);
-      // Don't reset other settings, let user choose
     }
-  }, [onBatchVideoStepsChange, onSteerableMotionSettingsChange]);
+  }, [onBatchVideoStepsChange]);
   
   // Handle manual steps change in accelerated mode
   const handleStepsChange = useCallback((steps: number) => {
@@ -1005,10 +998,12 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       model_name: steerableMotionSettings.model_name,
       seed: steerableMotionSettings.seed,
       debug: steerableMotionSettings.debug,
-      apply_reward_lora: steerableMotionSettings.apply_reward_lora,
+      // Force these settings to false always
+      apply_reward_lora: false,
+      apply_causvid: false,
+      use_lighti2x_lora: false,
+      show_input_images: false,
       colour_match_videos: steerableMotionSettings.colour_match_videos ?? true,
-      apply_causvid: steerableMotionSettings.apply_causvid ?? true,
-      use_lighti2x_lora: steerableMotionSettings.use_lighti2x_lora ?? false,
       fade_in_duration: steerableMotionSettings.fade_in_duration,
       fade_out_duration: steerableMotionSettings.fade_out_duration,
       after_first_post_generation_saturation: steerableMotionSettings.after_first_post_generation_saturation,
@@ -1016,7 +1011,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       params_json_str: JSON.stringify({ steps: batchVideoSteps }),
       enhance_prompt: enhancePrompt,
       openai_api_key: enhancePrompt ? openaiApiKey : '',
-      show_input_images: steerableMotionSettings.show_input_images,
       // Save UI state settings
       dimension_source: dimensionSource,
       generation_mode: generationMode,
@@ -1134,15 +1128,16 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           model_name: params?.model_name || 'vace_14B',
           seed: params?.seed || 789,
           debug: params?.debug ?? true,
-          apply_reward_lora: params?.apply_reward_lora ?? false,
+          // Force these settings to false always
+          apply_reward_lora: false,
+          apply_causvid: false,
+          use_lighti2x_lora: false,
+          show_input_images: false,
           colour_match_videos: params?.colour_match_videos ?? true,
-          apply_causvid: params?.apply_causvid ?? true,
-          use_lighti2x_lora: params?.use_lighti2x_lora ?? false,
           fade_in_duration: params?.fade_in_duration || '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
           fade_out_duration: params?.fade_out_duration || '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
           after_first_post_generation_saturation: params?.after_first_post_generation_saturation ?? 1,
           after_first_post_generation_brightness: params?.after_first_post_generation_brightness ?? 0,
-          show_input_images: params?.show_input_images ?? false,
         },
       };
       
@@ -1239,7 +1234,22 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
     // Apply other settings
     if (settings.negativePrompt) {
-      onSteerableMotionSettingsChange({ negative_prompt: settings.negativePrompt });
+      onSteerableMotionSettingsChange({ 
+        negative_prompt: settings.negativePrompt,
+        // Force these settings to false always
+        apply_reward_lora: false,
+        apply_causvid: false,
+        use_lighti2x_lora: false,
+        show_input_images: false,
+      });
+    } else {
+      // Force these settings to false even if no negative prompt
+      onSteerableMotionSettingsChange({
+        apply_reward_lora: false,
+        apply_causvid: false,
+        use_lighti2x_lora: false,
+        show_input_images: false,
+      });
     }
     if (settings.steps) {
       onBatchVideoStepsChange(settings.steps);
