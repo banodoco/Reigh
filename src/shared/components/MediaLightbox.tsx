@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, X, FlipHorizontal, Save, Download, Trash2, Settings, PlusCircle, CheckCircle, Sparkles, Star } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, FlipHorizontal, Save, Download, Trash2, Settings, PlusCircle, CheckCircle, Star } from 'lucide-react';
 import { GenerationRow } from '@/types/shots';
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Button } from '@/shared/components/ui/button';
@@ -8,12 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { getDisplayUrl, cn } from '@/shared/lib/utils';
 import HoverScrubVideo from '@/shared/components/HoverScrubVideo';
 import SimpleVideoPlayer from '@/tools/travel-between-images/components/SimpleVideoPlayer';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/shared/components/ui/dialog';
-import { Textarea } from '@/shared/components/ui/textarea';
-import { Label } from '@/shared/components/ui/label';
-
 import { useToggleGenerationStar } from '@/shared/hooks/useGenerations';
-import MagicEditForm from '@/shared/components/MagicEditForm';
+import MagicEditLauncher from '@/shared/components/MagicEditLauncher';
 import { toast } from 'sonner';
 
 interface Shot {
@@ -79,7 +75,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   const [hasChanges, setHasChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
-  const [isMagicEditOpen, setIsMagicEditOpen] = useState(false);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   // Ref for the dialog content so we can programmatically focus it, enabling keyboard shortcuts immediately
@@ -410,20 +405,11 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     <Star className={`h-4 w-4 ${starred ? 'fill-current' : ''}`} />
                   </Button>
 
-                  {!isVideo && showMagicEdit && onMagicEdit && (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => setIsMagicEditOpen(true)}
-                          className="bg-black/50 hover:bg-black/70 text-white"
-                        >
-                          <Sparkles className="h-4 w-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Magic Edit</TooltipContent>
-                    </Tooltip>
+                  {!isVideo && showMagicEdit && (
+                    <MagicEditLauncher
+                      imageUrl={displayUrl}
+                      imageDimensions={imageDimensions}
+                    />
                   )}
 
                   {!isVideo && showImageEditTools && (
@@ -608,24 +594,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
         </DialogPrimitive.Portal>
       </DialogPrimitive.Root>
 
-      {/* Magic Edit Modal */}
-      <Dialog open={isMagicEditOpen} onOpenChange={setIsMagicEditOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5" />
-              Magic Edit
-            </DialogTitle>
-          </DialogHeader>
-          <div className="mt-4">
-            <MagicEditForm
-              imageUrl={displayUrl}
-              imageDimensions={imageDimensions}
-              onClose={() => setIsMagicEditOpen(false)}
-            />
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Magic Edit Modal handled by MagicEditLauncher */}
 
 
     </TooltipProvider>

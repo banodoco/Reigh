@@ -95,8 +95,8 @@ serve(async (req) => {
   if (!body.project_id) {
     return jsonResponse({ error: "project_id is required" }, 400);
   }
-  if (!body.image_urls || body.image_urls.length < 2) {
-    return jsonResponse({ error: "At least two image_urls are required" }, 400);
+  if (!body.image_urls || body.image_urls.length === 0) {
+    return jsonResponse({ error: "At least one image_url is required" }, 400);
   }
   if (!body.base_prompts || body.base_prompts.length === 0) {
     return jsonResponse({ error: "base_prompts is required (at least one prompt)" }, 400);
@@ -131,10 +131,8 @@ serve(async (req) => {
       finalResolution = ASPECT_RATIO_TO_RESOLUTION[aspectRatioKey] ?? ASPECT_RATIO_TO_RESOLUTION[DEFAULT_ASPECT_RATIO];
     }
 
-    const numSegments = body.image_urls.length - 1;
-    if (numSegments <= 0) {
-      return jsonResponse({ error: "Not enough images to create video segments (minimum 2 required)" }, 400);
-    }
+    const numSegments = Math.max(1, body.image_urls.length - 1);
+    // Allow single image video generation by ensuring at least 1 segment
 
     // Expand arrays if they have a single element and numSegments > 1
     const expandArray = (arr: any[] | undefined, count: number) => {

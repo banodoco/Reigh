@@ -41,6 +41,11 @@ interface BatchSettingsFormProps {
   availableLoras?: LoraModel[];
   afterEachPromptText?: string;
   onAfterEachPromptTextChange?: (value: string) => void;
+  
+  // New accelerated props
+  accelerated: boolean;
+  onAcceleratedChange: (value: boolean) => void;
+  showStepsNotification?: boolean;
 }
 
 const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
@@ -67,6 +72,9 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
   availableLoras,
   afterEachPromptText,
   onAfterEachPromptTextChange,
+  accelerated,
+  onAcceleratedChange,
+  showStepsNotification,
 }) => {
     const [showAdvanced, setShowAdvanced] = React.useState(false);
 
@@ -193,26 +201,54 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                 )}
             </div>
 
-            <div className="relative">
-              <Label htmlFor="batchVideoSteps" className="text-sm font-medium block mb-1">Generation Steps: {batchVideoSteps}</Label>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">
-                    <Info className="h-4 w-4" />
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Number of processing steps for each frame. <br /> Higher values can improve quality but increase generation time.</p>
-                </TooltipContent>
-              </Tooltip>
-              <Slider
-                id="batchVideoSteps"
-                min={1}
-                max={30}
-                step={1}
-                value={[batchVideoSteps]}
-                onValueChange={(value) => onBatchVideoStepsChange(value[0])}
-              />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+              <div className="relative">
+                <Label htmlFor="accelerated" className="text-sm font-medium block mb-1">Accelerated</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">
+                      <Info className="h-4 w-4" />
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Accelerating speeds up the generation but loses prompt-adherence and motion quality.</p>
+                  </TooltipContent>
+                </Tooltip>
+                <div className="flex items-center space-x-2 pt-2">
+                  <Switch
+                    id="accelerated"
+                    checked={accelerated}
+                    onCheckedChange={onAcceleratedChange}
+                  />
+                  <Label htmlFor="accelerated" className="text-sm">Enable Accelerated Mode</Label>
+                </div>
+              </div>
+              <div className="relative">
+                <Label htmlFor="batchVideoSteps" className="text-sm font-medium block mb-1">Generation Steps: {batchVideoSteps}</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">
+                      <Info className="h-4 w-4" />
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Number of processing steps for each frame. <br /> Higher values can improve quality but increase generation time.</p>
+                  </TooltipContent>
+                </Tooltip>
+                <Slider
+                  id="batchVideoSteps"
+                  min={1}
+                  max={30}
+                  step={1}
+                  value={[batchVideoSteps]}
+                  onValueChange={(value) => onBatchVideoStepsChange(value[0])}
+                />
+                {showStepsNotification && (
+                  <p className="text-sm text-yellow-600 mt-1">
+                    Note: Manual step changes in Accelerated mode may affect performance.
+                  </p>
+                )}
+              </div>
             </div>
             <div>
               <Label className="text-sm font-medium block mb-2">Dimension Source</Label>
@@ -314,44 +350,48 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                     />
                     <Label htmlFor="debug">Debug Mode</Label>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="apply_reward_lora"
-                      checked={steerableMotionSettings.apply_reward_lora ?? true}
-                      onCheckedChange={(v) => onSteerableMotionSettingsChange({ apply_reward_lora: v })}
-                    />
-                    <Label htmlFor="apply_reward_lora">Apply Reward LoRA</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="apply-causvid"
-                      checked={steerableMotionSettings.apply_causvid ?? true}
-                      onCheckedChange={(v) => onSteerableMotionSettingsChange({ 
-                        apply_causvid: v, 
-                        use_lighti2x_lora: v ? false : steerableMotionSettings.use_lighti2x_lora 
-                      })}
-                    />
-                    <Label htmlFor="apply-causvid">Apply Causvid</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="use-lighti2x-lora"
-                      checked={steerableMotionSettings.use_lighti2x_lora ?? false}
-                      onCheckedChange={(v) => onSteerableMotionSettingsChange({ 
-                        use_lighti2x_lora: v,
-                        apply_causvid: v ? false : steerableMotionSettings.apply_causvid
-                      })}
-                    />
-                    <Label htmlFor="use-lighti2x-lora">Use LightI2X LoRA</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="show-input-images"
-                      checked={steerableMotionSettings.show_input_images ?? false}
-                      onCheckedChange={(v) => onSteerableMotionSettingsChange({ show_input_images: v })}
-                    />
-                    <Label htmlFor="show-input-images">Show Input Images</Label>
-                  </div>
+                  {!accelerated && (
+                    <>
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          id="apply_reward_lora"
+                          checked={steerableMotionSettings.apply_reward_lora ?? true}
+                          onCheckedChange={(v) => onSteerableMotionSettingsChange({ apply_reward_lora: v })}
+                        />
+                        <Label htmlFor="apply_reward_lora">Apply Reward LoRA</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          id="apply-causvid"
+                          checked={steerableMotionSettings.apply_causvid ?? true}
+                          onCheckedChange={(v) => onSteerableMotionSettingsChange({ 
+                            apply_causvid: v, 
+                            use_lighti2x_lora: v ? false : steerableMotionSettings.use_lighti2x_lora 
+                          })}
+                        />
+                        <Label htmlFor="apply-causvid">Apply Causvid</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          id="use-lighti2x-lora"
+                          checked={steerableMotionSettings.use_lighti2x_lora ?? false}
+                          onCheckedChange={(v) => onSteerableMotionSettingsChange({ 
+                            use_lighti2x_lora: v,
+                            apply_causvid: v ? false : steerableMotionSettings.apply_causvid
+                          })}
+                        />
+                        <Label htmlFor="use-lighti2x-lora">Use LightI2X LoRA</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          id="show-input-images"
+                          checked={steerableMotionSettings.show_input_images ?? false}
+                          onCheckedChange={(v) => onSteerableMotionSettingsChange({ show_input_images: v })}
+                        />
+                        <Label htmlFor="show-input-images">Show Input Images</Label>
+                      </div>
+                    </>
+                  )}
                 </div>
               </CollapsibleContent>
             </Collapsible>

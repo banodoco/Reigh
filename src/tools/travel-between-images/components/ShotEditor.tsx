@@ -28,6 +28,7 @@ import { ActiveLoRAsDisplay, ActiveLora } from '@/shared/components/ActiveLoRAsD
 import { useApiKeys } from '@/shared/hooks/useApiKeys';
 import { cropImageToProjectAspectRatio } from '@/shared/lib/imageCropper';
 import { parseRatio } from '@/shared/lib/aspectRatios';
+
 import { Skeleton } from '@/shared/components/ui/skeleton';
 import { usePanes } from '@/shared/contexts/PanesContext';
 import Timeline from '@/tools/travel-between-images/components/Timeline';
@@ -355,6 +356,45 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // Shot name editing state
   const [isEditingName, setIsEditingName] = useState(false);
   const [editingName, setEditingName] = useState(selectedShot.name);
+  
+  // Accelerated mode state
+  const [accelerated, setAccelerated] = useState(false);
+  const [showStepsNotification, setShowStepsNotification] = useState(false);
+  
+  // Handle accelerated mode changes
+  const handleAcceleratedChange = useCallback((value: boolean) => {
+    setAccelerated(value);
+    setShowStepsNotification(false); // Reset notification
+    
+    if (value) {
+      // Enable accelerated mode
+      onBatchVideoStepsChange(8);
+      onSteerableMotionSettingsChange({
+        apply_causvid: true,
+        apply_reward_lora: false,
+        use_lighti2x_lora: false,
+        show_input_images: false,
+      });
+    } else {
+      // Disable accelerated mode
+      onBatchVideoStepsChange(20);
+      // Don't reset other settings, let user choose
+    }
+  }, [onBatchVideoStepsChange, onSteerableMotionSettingsChange]);
+  
+  // Handle manual steps change in accelerated mode
+  const handleStepsChange = useCallback((steps: number) => {
+    onBatchVideoStepsChange(steps);
+    
+    // Show notification if manually changing steps in accelerated mode
+    if (accelerated && steps !== 8) {
+      setShowStepsNotification(true);
+      // Hide notification after 5 seconds
+      setTimeout(() => setShowStepsNotification(false), 5000);
+    } else {
+      setShowStepsNotification(false);
+    }
+  }, [accelerated, onBatchVideoStepsChange]);
 
   // Update editing name when selected shot changes
   useEffect(() => {
@@ -391,7 +431,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // Use local state for optimistic updates on image list
   const [localOrderedShotImages, setLocalOrderedShotImages] = useState(orderedShotImages || []);
   
-  // Filter out generations without position
+  // Filter out generations without position and sort by position
   const filteredOrderedShotImages = useMemo(() => {
     const filtered = localOrderedShotImages.filter(img => {
       const hasPosition = (img as any).position !== null && (img as any).position !== undefined;
@@ -401,6 +441,19 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       const shouldInclude = hasPosition || isVideo;
       
       return shouldInclude;
+    });
+    
+    // Sort by position (ascending) to maintain user-intended order
+    filtered.sort((a, b) => {
+      const posA = (a as any).position;
+      const posB = (b as any).position;
+      if (posA != null && posB != null) return posA - posB;   // ascending
+      if (posA != null) return -1;
+      if (posB != null) return 1;
+      // fall back to createdAt (newest last so order is stable)
+      const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return timeA - timeB;
     });
     
     return filtered;
@@ -861,11 +914,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       return;
     }
 
-    if (nonVideoImages.length < 2) {
-      toast.warning('Add at least two images to generate a travel video.');
-      return;
-    }
-
     let resolution: string | undefined = undefined;
 
     if ((dimensionSource || 'firstImage') === 'firstImage' && nonVideoImages.length > 0) {
@@ -900,11 +948,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     const absoluteImageUrls = nonVideoImages
       .map((img) => getDisplayUrl(img.imageUrl)) // Use getDisplayUrl here
       .filter((url): url is string => Boolean(url) && url !== '/placeholder.svg');
-
-    if (absoluteImageUrls.length < 2) {
-      toast.error('Not enough valid image URLs to generate video. Ensure images are processed correctly.');
-      return;
-    }
 
     let basePrompts: string[];
     let segmentFrames: number[];
@@ -1005,6 +1048,20 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       
       // Extract settings from task params (same logic as the deprecated Express API)
       const params = task.params as any;
+
+      // Use the same input image extraction logic as TaskDetailsModal to ensure consistent ordering
+      const taskInputImages: string[] = (() => {
+        const p = params || {};
+        if (Array.isArray(p.input_images) && p.input_images.length > 0) return p.input_images;
+        if (p.full_orchestrator_payload && Array.isArray(p.full_orchestrator_payload.input_image_paths_resolved)) {
+          return p.full_orchestrator_payload.input_image_paths_resolved;
+        }
+        if (Array.isArray(p.input_image_paths_resolved)) return p.input_image_paths_resolved;
+        return [];
+      })();
+
+      
+      
       const orchestratorDetails = params?.full_orchestrator_payload ?? params?.orchestrator_details;
       
       const settings = {
@@ -1117,9 +1174,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         });
       }
       
-      // Handle image replacement if requested
-      if (replaceImages && inputImages && inputImages.length > 0) {
-        await handleReplaceImagesFromTask(inputImages);
+      // Handle image replacement if requested - use task data instead of passed inputImages for consistent ordering
+      if (replaceImages && taskInputImages && taskInputImages.length > 0) {
+
+        await handleReplaceImagesFromTask(taskInputImages);
       }
       
 
@@ -1185,6 +1243,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     }
 
     try {
+
       toast.info(`Replacing images with ${inputImages.length} images from previous generation...`);
       
       // First, remove all current non-video images
@@ -1203,6 +1262,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       }
 
       // Add the new images from the task
+
       const newGenerationRows: GenerationRow[] = [];
       for (let i = 0; i < inputImages.length; i++) {
         const imageUrl = inputImages[i];
@@ -1281,7 +1341,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // Check if generation should be disabled due to missing OpenAI API key for enhance prompt
   const openaiApiKey = getApiKey('openai_api_key');
   const isGenerationDisabledDueToApiKey = enhancePrompt && (!openaiApiKey || openaiApiKey.trim() === '');
-  const isGenerationDisabled = isEnqueuing || nonVideoImages.length < 2 || isGenerationDisabledDueToApiKey;
+  const isGenerationDisabled = isEnqueuing || isGenerationDisabledDueToApiKey;
 
   // Skeleton component for image manager
   const ImageManagerSkeleton = () => (
@@ -1537,7 +1597,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                             batchVideoContext={batchVideoContext}
                             onBatchVideoContextChange={onBatchVideoContextChange}
                             batchVideoSteps={batchVideoSteps}
-                            onBatchVideoStepsChange={onBatchVideoStepsChange}
+                            onBatchVideoStepsChange={handleStepsChange}
                             dimensionSource={dimensionSource}
                             onDimensionSourceChange={onDimensionSourceChange}
                             customWidth={customWidth}
@@ -1553,6 +1613,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                             isTimelineMode={generationMode === 'timeline'}
                             afterEachPromptText={afterEachPromptText}
                             onAfterEachPromptTextChange={onAfterEachPromptTextChange}
+                            accelerated={accelerated}
+                            onAcceleratedChange={handleAcceleratedChange}
+                            showStepsNotification={showStepsNotification}
                         />
                         
                         {/* LoRA Settings (Mobile) */}
@@ -1593,7 +1656,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                                     ? 'Creating Tasks...' 
                                     : 'Generate Video'}
                             </Button>
-                            {nonVideoImages.length < 2 && <p className="text-xs text-center text-muted-foreground mt-2">You need at least two images to generate videos.</p>}
                             {isGenerationDisabledDueToApiKey && (
                               <p className="text-xs text-center text-muted-foreground mt-2">
                                 If Enhance Prompt is enabled, you must add an{' '}

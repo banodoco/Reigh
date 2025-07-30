@@ -258,41 +258,77 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
     });
   };
 
-  // Handler wrapper
+  // Always refetch the latest tasks before computing progress so that we use
+  // up-to-date information rather than potentially stale cached data.
   const handleCheckProgress = () => {
-    if (!allProjectTasks) {
-      refetchAllTasks().then(({ data }) => {
-        if (data) computeAndShowProgress(data);
+    console.log('[TaskProgressDebug] Check Progress clicked for task:', task.id, 'taskType:', task.taskType);
+    console.log('[TaskProgressDebug] Current allProjectTasks length:', allProjectTasks?.length || 0);
+    
+    refetchAllTasks()
+      .then(({ data }) => {
+        console.log('[TaskProgressDebug] Refetch completed, data length:', data?.length || 0);
+        // Prefer freshly-fetched data when available
+        if (data && data.length > 0) {
+          console.log('[TaskProgressDebug] Using freshly fetched data');
+          computeAndShowProgress(data);
+        } else if (allProjectTasks) {
+          console.log('[TaskProgressDebug] Using cached allProjectTasks');
+          // Fallback to existing cached data if refetch didn't return anything
+          computeAndShowProgress(allProjectTasks);
+        } else {
+          console.log('[TaskProgressDebug] No data available for progress computation');
+        }
+      })
+      .catch(() => {
+        console.log('[TaskProgressDebug] Refetch failed, using cached data if available');
+        // If refetch fails, still attempt to compute progress from cached data
+        if (allProjectTasks) {
+          computeAndShowProgress(allProjectTasks);
+        }
       });
-    } else {
-      computeAndShowProgress(allProjectTasks);
-    }
   };
 
   const computeAndShowProgress = (tasksData: Task[]) => {
+    console.log('[TaskProgressDebug] computeAndShowProgress called with', tasksData.length, 'tasks');
     const pRoot: any = typeof task.params === 'string' ? JSON.parse(task.params) : task.params || {};
+    console.log('[TaskProgressDebug] Task params parsed:', pRoot);
     const orchestratorDetails = pRoot.orchestrator_details || {};
+    console.log('[TaskProgressDebug] orchestratorDetails:', orchestratorDetails);
     const orchestratorId = orchestratorDetails.orchestrator_task_id || pRoot.orchestrator_task_id || pRoot.task_id || task.id;
+    console.log('[TaskProgressDebug] orchestratorId resolved to:', orchestratorId);
     const orchestratorRunId = orchestratorDetails.run_id || pRoot.orchestrator_run_id;
+    console.log('[TaskProgressDebug] orchestratorRunId:', orchestratorRunId);
 
     const subtasks = tasksData.filter((t) => {
       const p: any = typeof t.params === 'string' ? JSON.parse(t.params) : t.params || {};
+      const matchesOrchestrator = (
+        (p.orchestrator_task_id_ref === orchestratorId || p.orchestrator_task_id === orchestratorId || p.orchestrator_task_id_ref === task.id || p.orchestrator_task_id === task.id || (orchestratorRunId && p.orchestrator_run_id === orchestratorRunId))
+        && t.id !== task.id
+      );
+      if (matchesOrchestrator) {
+        console.log('[TaskProgressDebug] Found subtask:', t.id, 'status:', t.status, 'taskType:', t.taskType, 'params:', p);
+      }
       return (
         (p.orchestrator_task_id_ref === orchestratorId || p.orchestrator_task_id === orchestratorId || p.orchestrator_task_id_ref === task.id || p.orchestrator_task_id === task.id || (orchestratorRunId && p.orchestrator_run_id === orchestratorRunId))
         && t.id !== task.id
       );
     });
 
+    console.log('[TaskProgressDebug] Found', subtasks.length, 'subtasks');
     if (subtasks.length === 0) {
+      console.log('[TaskProgressDebug] No subtasks found, showing toast');
       toast({ title: 'Progress', description: 'No subtasks found yet.', variant: 'default' });
       return;
     }
     // Progress is based on the ratio of completed subtasks to (total subtasks - 1)
     const completed = subtasks.filter((t) => t.status === 'Complete').length;
+    console.log('[TaskProgressDebug] Completed subtasks:', completed);
     const denominator = Math.max(subtasks.length - 1, 1); // Avoid divide-by-zero and remove the final stitch task
+    console.log('[TaskProgressDebug] Denominator:', denominator);
 
     const rawPercent = (completed / denominator) * 100;
     const percent = Math.round(Math.min(rawPercent, 100));
+    console.log('[TaskProgressDebug] Calculated progress:', percent, '% (raw:', rawPercent, ')');
 
     toast({ title: 'Progress', description: `${percent}% Complete`, variant: 'default' });
 

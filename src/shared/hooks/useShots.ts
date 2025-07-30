@@ -249,7 +249,8 @@ export const useListShots = (projectId?: string | null) => {
           .from('shot_generations')
           .select(`*, generation:generations(*)`)
           .in('shot_id', shotIds)
-          .range(offset, offset + BATCH_SIZE - 1);
+          .range(offset, offset + BATCH_SIZE - 1)
+          .order('position', { ascending: true, nullsFirst: false });
         
         if (sgError) {
           throw sgError;
@@ -265,13 +266,8 @@ export const useListShots = (projectId?: string | null) => {
         hasMore = batchSize === BATCH_SIZE;
         offset += BATCH_SIZE;
       }
-      
-      // Sort by generation creation date (newest first)
-      allShotGenerations.sort((a, b) => {
-        const aTime = a.generation?.created_at ? new Date(a.generation.created_at).getTime() : 0;
-        const bTime = b.generation?.created_at ? new Date(b.generation.created_at).getTime() : 0;
-        return bTime - aTime; // Newest first
-      });
+
+
       
       // Group by shot ID
       const shotGenerationsMap = new Map<string, any[]>();
@@ -281,7 +277,8 @@ export const useListShots = (projectId?: string | null) => {
         }
         shotGenerationsMap.get(sg.shot_id)!.push(sg);
       }
-      
+
+
       // Transform shots to include their generations
       const result = shots.map(shot => {
         const shotGenerations = shotGenerationsMap.get(shot.id) || [];

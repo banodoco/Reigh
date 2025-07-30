@@ -22,6 +22,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useGetTaskIdForGeneration, useCreateGeneration } from '@/shared/hooks/useGenerations';
 import { useGetTask } from '@/shared/hooks/useTasks';
 
+
 interface TaskDetailsModalProps {
   generationId: string;
   children: ReactNode;
@@ -97,10 +98,9 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
     onClose?.();
   };
 
-  const handleApplySettingsFromTask = () => {
+    const handleApplySettingsFromTask = () => {
     if (taskId && onApplySettingsFromTask && task) {
-      // Extract input images from task params
-      // Use the inputImages array we already derived from multiple sources
+      // Pass the correctly ordered inputImages array (derived from task JSON sources)
       onApplySettingsFromTask(taskId, replaceImages, inputImages);
     }
     setIsOpen(false);
