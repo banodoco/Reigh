@@ -2,6 +2,7 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
 import { useToolSettings } from './useToolSettings';
 import { ActiveLora } from '@/shared/components/ActiveLoRAsDisplay';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/shared/components/ui/tooltip';
 
 // Re-export the LoraModel type for convenience
 export type { LoraModel } from '@/shared/components/LoraSelectorModal';
@@ -223,7 +224,7 @@ export const useLoraManager = (
     }
   }, [enableProjectPersistence, hasSavedLoras, selectedLoras.length, handleLoadProjectLoras]);
 
-  // Create a simple tooltip button helper
+  // Create a proper styled tooltip button using Radix UI Tooltip components
   const createTooltipButton = (config: {
     key: string;
     onClick: () => void;
@@ -237,14 +238,31 @@ export const useLoraManager = (
       key: config.key + '-wrapper', 
       className: config.wrapperClassName 
     }, [
-      React.createElement('button', {
-        key: config.key,
-        type: "button",
-        onClick: config.onClick,
-        disabled: config.disabled,
-        className: config.className,
-        title: config.tooltipContent
-      }, config.children)
+      // Create proper Radix UI Tooltip
+      React.createElement(Tooltip, {
+        key: config.key + '-tooltip'
+      }, [
+        React.createElement(TooltipTrigger, {
+          key: config.key + '-trigger',
+          asChild: true
+        }, [
+          React.createElement('button', {
+            key: config.key,
+            type: "button",
+            onClick: config.onClick,
+            disabled: config.disabled,
+            className: config.className
+          }, config.children)
+        ]),
+        React.createElement(TooltipContent, {
+          key: config.key + '-content'
+        }, [
+          React.createElement('div', {
+            key: config.key + '-content-text',
+            style: { whiteSpace: 'pre-line' }
+          }, config.tooltipContent)
+        ])
+      ])
     ]);
   };
 
