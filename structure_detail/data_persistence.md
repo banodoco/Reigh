@@ -10,6 +10,7 @@
 |-------|-------|-------------|----------|-------|
 | **LocalStorage** | 📱 Device | `usePersistentState` | Instant UI state | Falls back to RAM if blocked |
 | **Postgres JSONB** | 🌐 Cross-device | `useToolSettings`, `useUserUIState` | Settings sync | Source of truth |
+| **Shot Settings** | 🎯 Per-entity | `useToolSettings` with shot scope | Entity-specific state | Synced across devices |
 | **Supabase Storage** | 📦 Assets | `imageUploader`, `useResources` | Media files | Images, videos, LoRAs |
 
 ---
@@ -47,6 +48,90 @@ Global UI preferences stored in user profile.
 ```typescript
 const { uiState, updateUIState } = useUserUIState();
 // Stores under users.settings.ui
+```
+
+---
+
+## 🎯 **Entity-Specific Database Persistence**
+
+For UI state that needs to sync across devices but varies by entity (shot, project), use `useToolSettings` with entity scope instead of `usePersistentState`.
+
+### Shot-Level UI Settings
+
+Store UI preferences specific to individual shots in the database:
+
+```typescript
+// Shot-specific UI settings stored in shots.settings JSONB
+const { 
+  settings: shotUISettings, 
+  update: updateShotUISettings,
+  isLoading: isShotUISettingsLoading 
+} = useToolSettings<{
+  timelineFramePositions?: Array<[string, number]>;
+  acceleratedMode?: boolean;
+  randomSeed?: boolean;
+}>('travel-ui-state', { 
+  projectId: selectedProjectId, 
+  shotId: selectedShot?.id,
+  enabled: !!selectedShot?.id 
+});
+
+// Access settings with fallbacks
+const accelerated = shotUISettings?.acceleratedMode ?? false;
+const randomSeed = shotUISettings?.randomSeed ?? false;
+
+// Update settings (automatically saves to database)
+const setAccelerated = useCallback((value: boolean) => {
+  updateShotUISettings('shot', { acceleratedMode: value });
+}, [updateShotUISettings]);
+```
+
+### Database Storage Structure
+
+Settings are stored in entity JSONB columns:
+
+```sql
+-- shots.settings JSONB example
+{
+  "travel-ui-state": {
+    "timelineFramePositions": [["gen-id-1", 30], ["gen-id-2", 60]],
+    "acceleratedMode": true,
+    "randomSeed": false
+  },
+  "image-generation": {
+    "lastUsedModel": "wan-local",
+    "preferredQuality": "high"
+  }
+}
+```
+
+### When to Use Database vs LocalStorage
+
+| Use **Database Storage** (`useToolSettings`) | Use **LocalStorage** (`usePersistentState`) |
+|-----------------------------------------------|----------------------------------------------|
+| ✅ Settings that should sync across devices | ✅ UI state that's device-specific |
+| ✅ Entity-specific preferences (per shot/project) | ✅ Temporary/session state |
+| ✅ Important workflow state | ✅ View preferences (collapsed panels, etc.) |
+| ✅ Generation parameters & configurations | ✅ Quick toggles & instant feedback |
+
+### Example: Complete Implementation
+
+```typescript
+// ❌ Old: localStorage-only approach
+const [accelerated, setAccelerated] = usePersistentState(
+  `travel-accelerated-${shotId}`, 
+  false
+);
+
+// ✅ New: database-synced approach
+const { settings: shotUISettings, update: updateShotUISettings } = useToolSettings<{
+  acceleratedMode?: boolean;
+}>('travel-ui-state', { shotId: selectedShot?.id });
+
+const accelerated = shotUISettings?.acceleratedMode ?? false;
+const setAccelerated = useCallback((value: boolean) => {
+  updateShotUISettings('shot', { acceleratedMode: value });
+}, [updateShotUISettings]);
 ```
 
 ---
@@ -118,13 +203,29 @@ const { uiState, updateUIState } = useUserUIState();
    ```
 
 2. **Use appropriate storage layer**
-   - UI state → `usePersistentState` (fast, local)
-   - Settings → `useToolSettings` (synced, persistent)
+   - Device-specific UI → `usePersistentState` (fast, local)
+   - Cross-device settings → `useToolSettings` (synced, persistent)
+   - Entity-specific state → `useToolSettings` with scope (shot/project)
    - Assets → Supabase Storage (CDN-backed)
 
-3. **Handle loading states**
+3. **Handle loading states for database settings**
    ```typescript
-   if (isLoading) return <Skeleton />;
+   if (isLoading || isShotUISettingsLoading) return <Skeleton />;
+   
+   // Safe access with fallbacks
+   const accelerated = shotUISettings?.acceleratedMode ?? false;
+   ```
+
+4. **Use proper scope for entity settings**
+   ```typescript
+   // For shot-specific settings
+   updateShotUISettings('shot', { setting: value });
+   
+   // For project-specific settings  
+   updateProjectSettings('project', { setting: value });
+   
+   // For user-global settings
+   updateUserSettings('user', { setting: value });
    ```
 
 ### ❌ DON'T
@@ -152,22 +253,41 @@ const { uiState, updateUIState } = useUserUIState();
 ## 🔧 Implementation Example
 
 ```typescript
-// Complete tool implementation with persistence
-export function MyTool() {
-  // 1. Load tool settings (cross-device)
-  const { settings } = useToolSettings('my-tool');
+// Complete tool implementation with all persistence patterns
+export function MyTool({ selectedShot, selectedProject }) {
+  // 1. Load tool settings (cross-device, scope-based)
+  const { settings } = useToolSettings('my-tool', { 
+    projectId: selectedProject?.id,
+    shotId: selectedShot?.id 
+  });
   
-  // 2. Local UI state (device-specific)
+  // 2. Entity-specific UI state (synced across devices)
+  const { 
+    settings: shotUISettings, 
+    update: updateShotUISettings,
+    isLoading: isShotUISettingsLoading 
+  } = useToolSettings('my-tool-ui', { 
+    shotId: selectedShot?.id,
+    enabled: !!selectedShot?.id 
+  });
+  
+  // 3. Local UI state (device-specific)
   const [activeTab, setActiveTab] = usePersistentState('my-tool-tab', 0);
   
-  // 3. Complex tool state (synced + debounced)
+  // 4. Complex tool state (synced + debounced)
   const { state, updateState } = usePersistentToolState(
     'my-tool',
     { prompts: [], config: {} }
   );
   
-  // 4. Global UI preferences
+  // 5. Global UI preferences
   const { uiState } = useUserUIState();
+  
+  // Handle loading states
+  if (isShotUISettingsLoading) return <Skeleton />;
+  
+  // Access entity settings with fallbacks
+  const myEntitySetting = shotUISettings?.mySetting ?? defaultValue;
   
   return (
     <div className={uiState.theme === 'dark' ? 'dark' : ''}>
@@ -179,37 +299,56 @@ export function MyTool() {
 
 ### Per-Entity State Persistence
 
-For UI state that varies by entity (shot, project, etc.), use `usePersistentState` with entity-scoped keys:
+#### ⚠️ Legacy Approach (localStorage)
+For UI state that varies by entity (shot, project, etc.), you can use `usePersistentState` with entity-scoped keys:
 
 ```typescript
-// Example: GenerationsPane filter settings per shot
+// Example: GenerationsPane filter settings per shot (localStorage only)
 const [shotSettings, setShotSettings] = usePersistentState<Record<string, FilterSettings>>(
   'generations-pane-shot-settings',
   {}
 );
-
-// Save settings for specific shot
-const updateShotSettings = (shotId: string, settings: FilterSettings) => {
-  setShotSettings(prev => ({
-    ...prev,
-    [shotId]: settings
-  }));
-};
-
-// Load settings for specific shot
-const getShotSettings = (shotId: string): FilterSettings => {
-  return shotSettings[shotId] || defaultSettings;
-};
 ```
+
+#### ✅ Recommended: Database Approach
+For state that should sync across devices, use `useToolSettings` with entity scope instead:
+
+```typescript
+// Better: Database-synced per-shot settings
+const { settings: shotUISettings, update: updateShotUISettings } = useToolSettings(
+  'my-tool-ui', 
+  { shotId: selectedShot?.id }
+);
+```
+
+See the **Entity-Specific Database Persistence** section above for full implementation details.
 
 ---
 
 ## 🚀 Quick Start for New Tools
 
+### Basic Tool Settings
 1. **Define settings schema** in `settings.ts`
-2. **Wrap state** with `usePersistentToolState`
-3. **Call `markAsInteracted()`** after user actions
-4. **Done!** State persists automatically
+2. **Use `useToolSettings`** for cross-device configuration
+3. **Use `usePersistentState`** for device-specific UI state
+
+### Entity-Specific State (Recommended for Complex Tools)
+1. **Use `useToolSettings` with entity scope** for shot/project-specific settings
+2. **Handle loading states** properly with `isLoading` checks  
+3. **Access with fallbacks** using `??` operator
+4. **Update with proper scope** ('shot', 'project', 'user')
+
+### Example Quick Setup
+```typescript
+// Entity-specific UI settings (synced across devices)
+const { settings: shotUI, update: updateShotUI } = useToolSettings(
+  'my-tool-ui', 
+  { shotId: selectedShot?.id }
+);
+
+// Device-specific preferences (localStorage)
+const [collapsed, setCollapsed] = usePersistentState('my-tool-collapsed', false);
+```
 
 ---
 

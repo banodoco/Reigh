@@ -356,7 +356,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   const loraManager = useLoraManager(availableLoras, {
     projectId: selectedProjectId,
     enableProjectPersistence: true,
-    persistenceKey: 'image-generation-loras',
+    persistenceKey: 'project-loras', // Standardized key shared across all tools
     enableTriggerWords: true,
     onPromptUpdate: setAfterEachPromptText,
     currentPrompt: afterEachPromptText,

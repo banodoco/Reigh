@@ -14,6 +14,8 @@ export interface UseLoraManagerOptions {
   enableProjectPersistence?: boolean;
   /** Storage key for project persistence (defaults to 'loras') */
   persistenceKey?: string;
+  /** Disable auto-loading of project LoRAs. Useful when parent component handles its own initialization logic. */
+  disableAutoLoad?: boolean;
   /** Enable trigger word integration with prompt updates */
   enableTriggerWords?: boolean;
   /** Callback to update prompt when trigger words are added */
@@ -45,6 +47,7 @@ export interface UseLoraManagerReturn {
   hasSavedLoras?: boolean;
   isSavingLoras?: boolean;
   saveSuccess?: boolean;
+  saveFlash?: boolean;
   
   // Render helpers
   renderHeaderActions?: () => React.ReactNode;
@@ -61,12 +64,22 @@ export const useLoraManager = (
     enableTriggerWords = false,
     onPromptUpdate,
     currentPrompt = '',
+    disableAutoLoad = false,
   } = options;
 
   // Core state
   const [selectedLoras, setSelectedLoras] = useState<ActiveLora[]>([]);
   const [isLoraModalOpen, setIsLoraModalOpen] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saveFlash, setSaveFlash] = useState(false);
+  const [userHasManuallyInteracted, setUserHasManuallyInteracted] = useState(false);
+  const [lastSavedLoras, setLastSavedLoras] = useState<{ id: string; strength: number }[] | null>(null);
+
+  // Refs to hold current state for callbacks, preventing stale closures
+  const selectedLorasRef = useRef(selectedLoras);
+  useEffect(() => {
+    selectedLorasRef.current = selectedLoras;
+  }, [selectedLoras]);
 
   // Track latest prompt value for trigger words
   const latestPromptRef = useRef(currentPrompt);
@@ -89,16 +102,18 @@ export const useLoraManager = (
   );
 
   // Core handlers
-  const handleAddLora = useCallback((loraToAdd: any) => {
+  const handleAddLora = useCallback((loraToAdd: any, isManualAction = true) => {
     if (selectedLoras.find(sl => sl.id === loraToAdd["Model ID"])) {
-      toast.info(`LoRA already added.`);
+      const loraName = loraToAdd.Name !== "N/A" ? loraToAdd.Name : loraToAdd["Model ID"];
+      toast.error(`"${loraName}" is already added to your selection.`);
       return;
     }
 
     if (loraToAdd["Model Files"] && loraToAdd["Model Files"].length > 0) {
+      const loraName = loraToAdd.Name !== "N/A" ? loraToAdd.Name : loraToAdd["Model ID"];
       const newLora: ActiveLora = {
         id: loraToAdd["Model ID"],
-        name: loraToAdd.Name !== "N/A" ? loraToAdd.Name : loraToAdd["Model ID"],
+        name: loraName,
         path: loraToAdd["Model Files"][0].url || loraToAdd["Model Files"][0].path,
         strength: 1.0,
         previewImageUrl: loraToAdd.Images && loraToAdd.Images.length > 0 
@@ -107,14 +122,25 @@ export const useLoraManager = (
         trigger_word: loraToAdd.trigger_word,
       };
       setSelectedLoras(prev => [...prev, newLora]);
+      if (isManualAction) {
+        setUserHasManuallyInteracted(true);
+      }
     } else {
       toast.error("Selected LoRA has no model file specified.");
     }
   }, [selectedLoras]);
 
-  const handleRemoveLora = useCallback((loraIdToRemove: string) => {
+  const handleRemoveLora = useCallback((loraIdToRemove: string, isManualAction = true) => {
+    const loraToRemove = selectedLoras.find(lora => lora.id === loraIdToRemove);
+    if (!loraToRemove) {
+      return;
+    }
+    
     setSelectedLoras(prev => prev.filter(lora => lora.id !== loraIdToRemove));
-  }, []);
+    if (isManualAction) {
+      setUserHasManuallyInteracted(true);
+    }
+  }, [selectedLoras]);
 
   const handleLoraStrengthChange = useCallback((loraId: string, newStrength: number) => {
     setSelectedLoras(prev => 
@@ -144,21 +170,29 @@ export const useLoraManager = (
       return;
     }
 
+    // Trigger flash immediately when button is pressed
+    setSaveFlash(true);
+
     try {
-      const lorasToSave = selectedLoras.map(lora => ({
+      const lorasToSave = selectedLorasRef.current.map(lora => ({
         id: lora.id,
         strength: lora.strength
       }));
 
       await updateProjectLoraSettings('project', { loras: lorasToSave });
 
-      // Show success state
+      // Update local cache of saved LoRAs for immediate tooltip update
+      setLastSavedLoras(lorasToSave);
+
+      // Only clear flash and show success after save completes
+      setSaveFlash(false);
       setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 2000); // Clear after 2 seconds
+      setTimeout(() => setSaveSuccess(false), 2000); // Clear success after 2 seconds
     } catch (error) {
       console.error('Error saving LoRAs:', error);
+      setSaveFlash(false); // Clear flash on error too
     }
-  }, [enableProjectPersistence, selectedLoras, projectId, updateProjectLoraSettings]);
+  }, [enableProjectPersistence, projectId, updateProjectLoraSettings]);
 
   const handleLoadProjectLoras = useCallback(async () => {
     if (!enableProjectPersistence) return;
@@ -169,13 +203,15 @@ export const useLoraManager = (
     }
 
     try {
+      // Reset the manual interaction flag when explicitly loading
+      setUserHasManuallyInteracted(false);
       // Get saved LoRA IDs for comparison
       const savedLoraIds = new Set(savedLoras.map(lora => lora.id));
       const currentLoraIds = new Set(selectedLoras.map(lora => lora.id));
 
       // Remove LoRAs that are not in the saved list
       const lorasToRemove = selectedLoras.filter(lora => !savedLoraIds.has(lora.id));
-      lorasToRemove.forEach(lora => handleRemoveLora(lora.id));
+      lorasToRemove.forEach(lora => handleRemoveLora(lora.id, false)); // false = not manual action
 
       // Add LoRAs that are not currently selected
       const lorasToAdd = savedLoras.filter(savedLora => !currentLoraIds.has(savedLora.id));
@@ -184,7 +220,7 @@ export const useLoraManager = (
       for (const savedLora of lorasToAdd) {
         const availableLora = availableLoras.find(lora => lora['Model ID'] === savedLora.id);
         if (availableLora) {
-          handleAddLora(availableLora);
+          handleAddLora(availableLora, false); // false = not manual action
         } else {
           console.warn(`LoRA ${savedLora.id} not found in available LoRAs`);
         }
@@ -213,17 +249,29 @@ export const useLoraManager = (
     handleLoraStrengthChange
   ]);
 
+  // Initialize lastSavedLoras when projectLoraSettings first loads
+  useEffect(() => {
+    if (projectLoraSettings?.loras && !lastSavedLoras) {
+      setLastSavedLoras(projectLoraSettings.loras);
+    }
+  }, [projectLoraSettings?.loras, lastSavedLoras]);
+
   // Check if there are saved LoRAs to show the Load button  
   const hasSavedLoras = enableProjectPersistence 
     && projectLoraSettings?.loras 
     && projectLoraSettings.loras.length > 0;
 
   // Auto-load saved LoRAs by default when they exist and no LoRAs are currently selected
+  // BUT only if the user hasn't manually interacted (to prevent re-adding after manual removal)
+  // Also skip entirely if disableAutoLoad flag is true
   useEffect(() => {
-    if (enableProjectPersistence && hasSavedLoras && selectedLoras.length === 0) {
+    if (disableAutoLoad) {
+      return;
+    }
+    if (enableProjectPersistence && hasSavedLoras && selectedLoras.length === 0 && !userHasManuallyInteracted) {
       handleLoadProjectLoras();
     }
-  }, [enableProjectPersistence, hasSavedLoras, selectedLoras.length, handleLoadProjectLoras]);
+  }, [enableProjectPersistence, hasSavedLoras, selectedLoras.length, handleLoadProjectLoras, userHasManuallyInteracted, disableAutoLoad]);
 
   // No longer needed - using proper JSX with Tooltip components
 
@@ -231,14 +279,48 @@ export const useLoraManager = (
   const renderHeaderActions = useCallback(() => {
     if (!enableProjectPersistence) return null;
 
-    // Format saved LoRAs for tooltip (multi-line)
-    const savedLorasContent = projectLoraSettings?.loras && projectLoraSettings.loras.length > 0
-      ? `Saved LoRAs (${projectLoraSettings.loras.length}):\n` + 
-        projectLoraSettings.loras.map(lora => `• ${lora.id} (strength: ${lora.strength})`).join('\n')
+    // Format saved LoRAs for tooltip (multi-line) - use lastSavedLoras for immediate updates
+    const currentSavedLoras = lastSavedLoras || projectLoraSettings?.loras;
+    const savedLorasContent = currentSavedLoras && currentSavedLoras.length > 0
+      ? `Saved LoRAs (${currentSavedLoras.length}):\n` + 
+        currentSavedLoras.map(lora => `• ${lora.id} (strength: ${lora.strength})`).join('\n')
       : 'No saved LoRAs available';
 
     return (
       <div className="flex gap-1 ml-2 w-1/2">
+        {/* Save LoRAs button with tooltip - 1/4 width */}
+        <div className="flex-1">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleSaveProjectLoras}
+                disabled={selectedLoras.length === 0 || isSavingLoras}
+                className={`w-full text-xs h-7 flex items-center justify-center transition-all duration-300 ${
+                  saveFlash
+                    ? 'bg-green-400 hover:bg-green-500 border-green-400 text-white scale-105' 
+                    : saveSuccess 
+                    ? 'bg-green-600 hover:bg-green-700 border-green-600 text-white' 
+                    : ''
+                }`}
+              >
+                <svg
+                  className="h-4 w-4"
+                  fill="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z" />
+                </svg>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Save current LoRAs selection</p>
+            </TooltipContent>
+          </Tooltip>
+        </div>
+        
         {/* Load LoRAs button with tooltip - 3/4 width */}
         <div className="flex-[3]">
           <Tooltip>
@@ -265,37 +347,6 @@ export const useLoraManager = (
             </TooltipContent>
           </Tooltip>
         </div>
-        
-        {/* Save LoRAs button with tooltip - 1/4 width */}
-        <div className="flex-1">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleSaveProjectLoras}
-                disabled={selectedLoras.length === 0 || isSavingLoras}
-                className={`w-full text-xs h-7 flex items-center justify-center ${
-                  saveSuccess 
-                    ? 'bg-green-600 hover:bg-green-700 border-green-600 text-white' 
-                    : ''
-                }`}
-              >
-                <svg
-                  className="h-4 w-4"
-                  fill="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z" />
-                </svg>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Save current LoRAs selection</p>
-            </TooltipContent>
-          </Tooltip>
-        </div>
       </div>
     );
   }, [
@@ -306,7 +357,9 @@ export const useLoraManager = (
     selectedLoras.length,
     isSavingLoras,
     saveSuccess,
-    projectLoraSettings?.loras
+    saveFlash,
+    projectLoraSettings?.loras,
+    lastSavedLoras
   ]);
 
   return {
@@ -331,6 +384,7 @@ export const useLoraManager = (
       hasSavedLoras,
       isSavingLoras,
       saveSuccess,
+      saveFlash,
       renderHeaderActions,
     }),
   };

@@ -52,11 +52,15 @@ interface TravelRequestBody {
   after_first_post_generation_saturation?: number;
   after_first_post_generation_brightness?: number;
   params_json_str?: string;
+  steps?: number;
   main_output_dir_for_run?: string;
   enhance_prompt?: boolean;
   openai_api_key?: string;
   loras?: Array<{ path: string; strength: number }>;
   show_input_images?: boolean;
+  accelerated_mode?: boolean;
+  generation_mode?: 'batch' | 'timeline';
+  dimension_source?: 'project' | 'firstImage' | 'custom';
 }
 
 // Helper for standard JSON responses with CORS headers
@@ -147,6 +151,22 @@ serve(async (req) => {
     const segmentFramesExpanded = expandArray(body.segment_frames, numSegments) || [];
     const frameOverlapExpanded = expandArray(body.frame_overlap, numSegments) || [];
 
+    // Extract steps parameter - prioritize top-level, then from JSON string, then default
+    let stepsValue = body.steps;
+    if (stepsValue === undefined && body.params_json_str) {
+      try {
+        const paramsJson = JSON.parse(body.params_json_str);
+        if (typeof paramsJson.steps === 'number') {
+          stepsValue = paramsJson.steps;
+        }
+      } catch (e) {
+        console.warn("[steerable-motion] Failed to parse params_json_str:", e);
+      }
+    }
+    if (stepsValue === undefined) {
+      stepsValue = 20; // Default value
+    }
+
     // Build orchestrator payload
     const orchestratorPayload: Record<string, unknown> = {
       orchestrator_task_id: orchestratorTaskId,
@@ -160,6 +180,7 @@ serve(async (req) => {
       parsed_resolution_wh: finalResolution,
       model_name: body.model_name ?? "vace_14B",
       seed_base: body.seed ?? 789,
+      steps: stepsValue,
       apply_reward_lora: body.apply_reward_lora ?? false,
       colour_match_videos: body.colour_match_videos ?? true,
       apply_causvid: body.apply_causvid ?? true,
@@ -172,15 +193,15 @@ serve(async (req) => {
         : body.fade_out_duration ?? '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
       after_first_post_generation_saturation: body.after_first_post_generation_saturation ?? 1,
       after_first_post_generation_brightness: body.after_first_post_generation_brightness ?? 0,
-      params_json_str_override: typeof body.params_json_str === "object" && body.params_json_str !== null
-        ? JSON.stringify(body.params_json_str)
-        : body.params_json_str ?? '{"steps":4}',
       debug_mode_enabled: body.debug ?? true,
       shot_id: body.shot_id ?? undefined,
       main_output_dir_for_run: body.main_output_dir_for_run ?? "./outputs/default_travel_output",
       enhance_prompt: body.enhance_prompt ?? false,
       openai_api_key: body.openai_api_key ?? "",
       show_input_images: body.show_input_images ?? false,
+      accelerated_mode: body.accelerated_mode ?? false,
+      generation_mode: body.generation_mode ?? "batch",
+      dimension_source: body.dimension_source ?? "project",
     };
 
     // Attach additional_loras mapping if provided

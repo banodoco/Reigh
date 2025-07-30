@@ -18,7 +18,6 @@ import { Skeleton } from '@/shared/components/ui/skeleton';
 import { PageFadeIn } from '@/shared/components/transitions';
 import { useListPublicResources } from '@/shared/hooks/useResources';
 import { ToolPageHeader } from '@/shared/components/ToolPageHeader';
-import { ActiveLora } from '@/shared/components/ActiveLoRAsDisplay';
 import { useToolPageHeader } from '@/shared/contexts/ToolPageHeaderContext';
 import { useContentResponsive, useContentResponsiveColumns } from '@/shared/hooks/useContentResponsive';
 import { timeEnd } from '@/shared/lib/logger';
@@ -92,8 +91,8 @@ const VideoTravelToolPage: React.FC = () => {
   const [isCreateShotModalOpen, setIsCreateShotModalOpen] = useState(false);
   const queryClient = useQueryClient();
   // const { lastAffectedShotId, setLastAffectedShotId } = useLastAffectedShot(); // Keep for later if needed
-  const [isLoraModalOpen, setIsLoraModalOpen] = useState(false);
-  const [selectedLoras, setSelectedLoras] = useState<ActiveLora[]>([]);
+  // const [isLoraModalOpen, setIsLoraModalOpen] = useState(false);
+  // const [selectedLoras, setSelectedLoras] = useState<ActiveLora[]>([]);
   const { setHeader, clearHeader } = useToolPageHeader();
   
   // Use the shot navigation hook
@@ -125,7 +124,7 @@ const VideoTravelToolPage: React.FC = () => {
   const [videoPairConfigs, setVideoPairConfigs] = useState<any[]>([]);
   const [generationMode, setGenerationMode] = useState<'batch' | 'timeline'>('batch');
   const [pairConfigs, setPairConfigs] = useState<any[]>([]);
-  const [afterEachPromptText, setAfterEachPromptText] = useState<string>('');
+  // const [afterEachPromptText, setAfterEachPromptText] = useState<string>(''); // Removed - not used in ShotEditor
   
   // Memoize expensive computations
   const shouldShowShotEditor = useMemo(() => {
@@ -291,7 +290,6 @@ const VideoTravelToolPage: React.FC = () => {
       setVideoPairConfigs(settings.pairConfigs || []);
       setGenerationMode(settings.generationMode === 'by-pair' ? 'batch' : (settings.generationMode || 'batch'));
       setPairConfigs(settings.pairConfigs || []);
-      setSelectedLoras(settings.selectedLoras || []);
       setSteerableMotionSettings(settings.steerableMotionSettings || {
     negative_prompt: '',
     model_name: 'vace_14B',
@@ -587,7 +585,7 @@ const VideoTravelToolPage: React.FC = () => {
     enhancePrompt,
     generationMode,
     pairConfigs,
-    selectedLoras,
+    // selectedLoras removed - now managed directly in ShotEditor
   }), [
           videoControlMode,
           batchVideoPrompt,
@@ -601,7 +599,7 @@ const VideoTravelToolPage: React.FC = () => {
           enhancePrompt,
           generationMode,
           pairConfigs,
-          selectedLoras,
+          // selectedLoras removed - now managed directly in ShotEditor
   ]);
 
   // Save settings to database whenever they change (optimized)
@@ -634,39 +632,10 @@ const VideoTravelToolPage: React.FC = () => {
     };
   }, [selectedShot?.id, currentSettings, settings, updateSettings, isUpdating]);
 
-  const handleAddLora = (loraToAdd: LoraModel) => {
-    if (selectedLoras.find(sl => sl.id === loraToAdd["Model ID"])) {
-      return;
-    }
-    if (loraToAdd["Model Files"] && loraToAdd["Model Files"].length > 0) {
-      userHasInteracted.current = true;
-      setSelectedLoras(prevLoras => [
-        ...prevLoras,
-        {
-          id: loraToAdd["Model ID"],
-          name: loraToAdd.Name !== "N/A" ? loraToAdd.Name : loraToAdd["Model ID"],
-          path: loraToAdd["Model Files"][0].url,
-          strength: 1.0,
-          previewImageUrl: loraToAdd.Images && loraToAdd.Images.length > 0 ? loraToAdd.Images[0].url : undefined,
-          trigger_word: loraToAdd.trigger_word,
-        },
-      ]);
-    } else {
-      console.error("Selected LoRA has no model file specified.");
-    }
-  };
-
-  const handleRemoveLora = (loraIdToRemove: string) => {
-    userHasInteracted.current = true;
-    setSelectedLoras(prevLoras => prevLoras.filter(lora => lora.id !== loraIdToRemove));
-  };
-
-  const handleLoraStrengthChange = (loraId: string, newStrength: number) => {
-    userHasInteracted.current = true;
-    setSelectedLoras(prevLoras =>
-      prevLoras.map(lora => (lora.id === loraId ? { ...lora, strength: newStrength } : lora))
-    );
-  };
+  // LoRA handlers removed - now managed directly in ShotEditor
+  // const handleAddLora = (loraToAdd: LoraModel) => { ... };
+  // const handleRemoveLora = (loraIdToRemove: string) => { ... };
+  // const handleLoraStrengthChange = (loraId: string, newStrength: number) => { ... };
 
   if (!selectedProjectId) {
     if (showProjectError) {
@@ -801,13 +770,8 @@ const VideoTravelToolPage: React.FC = () => {
               } : steerableMotionSettings}
               onSteerableMotionSettingsChange={isLoadingSettings ? () => {} : handleSteerableMotionSettingsChange}
               onGenerateAllSegments={() => {}}
-              selectedLoras={isLoadingSettings ? [] : selectedLoras}
-              onAddLora={isLoadingSettings ? () => {} : handleAddLora}
-              onRemoveLora={isLoadingSettings ? () => {} : handleRemoveLora}
-              onLoraStrengthChange={isLoadingSettings ? () => {} : handleLoraStrengthChange}
+              // LoRA props removed - now managed internally by ShotEditor
               availableLoras={availableLoras}
-              isLoraModalOpen={isLoraModalOpen}
-              setIsLoraModalOpen={setIsLoraModalOpen}
               enhancePrompt={isLoadingSettings ? false : enhancePrompt}
               onEnhancePromptChange={isLoadingSettings ? () => {} : (enhance) => {
                 userHasInteracted.current = true;
@@ -825,11 +789,7 @@ const VideoTravelToolPage: React.FC = () => {
               hasNext={hasNext}
               onUpdateShotName={handleUpdateShotName}
               settingsLoading={isLoadingSettings}
-              afterEachPromptText={isLoadingSettings ? '' : afterEachPromptText}
-              onAfterEachPromptTextChange={isLoadingSettings ? () => {} : (text) => {
-                userHasInteracted.current = true;
-                setAfterEachPromptText(text);
-              }}
+              // afterEachPromptText props removed - not in ShotEditorProps interface
             />
           </PageFadeIn>
         </Suspense>

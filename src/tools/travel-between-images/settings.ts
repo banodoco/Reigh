@@ -1,5 +1,5 @@
 import { SteerableMotionSettings } from './components/ShotEditor';
-import { ActiveLora } from '@/shared/components/ActiveLoRAsDisplay';
+// import { ActiveLora } from '@/shared/components/ActiveLoRAsDisplay'; // Removed - LoRAs now managed in ShotEditor
 
 export interface VideoTravelSettings {
   videoControlMode: 'individual' | 'batch';
@@ -22,8 +22,7 @@ export interface VideoTravelSettings {
   }>;
   // Store the shot images as part of settings
   shotImageIds?: string[];
-  // Store selected LoRAs
-  selectedLoras?: ActiveLora[];
+  // selectedLoras removed - now managed directly in ShotEditor with separate persistence
 }
 
 export const videoTravelSettings = {

@@ -312,23 +312,11 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & { onClose: () => void
               return (
                 <Card 
                   key={lora["Model ID"]} 
-                  className={`w-full cursor-pointer transition-all duration-200 ${
+                  className={`w-full transition-all duration-200 ${
                     isSelectedOnGenerator 
                       ? 'border-green-500 bg-green-50 dark:bg-green-950/20 shadow-sm' 
                       : 'hover:border-gray-400 hover:shadow-sm'
                   }`}
-                  onClick={(e) => {
-                    // Prevent click if clicking on a button
-                    const target = e.target as HTMLElement;
-                    if (target.closest('button')) return;
-                    
-                    // Toggle selection
-                    if (isSelectedOnGenerator) {
-                      onRemoveLora(lora["Model ID"]);
-                    } else if (lora["Model Files"] && lora["Model Files"].length > 0) {
-                      onAddLora(lora);
-                    }
-                  }}
                 >
                   <div className="flex flex-col">
                     <CardHeader className="pb-2">
@@ -353,6 +341,32 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & { onClose: () => void
                             </div>
                             <div className="flex flex-col lg:items-end gap-2 flex-shrink-0">
                               <div className="flex gap-2">
+                                {isSelectedOnGenerator ? (
+                                  <Button
+                                    variant="destructive"
+                                    size="sm"
+                                    onClick={() => {
+                                      console.log('[LoraRemovalDebug] Remove button clicked in LoraSelectorModal for LoRA:', { id: lora["Model ID"], name: lora.Name });
+                                      onRemoveLora(lora["Model ID"]);
+                                    }}
+                                  >
+                                    Remove
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    variant="default"
+                                    size="sm"
+                                    onClick={() => {
+                                      if (lora["Model Files"] && lora["Model Files"].length > 0) {
+                                        onAddLora(lora);
+                                      }
+                                    }}
+                                    disabled={!lora["Model Files"] || lora["Model Files"].length === 0}
+                                    className="bg-green-600 hover:bg-green-700"
+                                  >
+                                    Add
+                                  </Button>
+                                )}
                                 {!isMyLora && (
                                   <Button
                                       variant="outline"

@@ -2,7 +2,7 @@ import React from 'react';
 import { Button } from "@/shared/components/ui/button";
 import { Label } from "@/shared/components/ui/label";
 import { SliderWithValue } from "@/shared/components/ui/slider-with-value";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/shared/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/components/ui/tooltip";
 import HoverScrubVideo from "@/shared/components/HoverScrubVideo";
 import { X, Plus } from "lucide-react";
 
@@ -36,18 +36,19 @@ const ActiveLoRAsDisplayComponent: React.FC<ActiveLoRAsDisplayProps> = ({
   onAddTriggerWord,
   renderHeaderActions,
 }) => {
-  if (selectedLoras.length === 0) {
-    return null;
-  }
-
-      return (
-    <TooltipProvider>
-      <div className={`space-y-4 pt-2 ${className}`}>
-        <div className="flex items-center justify-between">
-          <h3 className="text-md font-semibold">Active LoRAs:</h3>
-          {renderHeaderActions && renderHeaderActions()}
+  return (
+    <div className={`space-y-4 pt-2 ${className}`}>
+      <div className="flex items-center justify-between">
+        <h3 className="text-md font-semibold">Active LoRAs:</h3>
+        {renderHeaderActions && renderHeaderActions()}
+      </div>
+      
+      {selectedLoras.length === 0 ? (
+        <div className="p-4 border rounded-md shadow-sm bg-slate-50/50 dark:bg-slate-800/30 text-center">
+          <p className="text-sm text-muted-foreground">None selected</p>
         </div>
-        {selectedLoras.map((lora) => {
+      ) : (
+        selectedLoras.map((lora) => {
           // Check if preview is a video based on file extension or type
           const isVideo = lora.previewImageUrl && (
             lora.previewImageUrl.match(/\.(mp4|webm|mov|avi)(\?|$)/i) ||
@@ -126,7 +127,7 @@ const ActiveLoRAsDisplayComponent: React.FC<ActiveLoRAsDisplayProps> = ({
                     <Button 
                       variant="ghost" 
                       size="icon" 
-                      onClick={() => onRemoveLora(lora.id)} 
+                      onClick={() => onRemoveLora(lora.id)}
                       className="text-destructive hover:bg-destructive/10 h-7 w-7 flex-shrink-0 ml-2" 
                       disabled={isGenerating}
                     >
@@ -146,23 +147,24 @@ const ActiveLoRAsDisplayComponent: React.FC<ActiveLoRAsDisplayProps> = ({
               </div>
             </div>
           );
-        })}
-      </div>
-    </TooltipProvider>
+        })
+      )}
+    </div>
   );
 };
 
 export const ActiveLoRAsDisplay = React.memo(
   ActiveLoRAsDisplayComponent,
   (prev, next) => {
-    // Re-render only if selected loras, isGenerating flag, or availableLoras length changed
+    // Re-render only if selected loras, isGenerating flag, availableLoras length, OR header actions changed
     return (
       prev.isGenerating === next.isGenerating &&
       prev.availableLoras?.length === next.availableLoras?.length &&
       prev.selectedLoras.length === next.selectedLoras.length &&
       prev.selectedLoras.every((l, idx) =>
         l.id === next.selectedLoras[idx]?.id && l.strength === next.selectedLoras[idx]?.strength
-      )
+      ) &&
+      prev.renderHeaderActions === next.renderHeaderActions
     );
   }
 );
