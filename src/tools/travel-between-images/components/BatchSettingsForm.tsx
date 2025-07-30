@@ -324,27 +324,29 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                 </Button>
               </CollapsibleTrigger>
               <CollapsibleContent className="space-y-4 pt-4">
-                <div className="flex items-center space-x-2 mb-4">
-                  <Switch
-                    id="random-seed"
-                    checked={randomSeed}
-                    onCheckedChange={onRandomSeedChange}
-                  />
-                  <Label htmlFor="random-seed">Random Seed</Label>
-                  {!randomSeed && (
-                    <span className="text-sm text-muted-foreground ml-2">
-                      (Using seed: {steerableMotionSettings.seed})
-                    </span>
-                  )}
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="debug"
-                    checked={steerableMotionSettings.debug ?? true}
-                    onCheckedChange={(v) => onSteerableMotionSettingsChange({ debug: v })}
-                  />
-                  <Label htmlFor="debug">Debug Mode</Label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="debug"
+                      checked={steerableMotionSettings.debug ?? true}
+                      onCheckedChange={(v) => onSteerableMotionSettingsChange({ debug: v })}
+                    />
+                    <Label htmlFor="debug">Debug Mode</Label>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="random-seed"
+                      checked={randomSeed}
+                      onCheckedChange={onRandomSeedChange}
+                    />
+                    <Label htmlFor="random-seed">Random Seed</Label>
+                    {!randomSeed && (
+                      <span className="text-sm text-muted-foreground ml-2">
+                        (Using seed: {steerableMotionSettings.seed})
+                      </span>
+                    )}
+                  </div>
                 </div>
               </CollapsibleContent>
             </Collapsible>
