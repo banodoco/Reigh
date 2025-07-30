@@ -401,7 +401,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // Save current LoRAs to project settings
   const handleSaveProjectLoras = useCallback(async () => {
     if (!selectedProjectId) {
-      toast.error('No project selected');
       return;
     }
     
@@ -412,10 +411,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       }));
       
       await updateProjectLoraSettings('project', { loras: lorasToSave });
-      toast.success(`Saved ${lorasToSave.length} LoRA(s) to project`);
     } catch (error) {
       console.error('Error saving LoRAs:', error);
-      toast.error('Failed to save LoRAs to project');
     }
   }, [selectedLoras, selectedProjectId, updateProjectLoraSettings]);
   
@@ -423,30 +420,43 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const handleLoadProjectLoras = useCallback(async () => {
     const savedLoras = projectLoraSettings?.loras;
     if (!savedLoras || savedLoras.length === 0) {
-      toast.error('No saved LoRAs found for this project');
       return;
     }
     
     try {
-      // Clear existing LoRAs first
-      selectedLoras.forEach(lora => onRemoveLora(lora.id));
+      // Get saved LoRA IDs for comparison
+      const savedLoraIds = new Set(savedLoras.map(lora => lora.id));
+      const currentLoraIds = new Set(selectedLoras.map(lora => lora.id));
       
-      // Add saved LoRAs
-      for (const savedLora of savedLoras) {
+      // Remove LoRAs that are not in the saved list
+      const lorasToRemove = selectedLoras.filter(lora => !savedLoraIds.has(lora.id));
+      lorasToRemove.forEach(lora => onRemoveLora(lora.id));
+      
+      // Add LoRAs that are not currently selected
+      const lorasToAdd = savedLoras.filter(savedLora => !currentLoraIds.has(savedLora.id));
+      
+      // Add missing LoRAs
+      for (const savedLora of lorasToAdd) {
         const availableLora = availableLoras.find(lora => lora['Model ID'] === savedLora.id);
         if (availableLora) {
           onAddLora(availableLora);
-          // Use setTimeout to ensure the LoRA is added before setting strength
-          setTimeout(() => onLoraStrengthChange(savedLora.id, savedLora.strength), 10);
         } else {
           console.warn(`LoRA ${savedLora.id} not found in available LoRAs`);
         }
       }
       
-      toast.success(`Loaded ${savedLoras.length} LoRA(s) from project`);
+      // Update strengths for all saved LoRAs (including ones already selected)
+      // Use a longer timeout to ensure all add operations are processed
+      setTimeout(() => {
+        savedLoras.forEach(savedLora => {
+          const availableLora = availableLoras.find(lora => lora['Model ID'] === savedLora.id);
+          if (availableLora) {
+            onLoraStrengthChange(savedLora.id, savedLora.strength);
+          }
+        });
+      }, 50);
     } catch (error) {
       console.error('Error loading LoRAs:', error);
-      toast.error('Failed to load LoRAs from project');
     }
   }, [projectLoraSettings?.loras, selectedLoras, onRemoveLora, availableLoras, onAddLora, onLoraStrengthChange]);
   
