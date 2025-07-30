@@ -211,27 +211,48 @@ export const useLoraManager = (
     handleLoraStrengthChange
   ]);
 
-  // Check if there are saved LoRAs to show the Load button
+  // Check if there are saved LoRAs to show the Load button  
   const hasSavedLoras = enableProjectPersistence 
     && projectLoraSettings?.loras 
     && projectLoraSettings.loras.length > 0;
+
+  // Auto-load saved LoRAs by default when they exist and no LoRAs are currently selected
+  useEffect(() => {
+    if (enableProjectPersistence && hasSavedLoras && selectedLoras.length === 0) {
+      handleLoadProjectLoras();
+    }
+  }, [enableProjectPersistence, hasSavedLoras, selectedLoras.length, handleLoadProjectLoras]);
 
   // Render header actions for ActiveLoRAsDisplay
   const renderHeaderActions = useCallback(() => {
     if (!enableProjectPersistence) return null;
 
+    // Format saved LoRAs for tooltip
+    const savedLorasTooltip = projectLoraSettings?.loras && projectLoraSettings.loras.length > 0
+      ? projectLoraSettings.loras.map(lora => `${lora.id} (${lora.strength})`).join('\n')
+      : 'No saved LoRAs';
+
     return React.createElement('div', { className: "flex gap-1 ml-2 w-1/2" }, [
-      hasSavedLoras && React.createElement('button', {
+      // Load LoRAs button (always shown)
+      React.createElement('button', {
         key: 'load',
         type: "button",
         onClick: handleLoadProjectLoras,
-        className: "flex-[3] text-xs px-2 py-1 h-7 border border-input bg-background hover:bg-accent hover:text-accent-foreground rounded-md"
+        disabled: !hasSavedLoras,
+        title: `Saved LoRAs:\n${savedLorasTooltip}`,
+        className: `flex-[3] text-xs px-2 py-1 h-7 border border-input rounded-md ${
+          hasSavedLoras 
+            ? 'bg-background hover:bg-accent hover:text-accent-foreground' 
+            : 'bg-muted text-muted-foreground cursor-not-allowed'
+        }`
       }, 'Load LoRAs'),
+      // Save LoRAs button with floppy disk icon
       React.createElement('button', {
         key: 'save',
         type: "button",
         onClick: handleSaveProjectLoras,
         disabled: selectedLoras.length === 0 || isSavingLoras,
+        title: 'Save current LoRAs selection',
         className: `flex-1 text-xs px-1 py-1 h-7 border rounded-md flex items-center justify-center ${
           saveSuccess 
             ? 'bg-green-600 hover:bg-green-700 border-green-600 text-white' 
@@ -239,16 +260,12 @@ export const useLoraManager = (
         }`
       }, React.createElement('svg', {
         className: "h-4 w-4",
-        fill: "none",
-        stroke: "currentColor",
+        fill: "currentColor",
         viewBox: "0 0 24 24"
       }, React.createElement('path', {
-        strokeLinecap: "round",
-        strokeLinejoin: "round",
-        strokeWidth: 2,
-        d: "M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3-3m0 0l-3 3m3-3v12"
+        d: "M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"
       })))
-    ].filter(Boolean));
+    ]);
   }, [
     enableProjectPersistence,
     hasSavedLoras,
@@ -256,7 +273,8 @@ export const useLoraManager = (
     handleSaveProjectLoras,
     selectedLoras.length,
     isSavingLoras,
-    saveSuccess
+    saveSuccess,
+    projectLoraSettings?.loras
   ]);
 
   return {
