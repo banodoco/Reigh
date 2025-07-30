@@ -7,6 +7,7 @@ import { LoraSelectorModal, LoraModel } from "@/shared/components/LoraSelectorMo
 import { DisplayableMetadata } from "@/shared/components/ImageGallery";
 import { UploadCloud, PlusCircle, Edit3, Trash2 } from "lucide-react";
 import { ActiveLoRAsDisplay, ActiveLora } from "@/shared/components/ActiveLoRAsDisplay";
+import { useLoraManager } from '@/shared/hooks/useLoraManager';
 import { toast } from "sonner";
 import { cropImageToClosestAspectRatio, CropResult } from "@/shared/lib/imageCropper";
 import { 
@@ -328,8 +329,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   const promptIdCounter = useRef(1);
   const [isPromptModalOpen, setIsPromptModalOpen] = useState(false);
   const [imagesPerPrompt, setImagesPerPrompt] = useState(1);
-  const [selectedLoras, setSelectedLoras] = useState<ActiveLora[]>([]);
-  const [isLoraModalOpen, setIsLoraModalOpen] = useState(false);
   const defaultsApplied = useRef(false);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [directFormActivePromptId, setDirectFormActivePromptId] = useState<string | null>(null);
@@ -352,6 +351,16 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   // Fetch public LoRAs from all users
   const { data: publicLorasData } = useListPublicResources('lora');
   const availableLoras: LoraModel[] = publicLorasData?.map(resource => resource.metadata) || [];
+
+  // LoRA management using the modularized hook
+  const loraManager = useLoraManager(availableLoras, {
+    projectId: selectedProjectId,
+    enableProjectPersistence: true,
+    persistenceKey: 'image-generation-loras',
+    enableTriggerWords: true,
+    onPromptUpdate: setAfterEachPromptText,
+    currentPrompt: afterEachPromptText,
+  });
 
   // Get the effective shot ID for storage (use 'none' for null)
   const effectiveShotId = associatedShotId || 'none';
@@ -377,7 +386,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     {
       promptsByShot: [promptsByShot, setPromptsByShot],
       imagesPerPrompt: [imagesPerPrompt, setImagesPerPrompt],
-      selectedLoras: [selectedLoras, setSelectedLoras],
+      selectedLoras: [loraManager.selectedLoras, loraManager.setSelectedLoras],
       beforeEachPromptText: [beforeEachPromptText, setBeforeEachPromptText],
       afterEachPromptText: [afterEachPromptText, setAfterEachPromptText],
       associatedShotId: [associatedShotId, setAssociatedShotId],
@@ -429,9 +438,9 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
             });
           }
         });
-        setSelectedLoras(newSelectedLoras);
+        loraManager.setSelectedLoras(newSelectedLoras);
       } else {
-        setSelectedLoras([]);
+        loraManager.setSelectedLoras([]);
       }
 
       if (settings.beforeEachPromptText !== undefined) setBeforeEachPromptText(settings.beforeEachPromptText);
@@ -446,7 +455,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       ready &&
       !defaultsApplied.current && 
       availableLoras.length > 0 && 
-      selectedLoras.length === 0
+      loraManager.selectedLoras.length === 0
     ) { 
       const newSelectedLoras: ActiveLora[] = [];
       for (const defaultConfig of defaultLorasConfig) {
@@ -463,40 +472,24 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         }
       }
       if (newSelectedLoras.length > 0) {
-        setSelectedLoras(newSelectedLoras);
+        loraManager.setSelectedLoras(newSelectedLoras);
         defaultsApplied.current = true;
       }
     } 
-  }, [generationMode, availableLoras, ready, selectedLoras.length]);
+  }, [generationMode, availableLoras, ready, loraManager.selectedLoras.length]);
 
+  // Wrap loraManager handlers to maintain markAsInteracted behavior
   const handleAddLora = (loraToAdd: LoraModel) => { 
     markAsInteracted();
-    if (selectedLoras.find(sl => sl.id === loraToAdd["Model ID"])) { toast.info(`LoRA already added.`); return; }
-    if (loraToAdd["Model Files"] && loraToAdd["Model Files"].length > 0) {
-      const newLora = {
-        id: loraToAdd["Model ID"], 
-        name: loraToAdd.Name !== "N/A" ? loraToAdd.Name : loraToAdd["Model ID"],
-        path: loraToAdd["Model Files"][0].url, 
-        strength: 1.0, 
-        previewImageUrl: loraToAdd.Images && loraToAdd.Images.length > 0 ? loraToAdd.Images[0].url : undefined,
-        trigger_word: loraToAdd.trigger_word,
-      };
-      const updatedLoras = [...selectedLoras, newLora];
-      setSelectedLoras(updatedLoras);
-
-    } else { toast.error("Selected LoRA has no model file specified."); }
+    loraManager.handleAddLora(loraToAdd);
   };
   const handleRemoveLora = (loraIdToRemove: string) => {
     markAsInteracted();
-    const updatedLoras = selectedLoras.filter(lora => lora.id !== loraIdToRemove);
-    setSelectedLoras(updatedLoras);
+    loraManager.handleRemoveLora(loraIdToRemove);
   };
   const handleLoraStrengthChange = (loraId: string, newStrength: number) => {
     markAsInteracted();
-    const updatedLoras = selectedLoras.map(lora => 
-      lora.id === loraId ? { ...lora, strength: newStrength } : lora
-    );
-    setSelectedLoras(updatedLoras);
+    loraManager.handleLoraStrengthChange(loraId, newStrength);
   };
 
   const handleAddPrompt = (source: 'form' | 'modal' = 'form') => {
@@ -555,7 +548,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     e.preventDefault();    
 
     // Map selected LoRAs to the format expected by the task creation
-    const lorasForApi = selectedLoras.map(lora => ({
+    const lorasForApi = loraManager.selectedLoras.map(lora => ({
       path: lora.path,
       strength: parseFloat(lora.strength?.toString() ?? '0') || 0.0
     }));
@@ -578,7 +571,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       }), 
       imagesPerPrompt, 
       loras: lorasForApi, 
-      fullSelectedLoras: selectedLoras,
+      fullSelectedLoras: loraManager.selectedLoras,
       generationMode,
       associatedShotId
     };
@@ -864,17 +857,19 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
           <div className="space-y-6 md:order-2 md:row-start-1 md:col-start-2">
             <div>
               <Label>LoRA Models (Wan)</Label>
-              <Button type="button" variant="outline" className="w-full mt-1" onClick={() => setIsLoraModalOpen(true)} disabled={isGenerating}>
+              <Button type="button" variant="outline" className="w-full mt-1" onClick={() => loraManager.setIsLoraModalOpen(true)} disabled={isGenerating}>
                 Add or Manage LoRA Models
               </Button>
               
               <ActiveLoRAsDisplay
-                selectedLoras={selectedLoras}
+                selectedLoras={loraManager.selectedLoras}
                 onRemoveLora={handleRemoveLora}
                 onLoraStrengthChange={handleLoraStrengthChange}
                 isGenerating={isGenerating}
                 availableLoras={availableLoras}
                 className="mt-4"
+                onAddTriggerWord={loraManager.handleAddTriggerWord}
+                renderHeaderActions={loraManager.renderHeaderActions}
               />
             </div>
           </div>
@@ -898,13 +893,13 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
 
       <Suspense fallback={<div>Loading LoraSelectorModal...</div>}>
         <LazyLoraSelectorModal
-          isOpen={isLoraModalOpen}
-          onClose={() => setIsLoraModalOpen(false)}
+          isOpen={loraManager.isLoraModalOpen}
+          onClose={() => loraManager.setIsLoraModalOpen(false)}
           loras={availableLoras}
           onAddLora={handleAddLora}
           onRemoveLora={handleRemoveLora}
           onUpdateLoraStrength={handleLoraStrengthChange}
-          selectedLoras={selectedLoras.map(lora => {
+          selectedLoras={loraManager.selectedLoras.map(lora => {
             const fullLora = availableLoras.find(l => l['Model ID'] === lora.id);
             return {
               ...fullLora,
