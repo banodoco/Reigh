@@ -2,6 +2,8 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
 import { useToolSettings } from './useToolSettings';
 import { ActiveLora } from '@/shared/components/ActiveLoRAsDisplay';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/shared/components/ui/tooltip';
+import { Button } from '@/shared/components/ui/button';
 
 // Re-export the LoraModel type for convenience
 export type { LoraModel } from '@/shared/components/LoraSelectorModal';
@@ -223,78 +225,79 @@ export const useLoraManager = (
     }
   }, [enableProjectPersistence, hasSavedLoras, selectedLoras.length, handleLoadProjectLoras]);
 
-  // Create a simple button with HTML title tooltip
-  const createTooltipButton = (config: {
-    key: string;
-    onClick: () => void;
-    disabled: boolean;
-    tooltipContent: string;
-    className: string;
-    children: React.ReactNode;
-    wrapperClassName: string;
-  }) => {
-    return React.createElement('div', { 
-      key: config.key + '-wrapper', 
-      className: config.wrapperClassName 
-    }, [
-      React.createElement('button', {
-        key: config.key,
-        type: "button",
-        onClick: config.onClick,
-        disabled: config.disabled,
-        className: config.className,
-        title: config.tooltipContent
-      }, config.children)
-    ]);
-  };
+  // No longer needed - using proper JSX with Tooltip components
 
   // Render header actions for ActiveLoRAsDisplay
   const renderHeaderActions = useCallback(() => {
     if (!enableProjectPersistence) return null;
 
-    // Format saved LoRAs for tooltip (single line for HTML title)
+    // Format saved LoRAs for tooltip (multi-line)
     const savedLorasContent = projectLoraSettings?.loras && projectLoraSettings.loras.length > 0
-      ? `Saved LoRAs (${projectLoraSettings.loras.length}): ` + 
-        projectLoraSettings.loras.map(lora => `${lora.id} (${lora.strength})`).join(', ')
+      ? `Saved LoRAs (${projectLoraSettings.loras.length}):\n` + 
+        projectLoraSettings.loras.map(lora => `• ${lora.id} (strength: ${lora.strength})`).join('\n')
       : 'No saved LoRAs available';
 
-    return React.createElement('div', { className: "flex gap-1 ml-2 w-1/2" }, [
-      // Load LoRAs button with tooltip
-      createTooltipButton({
-        key: 'load',
-        onClick: handleLoadProjectLoras,
-        disabled: !hasSavedLoras,
-        tooltipContent: savedLorasContent,
-        wrapperClassName: 'flex-[3]',
-        className: `w-full text-xs px-2 py-1 h-7 border border-input rounded-md ${
-          hasSavedLoras 
-            ? 'bg-background hover:bg-accent hover:text-accent-foreground' 
-            : 'bg-muted text-muted-foreground cursor-not-allowed'
-        }`,
-        children: 'Load LoRAs'
-      }),
-      
-      // Save LoRAs button with tooltip
-      createTooltipButton({
-        key: 'save',
-        onClick: handleSaveProjectLoras,
-        disabled: selectedLoras.length === 0 || isSavingLoras,
-        tooltipContent: 'Save current LoRAs selection',
-        wrapperClassName: 'flex-1',
-        className: `w-full text-xs px-1 py-1 h-7 border rounded-md flex items-center justify-center ${
-          saveSuccess 
-            ? 'bg-green-600 hover:bg-green-700 border-green-600 text-white' 
-            : 'border-input bg-background hover:bg-accent hover:text-accent-foreground'
-        }`,
-        children: React.createElement('svg', {
-          className: "h-4 w-4",
-          fill: "currentColor",
-          viewBox: "0 0 24 24"
-        }, React.createElement('path', {
-          d: "M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"
-        }))
-      })
-    ]);
+    return (
+      <div className="flex gap-1 ml-2 w-1/2">
+        {/* Load LoRAs button with tooltip - 3/4 width */}
+        <div className="flex-[3]">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleLoadProjectLoras}
+                disabled={!hasSavedLoras}
+                className={`w-full text-xs h-7 ${
+                  hasSavedLoras 
+                    ? '' 
+                    : 'opacity-50 cursor-not-allowed'
+                }`}
+              >
+                Load LoRAs
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <div style={{ whiteSpace: 'pre-line' }}>
+                {savedLorasContent}
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        </div>
+        
+        {/* Save LoRAs button with tooltip - 1/4 width */}
+        <div className="flex-1">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleSaveProjectLoras}
+                disabled={selectedLoras.length === 0 || isSavingLoras}
+                className={`w-full text-xs h-7 flex items-center justify-center ${
+                  saveSuccess 
+                    ? 'bg-green-600 hover:bg-green-700 border-green-600 text-white' 
+                    : ''
+                }`}
+              >
+                <svg
+                  className="h-4 w-4"
+                  fill="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z" />
+                </svg>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Save current LoRAs selection</p>
+            </TooltipContent>
+          </Tooltip>
+        </div>
+      </div>
+    );
   }, [
     enableProjectPersistence,
     hasSavedLoras,
