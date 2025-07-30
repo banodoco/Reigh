@@ -494,6 +494,13 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     return filteredOrderedShotImages.filter(g => !isGenerationVideo(g));
   }, [filteredOrderedShotImages]);
   
+  // Auto-set context frames to 8 when hidden (<=2 images)
+  useEffect(() => {
+    if (nonVideoImages.length <= 2 && batchVideoContext !== 8) {
+      onBatchVideoContextChange(8);
+    }
+  }, [nonVideoImages.length, batchVideoContext, onBatchVideoContextChange]);
+  
   const videoOutputs = useMemo(() => {
     return filteredOrderedShotImages.filter(g => isGenerationVideo(g));
   }, [filteredOrderedShotImages]);
@@ -1649,6 +1656,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                             showStepsNotification={showStepsNotification}
                             randomSeed={randomSeed}
                             onRandomSeedChange={handleRandomSeedChange}
+                            imageCount={nonVideoImages.length}
                         />
                         
                         {/* LoRA Settings (Mobile) */}

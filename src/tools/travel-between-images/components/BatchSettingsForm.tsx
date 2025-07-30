@@ -50,6 +50,9 @@ interface BatchSettingsFormProps {
   // Random seed props  
   randomSeed: boolean;
   onRandomSeedChange: (value: boolean) => void;
+  
+  // Image count for conditional UI
+  imageCount?: number;
 }
 
 const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
@@ -81,6 +84,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
   showStepsNotification,
   randomSeed,
   onRandomSeedChange,
+  imageCount = 0,
 }) => {
     const [showAdvanced, setShowAdvanced] = React.useState(false);
 
@@ -158,10 +162,12 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
               </div>
             )}
             
-            <div className={`grid grid-cols-1 gap-4 ${!isTimelineMode ? 'md:grid-cols-2' : ''}`}>
+            <div className={`grid grid-cols-1 gap-4 ${!isTimelineMode && imageCount > 2 ? 'md:grid-cols-2' : ''}`}>
                 {!isTimelineMode && (
                   <div className="relative">
-                    <Label htmlFor="batchVideoFrames" className="text-sm font-medium block mb-1">Frames per pair: {batchVideoFrames}</Label>
+                    <Label htmlFor="batchVideoFrames" className="text-sm font-medium block mb-1">
+                      {imageCount === 1 ? 'Frames to generate' : 'Frames per pair'}: {batchVideoFrames}
+                    </Label>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">
@@ -169,7 +175,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                         </span>
                       </TooltipTrigger>
                       <TooltipContent>
-                        <p>Determines the duration of the video segment for each image. <br /> More frames result in a longer segment.</p>
+                        <p>Determines the duration of the video segment{imageCount === 1 ? '' : ' for each image'}. <br /> More frames result in a longer segment.</p>
                       </TooltipContent>
                     </Tooltip>
                     <Slider
@@ -182,7 +188,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                     />
                   </div>
                 )}
-                {!isTimelineMode && (
+                {!isTimelineMode && imageCount > 2 && (
                   <div className="relative">
                     <Label htmlFor="batchVideoContext" className="text-sm font-medium block mb-1">Number of Context Frames: {batchVideoContext}</Label>
                     <Tooltip>
