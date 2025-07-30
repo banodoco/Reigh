@@ -372,6 +372,23 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     }
   }, [onSteerableMotionSettingsChange]);
   
+  // Ref to track the latest prompt value to avoid stale state issues
+  const latestPromptRef = useRef(batchVideoPrompt);
+  
+  // Update ref whenever prompt changes
+  useEffect(() => {
+    latestPromptRef.current = batchVideoPrompt;
+  }, [batchVideoPrompt]);
+  
+  // Handle adding trigger words to prompt - ensures we always get the latest prompt value
+  const handleAddTriggerWord = useCallback((triggerWord: string) => {
+    const currentPrompt = latestPromptRef.current || '';
+    const newPrompt = currentPrompt.trim() ? `${currentPrompt}, ${triggerWord}` : triggerWord;
+    onBatchVideoPromptChange(newPrompt);
+    // Update ref immediately to handle rapid clicks
+    latestPromptRef.current = newPrompt;
+  }, [onBatchVideoPromptChange]);
+  
   // Handle accelerated mode changes
   const handleAcceleratedChange = useCallback((value: boolean) => {
     setAccelerated(value);
@@ -1667,11 +1684,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                                     onLoraStrengthChange={onLoraStrengthChange}
                                     availableLoras={availableLoras}
                                     className="mt-4"
-                                    onAddTriggerWord={(triggerWord) => {
-                                      const currentPrompt = batchVideoPrompt || '';
-                                      const newPrompt = currentPrompt.trim() ? `${currentPrompt}, ${triggerWord}` : triggerWord;
-                                      onBatchVideoPromptChange(newPrompt);
-                                    }}
+                                    onAddTriggerWord={handleAddTriggerWord}
                                 />
                             </div>
                         </div>
@@ -1719,11 +1732,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                                 onLoraStrengthChange={onLoraStrengthChange}
                                 availableLoras={availableLoras}
                                 className="mt-4"
-                                onAddTriggerWord={(triggerWord) => {
-                                  const currentPrompt = batchVideoPrompt || '';
-                                  const newPrompt = currentPrompt.trim() ? `${currentPrompt}, ${triggerWord}` : triggerWord;
-                                  onBatchVideoPromptChange(newPrompt);
-                                }}
+                                onAddTriggerWord={handleAddTriggerWord}
                             />
                         </div>
                     </div>
