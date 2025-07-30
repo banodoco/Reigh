@@ -37,6 +37,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
   const [isOpen, setIsOpen] = useState(false);
   const [replaceImages, setReplaceImages] = useState(true);
   const [taskId, setTaskId] = useState<string | null>(null);
+  const [showDetailedParams, setShowDetailedParams] = useState(false);
 
   // Use the new hooks
   const getTaskIdMutation = useGetTaskIdForGeneration();
@@ -53,7 +54,11 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
     return [];
   }, [task]);
 
-  const additionalLoras = (task as any)?.params?.additional_loras as Record<string, any> | undefined;
+  // Helper to safely access orchestrator payload
+  const orchestratorPayload = (task as any)?.params?.full_orchestrator_payload as any;
+  
+  // Get LoRAs from the correct location (orchestrator payload first, then fallback to params)
+  const additionalLoras = (orchestratorPayload?.additional_loras || (task as any)?.params?.additional_loras) as Record<string, any> | undefined;
 
   useEffect(() => {
     let cancelled = false; // guard to avoid state updates after unmount
@@ -149,31 +154,6 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
             </div>
           ) : task ? (
             <div className="overflow-y-auto pr-2 space-y-6" style={{ maxHeight: 'calc(80vh - 140px)' }}>
-              {/* Input Images Section - Prominently displayed at top */}
-              {inputImages.length > 0 && (
-                <div className="space-y-3">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-primary rounded-full"></div>
-                    <h3 className="text-lg font-semibold text-foreground">Input Images</h3>
-                    <span className="text-sm text-muted-foreground">({inputImages.length} image{inputImages.length !== 1 ? 's' : ''})</span>
-                  </div>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3 p-4 bg-muted/30 rounded-lg border">
-                    {inputImages.map((img: string, index: number) => (
-                      <div key={index} className="relative group">
-                        <img 
-                          src={img} 
-                          alt={`Input image ${index + 1}`} 
-                          className="w-full aspect-square object-cover rounded-md border shadow-sm transition-transform group-hover:scale-105"
-                        />
-                        <div className="absolute bottom-1 right-1 bg-black/70 text-white text-xs px-1.5 py-0.5 rounded">
-                          {index + 1}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
               {/* Generation Summary Section */}
               <div className="space-y-3">
                 <div className="flex items-center space-x-2">
@@ -181,15 +161,42 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
                   <h3 className="text-lg font-semibold text-foreground">Generation Summary</h3>
                 </div>
                 <div className="space-y-4 p-4 bg-muted/30 rounded-lg border">
+                  {/* Input Images Section - Inside Generation Summary */}
+                  {inputImages.length > 0 && (
+                    <div className="space-y-3">
+                      <div className="flex items-center space-x-2">
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Input Images</p>
+                        <span className="text-xs text-muted-foreground">({inputImages.length} image{inputImages.length !== 1 ? 's' : ''})</span>
+                      </div>
+                      <div className="grid grid-cols-6 gap-2">
+                        {inputImages.map((img: string, index: number) => (
+                          <div key={index} className="relative group">
+                            <img 
+                              src={img} 
+                              alt={`Input image ${index + 1}`} 
+                              className="w-full aspect-square object-cover rounded-md border shadow-sm transition-transform group-hover:scale-105"
+                            />
+                            <div className="absolute bottom-1 right-1 bg-black/70 text-white text-xs px-1 py-0.5 rounded">
+                              {index + 1}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   {/* Prompts Section */}
                   <div className="grid grid-cols-1 gap-4">
                     <div className="space-y-1">
                       <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Prompt</p>
-                      <p className="text-sm font-medium break-words whitespace-pre-wrap">{task.params.prompt}</p>
+                      <p className="text-sm font-medium break-words whitespace-pre-wrap">
+                        {orchestratorPayload?.base_prompts_expanded?.[0] || (task as any)?.params?.prompt || 'N/A'}
+                      </p>
                     </div>
                     <div className="space-y-1">
                       <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Negative Prompt</p>
-                      <p className="text-sm font-medium break-words whitespace-pre-wrap">{task.params.negative_prompt}</p>
+                      <p className="text-sm font-medium break-words whitespace-pre-wrap">
+                        {orchestratorPayload?.negative_prompts_expanded?.[0] || (task as any)?.params?.negative_prompt || 'N/A'}
+                      </p>
                     </div>
                   </div>
                   
@@ -197,19 +204,25 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-3 border-t border-muted-foreground/20">
                     <div className="space-y-1">
                       <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Steps</p>
-                      <p className="text-sm font-medium">{task.params.num_inference_steps}</p>
+                      <p className="text-sm font-medium">
+                        {orchestratorPayload?.steps || (task as any)?.params?.num_inference_steps || 'N/A'}
+                      </p>
                     </div>
                     <div className="space-y-1">
                       <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Resolution</p>
-                      <p className="text-sm font-medium">{task.params.parsed_resolution_wh}</p>
+                      <p className="text-sm font-medium">{(task as any)?.params?.parsed_resolution_wh || 'N/A'}</p>
                     </div>
                     <div className="space-y-1">
                       <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Frames / Segment</p>
-                      <p className="text-sm font-medium">{task.params.segment_frames_expanded}</p>
+                      <p className="text-sm font-medium">
+                        {orchestratorPayload?.segment_frames_expanded?.[0] || (task as any)?.params?.segment_frames_expanded || 'N/A'}
+                      </p>
                     </div>
                     <div className="space-y-1">
                       <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Context Frames</p>
-                      <p className="text-sm font-medium">{task.params.frame_overlap_expanded}</p>
+                      <p className="text-sm font-medium">
+                        {(task as any)?.params?.frame_overlap_settings_expanded?.[0] || orchestratorPayload?.frame_overlap_expanded?.[0] || (task as any)?.params?.frame_overlap_expanded || 'N/A'}
+                      </p>
                     </div>
                   </div>
 
@@ -246,17 +259,39 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
               </div>
               
               <div className="space-y-3">
-                <div className="flex items-center space-x-2">
-                  <div className="w-2 h-2 bg-primary rounded-full"></div>
-                  <h3 className="text-lg font-semibold text-foreground">Task Parameters</h3>
-                </div>
-                <div className="bg-muted/30 rounded-lg border p-4">
-                  <div className="max-h-96 overflow-y-auto">
-                    <pre className="text-xs font-mono text-foreground whitespace-pre-wrap break-words leading-relaxed">
-                      {JSON.stringify(task?.params ?? {}, null, 2)}
-                    </pre>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-primary rounded-full"></div>
+                    <h3 className="text-lg font-semibold text-foreground">Detailed Task Parameters</h3>
                   </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowDetailedParams(!showDetailedParams)}
+                    className="h-8 px-2"
+                  >
+                    <svg 
+                      className={`h-4 w-4 transition-transform ${showDetailedParams ? 'rotate-180' : ''}`}
+                      fill="none" 
+                      stroke="currentColor" 
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                    <span className="ml-1 text-xs">
+                      {showDetailedParams ? 'Hide' : 'Show'}
+                    </span>
+                  </Button>
                 </div>
+                {showDetailedParams && (
+                  <div className="bg-muted/30 rounded-lg border p-4">
+                    <div className="max-h-96 overflow-y-auto">
+                      <pre className="text-xs font-mono text-foreground whitespace-pre-wrap break-words leading-relaxed">
+                        {JSON.stringify(task?.params ?? {}, null, 2)}
+                      </pre>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           ) : (

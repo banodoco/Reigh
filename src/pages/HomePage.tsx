@@ -1,6 +1,6 @@
 /* eslint-disable no-sequences */
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowRight, Video, Users, FileText, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, GitBranch, X, HandHeart, Brain, Infinity } from 'lucide-react';
+import { ArrowRight, Video, Users, FileText, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, GitBranch, X, HandHeart, Brain, Infinity, Github, MessageCircle, Plus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import type { Session } from '@supabase/supabase-js';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -521,6 +521,38 @@ export default function HomePage() {
 
           </div>
         </div>
+
+        {/* Social Icons */}
+        <FadeInSection delayMs={400}>
+          <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-30">
+            <div className="flex flex-col items-center space-y-2">
+              {/* GitHub and Discord icons side by side */}
+              <div className="flex items-center space-x-3">
+                <a
+                  href="https://github.com/your-repo"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-2 bg-white/40 backdrop-blur-sm rounded-full border border-wes-vintage-gold/10 hover:border-wes-vintage-gold/20 transition-all duration-300 hover:bg-white/60 group opacity-70 hover:opacity-100"
+                >
+                  <Github className="w-3 h-3 text-wes-vintage-gold/70 group-hover:text-wes-vintage-gold transition-colors duration-300" />
+                </a>
+                <a
+                  href="https://discord.gg/D5K2c6kfhy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-2 bg-white/40 backdrop-blur-sm rounded-full border border-wes-vintage-gold/10 hover:border-wes-vintage-gold/20 transition-all duration-300 hover:bg-white/60 group opacity-70 hover:opacity-100"
+                >
+                  <MessageCircle className="w-3 h-3 text-wes-vintage-gold/70 group-hover:text-wes-vintage-gold transition-colors duration-300" />
+                </a>
+              </div>
+              
+              {/* Placeholder icon beneath them */}
+              <div className="p-1.5 bg-white/20 backdrop-blur-sm rounded-full border border-wes-vintage-gold/5 opacity-30">
+                <Plus className="w-2.5 h-2.5 text-wes-vintage-gold/40" />
+              </div>
+            </div>
+          </div>
+        </FadeInSection>
 
         {/*
           Additional landing content (examples, community art, philosophy/FAQ, and decorative film strips)

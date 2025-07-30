@@ -294,9 +294,9 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & { onClose: () => void
           </SelectContent>
         </Select>
       </div>
-      {/* Scrollable content area */}
-      <div className="flex-1 min-h-0 overflow-y-auto pr-4">
-        <div className="space-y-3 p-1">
+      {/* Scrollable content area with floating controls */}
+      <div className="flex-1 min-h-0 overflow-y-auto pr-4 relative">
+        <div className="space-y-3 p-1 pb-6">
           {paginatedLoras.length > 0 ? (
             paginatedLoras.map((lora) => {
               const isSelectedOnGenerator = selectedLoraMap.has(lora["Model ID"]);
@@ -489,70 +489,119 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & { onClose: () => void
             </Pagination>
           )}
         </div>
-      </div>
 
-      {/* Sticky Bottom Bar - Works on both mobile and desktop */}
-      <div className="sticky bottom-0 bg-white/95 backdrop-blur-sm border-t-2 border-gray-300 shadow-2xl p-4 mt-6 lg:rounded-b-lg lg:mx-6 lg:border-x-2 lg:border-b-2 lg:border-gray-300 before:absolute before:inset-x-0 before:-top-4 before:h-4 before:bg-gradient-to-t before:from-white/80 before:to-transparent before:pointer-events-none relative">
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center space-x-2">
-                <Checkbox 
-                  id="show-added-loras-only-sticky" 
-                  checked={showAddedLorasOnly}
-                  onCheckedChange={(checked) => setShowAddedLorasOnly(!!checked)}
-                  className="data-[state=checked]:bg-green-600 data-[state=checked]:border-green-600"
-                />
-                <Label htmlFor="show-added-loras-only-sticky" className="text-sm font-medium text-slate-900 cursor-pointer">
-                  <span className="hidden sm:inline">Show only added LoRAs</span>
-                  <span className="sm:hidden">Added</span>
-                </Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Checkbox 
-                  id="show-my-loras-only-sticky" 
-                  checked={showMyLorasOnly}
-                  onCheckedChange={(checked) => setShowMyLorasOnly(!!checked)}
-                  className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
-                />
-                <Label htmlFor="show-my-loras-only-sticky" className="text-sm font-medium text-slate-900 cursor-pointer">
-                  <span className="hidden sm:inline">Show only my LoRAs</span>
-                  <span className="sm:hidden">My LoRAs</span>
-                </Label>
+        {/* Sticky Floating Control Panel - Follows scroll with vintage aesthetic */}
+        <div className="sticky bottom-4 left-0 right-0 pointer-events-none z-20 mt-6">
+          {/* Vintage fade overlay with film grain effect - covers full panel height */}
+          <div className="absolute inset-x-0 -top-12 bottom-0 bg-gradient-to-t from-background/95 via-background/70 to-transparent pointer-events-none" />
+          
+          {/* Main floating control panel with vintage styling */}
+          <div className="wes-vintage-card mx-4 relative overflow-hidden border-2 border-wes-vintage-gold/50 shadow-wes-deep backdrop-blur-xl pointer-events-auto">
+            {/* Vintage film overlay pattern */}
+            <div className="absolute inset-0 wes-texture opacity-20" />
+            <div className="absolute inset-0 bg-gradient-to-r from-wes-cream/90 via-wes-pink/20 to-wes-lavender/30 animate-gradient-shift" />
+            
+            <div className="relative z-10 p-4">
+              <div className="flex flex-col gap-3">
+                {/* Top row - Filter controls and status badges */}
+                <div className="flex items-center justify-between gap-4">
+                  {/* Filter Controls */}
+                  <div className="flex items-center gap-3 lg:gap-4">
+                    {/* Added LoRAs Filter */}
+                    <div 
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all duration-300 cursor-pointer ${
+                        showAddedLorasOnly 
+                          ? 'bg-gradient-to-r from-wes-mint to-wes-mint-dark border-2 border-wes-mint-dark text-wes-forest shadow-wes hover:from-wes-mint-dark hover:to-wes-mint' 
+                          : 'bg-gradient-to-r from-wes-cream/90 to-wes-pink/30 border-2 border-wes-vintage-gold/30 text-primary hover:from-wes-pink/40 hover:to-wes-lavender/40 hover:border-wes-vintage-gold/60 shadow-sm'
+                      }`}
+                      onClick={() => setShowAddedLorasOnly(!showAddedLorasOnly)}
+                    >
+                      <Checkbox 
+                        id="show-added-loras-only-sticky" 
+                        checked={showAddedLorasOnly}
+                        onCheckedChange={(checked) => setShowAddedLorasOnly(!!checked)}
+                        className="data-[state=checked]:bg-wes-mint data-[state=checked]:border-wes-mint-dark border-primary/40 pointer-events-none"
+                      />
+                      <Label htmlFor="show-added-loras-only-sticky" className="text-sm font-medium cursor-pointer select-none font-inter tracking-wide pointer-events-none">
+                        <span className="hidden sm:inline">Show added LoRAs</span>
+                        <span className="sm:hidden">Added</span>
+                      </Label>
+                    </div>
+
+                    {/* My LoRAs Filter */}
+                    <div 
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all duration-300 cursor-pointer ${
+                        showMyLorasOnly 
+                          ? 'bg-gradient-to-r from-wes-dusty-blue to-wes-lavender border-2 border-wes-dusty-blue text-primary shadow-wes hover:from-wes-lavender hover:to-wes-dusty-blue' 
+                          : 'bg-gradient-to-r from-wes-cream/90 to-wes-pink/30 border-2 border-wes-vintage-gold/30 text-primary hover:from-wes-pink/40 hover:to-wes-lavender/40 hover:border-wes-vintage-gold/60 shadow-sm'
+                      }`}
+                      onClick={() => setShowMyLorasOnly(!showMyLorasOnly)}
+                    >
+                      <Checkbox 
+                        id="show-my-loras-only-sticky" 
+                        checked={showMyLorasOnly}
+                        onCheckedChange={(checked) => setShowMyLorasOnly(!!checked)}
+                        className="data-[state=checked]:bg-wes-dusty-blue data-[state=checked]:border-primary border-primary/40 pointer-events-none"
+                      />
+                      <Label htmlFor="show-my-loras-only-sticky" className="text-sm font-medium cursor-pointer select-none font-inter tracking-wide pointer-events-none">
+                        <span className="hidden sm:inline">Show my LoRAs</span>
+                        <span className="sm:hidden">My LoRAs</span>
+                      </Label>
+                    </div>
+                  </div>
+
+                  {/* Status Badges and Close */}
+                  <div className="flex items-center gap-2">
+                    {/* Status Badges */}
+                    {myLorasCount > 0 && (
+                      <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gradient-to-r from-wes-dusty-blue/20 to-wes-lavender/20 border border-wes-dusty-blue/30">
+                        <div className="w-1.5 h-1.5 rounded-full bg-wes-dusty-blue animate-pulse" />
+                        <span className="text-xs font-medium text-primary font-inter">
+                          {myLorasCount} saved
+                        </span>
+                      </div>
+                    )}
+                    {selectedLoraIds.length > 0 && (
+                      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gradient-to-r from-wes-mint/20 to-wes-sage/20 border border-wes-mint/30">
+                        <div className="w-1.5 h-1.5 rounded-full bg-wes-mint animate-pulse" />
+                        <span className="text-xs font-medium text-wes-forest font-inter">
+                          {selectedLoraIds.length} active
+                        </span>
+                      </div>
+                    )}
+                    
+                    {/* Close Button */}
+                    <Button 
+                      variant="wes-outline" 
+                      size="sm"
+                      onClick={onClose}
+                      className="flex items-center gap-1.5 font-inter tracking-wide"
+                    >
+                      <X className="h-4 w-4" />
+                      <span className="hidden sm:inline">Close</span>
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Bottom row - Status text with vintage styling */}
+                <div className="text-center">
+                  <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-wes-cream/80 to-wes-pink/20 border border-wes-vintage-gold/30 shadow-inner-vintage">
+                    <div className="w-1.5 h-1.5 rounded-full bg-wes-vintage-gold animate-pulse" />
+                    <span className="text-sm font-medium text-primary font-inter tracking-wide">
+                      {showMyLorasOnly && showAddedLorasOnly ? (
+                        <span className="text-wes-burgundy">Showing {processedLoras.length} of your added LoRAs</span>
+                      ) : showMyLorasOnly ? (
+                        <span className="text-wes-burgundy">Showing {processedLoras.length} of your LoRAs</span>
+                      ) : showAddedLorasOnly ? (
+                        <span className="text-wes-forest">Showing {processedLoras.length} added LoRAs</span>
+                      ) : (
+                        <span className="text-muted-foreground">Showing all {processedLoras.length} LoRAs</span>
+                      )}
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              {myLorasCount > 0 && (
-                <span className="hidden lg:inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
-                  {myLorasCount} saved
-                </span>
-              )}
-              {selectedLoraIds.length > 0 && (
-                <span className="hidden lg:inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
-                  {selectedLoraIds.length} added
-                </span>
-              )}
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={onClose}
-                className="flex items-center gap-1"
-              >
-                <X className="h-4 w-4" />
-                <span className="hidden sm:inline">Close</span>
-              </Button>
-            </div>
-          </div>
-          <div className="text-xs text-slate-600 text-center">
-            {showMyLorasOnly && showAddedLorasOnly ? (
-              <span className="text-purple-700">Showing {processedLoras.length} of your added LoRAs</span>
-            ) : showMyLorasOnly ? (
-              <span className="text-blue-700">Showing {processedLoras.length} of your LoRAs</span>
-            ) : showAddedLorasOnly ? (
-              <span className="text-green-700">Showing {processedLoras.length} added LoRAs</span>
-            ) : (
-              <span>Showing all {processedLoras.length} LoRAs</span>
-            )}
           </div>
         </div>
       </div>
