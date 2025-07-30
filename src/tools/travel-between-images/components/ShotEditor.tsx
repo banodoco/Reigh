@@ -359,6 +359,15 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // Random seed state
   const [randomSeed, setRandomSeed] = useState(false);
   
+  // Project LoRA settings for save/load functionality
+  const { 
+    settings: projectLoraSettings, 
+    update: updateProjectLoraSettings,
+    isUpdating: isSavingLoras 
+  } = useToolSettings<{ loras?: { id: string; strength: number }[] }>('travel-between-images-loras', { 
+    projectId: selectedProjectId 
+  });
+  
   // Handle random seed changes
   const handleRandomSeedChange = useCallback((value: boolean) => {
     setRandomSeed(value);
@@ -388,6 +397,61 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     // Update ref immediately to handle rapid clicks
     latestPromptRef.current = newPrompt;
   }, [onBatchVideoPromptChange]);
+  
+  // Save current LoRAs to project settings
+  const handleSaveProjectLoras = useCallback(async () => {
+    if (!selectedProjectId) {
+      toast.error('No project selected');
+      return;
+    }
+    
+    try {
+      const lorasToSave = selectedLoras.map(lora => ({
+        id: lora.id,
+        strength: lora.strength
+      }));
+      
+      await updateProjectLoraSettings('project', { loras: lorasToSave });
+      toast.success(`Saved ${lorasToSave.length} LoRA(s) to project`);
+    } catch (error) {
+      console.error('Error saving LoRAs:', error);
+      toast.error('Failed to save LoRAs to project');
+    }
+  }, [selectedLoras, selectedProjectId, updateProjectLoraSettings]);
+  
+  // Load saved LoRAs from project settings
+  const handleLoadProjectLoras = useCallback(async () => {
+    const savedLoras = projectLoraSettings?.loras;
+    if (!savedLoras || savedLoras.length === 0) {
+      toast.error('No saved LoRAs found for this project');
+      return;
+    }
+    
+    try {
+      // Clear existing LoRAs first
+      selectedLoras.forEach(lora => onRemoveLora(lora.id));
+      
+      // Add saved LoRAs
+      for (const savedLora of savedLoras) {
+        const availableLora = availableLoras.find(lora => lora['Model ID'] === savedLora.id);
+        if (availableLora) {
+          onAddLora(availableLora);
+          // Use setTimeout to ensure the LoRA is added before setting strength
+          setTimeout(() => onLoraStrengthChange(savedLora.id, savedLora.strength), 10);
+        } else {
+          console.warn(`LoRA ${savedLora.id} not found in available LoRAs`);
+        }
+      }
+      
+      toast.success(`Loaded ${savedLoras.length} LoRA(s) from project`);
+    } catch (error) {
+      console.error('Error loading LoRAs:', error);
+      toast.error('Failed to load LoRAs from project');
+    }
+  }, [projectLoraSettings?.loras, selectedLoras, onRemoveLora, availableLoras, onAddLora, onLoraStrengthChange]);
+  
+  // Check if there are saved LoRAs to show the Load button
+  const hasSavedLoras = projectLoraSettings?.loras && projectLoraSettings.loras.length > 0;
   
   // Handle accelerated mode changes
   const handleAcceleratedChange = useCallback((value: boolean) => {
@@ -1678,6 +1742,31 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                                     Add or Manage LoRAs
                                 </Button>
                                 
+                                {/* Save/Load LoRAs */}
+                                <div className="flex gap-2">
+                                    {hasSavedLoras && (
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={handleLoadProjectLoras}
+                                            className="flex-1"
+                                        >
+                                            Load LoRAs
+                                        </Button>
+                                    )}
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={handleSaveProjectLoras}
+                                        disabled={selectedLoras.length === 0 || isSavingLoras}
+                                        className="flex-1"
+                                    >
+                                        {isSavingLoras ? 'Saving...' : 'Save'}
+                                    </Button>
+                                </div>
+                                
                                 <ActiveLoRAsDisplay
                                     selectedLoras={selectedLoras}
                                     onRemoveLora={onRemoveLora}
@@ -1725,6 +1814,31 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                             <Button type="button" variant="outline" className="w-full" onClick={() => setIsLoraModalOpen(true)}>
                                 Add or Manage LoRAs
                             </Button>
+                            
+                            {/* Save/Load LoRAs */}
+                            <div className="flex gap-2">
+                                {hasSavedLoras && (
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={handleLoadProjectLoras}
+                                        className="flex-1"
+                                    >
+                                        Load LoRAs
+                                    </Button>
+                                )}
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handleSaveProjectLoras}
+                                    disabled={selectedLoras.length === 0 || isSavingLoras}
+                                    className="flex-1"
+                                >
+                                    {isSavingLoras ? 'Saving...' : 'Save'}
+                                </Button>
+                            </div>
                             
                             <ActiveLoRAsDisplay
                                 selectedLoras={selectedLoras}
