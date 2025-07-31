@@ -85,6 +85,22 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   // Star functionality
   const toggleStarMutation = useToggleGenerationStar();
 
+  // Local starred state to ensure UI reflects updates immediately even if parent data is stale
+  const initialStarred = useMemo(() => {
+    // Prefer explicit prop, fall back to media.starred if available
+    if (typeof starred === 'boolean') return starred;
+    // @ts-ignore – media may include starred even if not in type
+    if (typeof (media as any).starred === 'boolean') return (media as any).starred;
+    return false;
+  }, [starred, media]);
+
+  const [localStarred, setLocalStarred] = useState<boolean>(initialStarred);
+
+  // Keep local state in sync when parent updates (e.g., after query refetch)
+  useEffect(() => {
+    setLocalStarred(initialStarred);
+  }, [initialStarred]);
+
   // Safety check - if media is undefined, return early to prevent crashes
   if (!media) {
     return null;
@@ -320,19 +336,19 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               <div className="relative">
                 {isVideo ? (
                   videoPlayerComponent === 'simple-player' ? (
-                    <div style={{ maxWidth: '95vw' }}>
+                    <div style={{ width: '95vw', maxWidth: '95vw' }}>
                       <SimpleVideoPlayer
                         src={displayUrl}
                         poster={media.thumbUrl}
-                        className="w-full h-full max-h-[85vh] sm:max-h-[80vh] object-contain"
+                        className="w-full h-full max-h-[85vh] sm:max-h-[85vh] object-contain"
                       />
                     </div>
                   ) : (
                     <HoverScrubVideo
                       src={displayUrl}
                       poster={media.thumbUrl}
-                      className="w-full h-full max-h-[85vh] sm:max-h-[80vh] object-contain"
-                      style={{ maxWidth: '95vw' }}
+                      className="w-full h-full max-h-[85vh] sm:max-h-[85vh] object-contain"
+                      style={{ width: '95vw', maxWidth: '95vw' }}
                     />
                   )
                 ) : (
@@ -393,16 +409,19 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     variant="secondary"
                     size="sm"
                     onClick={() => {
+                      const newStarred = !localStarred;
+                      setLocalStarred(newStarred); // Optimistic UI update
+
                       if (onToggleStar) {
-                        onToggleStar(media.id, !starred);
+                        onToggleStar(media.id, newStarred);
                       } else {
-                        toggleStarMutation.mutate({ id: media.id, starred: !starred });
+                        toggleStarMutation.mutate({ id: media.id, starred: newStarred });
                       }
                     }}
                     disabled={toggleStarMutation.isPending}
                     className="transition-colors bg-black/50 hover:bg-black/70 text-white"
                   >
-                    <Star className={`h-4 w-4 ${starred ? 'fill-current' : ''}`} />
+                    <Star className={`h-4 w-4 ${localStarred ? 'fill-current' : ''}`} />
                   </Button>
 
                   {!isVideo && showMagicEdit && (
