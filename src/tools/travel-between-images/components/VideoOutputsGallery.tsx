@@ -172,7 +172,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
                       e.preventDefault();
                       handleMobileTap(originalIndex);
                     } : undefined}
-                    preload="none"
+                    preload="metadata"
                   />
                 </div>
                 
