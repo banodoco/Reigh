@@ -355,44 +355,67 @@ export function useToggleGenerationStar() {
       return toggleGenerationStar(id, starred);
     },
     onMutate: async ({ id, starred }) => {
-      // Cancel outgoing refetches (so they don't overwrite our optimistic update)
-      await queryClient.cancelQueries({ queryKey: ['generations'] });
+      // Cancel outgoing refetches so they don't overwrite our optimistic update
+      await Promise.all([
+        queryClient.cancelQueries({ queryKey: ['generations'] }),
+        queryClient.cancelQueries({ queryKey: ['shots'] }),
+      ]);
 
       // Snapshot previous values for rollback
-      const previousQueries = new Map();
-      
-      // Update all generations query caches optimistically
+      const previousGenerationsQueries = new Map();
+      const previousShotsQueries = new Map();
+
+      // 1) Optimistically update all generations-list caches
       queryClient.getQueriesData({ queryKey: ['generations'] }).forEach(([queryKey, data]) => {
         if (data && typeof data === 'object' && 'items' in data) {
-          previousQueries.set(queryKey, data);
-          
-          const updatedData = {
+          previousGenerationsQueries.set(queryKey, data);
+
+          const updated = {
             ...data,
-            items: (data as any).items.map((item: any) => 
-              item.id === id ? { ...item, starred } : item
-            )
+            items: (data as any).items.map((g: any) => (g.id === id ? { ...g, starred } : g)),
           };
-          
-          queryClient.setQueryData(queryKey, updatedData);
+          queryClient.setQueryData(queryKey, updated);
         }
       });
 
-      return { previousQueries };
+      // 2) Optimistically update all shots caches so star reflects in Shot views / timelines
+      queryClient.getQueriesData({ queryKey: ['shots'] }).forEach(([queryKey, data]) => {
+        if (Array.isArray(data)) {
+          previousShotsQueries.set(queryKey, data);
+
+          const updatedShots = (data as any).map((shot: any) => {
+            if (!shot.images) return shot;
+            return {
+              ...shot,
+              images: shot.images.map((img: any) => (img.id === id ? { ...img, starred } : img)),
+            };
+          });
+          queryClient.setQueryData(queryKey, updatedShots);
+        }
+      });
+
+      return { previousGenerationsQueries, previousShotsQueries };
     },
-    onError: (error: Error, _, context) => {
-      // Rollback optimistic updates on error
-      if (context?.previousQueries) {
-        context.previousQueries.forEach((data, queryKey) => {
-          queryClient.setQueryData(queryKey, data);
+    onError: (error: Error, _variables, context) => {
+      // Rollback optimistic updates
+      if (context?.previousGenerationsQueries) {
+        context.previousGenerationsQueries.forEach((data, key) => {
+          queryClient.setQueryData(key, data);
         });
       }
-      
+      if (context?.previousShotsQueries) {
+        context.previousShotsQueries.forEach((data, key) => {
+          queryClient.setQueryData(key, data);
+        });
+      }
+
       console.error('Error toggling generation star:', error);
       toast.error(error.message || 'Failed to toggle star');
     },
     onSettled: () => {
-      // Always refetch after error or success to ensure consistency
+      // Ensure both generations & shots caches are up-to-date after mutation
       queryClient.invalidateQueries({ queryKey: ['generations'] });
+      queryClient.invalidateQueries({ queryKey: ['shots'] });
     },
   });
 }
