@@ -102,11 +102,10 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   };
 
   const sortedVideoOutputs = useMemo(() => {
-    return [...videoOutputs].sort((a, b) => {
-      const aTime = new Date((a.createdAt || (a as any).created_at) || 0).getTime();
-      const bTime = new Date((b.createdAt || (b as any).created_at) || 0).getTime();
-      return bTime - aTime; // newest first
-    });
+    return [...videoOutputs]
+      .map(v => ({ v, time: new Date(v.createdAt || (v as { created_at?: string | null }).created_at || 0).getTime() }))
+      .sort((a, b) => b.time - a.time)
+      .map(({ v }) => v);
   }, [videoOutputs]);
 
   const totalPages = Math.ceil(sortedVideoOutputs.length / itemsPerPage);
@@ -173,12 +172,13 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
                       e.preventDefault();
                       handleMobileTap(originalIndex);
                     } : undefined}
+                    preload="none"
                   />
                 </div>
                 
                 {/* Timestamp - Top Left */}
                 <TimeStamp 
-                  createdAt={video.createdAt || (video as any).created_at} 
+                  createdAt={video.createdAt || (video as { created_at?: string | null }).created_at} 
                   position="top-left"
                   className="z-10 !top-1 !left-4 sm:!top-2 sm:!left-4"
                 />
@@ -248,7 +248,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
                 mediaId: media.id,
                 mediaKeys: Object.keys(media),
                 hasStarred: 'starred' in media,
-                starredValue: (media as any).starred,
+                starredValue: (media as { starred?: boolean }).starred,
                 timestamp: Date.now()
               });
               return media;
@@ -261,7 +261,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
             showImageEditTools={false}
             showDownload={true}
             videoPlayerComponent="simple-player"
-            starred={(sortedVideoOutputs[lightboxIndex] as any).starred || false}
+            starred={(sortedVideoOutputs[lightboxIndex] as { starred?: boolean }).starred || false}
           />
         )}
 

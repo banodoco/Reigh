@@ -10,7 +10,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 
 interface VideoShotDisplayProps {
   shot: Shot;
-  onSelectShot: (shotId: string) => void;
+  onSelectShot: () => void;
   currentProjectId: string | null; // Needed for mutations
 }
 
@@ -139,7 +139,7 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
       <div 
         key={shot.id} 
         className="mb-6 p-4 border rounded-lg hover:shadow-lg transition-shadow duration-200 relative cursor-pointer"
-        onClick={() => onSelectShot(shot.id)}
+        onClick={onSelectShot}
       >
         <div className="flex justify-between items-start mb-3">
           {isEditingName ? (
@@ -195,18 +195,22 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
           </div>
         </div>
         
-        <div className="flex space-x-2 overflow-x-auto pb-2">
+        <div className="flex space-x-2 overflow-hidden pb-2">
           {imagesToShow.length > 0 ? (
             imagesToShow.map((image, index) => (
               <div 
                 key={image.shotImageEntryId || `img-${index}`} 
-                className="flex-shrink-0 w-32 h-32 rounded overflow-hidden border animate-in fade-in-up"
+                className="flex-shrink-0 w-32 h-32 rounded overflow-hidden border animate-in fade-in-up cursor-pointer hover:shadow-md transition-shadow duration-200 hover:scale-[1.02] transform transition-transform"
                 style={{ animationDelay: `${index * 0.1}s` }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSelectShot();
+                }}
               >
                 <img 
                   src={getDisplayUrl(image.thumbUrl || image.imageUrl)} 
                   alt={`Shot image ${index + 1} for ${shot.name}`}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover pointer-events-none"
                   loading="lazy"
                 />
               </div>
@@ -215,8 +219,14 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
             <p className="text-sm text-muted-foreground italic">No images in this shot yet.</p>
           )}
           {imagesOnly.length > 5 && (
-            <div className="flex-shrink-0 w-32 h-32 rounded border bg-muted flex items-center justify-center">
-              <p className="text-sm text-muted-foreground text-center">+{imagesOnly.length - 5} more</p>
+            <div 
+              className="flex-shrink-0 w-32 h-32 rounded border bg-muted flex items-center justify-center cursor-pointer hover:bg-muted/80 transition-colors duration-200"
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelectShot();
+              }}
+            >
+              <p className="text-sm text-muted-foreground text-center pointer-events-none">+{imagesOnly.length - 5} more</p>
             </div>
           )}
         </div>

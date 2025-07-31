@@ -34,6 +34,7 @@ interface HoverScrubVideoProps extends Omit<React.HTMLAttributes<HTMLDivElement>
    * Handle touch end events (mobile only).
    */
   onTouchEnd?: (e: React.TouchEvent<HTMLVideoElement>) => void;
+  preload?: 'auto' | 'metadata' | 'none';
 }
 
 /**
@@ -48,6 +49,7 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
   muted = true,
   onDoubleClick,
   onTouchEnd,
+  preload: preloadProp = 'metadata',
   ...rest
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -92,7 +94,7 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
         ref={videoRef}
         src={getDisplayUrl(src)}
         poster={poster ? getDisplayUrl(poster) : undefined}
-        preload="metadata"
+        preload={preloadProp}
         onLoadedMetadata={(e) => {
           // Ensure we can see the first frame by seeking to the start
           if (e.currentTarget && e.currentTarget.currentTime === 0) {

@@ -31,13 +31,11 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       {shots.map((shot, index) => (
-        <FadeInSection key={shot.id} delayMs={index * 50}>
           <VideoShotDisplay
             shot={shot}
             onSelectShot={() => onSelectShot(shot)}
             currentProjectId={currentProjectId}
           />
-        </FadeInSection>
       ))}
     </div>
   );
