@@ -785,7 +785,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     }
 
     setIsUploadingImage(true);
-    toast.info(`Uploading ${files.length} image(s)...`);
 
     // Determine if cropping is enabled via project settings (toolSettings)
     const cropToProjectSize = (uploadSettings?.cropToProjectSize ?? true);
@@ -1205,9 +1204,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         });
       }
 
-      const frameText = targetFrame !== undefined ? ` at frame ${targetFrame}` : '';
-      toast.success(`Successfully added ${files.length} image(s) to the timeline${frameText}.`);
-      
       // Refresh the shot data, which will trigger Timeline to update
       onShotImagesUpdate();
     } catch (error) {
@@ -1576,8 +1572,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     }
 
     try {
-
-      toast.info(`Replacing images with ${inputImages.length} images from previous generation...`);
       
       // First, remove all current non-video images
       const imagesToRemove = nonVideoImages.map(img => img.shotImageEntryId);
