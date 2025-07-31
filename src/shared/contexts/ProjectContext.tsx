@@ -2,9 +2,14 @@ import React, { createContext, useState, useContext, ReactNode, useEffect, useRe
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Project } from '@/types/project'; // Added import
-import { ProjectUpdate } from '../../../db/schema/schema';
 import { UserPreferences } from '@/shared/settings/userPreferences';
 import { usePrefetchToolSettings } from '@/shared/hooks/usePrefetchToolSettings';
+
+// Type for updating projects
+interface ProjectUpdate {
+  name?: string;
+  aspectRatio?: string;
+}
 
 interface ProjectContextType {
   projects: Project[];
@@ -23,6 +28,26 @@ interface ProjectContextType {
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 
 // Dummy User ID is managed server-side and no longer needed here.
+
+// Helper function to create a default shot for a new project
+const createDefaultShot = async (projectId: string): Promise<void> => {
+  try {
+    const { error } = await supabase
+      .from('shots')
+      .insert({
+        name: 'Default Shot',
+        project_id: projectId,
+      });
+    
+    if (error) {
+      console.error('[ProjectContext] Failed to create default shot:', error);
+      // Don't throw - we don't want to fail project creation if shot creation fails
+    }
+  } catch (err) {
+    console.error('[ProjectContext] Exception creating default shot:', err);
+    // Don't throw - we don't want to fail project creation if shot creation fails
+  }
+};
 
 const determineProjectIdToSelect = (
   projects: Project[],
@@ -198,6 +223,10 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
           .single();
 
         if (createError) throw createError;
+        
+        // Create default shot for the new project
+        await createDefaultShot(newProject.id);
+        
         const mappedProject = mapDbProjectToProject(newProject);
         setProjects([mappedProject]);
         setSelectedProjectIdState(mappedProject.id);
@@ -269,6 +298,9 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
         .single();
 
       if (error) throw error;
+
+      // Create default shot for the new project
+      await createDefaultShot(newProject.id);
 
       const mappedProject = mapDbProjectToProject(newProject);
       setProjects(prevProjects => [...prevProjects, mappedProject].sort((a, b) => a.name.localeCompare(b.name)));
