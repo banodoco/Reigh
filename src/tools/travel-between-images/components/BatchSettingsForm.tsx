@@ -107,7 +107,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                     value={batchVideoPrompt}
                     onChange={(e) => onBatchVideoPromptChange(e.target.value)}
                     placeholder="Enter a global prompt for all video segments... (e.g., cinematic transition)"
-                    className="min-h-[70px] text-sm"
+                    className="min-h-[70px]"
                     rows={3}
                   />
                 </div>
@@ -128,7 +128,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                     value={steerableMotionSettings.negative_prompt}
                     onChange={(e) => onSteerableMotionSettingsChange({ negative_prompt: e.target.value })}
                     placeholder="e.g., blurry, low quality"
-                    className="min-h-[70px] text-sm"
+                    className="min-h-[70px]"
                     rows={3}
                   />
                 </div>
