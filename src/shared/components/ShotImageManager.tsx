@@ -1,4 +1,4 @@
-import React, { useState, Fragment, useRef, useEffect } from 'react';
+import React, { useState, Fragment, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   DndContext,
@@ -58,20 +58,146 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
   onImageSaved,
   onMagicEdit,
 }) => {
-  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  // State for drag and drop
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [mobileSelectedIds, setMobileSelectedIds] = useState<string[]>([]);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [skipConfirmationNextTimeVisual, setSkipConfirmationNextTimeVisual] = useState(false);
   const currentDialogSkipChoiceRef = useRef(false);
+  
+  // State to preserve selected IDs for delete confirmation
+  const [pendingDeleteIds, setPendingDeleteIds] = useState<string[]>([]);
   const isMobile = useIsMobile();
   const outerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
+  // Optimistic local order state - shows immediate drag results
+  const [optimisticOrder, setOptimisticOrder] = useState<GenerationRow[]>(images);
+  const [isOptimisticUpdate, setIsOptimisticUpdate] = useState(false);
+
+  // Keep local copy in sync when parent changes, but don't overwrite optimistic updates
+  useEffect(() => {
+    console.log('[DragDebug:ShotImageManager] Parent images prop changed', {
+      newLength: images.length,
+      isOptimisticUpdate,
+      timestamp: Date.now()
+    });
+    
+    // If we're in the middle of an optimistic update, don't sync yet
+    if (isOptimisticUpdate) {
+      console.log('[DragDebug:ShotImageManager] Skipping sync - optimistic update in progress');
+      
+      // Check if parent props now match our optimistic order (operation completed successfully)
+      const currentOrder = optimisticOrder.map(img => img.shotImageEntryId).join(',');
+      const parentOrder = images.map(img => img.shotImageEntryId).join(',');
+      
+      if (currentOrder === parentOrder) {
+        console.log('[DragDebug:ShotImageManager] Parent caught up with optimistic order - ending optimistic mode');
+        setIsOptimisticUpdate(false);
+        // Parent is now consistent, we can sync
+        setOptimisticOrder(images);
+      } else {
+        console.log('[DragDebug:ShotImageManager] Parent still has stale data - keeping optimistic order');
+        // Parent still has stale data, keep our optimistic order
+        return;
+      }
+    } else {
+      console.log('[DragDebug:ShotImageManager] Normal sync from parent props');
+      setOptimisticOrder(images);
+    }
+  }, [images, isOptimisticUpdate, optimisticOrder]);
+
+  // Use optimistic order everywhere instead of the parent `images` prop
+  const currentImages = optimisticOrder;
+
+  // Mobile double-tap detection refs
+  const doubleTapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Batch delete function - hoisted to top level to survive re-renders
+  const performBatchDelete = React.useCallback(
+    (ids: string[]) => {
+      if (ids.length === 0) return;
+      
+      // Clear selection first for immediate UI feedback
+      setMobileSelectedIds([]);
+      setConfirmOpen(false);
+      setPendingDeleteIds([]); // Clear pending delete IDs
+      
+      // Execute deletions
+      ids.forEach(id => onImageDelete(id));
+    },
+    [onImageDelete]
+  );
+
+  // Deselect when clicking outside the entire image manager area (mobile selection mode)
+  useEffect(() => {
+    if (!isMobile) return;
+
+    const handleDocClick = (e: MouseEvent) => {
+      if (mobileSelectedIds.length === 0) return;
+      if (outerRef.current && !outerRef.current.contains(e.target as Node)) {
+        setMobileSelectedIds([]);
+      }
+    };
+
+    document.addEventListener('click', handleDocClick);
+    return () => document.removeEventListener('click', handleDocClick);
+  }, [mobileSelectedIds.length, isMobile]);
+
+  const handleMoveHere = (targetIndex: number) => {
+    if (mobileSelectedIds.length === 0) return;
+    
+    // Get selected items and remaining items
+    const selectedItems = currentImages.filter(img => mobileSelectedIds.includes(img.shotImageEntryId));
+    const remainingItems = currentImages.filter(img => !mobileSelectedIds.includes(img.shotImageEntryId));
+    
+    // Calculate adjusted target index based on selected items before target
+    const selectedIndicesBefore = mobileSelectedIds
+      .map(id => currentImages.findIndex(img => img.shotImageEntryId === id))
+      .filter(idx => idx < targetIndex).length;
+    const adjustedTargetIndex = Math.max(0, targetIndex - selectedIndicesBefore);
+    
+    // Insert selected items at target position
+    const newOrder = [
+      ...remainingItems.slice(0, adjustedTargetIndex),
+      ...selectedItems,
+      ...remainingItems.slice(adjustedTargetIndex)
+    ];
+    
+    // Update optimistic order immediately, then notify parent
+    setIsOptimisticUpdate(true); // Flag that we're doing an optimistic update
+    setOptimisticOrder(newOrder);
+    onImageReorder(newOrder.map(img => img.shotImageEntryId));
+    setMobileSelectedIds([]); // Clear selection after move
+  };
+
   // Mobile double-tap detection refs
   const lastTouchTimeRef = useRef<number>(0);
-  const doubleTapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleMobileTap = useCallback((id: string, index: number) => {
+    const currentTime = Date.now();
+    const timeDiff = currentTime - lastTouchTimeRef.current;
+    
+    if (timeDiff < 300) {
+      // Double tap detected
+      const image = currentImages[index];
+      if (image?.imageUrl) {
+        setLightboxIndex(index);
+      }
+      return;
+    }
+    
+    // Single tap - handle selection
+    if (mobileSelectedIds.includes(id)) {
+      setMobileSelectedIds(prev => prev.filter(selectedId => selectedId !== id));
+    } else {
+      setMobileSelectedIds(prev => [...prev, id]);
+    }
+    
+    lastTouchTimeRef.current = currentTime;
+  }, [mobileSelectedIds, currentImages]);
 
   const { value: imageDeletionSettings, update: updateImageDeletionSettings } = useUserUIState('imageDeletion', { skipConfirmation: false });
 
@@ -106,74 +232,6 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
     };
   }, []);
 
-  // Handle mobile double-tap detection for image lightbox
-  const handleMobileTap = (index: number) => {
-    const currentTime = Date.now();
-    const timeSinceLastTap = currentTime - lastTouchTimeRef.current;
-    const image = images[index];
-    const imageId = image.shotImageEntryId;
-    
-    if (timeSinceLastTap < 300 && timeSinceLastTap > 0) {
-      // This is a double-tap, clear any pending timeout and open lightbox
-      if (doubleTapTimeoutRef.current) {
-        clearTimeout(doubleTapTimeoutRef.current);
-        doubleTapTimeoutRef.current = null;
-      }
-      setLightboxIndex(index);
-      setMobileSelectedIds([]); // Clear selection when opening lightbox
-    } else {
-      // This is a single tap, set a timeout to handle selection if no second tap comes
-      if (doubleTapTimeoutRef.current) {
-        clearTimeout(doubleTapTimeoutRef.current);
-      }
-      doubleTapTimeoutRef.current = setTimeout(() => {
-        // Handle single tap selection logic for mobile batch mode
-        if (generationMode === 'batch') {
-          if (mobileSelectedIds.includes(imageId)) {
-            // Clicking on selected image deselects it
-            setMobileSelectedIds(prev => prev.filter(selectedId => selectedId !== imageId));
-          } else {
-            // Add to selection
-            setMobileSelectedIds(prev => [...prev, imageId]);
-          }
-        }
-        doubleTapTimeoutRef.current = null;
-      }, 300);
-    }
-    
-    lastTouchTimeRef.current = currentTime;
-  };
-
-  // Batch delete function - hoisted to top level to survive re-renders
-  const performBatchDelete = React.useCallback(
-    (ids: string[]) => {
-      if (ids.length === 0) return;
-      
-      // Clear selection first for immediate UI feedback
-      setMobileSelectedIds([]);
-      setConfirmOpen(false);
-      
-      // Execute deletions
-      ids.forEach(id => onImageDelete(id));
-    },
-    [onImageDelete]
-  );
-
-  // Deselect when clicking outside the entire image manager area (mobile selection mode)
-  useEffect(() => {
-    if (!isMobile) return;
-
-    const handleDocClick = (e: MouseEvent) => {
-      if (mobileSelectedIds.length === 0) return;
-      if (outerRef.current && !outerRef.current.contains(e.target as Node)) {
-        setMobileSelectedIds([]);
-      }
-    };
-
-    document.addEventListener('click', handleDocClick);
-    return () => document.removeEventListener('click', handleDocClick);
-  }, [mobileSelectedIds.length, isMobile]);
-
   const sensors = useSensors(
     useSensor(MouseSensor, {
       // Increased distance to prevent accidental drags and reduce performance load
@@ -194,8 +252,14 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
   );
 
   // Preserve multi-selection when initiating a drag with ⌘/Ctrl pressed
-  const handleDragStart = (event: DragStartEvent) => {
+  const handleDragStart = useCallback((event: DragStartEvent) => {
     const { active } = event;
+    console.log('[DragDebug:ShotImageManager] Drag started', { 
+      activeId: active.id,
+      selectedIds: selectedIds.length,
+      mobileSelectedIds: mobileSelectedIds.length,
+      timestamp: Date.now()
+    });
 
     // Record the item being dragged so we can show a preview
     setActiveId(active.id as string);
@@ -212,24 +276,47 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
 
     if (!isModifierPressed && !selectedIds.includes(active.id as string)) {
       // Starting a regular drag on an un-selected item -> clear previous selection
+      console.log('[DragDebug:ShotImageManager] Clearing selection during drag start');
       setSelectedIds([]);
     }
-  };
+  }, [selectedIds, mobileSelectedIds]);
 
-  const handleDragEnd = (event: DragEndEvent) => {
-    setActiveId(null);
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event;
+    console.log('[DragDebug:ShotImageManager] Drag ended', { 
+      activeId: active.id,
+      overId: over?.id,
+      selectedIds: selectedIds.length,
+      timestamp: Date.now()
+    });
+    
+    setActiveId(null);
+    
     if (!over || active.id === over.id) {
+      console.log('[DragDebug:ShotImageManager] Drag ended with no change - same position');
       return;
     }
 
     const activeIsSelected = selectedIds.includes(active.id as string);
 
     if (!activeIsSelected || selectedIds.length <= 1) {
-      const oldIndex = images.findIndex((img) => img.shotImageEntryId === active.id);
-      const newIndex = images.findIndex((img) => img.shotImageEntryId === over.id);
-      if (oldIndex !== -1 && newIndex !== -1) {
-        const newOrder = arrayMove(images, oldIndex, newIndex);
+      const oldIndex = currentImages.findIndex((img) => img.shotImageEntryId === active.id);
+      const newIndex = currentImages.findIndex((img) => img.shotImageEntryId === over.id);
+      console.log('[DragDebug:ShotImageManager] Single item drag', { 
+        oldIndex, 
+        newIndex, 
+        willReorder: oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex 
+      });
+      
+      if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
+        // 1. Update optimistic order immediately for instant visual feedback
+        const newOrder = arrayMove(currentImages, oldIndex, newIndex);
+        console.log('[DragDebug:ShotImageManager] Updating optimistic order immediately');
+        setIsOptimisticUpdate(true); // Flag that we're doing an optimistic update
+        setOptimisticOrder(newOrder);
+        
+        // 2. Notify parent so React state becomes eventually consistent
+        console.log('[DragDebug:ShotImageManager] Calling onImageReorder for single item');
         onImageReorder(newOrder.map((img) => img.shotImageEntryId));
       }
       setSelectedIds([]);
@@ -238,14 +325,17 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
 
     // Multi-drag logic
     if (selectedIds.includes(over.id as string)) {
+      console.log('[DragDebug:ShotImageManager] Multi-drag cancelled - dropping on selection');
       return; // Avoid dropping a selection onto part of itself
     }
 
-    const overIndex = images.findIndex((img) => img.shotImageEntryId === over.id);
-    const activeIndex = images.findIndex((img) => img.shotImageEntryId === active.id);
+    console.log('[DragDebug:ShotImageManager] Multi-drag reorder', { selectedCount: selectedIds.length });
 
-    const selectedItems = images.filter((img) => selectedIds.includes(img.shotImageEntryId));
-    const remainingItems = images.filter((img) => !selectedIds.includes(img.shotImageEntryId));
+    const overIndex = currentImages.findIndex((img) => img.shotImageEntryId === over.id);
+    const activeIndex = currentImages.findIndex((img) => img.shotImageEntryId === active.id);
+
+    const selectedItems = currentImages.filter((img) => selectedIds.includes(img.shotImageEntryId));
+    const remainingItems = currentImages.filter((img) => !selectedIds.includes(img.shotImageEntryId));
 
     const overInRemainingIndex = remainingItems.findIndex((img) => img.shotImageEntryId === over.id);
 
@@ -266,11 +356,18 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
       ];
     }
 
+    // 1. Update optimistic order immediately for instant visual feedback
+    console.log('[DragDebug:ShotImageManager] Updating optimistic order for multi-drag');
+    setIsOptimisticUpdate(true); // Flag that we're doing an optimistic update
+    setOptimisticOrder(newItems);
+    
+    // 2. Notify parent so React state becomes eventually consistent
+    console.log('[DragDebug:ShotImageManager] Calling onImageReorder for multi-drag');
     onImageReorder(newItems.map((img) => img.shotImageEntryId));
     setSelectedIds([]);
-  };
+  }, [selectedIds, currentImages, onImageReorder]);
 
-  const handleItemClick = (id: string, event: React.MouseEvent) => {
+  const handleItemClick = useCallback((id: string, event: React.MouseEvent) => {
     event.preventDefault(); // Prevent any default behavior like navigation
     
     // Mobile behavior for batch mode
@@ -293,52 +390,27 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
     } else {
       setSelectedIds([id]);
     }
-  };
+  }, [isMobile, generationMode, mobileSelectedIds]);
 
   const handleMobileDoubleClick = (index: number) => {
     if (isMobile && generationMode === 'batch') {
       setLightboxIndex(index);
-      setMobileSelectedIds([]); // Clear selection when opening lightbox
     }
   };
 
-  const handleMoveHere = (targetIndex: number) => {
-    if (mobileSelectedIds.length === 0) return;
-    
-    // Get selected items and remaining items
-    const selectedItems = images.filter(img => mobileSelectedIds.includes(img.shotImageEntryId));
-    const remainingItems = images.filter(img => !mobileSelectedIds.includes(img.shotImageEntryId));
-    
-    // Calculate adjusted target index based on selected items before target
-    const selectedIndicesBefore = mobileSelectedIds
-      .map(id => images.findIndex(img => img.shotImageEntryId === id))
-      .filter(idx => idx < targetIndex).length;
-    const adjustedTargetIndex = Math.max(0, targetIndex - selectedIndicesBefore);
-    
-    // Insert selected items at target position
-    const newOrder = [
-      ...remainingItems.slice(0, adjustedTargetIndex),
-      ...selectedItems,
-      ...remainingItems.slice(adjustedTargetIndex)
-    ];
-    
-    onImageReorder(newOrder.map(img => img.shotImageEntryId));
-    setMobileSelectedIds([]); // Clear selection after move
-  };
-
   const handleNext = () => {
-    if (lightboxIndex !== null) {
-      setLightboxIndex((lightboxIndex + 1) % images.length);
+    if (lightboxIndex !== null && lightboxIndex < currentImages.length - 1) {
+      setLightboxIndex(lightboxIndex + 1);
     }
   };
 
   const handlePrevious = () => {
-    if (lightboxIndex !== null) {
-      setLightboxIndex((lightboxIndex - 1 + images.length) % images.length);
+    if (lightboxIndex !== null && lightboxIndex > 0) {
+      setLightboxIndex(lightboxIndex - 1);
     }
   };
 
-  const activeImage = activeId ? images.find((img) => img.shotImageEntryId === activeId) : null;
+  const activeImage = activeId ? currentImages.find((img) => img.shotImageEntryId === activeId) : null;
 
   if (!images || images.length === 0) {
     return (
@@ -393,9 +465,9 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
         }}>
         
         <div className={cn("grid gap-3 grid-cols-3")}>
-          {images.map((image, index) => {
+          {currentImages.map((image, index) => {
             const isSelected = mobileSelectedIds.includes(image.shotImageEntryId);
-            const isLastItem = index === images.length - 1;
+            const isLastItem = index === currentImages.length - 1;
             
             return (
               <React.Fragment key={image.shotImageEntryId}>
@@ -403,8 +475,10 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
                   <MobileImageItem
                      image={image}
                      isSelected={isSelected}
-                     onMobileTap={() => handleMobileTap(index)}
+                     index={index}
+                     onMobileTap={() => handleMobileTap(image.shotImageEntryId, index)}
                      onDelete={() => onImageDelete(image.shotImageEntryId)}
+                     onDuplicate={onImageDuplicate}
                      hideDeleteButton={mobileSelectedIds.length > 0}
                    />
                    
@@ -425,92 +499,96 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
                   )}
 
                   {/* Move here button after this item */}
-                  {mobileSelectedIds.length > 0 && (
-                    <div 
-                      className="absolute top-1/2 -right-1 -translate-y-1/2 translate-x-1/2 z-10"
-                    >
-                      <Button
-                        size="icon"
-                        variant="secondary"
-                        className="h-12 w-6 rounded-full p-0"
-                        onClick={() => handleMoveHere(index + 1)}
-                        onPointerDown={e=>e.stopPropagation()}
-                        title="Move here"
-                      >
-                        <ArrowDown className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  )}
+                  {mobileSelectedIds.length > 0 &&
+                   (!isLastItem || isSelected) &&
+                   <div className="absolute top-1/2 -right-1 -translate-y-1/2 translate-x-1/2 z-10">
+                     <Button
+                       size="icon"
+                       variant="secondary"
+                       className="h-12 w-6 rounded-full p-0"
+                       onClick={() => handleMoveHere(index + 1)}
+                       onPointerDown={e=>e.stopPropagation()}
+                       title="Move here"
+                     >
+                       <ArrowDown className="h-4 w-4" />
+                     </Button>
+                   </div>
+                  }
                 </div>
               </React.Fragment>
             );
           })}
         </div>
 
-        {/* {mobileSelectedIds.length > 0 && (
-          <div className="fixed bottom-4 right-4 z-40">
-            <Button
-              variant="destructive"
-              size="lg"
-              onClick={handleDeleteTrigger}
-              className="shadow-lg"
-            >
-              {mobileSelectedIds.length > 1 ? `Delete ${mobileSelectedIds.length}` : 'Delete'}
-            </Button>
+        {/* Floating Action Bar for Multiple Selection */}
+        {mobileSelectedIds.length > 1 && (
+          <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center gap-3">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                {mobileSelectedIds.length} selected
+              </span>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setMobileSelectedIds([])}
+                  className="text-sm"
+                >
+                  Deselect All
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => {
+                    setPendingDeleteIds([...mobileSelectedIds]); // Preserve selected IDs
+                    setConfirmOpen(true);
+                  }}
+                  className="text-sm"
+                >
+                  Delete All
+                </Button>
+              </div>
+            </div>
           </div>
-        )} */}
+        )}
 
-        {/* Confirmation dialog rendered outside the conditional so it persists through unmounts */}
+        {/* Delete Confirmation Dialog */}
         <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-          <AlertDialogOverlay onPointerDown={(e) => e.stopPropagation()} />
-          <AlertDialogContent
-            onPointerDown={(e)=>e.stopPropagation()}
-            onClick={(e)=>e.stopPropagation()}
-          >
+          <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Delete Image{mobileSelectedIds.length > 1 ? 's' : ''}</AlertDialogTitle>
+              <AlertDialogTitle>Delete Images</AlertDialogTitle>
               <AlertDialogDescription>
-                Do you want to permanently remove {mobileSelectedIds.length > 1 ? 'these images' : 'this image'} from the shot? This action cannot be undone.
+                Are you sure you want to delete {pendingDeleteIds.length} selected image{pendingDeleteIds.length > 1 ? 's' : ''}? This action cannot be undone.
               </AlertDialogDescription>
             </AlertDialogHeader>
-            <div className="flex items-center space-x-2 my-4">
-              <Checkbox
-                id="skip-confirm"
-                checked={skipConfirmationNextTimeVisual}
-                onCheckedChange={(checked)=>{
-                  const v = Boolean(checked);
-                  setSkipConfirmationNextTimeVisual(v);
-                  currentDialogSkipChoiceRef.current = v;
-                }}
-              />
-              <Label htmlFor="skip-confirm" className="text-sm font-medium leading-none">
-                Delete without confirmation in the future
-              </Label>
-            </div>
             <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setConfirmOpen(false)}>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={()=>{
-                if (currentDialogSkipChoiceRef.current) {
-                  updateImageDeletionSettings({ skipConfirmation: true });
-                }
-                performBatchDelete(mobileSelectedIds);
-              }}>Delete</AlertDialogAction>
+              <AlertDialogCancel onClick={() => {
+                setConfirmOpen(false);
+                setPendingDeleteIds([]); // Clear pending IDs when cancelled
+              }}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => performBatchDelete(pendingDeleteIds)}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Delete {pendingDeleteIds.length} Image{pendingDeleteIds.length > 1 ? 's' : ''}
+              </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
         
-        {lightboxIndex !== null && images[lightboxIndex] && (
+        {lightboxIndex !== null && currentImages[lightboxIndex] && (
           <MediaLightbox
-            media={images[lightboxIndex]}
+            media={currentImages[lightboxIndex]}
             onClose={() => setLightboxIndex(null)}
             onNext={handleNext}
             onPrevious={handlePrevious}
-            onImageSaved={onImageSaved ? async (newImageUrl: string, createNew?: boolean) => await onImageSaved(images[lightboxIndex].id, newImageUrl, createNew) : undefined}
+            onImageSaved={onImageSaved ? async (newImageUrl: string, createNew?: boolean) => await onImageSaved(currentImages[lightboxIndex].id, newImageUrl, createNew) : undefined}
             showNavigation={true}
             showImageEditTools={true}
             showDownload={true}
             showMagicEdit={true}
             videoPlayerComponent="hover-scrub"
+            starred={(currentImages[lightboxIndex] as any).starred || false}
             onMagicEdit={onMagicEdit}
           />
         )}
@@ -525,9 +603,9 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <SortableContext items={images.map((img) => img.shotImageEntryId)} strategy={rectSortingStrategy}>
+      <SortableContext items={currentImages.map((img) => img.shotImageEntryId)} strategy={rectSortingStrategy}>
         <div className={cn("grid gap-3", isMobile ? "grid-cols-3" : gridColsClass)}>
-          {images.map((image, index) => (
+          {currentImages.map((image, index) => (
             <SortableImageItem
               key={image.shotImageEntryId}
               image={image}
@@ -549,7 +627,7 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
               onDuplicate={onImageDuplicate}
               position={index}
               onDoubleClick={isMobile ? () => {} : () => setLightboxIndex(index)}
-              onMobileTap={isMobile ? () => handleMobileTap(index) : undefined}
+              onMobileTap={isMobile ? () => handleMobileTap(image.shotImageEntryId, index) : undefined}
               skipConfirmation={imageDeletionSettings.skipConfirmation}
               onSkipConfirmationSave={() => updateImageDeletionSettings({ skipConfirmation: true })}
             />
@@ -567,18 +645,19 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
           </>
         ) : null}
       </DragOverlay>
-      {lightboxIndex !== null && images[lightboxIndex] && (
+      {lightboxIndex !== null && currentImages[lightboxIndex] && (
         <MediaLightbox
-          media={images[lightboxIndex]}
+          media={currentImages[lightboxIndex]}
           onClose={() => setLightboxIndex(null)}
           onNext={handleNext}
           onPrevious={handlePrevious}
-          onImageSaved={onImageSaved ? async (newImageUrl: string, createNew?: boolean) => await onImageSaved(images[lightboxIndex].id, newImageUrl, createNew) : undefined}
+          onImageSaved={onImageSaved ? async (newImageUrl: string, createNew?: boolean) => await onImageSaved(currentImages[lightboxIndex].id, newImageUrl, createNew) : undefined}
           showNavigation={true}
           showImageEditTools={true}
           showDownload={true}
           showMagicEdit={true}
           videoPlayerComponent="hover-scrub"
+          starred={(currentImages[lightboxIndex] as any).starred || false}
           onMagicEdit={onMagicEdit}
         />
       )}
@@ -587,24 +666,28 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
 };
 
 // Lightweight non-sortable image item used in mobile batch mode to avoid
-// relying on dnd-kit context (which isn’t mounted in that view).
+// relying on dnd-kit context (which isn't mounted in that view).
 interface MobileImageItemProps {
   image: GenerationRow;
   isSelected: boolean;
+  index: number; // Add index for position calculation
   onClick?: (event: React.MouseEvent) => void;
   onDoubleClick?: () => void;
   onMobileTap?: () => void;
-  onDelete: () => void; // Add this
+  onDelete: () => void; // Fixed: properly typed delete function
+  onDuplicate: (generationId: string, position: number) => void; // Add duplicate function
   hideDeleteButton?: boolean;
 }
 
 const MobileImageItem: React.FC<MobileImageItemProps> = ({
   image,
   isSelected,
+  index,
   onClick,
   onDoubleClick,
   onMobileTap,
   onDelete, // Add this
+  onDuplicate,
   hideDeleteButton,
 }) => {
   const imageUrl = image.thumbUrl || image.imageUrl;
@@ -630,18 +713,34 @@ const MobileImageItem: React.FC<MobileImageItemProps> = ({
         } : undefined}
       />
       {!hideDeleteButton && (
-        <Button
-          variant="destructive"
-          size="icon"
-          className="absolute top-1 right-1 h-7 w-7 p-0 rounded-full opacity-70 hover:opacity-100 transition-opacity z-10"
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete();
-          }}
-          title="Remove image from shot"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </Button>
+        <>
+          <Button
+            variant="destructive"
+            size="icon"
+            className="absolute top-1 right-1 h-7 w-7 p-0 rounded-full opacity-70 hover:opacity-100 transition-opacity z-10"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+            title="Remove image from shot"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant="secondary"
+            size="icon"
+            className="absolute top-1 left-1 h-7 w-7 p-0 rounded-full opacity-70 hover:opacity-100 transition-opacity z-10"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDuplicate(image.id, index);
+            }}
+            title="Duplicate image"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+          </Button>
+        </>
       )}
     </div>
   );
