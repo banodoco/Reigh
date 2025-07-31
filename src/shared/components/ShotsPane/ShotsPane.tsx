@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useRenderLogger } from '@/shared/hooks/useRenderLogger';
 import ShotGroup from './ShotGroup';
 import NewGroupDropZone from './NewGroupDropZone';
-import { useListShots } from '@/shared/hooks/useShots';
+import { useShots } from '@/shared/contexts/ShotsContext';
 import { useProject } from "@/shared/contexts/ProjectContext";
 import { useSlidingPane } from '@/shared/hooks/useSlidingPane';
 import { cn } from '@/shared/lib/utils';
@@ -20,7 +20,7 @@ import { useShotNavigation } from '@/shared/hooks/useShotNavigation';
 
 export const ShotsPane: React.FC = () => {
   const { selectedProjectId } = useProject();
-  const { data: shots, isLoading, error } = useListShots(selectedProjectId);
+  const { shots, isLoading, error } = useShots();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   // Pagination state
   const pageSize = 5;

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, Suspense, useMemo, useLayoutEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { SteerableMotionSettings } from '../components/ShotEditor';
-import { useListShots, useCreateShot, useHandleExternalImageDrop, useUpdateShotName } from '@/shared/hooks/useShots';
+import { useCreateShot, useHandleExternalImageDrop, useUpdateShotName } from '@/shared/hooks/useShots';
+import { useShots } from '@/shared/contexts/ShotsContext';
 import { Shot } from '@/types/shots';
 import { Button } from '@/shared/components/ui/button';
 import { useProject } from "@/shared/contexts/ProjectContext";
@@ -27,9 +28,9 @@ import { useShotNavigation } from '@/shared/hooks/useShotNavigation';
 import ShotEditor from '../components/ShotEditor';
 
 // Custom hook to parallelize data fetching for better performance
-const useVideoTravelData = (selectedProjectId: string | null, selectedShotId?: string) => {
-  // Fetch shots data
-  const shotsQuery = useListShots(selectedProjectId);
+const useVideoTravelData = (selectedShotId?: string) => {
+  // Get shots data from context (single source of truth)
+  const { shots, isLoading: shotsLoading, error: shotsError, refetchShots } = useShots();
   
   // Fetch public LoRAs data
   const publicLorasQuery = useListPublicResources('lora');
@@ -42,10 +43,10 @@ const useVideoTravelData = (selectedProjectId: string | null, selectedShotId?: s
 
   return {
     // Shots data
-    shots: shotsQuery.data,
-    shotsLoading: shotsQuery.isLoading,
-    shotsError: shotsQuery.error,
-    refetchShots: shotsQuery.refetch,
+    shots,
+    shotsLoading,
+    shotsError,
+    refetchShots,
     
     // LoRAs data
     availableLoras: (publicLorasQuery.data?.map(resource => resource.metadata) || []) as LoraModel[],
@@ -83,7 +84,7 @@ const VideoTravelToolPage: React.FC = () => {
     updateSettings,
     settingsLoading: isLoadingSettings,
     settingsUpdating: isUpdating
-  } = useVideoTravelData(selectedProjectId, selectedShot?.id);
+  } = useVideoTravelData(selectedShot?.id);
   
   const createShotMutation = useCreateShot();
   const handleExternalImageDropMutation = useHandleExternalImageDrop();
@@ -703,14 +704,13 @@ const VideoTravelToolPage: React.FC = () => {
         }>
           <PageFadeIn className="pt-5">
             <ShotEditor
-              selectedShot={shotToEdit}
+              selectedShotId={shotToEdit?.id || ''}
               projectId={selectedProjectId}
               videoPairConfigs={videoPairConfigs}
               videoControlMode={isLoadingSettings ? 'batch' : videoControlMode}
               batchVideoPrompt={isLoadingSettings ? '' : batchVideoPrompt}
               batchVideoFrames={isLoadingSettings ? 60 : batchVideoFrames}
               batchVideoContext={isLoadingSettings ? 10 : batchVideoContext}
-              orderedShotImages={shotToEdit?.images || []}
               onShotImagesUpdate={handleShotImagesUpdate}
               onBack={handleBackToShotList}
               onVideoControlModeChange={isLoadingSettings ? () => {} : (mode) => {

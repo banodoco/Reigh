@@ -44,8 +44,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import SettingsModal from '@/shared/components/SettingsModal';
 // Removed React.lazy for Timeline – imported above eagerly.
 import { useCreateGeneration, useUpdateGenerationLocation } from '@/shared/hooks/useGenerations';
-import { useUnpositionedGenerationsCount } from '@/shared/hooks/useShotGenerations';
+import { useUnpositionedGenerationsCount, useAllShotGenerations } from '@/shared/hooks/useShotGenerations';
 import usePersistentState from '@/shared/hooks/usePersistentState';
+import { useShots } from '@/shared/contexts/ShotsContext';
 
 // Add the missing type definition
 export interface SegmentGenerationParams {
@@ -112,14 +113,13 @@ interface ShotSettings {
 }
 
 export interface ShotEditorProps {
-  selectedShot: Shot;
+  selectedShotId: string;
   projectId: string;
   videoPairConfigs: VideoPairConfig[];
   videoControlMode: 'individual' | 'batch';
   batchVideoPrompt: string;
   batchVideoFrames: number;
   batchVideoContext: number;
-  orderedShotImages: GenerationRow[];
   onShotImagesUpdate: () => void;
   onBack: () => void;
   onVideoControlModeChange: (mode: 'individual' | 'batch') => void;
@@ -177,14 +177,13 @@ const isGenerationVideo = (gen: GenerationRow): boolean => {
 };
 
 const ShotEditor: React.FC<ShotEditorProps> = ({
-  selectedShot,
+  selectedShotId,
   projectId,
   videoPairConfigs,
   videoControlMode,
   batchVideoPrompt,
   batchVideoFrames,
   batchVideoContext,
-  orderedShotImages,
   onShotImagesUpdate,
   onBack,
   onVideoControlModeChange,
@@ -218,6 +217,11 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // Call all hooks first (Rules of Hooks)
   const { selectedProjectId, projects } = useProject();
   const { getApiKey } = useApiKeys();
+  
+  // Load complete shot data and images
+  const { shots } = useShots(); // Get shots from context for shot metadata
+  const selectedShot = shots?.find(shot => shot.id === selectedShotId);
+  const { data: orderedShotImages = [] } = useAllShotGenerations(selectedShotId);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const addImageToShotMutation = useAddImageToShot();
   const removeImageFromShotMutation = useRemoveImageFromShot();
@@ -631,8 +635,22 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // Use local state for optimistic updates on image list
   const [localOrderedShotImages, setLocalOrderedShotImages] = useState(orderedShotImages || []);
   
+  // Debug: Track localOrderedShotImages changes
+  useEffect(() => {
+    console.log('[DragDebug:ShotEditor] localOrderedShotImages state changed', {
+      newLength: localOrderedShotImages.length,
+      firstFewIds: localOrderedShotImages.slice(0, 5).map(img => img.shotImageEntryId),
+      timestamp: Date.now()
+    });
+  }, [localOrderedShotImages]);
+  
   // Filter out generations without position and sort by position
   const filteredOrderedShotImages = useMemo(() => {
+    console.log('[DragDebug:ShotEditor] filteredOrderedShotImages recalculating', {
+      localImagesLength: localOrderedShotImages.length,
+      timestamp: Date.now()
+    });
+    
     const filtered = localOrderedShotImages.filter(img => {
       const hasPosition = (img as any).position !== null && (img as any).position !== undefined;
       const isVideo = isGenerationVideo(img);
@@ -645,6 +663,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     
     // Sort by position (ascending) to maintain user-intended order
     filtered.sort((a, b) => {
+      // Sort by position (ascending), then by created date for stable ordering
       const posA = (a as any).position;
       const posB = (b as any).position;
       if (posA != null && posB != null) return posA - posB;   // ascending
@@ -656,6 +675,11 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       return timeA - timeB;
     });
     
+    console.log('[DragDebug:ShotEditor] filteredOrderedShotImages result', {
+      filteredLength: filtered.length,
+      firstFewIds: filtered.slice(0, 3).map(img => img.shotImageEntryId)
+    });
+    
     return filtered;
   }, [localOrderedShotImages]);
   
@@ -663,8 +687,17 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const { data: unpositionedGenerationsCount = 0 } = useUnpositionedGenerationsCount(selectedShot?.id);
   
   useEffect(() => {
+    console.log('[DragDebug:ShotEditor] Props sync useEffect triggered', {
+      skipNextSync: skipNextSyncRef.current,
+      isUploadingImage,
+      orderedShotImagesLength: orderedShotImages?.length || 0,
+      localImagesLength: localOrderedShotImages.length,
+      timestamp: Date.now()
+    });
+    
     // Skip sync if we just finished uploading to prevent flicker
     if (skipNextSyncRef.current) {
+      console.log('[DragDebug:ShotEditor] Skipping props sync due to skipNextSyncRef');
       skipNextSyncRef.current = false;
       return;
     }
@@ -672,7 +705,12 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     // Only sync from props if we are not in the middle of an upload.
     // The upload function will be the source of truth during the upload process.
     if (!isUploadingImage) {
+      console.log('[DragDebug:ShotEditor] Syncing localOrderedShotImages from props', {
+        newLength: orderedShotImages?.length || 0
+      });
       setLocalOrderedShotImages(orderedShotImages || []);
+    } else {
+      console.log('[DragDebug:ShotEditor] Skipping props sync - upload in progress');
     }
   }, [orderedShotImages, isUploadingImage]);
 
@@ -682,18 +720,48 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // Settings persistence is now handled by the parent component via database
 
   const nonVideoImages = useMemo(() => {
-    return filteredOrderedShotImages.filter(g => !isGenerationVideo(g));
+    console.log('[DragDebug:ShotEditor] nonVideoImages recalculating', {
+      filteredImagesLength: filteredOrderedShotImages.length,
+      timestamp: Date.now()
+    });
+    
+    const result = filteredOrderedShotImages.filter(g => !isGenerationVideo(g));
+    
+    console.log('[DragDebug:ShotEditor] nonVideoImages result', {
+      nonVideoCount: result.length,
+      firstFewIds: result.slice(0, 3).map(img => img.shotImageEntryId)
+    });
+    
+    return result;
   }, [filteredOrderedShotImages]);
   
   // Auto-set context frames to 8 when hidden (<=2 images)
   useEffect(() => {
+    console.log('[DragDebug:ShotEditor] Context frames auto-adjust check', {
+      nonVideoImagesLength: nonVideoImages.length,
+      currentContext: batchVideoContext,
+      willChange: nonVideoImages.length <= 2 && batchVideoContext !== 8
+    });
+    
     if (nonVideoImages.length <= 2 && batchVideoContext !== 8) {
+      console.log('[DragDebug:ShotEditor] Auto-adjusting context frames to 8');
       onBatchVideoContextChange(8);
     }
   }, [nonVideoImages.length, batchVideoContext, onBatchVideoContextChange]);
   
   const videoOutputs = useMemo(() => {
-    return filteredOrderedShotImages.filter(g => isGenerationVideo(g));
+    console.log('[DragDebug:ShotEditor] videoOutputs recalculating', {
+      filteredImagesLength: filteredOrderedShotImages.length,
+      timestamp: Date.now()
+    });
+    
+    const result = filteredOrderedShotImages.filter(g => isGenerationVideo(g));
+    
+    console.log('[DragDebug:ShotEditor] videoOutputs result', {
+      videoCount: result.length
+    });
+    
+    return result;
   }, [filteredOrderedShotImages]);
 
   const {
@@ -704,7 +772,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   if (!selectedShot) {
     return (
       <div className="flex items-center justify-center h-64">
-        <p className="text-muted-foreground">No shot selected</p>
+        <p className="text-muted-foreground">Shot not found</p>
       </div>
     );
   }
@@ -927,15 +995,24 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       return;
     }
 
+    // Place the duplicate one position after the original (position + 1)
+    const duplicatePosition = position + 1;
+
     duplicateImageInShotMutation.mutate({
       shot_id: selectedShot.id,
       generation_id: generationId,
-      position: position,
+      position: duplicatePosition,
       project_id: selectedProjectId,
     });
   };
 
-  const handleReorderImagesInShot = (orderedShotGenerationIds: string[]) => {
+  const handleReorderImagesInShot = useCallback((orderedShotGenerationIds: string[]) => {
+    console.log('[DragDebug:ShotEditor] handleReorderImagesInShot called', {
+      newOrderIds: orderedShotGenerationIds,
+      currentLocalImagesCount: localOrderedShotImages.length,
+      selectedShotId: selectedShot?.id,
+      timestamp: Date.now()
+    });
     
     if (!selectedShot || !selectedProjectId) {
       console.error('Cannot reorder images: No shot or project selected.');
@@ -960,27 +1037,52 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     // Combine reordered positioned images with videos and unpositioned images
     const combinedImages = [...reorderedImages, ...videoImages, ...unpositionedImages];
     
+    // Only update state if the order actually changed to prevent unnecessary re-renders
+    const currentOrder = localOrderedShotImages.map(img => img.shotImageEntryId).join(',');
+    const newOrder = combinedImages.map(img => img.shotImageEntryId).join(',');
+    
+    console.log('[DragDebug:ShotEditor] Order comparison', {
+      currentOrder: currentOrder.substring(0, 100) + '...',
+      newOrder: newOrder.substring(0, 100) + '...',
+      ordersMatch: currentOrder === newOrder,
+      reorderedCount: reorderedImages.length,
+      videoCount: videoImages.length,
+      unpositionedCount: unpositionedImages.length
+    });
+    
+    if (currentOrder === newOrder) {
+      console.log('[DragDebug:ShotEditor] Orders match - skipping state update');
+      return; // No change, skip the update
+    }
+    
+    // CRITICAL FIX: Set skipNextSyncRef BEFORE updating state to prevent props sync from overriding
+    console.log('[DragDebug:ShotEditor] Setting skipNextSyncRef BEFORE state update');
+    skipNextSyncRef.current = true;
+    
+    console.log('[DragDebug:ShotEditor] Updating localOrderedShotImages state');
     setLocalOrderedShotImages(combinedImages);
 
     // Send the new order to the backend (include video images to preserve their positions)
     const combinedIds = [...orderedShotGenerationIds, ...videoImages.map(v => v.shotImageEntryId)];
 
+    console.log('[DragDebug:ShotEditor] Calling updateShotImageOrderMutation');
     updateShotImageOrderMutation.mutate({
       shotId: selectedShot.id,
       orderedShotGenerationIds: combinedIds,
       projectId: selectedProjectId,
     }, {
       onError: (error) => {
-        console.error('Failed to reorder images:', error);
-        // Rollback on error
+        console.error('[DragDebug:ShotEditor] Failed to reorder images:', error);
+        // Reset the flag on error and rollback
+        skipNextSyncRef.current = false;
         setLocalOrderedShotImages(orderedShotImages);
       },
       onSuccess: () => {
-        // Skip the next prop sync to prevent overriding our reorder
-        skipNextSyncRef.current = true;
+        console.log('[DragDebug:ShotEditor] Reorder mutation successful');
+        // skipNextSyncRef was already set to true before the state update
       }
     });
-  };
+  }, [selectedShot, selectedProjectId, localOrderedShotImages, updateShotImageOrderMutation, orderedShotImages]);
 
   const handleImageSaved = async (imageId: string, newImageUrl: string, createNew?: boolean) => {
     

@@ -67,6 +67,7 @@
 | Context | Purpose | Provider Location | Usage |
 |---------|---------|-------------------|-------|
 | **`ProjectContext`** | Current project state | `App.tsx` | `const { project, setProject } = useProject()` |
+| **`ShotsContext`** | Single source of truth for shots data | `App.tsx` | `const { shots, isLoading, refetchShots } = useShots()` |
 | **`PanesContext`** | Pane lock/visibility | `Layout.tsx` | `const { lockedPanes, togglePane } = usePanes()` |
 | **`LastAffectedShotContext`** | Recent shot tracking | `App.tsx` | `const { lastShot } = useLastAffectedShot()` |
 | **`CurrentShotContext`** | Active shot selection | Tool-specific | `const { currentShot } = useCurrentShot()` |
@@ -77,17 +78,21 @@
 ```typescript
 // Using multiple contexts in a component
 import { useProject } from '@/shared/contexts/ProjectContext';
+import { useShots } from '@/shared/contexts/ShotsContext';
 import { usePanes } from '@/shared/contexts/PanesContext';
 
 export function MyComponent() {
   const { project } = useProject();
+  const { shots, isLoading } = useShots(); // Single source of truth for shots
   const { lockedPanes, togglePane } = usePanes();
   
   if (!project) return <div>Select a project</div>;
+  if (isLoading) return <div>Loading shots...</div>;
   
   return (
     <div>
       <h1>{project.name}</h1>
+      <p>{shots?.length || 0} shots available</p>
       <Button onClick={() => togglePane('shots')}>
         {lockedPanes.shots ? 'Unlock' : 'Lock'} Shots
       </Button>
@@ -95,6 +100,27 @@ export function MyComponent() {
   );
 }
 ```
+
+### 🎯 **ShotsContext: Centralized Data Management**
+
+The `ShotsContext` provides a **single source of truth** for shots data across all components, eliminating data duplication and improving performance:
+
+- **Before**: `VideoTravelToolPage`, `ShotsPane`, and other components each called `useListShots()` separately
+- **After**: One `ShotsProvider` manages all shots data, consumed via `useShots()` hook
+- **Performance**: Main view now loads only 5 thumbnail images per shot (vs. all images previously)
+- **Consistency**: All components see identical, synchronized shots state
+
+#### Data Consistency Strategy
+
+**Two-Tier Data Loading:**
+- **List Views** (`ShotsPane`, `VideoTravelToolPage`): Use `useShots()` → 5 thumbnails per shot
+- **Detail Views** (`ShotEditor`): Use `useAllShotGenerations(shotId)` → complete data for selected shot
+
+**Key Benefits:**
+- **Fast Browsing**: List views load minimal data for quick navigation
+- **Complete Editing**: Detail views load full data only when needed
+- **Video Generation**: Uses complete image data from detail view (not limited thumbnails)
+- **No Data Conflicts**: Shot metadata (ID, name) is consistent; only image completeness varies
 
 ---
 

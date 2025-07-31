@@ -693,42 +693,58 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   return (
     <>
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Associated Shot Selector - Now at the top */}
-        <div className="w-1/2 flex items-center gap-2">
-          <Label htmlFor="associatedShot" className="inline-block">Associated with Shot</Label>
-          <Select
-            value={associatedShotId || "none"}
-            onValueChange={(value) => {
-              markAsInteracted();
-              setAssociatedShotId(value === "none" ? null : value);
-            }}
-            disabled={!hasApiKey || isGenerating}
-          >
-            <SelectTrigger id="associatedShot" className="inline-flex w-auto min-w-[200px]">
-              <SelectValue placeholder="None" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">None</SelectItem>
-              {shots?.map((shot) => (
-                <SelectItem key={shot.id} value={shot.id}>
-                  {shot.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setIsCreateShotModalOpen(true)}
-            disabled={!hasApiKey || isGenerating}
-            className="h-8 w-8 p-0"
-          >
-            <PlusCircle className="h-4 w-4" />
-          </Button>
-        </div>
-
+        {/* Main Content Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Associated Shot Selector */}
+          <div className="flex items-center gap-2 md:col-start-1 md:row-start-1 self-start w-full">
+            <Label htmlFor="associatedShot" className="inline-block">Associated with Shot</Label>
+            <Select
+              value={associatedShotId || "none"}
+              onValueChange={(value) => {
+                markAsInteracted();
+                setAssociatedShotId(value === "none" ? null : value);
+              }}
+              disabled={!hasApiKey || isGenerating}
+            >
+              <SelectTrigger id="associatedShot" className="inline-flex flex-1 min-w-[200px]">
+                <SelectValue placeholder="None" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">None</SelectItem>
+                {shots?.map((shot) => (
+                  <SelectItem key={shot.id} value={shot.id}>
+                    {shot.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setIsCreateShotModalOpen(true)}
+              disabled={!hasApiKey || isGenerating}
+              className="gap-1"
+            >
+              <PlusCircle className="h-4 w-4" />
+              <span className="hidden sm:inline">Create New Shot</span>
+            </Button>
+          </div>
+
+          {/* LoRA Header (label + manage button) */}
+          <div className="flex items-center gap-2 md:col-start-2 md:row-start-1 self-start">
+            <Label>LoRA Models (Wan)</Label>
+            <Button
+              type="button"
+              variant="outline"
+              className="mt-1"
+              onClick={() => loraManager.setIsLoraModalOpen(true)}
+              disabled={isGenerating}
+            >
+              Add or Manage LoRA Models
+            </Button>
+          </div>
+
           {/* Prompts Section */}
           <div className="space-y-4">
             <div>
@@ -853,25 +869,18 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
 
           </div>
           
-          {/* LoRA Section */}
-          <div className="space-y-6 md:order-2 md:row-start-1 md:col-start-2">
-            <div>
-              <Label>LoRA Models (Wan)</Label>
-              <Button type="button" variant="outline" className="w-full mt-1" onClick={() => loraManager.setIsLoraModalOpen(true)} disabled={isGenerating}>
-                Add or Manage LoRA Models
-              </Button>
-              
-              <ActiveLoRAsDisplay
-                selectedLoras={loraManager.selectedLoras}
-                onRemoveLora={handleRemoveLora}
-                onLoraStrengthChange={handleLoraStrengthChange}
-                isGenerating={isGenerating}
-                availableLoras={availableLoras}
-                className="mt-4"
-                onAddTriggerWord={loraManager.handleAddTriggerWord}
-                renderHeaderActions={loraManager.renderHeaderActions}
-              />
-            </div>
+          {/* LoRA Active List Section */}
+          <div className="space-y-4 md:order-2 md:row-start-2 md:col-start-2">
+            <ActiveLoRAsDisplay
+              selectedLoras={loraManager.selectedLoras}
+              onRemoveLora={handleRemoveLora}
+              onLoraStrengthChange={handleLoraStrengthChange}
+              isGenerating={isGenerating}
+              availableLoras={availableLoras}
+              className="mt-1"
+              onAddTriggerWord={loraManager.handleAddTriggerWord}
+              renderHeaderActions={loraManager.renderHeaderActions}
+            />
           </div>
         </div>
 

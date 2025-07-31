@@ -235,70 +235,26 @@ export const useListShots = (projectId?: string | null) => {
         return [];
       }
       
-      // Get all shot IDs for batch fetching generations
-      const shotIds = shots.map(shot => shot.id);
-      
-      // Fetch shot_generations in batches to handle large datasets
-      let allShotGenerations: any[] = [];
-      const BATCH_SIZE = 1000;
-      let hasMore = true;
-      let offset = 0;
-      
-      while (hasMore) {
-        const { data: shotGenerationsBatch, error: sgError } = await supabase
+      // Get only the first 5 images per shot for thumbnail display
+      const shotPromises = shots.map(async (shot) => {
+        const { data: shotGenerations, error: sgError } = await supabase
           .from('shot_generations')
           .select(`*, generation:generations(*)`)
-          .in('shot_id', shotIds)
-          .range(offset, offset + BATCH_SIZE - 1)
-          .order('position', { ascending: true, nullsFirst: false });
+          .eq('shot_id', shot.id)
+          .order('position', { ascending: true, nullsFirst: false })
+          .limit(5); // Only load 5 images per shot for main view
         
         if (sgError) {
           throw sgError;
         }
         
-        const batchSize = shotGenerationsBatch?.length || 0;
-        
-        if (shotGenerationsBatch) {
-          allShotGenerations = allShotGenerations.concat(shotGenerationsBatch);
-        }
-        
-        // Check if we got a full batch (if not, we've reached the end)
-        hasMore = batchSize === BATCH_SIZE;
-        offset += BATCH_SIZE;
-      }
-
-
-      
-      // Group by shot ID
-      const shotGenerationsMap = new Map<string, any[]>();
-      for (const sg of allShotGenerations) {
-        if (!shotGenerationsMap.has(sg.shot_id)) {
-          shotGenerationsMap.set(sg.shot_id, []);
-        }
-        shotGenerationsMap.get(sg.shot_id)!.push(sg);
-      }
-
-
-      // Transform shots to include their generations
-      const result = shots.map(shot => {
-        const shotGenerations = shotGenerationsMap.get(shot.id) || [];
-        
-        const transformedImages = shotGenerations.map(sg => {
-          // Debug: Check what fields are available
-          console.log('[DEBUG] sg.generation fields:', Object.keys(sg.generation || {}));
-          console.log('[DEBUG] sg.generation.starred:', sg.generation?.starred);
-          
-          return {
-            ...sg.generation,
-            shotImageEntryId: sg.id,
-            position: sg.position,
-            // Ensure imageUrl is set from location for display purposes
-            imageUrl: sg.generation.imageUrl || sg.generation.location,
-            thumbUrl: sg.generation.thumbUrl || sg.generation.location,
-            // Explicitly preserve starred field
-            starred: sg.generation?.starred || false,
-          };
-        });
+        const transformedImages = (shotGenerations || []).map(sg => ({
+          ...sg.generation,
+          shotImageEntryId: sg.id,
+          position: sg.position,
+          imageUrl: sg.generation.imageUrl || sg.generation.location,
+          thumbUrl: sg.generation.thumbUrl || sg.generation.location,
+        }));
         
         return {
           ...shot,
@@ -306,6 +262,7 @@ export const useListShots = (projectId?: string | null) => {
         };
       });
       
+      const result = await Promise.all(shotPromises);
       return result;
     },
     enabled: !!projectId,

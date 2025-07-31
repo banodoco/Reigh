@@ -4,7 +4,8 @@ import { TooltipProvider } from "@/shared/components/ui/tooltip";
 import { Toaster as Sonner } from "@/shared/components/ui/sonner";
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent, DragStartEvent, DragOverlay } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { useHandleExternalImageDrop, useCreateShot, useAddImageToShot, useListShots } from "@/shared/hooks/useShots";
+import { useHandleExternalImageDrop, useCreateShot, useAddImageToShot } from "@/shared/hooks/useShots";
+import { useShots } from '@/shared/contexts/ShotsContext';
 import { NEW_GROUP_DROPPABLE_ID } from '@/shared/components/ShotsPane/NewGroupDropZone';
 import { LastAffectedShotProvider, LastAffectedShotContext } from '@/shared/contexts/LastAffectedShotContext';
 import { AppRoutes } from "./routes";
@@ -13,6 +14,7 @@ import { useWebSocket } from '@/shared/hooks/useWebSocket';
 import { PanesProvider } from '@/shared/contexts/PanesContext';
 import { CurrentShotProvider } from '@/shared/contexts/CurrentShotContext';
 import { ToolPageHeaderProvider } from '@/shared/contexts/ToolPageHeaderContext';
+import { ShotsProvider } from '@/shared/contexts/ShotsContext';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -41,7 +43,7 @@ const AppInternalContent = () => {
   if (!context) throw new Error("useLastAffectedShot must be used within a LastAffectedShotProvider");
   const { setLastAffectedShotId } = context;
 
-  const { data: shotsFromHook, isLoading: isLoadingShots } = useListShots(selectedProjectId);
+  const { shots: shotsFromHook, isLoading: isLoadingShots } = useShots();
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -213,15 +215,17 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ProjectProvider>
-        <PanesProvider>
-          <LastAffectedShotProvider>
-            <CurrentShotProvider>
-              <ToolPageHeaderProvider>
-                <AppInternalContent />
-              </ToolPageHeaderProvider>
-            </CurrentShotProvider>
-          </LastAffectedShotProvider>
-        </PanesProvider>
+        <ShotsProvider>
+          <PanesProvider>
+            <LastAffectedShotProvider>
+              <CurrentShotProvider>
+                <ToolPageHeaderProvider>
+                  <AppInternalContent />
+                </ToolPageHeaderProvider>
+              </CurrentShotProvider>
+            </LastAffectedShotProvider>
+          </PanesProvider>
+        </ShotsProvider>
       </ProjectProvider>
     </QueryClientProvider>
   );

@@ -284,30 +284,36 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-          <TabsList className="grid w-full grid-cols-3 bg-gray-100 border border-gray-200">
+          <TabsList className="grid w-full grid-cols-3 bg-gray-100 border border-gray-200 h-auto p-3 sm:h-10 sm:p-1 mb-6">
             <TabsTrigger 
               value="purchase"
-              className="data-[state=active]:bg-white data-[state=active]:shadow-sm flex flex-col sm:flex-row items-center justify-center gap-0.5 py-2 text-xs sm:text-sm"
-              style={{ whiteSpace: 'normal' }}
+              className="data-[state=active]:bg-white data-[state=active]:shadow-sm flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-0.5 py-2 sm:py-1.5 px-2 sm:px-3 text-xs sm:text-sm"
             >
-              <CreditCard className="w-4 h-4 mb-0.5 sm:mb-0 sm:mr-2" />
-              <span className="text-center leading-tight">Add<br className="sm:hidden" />Credits</span>
+              <CreditCard className="w-4 h-4" />
+              <span className="text-center leading-tight">
+                <span className="sm:hidden">Add<br />Credits</span>
+                <span className="hidden sm:inline">Add Credits</span>
+              </span>
             </TabsTrigger>
             <TabsTrigger 
               value="history"
-              className="data-[state=active]:bg-white data-[state=active]:shadow-sm flex flex-col sm:flex-row items-center justify-center gap-0.5 py-2 text-xs sm:text-sm"
-              style={{ whiteSpace: 'normal' }}
+              className="data-[state=active]:bg-white data-[state=active]:shadow-sm flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-0.5 py-2 sm:py-1.5 px-2 sm:px-3 text-xs sm:text-sm"
             >
-              <History className="w-4 h-4 mb-0.5 sm:mb-0 sm:mr-2" />
-              <span className="text-center leading-tight">Transaction<br className="sm:hidden" /> History</span>
+              <History className="w-4 h-4" />
+              <span className="text-center leading-tight">
+                <span className="sm:hidden">Transaction<br />History</span>
+                <span className="hidden sm:inline">Transaction History</span>
+              </span>
             </TabsTrigger>
             <TabsTrigger 
               value="task-log"
-              className="data-[state=active]:bg-white data-[state=active]:shadow-sm flex flex-col sm:flex-row items-center justify-center gap-0.5 py-2 text-xs sm:text-sm"
-              style={{ whiteSpace: 'normal' }}
+              className="data-[state=active]:bg-white data-[state=active]:shadow-sm flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-0.5 py-2 sm:py-1.5 px-2 sm:px-3 text-xs sm:text-sm"
             >
-              <Activity className="w-4 h-4 mb-0.5 sm:mb-0 sm:mr-2" />
-              <span className="text-center leading-tight">Task<br className="sm:hidden" />Log</span>
+              <Activity className="w-4 h-4" />
+              <span className="text-center leading-tight">
+                <span className="sm:hidden">Task<br />Log</span>
+                <span className="hidden sm:inline">Task Log</span>
+              </span>
             </TabsTrigger>
           </TabsList>
 
@@ -420,12 +426,23 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
           </TabsContent>
 
           <TabsContent value="task-log" className="flex-1 space-y-4">
+            {/* Mobile notice */}
+            <div className="sm:hidden p-3 bg-blue-50 border border-blue-200 rounded-lg text-center">
+              <p className="text-sm text-blue-700">More details are available on desktop</p>
+            </div>
+            
             {/* Filters Bar */}
-            <div className="flex flex-wrap items-center gap-2 p-4 bg-gray-50 rounded-lg border">
-              <div className="flex items-center gap-2">
+            <div className="p-4 bg-gray-50 rounded-lg border space-y-3 sm:space-y-0">
+              <div className="flex items-center gap-2 sm:hidden">
                 <Filter className="w-4 h-4 text-gray-500" />
                 <span className="text-sm font-medium text-gray-700">Filter by:</span>
               </div>
+              
+              <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
+                <div className="hidden sm:flex items-center gap-2">
+                  <Filter className="w-4 h-4 text-gray-500" />
+                  <span className="text-sm font-medium text-gray-700">Filter by:</span>
+                </div>
 
               {/* Cost Filter */}
               <Popover>
@@ -664,13 +681,13 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                 </Popover>
               )}
 
-              {/* Clear Filters */}
-              {getFilterCount() > 0 && (
-                <Button variant="ghost" size="sm" onClick={clearFilters} className="h-8 text-gray-500">
-                  Clear ({getFilterCount()})
-                </Button>
-              )}
-
+                {/* Clear Filters */}
+                {getFilterCount() > 0 && (
+                  <Button variant="ghost" size="sm" onClick={clearFilters} className="h-8 text-gray-500">
+                    Clear ({getFilterCount()})
+                  </Button>
+                )}
+              </div>
             </div>
 
             {/* Download Button Section */}
@@ -745,9 +762,9 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                       <TableRow>
                         <TableHead>Date</TableHead>
                         <TableHead>Task Type</TableHead>
-                        <TableHead>Project</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Duration</TableHead>
+                        <TableHead className="hidden sm:table-cell">Project</TableHead>
+                        <TableHead className="hidden sm:table-cell">Status</TableHead>
+                        <TableHead className="hidden sm:table-cell">Duration</TableHead>
                         <TableHead>Cost</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -758,14 +775,14 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                             {formatDistanceToNow(new Date(task.createdAt), { addSuffix: true })}
                           </TableCell>
                           <TableCell>
-                            <Badge variant="outline" className="capitalize py-1.5 my-1">
+                            <Badge variant="outline" className="capitalize py-1.5 my-1 text-xs">
                               {formatTaskType(task.taskType)}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-sm text-gray-600 max-w-[120px] truncate">
+                          <TableCell className="hidden sm:table-cell text-sm text-gray-600 max-w-[120px] truncate">
                             {task.projectName || 'Unknown Project'}
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="hidden sm:table-cell">
                             <Badge
                               variant={
                                 task.status === 'Complete' ? 'default' : 
@@ -776,16 +793,16 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                               {task.status}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-sm text-gray-600">
+                          <TableCell className="hidden sm:table-cell text-sm text-gray-600">
                             {task.duration ? `${task.duration}s` : '-'}
                           </TableCell>
-                                                  <TableCell 
-                          className={`font-semibold text-sm ${
-                            task.cost ? 'text-red-600' : 'text-gray-400'
-                          }`}
+                          <TableCell 
+                            className={`font-semibold text-sm ${
+                              task.cost ? 'text-red-600' : 'text-gray-400'
+                            }`}
                           >
-                          {task.cost ? `$${(parseFloat(task.cost.toString()) / 100).toFixed(3)}` : 'Free'}
-                        </TableCell>
+                            {task.cost ? `$${(parseFloat(task.cost.toString()) / 100).toFixed(3)}` : 'Free'}
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

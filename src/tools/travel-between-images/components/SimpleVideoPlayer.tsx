@@ -55,7 +55,11 @@ const SimpleVideoPlayer: React.FC<SimpleVideoPlayerProps> = ({
   };
 
   return (
-    <div className={`flex flex-col items-center space-y-2 ${className}`} style={{ maxHeight: '80vh' }}>
+    <div
+      className={`flex flex-col items-center space-y-2 w-[95vw] sm:w-auto ${className}`}
+      // Limit overall size; width adapts responsively (fills viewport on mobile, natural on desktop)
+      style={{ maxHeight: '85vh', maxWidth: '95vw' }}
+    >
       {/* Video element */}
       <video
         ref={videoRef}
@@ -67,8 +71,8 @@ const SimpleVideoPlayer: React.FC<SimpleVideoPlayerProps> = ({
         playsInline
         autoPlay
         preload="auto"
-        className="w-full object-contain"
-        style={{ maxHeight: 'calc(80vh - 40px)' }}
+        className="object-contain w-full sm:w-auto max-w-full"
+        style={{ maxHeight: 'calc(85vh - 40px)' }}
       >
         Your browser does not support the video tag.
       </video>
