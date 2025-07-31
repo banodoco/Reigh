@@ -381,14 +381,21 @@ export const useAddImageToShot = () => {
       return shotGeneration;
     },
     onSuccess: (_, variables) => {
-      // Use the project_id from variables directly
-      const project_id = variables.project_id;
-      
+      // After successfully adding the image, invalidate related queries so UI refreshes.
+      // 1. Re-fetch shots list for the project (affects thumbnail counts, etc.)
+      const { project_id, shot_id } = variables;
+
       if (project_id) {
         queryClient.invalidateQueries({ queryKey: ['shots', project_id] });
-        // Also invalidate generations cache so GenerationsPane updates immediately
+        // Also invalidate project-level generations cache (used by GenerationsPane)
         queryClient.invalidateQueries({ queryKey: ['generations', project_id] });
-      }      
+      }
+
+      // 2. Critically, re-fetch the per-shot generations list used by ShotEditor so that
+      //    newly-added images appear without a manual refresh.
+      if (shot_id) {
+        queryClient.invalidateQueries({ queryKey: ['all-shot-generations', shot_id] });
+      }
     },
     onError: (error: Error) => {
       console.error('Error adding image to shot:', error);
