@@ -52,8 +52,28 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, 
 
   const handleCreateProject = async () => {
     let finalProjectName = projectName.trim();
+    // If user didn't enter a name, pick a random dummy name that's not already used
     if (!finalProjectName) {
-      finalProjectName = getRandomDummyName();
+      const existingNamesLower = projects.map(p => p.name.toLowerCase());
+
+      // Try up to dummy names list length times to find a unique one
+      const maxTries = 10;
+      let tries = 0;
+      let candidateName = '';
+      while (tries < maxTries) {
+        candidateName = getRandomDummyName();
+        if (!existingNamesLower.includes(candidateName.toLowerCase())) {
+          break;
+        }
+        tries++;
+      }
+
+      // As a fallback, append a random number to guarantee uniqueness
+      if (existingNamesLower.includes(candidateName.toLowerCase())) {
+        candidateName = `${candidateName} ${Math.floor(Math.random() * 1000)}`;
+      }
+
+      finalProjectName = candidateName;
     }
 
     if (!aspectRatio) {
