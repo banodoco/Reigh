@@ -387,6 +387,7 @@ const Timeline: React.FC<TimelineProps> = ({
           onImageSaved={async (newUrl: string, createNew?: boolean) => await onImageSaved(images[lightboxIndex].id, newUrl, createNew)}
           showNavigation={true}
           showMagicEdit={true}
+          starred={(images[lightboxIndex] as any).starred || false}
           onMagicEdit={(imageUrl, prompt, numImages) => {
             // TODO: Implement magic edit generation
             console.log('Magic Edit from Timeline:', { imageUrl, prompt, numImages });

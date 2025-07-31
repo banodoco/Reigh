@@ -261,6 +261,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
             showImageEditTools={false}
             showDownload={true}
             videoPlayerComponent="simple-player"
+            starred={(sortedVideoOutputs[lightboxIndex] as any).starred || false}
           />
         )}
 
