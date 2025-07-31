@@ -283,14 +283,22 @@ export const useListShots = (projectId?: string | null) => {
       const result = shots.map(shot => {
         const shotGenerations = shotGenerationsMap.get(shot.id) || [];
         
-        const transformedImages = shotGenerations.map(sg => ({
-          ...sg.generation,
-          shotImageEntryId: sg.id,
-          position: sg.position,
-          // Ensure imageUrl is set from location for display purposes
-          imageUrl: sg.generation.imageUrl || sg.generation.location,
-          thumbUrl: sg.generation.thumbUrl || sg.generation.location,
-        }));
+        const transformedImages = shotGenerations.map(sg => {
+          // Debug: Check what fields are available
+          console.log('[DEBUG] sg.generation fields:', Object.keys(sg.generation || {}));
+          console.log('[DEBUG] sg.generation.starred:', sg.generation?.starred);
+          
+          return {
+            ...sg.generation,
+            shotImageEntryId: sg.id,
+            position: sg.position,
+            // Ensure imageUrl is set from location for display purposes
+            imageUrl: sg.generation.imageUrl || sg.generation.location,
+            thumbUrl: sg.generation.thumbUrl || sg.generation.location,
+            // Explicitly preserve starred field
+            starred: sg.generation?.starred || false,
+          };
+        });
         
         return {
           ...shot,
