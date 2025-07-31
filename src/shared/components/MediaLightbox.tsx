@@ -88,9 +88,24 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   // Local starred state to ensure UI reflects updates immediately even if parent data is stale
   const initialStarred = useMemo(() => {
     // Prefer explicit prop, fall back to media.starred if available
-    if (typeof starred === 'boolean') return starred;
+    console.log('[StarDebug:MediaLightbox] Calculating initialStarred', {
+      mediaId: media.id,
+      starredProp: starred,
+      mediaStarred: (media as any).starred,
+      mediaKeys: Object.keys(media),
+      timestamp: Date.now()
+    });
+    
+    if (typeof starred === 'boolean') {
+      console.log('[StarDebug:MediaLightbox] Using starred prop:', starred);
+      return starred;
+    }
     // @ts-ignore – media may include starred even if not in type
-    if (typeof (media as any).starred === 'boolean') return (media as any).starred;
+    if (typeof (media as any).starred === 'boolean') {
+      console.log('[StarDebug:MediaLightbox] Using media.starred:', (media as any).starred);
+      return (media as any).starred;
+    }
+    console.log('[StarDebug:MediaLightbox] Defaulting to false');
     return false;
   }, [starred, media]);
 
@@ -98,6 +113,13 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
   // Keep local state in sync when parent updates (e.g., after query refetch)
   useEffect(() => {
+    console.log('[StarDebug:MediaLightbox] Syncing localStarred', {
+      mediaId: media.id,
+      oldLocalStarred: localStarred,
+      newInitialStarred: initialStarred,
+      willUpdate: localStarred !== initialStarred,
+      timestamp: Date.now()
+    });
     setLocalStarred(initialStarred);
   }, [initialStarred]);
 
@@ -336,19 +358,19 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               <div className="relative">
                 {isVideo ? (
                   videoPlayerComponent === 'simple-player' ? (
-                    <div style={{ width: '95vw', maxWidth: '95vw' }}>
+                    <div style={{ maxWidth: '95vw' }}>
                       <SimpleVideoPlayer
                         src={displayUrl}
                         poster={media.thumbUrl}
-                        className="w-full h-full max-h-[85vh] sm:max-h-[85vh] object-contain"
+                        className="h-auto max-h-[85vh] sm:max-h-[85vh] object-contain"
                       />
                     </div>
                   ) : (
                     <HoverScrubVideo
                       src={displayUrl}
                       poster={media.thumbUrl}
-                      className="w-full h-full max-h-[85vh] sm:max-h-[85vh] object-contain"
-                      style={{ width: '95vw', maxWidth: '95vw' }}
+                      className="h-auto max-h-[85vh] sm:max-h-[85vh] object-contain w-[95vw] sm:w-auto"
+                      style={{ maxWidth: '95vw' }}
                     />
                   )
                 ) : (
@@ -410,11 +432,21 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     size="sm"
                     onClick={() => {
                       const newStarred = !localStarred;
+                      console.log('[StarDebug:MediaLightbox] Star button clicked', {
+                        mediaId: media.id,
+                        oldLocalStarred: localStarred,
+                        newStarred,
+                        hasOnToggleStar: !!onToggleStar,
+                        timestamp: Date.now()
+                      });
+                      
                       setLocalStarred(newStarred); // Optimistic UI update
 
                       if (onToggleStar) {
+                        console.log('[StarDebug:MediaLightbox] Calling onToggleStar prop');
                         onToggleStar(media.id, newStarred);
                       } else {
+                        console.log('[StarDebug:MediaLightbox] Calling toggleStarMutation');
                         toggleStarMutation.mutate({ id: media.id, starred: newStarred });
                       }
                     }}

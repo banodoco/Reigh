@@ -370,7 +370,17 @@ const Timeline: React.FC<TimelineProps> = ({
       {/* Lightbox */}
       {lightboxIndex !== null && images[lightboxIndex] && (
         <MediaLightbox
-          media={images[lightboxIndex]}
+          media={(() => {
+            const media = images[lightboxIndex];
+            console.log('[StarDebug:Timeline] MediaLightbox media', {
+              mediaId: media.id,
+              mediaKeys: Object.keys(media),
+              hasStarred: 'starred' in media,
+              starredValue: (media as any).starred,
+              timestamp: Date.now()
+            });
+            return media;
+          })()}
           onClose={() => setLightboxIndex(null)}
           onNext={images.length > 1 ? goNext : undefined}
           onPrevious={images.length > 1 ? goPrev : undefined}

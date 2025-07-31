@@ -386,9 +386,11 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     setActiveLightboxMedia(null);
   };
 
-  const handleImageSaved = (newImageUrl: string) => {
+  // Conform to MediaLightbox signature: returns Promise<void> and accepts optional createNew flag
+  const handleImageSaved = async (newImageUrl: string, _createNew?: boolean): Promise<void> => {
     if (activeLightboxMedia?.id && onImageSaved) {
-      onImageSaved(activeLightboxMedia.id, newImageUrl);
+      // Wrap the potentially synchronous parent handler in Promise.resolve to always return a Promise
+      await Promise.resolve(onImageSaved(activeLightboxMedia.id, newImageUrl));
     }
   };
   
@@ -644,7 +646,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   return (
     <TooltipProvider>
       <div className="space-y-6 pb-8">
-        <div className="flex flex-wrap justify-between items-center mb-4 gap-x-4 gap-y-2"> {/* Added gap-y-2 and flex-wrap for better responsiveness */}
+        <div className="flex flex-wrap justify-between items-center mt-7 mb-4 gap-x-4 gap-y-2"> {/* Increased top margin to 1.75rem (mt-7) while keeping bottom margin 1rem (mb-4) for desired spacing */}
             <div className="flex items-center gap-2">
                 {/* Pagination Controls */}
                 {totalPages > 1 && (
@@ -795,8 +797,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
             </div>
         </div>
 
-        {/* Gallery content wrapper with minimum height to prevent layout jump */}
-        <div className="min-h-[400px] sm:min-h-[500px] lg:min-h-[600px]">
+        {/* Gallery content wrapper with minimum height to prevent layout jump when there are images */}
+        <div className={paginatedImages.length > 0 ? "min-h-[400px] sm:min-h-[500px] lg:min-h-[600px]" : ""}>
           {images.length > 0 && filteredImages.length === 0 && (filterByToolType || mediaTypeFilter !== 'all' || searchTerm.trim()) && (
             <div className="text-center py-12 mt-8 text-muted-foreground border rounded-lg bg-card shadow-sm">
               <Filter className="mx-auto h-10 w-10 mb-3 opacity-60" />
@@ -908,7 +910,18 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
           showTickForImageId={showTickForImageId}
           onShowTick={setShowTickForImageId}
           starred={
-            filteredImages.find(img => img.id === activeLightboxMedia.id)?.starred || false
+            (() => {
+              const foundImage = filteredImages.find(img => img.id === activeLightboxMedia.id);
+              const starredValue = foundImage?.starred || false;
+              console.log('[StarDebug:ImageGallery] MediaLightbox starred prop', {
+                mediaId: activeLightboxMedia.id,
+                foundImage: !!foundImage,
+                starredValue,
+                foundImageKeys: foundImage ? Object.keys(foundImage) : [],
+                timestamp: Date.now()
+              });
+              return starredValue;
+            })()
           }
           onMagicEdit={(imageUrl, prompt, numImages) => {
             // TODO: Implement magic edit generation

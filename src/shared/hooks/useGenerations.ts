@@ -352,9 +352,12 @@ export function useToggleGenerationStar() {
 
   return useMutation({
     mutationFn: ({ id, starred }: { id: string; starred: boolean }) => {
+      console.log('[StarDebug:useToggleGenerationStar] Starting mutation', { id, starred });
       return toggleGenerationStar(id, starred);
     },
     onMutate: async ({ id, starred }) => {
+      console.log('[StarDebug:useToggleGenerationStar] onMutate called', { id, starred });
+      
       // Cancel outgoing refetches so they don't overwrite our optimistic update
       await Promise.all([
         queryClient.cancelQueries({ queryKey: ['generations'] }),
@@ -366,7 +369,10 @@ export function useToggleGenerationStar() {
       const previousShotsQueries = new Map();
 
       // 1) Optimistically update all generations-list caches
-      queryClient.getQueriesData({ queryKey: ['generations'] }).forEach(([queryKey, data]) => {
+      const generationsQueries = queryClient.getQueriesData({ queryKey: ['generations'] });
+      console.log('[StarDebug:useToggleGenerationStar] Found generations queries:', generationsQueries.length);
+      
+      generationsQueries.forEach(([queryKey, data]) => {
         if (data && typeof data === 'object' && 'items' in data) {
           previousGenerationsQueries.set(queryKey, data);
 
@@ -374,29 +380,45 @@ export function useToggleGenerationStar() {
             ...data,
             items: (data as any).items.map((g: any) => (g.id === id ? { ...g, starred } : g)),
           };
+          console.log('[StarDebug:useToggleGenerationStar] Updating generations cache', { queryKey, itemsCount: updated.items.length });
           queryClient.setQueryData(queryKey, updated);
         }
       });
 
       // 2) Optimistically update all shots caches so star reflects in Shot views / timelines
-      queryClient.getQueriesData({ queryKey: ['shots'] }).forEach(([queryKey, data]) => {
+      const shotsQueries = queryClient.getQueriesData({ queryKey: ['shots'] });
+      console.log('[StarDebug:useToggleGenerationStar] Found shots queries:', shotsQueries.length);
+      
+      shotsQueries.forEach(([queryKey, data]) => {
         if (Array.isArray(data)) {
           previousShotsQueries.set(queryKey, data);
 
           const updatedShots = (data as any).map((shot: any) => {
             if (!shot.images) return shot;
+            const updatedImages = shot.images.map((img: any) => (img.id === id ? { ...img, starred } : img));
+            const hasUpdates = updatedImages.some((img: any, idx: number) => img.starred !== shot.images[idx].starred);
+            if (hasUpdates) {
+              console.log('[StarDebug:useToggleGenerationStar] Updating shot images for shot', shot.id, { updatedCount: updatedImages.filter((img: any) => img.starred).length });
+            }
             return {
               ...shot,
-              images: shot.images.map((img: any) => (img.id === id ? { ...img, starred } : img)),
+              images: updatedImages,
             };
           });
           queryClient.setQueryData(queryKey, updatedShots);
         }
       });
 
+      console.log('[StarDebug:useToggleGenerationStar] onMutate complete', { 
+        generationsQueriesUpdated: previousGenerationsQueries.size,
+        shotsQueriesUpdated: previousShotsQueries.size 
+      });
+
       return { previousGenerationsQueries, previousShotsQueries };
     },
     onError: (error: Error, _variables, context) => {
+      console.log('[StarDebug:useToggleGenerationStar] onError called', { error: error.message });
+      
       // Rollback optimistic updates
       if (context?.previousGenerationsQueries) {
         context.previousGenerationsQueries.forEach((data, key) => {
@@ -412,7 +434,12 @@ export function useToggleGenerationStar() {
       console.error('Error toggling generation star:', error);
       toast.error(error.message || 'Failed to toggle star');
     },
+    onSuccess: (data, variables) => {
+      console.log('[StarDebug:useToggleGenerationStar] onSuccess called', { variables, data });
+    },
     onSettled: () => {
+      console.log('[StarDebug:useToggleGenerationStar] onSettled called - invalidating caches');
+      
       // Ensure both generations & shots caches are up-to-date after mutation
       queryClient.invalidateQueries({ queryKey: ['generations'] });
       queryClient.invalidateQueries({ queryKey: ['shots'] });

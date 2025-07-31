@@ -242,7 +242,17 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
 
         {lightboxIndex !== null && (
           <MediaLightbox
-            media={sortedVideoOutputs[lightboxIndex]}
+            media={(() => {
+              const media = sortedVideoOutputs[lightboxIndex];
+              console.log('[StarDebug:VideoOutputsGallery] MediaLightbox media', {
+                mediaId: media.id,
+                mediaKeys: Object.keys(media),
+                hasStarred: 'starred' in media,
+                starredValue: (media as any).starred,
+                timestamp: Date.now()
+              });
+              return media;
+            })()}
             onClose={() => setLightboxIndex(null)}
             onNext={handleNext}
             onPrevious={handlePrevious}
