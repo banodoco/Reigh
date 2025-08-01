@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Button } from '@/shared/components/ui/button';
 import { Label } from '@/shared/components/ui/label';
 import { Textarea } from '@/shared/components/ui/textarea';
@@ -117,6 +117,17 @@ export const MagicEditForm: React.FC<MagicEditFormProps> = ({
       toast.error("Failed to create shot");
     }
   }, [selectedProjectId, createShotMutation, queryClient]);
+
+  // Reset magicEditShotId if the selected shot no longer exists (e.g., was deleted)
+  useEffect(() => {
+    if (magicEditShotId && shots) {
+      const shotExists = shots.some(shot => shot.id === magicEditShotId);
+      if (!shotExists) {
+        console.log('[MagicEditForm] Selected shot', magicEditShotId, 'no longer exists, resetting to None');
+        setMagicEditShotId(null);
+      }
+    }
+  }, [magicEditShotId, shots]);
 
   return (
     <>

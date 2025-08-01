@@ -448,15 +448,22 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         associatedShotId,
         promptsByShot: JSON.stringify(promptsByShot, null, 2),
         effectiveShotId,
-        promptsCount: prompts.length
-      });
-      
-      // Check if the promptsByShot has any data
-      Object.keys(promptsByShot).forEach(shotId => {
-        console.log(`[ImageGenerationForm] Shot ${shotId} has ${promptsByShot[shotId]?.length || 0} prompts:`, promptsByShot[shotId]);
+        projectId: selectedProjectId,
       });
     }
-  }, [ready]);
+  }, [ready, associatedShotId, promptsByShot, effectiveShotId, selectedProjectId]);
+
+  // Reset associatedShotId if the selected shot no longer exists (e.g., was deleted)
+  useEffect(() => {
+    if (associatedShotId && shots) {
+      const shotExists = shots.some(shot => shot.id === associatedShotId);
+      if (!shotExists) {
+        console.log('[ImageGenerationForm] Selected shot', associatedShotId, 'no longer exists, resetting to None');
+        setAssociatedShotId(null);
+        markAsInteracted();
+      }
+    }
+  }, [associatedShotId, shots, markAsInteracted]);
 
   // Initialize prompts for a shot if they don't exist
   useEffect(() => {

@@ -188,6 +188,72 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
     // 8) Get the public URL
     const { data: urlData } = supabaseAdmin.storage.from('image_uploads').getPublicUrl(objectPath);
     const publicUrl = urlData.publicUrl;
+    
+    // 8.5) Validate shot existence and clean up parameters if necessary
+    console.log(`[COMPLETE-TASK-DEBUG] Validating shot references for task ${taskIdString}`);
+    try {
+      // Get the current task to check its parameters
+      const { data: currentTask, error: taskFetchError } = await supabaseAdmin
+        .from("tasks")
+        .select("params, task_type")
+        .eq("id", taskIdString)
+        .single();
+      
+      if (!taskFetchError && currentTask && currentTask.params) {
+        let shotId = null;
+        let needsParamsUpdate = false;
+        let updatedParams = { ...currentTask.params };
+        
+        // Extract shot_id based on task type
+        if (currentTask.task_type === 'travel_stitch') {
+          shotId = currentTask.params?.full_orchestrator_payload?.shot_id;
+        } else if (currentTask.task_type === 'single_image') {
+          shotId = currentTask.params?.shot_id;
+        }
+        
+        // If there's a shot_id, validate it exists
+        if (shotId) {
+          console.log(`[COMPLETE-TASK-DEBUG] Checking if shot ${shotId} exists...`);
+          const { data: shotData, error: shotError } = await supabaseAdmin
+            .from("shots")
+            .select("id")
+            .eq("id", shotId)
+            .single();
+          
+          if (shotError || !shotData) {
+            console.log(`[COMPLETE-TASK-DEBUG] Shot ${shotId} does not exist, removing from task parameters`);
+            needsParamsUpdate = true;
+            
+            // Remove shot_id from parameters
+            if (currentTask.task_type === 'travel_stitch' && updatedParams.full_orchestrator_payload) {
+              delete updatedParams.full_orchestrator_payload.shot_id;
+            } else if (currentTask.task_type === 'single_image') {
+              delete updatedParams.shot_id;
+            }
+          } else {
+            console.log(`[COMPLETE-TASK-DEBUG] Shot ${shotId} exists and is valid`);
+          }
+        }
+        
+        // Update task parameters if needed (before marking as complete)
+        if (needsParamsUpdate) {
+          console.log(`[COMPLETE-TASK-DEBUG] Updating task parameters to remove invalid shot reference`);
+          const { error: paramsUpdateError } = await supabaseAdmin
+            .from("tasks")
+            .update({ params: updatedParams })
+            .eq("id", taskIdString);
+          
+          if (paramsUpdateError) {
+            console.error(`[COMPLETE-TASK-DEBUG] Failed to update task parameters:`, paramsUpdateError);
+            // Continue anyway - better to complete the task than fail entirely
+          }
+        }
+      }
+    } catch (shotValidationError) {
+      console.error(`[COMPLETE-TASK-DEBUG] Error during shot validation:`, shotValidationError);
+      // Continue anyway - don't fail task completion due to validation errors
+    }
+    
     // 9) Update the database with the public URL
     console.log(`[COMPLETE-TASK-DEBUG] Updating task ${taskIdString} to Complete status`);
     const { error: dbError } = await supabaseAdmin.from("tasks").update({
