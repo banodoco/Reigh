@@ -636,6 +636,17 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   const totalFilteredItems = isServerPagination ? (totalCount ?? (offset + images.length)) : filteredImages.length;
   const currentPageForCalc = isServerPagination ? (serverPage! - 1) : page;
   const totalPages = Math.max(1, Math.ceil(totalFilteredItems / ITEMS_PER_PAGE));
+
+  // Calculate navigation availability for MediaLightbox
+  const { hasNext, hasPrevious } = useMemo(() => {
+    if (!activeLightboxMedia) return { hasNext: false, hasPrevious: false };
+    
+    const currentIndex = filteredImages.findIndex(img => img.id === activeLightboxMedia.id);
+    return {
+      hasNext: currentIndex < filteredImages.length - 1,
+      hasPrevious: currentIndex > 0
+    };
+  }, [activeLightboxMedia, filteredImages]);
   
   const paginatedImages = React.useMemo(() => {
     if (isServerPagination) {
@@ -960,6 +971,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
           showDownload={true}
           showMagicEdit={true}
           videoPlayerComponent="simple-player"
+          hasNext={hasNext}
+          hasPrevious={hasPrevious}
           allShots={simplifiedShotOptions}
           selectedShotId={selectedShotIdLocal}
           onShotChange={handleShotChange}

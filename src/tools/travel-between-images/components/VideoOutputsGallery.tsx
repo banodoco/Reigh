@@ -160,7 +160,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
             const originalIndex = startIndex + index;
             return (
               <div key={video.id} className="w-1/2 lg:w-1/3 px-1 sm:px-1.5 md:px-2 mb-2 sm:mb-3 md:mb-4 relative group">
-                <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden shadow-sm border">
+                <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden shadow-sm border relative">
                   <HoverScrubVideo
                     src={getDisplayUrl(video.location || video.imageUrl)}
                     poster={video.thumbUrl}
@@ -174,6 +174,29 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
                     } : undefined}
                     preload="metadata"
                   />
+                  
+                  {/* Action buttons – positioned directly on the video container */}
+                  <div className="absolute top-1/2 right-2 sm:right-3 flex flex-col items-end gap-1 opacity-0 group-hover:opacity-100 group-touch:opacity-100 transition-opacity -translate-y-1/2 z-20">
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      onClick={() => setSelectedVideoForDetails(video)}
+                      className="h-6 w-6 sm:h-7 sm:w-7 p-0 rounded-full bg-black/50 hover:bg-black/70 text-white"
+                      title="View details"
+                    >
+                      <Info className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="icon"
+                      onClick={() => onDelete(video.id)}
+                      disabled={deletingVideoId === video.id}
+                      className="h-6 w-6 sm:h-7 sm:w-7 p-0 rounded-full"
+                      title="Delete video"
+                    >
+                      <Trash2 className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                    </Button>
+                  </div>
                 </div>
                 
                 {/* Timestamp - Top Left */}
@@ -182,29 +205,6 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
                   position="top-left"
                   className="z-10 !top-1 !left-4 sm:!top-2 sm:!left-4"
                 />
-                
-                {/* Action buttons – styled to match ImageGallery overlays */}
-                <div className="absolute top-1 right-3 sm:top-2 sm:right-3 md:right-4 flex flex-col items-end gap-1 opacity-0 group-hover:opacity-100 group-touch:opacity-100 transition-opacity">
-                  <Button
-                    variant="secondary"
-                    size="icon"
-                    onClick={() => setSelectedVideoForDetails(video)}
-                    className="h-6 w-6 sm:h-7 sm:w-7 p-0 rounded-full bg-black/50 hover:bg-black/70 text-white"
-                    title="View details"
-                  >
-                    <Info className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    size="icon"
-                    onClick={() => onDelete(video.id)}
-                    disabled={deletingVideoId === video.id}
-                    className="h-6 w-6 sm:h-7 sm:w-7 p-0 rounded-full"
-                    title="Delete video"
-                  >
-                    <Trash2 className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-                  </Button>
-                </div>
               </div>
             );
           })}
@@ -261,6 +261,8 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
             showImageEditTools={false}
             showDownload={true}
             videoPlayerComponent="simple-player"
+            hasNext={lightboxIndex < sortedVideoOutputs.length - 1}
+            hasPrevious={lightboxIndex > 0}
             starred={(sortedVideoOutputs[lightboxIndex] as { starred?: boolean }).starred || false}
           />
         )}

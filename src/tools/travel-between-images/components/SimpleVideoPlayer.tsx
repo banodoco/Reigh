@@ -56,8 +56,7 @@ const SimpleVideoPlayer: React.FC<SimpleVideoPlayerProps> = ({
 
   return (
     <div
-      className={`flex flex-col items-center space-y-2 w-[95vw] sm:w-auto ${className}`}
-      // Limit overall size; width adapts responsively (fills viewport on mobile, natural on desktop)
+      className={cn("relative w-[95vw] sm:w-auto", className)}
       style={{ maxHeight: '85vh', maxWidth: '95vw' }}
     >
       {/* Video element */}
@@ -72,22 +71,22 @@ const SimpleVideoPlayer: React.FC<SimpleVideoPlayerProps> = ({
         autoPlay
         preload="auto"
         className="object-contain w-full sm:w-auto max-w-full"
-        style={{ maxHeight: 'calc(85vh - 40px)' }}
+        style={{ maxHeight: '85vh' }}
       >
         Your browser does not support the video tag.
       </video>
 
-      {/* Playback speed controls below the video */}
-      <div className="flex items-center space-x-2 bg-black/60 rounded-md px-2 py-1 backdrop-blur-sm">
+      {/* Playback speed controls – overlay at bottom center */}
+      <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center space-x-2 bg-black/60 rounded-md px-2 py-1 backdrop-blur-sm">
         {speedOptions.map((speed) => (
           <Button
             key={speed}
-            variant={playbackRate === speed ? "default" : "secondary"}
+            variant={playbackRate === speed ? 'default' : 'secondary'}
             size="sm"
             onClick={() => handleSpeedChange(speed)}
             className={cn(
-              "h-6 min-w-[48px] px-2 text-xs",
-              playbackRate === speed ? "text-white" : "text-foreground"
+              'h-6 min-w-[48px] px-2 text-xs',
+              playbackRate === speed ? 'text-white' : 'text-foreground'
             )}
           >
             {speed}x

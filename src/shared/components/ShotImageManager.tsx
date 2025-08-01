@@ -594,6 +594,8 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
             showDownload={true}
             showMagicEdit={true}
             videoPlayerComponent="hover-scrub"
+            hasNext={lightboxIndex < currentImages.length - 1}
+            hasPrevious={lightboxIndex > 0}
             starred={(currentImages[lightboxIndex] as any).starred || false}
             onMagicEdit={onMagicEdit}
           />
@@ -665,6 +667,8 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
           showDownload={true}
           showMagicEdit={true}
           videoPlayerComponent="hover-scrub"
+          hasNext={lightboxIndex < currentImages.length - 1}
+          hasPrevious={lightboxIndex > 0}
           starred={(currentImages[lightboxIndex] as any).starred || false}
           onMagicEdit={onMagicEdit}
         />
