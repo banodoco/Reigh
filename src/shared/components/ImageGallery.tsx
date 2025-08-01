@@ -140,6 +140,8 @@ interface ImageGalleryProps {
   formAssociatedShotId?: string | null;
   /** Callback when user clicks to switch to the form's associated shot */
   onSwitchToAssociatedShot?: (shotId: string) => void;
+  /** Reduce spacing for compact/pane usage */
+  reducedSpacing?: boolean;
 }
 
 // Helper to format metadata for display
@@ -266,7 +268,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   onToolTypeFilterChange,
   initialStarredFilter = false,
   formAssociatedShotId,
-  onSwitchToAssociatedShot
+  onSwitchToAssociatedShot,
+  reducedSpacing = false
 }) => {
   const [activeLightboxMedia, setActiveLightboxMedia] = useState<GenerationRow | null>(null);
   const [downloadingImageId, setDownloadingImageId] = useState<string | null>(null);
@@ -275,6 +278,17 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   const { currentShotId } = useCurrentShot();
   const isMobile = useIsMobile();
   const simplifiedShotOptions = React.useMemo(() => allShots.map(s => ({ id: s.id, name: s.name })), [allShots]);
+  
+  // Memoize grid column classes to prevent unnecessary recalculations
+  const gridColumnClasses = React.useMemo(() => {
+    if (columnsPerRow === 7) {
+      return 'grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-7';
+    } else if (columnsPerRow === 6) {
+      return 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-6';
+    } else {
+      return 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 2xl:grid-cols-5';
+    }
+  }, [columnsPerRow]);
   
   // Star functionality
   const toggleStarMutation = useToggleGenerationStar();
@@ -699,8 +713,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
 
   return (
     <TooltipProvider>
-      <div className="space-y-6 pb-8">
-        <div className="flex flex-wrap justify-between items-center mt-7 mb-4 gap-x-4 gap-y-2"> {/* Increased top margin to 1.75rem (mt-7) while keeping bottom margin 1rem (mb-4) for desired spacing */}
+      <div className={`${reducedSpacing ? 'space-y-3' : 'space-y-6'} ${reducedSpacing ? 'pb-2' : 'pb-8'}`}>
+        <div className={`flex flex-wrap justify-between items-center ${reducedSpacing ? 'mt-2' : 'mt-7'} mb-4 gap-x-4 gap-y-2`}> {/* Reduce top margin for compact/pane usage */}
             <div className="flex items-center gap-2">
                 {/* Pagination Controls */}
                 {totalPages > 1 && (
@@ -887,7 +901,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
           )}
 
           {paginatedImages.length > 0 && (
-              <div className={`grid gap-4 mb-12 ${columnsPerRow === 6 ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-6' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 2xl:grid-cols-5'}`}>
+                <div className={`grid gap-4 ${reducedSpacing ? 'mb-4' : 'mb-12'} ${gridColumnClasses}`}>
             {paginatedImages.map((image, index) => (
               <ImageGalleryItem
                 key={image.id || `image-${index}`}

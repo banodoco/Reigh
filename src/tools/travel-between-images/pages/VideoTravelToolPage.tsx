@@ -132,8 +132,10 @@ const VideoTravelToolPage: React.FC = () => {
     // Check if we have a hash in the URL (direct navigation to a shot)
     const hashShotId = location.hash?.replace('#', '');
     
-    if (hashShotId && !isLoading) {
-      return true; // Show editor immediately if we have a hash
+    if (hashShotId && !isLoading && shots) {
+      // Only show editor if the hash shot actually exists
+      const hashShot = shots.find(s => s.id === hashShotId);
+      return !!hashShot;
     }
     
     // Only show editor if we actually have a shot to edit
@@ -186,6 +188,14 @@ const VideoTravelToolPage: React.FC = () => {
         setCurrentShotId(matchingShot.id);
         // Return early to allow state update before sync
         return;
+      } else {
+        // Shot from hash doesn't exist - redirect to main view
+        console.log(`[VideoTravelTool] Shot ${hashShotId} not found, redirecting to main view`);
+        setSelectedShot(null);
+        setVideoPairConfigs([]);
+        setCurrentShotId(null);
+        navigate(location.pathname, { replace: true, state: { fromShotClick: false } });
+        return;
       }
     }
 
@@ -200,7 +210,7 @@ const VideoTravelToolPage: React.FC = () => {
     } else if (location.hash) {
       window.history.replaceState(null, '', basePath);
     }
-  }, [isLoading, shots, selectedShot, location.pathname, location.search, location.hash]);
+  }, [isLoading, shots, selectedShot, location.pathname, location.search, location.hash, navigate]);
   
   const [steerableMotionSettings, setSteerableMotionSettings] = useState<SteerableMotionSettings>({
     negative_prompt: '',
@@ -417,12 +427,15 @@ const VideoTravelToolPage: React.FC = () => {
       if (shotToSelect) {
         setSelectedShot(shotToSelect);
       } else {
-        // Shot not found, clear selection
+        // Shot not found, redirect to main view
+        console.log(`[VideoTravelTool] Shot ${currentShotId} not found, redirecting to main view`);
         setSelectedShot(null);
         setVideoPairConfigs([]);
+        setCurrentShotId(null);
+        navigate(location.pathname, { replace: true, state: { fromShotClick: false } });
       }
     }
-  }, [currentShotId, shots, viaShotClick]); // Removed selectedShot from deps to avoid loops
+  }, [currentShotId, shots, viaShotClick, navigate, location.pathname]); // Removed selectedShot from deps to avoid loops
 
   // NEW: Immediately select shot on mount if we have the data
   useEffect(() => {

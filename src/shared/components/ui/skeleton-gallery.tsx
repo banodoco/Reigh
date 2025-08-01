@@ -110,4 +110,6 @@ export function SkeletonGallery({
       </div>
     </div>
   );
-} 
+}
+
+export default React.memo(SkeletonGallery); 

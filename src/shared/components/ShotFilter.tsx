@@ -86,4 +86,6 @@ export const ShotFilter: React.FC<ShotFilterProps> = ({
       )}
     </div>
   );
-}; 
+};
+
+export default React.memo(ShotFilter); 

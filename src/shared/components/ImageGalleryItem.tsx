@@ -530,4 +530,6 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
       {imageContent}
     </DraggableImage>
   );
-}; 
+};
+
+export default React.memo(ImageGalleryItem); 
