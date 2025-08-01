@@ -19,16 +19,35 @@ import { ShotsProvider } from '@/shared/contexts/ShotsContext';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // Disable automatic retries to prevent observer issues
-      retry: false,
+      // Mobile-optimized retry strategy for network reliability
+      retry: (failureCount, error) => {
+        // Don't retry auth errors or client errors (4xx)
+        if (error?.message?.includes('unauthorized') || error?.message?.includes('forbidden')) {
+          return false;
+        }
+        // Retry up to 2 times for network errors (reduced from default 3 for faster UX)
+        return failureCount < 2;
+      },
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 3000), // Exponential backoff, max 3s
       // Ensure queries don't refetch on window focus by default
       refetchOnWindowFocus: false,
       // Prevent stale time issues
       staleTime: 5 * 60 * 1000, // 5 minutes
+      // Enable network mode for better mobile handling
+      networkMode: 'online',
     },
     mutations: {
-      // Disable retries for mutations too
-      retry: false,
+      // Enable retries for mutations on mobile to handle network hiccups
+      retry: (failureCount, error) => {
+        // Don't retry auth/permission errors
+        if (error?.message?.includes('unauthorized') || error?.message?.includes('forbidden')) {
+          return false;
+        }
+        // Retry once for network errors
+        return failureCount < 1;
+      },
+      retryDelay: 1500, // Fixed 1.5s delay for mutations
+      networkMode: 'online',
     },
   },
 });

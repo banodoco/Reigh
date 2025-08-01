@@ -170,6 +170,37 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
     queryFn: async () => {
       if (!hasGeneratedImage || !task.outputLocation) return null;
       
+      // Debug: Check if this task has the generation_created flag set
+      const { data: taskCheck, error: taskCheckError } = await supabase
+        .from('tasks')
+        .select('generation_created')
+        .eq('id', task.id)
+        .single();
+      
+      if (!taskCheckError && taskCheck) {
+        console.log(`[TaskFetchGeneration] Debug: Task ${task.id} generation_created flag:`, taskCheck.generation_created);
+      }
+      
+      // Debug: Check if any generation exists with this output location (project agnostic)
+      const { data: anyGeneration, error: anyGenerationError } = await supabase
+        .from('generations')
+        .select('id, project_id, location')
+        .eq('location', task.outputLocation)
+        .maybeSingle();
+      
+      if (!anyGenerationError && anyGeneration) {
+        console.log(`[TaskFetchGeneration] Debug: Found generation with location ${task.outputLocation}:`, {
+          id: anyGeneration.id,
+          project_id: anyGeneration.project_id,
+          expected_project_id: task.projectId,
+          project_match: anyGeneration.project_id === task.projectId
+        });
+      } else if (anyGenerationError) {
+        console.error(`[TaskFetchGeneration] Debug: Error checking for any generation:`, anyGenerationError);
+      } else {
+        console.log(`[TaskFetchGeneration] Debug: No generation found with location ${task.outputLocation}`);
+      }
+      
       const { data, error } = await supabase
         .from('generations')
         .select('*')
@@ -183,7 +214,13 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
           taskType: task.taskType,
           outputLocation: task.outputLocation,
           projectId: task.projectId,
-          error
+          error: {
+            message: error.message,
+            code: error.code,
+            details: error.details,
+            hint: error.hint,
+            fullError: error
+          }
         });
         return null;
       }

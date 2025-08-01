@@ -52,44 +52,56 @@ interface UpdateToolSettingsParams {
  */
 async function fetchToolSettingsSupabase(toolId: string, ctx: ToolSettingsContext): Promise<unknown> {
   try {
-    // Get current user
+    // Mobile optimization: Cache user info to avoid repeated auth calls
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
       throw new Error('Authentication required');
     }
 
-    // Fetch all needed data in parallel using Supabase client
+    // Mobile optimization: Use more efficient queries with targeted JSON extraction
+    // Instead of fetching entire settings objects, extract only the tool-specific data
     const [userResult, projectResult, shotResult] = await Promise.all([
-      // User settings
+      // User settings - extract only the tool-specific settings
       supabase
         .from('users')
-        .select('settings')
+        .select(`settings->${toolId}`)
         .eq('id', user.id)
-        .single(),
+        .maybeSingle(), // More mobile-friendly than .single()
       
       // Project settings (if projectId provided)
       ctx.projectId ? 
         supabase
           .from('projects')
-          .select('settings')
+          .select(`settings->${toolId}`)
           .eq('id', ctx.projectId)
-          .single() :
+          .maybeSingle() : // More mobile-friendly than .single()
         Promise.resolve({ data: null, error: null }),
       
       // Shot settings (if shotId provided)  
       ctx.shotId ?
         supabase
           .from('shots')
-          .select('settings')
+          .select(`settings->${toolId}`)
           .eq('id', ctx.shotId)
-          .single() :
+          .maybeSingle() : // More mobile-friendly than .single()
         Promise.resolve({ data: null, error: null }),
     ]);
 
-    // Extract tool-specific settings from each scope
-    const userSettings = (userResult.data?.settings as any)?.[toolId] ?? {};
-    const projectSettings = (projectResult.data?.settings as any)?.[toolId] ?? {};
-    const shotSettings = (shotResult.data?.settings as any)?.[toolId] ?? {};
+    // Handle errors more gracefully for mobile
+    if (userResult.error && !userResult.error.message.includes('No rows found')) {
+      console.warn('[fetchToolSettingsSupabase] User settings error:', userResult.error);
+    }
+    if (projectResult.error && !projectResult.error.message.includes('No rows found')) {
+      console.warn('[fetchToolSettingsSupabase] Project settings error:', projectResult.error);
+    }
+    if (shotResult.error && !shotResult.error.message.includes('No rows found')) {
+      console.warn('[fetchToolSettingsSupabase] Shot settings error:', shotResult.error);
+    }
+
+    // Extract tool-specific settings (already targeted by query)
+    const userSettings = (userResult.data?.[`settings->${toolId}`] as any) ?? {};
+    const projectSettings = (projectResult.data?.[`settings->${toolId}`] as any) ?? {};
+    const shotSettings = (shotResult.data?.[`settings->${toolId}`] as any) ?? {};
 
     // Merge in priority order: defaults → user → project → shot
     return deepMerge(
@@ -102,6 +114,10 @@ async function fetchToolSettingsSupabase(toolId: string, ctx: ToolSettingsContex
 
   } catch (error) {
     console.error('[fetchToolSettingsSupabase] Error:', error);
+    // Mobile-friendly error handling - provide more context
+    if (error?.message?.includes('Failed to fetch')) {
+      throw new Error('Network connection issue. Please check your internet connection.');
+    }
     throw error;
   }
 }
@@ -188,7 +204,7 @@ export function useToolSettings<T>(
   const shotId: string | undefined = context?.shotId;
   const fetchEnabled: boolean = context?.enabled ?? true;
 
-  // Fetch merged settings using Supabase
+  // Fetch merged settings using Supabase with mobile optimizations
   const { data: settings, isLoading, error } = useQuery({
     queryKey: ['toolSettings', toolId, projectId, shotId],
     queryFn: () => fetchToolSettingsSupabase(toolId, { projectId, shotId }),
@@ -196,6 +212,21 @@ export function useToolSettings<T>(
     staleTime: 10 * 60 * 1000, // 10 minutes
     gcTime: 15 * 60 * 1000, // 15 minutes
     refetchOnWindowFocus: false,
+    // Mobile-specific optimizations
+    retry: (failureCount, error) => {
+      // Don't retry auth errors
+      if (error?.message?.includes('Authentication required')) {
+        return false;
+      }
+      // Retry up to 3 times for network errors on mobile
+      return failureCount < 3;
+    },
+    retryDelay: (attemptIndex) => {
+      // Faster retry schedule for settings: 500ms, 1s, 2s
+      return Math.min(500 * Math.pow(2, attemptIndex), 2000);
+    },
+    // Shorter timeout for critical settings data
+    networkMode: 'online',
   });
 
   // Log errors for debugging

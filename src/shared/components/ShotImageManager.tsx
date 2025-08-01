@@ -124,8 +124,9 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
     (ids: string[]) => {
       if (ids.length === 0) return;
       
-      // Clear selection first for immediate UI feedback
+      // Clear selection first for immediate UI feedback (both mobile and desktop)
       setMobileSelectedIds([]);
+      setSelectedIds([]);
       setConfirmOpen(false);
       setPendingDeleteIds([]); // Clear pending delete IDs
       
@@ -243,13 +244,14 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
         distance: 8,
       },
     }),
-    useSensor(TouchSensor, {
+    // Only enable TouchSensor on desktop to avoid interfering with mobile selection
+    ...(!isMobile ? [useSensor(TouchSensor, {
       // Reduced delay for better responsiveness but with tolerance
       activationConstraint: {
         delay: 150,
         tolerance: 8,
       },
-    }),
+    })] : []),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     }),
@@ -572,8 +574,8 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
           })}
         </div>
 
-        {/* Floating Action Bar for Multiple Selection */}
-        {mobileSelectedIds.length > 1 && (
+        {/* Floating Action Bar for Multiple Selection (Mobile) */}
+        {mobileSelectedIds.length >= 1 && (
           <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center gap-3">
               <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -586,7 +588,7 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
                   onClick={() => setMobileSelectedIds([])}
                   className="text-sm"
                 >
-                  Deselect All
+                  {mobileSelectedIds.length === 1 ? 'Deselect' : 'Deselect All'}
                 </Button>
                 <Button
                   variant="destructive"
@@ -597,36 +599,14 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
                   }}
                   className="text-sm"
                 >
-                  Delete All
+                  {mobileSelectedIds.length === 1 ? 'Delete' : 'Delete All'}
                 </Button>
               </div>
             </div>
           </div>
         )}
 
-        {/* Delete Confirmation Dialog */}
-        <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Delete Images</AlertDialogTitle>
-              <AlertDialogDescription>
-                Are you sure you want to delete {pendingDeleteIds.length} selected image{pendingDeleteIds.length > 1 ? 's' : ''}? This action cannot be undone.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => {
-                setConfirmOpen(false);
-                setPendingDeleteIds([]); // Clear pending IDs when cancelled
-              }}>Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={() => performBatchDelete(pendingDeleteIds)}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              >
-                Delete {pendingDeleteIds.length} Image{pendingDeleteIds.length > 1 ? 's' : ''}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+
         
         {lightboxIndex !== null && currentImages[lightboxIndex] && (
           <MediaLightbox
@@ -719,6 +699,62 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
           onMagicEdit={onMagicEdit}
         />
       )}
+
+      {/* Floating Action Bar for Multiple Selection (Desktop) */}
+      {selectedIds.length >= 1 && (
+        <div className="fixed bottom-[54px] left-1/2 transform -translate-x-1/2 z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center gap-3">
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              {selectedIds.length} selected
+            </span>
+            <div className="flex gap-2">
+                             <Button
+                 variant="outline"
+                 size="sm"
+                 onClick={() => setSelectedIds([])}
+                 className="text-sm"
+               >
+                 {selectedIds.length === 1 ? 'Deselect' : 'Deselect All'}
+               </Button>
+               <Button
+                 variant="destructive"
+                 size="sm"
+                 onClick={() => {
+                   setPendingDeleteIds([...selectedIds]); // Preserve selected IDs
+                   setConfirmOpen(true);
+                 }}
+                 className="text-sm"
+               >
+                 {selectedIds.length === 1 ? 'Delete' : 'Delete All'}
+               </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Shared Delete Confirmation Dialog for both Mobile and Desktop */}
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Images</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete {pendingDeleteIds.length} selected image{pendingDeleteIds.length > 1 ? 's' : ''}? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setConfirmOpen(false);
+              setPendingDeleteIds([]); // Clear pending IDs when cancelled
+            }}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => performBatchDelete(pendingDeleteIds)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete {pendingDeleteIds.length} Image{pendingDeleteIds.length > 1 ? 's' : ''}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DndContext>
   );
 };
@@ -759,7 +795,7 @@ const MobileImageItem: React.FC<MobileImageItemProps> = ({
     <div
       className={cn(
         'relative bg-muted/50 rounded border p-1 flex flex-col items-center justify-center aspect-square overflow-hidden shadow-sm cursor-pointer',
-        { 'ring-2 ring-offset-2 ring-blue-500 border-blue-500': isSelected },
+        { 'ring-4 ring-offset-2 ring-orange-500 border-orange-500 bg-orange-500/15': isSelected },
       )}
       onClick={onClick}
       onDoubleClick={onDoubleClick}

@@ -155,7 +155,7 @@ export function useWebSocket(projectId: string | null) {
         // Listen to database changes on generations table (primary real-time mechanism)
         .on('postgres_changes', 
           { 
-            event: 'INSERT', 
+            event: 'INSERT',
             schema: 'public', 
             table: 'generations',
             filter: `project_id=eq.${projectId}`
@@ -173,6 +173,8 @@ export function useWebSocket(projectId: string | null) {
             const shotId = newRecord?.params?.shotId || newRecord?.params?.shot_id;
             if (shotId) {
               scheduleInvalidation(['shots', shotId]);
+              // CRITICAL: Also invalidate the all-shot-generations query used by ShotEditor
+              scheduleInvalidation(['all-shot-generations', shotId]);
             }
           }
         )
@@ -186,9 +188,17 @@ export function useWebSocket(projectId: string | null) {
           (payload) => {
             log('PerfDebug:DBChange', 'Shot generation changed:', payload);
             
+            const record = payload.new || payload.old;
+            const shotId = (record as any)?.shot_id;
+            
             // Invalidate shots and generations
             scheduleInvalidation(['shots', projectId]);
             scheduleInvalidation(['generations', projectId]);
+            
+            // CRITICAL: Also invalidate the specific shot's all-shot-generations query
+            if (shotId) {
+              scheduleInvalidation(['all-shot-generations', shotId]);
+            }
           }
         )
         .subscribe((status, err) => {

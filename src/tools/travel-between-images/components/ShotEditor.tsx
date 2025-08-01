@@ -361,7 +361,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       console.warn('[ShotEditor] Settings failed to load within expected time. Falling back to defaults.');
       setSettingsError('Failed to load saved settings – using defaults.');
       setIsModeReady(true);
-    }, 3500); // 3.5 s chosen to balance UX and real-world mobile latency
+    }, 5000); // 5s timeout - now reasonable with optimized queries and retry logic
 
     return () => clearTimeout(fallbackTimer);
   }, [settingsLoading]);

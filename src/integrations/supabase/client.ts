@@ -8,7 +8,29 @@ const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJh
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+  auth: {
+    // Faster auth token refresh for mobile
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: false, // Faster mobile startup
+  },
+  global: {
+    // Mobile-optimized HTTP settings
+    fetch: (url, options = {}) => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout for individual requests
+      
+      return fetch(url, {
+        ...options,
+        signal: controller.signal,
+      }).finally(() => clearTimeout(timeoutId));
+    },
+  },
+  db: {
+    schema: 'public',
+  },
+});
 
 // Auto-login for dev mode
 if (import.meta.env.VITE_APP_ENV === 'dev') {
