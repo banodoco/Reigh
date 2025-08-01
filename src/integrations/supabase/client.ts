@@ -19,7 +19,11 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     // Mobile-optimized HTTP settings
     fetch: (url, options = {}) => {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout for individual requests
+      // Longer timeout for edge functions (especially AI functions that can take 30+ seconds)
+      // Regular DB requests are still fast, but AI edge functions need more time
+      const isEdgeFunction = url.includes('/functions/v1/');
+      const timeoutMs = isEdgeFunction ? 60000 : 8000; // 60s for edge functions, 8s for other requests
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
       
       return fetch(url, {
         ...options,
