@@ -825,13 +825,13 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
             {associatedShotId && shots && (() => {
               const selectedShot = shots.find(shot => shot.id === associatedShotId);
               return selectedShot ? (
-                <div className="flex justify-end">
+                <div className="flex justify-start">
                   <button
                     type="button"
                     onClick={() => navigateToShot(selectedShot)}
-                    className="text-xs font-medium text-emerald-600 hover:text-emerald-700 hover:underline transition-colors duration-200 px-2 py-1 rounded-md hover:bg-emerald-50"
+                    className="text-xs font-medium text-gray-500 hover:text-gray-700 hover:underline transition-colors duration-200 px-2 py-1 rounded-md hover:bg-gray-50"
                   >
-                    Jump to animate shot →
+                    Jump to animate '{selectedShot.name}' →
                   </button>
                 </div>
               ) : null;
