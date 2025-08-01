@@ -349,6 +349,26 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   const createShotMutation = useCreateShot();
   const queryClient = useQueryClient();
 
+  // Debug project context
+  useEffect(() => {
+    console.log('[ImageGenerationForm] Project context - selectedProjectId:', selectedProjectId, 'currentShotId:', currentShotId);
+  }, [selectedProjectId, currentShotId]);
+
+  // Debug persistence hook inputs
+  useEffect(() => {
+    console.log('[ImageGenerationForm] Persistence hook inputs:', {
+      toolId: 'image-generation',
+      context: { projectId: selectedProjectId },
+      stateValues: {
+        promptsByShot: Object.keys(promptsByShot).length,
+        associatedShotId,
+        imagesPerPrompt,
+        beforeEachPromptText: beforeEachPromptText.substring(0, 20) + '...',
+        afterEachPromptText: afterEachPromptText.substring(0, 20) + '...',
+      }
+    });
+  }, [selectedProjectId, promptsByShot, associatedShotId, imagesPerPrompt, beforeEachPromptText, afterEachPromptText]);
+
   // Fetch public LoRAs from all users
   const { data: publicLorasData } = useListPublicResources('lora');
   const availableLoras: LoraModel[] = publicLorasData?.map(resource => resource.metadata) || [];
@@ -371,9 +391,11 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   
   // Helper to update prompts for the current shot
   const setPrompts = useCallback((newPrompts: PromptEntry[] | ((prev: PromptEntry[]) => PromptEntry[])) => {
+    console.log('[ImageGenerationForm] setPrompts called for shot:', effectiveShotId);
     setPromptsByShot(prev => {
       const currentPrompts = prev[effectiveShotId] || [];
       const updatedPrompts = typeof newPrompts === 'function' ? newPrompts(currentPrompts) : newPrompts;
+      console.log('[ImageGenerationForm] Updating prompts from', currentPrompts.length, 'to', updatedPrompts.length, 'for shot:', effectiveShotId);
       return {
         ...prev,
         [effectiveShotId]: updatedPrompts
@@ -394,6 +416,48 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     }
   );
 
+  // Debug persistence state changes
+  useEffect(() => {
+    console.log('[ImageGenerationForm] Persistence state - ready:', ready, 'isSaving:', isSaving, 'associatedShotId:', associatedShotId);
+    
+    // Log what would be saved when isSaving becomes true
+    if (isSaving) {
+      console.log('[ImageGenerationForm] Currently saving settings:', {
+        promptsByShot: JSON.stringify(promptsByShot),
+        associatedShotId,
+        selectedProjectId,
+        imagesPerPrompt,
+        beforeEachPromptText,
+        afterEachPromptText,
+      });
+    }
+  }, [ready, isSaving, associatedShotId, promptsByShot, selectedProjectId, imagesPerPrompt, beforeEachPromptText, afterEachPromptText]);
+
+  // Debug prompts changes
+  useEffect(() => {
+    console.log('[ImageGenerationForm] Prompts for shot', effectiveShotId, ':', prompts.length, 'prompts');
+    prompts.forEach((p, i) => {
+      console.log(`  Prompt ${i + 1}:`, p.fullPrompt.substring(0, 50) + (p.fullPrompt.length > 50 ? '...' : ''));
+    });
+  }, [effectiveShotId, prompts]);
+
+  // Debug settings hydration
+  useEffect(() => {
+    if (ready) {
+      console.log('[ImageGenerationForm] Settings hydrated:', {
+        associatedShotId,
+        promptsByShot: JSON.stringify(promptsByShot, null, 2),
+        effectiveShotId,
+        promptsCount: prompts.length
+      });
+      
+      // Check if the promptsByShot has any data
+      Object.keys(promptsByShot).forEach(shotId => {
+        console.log(`[ImageGenerationForm] Shot ${shotId} has ${promptsByShot[shotId]?.length || 0} prompts:`, promptsByShot[shotId]);
+      });
+    }
+  }, [ready]);
+
   // Initialize prompts for a shot if they don't exist
   useEffect(() => {
     if (ready && !promptsByShot[effectiveShotId]) {
@@ -402,7 +466,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         [effectiveShotId]: [{ id: generatePromptId(), fullPrompt: "", shortPrompt: "" }]
       }));
     }
-  }, [ready, effectiveShotId, promptsByShot]);
+  }, [ready, effectiveShotId]); // Remove promptsByShot from dependencies to avoid infinite loops
 
   const hasApiKey = true; // Always true for wan-local
 
@@ -703,8 +767,22 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
             <Select
               value={associatedShotId || "none"}
               onValueChange={(value) => {
+                console.log('[ImageGenerationForm] Changing shot from', associatedShotId, 'to', value);
                 markAsInteracted();
-                setAssociatedShotId(value === "none" ? null : value);
+                const newShotId = value === "none" ? null : value;
+                setAssociatedShotId(newShotId);
+                
+                // Initialize prompts for the new shot if they don't exist
+                const newEffectiveShotId = newShotId || 'none';
+                if (!promptsByShot[newEffectiveShotId]) {
+                  console.log('[ImageGenerationForm] Initializing prompts for shot:', newEffectiveShotId);
+                  setPromptsByShot(prev => ({
+                    ...prev,
+                    [newEffectiveShotId]: [{ id: generatePromptId(), fullPrompt: "", shortPrompt: "" }]
+                  }));
+                } else {
+                  console.log('[ImageGenerationForm] Shot', newEffectiveShotId, 'already has', promptsByShot[newEffectiveShotId]?.length, 'prompts');
+                }
               }}
               disabled={!hasApiKey || isGenerating}
             >

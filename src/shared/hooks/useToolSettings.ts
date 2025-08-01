@@ -59,32 +59,29 @@ async function fetchToolSettingsSupabase(toolId: string, ctx: ToolSettingsContex
     }
 
     // Mobile optimization: Use more efficient queries with targeted JSON extraction
-    // Instead of fetching entire settings objects, extract only the tool-specific data
+    // NOTE: We fetch the entire settings JSON to avoid SQL path issues with tool IDs containing hyphens.
     const [userResult, projectResult, shotResult] = await Promise.all([
-      // User settings - extract only the tool-specific settings
       supabase
         .from('users')
-        .select(`settings->${toolId}`)
+        .select('settings')
         .eq('id', user.id)
-        .maybeSingle(), // More mobile-friendly than .single()
-      
-      // Project settings (if projectId provided)
-      ctx.projectId ? 
-        supabase
-          .from('projects')
-          .select(`settings->${toolId}`)
-          .eq('id', ctx.projectId)
-          .maybeSingle() : // More mobile-friendly than .single()
-        Promise.resolve({ data: null, error: null }),
-      
-      // Shot settings (if shotId provided)  
-      ctx.shotId ?
-        supabase
-          .from('shots')
-          .select(`settings->${toolId}`)
-          .eq('id', ctx.shotId)
-          .maybeSingle() : // More mobile-friendly than .single()
-        Promise.resolve({ data: null, error: null }),
+        .maybeSingle(),
+
+      ctx.projectId
+        ? supabase
+            .from('projects')
+            .select('settings')
+            .eq('id', ctx.projectId)
+            .maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+
+      ctx.shotId
+        ? supabase
+            .from('shots')
+            .select('settings')
+            .eq('id', ctx.shotId)
+            .maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
     ]);
 
     // Handle errors more gracefully for mobile
@@ -98,10 +95,10 @@ async function fetchToolSettingsSupabase(toolId: string, ctx: ToolSettingsContex
       console.warn('[fetchToolSettingsSupabase] Shot settings error:', shotResult.error);
     }
 
-    // Extract tool-specific settings (already targeted by query)
-    const userSettings = (userResult.data?.[`settings->${toolId}`] as any) ?? {};
-    const projectSettings = (projectResult.data?.[`settings->${toolId}`] as any) ?? {};
-    const shotSettings = (shotResult.data?.[`settings->${toolId}`] as any) ?? {};
+    // Extract tool-specific settings from the full settings JSON
+    const userSettings = (userResult.data?.settings?.[toolId] as any) ?? {};
+    const projectSettings = (projectResult.data?.settings?.[toolId] as any) ?? {};
+    const shotSettings = (shotResult.data?.settings?.[toolId] as any) ?? {};
 
     // Merge in priority order: defaults → user → project → shot
     return deepMerge(
