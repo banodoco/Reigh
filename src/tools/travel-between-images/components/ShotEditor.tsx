@@ -1015,9 +1015,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     });
   };
 
-  const handleDuplicateImage = async (generationId: string, position: number) => {
+  const handleDuplicateImage = async (shotImageEntryId: string, position: number) => {
     console.log('[DUPLICATE] handleDuplicateImage called', {
-      generationId,
+      shotImageEntryId,
       position,
       timestamp: Date.now()
     });
@@ -1027,8 +1027,15 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       return;
     }
 
-    // Start loading state
-    setDuplicatingImageId(generationId);
+    const originalImage = localOrderedShotImages.find(img => img.shotImageEntryId === shotImageEntryId);
+    if (!originalImage) {
+      toast.error("Original image not found for duplication.");
+      return;
+    }
+    const generationId = originalImage.id;
+
+    // Start loading state targeting the specific shotImageEntryId
+    setDuplicatingImageId(shotImageEntryId);
 
     // Place the duplicate one position after the original (position + 1)
     const duplicatePosition = position + 1;
@@ -1047,7 +1054,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       onSuccess: () => {
         console.log('[DUPLICATE] Duplicate mutation successful');
         // Show success state
-        setDuplicateSuccessImageId(generationId);
+        setDuplicateSuccessImageId(shotImageEntryId);
         // Clear success state after 2 seconds
         setTimeout(() => setDuplicateSuccessImageId(null), 2000);
       },

@@ -23,7 +23,7 @@ import { useIsMobile } from '@/shared/hooks/use-mobile';
 interface SortableImageItemProps {
   image: GenerationRow;
   onDelete: (shotImageEntryId: string) => void;
-  onDuplicate?: (generationId: string, position: number) => void;
+  onDuplicate?: (shotImageEntryId: string, position: number) => void;
   onDoubleClick: () => void;
   onMobileTap?: () => void;
   onClick: (event: React.MouseEvent) => void;
@@ -91,7 +91,7 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
   const handleDuplicateClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (onDuplicate && position !== undefined) {
-      onDuplicate(image.id, position + 1);
+      onDuplicate(image.shotImageEntryId, position);
     }
   };
 
@@ -142,12 +142,12 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
               size="icon"
               className="absolute top-1 right-9 h-7 w-7 p-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10"
               onClick={handleDuplicateClick}
-              disabled={duplicatingImageId === image.id}
+              disabled={duplicatingImageId === image.shotImageEntryId}
               title="Duplicate image"
             >
-              {duplicatingImageId === image.id ? (
+              {duplicatingImageId === image.shotImageEntryId ? (
                 <div className="h-3.5 w-3.5 animate-spin rounded-full border-b-2 border-white"></div>
-              ) : duplicateSuccessImageId === image.id ? (
+              ) : duplicateSuccessImageId === image.shotImageEntryId ? (
                 <Check className="h-3.5 w-3.5" />
               ) : (
                 <Copy className="h-3.5 w-3.5" />

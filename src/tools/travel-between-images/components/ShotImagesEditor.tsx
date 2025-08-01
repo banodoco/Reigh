@@ -43,7 +43,7 @@ interface ShotImagesEditorProps {
   /** Delete callback for ShotImageManager */
   onImageDelete: (shotImageEntryId: string) => void;
   /** Duplicate callback for ShotImageManager */
-  onImageDuplicate: (generationId: string, position: number) => void;
+  onImageDuplicate: (shotImageEntryId: string, position: number) => void;
   /** Number of columns for ShotImageManager grid */
   columns: 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
   /** Skeleton shown while data is loading */

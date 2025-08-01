@@ -40,7 +40,7 @@ import { useUserUIState } from '@/shared/hooks/useUserUIState';
 export interface ShotImageManagerProps {
   images: GenerationRow[];
   onImageDelete: (shotImageEntryId: string) => void;
-  onImageDuplicate?: (generationId: string, position: number) => void;
+  onImageDuplicate?: (shotImageEntryId: string, position: number) => void;
   onImageReorder: (orderedShotGenerationIds: string[]) => void;
   columns?: 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
   generationMode: 'batch' | 'timeline';
@@ -328,11 +328,6 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
     }
 
     // Multi-drag logic
-    if (selectedIds.includes(over.id as string)) {
-      console.log('[DragDebug:ShotImageManager] Multi-drag cancelled - dropping on selection');
-      return; // Avoid dropping a selection onto part of itself
-    }
-
     console.log('[DragDebug:ShotImageManager] Multi-drag reorder', { selectedCount: selectedIds.length });
 
     const overIndex = currentImages.findIndex((img) => img.shotImageEntryId === over.id);
@@ -341,23 +336,74 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
     const selectedItems = currentImages.filter((img) => selectedIds.includes(img.shotImageEntryId));
     const remainingItems = currentImages.filter((img) => !selectedIds.includes(img.shotImageEntryId));
 
-    const overInRemainingIndex = remainingItems.findIndex((img) => img.shotImageEntryId === over.id);
-
+    // If dropping onto a selected item, we need to determine the correct insertion point
+    let targetIndex: number;
     let newItems: GenerationRow[];
-    if (activeIndex > overIndex) {
-      // Dragging up
-      newItems = [
-        ...remainingItems.slice(0, overInRemainingIndex),
-        ...selectedItems,
-        ...remainingItems.slice(overInRemainingIndex),
-      ];
+    
+    if (selectedIds.includes(over.id as string)) {
+      // Dropping onto a selected item - use the position relative to non-selected items
+      // Find the position where this selected item would be among remaining items
+      const selectedItemIndices = selectedItems.map(item => 
+        currentImages.findIndex(img => img.shotImageEntryId === item.shotImageEntryId)
+      ).sort((a, b) => a - b);
+      
+      const overIndexInSelected = selectedItemIndices.indexOf(overIndex);
+      
+      if (overIndexInSelected === 0) {
+        // Dropping on first selected item - insert at beginning of group
+        targetIndex = selectedItemIndices[0];
+      } else {
+        // Dropping on other selected item - insert after the previous non-selected item
+        const prevSelectedIndex = selectedItemIndices[overIndexInSelected - 1];
+        const itemsBetween = currentImages.slice(prevSelectedIndex + 1, overIndex);
+        const nonSelectedBetween = itemsBetween.filter(item => !selectedIds.includes(item.shotImageEntryId));
+        targetIndex = prevSelectedIndex + nonSelectedBetween.length + 1;
+      }
+      
+      const overInRemainingIndex = remainingItems.findIndex((_, idx) => {
+        const remainingItemIndex = currentImages.findIndex(img => img.shotImageEntryId === remainingItems[idx].shotImageEntryId);
+        return remainingItemIndex >= targetIndex;
+      });
+      
+      if (overInRemainingIndex === -1) {
+        // Insert at end
+        newItems = [...remainingItems, ...selectedItems];
+      } else {
+        newItems = [
+          ...remainingItems.slice(0, overInRemainingIndex),
+          ...selectedItems,
+          ...remainingItems.slice(overInRemainingIndex),
+        ];
+      }
     } else {
-      // Dragging down
-      newItems = [
-        ...remainingItems.slice(0, overInRemainingIndex + 1),
-        ...selectedItems,
-        ...remainingItems.slice(overInRemainingIndex + 1),
-      ];
+      // Dropping onto a non-selected item - use original logic
+      const overInRemainingIndex = remainingItems.findIndex((img) => img.shotImageEntryId === over.id);
+
+      if (activeIndex > overIndex) {
+        // Dragging up
+        newItems = [
+          ...remainingItems.slice(0, overInRemainingIndex),
+          ...selectedItems,
+          ...remainingItems.slice(overInRemainingIndex),
+        ];
+      } else {
+        // Dragging down
+        newItems = [
+          ...remainingItems.slice(0, overInRemainingIndex + 1),
+          ...selectedItems,
+          ...remainingItems.slice(overInRemainingIndex + 1),
+        ];
+      }
+    }
+
+    // Check if the order actually changed to avoid unnecessary updates
+    const currentOrder = currentImages.map(img => img.shotImageEntryId).join(',');
+    const newOrder = newItems.map(img => img.shotImageEntryId).join(',');
+    
+    if (currentOrder === newOrder) {
+      console.log('[DragDebug:ShotImageManager] Multi-drag resulted in no change - skipping update');
+      setSelectedIds([]);
+      return;
     }
 
     // 1. Update optimistic order immediately for instant visual feedback
@@ -506,7 +552,7 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
 
                   {/* Move here button after this item */}
                   {mobileSelectedIds.length > 0 &&
-                   (!isLastItem || isSelected) &&
+                   (!isSelected || isLastItem) &&
                    <div className="absolute top-1/2 -right-1 -translate-y-1/2 translate-x-1/2 z-10">
                      <Button
                        size="icon"
@@ -514,7 +560,7 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
                        className="h-12 w-6 rounded-full p-0"
                        onClick={() => handleMoveHere(index + 1)}
                        onPointerDown={e=>e.stopPropagation()}
-                       title="Move here"
+                       title={isLastItem ? "Move to end" : "Move here"}
                      >
                        <ArrowDown className="h-4 w-4" />
                      </Button>
@@ -687,7 +733,7 @@ interface MobileImageItemProps {
   onDoubleClick?: () => void;
   onMobileTap?: () => void;
   onDelete: () => void; // Fixed: properly typed delete function
-  onDuplicate?: (generationId: string, position: number) => void; // Add duplicate function
+  onDuplicate?: (shotImageEntryId: string, position: number) => void; // Add duplicate function
   hideDeleteButton?: boolean;
   duplicatingImageId?: string | null;
   duplicateSuccessImageId?: string | null;
@@ -748,14 +794,14 @@ const MobileImageItem: React.FC<MobileImageItemProps> = ({
             className="absolute top-1 left-1 h-7 w-7 p-0 rounded-full opacity-70 hover:opacity-100 transition-opacity z-10"
             onClick={(e) => {
               e.stopPropagation();
-              onDuplicate?.(image.id, index);
+              onDuplicate?.(image.shotImageEntryId, index);
             }}
-            disabled={duplicatingImageId === image.id}
+            disabled={duplicatingImageId === image.shotImageEntryId}
             title="Duplicate image"
           >
-            {duplicatingImageId === image.id ? (
+            {duplicatingImageId === image.shotImageEntryId ? (
               <div className="h-3.5 w-3.5 animate-spin rounded-full border-b-2 border-white"></div>
-            ) : duplicateSuccessImageId === image.id ? (
+            ) : duplicateSuccessImageId === image.shotImageEntryId ? (
               <Check className="h-3.5 w-3.5" />
             ) : (
               <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
