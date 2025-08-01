@@ -59,6 +59,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   const [mediaTypeFilter, setMediaTypeFilter] = useState<'all' | 'image' | 'video'>('all'); // Add media type filter state
   const [starredOnly, setStarredOnly] = useState<boolean>(false);
   const [toolTypeFilterEnabled, setToolTypeFilterEnabled] = useState<boolean>(true); // State for the tool type filter checkbox
+  const [formAssociatedShotId, setFormAssociatedShotId] = useState<string | null>(null); // Track the associated shot from the form
   const isMobile = useIsMobile();
   
   // Early prefetch of public LoRAs to reduce loading time
@@ -158,6 +159,18 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     }, 300); // Delay fetching to allow for page transition
     return () => clearTimeout(timer);
   }, []);
+
+  // Track the associated shot ID from the form
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (imageGenerationFormRef.current) {
+        const associatedShotId = imageGenerationFormRef.current.getAssociatedShotId();
+        setFormAssociatedShotId(associatedShotId);
+      }
+    }, 500); // Check every 500ms
+
+    return () => clearInterval(interval);
+  }, []); // Remove dependency to prevent unnecessary effect recreation
 
   // Handle scrolling to gallery when coming from "View All" in GenerationsPane
   useEffect(() => {
@@ -430,6 +443,11 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     // Page reset is now handled in the useEffect
   }, []);
 
+  // Handle switching to the associated shot from the form
+  const handleSwitchToAssociatedShot = useCallback((shotId: string) => {
+    setSelectedShotFilter(shotId);
+  }, []); // Remove dependencies to prevent stale closure issues
+
   // [NavPerf] Stop timers when page has mounted
   useEffect(() => {
     timeEnd('NavPerf', 'PageLoad:/tools/image-generation');
@@ -566,6 +584,8 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
                 initialStarredFilter={starredOnly}
                 onStarredFilterChange={setStarredOnly}
                 onToolTypeFilterChange={setToolTypeFilterEnabled}
+                formAssociatedShotId={formAssociatedShotId}
+                onSwitchToAssociatedShot={handleSwitchToAssociatedShot}
               />
             )}
           </div>

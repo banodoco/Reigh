@@ -91,6 +91,7 @@ export interface MetadataLora {
 
 export interface ImageGenerationFormHandles {
   applySettings: (settings: DisplayableMetadata) => void;
+  getAssociatedShotId: () => string | null;
 }
 
 interface ImageGenerationFormProps {
@@ -445,7 +446,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
 
       if (settings.beforeEachPromptText !== undefined) setBeforeEachPromptText(settings.beforeEachPromptText);
       if (settings.afterEachPromptText !== undefined) setAfterEachPromptText(settings.afterEachPromptText);
-    }
+    },
+    getAssociatedShotId: () => associatedShotId
   }));
 
   // Optimize default LoRA loading - only run when all conditions are met

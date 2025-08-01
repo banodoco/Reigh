@@ -13,7 +13,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/sha
 import { Badge } from '@/shared/components/ui/badge';
 import { Separator } from '@/shared/components/ui/separator';
 import { Checkbox } from '@/shared/components/ui/checkbox';
-import { usePaneAwareModalStyle } from '@/shared/hooks/usePaneAwareModalStyle';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { Label } from '@/shared/components/ui/label';
 import { ScrollArea } from '@/shared/components/ui/scroll-area';
@@ -32,7 +31,6 @@ interface TaskDetailsModalProps {
 }
 
 const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, children, onApplySettings, onApplySettingsFromTask, onClose }) => {
-  const modalStyle = usePaneAwareModalStyle();
   const isMobile = useIsMobile();
   const [isOpen, setIsOpen] = useState(false);
   const [replaceImages, setReplaceImages] = useState(true);
@@ -128,7 +126,6 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
     >
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent 
-        style={modalStyle}
         className={`sm:max-w-[700px] flex flex-col ${
           isMobile ? 'mx-2 my-5 max-h-[calc(100vh-2.5rem)]' : ''
         }`}

@@ -140,6 +140,7 @@ export const useDuplicateShot = () => {
         created_at: completeShot.created_at,
         updated_at: completeShot.updated_at,
         project_id: completeShot.project_id,
+        position: completeShot.position || 1, // Include position field
         images: completeShot.shot_generations?.map((sg: any) => ({
           ...sg.generation,
           shotImageEntryId: sg.id,
@@ -171,6 +172,7 @@ export const useDuplicateShot = () => {
           created_at: new Date().toISOString(),
           images: nonVideoImages, // Only copy non-video images for optimistic update
           project_id: projectId,
+          position: (originalShot.position || 0) + 1, // Position after the original shot
         };
 
         queryClient.setQueryData<Shot[]>(['shots', projectId], (oldShots = []) =>
@@ -225,7 +227,7 @@ export const useListShots = (projectId?: string | null) => {
         .from('shots')
         .select('*')
         .eq('project_id', projectId)
-        .order('created_at', { ascending: false });
+        .order('position', { ascending: true });
       
       if (shotsError) {
         throw shotsError;
@@ -242,7 +244,8 @@ export const useListShots = (projectId?: string | null) => {
           .select(`*, generation:generations(*)`)
           .eq('shot_id', shot.id)
           .order('position', { ascending: true, nullsFirst: false })
-          .limit(5); // Only load 5 images per shot for main view
+          // Load ALL images so ShotsPane always reflects the current state
+          ;
         
         if (sgError) {
           throw sgError;
@@ -266,6 +269,48 @@ export const useListShots = (projectId?: string | null) => {
       return result;
     },
     enabled: !!projectId,
+  });
+};
+
+// Type for the arguments of useReorderShots mutation
+interface ReorderShotsArgs {
+  projectId: string;
+  shotOrders: { shotId: string; position: number }[];
+}
+
+// Hook to reorder shots by updating their position values
+export const useReorderShots = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ projectId, shotOrders }: ReorderShotsArgs) => {
+      // Update each shot's position in a batch
+      const updates = shotOrders.map(({ shotId, position }) =>
+        supabase
+          .from('shots')
+          .update({ position })
+          .eq('id', shotId)
+          .eq('project_id', projectId)
+      );
+
+      const results = await Promise.all(updates);
+      
+      // Check for any errors
+      const errors = results.filter(result => result.error);
+      if (errors.length > 0) {
+        throw new Error(`Failed to update shot positions: ${errors.map(e => e.error?.message).join(', ')}`);
+      }
+
+      return results;
+    },
+    onSuccess: (data, { projectId }) => {
+      // Don't invalidate immediately - let optimistic updates handle the UI
+      // The component using this mutation should handle optimistic updates
+      // and only revert on error (which is handled in onError above)
+    },
+    onError: (error) => {
+      console.error('Error reordering shots:', error);
+    },
   });
 };
 
@@ -564,9 +609,11 @@ export const useDuplicateImageInShot = () => {
         toast.error('Failed to duplicate image');
       }
     },
-    onSuccess: (_, { project_id }) => {
+    onSuccess: (_, { project_id, shot_id }) => {
       // Invalidate to get fresh data
       queryClient.invalidateQueries({ queryKey: ['shots', project_id] });
+      // CRITICAL: Invalidate the per-shot generations list used by ShotEditor
+      queryClient.invalidateQueries({ queryKey: ['all-shot-generations', shot_id] });
     }
   });
 };
@@ -630,6 +677,8 @@ export const useRemoveImageFromShot = () => {
         queryClient.invalidateQueries({ queryKey: ['shots', project_id] });
         // Also invalidate generations cache so GenerationsPane updates immediately
         queryClient.invalidateQueries({ queryKey: ['generations', project_id] });
+        // CRITICAL: Invalidate the per-shot generations list used by ShotEditor
+        queryClient.invalidateQueries({ queryKey: ['all-shot-generations', variables.shot_id] });
       }
     },
   });
@@ -758,11 +807,13 @@ export const useUpdateShotImageOrder = () => {
       }
       toast.error(`Failed to reorder images: ${err.message}`);
     },
-    onSettled: (data, error, { projectId }) => {
+    onSettled: (data, error, { projectId, shotId }) => {
       if (projectId) {
         queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
         // Also invalidate generations cache so GenerationsPane updates immediately
         queryClient.invalidateQueries({ queryKey: ['generations', projectId] });
+        // CRITICAL: Invalidate the per-shot generations list used by ShotEditor
+        queryClient.invalidateQueries({ queryKey: ['all-shot-generations', shotId] });
       }
     },
   });

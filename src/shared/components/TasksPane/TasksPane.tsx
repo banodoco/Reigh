@@ -9,13 +9,11 @@ import { useSlidingPane } from '@/shared/hooks/useSlidingPane';
 import { usePanes } from '@/shared/contexts/PanesContext';
 import PaneControlTab from '../PaneControlTab';
 import { useProject } from '@/shared/contexts/ProjectContext';
-import { useCancelAllPendingTasks, useListTasks, useTaskStatusCounts, usePaginatedTasks, type PaginatedTasksResponse } from '@/shared/hooks/useTasks';
+import { useCancelAllPendingTasks, useTaskStatusCounts, usePaginatedTasks, type PaginatedTasksResponse } from '@/shared/hooks/useTasks';
 import { useToast } from '@/shared/hooks/use-toast';
-import { filterVisibleTasks } from '@/shared/lib/taskConfig';
 import { TasksPaneProcessingWarning } from '../ProcessingWarnings';
 import { TASK_STATUS, TaskStatus } from '@/types/database';
 
-const CANCELLABLE_TASK_STATUSES: TaskStatus[] = [TASK_STATUS.QUEUED, TASK_STATUS.IN_PROGRESS];
 const ITEMS_PER_PAGE = 50;
 
 // Status filter mapping
@@ -154,7 +152,6 @@ export const TasksPane: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
 
   // Project context & task helpers
   const { selectedProjectId } = useProject();
-  const { data: cancellableTasks } = useListTasks({ projectId: selectedProjectId, status: CANCELLABLE_TASK_STATUSES });
   
   // Get paginated tasks
   const { data: paginatedData, isLoading: isPaginatedLoading } = usePaginatedTasks({
@@ -187,27 +184,13 @@ export const TasksPane: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
     }
   }, [statusCounts, isStatusCountsLoading, displayStatusCounts]);
   
-  // --- Determine cancellable task count quickly so the "Cancel All" button enables immediately ---
-  const visibleCancellableCount = React.useMemo(() => {
-    // 1️⃣ Use the tasks already loaded in the paginated list (fast, already in cache)
-    const fromPaginated = filterVisibleTasks(
-      (displayPaginatedData?.tasks || []).filter(task =>
-        CANCELLABLE_TASK_STATUSES.includes(task.status)
-      )
-    ).length;
-
-    if (fromPaginated > 0) {
-      return fromPaginated;
-    }
-
-    // 2️⃣ Fallback to the value derived from status-count query (may be a second slower)
-    return displayStatusCounts?.processing || 0;
-  }, [displayPaginatedData, displayStatusCounts]);
+  // Use processing count from status counts as the single source of truth
+  const cancellableTaskCount = displayStatusCounts?.processing || 0;
 
   const cancelAllPendingMutation = useCancelAllPendingTasks();
   const { toast } = useToast();
 
-  useRenderLogger('TasksPane', { cancellableCount: visibleCancellableCount });
+  useRenderLogger('TasksPane', { cancellableCount: cancellableTaskCount });
 
   // Reset to page 1 when filter changes
   const handleFilterChange = (filter: FilterGroup) => {
@@ -306,8 +289,8 @@ export const TasksPane: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
         handlePaneLeave={handlePaneLeave}
         thirdButton={{
           onClick: openPane,
-          ariaLabel: `Open Tasks pane (${visibleCancellableCount} active tasks)`,
-          content: <span className="text-xs font-medium">{visibleCancellableCount}</span>
+          ariaLabel: `Open Tasks pane (${cancellableTaskCount} active tasks)`,
+          content: <span className="text-xs font-medium">{cancellableTaskCount}</span>
         }}
       />
       <div
@@ -335,7 +318,7 @@ export const TasksPane: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
                 variant="destructive"
                 size="sm"
                 onClick={handleCancelAllPending}
-                disabled={cancelAllPendingMutation.isPending || visibleCancellableCount === 0}
+                disabled={cancelAllPendingMutation.isPending || cancellableTaskCount === 0}
               >
                 {cancelAllPendingMutation.isPending ? 'Cancelling All...' : 'Cancel All'}
               </Button>

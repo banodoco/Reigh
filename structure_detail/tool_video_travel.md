@@ -33,7 +33,8 @@ src/tools/travel-between-images/
 │   ├── SimpleVideoPlayer.tsx          # Lightweight player
 │   ├── TaskDetailsModal.tsx           # Generation parameters
 │   ├── VideoShotDisplay.tsx           # Shot preview card
-│   ├── ShotListDisplay.tsx            # Shot grid view
+│   ├── ShotListDisplay.tsx            # Shot grid view with drag-and-drop reordering
+│   ├── SortableShotItem.tsx           # Draggable shot card wrapper
 │   └── SortableImageItem.tsx          # Draggable images
 └── settings.ts                        # Tool configuration
 ```
@@ -49,6 +50,16 @@ src/tools/travel-between-images/
 - Hosts the main `ShotEditor`
 - Manages LoRA state filtering for "Wan 2.1 14b" models
 - Handles shot selection and navigation
+
+### `ShotListDisplay.tsx` & `SortableShotItem.tsx`
+**Shot reordering system**
+- **Drag-and-Drop Interface**: Shots can be reordered by dragging the grip handle (⋮⋮)
+- **Integrated Button Design**: Grip handle appears as the first action button, styled consistently
+- **Database Integration**: Auto-saves new order using position field with `useReorderShots` hook
+- **Optimistic Updates**: Immediate visual feedback with no jumping, reverts only on error
+- **Visual Feedback**: Dragged items become semi-transparent, disabling during save operations
+- **Touch Support**: Configured for mobile with delay/tolerance for drag activation
+- **Error Handling**: Toast notifications for failed reorder operations
 
 ### `ShotEditor.tsx`
 **Core editing environment**

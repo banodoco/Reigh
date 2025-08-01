@@ -122,6 +122,13 @@ The `ShotsContext` provides a **single source of truth** for shots data across a
 - **Video Generation**: Uses complete image data from detail view (not limited thumbnails)
 - **No Data Conflicts**: Shot metadata (ID, name) is consistent; only image completeness varies
 
+**Cache Synchronization (Fixed):**
+All shot mutations (`useRemoveImageFromShot`, `useUpdateShotImageOrder`, `useDuplicateImageInShot`) now properly invalidate both query caches:
+- `['shots', projectId]` - for list views (ShotsPane, etc.)
+- `['all-shot-generations', shotId]` - for detail views (ShotEditor)
+
+This ensures real-time synchronization between ShotsPane and ShotEditor when reordering, adding, or removing images.
+
 ---
 
 ## 🧩 Key Components (`/src/shared/components/`)

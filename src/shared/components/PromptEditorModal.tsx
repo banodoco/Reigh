@@ -12,7 +12,6 @@ import { Textarea } from '@/shared/components/ui/textarea';
 import { Label } from '@/shared/components/ui/label';
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/components/ui/tabs";
-import { usePaneAwareModalStyle } from '@/shared/hooks/usePaneAwareModalStyle';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { usePersistentToolState } from '@/shared/hooks/usePersistentToolState';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/shared/components/ui/collapsible';
@@ -55,7 +54,6 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
   const [promptToEdit, setPromptToEdit] = useState<PromptToEditState | null>(null);
   const [activeTab, setActiveTab] = useState<EditorMode>('generate');
   const [activePromptIdForFullView, setActivePromptIdForFullView] = useState<string | null>(null);
-  const modalStyle = usePaneAwareModalStyle();
   const isMobile = useIsMobile();
   const [isAIPromptSectionExpanded, setIsAIPromptSectionExpanded] = useState(false);
   
@@ -340,9 +338,8 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleFinalSaveAndClose()}>
       <DialogContent 
-        style={modalStyle} 
-        className={`max-w-4xl ${
-          isMobile ? 'my-5 max-h-[calc(100vh-2.5rem)] flex flex-col justify-between p-0' : 'flex flex-col p-0'
+        className={`max-w-4xl max-h-[90vh] ${
+          isMobile ? 'my-5 flex flex-col justify-between p-0' : 'flex flex-col p-0'
         }`}
         onOpenAutoFocus={(event) => {
           // Prevent auto-focus on mobile devices to avoid triggering the keyboard

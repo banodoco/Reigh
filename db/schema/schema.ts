@@ -64,6 +64,7 @@ export const shots = pgTable('shots', {
   updatedAt: timestamp('updated_at', { withTimezone: true }),
   projectId: uuid('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
   settings: jsonb('settings'), // Store tool settings as JSONB
+  position: integer('position').notNull().default(1), // Position for manual ordering
 });
 
 export const shotGenerations = pgTable('shot_generations', {

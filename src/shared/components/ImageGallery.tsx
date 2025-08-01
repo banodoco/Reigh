@@ -136,6 +136,10 @@ interface ImageGalleryProps {
   onStarredFilterChange?: (starredOnly: boolean) => void;
   /** Callback when tool type filter changes */
   onToolTypeFilterChange?: (enabled: boolean) => void;
+  /** Associated shot ID from the generation form (for shot mismatch notifier) */
+  formAssociatedShotId?: string | null;
+  /** Callback when user clicks to switch to the form's associated shot */
+  onSwitchToAssociatedShot?: (shotId: string) => void;
 }
 
 // Helper to format metadata for display
@@ -260,7 +264,9 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   onToggleStar,
   onStarredFilterChange,
   onToolTypeFilterChange,
-  initialStarredFilter = false
+  initialStarredFilter = false,
+  formAssociatedShotId,
+  onSwitchToAssociatedShot
 }) => {
   const [activeLightboxMedia, setActiveLightboxMedia] = useState<GenerationRow | null>(null);
   const [downloadingImageId, setDownloadingImageId] = useState<string | null>(null);
@@ -320,6 +326,11 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     // When the component mounts or initialFilterState prop changes, update the filter state
     setFilterByToolType(initialFilterState);
   }, [initialFilterState]);
+
+  useEffect(() => {
+    // When the component mounts or initialShotFilter prop changes, update the shot filter state
+    setShotFilter(initialShotFilter);
+  }, [initialShotFilter]);
 
   useEffect(() => {
     // When the component mounts or initialStarredFilter prop changes, update the starred filter state
@@ -523,6 +534,13 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     });
   }, [onStarredFilterChange]);
 
+  // Handle switching to the associated shot from the form
+  const handleSwitchToAssociatedShot = useCallback(() => {
+    if (formAssociatedShotId && onSwitchToAssociatedShot) {
+      onSwitchToAssociatedShot(formAssociatedShotId);
+    }
+  }, [formAssociatedShotId, onSwitchToAssociatedShot]);
+
   // Update search visibility based on search term
   useEffect(() => {
     if (searchTerm && !isSearchOpen) {
@@ -585,6 +603,31 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
         
     return currentFiltered;
   }, [images, filterByToolType, currentToolType, mediaTypeFilter, searchTerm, showStarredOnly]);
+
+  // Determine if we should show the shot mismatch notifier
+  const shouldShowShotNotifier = React.useMemo(() => {
+    return !!(formAssociatedShotId && showShotFilter && shotFilter !== formAssociatedShotId);
+  }, [formAssociatedShotId, shotFilter, showShotFilter]);
+
+  // Get the names and text for the notifier
+  const { currentShotDisplayText, buttonText } = React.useMemo(() => {
+    const currentShot = allShots.find(shot => shot.id === shotFilter);
+    const associatedShot = allShots.find(shot => shot.id === formAssociatedShotId);
+    const associatedShotName = associatedShot?.name || 'Unknown';
+    
+    if (shotFilter === 'all') {
+      return {
+        currentShotDisplayText: "You're viewing images for all shots",
+        buttonText: `Jump to '${associatedShotName}'`
+      };
+    } else {
+      const currentShotName = currentShot?.name || 'Unknown';
+      return {
+        currentShotDisplayText: `You're viewing images for '${currentShotName}'`,
+        buttonText: `Switch To '${associatedShotName}'`
+      };
+    }
+  }, [allShots, shotFilter, formAssociatedShotId]);
 
   // Determine if we're in server-side pagination mode
   const isServerPagination = !!(onServerPageChange && serverPage);
@@ -796,6 +839,23 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                 </Button>
             </div>
         </div>
+
+        {/* Shot Mismatch Notifier */}
+        {shouldShowShotNotifier && (
+          <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg text-green-800 dark:bg-green-900/20 dark:border-green-800 dark:text-green-200">
+            <span className="text-sm">
+              <strong>{currentShotDisplayText}</strong>
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSwitchToAssociatedShot}
+              className="ml-3 text-green-700 border-green-300 hover:bg-green-100 dark:text-green-200 dark:border-green-700 dark:hover:bg-green-800"
+            >
+              {buttonText}
+            </Button>
+          </div>
+        )}
 
         {/* Gallery content wrapper with minimum height to prevent layout jump when there are images */}
         <div className={paginatedImages.length > 0 ? "min-h-[400px] sm:min-h-[500px] lg:min-h-[600px]" : ""}>

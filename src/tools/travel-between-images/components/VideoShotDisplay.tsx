@@ -3,7 +3,7 @@ import { Shot, GenerationRow } from '../../../types/shots'; // Corrected import 
 import { useUpdateShotName, useDeleteShot, useDuplicateShot } from '../../../shared/hooks/useShots'; // Import new hooks
 import { Input } from '@/shared/components/ui/input';
 import { Button } from '@/shared/components/ui/button';
-import { Pencil, Trash2, Check, X, Copy } from 'lucide-react'; // Icons
+import { Pencil, Trash2, Check, X, Copy, GripVertical } from 'lucide-react'; // Icons
 import { toast } from 'sonner';
 import { getDisplayUrl } from '@/shared/lib/utils';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/shared/components/ui/alert-dialog';
@@ -12,9 +12,13 @@ interface VideoShotDisplayProps {
   shot: Shot;
   onSelectShot: () => void;
   currentProjectId: string | null; // Needed for mutations
+  dragHandleProps?: {
+    disabled?: boolean;
+    [key: string]: any; // For drag attributes and listeners
+  };
 }
 
-const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot, currentProjectId }) => {
+const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot, currentProjectId, dragHandleProps }) => {
   const [isEditingName, setIsEditingName] = useState(false);
   const [editableName, setEditableName] = useState(shot.name);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -174,6 +178,19 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
             </h3>
           )}
           <div className="flex items-center space-x-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+            {/* Drag Handle Button */}
+            {dragHandleProps && (
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8 cursor-grab active:cursor-grabbing"
+                disabled={dragHandleProps.disabled}
+                title="Drag to reorder"
+                {...dragHandleProps}
+              >
+                <GripVertical className="h-4 w-4" />
+              </Button>
+            )}
             {!isEditingName && (
                <Button variant="ghost" size="icon" onClick={handleNameEditToggle} className="h-8 w-8">
                   <Pencil className="h-4 w-4" />

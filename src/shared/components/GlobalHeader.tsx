@@ -41,6 +41,10 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
   const [isProjectSettingsModalOpen, setIsProjectSettingsModalOpen] = useState(false);
 
   const handleProjectChange = (projectId: string) => {
+    if (projectId === 'create-new') {
+      setIsCreateProjectModalOpen(true);
+      return;
+    }
     setSelectedProjectId(projectId);
   };
 
@@ -142,6 +146,26 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                           </div>
                         </SelectItem>
                       ))}
+                      {projects.length > 0 && (
+                        <div className="px-2 py-2">
+                          <div className="border-t-2 border-wes-vintage-gold/30 relative">
+                            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-wes-vintage-gold/60 to-transparent" />
+                          </div>
+                        </div>
+                      )}
+                      <SelectItem 
+                        value="create-new"
+                        className="font-inter hover:bg-wes-vintage-gold/20 transition-colors duration-300 p-3 pl-3 pr-8 [&>span:first-child]:left-auto [&>span:first-child]:right-2 mt-1"
+                      >
+                        <div className="flex items-center space-x-2">
+                          <div className="w-4 h-4 bg-gradient-to-br from-wes-vintage-gold to-amber-400 rounded-full flex items-center justify-center flex-shrink-0">
+                            <PlusCircle className="h-2 w-2 text-white flex-shrink-0" />
+                          </div>
+                          <span className="font-crimson font-medium text-primary">
+                            Create New Project
+                          </span>
+                        </div>
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -311,6 +335,26 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                         </div>
                       </SelectItem>
                     ))}
+                                         {projects.length > 0 && (
+                       <div className="px-2 py-2">
+                         <div className="border-t-2 border-wes-vintage-gold/30 relative">
+                           <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-wes-vintage-gold/60 to-transparent" />
+                         </div>
+                       </div>
+                     )}
+                     <SelectItem 
+                       value="create-new"
+                       className="font-inter hover:bg-wes-vintage-gold/20 transition-colors duration-300 p-3 pl-3 pr-8 [&>span:first-child]:left-auto [&>span:first-child]:right-2 mt-1"
+                     >
+                      <div className="flex items-center space-x-2">
+                        <div className="w-4 h-4 bg-gradient-to-br from-wes-vintage-gold to-amber-400 rounded-full flex items-center justify-center flex-shrink-0">
+                          <PlusCircle className="h-2 w-2 text-white flex-shrink-0" />
+                        </div>
+                        <span className="font-crimson font-medium text-primary text-sm">
+                          Create New Project
+                        </span>
+                      </div>
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               )}

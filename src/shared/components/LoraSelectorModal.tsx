@@ -5,7 +5,6 @@ import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter as ItemCardFooter, CardHeader, CardTitle } from "@/shared/components/ui/card";
 import { Input } from "@/shared/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/components/ui/select";
-import { usePaneAwareModalStyle } from '@/shared/hooks/usePaneAwareModalStyle';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/components/ui/tabs";
 import { useListResources, useCreateResource, useDeleteResource, Resource } from '@/shared/hooks/useResources';
@@ -1108,7 +1107,6 @@ export const LoraSelectorModal: React.FC<LoraSelectorModalProps> = ({
   selectedLoras,
   lora_type,
 }) => {
-  const modalStyle = usePaneAwareModalStyle();
   const isMobile = useIsMobile();
   const myLorasResource = useListResources('lora');
   const createResource = useCreateResource();
@@ -1124,7 +1122,6 @@ export const LoraSelectorModal: React.FC<LoraSelectorModalProps> = ({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent
-        style={modalStyle}
         className={`max-w-4xl flex flex-col max-h-[90vh] overflow-hidden ${
           isMobile ? 'mx-2 my-5 max-h-[calc(100vh-2.5rem)]' : ''
         }`}

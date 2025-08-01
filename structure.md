@@ -187,7 +187,7 @@ tool-name/
 | Tool | Status | Documentation | Key Features |
 |------|--------|---------------|--------------|
 | **Image Generation** | ✅ Active | [`tool_image_generation.md`](structure_detail/tool_image_generation.md) | Wan-local generation, LoRA support |
-| **Video Travel** | ✅ Active | [`tool_video_travel.md`](structure_detail/tool_video_travel.md) | Frame-accurate timeline with dynamic spacing, batch processing |
+| **Video Travel** | ✅ Active | [`tool_video_travel.md`](structure_detail/tool_video_travel.md) | Frame-accurate timeline with dynamic spacing, batch processing, drag-and-drop shot reordering |
 | **Edit Travel** | ⚠️ Hidden | [`tool_edit_travel.md`](structure_detail/tool_edit_travel.md) | Text-guided transformations |
 | **Training Data** | ⚠️ Hidden | [`tool_training_data_helper.md`](structure_detail/tool_training_data_helper.md) | Video upload & segmentation |
 
