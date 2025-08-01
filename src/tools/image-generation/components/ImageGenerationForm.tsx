@@ -792,7 +792,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
               })()}
               {/* Select dropdown and create button */}
               <div className="flex items-center gap-2">
-                <Select
+            <Select
               value={associatedShotId || "none"}
               onValueChange={(value) => {
                 console.log('[ImageGenerationForm] Changing shot from', associatedShotId, 'to', value);
