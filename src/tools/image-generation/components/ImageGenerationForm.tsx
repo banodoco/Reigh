@@ -773,25 +773,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
           {/* Associated Shot Selector */}
           <div className="space-y-2 md:col-start-1 md:row-start-1 self-start w-full">
             <Label htmlFor="associatedShot" className="inline-block">Associated with Shot</Label>
-            {/* Select dropdown with jump link above it */}
-            <div className="space-y-1">
-              {/* Jump link positioned above the select field */}
-              {associatedShotId && shots && (() => {
-                const selectedShot = shots.find(shot => shot.id === associatedShotId);
-                return selectedShot ? (
-                  <div className="flex justify-end">
-                    <button
-                      type="button"
-                      onClick={() => navigateToShot(selectedShot)}
-                      className="text-xs font-medium text-emerald-600 hover:text-emerald-700 hover:underline transition-colors duration-200 px-2 py-1 rounded-md hover:bg-emerald-50"
-                    >
-                      Jump to animate shot →
-                    </button>
-                  </div>
-                ) : null;
-              })()}
-              {/* Select dropdown and create button */}
-              <div className="flex items-center gap-2">
+            {/* Select dropdown and create button */}
+            <div className="flex items-center gap-2">
             <Select
               value={associatedShotId || "none"}
               onValueChange={(value) => {
@@ -837,8 +820,22 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
               <PlusCircle className="h-4 w-4" />
               <span className="hidden sm:inline">Create New Shot</span>
             </Button>
-              </div>
             </div>
+            {/* Jump to animate shot link */}
+            {associatedShotId && shots && (() => {
+              const selectedShot = shots.find(shot => shot.id === associatedShotId);
+              return selectedShot ? (
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => navigateToShot(selectedShot)}
+                    className="text-xs font-medium text-emerald-600 hover:text-emerald-700 hover:underline transition-colors duration-200 px-2 py-1 rounded-md hover:bg-emerald-50"
+                  >
+                    Jump to animate shot →
+                  </button>
+                </div>
+              ) : null;
+            })()}
           </div>
 
           {/* LoRA Header (label + manage button) */}
