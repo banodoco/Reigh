@@ -490,7 +490,7 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
 
   // Mobile batch mode with selection
   if (isMobile && generationMode === 'batch') {
-    const mobileColumns = 3; // Always use 3 columns on mobile
+    const mobileColumns = columns; // Use the columns prop for mobile
     const itemsPerRow = mobileColumns;
     
     const shouldSkipConfirmation = imageDeletionSettings.skipConfirmation;
@@ -515,7 +515,7 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
           }
         }}>
         
-        <div className={cn("grid gap-3 grid-cols-3")}>
+        <div className={cn("grid gap-3", `grid-cols-${mobileColumns}`)}>
           {currentImages.map((image, index) => {
             const isSelected = mobileSelectedIds.includes(image.shotImageEntryId);
             const isLastItem = index === currentImages.length - 1;
@@ -663,7 +663,7 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
       onDragEnd={handleDragEnd}
     >
       <SortableContext items={currentImages.map((img) => img.shotImageEntryId)} strategy={rectSortingStrategy}>
-        <div className={cn("grid gap-3", isMobile ? "grid-cols-3" : gridColsClass)}>
+        <div className={cn("grid gap-3", gridColsClass)}>
           {currentImages.map((image, index) => (
             <SortableImageItem
               key={image.shotImageEntryId}
@@ -816,6 +816,31 @@ const MobileImageItem: React.FC<MobileImageItemProps> = ({
   const imageUrl = image.thumbUrl || image.imageUrl;
   const displayUrl = getDisplayUrl(imageUrl);
 
+  // Track touch position to detect scrolling vs tapping
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (!onMobileTap || !touchStartRef.current) return;
+
+    const touch = e.changedTouches[0];
+    const deltaX = Math.abs(touch.clientX - touchStartRef.current.x);
+    const deltaY = Math.abs(touch.clientY - touchStartRef.current.y);
+    
+    // Only trigger tap if movement is minimal (< 10px in any direction)
+    // This prevents accidental selection during scrolling
+    if (deltaX < 10 && deltaY < 10) {
+      e.preventDefault();
+      onMobileTap();
+    }
+    
+    touchStartRef.current = null;
+  };
+
   return (
     <div
       className={cn(
@@ -830,10 +855,8 @@ const MobileImageItem: React.FC<MobileImageItemProps> = ({
         src={displayUrl}
         alt={`Image ${image.id}`}
         className="max-w-full max-h-full object-contain rounded-sm"
-        onTouchEnd={onMobileTap ? (e) => {
-          e.preventDefault();
-          onMobileTap();
-        } : undefined}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
       />
       {!hideDeleteButton && (
         <>

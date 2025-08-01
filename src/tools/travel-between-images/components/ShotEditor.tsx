@@ -1759,8 +1759,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       {/* Content area skeleton */}
       <div className="p-1 min-h-[200px]">
         {/* Image grid skeleton - fewer items initially */}
-        <div className={`grid gap-3 ${isMobile ? 'grid-cols-3' : 'grid-cols-6'}`}>
-          {Array.from({ length: isMobile ? 3 : 6 }).map((_, i) => (
+        <div className={`grid gap-3 ${isMobile ? 'grid-cols-2' : 'grid-cols-6'}`}>
+          {Array.from({ length: isMobile ? 2 : 6 }).map((_, i) => (
             <div key={i} className="aspect-square">
               <Skeleton className="w-full h-full rounded-lg" />
             </div>
@@ -1886,7 +1886,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             onPendingPositionApplied={handlePendingPositionApplied}
             onImageDelete={handleDeleteImageFromShot}
             onImageDuplicate={handleDuplicateImage}
-            columns={(isMobile ? 3 : 6) as 3 | 6}
+            columns={(isMobile ? 2 : 6) as 2 | 6}
             skeleton={<ImageManagerSkeleton />}
             unpositionedGenerationsCount={unpositionedGenerationsCount}
             onOpenUnpositionedPane={openUnpositionedGenerationsPane}

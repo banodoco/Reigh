@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect } from 'react';
 import { useRenderLogger } from '@/shared/hooks/useRenderLogger';
 import { useSlidingPane } from '@/shared/hooks/useSlidingPane';
 import { cn } from '@/shared/lib/utils';
@@ -14,7 +14,7 @@ import { ShotFilter } from '@/shared/components/ShotFilter';
 import { useGenerationsPageLogic } from '@/shared/hooks/useGenerationsPageLogic';
 
 const DEFAULT_PANE_HEIGHT = 350;
-const GENERATIONS_PER_PAGE = 14; // 2 rows of 7 items for optimal pane layout
+const GENERATIONS_PER_PAGE = 18;
 
 export const GenerationsPane: React.FC = () => {
   const navigate = useNavigate();
@@ -86,63 +86,6 @@ export const GenerationsPane: React.FC = () => {
     }
   };
 
-  // Memoize pane positioning style to prevent unnecessary recalculations
-  const paneStyle = useMemo(() => ({
-    height: `${generationsPaneHeight}px`,
-    left: isShotsPaneLocked ? `${shotsPaneWidth}px` : 0,
-    right: isTasksPaneLocked ? `${tasksPaneWidth}px` : 0,
-  }), [generationsPaneHeight, isShotsPaneLocked, shotsPaneWidth, isTasksPaneLocked, tasksPaneWidth]);
-
-  // Memoize horizontal offset calculation
-  const horizontalOffset = useMemo(() => 
-    (isShotsPaneLocked ? shotsPaneWidth : 0) - (isTasksPaneLocked ? tasksPaneWidth : 0),
-    [isShotsPaneLocked, shotsPaneWidth, isTasksPaneLocked, tasksPaneWidth]
-  );
-
-  // Memoize ImageGallery props to prevent unnecessary re-renders
-  const imageGalleryProps = useMemo(() => ({
-    images: paginatedData.items,
-    onDelete: handleDeleteGeneration,
-    isDeleting: isDeleting,
-    allShots: shotsData || [],
-    lastShotId: lastAffectedShotId || undefined,
-    onAddToLastShot: handleAddToShot,
-    offset: (page - 1) * GENERATIONS_PER_PAGE,
-    totalCount: totalCount,
-    whiteText: true,
-    columnsPerRow: 7, // 2 rows of 7 columns for optimal pane layout
-    initialMediaTypeFilter: 'image' as const,
-    initialStarredFilter: false,
-    reducedSpacing: true, // Reduce spacing for pane usage
-  }), [
-    paginatedData.items,
-    handleDeleteGeneration,
-    isDeleting,
-    shotsData,
-    lastAffectedShotId,
-    handleAddToShot,
-    page,
-    totalCount
-  ]);
-
-  // Memoize ShotFilter props to prevent unnecessary re-renders
-  const shotFilterProps = useMemo(() => ({
-    shots: shotsData || [],
-    selectedShotId: selectedShotFilter,
-    onShotChange: setSelectedShotFilter,
-    excludePositioned: excludePositioned,
-    onExcludePositionedChange: setExcludePositioned,
-    size: 'sm' as const,
-    whiteText: true,
-    checkboxId: 'exclude-positioned-generations-pane',
-  }), [
-    shotsData,
-    selectedShotFilter,
-    setSelectedShotFilter,
-    excludePositioned,
-    setExcludePositioned
-  ]);
-
   return (
     <>
       {/* Hide the control tab when on the generations page */}
@@ -155,7 +98,9 @@ export const GenerationsPane: React.FC = () => {
           openPane={openPane}
           paneDimension={generationsPaneHeight}
           /* Centre within visible width taking into account any locked side panes */
-          horizontalOffset={horizontalOffset}
+          horizontalOffset={
+            (isShotsPaneLocked ? shotsPaneWidth : 0) - (isTasksPaneLocked ? tasksPaneWidth : 0)
+          }
           handlePaneEnter={handlePaneEnter}
           handlePaneLeave={handlePaneLeave}
           thirdButton={{
@@ -169,7 +114,11 @@ export const GenerationsPane: React.FC = () => {
       )}
       <div
         {...paneProps}
-        style={paneStyle}
+        style={{
+          height: `${generationsPaneHeight}px`,
+          left: isShotsPaneLocked ? `${shotsPaneWidth}px` : 0,
+          right: isTasksPaneLocked ? `${tasksPaneWidth}px` : 0,
+        }}
         className={cn(
           `fixed bottom-0 bg-zinc-900/95 border-t border-zinc-700 shadow-xl z-[100] transform transition-all duration-300 ease-smooth flex flex-col`,
           transformClass
@@ -180,7 +129,14 @@ export const GenerationsPane: React.FC = () => {
                 <h2 className="text-xl font-semibold text-zinc-200 ml-2">Generations</h2>
                 
                 <ShotFilter
-                  {...shotFilterProps}
+                  shots={shotsData || []}
+                  selectedShotId={selectedShotFilter}
+                  onShotChange={setSelectedShotFilter}
+                  excludePositioned={excludePositioned}
+                  onExcludePositionedChange={setExcludePositioned}
+                  size="sm"
+                  whiteText={true}
+                  checkboxId="exclude-positioned-generations-pane"
                 />
             </div>
             <div className="flex items-center space-x-2">
@@ -203,8 +159,8 @@ export const GenerationsPane: React.FC = () => {
         <div className="flex-grow p-3 overflow-y-auto">
             {isLoading && (
                 <SkeletonGallery 
-                    count={14}
-                    columns={{ base: 3, sm: 4, md: 5, lg: 6, xl: 7 }}
+                    count={12}
+                    columns={{ base: 2, sm: 3, md: 4, lg: 5, xl: 6 }}
                     whiteText={true}
                     showControls={false}
                 />
@@ -212,7 +168,18 @@ export const GenerationsPane: React.FC = () => {
             {error && <p className="text-red-500 text-center">Error: {error.message}</p>}
             {paginatedData.items.length > 0 && (
                 <ImageGallery
-                    {...imageGalleryProps}
+                    images={paginatedData.items}
+                    onDelete={handleDeleteGeneration}
+                    isDeleting={isDeleting}
+                    allShots={shotsData || []}
+                    lastShotId={lastAffectedShotId || undefined}
+                    onAddToLastShot={handleAddToShot}
+                    offset={(page - 1) * GENERATIONS_PER_PAGE}
+                    totalCount={totalCount}
+                    whiteText
+                    columnsPerRow={6}
+                    initialMediaTypeFilter="image"
+                    initialStarredFilter={false}
                 />
             )}
             {paginatedData.items.length === 0 && !isLoading && (

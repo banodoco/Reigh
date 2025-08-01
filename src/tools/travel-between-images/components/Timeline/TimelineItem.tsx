@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef } from "react";
 import { GenerationRow } from "@/types/shots";
 import { getDisplayUrl } from "@/shared/lib/utils";
 
@@ -41,6 +41,30 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
   maxAllowedGap,
   originalFramePos,
 }) => {
+  // Track touch position to detect scrolling vs tapping
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (!onMobileTap || !touchStartRef.current) return;
+
+    const touch = e.changedTouches[0];
+    const deltaX = Math.abs(touch.clientX - touchStartRef.current.x);
+    const deltaY = Math.abs(touch.clientY - touchStartRef.current.y);
+    
+    // Only trigger tap if movement is minimal (< 10px in any direction)
+    // This prevents accidental selection during scrolling
+    if (deltaX < 10 && deltaY < 10) {
+      e.preventDefault();
+      onMobileTap();
+    }
+    
+    touchStartRef.current = null;
+  };
   // Calculate position as pixel offset instead of percentage
   const pixelPosition = ((framePosition - fullMinFrames) / fullRange) * timelineWidth;
 
@@ -115,10 +139,8 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
             alt={`Frame ${displayFrame}`}
             className="w-full h-full object-cover"
             draggable={false}
-            onTouchEnd={onMobileTap ? (e) => {
-              e.preventDefault();
-              onMobileTap();
-            } : undefined}
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
           />
           <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] leading-none text-center py-0.5">
             {displayFrame}

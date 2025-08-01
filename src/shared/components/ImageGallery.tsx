@@ -714,7 +714,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   return (
     <TooltipProvider>
       <div className={`${reducedSpacing ? 'space-y-3' : 'space-y-6'} ${reducedSpacing ? 'pb-2' : 'pb-8'}`}>
-        <div className={`flex flex-wrap justify-between items-center ${reducedSpacing ? 'mt-2' : 'mt-7'} mb-4 gap-x-4 gap-y-2`}> {/* Reduce top margin for compact/pane usage */}
+        <div className={`flex flex-wrap justify-between items-center ${reducedSpacing ? 'mt-0' : 'mt-7'} mb-4 gap-x-4 gap-y-2`}> {/* Reduce top margin for compact/pane usage */}
             <div className="flex items-center gap-2">
                 {/* Pagination Controls */}
                 {totalPages > 1 && (
@@ -857,7 +857,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                     variant="outline"
                     size="icon"
                     onClick={handleStarredFilterToggle}
-                    className={`h-8 w-8 p-0 ${whiteText ? 'border-zinc-600 text-white' : ''} ${showStarredOnly ? 'bg-primary text-primary-foreground border-primary' : ''}`}
+                    className={`h-8 w-8 p-0 ${whiteText ? 'bg-accent text-accent-foreground border-accent hover:bg-accent/80' : ''} ${showStarredOnly ? 'bg-primary text-primary-foreground border-primary' : ''}`}
                     aria-label="Filter by starred generations"
                 >
                     <Star className={`h-4 w-4 ${showStarredOnly ? 'fill-current' : ''}`} />
@@ -935,7 +935,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
           )}
         </div>
         {/* Bottom Pagination Controls (moved inside container for better spacing) */}
-        {totalPages > 1 && (
+        {totalPages > 1 && !reducedSpacing && (
           <div className={`flex justify-center items-center mt-4 ${whiteText ? 'text-white' : 'text-gray-600'}`}>
             <Button
               variant="outline"

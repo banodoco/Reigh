@@ -62,6 +62,31 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
   const currentDialogSkipChoiceRef = useRef(skipConfirmation);
   const isMobile = useIsMobile();
 
+  // Track touch position to detect scrolling vs tapping
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (!onMobileTap || !touchStartRef.current) return;
+
+    const touch = e.changedTouches[0];
+    const deltaX = Math.abs(touch.clientX - touchStartRef.current.x);
+    const deltaY = Math.abs(touch.clientY - touchStartRef.current.y);
+    
+    // Only trigger tap if movement is minimal (< 10px in any direction)
+    // This prevents accidental selection during scrolling
+    if (deltaX < 10 && deltaY < 10) {
+      e.preventDefault();
+      onMobileTap();
+    }
+    
+    touchStartRef.current = null;
+  };
+
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -120,10 +145,8 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
         src={getDisplayUrl(image.imageUrl)}
         alt={`Generated image ${(position ?? 0) + 1}`}
         className="w-full h-full object-cover transition-opacity duration-200"
-        onTouchEnd={isMobile && onMobileTap ? (e) => {
-          e.preventDefault();
-          onMobileTap();
-        } : undefined}
+        onTouchStart={isMobile ? handleTouchStart : undefined}
+        onTouchEnd={isMobile ? handleTouchEnd : undefined}
         loading="lazy"
         draggable={false}
         onError={(e) => {
