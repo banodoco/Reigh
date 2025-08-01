@@ -285,6 +285,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
       return 'grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-7';
     } else if (columnsPerRow === 6) {
       return 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-6';
+    } else if (columnsPerRow === 3) {
+      return 'grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 2xl:grid-cols-5';
     } else {
       return 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 2xl:grid-cols-5';
     }
@@ -901,7 +903,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
           )}
 
           {paginatedImages.length > 0 && (
-                <div className={`grid gap-4 ${reducedSpacing ? 'mb-4' : 'mb-12'} ${gridColumnClasses}`}>
+                <div className={`grid ${reducedSpacing ? 'gap-2 sm:gap-4' : 'gap-4'} ${reducedSpacing ? 'mb-4' : 'mb-12'} ${gridColumnClasses}`}>
             {paginatedImages.map((image, index) => (
               <ImageGalleryItem
                 key={image.id || `image-${index}`}

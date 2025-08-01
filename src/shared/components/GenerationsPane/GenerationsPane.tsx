@@ -3,7 +3,7 @@ import { useRenderLogger } from '@/shared/hooks/useRenderLogger';
 import { useSlidingPane } from '@/shared/hooks/useSlidingPane';
 import { cn } from '@/shared/lib/utils';
 import { Button } from '@/shared/components/ui/button';
-import { LockIcon, UnlockIcon, Square, ChevronLeft, ChevronRight } from 'lucide-react';
+import { LockIcon, UnlockIcon, Square } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ImageGallery } from '@/shared/components/ImageGallery';
 import { usePanes } from '@/shared/contexts/PanesContext';
@@ -94,18 +94,6 @@ export const GenerationsPane: React.FC = () => {
     }
   }, [isOnGenerationsPage, isOpen, isLocked, setIsGenerationsPaneLocked]);
 
-  const handleNextPage = () => {
-    if (page < paginatedData.totalPages) {
-      handleServerPageChange(page + 1);
-    }
-  };
-
-  const handlePrevPage = () => {
-    if (page > 1) {
-      handleServerPageChange(page - 1);
-    }
-  };
-
   return (
     <>
       {/* Hide the control tab when on the generations page */}
@@ -162,20 +150,10 @@ export const GenerationsPane: React.FC = () => {
                 />
             </div>
             <div className="flex items-center space-x-2">
-                {/* Actions - hide when on generations page */}
-                {!isOnGenerationsPage && (
-                  <>
-                    <Button variant="outline" size="sm" onClick={handlePrevPage} disabled={page === 1 || isLoading}>
-                        <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={handleNextPage} disabled={page >= paginatedData.totalPages || isLoading}>
-                        <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </>
-                )}
+                {/* Pagination buttons removed - they're duplicated in ImageGallery below */}
             </div>
         </div>
-        <div className="flex-grow px-3 pt-3 overflow-y-auto">
+        <div className="flex-grow px-1 sm:px-3 pt-1 sm:pt-3 overflow-y-auto">
             {isLoading && (
                 <SkeletonGallery 
                     count={12}
@@ -196,10 +174,12 @@ export const GenerationsPane: React.FC = () => {
                     offset={(page - 1) * GENERATIONS_PER_PAGE}
                     totalCount={totalCount}
                     whiteText
-                    columnsPerRow={6}
+                    columnsPerRow={isMobile ? 3 : 6}
                     initialMediaTypeFilter="image"
                     initialStarredFilter={false}
                     reducedSpacing={true}
+                    serverPage={page}
+                    onServerPageChange={handleServerPageChange}
                 />
             )}
             {paginatedData.items.length === 0 && !isLoading && (

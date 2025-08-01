@@ -237,20 +237,16 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
 
         {/* Mobile Layout (below lg) */}
         <div 
-          className="lg:hidden w-full pt-2"
+          className="lg:hidden w-full"
           style={{
-            position: 'relative',
-            zIndex: 10,
-            padding: 0,
-            margin: 0,
             paddingRight: contentOffsetRight ? `${contentOffsetRight}px` : undefined,
             paddingLeft: contentOffsetLeft ? `${contentOffsetLeft}px` : undefined,
           }}
         >
           {/* Top row - Brand + Project Buttons + App Settings */}
-          <div className="flex items-center justify-between h-16 w-full" style={{ paddingLeft: '20px', paddingRight: '16px' }}>
+          <div className="flex items-center justify-between h-16 w-full px-4">
             {/* Left side - Brand + Project Buttons */}
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-3">
               {/* Brand */}
               <div
                 role="link"
@@ -258,7 +254,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                 aria-label="Go to homepage"
                 onPointerUp={() => navigate(session ? "/tools" : "/")}
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') navigate(session ? "/tools" : "/"); }}
-                className="group relative block p-2 -m-2 cursor-pointer"
+                className="group relative cursor-pointer"
               >
                 <div className="relative flex items-center space-x-2">
                   <div className="relative">
@@ -320,8 +316,8 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
           </div>
 
           {/* Bottom row - Project Selector */}
-          <div className="flex items-center h-[4.5rem] w-full border-t border-wes-vintage-gold/20" style={{ paddingLeft: '16px', paddingRight: '16px' }}>
-            <div className="flex-1 p-2 border-2 border-wes-vintage-gold/30 rounded-xl bg-white/50 shadow-wes-vintage">
+          <div className="flex items-center h-20 w-full border-t border-wes-vintage-gold/20 px-4 pt-2 pb-6">
+            <div className="flex-1 p-3 border-2 border-wes-vintage-gold/30 rounded-xl bg-white/50 shadow-wes-vintage">
               {isLoadingProjects && projects.length === 0 ? (
                 <div className="w-full h-10 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 animate-pulse rounded-lg border-2 border-wes-vintage-gold/30"></div>
               ) : projects.length === 0 && !isLoadingProjects ? (
@@ -356,17 +352,17 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                         </div>
                       </SelectItem>
                     ))}
-                                         {projects.length > 0 && (
-                       <div className="px-2 py-2">
-                         <div className="border-t-2 border-wes-vintage-gold/30 relative">
-                           <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-wes-vintage-gold/60 to-transparent" />
-                         </div>
-                       </div>
-                     )}
-                     <SelectItem 
-                       value="create-new"
-                       className="font-inter hover:bg-wes-vintage-gold/20 transition-colors duration-300 p-3 pl-3 pr-8 [&>span:first-child]:left-auto [&>span:first-child]:right-2 mt-1"
-                     >
+                    {projects.length > 0 && (
+                      <div className="px-2 py-2">
+                        <div className="border-t-2 border-wes-vintage-gold/30 relative">
+                          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-wes-vintage-gold/60 to-transparent" />
+                        </div>
+                      </div>
+                    )}
+                    <SelectItem 
+                      value="create-new"
+                      className="font-inter hover:bg-wes-vintage-gold/20 transition-colors duration-300 p-3 pl-3 pr-8 [&>span:first-child]:left-auto [&>span:first-child]:right-2 mt-1"
+                    >
                       <div className="flex items-center space-x-2">
                         <div className="w-4 h-4 bg-gradient-to-br from-wes-vintage-gold to-amber-400 rounded-full flex items-center justify-center flex-shrink-0">
                           <PlusCircle className="h-2 w-2 text-white flex-shrink-0" />
