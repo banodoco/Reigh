@@ -64,6 +64,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
   const [generationControlValues, setGenerationControlValues] = useState<GenerationControlValues>({
     overallPromptText: '', rulesToRememberText: '',
     numberToGenerate: 24, includeExistingContext: true, addSummary: true,
+    temperature: 0.8,
   });
   const [bulkEditControlValues, setBulkEditControlValues] = useState<BulkEditControlValues>({
     editInstructions: '', modelType: 'smart' as AIModelType,

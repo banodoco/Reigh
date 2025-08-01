@@ -34,6 +34,7 @@ export const useAIInteractionService = ({
             rulesToRememberText: params.rulesToRememberText,
             numberToGenerate: params.numberToGenerate,
             existingPrompts: params.includeExistingContext ? params.existingPrompts ?? [] : [],
+            temperature: params.temperature || 0.8,
           },
         });
 

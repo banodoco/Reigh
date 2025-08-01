@@ -2,7 +2,7 @@
 // @ts-nocheck
 // deno-lint-ignore-file
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import OpenAI from "npm:openai@4.104.0";
+import Groq from "npm:groq-sdk@0.26.0";
 
 function jsonResponse(body: any, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -16,11 +16,11 @@ function jsonResponse(body: any, status = 200) {
   });
 }
 
-const apiKey = Deno.env.get("OPENAI_API_KEY");
+const apiKey = Deno.env.get("GROQ_API_KEY");
 if (!apiKey) {
-  console.error("[ai-prompt] OPENAI_API_KEY not set in env vars");
+  console.error("[ai-prompt] GROQ_API_KEY not set in env vars");
 }
-const openai = new OpenAI({ apiKey });
+const groq = new Groq({ apiKey });
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return jsonResponse({ ok: true });
@@ -44,6 +44,7 @@ serve(async (req) => {
           rulesToRememberText = "",
           numberToGenerate = 3,
           existingPrompts = [],
+          temperature = 0.8,
         } = body;
 
         let systemMsg = `You are a helpful assistant that generates image prompts based on user input.
@@ -91,12 +92,15 @@ YOUR OUTPUT (${numberToGenerate} prompts):
 
 IMPORTANT: Only respond with the ${numberToGenerate} prompts, nothing else. Do not include any commentary, explanations, or additional text.`;
 
-        const resp = await openai.chat.completions.create({
-          model: "o3",
+        const resp = await groq.chat.completions.create({
+          model: "moonshotai/kimi-k2-instruct",
           messages: [
             { role: "system", content: systemMsg },
             { role: "user", content: `${userMsg}\n\n${instruction}` },
           ],
+          temperature: temperature,
+          max_tokens: 4096,
+          top_p: 1,
         });
         const outputText = resp.choices[0]?.message?.content?.trim() || "";
         const prompts = outputText.split("\n").map((s) => s.trim()).filter(Boolean);
@@ -132,15 +136,15 @@ IMPORTANT: Only change what is specifically requested in the edit instructions.`
 Edit Instructions: ${editInstructions}
 
 Revised Prompt:`;
-        const model = modelType === "smart" ? "o3-mini" : "gpt-4o-mini";
-        const resp = await openai.chat.completions.create({
-          model,
+        const resp = await groq.chat.completions.create({
+          model: "moonshotai/kimi-k2-instruct",
           messages: [
             { role: "system", content: systemMsg },
             { role: "user", content: userMsg },
           ],
-          temperature: modelType === "smart" ? undefined : 0.5,
-          max_tokens: modelType === "smart" ? undefined : 1024,
+          temperature: 1.0,
+          max_tokens: 2048,
+          top_p: 1,
         });
         const newText = resp.choices[0]?.message?.content?.trim() || originalPromptText;
         return jsonResponse({ success: true, newText, usage: resp.usage });
@@ -148,15 +152,16 @@ Revised Prompt:`;
       case "generate_summary": {
         const { promptText = "" } = body;
         if (!promptText) return jsonResponse({ error: "promptText required" }, 400);
-        const resp = await openai.chat.completions.create({
-          model: "gpt-4o-mini-2024-07-18",
+        const resp = await groq.chat.completions.create({
+          model: "moonshotai/kimi-k2-instruct",
           messages: [{ role: "user", content: `Create a brief summary of this image prompt in 10 words or less. Output only the summary text with no additional formatting or quotation marks:
 
 "${promptText}"
 
 Summary:` }],
-          temperature: 1,
+          temperature: 1.0,
           max_tokens: 50,
+          top_p: 1,
         });
         const summary = resp.choices[0]?.message?.content?.trim() || null;
         return jsonResponse({ summary, usage: resp.usage });
@@ -168,4 +173,4 @@ Summary:` }],
     console.error(`[ai-prompt] Error handling task ${task}:`, err?.message || err);
     return jsonResponse({ error: "Internal server error", details: err?.message }, 500);
   }
-}) 
+}); 

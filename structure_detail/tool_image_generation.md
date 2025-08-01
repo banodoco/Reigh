@@ -40,11 +40,18 @@ src/tools/image-generation/
 - **State**: Persistent via `usePersistentToolState`
 
 ### `PromptGenerationControls.tsx`
-**Prompt management interface**
-- Add/edit/delete prompts
-- Bulk operations support
-- Prompt templates
-- Real-time validation
+**AI-powered prompt management interface**
+- **AI Generation**: Create prompts using Groq API (moonshotai/kimi-k2-instruct model)
+- **Creativity Control**: 5-level temperature slider (0.4-1.2):
+  - Predictable (0.4) - Consistent, expected results
+  - Interesting (0.6) - Some variation with coherence
+  - Balanced (0.8) - Good balance of creativity *(default)*
+  - Chaotic (1.0) - Wild and unexpected ideas
+  - Insane (1.2) - Maximum randomness
+- **Bulk Operations**: AI-powered bulk editing of existing prompts
+- **Context Awareness**: Include existing prompts as context for generation
+- **Auto-summarization**: Generate short summaries for prompt organization
+- **Persistence**: Settings saved per-project including temperature preference
 
 ---
 
@@ -60,6 +67,29 @@ const {
   deleteGeneration // Delete image function
 } = useGenerations(projectId);
 ```
+
+---
+
+## 🤖 AI Service Integration
+
+### Groq API (moonshotai/kimi-k2-instruct)
+The tool integrates with Groq's API for AI-powered prompt generation:
+
+**Edge Function**: `supabase/functions/ai-prompt/index.ts`
+- Handles prompt generation, editing, and summarization
+- Uses GROQ_API_KEY environment variable
+- Supports dynamic temperature control (0.4-1.2)
+
+**Service Hook**: `useAIInteractionService`
+- Manages AI requests and state
+- Provides `generatePrompts`, `editPromptWithAI`, `generateSummary`
+- Handles loading states and error recovery
+
+**Features**:
+- **Generate**: Create multiple prompts based on user requirements
+- **Edit**: AI-powered refinement of existing prompts  
+- **Summarize**: Generate short descriptions for organization
+- **Context**: Use existing prompts to inform new generations
 
 ---
 
@@ -87,7 +117,11 @@ const {
     softEdgeStrength: 20,
     generationMode: 'wan-local',
     beforeEachPromptText: '',
-    afterEachPromptText: ''
+    afterEachPromptText: '',
+    // AI Prompt Generation Settings
+    temperature: 0.8,  // Creativity level (0.4-1.2)
+    includeExistingContext: true,
+    addSummary: true
   }
 }
 ```

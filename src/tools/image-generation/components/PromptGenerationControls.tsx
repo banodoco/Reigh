@@ -4,6 +4,7 @@ import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
 import { Textarea } from '@/shared/components/ui/textarea';
 import { Checkbox } from '@/shared/components/ui/checkbox';
+import { Slider } from '@/shared/components/ui/slider';
 import { GeneratePromptsParams, AIPromptItem } from '@/types/ai';
 import { Wand2 } from 'lucide-react';
 
@@ -13,6 +14,7 @@ export interface GenerationControlValues {
   numberToGenerate: number;
   includeExistingContext: boolean;
   addSummary: boolean;
+  temperature: number;
 }
 
 interface PromptGenerationControlsProps {
@@ -23,6 +25,14 @@ interface PromptGenerationControlsProps {
   initialValues?: Partial<GenerationControlValues>;
   onValuesChange?: (values: GenerationControlValues) => void;
 }
+
+const temperatureOptions = [
+  { value: 0.4, label: 'Predictable', description: 'Consistent, expected results' },
+  { value: 0.6, label: 'Interesting', description: 'Some variation with coherence' },
+  { value: 0.8, label: 'Balanced', description: 'Good balance of creativity' },
+  { value: 1.0, label: 'Chaotic', description: 'Wild and unexpected ideas' },
+  { value: 1.2, label: 'Insane', description: 'Maximum randomness' },
+];
 
 export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> = ({
   onGenerate,
@@ -37,6 +47,7 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
   const [numberToGenerate, setNumberToGenerate] = useState<number>(initialValues?.numberToGenerate || 3);
   const [includeExistingContext, setIncludeExistingContext] = useState(initialValues?.includeExistingContext ?? true);
   const [addSummary, setAddSummary] = useState(initialValues?.addSummary || false);
+  const [temperature, setTemperature] = useState<number>(initialValues?.temperature || 0.8);
 
   useEffect(() => {
     if (initialValues) {
@@ -45,6 +56,7 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
       setNumberToGenerate(initialValues.numberToGenerate || 3);
       setIncludeExistingContext(initialValues.includeExistingContext ?? true);
       setAddSummary(initialValues.addSummary || false);
+      setTemperature(initialValues.temperature || 0.8);
     }
   }, [initialValues]);
 
@@ -56,11 +68,12 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
         numberToGenerate,
         includeExistingContext,
         addSummary,
+        temperature,
       });
     }
   }, [
     overallPromptText, rulesToRememberText, 
-    numberToGenerate, includeExistingContext, addSummary, 
+    numberToGenerate, includeExistingContext, addSummary, temperature,
     onValuesChange
   ]);
 
@@ -68,6 +81,7 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
   useEffect(() => { handleValueChange(); }, [handleValueChange]);
 
   const handleGenerateClick = async (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
     if (!hasApiKey) {
         alert('API Key is required to generate prompts.');
         return;
@@ -78,7 +92,21 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
       numberToGenerate,
       existingPrompts: includeExistingContext ? existingPromptsForContext : undefined,
       addSummaryForNewPrompts: addSummary,
+      temperature,
     });
+  };
+
+  const selectedTemperatureOption = temperatureOptions.find(opt => opt.value === temperature);
+  const temperatureValues = temperatureOptions.map(opt => opt.value);
+  const currentIndex = temperatureValues.indexOf(temperature);
+
+  const handleTemperatureChange = (values: number[]) => {
+    const newValue = values[0];
+    // Find the closest temperature option
+    const closest = temperatureOptions.reduce((prev, curr) => 
+      Math.abs(curr.value - newValue) < Math.abs(prev.value - newValue) ? curr : prev
+    );
+    setTemperature(closest.value);
   };
 
   return (
@@ -108,7 +136,7 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
           disabled={!hasApiKey || isGenerating}
         />
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
+      <div className="grid grid-cols-1 sm:grid-cols-[1fr_2fr_1fr] gap-6 items-start">
         <div>
           <Label htmlFor="gen_numberToGenerate">Number to Generate</Label>
           <Input
@@ -118,10 +146,43 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
             onChange={(e) => setNumberToGenerate(Math.max(1, parseInt(e.target.value, 10) || 1))}
             min="1"
             disabled={!hasApiKey || isGenerating}
-            className="w-full sm:w-auto"
+            className="w-full"
           />
         </div>
-        <div className="space-y-2 pt-2 sm:pt-0">
+        <div className="flex flex-col items-center">
+          <div className="w-full">
+            <div className="text-center mb-3">
+              <span className="font-medium text-sm">
+                Level of creativity
+              </span>
+              <span className="block text-xs text-muted-foreground">
+                {selectedTemperatureOption?.description || 'Good balance of creativity'}
+              </span>
+            </div>
+            <div className="relative mb-0">
+              <Slider
+                id="gen_temperature"
+                value={[temperature]}
+                onValueChange={handleTemperatureChange}
+                min={0.4}
+                max={1.2}
+                step={0.2}
+                disabled={!hasApiKey || isGenerating}
+                className="w-full"
+              />
+              <div className="flex justify-between text-xs text-muted-foreground mt-2">
+                <span>1</span>
+                <span>5</span>
+              </div>
+            </div>
+            <div className="text-center">
+              <span className="font-medium text-sm">
+                {selectedTemperatureOption?.label || 'Balanced'}
+              </span>
+            </div>
+          </div>
+        </div>
+        <div className="space-y-2 pt-6 sm:pt-4">
             <div className="flex items-center space-x-2">
                 <Checkbox 
                     id="gen_includeExistingContext" 
@@ -130,7 +191,7 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
                     disabled={!hasApiKey || isGenerating || existingPromptsForContext.length === 0}
                 />
                 <Label htmlFor="gen_includeExistingContext" className="font-normal">
-                    Include {existingPromptsForContext.length} existing prompt(s) as context
+                    Include current prompts
                 </Label>
             </div>
             <div className="flex items-center space-x-2">
@@ -140,7 +201,7 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
                     onCheckedChange={(checked) => setAddSummary(Boolean(checked))} 
                     disabled={!hasApiKey || isGenerating}
                 />
-                <Label htmlFor="gen_addSummary" className="font-normal">Add short summaries to new prompts</Label>
+                <Label htmlFor="gen_addSummary" className="font-normal">Add short summaries</Label>
             </div>
         </div>
       </div>

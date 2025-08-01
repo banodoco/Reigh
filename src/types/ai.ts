@@ -12,6 +12,7 @@ export interface GeneratePromptsParams {
   existingPrompts?: AIPromptItem[];         // Renamed and kept optional
   includeExistingContext?: boolean;         // Added from user specification
   addSummaryForNewPrompts?: boolean;        // Renamed from addSummary
+  temperature?: number;                     // AI creativity level (0.6-1.4)
 }
 
 export type AIModelType = 'standard' | 'smart';
