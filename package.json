@@ -81,6 +81,7 @@
     "react-router-dom": "^6.26.2",
     "react-virtualized-auto-sizer": "^1.0.26",
     "react-window": "^1.8.11",
+    "react-window-infinite-loader": "^1.0.10",
     "recharts": "^2.12.7",
     "sonner": "^1.5.0",
     "styled-jsx": "^5.1.7",

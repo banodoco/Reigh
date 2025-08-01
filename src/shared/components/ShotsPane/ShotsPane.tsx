@@ -6,6 +6,8 @@ import { useShots } from '@/shared/contexts/ShotsContext';
 import { useProject } from "@/shared/contexts/ProjectContext";
 import { useSlidingPane } from '@/shared/hooks/useSlidingPane';
 import { cn } from '@/shared/lib/utils';
+import { useToolSettings } from '@/shared/hooks/useToolSettings';
+import { VideoTravelSettings } from '@/tools/travel-between-images/settings';
 import { Button } from '@/shared/components/ui/button';
 import { ArrowRightIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -25,6 +27,21 @@ export const ShotsPane: React.FC = () => {
   // Pagination state
   const pageSize = 5;
   const [currentPage, setCurrentPage] = useState(1);
+
+  // Fetch project-level settings for defaults when creating new shots
+  const { settings: projectSettings } = useToolSettings<VideoTravelSettings>(
+    'travel-between-images',
+    { projectId: selectedProjectId, enabled: !!selectedProjectId }
+  );
+
+  // Fetch project-level UI settings for defaults
+  const { settings: projectUISettings } = useToolSettings<{
+    acceleratedMode?: boolean;
+    randomSeed?: boolean;
+  }>('travel-ui-state', { 
+    projectId: selectedProjectId, 
+    enabled: !!selectedProjectId 
+  });
 
   useRenderLogger('ShotsPane', { shotsCount: shots?.length, currentPage });
   
@@ -109,6 +126,18 @@ export const ShotsPane: React.FC = () => {
     }
 
     setIsCreateModalOpen(false);
+
+    // Apply project defaults to the newly created shot if available
+    if (createdShotId && (projectSettings || projectUISettings)) {
+      const defaultsToApply = {
+        ...(projectSettings || {}),
+        // Include UI settings in a special key that will be handled separately
+        _uiSettings: projectUISettings || {}
+      };
+      // Store the new shot ID to apply defaults when settings load
+      sessionStorage.setItem(`apply-project-defaults-${createdShotId}`, JSON.stringify(defaultsToApply));
+      console.log('[ShotsPane] Marked shot for project defaults application:', createdShotId);
+    }
 
     // If a shot was successfully created, we purposely *do not* auto-navigate or
     // switch the current shot here. This keeps the user in their current

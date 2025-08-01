@@ -25,7 +25,8 @@ import VideoOutputsGallery from "./VideoOutputsGallery";
 import BatchSettingsForm from "./BatchSettingsForm";
 import { LoraModel, LoraSelectorModal } from '@/shared/components/LoraSelectorModal';
 import { ActiveLoRAsDisplay, ActiveLora } from '@/shared/components/ActiveLoRAsDisplay';
-import { useLoraManager } from '@/shared/hooks/useLoraManager';
+import { useLora } from '@/shared/hooks/useLora';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/shared/components/ui/tooltip';
 import { useApiKeys } from '@/shared/hooks/useApiKeys';
 import { cropImageToProjectAspectRatio } from '@/shared/lib/imageCropper';
 import { parseRatio } from '@/shared/lib/aspectRatios';
@@ -138,7 +139,7 @@ export interface ShotEditorProps {
   steerableMotionSettings: SteerableMotionSettings;
   onSteerableMotionSettingsChange: (settings: Partial<SteerableMotionSettings>) => void;
   onGenerateAllSegments: () => void;
-  availableLoras: LoraModel[];
+  availableLoras?: LoraModel[];
 
   generationMode: 'batch' | 'timeline';
   onGenerationModeChange: (mode: 'batch' | 'timeline') => void;
@@ -253,18 +254,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     projectId: selectedProjectId, 
     shotId: selectedShot?.id,
     enabled: !!selectedShot?.id 
-  });
-
-  // Project-level UI settings for defaults and saving
-  const { 
-    settings: projectUISettings,
-    update: updateProjectUISettings
-  } = useToolSettings<{
-    acceleratedMode?: boolean;
-    randomSeed?: boolean;
-  }>('travel-ui-state', { 
-    projectId: selectedProjectId,
-    enabled: !!selectedProjectId 
   });
   
   // Convert timeline positions to Map for component usage
@@ -424,47 +413,23 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const randomSeed = shotUISettings?.randomSeed ?? false;
   const [showStepsNotification, setShowStepsNotification] = useState(false);
   
-  // Jump to appropriate step count when accelerated mode changes (but don't enforce afterward)
-  const prevAcceleratedRef = useRef(accelerated);
+  // Ensure the step count defaults to 8 when accelerated mode is enabled by default
   useEffect(() => {
-    // Only change steps when accelerated mode actually changes, not on every render
-    if (prevAcceleratedRef.current !== accelerated) {
-      prevAcceleratedRef.current = accelerated;
-      
-      if (accelerated) {
-        onBatchVideoStepsChange(8);
-      } else {
-        onBatchVideoStepsChange(20);
-      }
+    if (accelerated && batchVideoSteps !== 8) {
+      onBatchVideoStepsChange(8);
     }
-  }, [accelerated, onBatchVideoStepsChange]);
+  }, [accelerated, batchVideoSteps, onBatchVideoStepsChange]);
   
   const setAccelerated = useCallback((value: boolean) => {
     updateShotUISettings('shot', { acceleratedMode: value });
-    // Also save to project level for new shot defaults
-    if (updateProjectUISettings) {
-      updateProjectUISettings('project', { acceleratedMode: value });
-    }
-  }, [updateShotUISettings, updateProjectUISettings]);
+  }, [updateShotUISettings]);
   
   const setRandomSeed = useCallback((value: boolean) => {
     updateShotUISettings('shot', { randomSeed: value });
-    // Also save to project level for new shot defaults
-    if (updateProjectUISettings) {
-      updateProjectUISettings('project', { randomSeed: value });
-    }
-  }, [updateShotUISettings, updateProjectUISettings]);
+  }, [updateShotUISettings]);
   
-  // LoRA management using the modularized hook with manual Save/Load buttons enabled
-  const loraManager = useLoraManager(availableLoras, {
-    projectId: selectedProjectId,
-    enableProjectPersistence: true, // Enable for Save/Load buttons
-    persistenceKey: 'project-loras', // Standardized key shared across all tools
-    enableTriggerWords: true,
-    onPromptUpdate: onBatchVideoPromptChange,
-    currentPrompt: batchVideoPrompt,
-    disableAutoLoad: true, // Prevent internal auto-loading; ShotEditor handles it
-  });
+  // LoRA management using the new system
+  const lora = useLora('Wan 2.1 14b');
 
 
 
@@ -472,69 +437,44 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const [hasInitializedShot, setHasInitializedShot] = useState<string | null>(null);
   const isLoadingLorasRef = useRef(false);
   
-  // Initialize shot UI settings from project defaults
-  const [hasInitializedUISettings, setHasInitializedUISettings] = useState<string | null>(null);
-  
   // Reset initialization state when shot changes
   useEffect(() => {
     if (selectedShot?.id !== hasInitializedShot) {
       setHasInitializedShot(null);
       isLoadingLorasRef.current = false;
     }
-    if (selectedShot?.id !== hasInitializedUISettings) {
-      setHasInitializedUISettings(null);
-    }
-  }, [selectedShot?.id, hasInitializedShot, hasInitializedUISettings]);
+  }, [selectedShot?.id, hasInitializedShot]);
   
   // Load shot-specific LoRAs when shot changes (only depend on data, not loraManager)
   useEffect(() => {
     // Only run if we have everything we need and haven't initialized this shot yet
     if (!selectedShot?.id || isShotLoraSettingsLoading || hasInitializedShot === selectedShot.id || isLoadingLorasRef.current) {
-      console.log('[LoRA] Skipping initialization for shot:', selectedShot?.id, {
-        noShotId: !selectedShot?.id,
-        settingsLoading: isShotLoraSettingsLoading,
-        alreadyInitialized: hasInitializedShot === selectedShot?.id,
-        isLoadingRef: isLoadingLorasRef.current,
-        availableLorasCount: availableLoras.length
-      });
-      return;
-    }
-    
-    // Also ensure availableLoras are loaded
-    if (!availableLoras || availableLoras.length === 0) {
-      console.log('[LoRA] Waiting for available LoRAs to load for shot:', selectedShot.id);
       return;
     }
     
     isLoadingLorasRef.current = true;
-    console.log('[LoRA] Initializing LoRAs for shot:', selectedShot.id, {
-      shotLoraSettings: shotLoraSettings,
-      projectLoraSettings: projectLoraSettings,
-      availableLorasCount: availableLoras.length
-    });
+    console.log('[LoRA] Initializing LoRAs for shot:', selectedShot.id);
 
     const loadLorasIntoManager = (lorasToLoad: { id: string; strength: number }[], source: string) => {
       console.log(`[LoRA] Loading ${source} LoRAs (${lorasToLoad.length})`);
       
-      // Force clear all LoRAs first using setSelectedLoras for immediate effect
-      if (loraManager.setSelectedLoras) {
-        loraManager.setSelectedLoras([]);
-      }
+      // Force clear all LoRAs first 
+      lora.clearSelection();
 
       // Small delay to allow state update before adding new LoRAs
       setTimeout(() => {
         // Add each LoRA with proper error checking
         lorasToLoad.forEach(savedLora => {
-          const availableLora = availableLoras.find(lora => lora['Model ID'] === savedLora.id);
+          const availableLora = lora.allLoras.find(l => l['Model ID'] === savedLora.id);
           if (availableLora) {
             // Check if it's already added before attempting to add
-            const isAlreadyAdded = loraManager.selectedLoras.some(lora => lora.id === savedLora.id);
+            const isAlreadyAdded = lora.selectedLoras.some(l => l.id === savedLora.id);
             if (!isAlreadyAdded) {
-              loraManager.handleAddLora(availableLora);
+              lora.addLora(availableLora);
               
               // Set strength after adding
               setTimeout(() => {
-                loraManager.handleLoraStrengthChange(savedLora.id, savedLora.strength);
+                lora.updateLoraStrength(savedLora.id, savedLora.strength);
               }, 100); // Longer delay for strength setting
             }
           } else {
@@ -556,9 +496,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         console.log('[LoRA] Shot configured with no LoRAs - keeping empty');
         
         // Clear any existing LoRAs to respect user's choice to have none
-        if (loraManager.setSelectedLoras) {
-          loraManager.setSelectedLoras([]);
-        }
+              lora.clearSelection();
       }
     } 
     // Shot has never been configured - inherit from project if available
@@ -582,47 +520,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     shotLoraSettings?.loras, 
     projectLoraSettings?.loras, 
     hasInitializedShot,
-    updateShotLoraSettings,
-    availableLoras.length // Include availableLoras.length to re-run when LoRAs are loaded
-    // Deliberately NOT including loraManager to prevent re-runs
-  ]);
-
-  // Initialize shot UI settings from project defaults if this is a new shot
-  useEffect(() => {
-    if (!selectedShot?.id || isShotUISettingsLoading || hasInitializedUISettings === selectedShot.id) {
-      return;
-    }
-
-    console.log('[ShotEditor] Initializing UI settings for shot:', selectedShot.id);
-
-    // Check if shot has been configured before (even if empty)
-    const shotHasBeenConfigured = shotUISettings && ('acceleratedMode' in shotUISettings || 'randomSeed' in shotUISettings);
-    
-    if (!shotHasBeenConfigured && projectUISettings) {
-      // Shot has never been configured - inherit from project if available
-      console.log('[ShotEditor] First-time shot UI setup - inheriting from project settings');
-      
-      const uiSettingsToApply: any = {};
-      if (projectUISettings.acceleratedMode !== undefined) {
-        uiSettingsToApply.acceleratedMode = projectUISettings.acceleratedMode;
-      }
-      if (projectUISettings.randomSeed !== undefined) {
-        uiSettingsToApply.randomSeed = projectUISettings.randomSeed;
-      }
-      
-      if (Object.keys(uiSettingsToApply).length > 0) {
-        updateShotUISettings('shot', uiSettingsToApply);
-      }
-    }
-    
-    setHasInitializedUISettings(selectedShot.id);
-  }, [
-    selectedShot?.id, 
-    isShotUISettingsLoading, 
-    shotUISettings, 
-    projectUISettings, 
-    hasInitializedUISettings,
-    updateShotUISettings
+    updateShotLoraSettings
+    // Deliberately NOT including loraManager or availableLoras to prevent re-runs
   ]);
 
   // Save LoRA changes to shot settings whenever they change
@@ -633,16 +532,16 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       return;
     }
 
-    const currentLorasKey = JSON.stringify(loraManager.selectedLoras.map(l => ({ id: l.id, strength: l.strength })));
+    const currentLorasKey = JSON.stringify(lora.selectedLoras.map(l => ({ id: l.id, strength: l.strength })));
     
     // Only save if LoRAs actually changed
     if (currentLorasKey !== prevSelectedLorasRef.current) {
       prevSelectedLorasRef.current = currentLorasKey;
       
-      if (loraManager.selectedLoras.length > 0) {
-        const lorasToSave = loraManager.selectedLoras.map(lora => ({
-          id: lora.id,
-          strength: lora.strength
+      if (lora.selectedLoras.length > 0) {
+        const lorasToSave = lora.selectedLoras.map(l => ({
+          id: l.id,
+          strength: l.strength
         }));
         updateShotLoraSettings('shot', { loras: lorasToSave });
       } else {
@@ -650,7 +549,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       }
     }
   }, [
-    loraManager.selectedLoras, 
+    lora.selectedLoras, 
     selectedShot?.id, 
     hasInitializedShot, 
     isShotLoraSettingsLoading, 
@@ -676,14 +575,21 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const handleAcceleratedChange = useCallback((value: boolean) => {
     setAccelerated(value);
     setShowStepsNotification(false); // Reset notification
-    // Note: Step changes are handled automatically by the useEffect above
-  }, [setAccelerated]);
+    
+    if (value) {
+      // Enable accelerated mode - just set steps to 8
+      onBatchVideoStepsChange(8);
+    } else {
+      // Disable accelerated mode - set steps to 20
+      onBatchVideoStepsChange(20);
+    }
+  }, [setAccelerated, onBatchVideoStepsChange]);
   
   // Handle manual steps change in accelerated mode
   const handleStepsChange = useCallback((steps: number) => {
     onBatchVideoStepsChange(steps);
     
-    // Show notification if manually changing steps in accelerated mode (but allow the change)
+    // Show notification if manually changing steps in accelerated mode
     if (accelerated && steps !== 8) {
       setShowStepsNotification(true);
       // Hide notification after 5 seconds
@@ -1469,8 +1375,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       random_seed: randomSeed,
     };
 
-    if (loraManager.selectedLoras && loraManager.selectedLoras.length > 0) {
-      requestBody.loras = loraManager.selectedLoras.map(l => ({ 
+    if (lora.selectedLoras && lora.selectedLoras.length > 0) {
+      requestBody.loras = lora.selectedLoras.map(l => ({ 
         path: l.path, 
         strength: parseFloat(l.strength?.toString() ?? '0') || 0.0 
       }));
@@ -1614,22 +1520,22 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           const strength: number = parseFloat(l.strength?.toString() || '0') || 0;
 
           // Try to find matching LoRA in availableLoras by matching any file URL or huggingface URL
-          const matching = availableLoras.find(av =>
+                      const matching = lora.allLoras.find(av =>
             av["Model Files"].some((f: any) => f.url === url || f.path === url) ||
             av.huggingface_url === url
           );
 
           if (matching) {
-            loraManager.handleAddLora(matching);
-            // Wait a tick so it's added before updating strength
-            setTimeout(() => loraManager.handleLoraStrengthChange(matching["Model ID"], strength), 0);
+                          lora.addLora(matching);
+              // Wait a tick so it's added before updating strength
+              setTimeout(() => lora.updateLoraStrength(matching["Model ID"], strength), 0);
           } else {
             // Fallback: derive a name from filename and add a minimal LoraModel-like object
             const fileName = url.split('/').pop() || url;
             const baseName = fileName.replace(/\.(safetensors|ckpt|pt)$/i, '');
             // Create unique ID by combining filename with nanoid to prevent duplicates
             const derivedId = `${baseName}_${nanoid(8)}`;
-            loraManager.handleAddLora({
+            lora.addLora({
               "Model ID": derivedId,
               Name: baseName, // Use clean name for display
               Author: 'Imported',
@@ -1638,7 +1544,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
               huggingface_url: url,
               lora_type: 'motion',
             } as any);
-            setTimeout(() => loraManager.handleLoraStrengthChange(derivedId, strength), 0);
+                          setTimeout(() => lora.updateLoraStrength(derivedId, strength), 0);
           }
         });
       }
@@ -2011,7 +1917,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                             onSteerableMotionSettingsChange={onSteerableMotionSettingsChange}
                             projects={projects}
                             selectedProjectId={selectedProjectId}
-                            selectedLoras={loraManager.selectedLoras}
+                            selectedLoras={lora.selectedLoras}
                             availableLoras={availableLoras}
                             isTimelineMode={generationMode === 'timeline'}
                             accelerated={accelerated}
@@ -2027,18 +1933,18 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                             <div className="space-y-4 p-4 border rounded-lg bg-card">
                                 <h3 className="font-semibold text-sm">LoRA Models</h3>
                                 
-                                <Button type="button" variant="outline" className="w-full" onClick={() => loraManager.setIsLoraModalOpen(true)}>
+                                <Button type="button" variant="outline" className="w-full" onClick={() => lora.openLoraModal()}>
                                     Add or Manage LoRAs
                                 </Button>
                                 
                                 <ActiveLoRAsDisplay
-                                    selectedLoras={loraManager.selectedLoras}
-                                    onRemoveLora={loraManager.handleRemoveLora}
-                                    onLoraStrengthChange={loraManager.handleLoraStrengthChange}
+                                    selectedLoras={lora.selectedLoras}
+                                    onRemoveLora={lora.removeLora}
+                                    onLoraStrengthChange={lora.updateLoraStrength}
                                     availableLoras={availableLoras}
                                     className="mt-4"
-                                    onAddTriggerWord={loraManager.handleAddTriggerWord}
-                                    renderHeaderActions={loraManager.renderHeaderActions}
+                                    onAddTriggerWord={lora.addTriggerWord}
+                                    renderHeaderActions={() => null}
                                 />
                             </div>
                         </div>
@@ -2100,17 +2006,17 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       <LoraSelectorModal
         isOpen={loraManager.isLoraModalOpen}
         onClose={() => loraManager.setIsLoraModalOpen(false)}
-        loras={availableLoras}
+        loras={lora.allLoras}
         onAddLora={loraManager.handleAddLora}
         onRemoveLora={loraManager.handleRemoveLora}
         onUpdateLoraStrength={loraManager.handleLoraStrengthChange}
-        selectedLoras={loraManager.selectedLoras.map(lora => {
-          const fullLora = availableLoras.find(l => l['Model ID'] === lora.id);
+        selectedLoras={loraManager.selectedLoras.map(selectedLora => {
+          const fullLora = lora.allLoras.find(l => l['Model ID'] === selectedLora.id);
           return {
             ...fullLora,
-            "Model ID": lora.id,
-            Name: lora.name,
-            strength: lora.strength,
+            "Model ID": selectedLora.id,
+            Name: selectedLora.name,
+            strength: selectedLora.strength,
           } as LoraModel & { strength: number };
         })}
         lora_type="Wan 2.1 14b"

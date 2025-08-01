@@ -352,12 +352,60 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
         }
       }
 
+      // Get settings from the current project to copy to the new project
+      let settingsToInherit = {};
+      if (selectedProjectId) {
+        try {
+          const { data: currentProjectData } = await supabase
+            .from('projects')
+            .select('settings')
+            .eq('id', selectedProjectId)
+            .single();
+          
+          if (currentProjectData?.settings) {
+            // Filter out prompt-related settings while keeping everything else
+            settingsToInherit = {};
+            
+            Object.entries(currentProjectData.settings).forEach(([toolId, toolSettings]) => {
+              if (typeof toolSettings === 'object' && toolSettings !== null) {
+                // Create a copy of tool settings excluding prompts
+                const filteredToolSettings = { ...toolSettings } as any;
+                
+                // Remove prompt-related keys
+                delete filteredToolSettings.promptsByShot;
+                delete filteredToolSettings.batchVideoPrompt;
+                delete filteredToolSettings.prompts;
+                delete filteredToolSettings.beforeEachPromptText;
+                delete filteredToolSettings.afterEachPromptText;
+                delete filteredToolSettings.pairConfigs; // These often contain prompts
+                
+                // Only include the tool settings if there's still something left after filtering
+                if (Object.keys(filteredToolSettings).length > 0) {
+                  settingsToInherit[toolId] = filteredToolSettings;
+                }
+              }
+            });
+            
+            console.log('[ProjectContext] Copying settings from current project to new project (excluding prompts):', {
+              sourceProjectId: selectedProjectId,
+              originalToolCount: Object.keys(currentProjectData.settings).length,
+              filteredToolCount: Object.keys(settingsToInherit).length,
+              settingsKeys: Object.keys(settingsToInherit)
+            });
+          }
+        } catch (settingsError) {
+          console.warn('[ProjectContext] Failed to copy settings from current project:', settingsError);
+          // Continue with project creation even if settings copy fails
+        }
+      }
+
       const { data: newProject, error } = await supabase
         .from('projects')
         .insert({
           name: projectData.name,
           user_id: user.id,
           aspect_ratio: projectData.aspectRatio,
+          settings: settingsToInherit, // Copy settings from current project
         })
         .select()
         .single();
@@ -373,6 +421,10 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
       
       // Save the new project as last opened in user settings
       updateUserPreferences('user', { lastOpenedProjectId: mappedProject.id });
+
+      if (Object.keys(settingsToInherit).length > 0) {
+        toast.success(`Project "${projectData.name}" created with inherited settings!`);
+      }
             
       return mappedProject;
     } catch (err: any) {
@@ -382,7 +434,7 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setIsCreatingProject(false);
     }
-  }, [updateUserPreferences]);
+  }, [updateUserPreferences, selectedProjectId]);
 
   const updateProject = useCallback(async (projectId: string, updates: ProjectUpdate): Promise<boolean> => {
     if (!updates.name?.trim() && !updates.aspectRatio) {

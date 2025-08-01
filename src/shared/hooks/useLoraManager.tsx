@@ -69,6 +69,22 @@ export const useLoraManager = (
 
   // Core state
   const [selectedLoras, setSelectedLoras] = useState<ActiveLora[]>([]);
+  // Deduplicate selectedLoras whenever it changes to prevent duplicate entries, especially
+  // when state is restored from persistence or set externally without using our handlers.
+  useEffect(() => {
+    if (selectedLoras.length > 1) {
+      const uniqueMap = new Map<string, ActiveLora>();
+      selectedLoras.forEach(lora => {
+        if (!uniqueMap.has(lora.id)) {
+          uniqueMap.set(lora.id, lora);
+        }
+      });
+      if (uniqueMap.size !== selectedLoras.length) {
+        // Only update state if duplicates were actually found to avoid extra renders.
+        setSelectedLoras(Array.from(uniqueMap.values()));
+      }
+    }
+  }, [selectedLoras]);
   const [isLoraModalOpen, setIsLoraModalOpen] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveFlash, setSaveFlash] = useState(false);
@@ -103,7 +119,8 @@ export const useLoraManager = (
 
   // Core handlers
   const handleAddLora = useCallback((loraToAdd: any, isManualAction = true) => {
-    if (selectedLoras.find(sl => sl.id === loraToAdd["Model ID"])) {
+    // Use the ref to ensure we are checking against the most up-to-date selection.
+    if (selectedLorasRef.current.find(sl => sl.id === loraToAdd["Model ID"])) {
       const loraName = loraToAdd.Name !== "N/A" ? loraToAdd.Name : loraToAdd["Model ID"];
       toast.error(`"${loraName}" is already added to your selection.`);
       return;
@@ -128,7 +145,7 @@ export const useLoraManager = (
     } else {
       toast.error("Selected LoRA has no model file specified.");
     }
-  }, [selectedLoras]);
+  }, []);
 
   const handleRemoveLora = useCallback((loraIdToRemove: string, isManualAction = true) => {
     const loraToRemove = selectedLoras.find(lora => lora.id === loraIdToRemove);

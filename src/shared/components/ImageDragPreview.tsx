@@ -48,7 +48,7 @@ export const MultiImagePreview: React.FC<MultiImagePreviewProps> = ({ count, ima
           alt={`Image ${image.id}`}
           className="max-w-full max-h-full object-contain rounded-sm"
         />
-        <div className="absolute -top-2 -right-2 bg-blue-500 text-white rounded-full h-6 w-6 flex items-center justify-center text-xs font-bold">
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-orange-500 text-white rounded-full h-8 w-8 flex items-center justify-center text-sm font-bold shadow-lg">
           {count}
         </div>
       </div>

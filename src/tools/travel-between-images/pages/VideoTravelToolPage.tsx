@@ -28,7 +28,7 @@ import { useShotNavigation } from '@/shared/hooks/useShotNavigation';
 import ShotEditor from '../components/ShotEditor';
 
 // Custom hook to parallelize data fetching for better performance
-const useVideoTravelData = (selectedShotId?: string) => {
+const useVideoTravelData = (selectedShotId?: string, projectId?: string) => {
   // Get shots data from context (single source of truth)
   const { shots, isLoading: shotsLoading, error: shotsError, refetchShots } = useShots();
   
@@ -40,6 +40,21 @@ const useVideoTravelData = (selectedShotId?: string) => {
     'travel-between-images',
     { shotId: selectedShotId, enabled: !!selectedShotId }
   );
+
+  // Fetch project-level settings for defaults and saving
+  const projectSettingsQuery = useToolSettings<VideoTravelSettings>(
+    'travel-between-images',
+    { projectId: projectId, enabled: !!projectId }
+  );
+
+  // Fetch project-level UI settings for defaults
+  const projectUISettingsQuery = useToolSettings<{
+    acceleratedMode?: boolean;
+    randomSeed?: boolean;
+  }>('travel-ui-state', { 
+    projectId: projectId, 
+    enabled: !!projectId 
+  });
 
   return {
     // Shots data
@@ -57,6 +72,15 @@ const useVideoTravelData = (selectedShotId?: string) => {
     updateSettings: toolSettingsQuery.update,
     settingsLoading: toolSettingsQuery.isLoading,
     settingsUpdating: toolSettingsQuery.isUpdating,
+
+    // Project settings data
+    projectSettings: projectSettingsQuery.settings,
+    updateProjectSettings: projectSettingsQuery.update,
+    projectSettingsLoading: projectSettingsQuery.isLoading,
+    projectSettingsUpdating: projectSettingsQuery.isUpdating,
+
+    // Project UI settings data
+    projectUISettings: projectUISettingsQuery.settings,
   };
 };
 
@@ -83,8 +107,13 @@ const VideoTravelToolPage: React.FC = () => {
     settings,
     updateSettings,
     settingsLoading: isLoadingSettings,
-    settingsUpdating: isUpdating
-  } = useVideoTravelData(selectedShot?.id);
+    settingsUpdating: isUpdating,
+    projectSettings,
+    updateProjectSettings,
+    projectSettingsLoading,
+    projectSettingsUpdating,
+    projectUISettings
+  } = useVideoTravelData(selectedShot?.id, selectedProjectId);
   
   const createShotMutation = useCreateShot();
   const handleExternalImageDropMutation = useHandleExternalImageDrop();
@@ -289,19 +318,46 @@ const VideoTravelToolPage: React.FC = () => {
       // Reset user interaction flag when loading new settings
       userHasInteracted.current = false;
       
-      setVideoControlMode(settings.videoControlMode || 'batch');
-      setBatchVideoPrompt(settings.batchVideoPrompt || '');
-      setBatchVideoFrames(settings.batchVideoFrames || 60);
-      setBatchVideoContext(settings.batchVideoContext || 10);
-      setBatchVideoSteps(settings.batchVideoSteps || 4);
-      setDimensionSource(settings.dimensionSource || 'firstImage');
-      setCustomWidth(settings.customWidth);
-      setCustomHeight(settings.customHeight);
-      setEnhancePrompt(settings.enhancePrompt || false);
-      setVideoPairConfigs(settings.pairConfigs || []);
-      setGenerationMode(settings.generationMode === 'by-pair' ? 'batch' : (settings.generationMode || 'batch'));
-      setPairConfigs(settings.pairConfigs || []);
-      setSteerableMotionSettings(settings.steerableMotionSettings || {
+      // Check if this shot needs project defaults applied
+      let settingsToApply = settings;
+      if (selectedShot?.id) {
+        const projectDefaultsKey = `apply-project-defaults-${selectedShot.id}`;
+        const storedProjectDefaults = sessionStorage.getItem(projectDefaultsKey);
+        
+        if (storedProjectDefaults) {
+          try {
+            const projectDefaults = JSON.parse(storedProjectDefaults);
+            // Merge project defaults with any existing shot settings, with shot settings taking precedence
+            settingsToApply = { ...projectDefaults, ...settings };
+            
+            // Apply the merged settings to the database
+            setTimeout(() => {
+              updateSettings('shot', settingsToApply);
+              console.log('[VideoTravelToolPage] Applied project defaults to new shot:', selectedShot.id);
+            }, 100);
+            
+            // Clean up the session storage
+            sessionStorage.removeItem(projectDefaultsKey);
+          } catch (error) {
+            console.warn('[VideoTravelToolPage] Failed to parse stored project defaults:', error);
+            settingsToApply = settings;
+          }
+        }
+      }
+      
+      setVideoControlMode(settingsToApply.videoControlMode || 'batch');
+      setBatchVideoPrompt(settingsToApply.batchVideoPrompt || '');
+      setBatchVideoFrames(settingsToApply.batchVideoFrames || 60);
+      setBatchVideoContext(settingsToApply.batchVideoContext || 10);
+      setBatchVideoSteps(settingsToApply.batchVideoSteps || 4);
+      setDimensionSource(settingsToApply.dimensionSource || 'firstImage');
+      setCustomWidth(settingsToApply.customWidth);
+      setCustomHeight(settingsToApply.customHeight);
+      setEnhancePrompt(settingsToApply.enhancePrompt || false);
+      setVideoPairConfigs(settingsToApply.pairConfigs || []);
+      setGenerationMode(settingsToApply.generationMode === 'by-pair' ? 'batch' : (settingsToApply.generationMode || 'batch'));
+      setPairConfigs(settingsToApply.pairConfigs || []);
+      setSteerableMotionSettings(settingsToApply.steerableMotionSettings || {
     negative_prompt: '',
     model_name: 'vace_14B',
     seed: 789,
@@ -317,7 +373,7 @@ const VideoTravelToolPage: React.FC = () => {
     show_input_images: false,
   });
     }
-  }, [settings, isLoadingSettings]);
+  }, [settings, isLoadingSettings, selectedShot?.id, updateSettings]);
 
   // Reset loaded flag when switching shots
   useEffect(() => {
@@ -554,6 +610,17 @@ const VideoTravelToolPage: React.FC = () => {
       setSelectedShot(newShot);
       setCurrentShotId(newShot.id);
       
+      // Mark this shot as needing project defaults applied
+      if (projectSettings || projectUISettings) {
+        const defaultsToApply = {
+          ...(projectSettings || {}),
+          // Include UI settings in a special key that will be handled separately
+          _uiSettings: projectUISettings || {}
+        };
+        // Store the new shot ID to apply defaults when settings load
+        sessionStorage.setItem(`apply-project-defaults-${newShot.id}`, JSON.stringify(defaultsToApply));
+      }
+      
       // Close the modal
       setIsCreateShotModalOpen(false);
     } catch (error) {
@@ -633,7 +700,11 @@ const VideoTravelToolPage: React.FC = () => {
 
         if (!isUpdating && !deepEqual(sanitizeSettings(currentSettings), sanitizeSettings(settings))) {
           lastSavedSettingsRef.current = currentSettings;
+          // Save to both shot and project levels
           updateSettings('shot', currentSettings);
+          if (selectedProjectId && updateProjectSettings) {
+            updateProjectSettings('project', currentSettings);
+          }
         }
       }, 200); // Reduced wait time for better performance
     }
@@ -644,7 +715,7 @@ const VideoTravelToolPage: React.FC = () => {
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [selectedShot?.id, currentSettings, settings, updateSettings, isUpdating]);
+  }, [selectedShot?.id, currentSettings, settings, updateSettings, isUpdating, selectedProjectId, updateProjectSettings]);
 
   // LoRA handlers removed - now managed directly in ShotEditor
   // const handleAddLora = (loraToAdd: LoraModel) => { ... };
