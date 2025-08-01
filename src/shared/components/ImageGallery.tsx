@@ -883,7 +883,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
         )}
 
         {/* Gallery content wrapper with minimum height to prevent layout jump when there are images */}
-        <div className={paginatedImages.length > 0 ? "min-h-[400px] sm:min-h-[500px] lg:min-h-[600px]" : ""}>
+        <div className={paginatedImages.length > 0 && !reducedSpacing ? "min-h-[400px] sm:min-h-[500px] lg:min-h-[600px]" : ""}>
           {images.length > 0 && filteredImages.length === 0 && (filterByToolType || mediaTypeFilter !== 'all' || searchTerm.trim()) && (
             <div className="text-center py-12 mt-8 text-muted-foreground border rounded-lg bg-card shadow-sm">
               <Filter className="mx-auto h-10 w-10 mb-3 opacity-60" />

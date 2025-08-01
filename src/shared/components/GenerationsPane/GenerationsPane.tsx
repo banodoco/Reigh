@@ -12,6 +12,7 @@ import { Skeleton } from '@/shared/components/ui/skeleton';
 import { SkeletonGallery } from '@/shared/components/ui/skeleton-gallery';
 import { ShotFilter } from '@/shared/components/ShotFilter';
 import { useGenerationsPageLogic } from '@/shared/hooks/useGenerationsPageLogic';
+import { useIsMobile } from '@/shared/hooks/use-mobile';
 
 const DEFAULT_PANE_HEIGHT = 350;
 const GENERATIONS_PER_PAGE = 18;
@@ -23,6 +24,8 @@ export const GenerationsPane: React.FC = () => {
   // Check if we're on the generations page
   const isOnGenerationsPage = location.pathname === '/generations';
   
+  const isMobile = useIsMobile();
+
   // Use the generalized logic
   const {
     selectedProjectId,
@@ -54,6 +57,8 @@ export const GenerationsPane: React.FC = () => {
   const {
     isGenerationsPaneLocked,
     setIsGenerationsPaneLocked,
+    isGenerationsPaneOpen,
+    setIsGenerationsPaneOpen,
     generationsPaneHeight,
     isShotsPaneLocked,
     shotsPaneWidth,
@@ -66,6 +71,21 @@ export const GenerationsPane: React.FC = () => {
     isLocked: isGenerationsPaneLocked,
     onToggleLock: () => setIsGenerationsPaneLocked(!isGenerationsPaneLocked),
   });
+
+  // Listen for custom event to open the pane (used on mobile from other components)
+  useEffect(() => {
+    const handleOpenGenerationsPane = () => {
+      openPane();
+    };
+
+    window.addEventListener('openGenerationsPane', handleOpenGenerationsPane);
+    return () => window.removeEventListener('openGenerationsPane', handleOpenGenerationsPane);
+  }, [openPane]);
+
+  // Sync open state with context so Layout can access it
+  useEffect(() => {
+    setIsGenerationsPaneOpen(isOpen);
+  }, [isOpen, setIsGenerationsPaneOpen]);
 
   // Close the pane when navigating to generations page
   useEffect(() => {
@@ -137,15 +157,14 @@ export const GenerationsPane: React.FC = () => {
                   size="sm"
                   whiteText={true}
                   checkboxId="exclude-positioned-generations-pane"
+                  triggerWidth="w-[110px] sm:w-[170px]"
+                  isMobile={isMobile}
                 />
             </div>
             <div className="flex items-center space-x-2">
                 {/* Actions - hide when on generations page */}
                 {!isOnGenerationsPage && (
                   <>
-                    <span className="text-sm text-white">
-                        Page {paginatedData.currentPage} of {paginatedData.totalPages || 1}
-                    </span>
                     <Button variant="outline" size="sm" onClick={handlePrevPage} disabled={page === 1 || isLoading}>
                         <ChevronLeft className="h-4 w-4" />
                     </Button>
@@ -156,7 +175,7 @@ export const GenerationsPane: React.FC = () => {
                 )}
             </div>
         </div>
-        <div className="flex-grow p-3 overflow-y-auto">
+        <div className="flex-grow px-3 pt-3 overflow-y-auto">
             {isLoading && (
                 <SkeletonGallery 
                     count={12}
@@ -180,6 +199,7 @@ export const GenerationsPane: React.FC = () => {
                     columnsPerRow={6}
                     initialMediaTypeFilter="image"
                     initialStarredFilter={false}
+                    reducedSpacing={true}
                 />
             )}
             {paginatedData.items.length === 0 && !isLoading && (

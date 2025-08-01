@@ -19,6 +19,7 @@ interface ShotFilterProps {
   checkboxId?: string;
   size?: 'sm' | 'md';
   whiteText?: boolean;
+  isMobile?: boolean;
 }
 
 export const ShotFilter: React.FC<ShotFilterProps> = ({
@@ -36,6 +37,7 @@ export const ShotFilter: React.FC<ShotFilterProps> = ({
   checkboxId = "exclude-positioned",
   size = 'md',
   whiteText = false,
+  isMobile = false,
 }) => {
   const heightClass = size === 'sm' ? 'h-8' : 'h-10';
   const textSizeClass = size === 'sm' ? 'text-xs' : 'text-sm';
@@ -45,27 +47,34 @@ export const ShotFilter: React.FC<ShotFilterProps> = ({
     ? `${triggerWidth} ${heightClass} ${textSizeClass} bg-zinc-800 border-zinc-700 text-white`
     : `${triggerWidth} ${heightClass} ${textSizeClass}`;
 
+  // Adjust layout for mobile
+  const containerClassName = isMobile 
+    ? "flex flex-col space-y-2" 
+    : className;
+
   return (
-    <div className={className}>
-      {labelText && (
-        <Label className={`${labelSizeClass} font-medium ${whiteText ? 'text-white' : 'text-foreground'}`}>
-          {labelText}
-        </Label>
-      )}
-      
-      <Select value={selectedShotId} onValueChange={onShotChange}>
-        <SelectTrigger className={triggerClassName || defaultTriggerClassName}>
-          <SelectValue placeholder="Filter by shot..." />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All Shots</SelectItem>
-          {shots?.map(shot => (
-            <SelectItem key={shot.id} value={shot.id}>
-              {shot.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+    <div className={containerClassName}>
+      <div className={isMobile ? "flex items-center space-x-3" : "contents"}>
+        {labelText && (
+          <Label className={`${labelSizeClass} font-medium ${whiteText ? 'text-white' : 'text-foreground'}`}>
+            {labelText}
+          </Label>
+        )}
+        
+        <Select value={selectedShotId} onValueChange={onShotChange}>
+          <SelectTrigger className={triggerClassName || defaultTriggerClassName}>
+            <SelectValue placeholder="Filter by shot..." />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Shots</SelectItem>
+            {shots?.map(shot => (
+              <SelectItem key={shot.id} value={shot.id}>
+                {shot.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
       
       {/* Position filter checkbox - only show when a specific shot is selected */}
       {showPositionFilter && selectedShotId !== 'all' && onExcludePositionedChange && (

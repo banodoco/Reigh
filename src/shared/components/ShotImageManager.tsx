@@ -99,8 +99,10 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
       if (currentOrder === parentOrder) {
         console.log('[DragDebug:ShotImageManager] Parent caught up with optimistic order - ending optimistic mode');
         setIsOptimisticUpdate(false);
-        // Parent is now consistent, we can sync
-        setOptimisticOrder(images);
+        // Parent is now consistent, we can sync only if different reference
+        if (optimisticOrder !== images) {
+          setOptimisticOrder(images);
+        }
       } else {
         console.log('[DragDebug:ShotImageManager] Parent still has stale data - keeping optimistic order');
         // Parent still has stale data, keep our optimistic order
@@ -108,9 +110,14 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
       }
     } else {
       console.log('[DragDebug:ShotImageManager] Normal sync from parent props');
-      setOptimisticOrder(images);
+      // Only update if the reference is actually different
+      if (optimisticOrder !== images) {
+        setOptimisticOrder(images);
+      } else {
+        console.log('[DragDebug:ShotImageManager] Skipping sync - same reference');
+      }
     }
-  }, [images, isOptimisticUpdate, optimisticOrder]);
+  }, [images, isOptimisticUpdate]);
 
   // Use optimistic order everywhere instead of the parent `images` prop
   const currentImages = optimisticOrder;

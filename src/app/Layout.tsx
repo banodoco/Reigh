@@ -35,6 +35,7 @@ const Layout: React.FC = () => {
     isShotsPaneLocked, 
     shotsPaneWidth, 
     isGenerationsPaneLocked, 
+    isGenerationsPaneOpen,
     generationsPaneHeight 
   } = usePanes();
   const { header } = useHeaderState();
@@ -121,7 +122,7 @@ const Layout: React.FC = () => {
   const mainContentStyle = {
     marginRight: isTasksPaneLocked ? `${tasksPaneWidth}px` : '0px',
     marginLeft: isShotsPaneLocked ? `${shotsPaneWidth}px` : '0px',
-    paddingBottom: isGenerationsPaneLocked ? `${generationsPaneHeight}px` : '0px',
+    paddingBottom: (isGenerationsPaneLocked || isGenerationsPaneOpen) ? `${generationsPaneHeight}px` : '0px',
     // CSS custom properties for content-responsive behavior
     '--content-width': `${contentWidth}px`,
     '--content-height': `${contentHeight}px`,

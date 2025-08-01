@@ -6,6 +6,8 @@ import { useIsMobile } from '@/shared/hooks/use-mobile';
 interface PanesContextType {
   isGenerationsPaneLocked: boolean;
   setIsGenerationsPaneLocked: (isLocked: boolean) => void;
+  isGenerationsPaneOpen: boolean;
+  setIsGenerationsPaneOpen: (isOpen: boolean) => void;
   generationsPaneHeight: number;
   setGenerationsPaneHeight: (height: number) => void;
 
@@ -34,6 +36,9 @@ export const PanesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   // Local state for lock status (source of truth for UI)
   const [locks, setLocks] = useState(paneLocks);
+
+  // Pane open states (not persisted, runtime only)
+  const [isGenerationsPaneOpenState, setIsGenerationsPaneOpenState] = useState(false);
 
   // Pane dimensions (not persisted)
   const [generationsPaneHeight, setGenerationsPaneHeightState] = useState(350);
@@ -118,6 +123,11 @@ export const PanesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     });
   }, [savePaneLocks, isMobile]);
 
+  // Open state setters
+  const setIsGenerationsPaneOpen = useCallback((isOpen: boolean) => {
+    setIsGenerationsPaneOpenState(isOpen);
+  }, []);
+
   // Dimension setters
   const setGenerationsPaneHeight = useCallback((height: number) => {
     setGenerationsPaneHeightState(height);
@@ -136,6 +146,8 @@ export const PanesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       // On mobile, always return false for locks
       isGenerationsPaneLocked: isMobile ? false : locks.gens,
       setIsGenerationsPaneLocked,
+      isGenerationsPaneOpen: isGenerationsPaneOpenState,
+      setIsGenerationsPaneOpen,
       generationsPaneHeight,
       setGenerationsPaneHeight,
       isShotsPaneLocked: isMobile ? false : locks.shots,
@@ -155,6 +167,8 @@ export const PanesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       setIsGenerationsPaneLocked,
       setIsShotsPaneLocked,
       setIsTasksPaneLocked,
+      isGenerationsPaneOpenState,
+      setIsGenerationsPaneOpen,
       generationsPaneHeight,
       setGenerationsPaneHeight,
       shotsPaneWidth,

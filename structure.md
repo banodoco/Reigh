@@ -47,6 +47,7 @@
 | **Tool: Edit Travel** | [tool_edit_travel.md](structure_detail/tool_edit_travel.md) | Text-guided image transformations |
 | **Tool: Training Data** | [tool_training_data_helper.md](structure_detail/tool_training_data_helper.md) | Training video upload & segmentation |
 | **Debug Logging** | [debug_logging.md](structure_detail/debug_logging.md) | PerfDebug log helpers & profiling |
+| **Component Modularization** | [component_modularization.md](structure_detail/component_modularization.md) | Guide for breaking down large components into maintainable modules |
 | **Railway Deployment** | [DEPLOY_RAILWAY.md](DEPLOY_RAILWAY.md) | Complete Railway.com deployment guide |
 
 This document is meant to serve as a comprehensive view of Reigh's architecture. 

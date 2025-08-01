@@ -1,0 +1,206 @@
+import { useEffect, useRef, useState, useCallback } from 'react';
+import { LoraModel } from '@/shared/components/LoraSelectorModal';
+import { useLoraManager } from '@/shared/hooks/useLoraManager';
+import { useToolSettings } from '@/shared/hooks/useToolSettings';
+import { Shot } from "@/types/shots";
+
+interface UseLoRaSyncProps {
+  selectedShot: Shot | undefined;
+  projectId: string | undefined;
+  availableLoras: LoraModel[];
+  batchVideoPrompt: string;
+  onBatchVideoPromptChange: (prompt: string) => void;
+}
+
+export const useLoraSync = ({
+  selectedShot,
+  projectId,
+  availableLoras,
+  batchVideoPrompt,
+  onBatchVideoPromptChange,
+}: UseLoRaSyncProps) => {
+  // Shot-level LoRA settings
+  const { 
+    settings: shotLoraSettings, 
+    update: updateShotLoraSettings,
+    isLoading: isShotLoraSettingsLoading 
+  } = useToolSettings<{
+    loras?: { id: string; strength: number }[];
+  }>('travel-loras', { 
+    projectId, 
+    shotId: selectedShot?.id,
+    enabled: !!selectedShot?.id 
+  });
+
+  // Project-level LoRA settings for initial fallback (standardized key shared across all tools)
+  const { 
+    settings: projectLoraSettings 
+  } = useToolSettings<{
+    loras?: { id: string; strength: number }[];
+  }>('project-loras', { 
+    projectId,
+    enabled: !!projectId 
+  });
+
+  // LoRA management using the modularized hook with manual Save/Load buttons enabled
+  const loraManager = useLoraManager(availableLoras, {
+    projectId,
+    enableProjectPersistence: true, // Enable for Save/Load buttons
+    persistenceKey: 'project-loras', // Standardized key shared across all tools
+    enableTriggerWords: true,
+    onPromptUpdate: onBatchVideoPromptChange,
+    currentPrompt: batchVideoPrompt,
+    disableAutoLoad: true, // Prevent internal auto-loading; ShotEditor handles it
+  });
+
+  // Initialize shot LoRAs from database settings
+  const [hasInitializedShot, setHasInitializedShot] = useState<string | null>(null);
+  const isLoadingLorasRef = useRef(false);
+
+  // Reset initialization state when shot changes
+  useEffect(() => {
+    if (selectedShot?.id !== hasInitializedShot) {
+      setHasInitializedShot(null);
+      isLoadingLorasRef.current = false;
+    }
+  }, [selectedShot?.id, hasInitializedShot]);
+
+  // Load shot-specific LoRAs when shot changes (only depend on data, not loraManager)
+  useEffect(() => {
+    // Only run if we have everything we need and haven't initialized this shot yet
+    if (!selectedShot?.id || isShotLoraSettingsLoading || hasInitializedShot === selectedShot.id || isLoadingLorasRef.current) {
+      console.log('[LoRA] Skipping initialization for shot:', selectedShot?.id, {
+        noShotId: !selectedShot?.id,
+        settingsLoading: isShotLoraSettingsLoading,
+        alreadyInitialized: hasInitializedShot === selectedShot?.id,
+        isLoadingRef: isLoadingLorasRef.current,
+        availableLorasCount: availableLoras.length
+      });
+      return;
+    }
+    
+    // Also ensure availableLoras are loaded
+    if (!availableLoras || availableLoras.length === 0) {
+      console.log('[LoRA] Waiting for available LoRAs to load for shot:', selectedShot.id);
+      return;
+    }
+    
+    isLoadingLorasRef.current = true;
+    console.log('[LoRA] Initializing LoRAs for shot:', selectedShot.id, {
+      shotLoraSettings: shotLoraSettings,
+      projectLoraSettings: projectLoraSettings,
+      availableLorasCount: availableLoras.length
+    });
+
+    const loadLorasIntoManager = (lorasToLoad: { id: string; strength: number }[], source: string) => {
+      console.log(`[LoRA] Loading ${source} LoRAs (${lorasToLoad.length})`);
+      
+      // Force clear all LoRAs first using setSelectedLoras for immediate effect
+      if (loraManager.setSelectedLoras) {
+        loraManager.setSelectedLoras([]);
+      }
+
+      // Small delay to allow state update before adding new LoRAs
+      setTimeout(() => {
+        // Add each LoRA with proper error checking
+        lorasToLoad.forEach(savedLora => {
+          const availableLora = availableLoras.find(lora => lora['Model ID'] === savedLora.id);
+          if (availableLora) {
+            // Check if it's already added before attempting to add
+            const isAlreadyAdded = loraManager.selectedLoras.some(lora => lora.id === savedLora.id);
+            if (!isAlreadyAdded) {
+              loraManager.handleAddLora(availableLora);
+              
+              // Set strength after adding
+              setTimeout(() => {
+                loraManager.handleLoraStrengthChange(savedLora.id, savedLora.strength);
+              }, 100); // Longer delay for strength setting
+            }
+          } else {
+            console.warn(`[LoRA] LoRA ${savedLora.id} not found in available LoRAs`);
+          }
+        });
+      }, 100); // Allow state clearing to complete before adding
+    };
+
+    // Check if shot has been configured before (even if empty)
+    const shotHasBeenConfigured = shotLoraSettings && 'loras' in shotLoraSettings;
+    
+    if (shotHasBeenConfigured) {
+      // Shot has been configured - respect the saved settings (even if empty)
+      if (shotLoraSettings.loras && shotLoraSettings.loras.length > 0) {
+        console.log('[LoRA] Loading existing shot LoRAs');
+        loadLorasIntoManager(shotLoraSettings.loras, 'shot');
+      } else {
+        console.log('[LoRA] Shot configured with no LoRAs - keeping empty');
+        
+        // Clear any existing LoRAs to respect user's choice to have none
+        if (loraManager.setSelectedLoras) {
+          loraManager.setSelectedLoras([]);
+        }
+      }
+    } 
+    // Shot has never been configured - inherit from project if available
+    else if (projectLoraSettings?.loras?.length > 0) {
+      console.log('[LoRA] First-time shot setup - inheriting from project settings');
+      
+      // Save project LoRAs as shot LoRAs for first-time setup
+      updateShotLoraSettings('shot', { loras: projectLoraSettings.loras });
+      
+      // Load them into the manager
+      loadLorasIntoManager(projectLoraSettings.loras, 'project (inherited)');
+    } else {
+      console.log('[LoRA] No LoRAs to load for this shot');
+    }
+    
+    setHasInitializedShot(selectedShot.id);
+    isLoadingLorasRef.current = false;
+  }, [
+    selectedShot?.id, 
+    isShotLoraSettingsLoading, 
+    shotLoraSettings?.loras, 
+    projectLoraSettings?.loras, 
+    hasInitializedShot,
+    updateShotLoraSettings,
+    availableLoras.length // Include availableLoras.length to re-run when LoRAs are loaded
+    // Deliberately NOT including loraManager to prevent re-runs
+  ]);
+
+  // Save LoRA changes to shot settings whenever they change
+  const prevSelectedLorasRef = useRef<string>('');
+  useEffect(() => {
+    // Skip if settings are still loading or shot not ready
+    if (isShotLoraSettingsLoading || !selectedShot?.id || hasInitializedShot !== selectedShot.id) {
+      return;
+    }
+
+    const currentLorasKey = JSON.stringify(loraManager.selectedLoras.map(l => ({ id: l.id, strength: l.strength })));
+    
+    // Only save if LoRAs actually changed
+    if (currentLorasKey !== prevSelectedLorasRef.current) {
+      prevSelectedLorasRef.current = currentLorasKey;
+      
+      if (loraManager.selectedLoras.length > 0) {
+        const lorasToSave = loraManager.selectedLoras.map(lora => ({
+          id: lora.id,
+          strength: lora.strength
+        }));
+        updateShotLoraSettings('shot', { loras: lorasToSave });
+      } else {
+        updateShotLoraSettings('shot', { loras: [] });
+      }
+    }
+  }, [
+    loraManager.selectedLoras, 
+    selectedShot?.id, 
+    hasInitializedShot, 
+    isShotLoraSettingsLoading, 
+    updateShotLoraSettings
+  ]);
+
+  return {
+    loraManager,
+    isShotLoraSettingsLoading,
+    hasInitializedShot,
+  };
+}; 

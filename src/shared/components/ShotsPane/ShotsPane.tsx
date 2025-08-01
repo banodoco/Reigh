@@ -9,7 +9,7 @@ import { cn } from '@/shared/lib/utils';
 import { useToolSettings } from '@/shared/hooks/useToolSettings';
 import { VideoTravelSettings } from '@/tools/travel-between-images/settings';
 import { Button } from '@/shared/components/ui/button';
-import { ArrowRightIcon } from 'lucide-react';
+import { ArrowRightIcon, ArrowUpDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { usePanes } from '@/shared/contexts/PanesContext';
 import CreateShotModal from '@/shared/components/CreateShotModal';
@@ -43,9 +43,25 @@ export const ShotsPane: React.FC = () => {
     enabled: !!selectedProjectId 
   });
 
+  // Fetch and manage shots pane UI settings with sort order
+  const { settings: shotsPaneSettings, update: updateShotsPaneSettings } = useToolSettings<{
+    sortOrder?: 'oldest' | 'newest';
+  }>('shots-pane-ui-state', { 
+    projectId: selectedProjectId, 
+    enabled: !!selectedProjectId 
+  });
+
+  // Get sort order from settings, default to 'oldest'
+  const sortOrder = shotsPaneSettings?.sortOrder || 'oldest';
+
+  const handleSortOrderChange = (newSortOrder: 'oldest' | 'newest') => {
+    if (!selectedProjectId) return;
+    updateShotsPaneSettings('project', { sortOrder: newSortOrder });
+  };
+
   useRenderLogger('ShotsPane', { shotsCount: shots?.length, currentPage });
   
-  // Filter shots to only include images with positions (similar to ShotEditor.tsx approach)
+  // Filter and sort shots
   const filteredShots = useMemo(() => {
     if (!shots) {
       return [];
@@ -72,8 +88,18 @@ export const ShotsPane: React.FC = () => {
       };
     });
     
-    return filtered;
-  }, [shots]);
+    // Sort shots by creation date
+    return filtered.sort((a, b) => {
+      const dateA = new Date(a.created_at || 0).getTime();
+      const dateB = new Date(b.created_at || 0).getTime();
+      
+      if (sortOrder === 'oldest') {
+        return dateA - dateB; // Oldest first
+      } else {
+        return dateB - dateA; // Newest first
+      }
+    });
+  }, [shots, sortOrder]);
   
   // Adjust currentPage if shots length changes (e.g., after create/delete)
   useEffect(() => {
@@ -92,6 +118,7 @@ export const ShotsPane: React.FC = () => {
 
   const {
     isGenerationsPaneLocked,
+    isGenerationsPaneOpen,
     generationsPaneHeight,
     isShotsPaneLocked,
     setIsShotsPaneLocked,
@@ -152,7 +179,7 @@ export const ShotsPane: React.FC = () => {
     // navigate('/tools/travel-between-images', { state: { fromShotClick: true } });
   };
 
-  const bottomOffset = isGenerationsPaneLocked ? generationsPaneHeight : 0;
+  const bottomOffset = (isGenerationsPaneLocked || isGenerationsPaneOpen) ? generationsPaneHeight : 0;
 
   return (
     <>
@@ -163,7 +190,7 @@ export const ShotsPane: React.FC = () => {
         toggleLock={toggleLock}
         openPane={openPane}
         paneDimension={shotsPaneWidth}
-        bottomOffset={isGenerationsPaneLocked ? generationsPaneHeight : 0}
+        bottomOffset={(isGenerationsPaneLocked || isGenerationsPaneOpen) ? generationsPaneHeight : 0}
         handlePaneEnter={handlePaneEnter}
         handlePaneLeave={handlePaneLeave}
         thirdButton={{
@@ -194,7 +221,17 @@ export const ShotsPane: React.FC = () => {
         >
           <div className="p-2 border-b border-zinc-800 flex items-center justify-between flex-shrink-0">
             <h2 className="text-xl font-semibold text-zinc-200 ml-2">Shots</h2>
-            <div className="flex items-center">
+            <div className="flex items-center gap-2">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="text-zinc-400 hover:text-zinc-100 hover:bg-zinc-700/50 active:bg-zinc-600/60"
+                onClick={() => handleSortOrderChange(sortOrder === 'oldest' ? 'newest' : 'oldest')}
+                title={`Currently showing ${sortOrder} first. Click to show ${sortOrder === 'oldest' ? 'newest' : 'oldest'} first.`}
+              >
+                <ArrowUpDown className="h-4 w-4" />
+                {sortOrder === 'oldest' ? 'Oldest' : 'Newest'}
+              </Button>
               <Button 
                 variant="ghost" 
                 size="sm" 

@@ -138,6 +138,7 @@ export const TasksPane: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
   const queryClient = useQueryClient();
   const {
     isGenerationsPaneLocked,
+    isGenerationsPaneOpen,
     generationsPaneHeight,
     isTasksPaneLocked,
     setIsTasksPaneLocked,
@@ -269,7 +270,7 @@ export const TasksPane: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
     onToggleLock: () => setIsTasksPaneLocked(!isTasksPaneLocked),
   });
 
-  const bottomOffset = isGenerationsPaneLocked ? generationsPaneHeight : 0;
+  const bottomOffset = (isGenerationsPaneLocked || isGenerationsPaneOpen) ? generationsPaneHeight : 0;
 
   // Calculate pagination info using display data to avoid flickering
   const totalTasks = displayPaginatedData?.total || 0;
@@ -284,7 +285,7 @@ export const TasksPane: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
         toggleLock={toggleLock}
         openPane={openPane}
         paneDimension={tasksPaneWidth}
-        bottomOffset={isGenerationsPaneLocked ? generationsPaneHeight : 0}
+        bottomOffset={(isGenerationsPaneLocked || isGenerationsPaneOpen) ? generationsPaneHeight : 0}
         handlePaneEnter={handlePaneEnter}
         handlePaneLeave={handlePaneLeave}
         thirdButton={{

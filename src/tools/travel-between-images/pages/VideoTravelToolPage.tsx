@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, Suspense, useMemo, useLayoutEffect } from 'react';
+import React, { useState, useEffect, useRef, Suspense, useMemo, useLayoutEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { SteerableMotionSettings } from '../components/ShotEditor';
 import { useCreateShot, useHandleExternalImageDrop, useUpdateShotName } from '@/shared/hooks/useShots';
@@ -118,6 +118,75 @@ const VideoTravelToolPage: React.FC = () => {
   const createShotMutation = useCreateShot();
   const handleExternalImageDropMutation = useHandleExternalImageDrop();
   const updateShotNameMutation = useUpdateShotName();
+
+  // Memoized callbacks to prevent infinite re-renders
+  const noOpCallback = useCallback(() => {}, []);
+  
+  const handleVideoControlModeChange = useCallback((mode: 'individual' | 'batch') => {
+    if (isLoadingSettings) return;
+    userHasInteracted.current = true;
+    setVideoControlMode(mode);
+  }, [isLoadingSettings]);
+
+  const handlePairConfigChange = useCallback((pairId: string, field: 'prompt' | 'frames' | 'context', value: string | number) => {
+    if (isLoadingSettings) return;
+    userHasInteracted.current = true;
+    setVideoPairConfigs(prev => prev.map(p => p.id === pairId ? { ...p, [field]: value } : p));
+  }, [isLoadingSettings]);
+
+  const handleBatchVideoPromptChange = useCallback((prompt: string) => {
+    if (isLoadingSettings) return;
+    userHasInteracted.current = true;
+    setBatchVideoPrompt(prompt);
+  }, [isLoadingSettings]);
+
+  const handleBatchVideoFramesChange = useCallback((frames: number) => {
+    if (isLoadingSettings) return;
+    userHasInteracted.current = true;
+    setBatchVideoFrames(frames);
+  }, [isLoadingSettings]);
+
+  const handleBatchVideoContextChange = useCallback((context: number) => {
+    if (isLoadingSettings) return;
+    userHasInteracted.current = true;
+    setBatchVideoContext(context);
+  }, [isLoadingSettings]);
+
+  const handleBatchVideoStepsChange = useCallback((steps: number) => {
+    if (isLoadingSettings) return;
+    userHasInteracted.current = true;
+    setBatchVideoSteps(steps);
+  }, [isLoadingSettings]);
+
+  const handleDimensionSourceChange = useCallback((source: 'project' | 'firstImage' | 'custom') => {
+    if (isLoadingSettings) return;
+    userHasInteracted.current = true;
+    setDimensionSource(source);
+  }, [isLoadingSettings]);
+
+  const handleCustomWidthChange = useCallback((width?: number) => {
+    if (isLoadingSettings) return;
+    userHasInteracted.current = true;
+    setCustomWidth(width);
+  }, [isLoadingSettings]);
+
+  const handleCustomHeightChange = useCallback((height?: number) => {
+    if (isLoadingSettings) return;
+    userHasInteracted.current = true;
+    setCustomHeight(height);
+  }, [isLoadingSettings]);
+
+  const handleEnhancePromptChange = useCallback((enhance: boolean) => {
+    if (isLoadingSettings) return;
+    userHasInteracted.current = true;
+    setEnhancePrompt(enhance);
+  }, [isLoadingSettings]);
+
+  const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
+    if (isLoadingSettings) return;
+    userHasInteracted.current = true;
+    setGenerationMode(mode);
+  }, [isLoadingSettings]);
   const [isCreateShotModalOpen, setIsCreateShotModalOpen] = useState(false);
   const queryClient = useQueryClient();
   // const { lastAffectedShotId, setLastAffectedShotId } = useLastAffectedShot(); // Keep for later if needed
@@ -797,46 +866,19 @@ const VideoTravelToolPage: React.FC = () => {
               batchVideoContext={isLoadingSettings ? 10 : batchVideoContext}
               onShotImagesUpdate={handleShotImagesUpdate}
               onBack={handleBackToShotList}
-              onVideoControlModeChange={isLoadingSettings ? () => {} : (mode) => {
-                userHasInteracted.current = true;
-                setVideoControlMode(mode);
-              }}
-              onPairConfigChange={isLoadingSettings ? () => {} : (pairId, field, value) => {
-                userHasInteracted.current = true;
-                setVideoPairConfigs(prev => prev.map(p => p.id === pairId ? { ...p, [field]: value } : p));
-              }}
-              onBatchVideoPromptChange={isLoadingSettings ? () => {} : (prompt) => {
-                userHasInteracted.current = true;
-                setBatchVideoPrompt(prompt);
-              }}
-              onBatchVideoFramesChange={isLoadingSettings ? () => {} : (frames) => {
-                userHasInteracted.current = true;
-                setBatchVideoFrames(frames);
-              }}
-              onBatchVideoContextChange={isLoadingSettings ? () => {} : (context) => {
-                userHasInteracted.current = true;
-                setBatchVideoContext(context);
-              }}
+              onVideoControlModeChange={handleVideoControlModeChange}
+              onPairConfigChange={handlePairConfigChange}
+              onBatchVideoPromptChange={handleBatchVideoPromptChange}
+              onBatchVideoFramesChange={handleBatchVideoFramesChange}
+              onBatchVideoContextChange={handleBatchVideoContextChange}
               batchVideoSteps={isLoadingSettings ? 4 : batchVideoSteps}
-              onBatchVideoStepsChange={isLoadingSettings ? () => {} : (steps) => {
-                userHasInteracted.current = true;
-                setBatchVideoSteps(steps);
-              }}
+              onBatchVideoStepsChange={handleBatchVideoStepsChange}
               dimensionSource={isLoadingSettings ? 'firstImage' : dimensionSource}
-              onDimensionSourceChange={isLoadingSettings ? () => {} : (source) => {
-                userHasInteracted.current = true;
-                setDimensionSource(source);
-              }}
+              onDimensionSourceChange={handleDimensionSourceChange}
               customWidth={isLoadingSettings ? undefined : customWidth}
-              onCustomWidthChange={isLoadingSettings ? () => {} : (width) => {
-                userHasInteracted.current = true;
-                setCustomWidth(width);
-              }}
+              onCustomWidthChange={handleCustomWidthChange}
               customHeight={isLoadingSettings ? undefined : customHeight}
-              onCustomHeightChange={isLoadingSettings ? () => {} : (height) => {
-                userHasInteracted.current = true;
-                setCustomHeight(height);
-              }}
+              onCustomHeightChange={handleCustomHeightChange}
               steerableMotionSettings={isLoadingSettings ? {
                 negative_prompt: '',
                 model_name: 'vace_14B',
@@ -852,20 +894,14 @@ const VideoTravelToolPage: React.FC = () => {
                 after_first_post_generation_brightness: 0,
                 show_input_images: false,
               } : steerableMotionSettings}
-              onSteerableMotionSettingsChange={isLoadingSettings ? () => {} : handleSteerableMotionSettingsChange}
-              onGenerateAllSegments={() => {}}
+              onSteerableMotionSettingsChange={isLoadingSettings ? noOpCallback : handleSteerableMotionSettingsChange}
+              onGenerateAllSegments={noOpCallback}
               // LoRA props removed - now managed internally by ShotEditor
               availableLoras={availableLoras}
               enhancePrompt={isLoadingSettings ? false : enhancePrompt}
-              onEnhancePromptChange={isLoadingSettings ? () => {} : (enhance) => {
-                userHasInteracted.current = true;
-                setEnhancePrompt(enhance);
-              }}
+              onEnhancePromptChange={handleEnhancePromptChange}
               generationMode={isLoadingSettings ? 'batch' : generationMode}
-              onGenerationModeChange={isLoadingSettings ? () => {} : (mode) => {
-                userHasInteracted.current = true;
-                setGenerationMode(mode);
-              }}
+              onGenerationModeChange={handleGenerationModeChange}
 
               onPreviousShot={handlePreviousShot}
               onNextShot={handleNextShot}
