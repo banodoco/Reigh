@@ -10,6 +10,7 @@ import { PlusCircle, Settings, Palette, Sparkles, Crown, Star, Gem, Wrench, Chev
 import { cn } from '@/shared/lib/utils';
 import { ProjectSettingsModal } from '@/shared/components/ProjectSettingsModal';
 import { toast } from "sonner";
+import { useProjectContextDebug } from '@/shared/hooks/useProjectContextDebug';
 
 interface GlobalHeaderProps {
   contentOffsetRight?: number;
@@ -20,6 +21,9 @@ interface GlobalHeaderProps {
 export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight = 0, contentOffsetLeft = 0, onOpenSettings }) => {
   const { projects, selectedProjectId, setSelectedProjectId, isLoadingProjects } = useProject();
   const navigate = useNavigate();
+
+  // [MobileStallFix] Enable debug monitoring
+  useProjectContextDebug();
 
   // Track authentication state to conditionally change the logo destination
   const [session, setSession] = useState<Session | null>(null);
@@ -39,6 +43,23 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
   }, []);
   const [isCreateProjectModalOpen, setIsCreateProjectModalOpen] = useState(false);
   const [isProjectSettingsModalOpen, setIsProjectSettingsModalOpen] = useState(false);
+
+  // [MobileStallFix] Add mobile-specific debug logging for stalling detection
+  useEffect(() => {
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    if (isMobile) {
+      console.log(`[GlobalHeader:MobileDebug] State - loading: ${isLoadingProjects}, projects: ${projects.length}, selected: ${selectedProjectId}`);
+      
+      // Check for stall condition
+      if (isLoadingProjects && projects.length === 0) {
+        console.log(`[GlobalHeader:MobileDebug] Mobile showing skeleton/loading state`);
+      } else if (!isLoadingProjects && projects.length === 0) {
+        console.warn(`[GlobalHeader:MobileDebug] Mobile showing 'no projects' - potential stall!`);
+      } else if (projects.length > 0 && !selectedProjectId) {
+        console.warn(`[GlobalHeader:MobileDebug] Mobile has projects but no selection - potential issue!`);
+      }
+    }
+  }, [isLoadingProjects, projects.length, selectedProjectId]);
 
   const handleProjectChange = (projectId: string) => {
     if (projectId === 'create-new') {

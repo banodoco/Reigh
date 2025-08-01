@@ -87,18 +87,51 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
   const [isLoadingPreferences, setIsLoadingPreferences] = useState(false);
   const userPreferencesRef = useRef<UserPreferences | undefined>(undefined);
 
+  // [MobileStallFix] Add mobile detection and recovery state
+  const isMobileRef = useRef(/iPhone|iPad|iPod|Android/i.test(navigator.userAgent));
+  const preferencesTimeoutRef = useRef<NodeJS.Timeout>();
+  const projectsTimeoutRef = useRef<NodeJS.Timeout>();
+
   // Prefetch all tool settings for the currently selected project so that
   // tool pages hydrate instantly without an extra round-trip.
   usePrefetchToolSettings(selectedProjectId);
 
-  // Set up auth state tracking
+  // [MobileStallFix] Cleanup all timeouts on unmount
   useEffect(() => {
+    return () => {
+      if (preferencesTimeoutRef.current) {
+        clearTimeout(preferencesTimeoutRef.current);
+      }
+      if (projectsTimeoutRef.current) {
+        clearTimeout(projectsTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // [MobileStallFix] Enhanced auth state tracking with mobile recovery
+  useEffect(() => {
+    let authStateChangeCount = 0;
+    
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log(`[ProjectContext:MobileDebug] Initial session:`, !!session?.user?.id);
       setUserId(session?.user?.id);
     });
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+      authStateChangeCount++;
+      console.log(`[ProjectContext:MobileDebug] Auth change #${authStateChangeCount}:`, event, !!session?.user?.id);
+      
       setUserId(session?.user?.id);
+      
+      // [MobileStallFix] Reset preferences loading state on auth logout/signin
+      if (event === 'SIGNED_OUT' || event === 'SIGNED_IN') {
+        console.log(`[ProjectContext:MobileDebug] Resetting preferences loading state due to ${event}`);
+        setIsLoadingPreferences(false);
+        if (preferencesTimeoutRef.current) {
+          clearTimeout(preferencesTimeoutRef.current);
+          preferencesTimeoutRef.current = undefined;
+        }
+      }
     });
 
     return () => {
@@ -106,11 +139,25 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
 
-  // Fetch user preferences (direct Supabase query)
+  // [MobileStallFix] Enhanced preferences fetching with timeout and recovery
   const fetchUserPreferences = useCallback(async () => {
     if (!userId) return;
 
+    console.log(`[ProjectContext:MobileDebug] Starting preferences fetch for user: ${userId}`);
     setIsLoadingPreferences(true);
+
+    // [MobileStallFix] Set a safety timeout for mobile networks
+    if (preferencesTimeoutRef.current) {
+      clearTimeout(preferencesTimeoutRef.current);
+    }
+    
+    preferencesTimeoutRef.current = setTimeout(() => {
+      console.warn(`[ProjectContext:MobileDebug] Preferences fetch timeout, forcing recovery`);
+      setIsLoadingPreferences(false);
+      setUserPreferences({});
+      userPreferencesRef.current = {};
+    }, isMobileRef.current ? 10000 : 5000); // Longer timeout for mobile
+
     try {
       // Read the settings JSON for the current user
       const { data, error } = await supabase
@@ -122,12 +169,21 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
       if (error) throw error;
 
       const preferences = (data?.settings as any)?.['user-preferences'] ?? {};
+      console.log(`[ProjectContext:MobileDebug] Preferences loaded successfully`);
       setUserPreferences(preferences);
       userPreferencesRef.current = preferences;
     } catch (error) {
       console.error('[ProjectContext] Failed to fetch user preferences:', error);
+      // [MobileStallFix] Set empty preferences on error instead of leaving undefined
+      setUserPreferences({});
+      userPreferencesRef.current = {};
     } finally {
+      if (preferencesTimeoutRef.current) {
+        clearTimeout(preferencesTimeoutRef.current);
+        preferencesTimeoutRef.current = undefined;
+      }
       setIsLoadingPreferences(false);
+      console.log(`[ProjectContext:MobileDebug] Preferences loading completed`);
     }
   }, [userId]);
 
@@ -167,17 +223,25 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [userId]);
 
-  // Fetch preferences when userId changes
+  // [MobileStallFix] Enhanced preferences effect with proper cleanup
   useEffect(() => {
     if (userId) {
       fetchUserPreferences();
     } else {
+      console.log(`[ProjectContext:MobileDebug] No userId, clearing preferences state`);
       setUserPreferences(undefined);
       userPreferencesRef.current = undefined;
+      // [MobileStallFix] Critical fix: Reset loading state when no user
+      setIsLoadingPreferences(false);
+      if (preferencesTimeoutRef.current) {
+        clearTimeout(preferencesTimeoutRef.current);
+        preferencesTimeoutRef.current = undefined;
+      }
     }
   }, [userId, fetchUserPreferences]);
 
   const fetchProjects = useCallback(async () => {
+    console.log(`[ProjectContext:MobileDebug] Starting projects fetch`);
     try {
       // Get current user
       const { data: { user } } = await supabase.auth.getUser();
@@ -246,6 +310,7 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
           updateUserPreferences('user', { lastOpenedProjectId: projectIdToSelect });
         }
       }
+      console.log(`[ProjectContext:MobileDebug] Projects loaded successfully`);
     } catch (error: any) {
       console.error('[ProjectContext] Error fetching projects via API:', error);
       toast.error(`Failed to load projects: ${error.message}`);
@@ -401,16 +466,52 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [updateUserPreferences]);
 
+  // [MobileStallFix] Enhanced project loading with fallback recovery
   useEffect(() => {
+    console.log(`[ProjectContext:MobileDebug] Project loading check - userId: ${!!userId}, isLoadingPreferences: ${isLoadingPreferences}`);
+    
     // Wait for auth and user preferences to be ready before fetching projects
     if (userId && !isLoadingPreferences) {
+      console.log(`[ProjectContext:MobileDebug] Starting project fetch with 100ms delay`);
       const timer = setTimeout(() => {
         fetchProjects();
       }, 100); // Small delay to ensure everything is ready
+
+      // [MobileStallFix] Set a fallback timeout for projects loading
+      if (projectsTimeoutRef.current) {
+        clearTimeout(projectsTimeoutRef.current);
+      }
+
+      projectsTimeoutRef.current = setTimeout(() => {
+        console.warn(`[ProjectContext:MobileDebug] Projects fetch timeout, forcing recovery attempt`);
+        if (isLoadingProjects) {
+          // Force retry the fetch without waiting for preferences
+          console.log(`[ProjectContext:MobileDebug] Forcing projects fetch retry`);
+          fetchProjects();
+        }
+      }, isMobileRef.current ? 15000 : 10000); // Longer timeout for mobile
      
-      return () => clearTimeout(timer);
+      return () => {
+        clearTimeout(timer);
+        if (projectsTimeoutRef.current) {
+          clearTimeout(projectsTimeoutRef.current);
+          projectsTimeoutRef.current = undefined;
+        }
+      };
+    } else if (userId && isLoadingPreferences) {
+      // [MobileStallFix] Add emergency fallback if preferences get stuck
+      const emergencyTimer = setTimeout(() => {
+        console.warn(`[ProjectContext:MobileDebug] Emergency fallback: preferences stuck, forcing projects load`);
+        if (isLoadingPreferences) {
+          setIsLoadingPreferences(false);
+          setUserPreferences({});
+          userPreferencesRef.current = {};
+        }
+      }, isMobileRef.current ? 20000 : 15000); // Emergency fallback
+
+      return () => clearTimeout(emergencyTimer);
     }
-  }, [userId, isLoadingPreferences, fetchProjects]); // Refetch when user changes or preferences finish loading
+  }, [userId, isLoadingPreferences, fetchProjects, isLoadingProjects]); // Refetch when user changes or preferences finish loading
 
   const handleSetSelectedProjectId = useCallback((projectId: string | null) => {
     setSelectedProjectIdState(projectId);

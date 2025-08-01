@@ -29,10 +29,9 @@ import { Label } from './ui/label';
 import { Slider } from './ui/slider';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { Button } from './ui/button';
-import { ArrowDown } from 'lucide-react';
+import { ArrowDown, Trash2, Check } from 'lucide-react';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel, AlertDialogOverlay } from "@/shared/components/ui/alert-dialog";
 import { Checkbox } from "@/shared/components/ui/checkbox";
-import { Trash2, Check } from 'lucide-react';
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
 
 // Removed legacy sessionStorage key constant now that setting is persisted in DB
@@ -606,7 +605,33 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
           </div>
         )}
 
-
+        {/* Delete Confirmation Dialog (Mobile) */}
+        <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Images</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete {pendingDeleteIds.length} selected image{pendingDeleteIds.length > 1 ? 's' : ''}? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel
+                onClick={() => {
+                  setConfirmOpen(false);
+                  setPendingDeleteIds([]); // Clear pending IDs when cancelled
+                }}
+              >
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => performBatchDelete(pendingDeleteIds)}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Delete {pendingDeleteIds.length} Image{pendingDeleteIds.length > 1 ? 's' : ''}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
         
         {lightboxIndex !== null && currentImages[lightboxIndex] && (
           <MediaLightbox
@@ -659,7 +684,7 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
               onClick={isMobile ? undefined : (e) => handleItemClick(image.shotImageEntryId, e)}
               onDelete={() => onImageDelete(image.shotImageEntryId)}
               onDuplicate={onImageDuplicate}
-              position={index}
+              position={(image as any).position ?? index}
               onDoubleClick={isMobile ? () => {} : () => setLightboxIndex(index)}
               onMobileTap={isMobile ? () => handleMobileTap(image.shotImageEntryId, index) : undefined}
               skipConfirmation={imageDeletionSettings.skipConfirmation}
@@ -830,7 +855,7 @@ const MobileImageItem: React.FC<MobileImageItemProps> = ({
             className="absolute top-1 left-1 h-7 w-7 p-0 rounded-full opacity-70 hover:opacity-100 transition-opacity z-10"
             onClick={(e) => {
               e.stopPropagation();
-              onDuplicate?.(image.shotImageEntryId, index);
+              onDuplicate?.(image.shotImageEntryId, (image as any).position ?? index);
             }}
             disabled={duplicatingImageId === image.shotImageEntryId}
             title="Duplicate image"

@@ -15,6 +15,8 @@ import { PanesProvider } from '@/shared/contexts/PanesContext';
 import { CurrentShotProvider } from '@/shared/contexts/CurrentShotContext';
 import { ToolPageHeaderProvider } from '@/shared/contexts/ToolPageHeaderContext';
 import { ShotsProvider } from '@/shared/contexts/ShotsContext';
+// [MobileStallFix] Import debug utilities for console debugging
+import '@/shared/lib/mobileProjectDebug';
 
 const queryClient = new QueryClient({
   defaultOptions: {
