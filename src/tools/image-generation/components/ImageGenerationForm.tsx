@@ -772,25 +772,27 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Associated Shot Selector */}
           <div className="space-y-2 md:col-start-1 md:row-start-1 self-start w-full">
-            {/* Header with jump link */}
-            <div className="flex items-center justify-between">
-              <Label htmlFor="associatedShot" className="inline-block">Associated with Shot</Label>
+            <Label htmlFor="associatedShot" className="inline-block">Associated with Shot</Label>
+            {/* Select dropdown with jump link above it */}
+            <div className="space-y-1">
+              {/* Jump link positioned above the select field */}
               {associatedShotId && shots && (() => {
                 const selectedShot = shots.find(shot => shot.id === associatedShotId);
                 return selectedShot ? (
-                  <button
-                    type="button"
-                    onClick={() => navigateToShot(selectedShot)}
-                    className="text-xs font-medium text-emerald-600 hover:text-emerald-700 hover:underline transition-colors duration-200 px-2 py-1 rounded-md hover:bg-emerald-50"
-                  >
-                    Jump to animate shot →
-                  </button>
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => navigateToShot(selectedShot)}
+                      className="text-xs font-medium text-emerald-600 hover:text-emerald-700 hover:underline transition-colors duration-200 px-2 py-1 rounded-md hover:bg-emerald-50"
+                    >
+                      Jump to animate shot →
+                    </button>
+                  </div>
                 ) : null;
               })()}
-            </div>
-            {/* Select dropdown and create button */}
-            <div className="flex items-center gap-2">
-            <Select
+              {/* Select dropdown and create button */}
+              <div className="flex items-center gap-2">
+                <Select
               value={associatedShotId || "none"}
               onValueChange={(value) => {
                 console.log('[ImageGenerationForm] Changing shot from', associatedShotId, 'to', value);
@@ -835,6 +837,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
               <PlusCircle className="h-4 w-4" />
               <span className="hidden sm:inline">Create New Shot</span>
             </Button>
+              </div>
             </div>
           </div>
 
