@@ -1180,7 +1180,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       }
 
       if (createNew) {
-        // Create a new generation and add it to the shot
+        // Create a new generation and add it to the shot at the original position
         
         // Get the original image to find its position
         const originalImage = filteredOrderedShotImages.find(img => img.id === imageId);
@@ -1196,16 +1196,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           prompt: 'Flipped image',
         });
 
-        // Add it to the shot (it will be positioned at the end)
-        const addedShotImage = await addImageToShotMutation.mutateAsync({
-          shot_id: selectedShot.id,
-          generation_id: newGeneration.id,
-          project_id: selectedProjectId,
-          imageUrl: finalImageUrl,
-          thumbUrl: finalImageUrl,
-        });
-
-        // Remove the original image from the shot to avoid duplicates
+        // Remove the original image from the shot first to free up its position
         if (originalImage?.shotImageEntryId) {
           await removeImageFromShotMutation.mutateAsync({
             shot_id: selectedShot.id,
@@ -1213,6 +1204,17 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             project_id: selectedProjectId,
           });
         }
+
+        // Add the new generation at the original position using duplicateImageInShot
+        // which handles precise positioning
+        await duplicateImageInShotMutation.mutateAsync({
+          shot_id: selectedShot.id,
+          generation_id: newGeneration.id,
+          position: originalPosition,
+          project_id: selectedProjectId,
+          silent: true, // Don't show "duplicated" toast since this is really a "flip"
+        });
+
         // Force refresh the shot images in parent
         onShotImagesUpdate();
       } else {
