@@ -410,9 +410,25 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       return;
     }
 
-    // ... rest of the reorder logic would be here
-    // This is simplified for now - full implementation would follow the pattern from the original
-  }, [selectedShot, projectId, localOrderedShotImages, updateShotImageOrderMutation]);
+    console.log('[ShotEditor] Reordering images in shot', {
+      shotId: selectedShot.id,
+      projectId: projectId,
+      orderedShotGenerationIds: orderedShotGenerationIds,
+      timestamp: Date.now()
+    });
+
+    // Update the order on the server
+    updateShotImageOrderMutation.mutate({
+      shotId: selectedShot.id,
+      orderedShotGenerationIds: orderedShotGenerationIds,
+      projectId: projectId
+    }, {
+      onError: (error) => {
+        console.error('[ShotEditor] Failed to reorder images:', error);
+        // The mutation's onError will handle showing the error message and reverting optimistic updates
+      }
+    });
+  }, [selectedShot, projectId, updateShotImageOrderMutation]);
 
   const handlePendingPositionApplied = useCallback((generationId: string) => {
     const newMap = new Map(state.pendingFramePositions);

@@ -121,8 +121,6 @@ export const useLoraManager = (
   const handleAddLora = useCallback((loraToAdd: any, isManualAction = true) => {
     // Use the ref to ensure we are checking against the most up-to-date selection.
     if (selectedLorasRef.current.find(sl => sl.id === loraToAdd["Model ID"])) {
-      const loraName = loraToAdd.Name !== "N/A" ? loraToAdd.Name : loraToAdd["Model ID"];
-      toast.error(`"${loraName}" is already added to your selection.`);
       return;
     }
 
