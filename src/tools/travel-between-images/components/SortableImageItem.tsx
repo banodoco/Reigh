@@ -3,7 +3,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { GenerationRow } from '@/types/shots';
 import { Button } from '@/shared/components/ui/button';
-import { Trash2, Copy } from 'lucide-react';
+import { Trash2, Copy, Check } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,6 +33,8 @@ interface SortableImageItemProps {
   position?: number;
   skipConfirmation: boolean;
   onSkipConfirmationSave: () => void;
+  duplicatingImageId?: string | null;
+  duplicateSuccessImageId?: string | null;
 }
 
 export const SortableImageItem: React.FC<SortableImageItemProps> = ({
@@ -48,6 +50,8 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
   position,
   skipConfirmation,
   onSkipConfirmationSave,
+  duplicatingImageId,
+  duplicateSuccessImageId,
 }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: image.shotImageEntryId,
@@ -138,9 +142,16 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
               size="icon"
               className="absolute top-1 right-9 h-7 w-7 p-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10"
               onClick={handleDuplicateClick}
+              disabled={duplicatingImageId === image.id}
               title="Duplicate image"
             >
-              <Copy className="h-3.5 w-3.5" />
+              {duplicatingImageId === image.id ? (
+                <div className="h-3.5 w-3.5 animate-spin rounded-full border-b-2 border-white"></div>
+              ) : duplicateSuccessImageId === image.id ? (
+                <Check className="h-3.5 w-3.5" />
+              ) : (
+                <Copy className="h-3.5 w-3.5" />
+              )}
             </Button>
           )}
           <Button

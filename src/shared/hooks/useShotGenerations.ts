@@ -1,6 +1,7 @@
 import { useInfiniteQuery, useQuery, UseInfiniteQueryResult, UseQueryResult } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { GenerationRow } from '@/types/shots';
+import React from 'react';
 
 interface ShotGenerationsPage {
   items: GenerationRow[];
@@ -100,10 +101,19 @@ export const useUnpositionedGenerationsCount = (
 export const useAllShotGenerations = (
   shotId: string | null
 ): UseQueryResult<GenerationRow[]> => {
+  // Throttle logging to avoid infinite loop spam
+  const lastLogRef = React.useRef(0);
+  const now = Date.now();
+  if (now - lastLogRef.current > 1000) { // Log max once per second
+    console.log('[ADDTOSHOT] useAllShotGenerations called (throttled)', { shotId, timestamp: now });
+    lastLogRef.current = now;
+  }
+
   return useQuery({
     queryKey: ['all-shot-generations', shotId],
     enabled: !!shotId,
     queryFn: async () => {
+      console.log('[ADDTOSHOT] useAllShotGenerations queryFn executing', { shotId, timestamp: Date.now() });
       let allGenerations: any[] = [];
       let offset = 0;
       const BATCH_SIZE = 1000;
@@ -136,7 +146,7 @@ export const useAllShotGenerations = (
       }
 
       // Transform to match GenerationRow interface
-      return allGenerations
+      const result = allGenerations
         .filter(sg => sg.generation)
         .map(sg => ({
           ...sg.generation,
@@ -146,6 +156,14 @@ export const useAllShotGenerations = (
           imageUrl: sg.generation?.location || sg.generation?.imageUrl,
           thumbUrl: sg.generation?.thumb_url || sg.generation?.thumbUrl,
         }));
+
+      console.log('[ADDTOSHOT] useAllShotGenerations queryFn completed', { 
+        shotId, 
+        resultCount: result.length,
+        timestamp: Date.now() 
+      });
+
+      return result;
     },
     staleTime: 2 * 60 * 1000, // 2 minutes
     gcTime: 5 * 60 * 1000, // 5 minutes

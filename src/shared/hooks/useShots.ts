@@ -426,11 +426,13 @@ export const useAddImageToShot = () => {
       return shotGeneration;
     },
     onSuccess: (_, variables) => {
+      console.log('[ADDTOSHOT] useAddImageToShot onSuccess called', variables);
       // After successfully adding the image, invalidate related queries so UI refreshes.
       // 1. Re-fetch shots list for the project (affects thumbnail counts, etc.)
       const { project_id, shot_id } = variables;
 
       if (project_id) {
+        console.log('[ADDTOSHOT] Invalidating shots and generations queries for project', project_id);
         queryClient.invalidateQueries({ queryKey: ['shots', project_id] });
         // Also invalidate project-level generations cache (used by GenerationsPane)
         queryClient.invalidateQueries({ queryKey: ['generations', project_id] });
@@ -439,6 +441,7 @@ export const useAddImageToShot = () => {
       // 2. Critically, re-fetch the per-shot generations list used by ShotEditor so that
       //    newly-added images appear without a manual refresh.
       if (shot_id) {
+        console.log('[ADDTOSHOT] Invalidating all-shot-generations query for shot', shot_id);
         queryClient.invalidateQueries({ queryKey: ['all-shot-generations', shot_id] });
       }
     },
@@ -485,13 +488,22 @@ export const usePositionExistingGenerationInShot = () => {
       return shotGeneration;
     },
     onSuccess: (_, variables) => {
+      console.log('[ADDTOSHOT] usePositionExistingGenerationInShot onSuccess called', variables);
       // Use the project_id from variables directly
-      const project_id = variables.project_id;
+      const { project_id, shot_id } = variables;
       
       if (project_id) {
+        console.log('[ADDTOSHOT] Invalidating shots and generations queries for project', project_id);
         queryClient.invalidateQueries({ queryKey: ['shots', project_id] });
         // Also invalidate generations cache so GenerationsPane updates immediately
         queryClient.invalidateQueries({ queryKey: ['generations', project_id] });
+      }      
+
+      // CRITICAL: Invalidate the per-shot generations list used by ShotEditor so that
+      //    newly-positioned images appear without a manual refresh.
+      if (shot_id) {
+        console.log('[ADDTOSHOT] Invalidating all-shot-generations query for shot', shot_id);
+        queryClient.invalidateQueries({ queryKey: ['all-shot-generations', shot_id] });
       }      
     },
     onError: (error: Error) => {
@@ -555,6 +567,13 @@ export const useDuplicateImageInShot = () => {
       return newShotGeneration;
     },
     onMutate: async ({ shot_id, generation_id, position, project_id, silent }) => {
+      console.log('[DUPLICATE] onMutate optimistic update', {
+        shot_id,
+        generation_id,
+        position,
+        timestamp: Date.now()
+      });
+
       // Cancel outgoing refetches
       await queryClient.cancelQueries({ queryKey: ['shots', project_id] });
       
@@ -569,6 +588,11 @@ export const useDuplicateImageInShot = () => {
             const genToDuplicate = shot.images.find(img => img.id === generation_id);
             if (!genToDuplicate) return shot;
             
+            console.log('[DUPLICATE] Found generation to duplicate', {
+              genToDuplicate: genToDuplicate.shotImageEntryId,
+              originalPosition: (genToDuplicate as any).position
+            });
+
             // Create a new shot generation entry
             const duplicatedImage = {
               ...genToDuplicate,
@@ -577,18 +601,38 @@ export const useDuplicateImageInShot = () => {
               position: position
             };
             
+            console.log('[DUPLICATE] Images before position adjustment', {
+              imageCount: shot.images.length,
+              positions: shot.images.map(img => (img as any).position)
+            });
+
             // Update positions and insert duplicate
             const updatedImages = shot.images.map(img => {
               const imgPosition = (img as any).position;
               if (imgPosition !== null && imgPosition !== undefined && imgPosition >= position) {
+                console.log('[DUPLICATE] Shifting image position', {
+                  imageId: img.shotImageEntryId,
+                  oldPosition: imgPosition,
+                  newPosition: imgPosition + 1
+                });
                 return { ...img, position: imgPosition + 1 } as any;
               }
               return img;
             });
             
+            console.log('[DUPLICATE] About to splice at position', {
+              splicePosition: position,
+              arrayLength: updatedImages.length
+            });
+
             // Insert the duplicate at the correct position
             updatedImages.splice(position, 0, duplicatedImage);
             
+            console.log('[DUPLICATE] Final images after splice', {
+              imageCount: updatedImages.length,
+              positions: updatedImages.map(img => (img as any).position)
+            });
+
             return { ...shot, images: updatedImages };
           }
           return shot;

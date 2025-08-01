@@ -32,7 +32,7 @@ import { Button } from './ui/button';
 import { ArrowDown } from 'lucide-react';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel, AlertDialogOverlay } from "@/shared/components/ui/alert-dialog";
 import { Checkbox } from "@/shared/components/ui/checkbox";
-import { Trash2 } from 'lucide-react';
+import { Trash2, Check } from 'lucide-react';
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
 
 // Removed legacy sessionStorage key constant now that setting is persisted in DB
@@ -46,6 +46,8 @@ export interface ShotImageManagerProps {
   generationMode: 'batch' | 'timeline';
   onImageSaved?: (imageId: string, newImageUrl: string, createNew?: boolean) => Promise<void>; // Callback when image is saved with changes
   onMagicEdit?: (imageUrl: string, prompt: string, numImages: number) => void;
+  duplicatingImageId?: string | null;
+  duplicateSuccessImageId?: string | null;
 }
 
 const ShotImageManager: React.FC<ShotImageManagerProps> = ({
@@ -57,6 +59,8 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
   generationMode,
   onImageSaved,
   onMagicEdit,
+  duplicatingImageId,
+  duplicateSuccessImageId,
 }) => {
   // State for drag and drop
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -480,6 +484,8 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
                      onDelete={() => onImageDelete(image.shotImageEntryId)}
                      onDuplicate={onImageDuplicate}
                      hideDeleteButton={mobileSelectedIds.length > 0}
+                     duplicatingImageId={duplicatingImageId}
+                     duplicateSuccessImageId={duplicateSuccessImageId}
                    />
                    
                   {/* Move button before first image */}
@@ -630,6 +636,8 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
               onMobileTap={isMobile ? () => handleMobileTap(image.shotImageEntryId, index) : undefined}
               skipConfirmation={imageDeletionSettings.skipConfirmation}
               onSkipConfirmationSave={() => updateImageDeletionSettings({ skipConfirmation: true })}
+              duplicatingImageId={duplicatingImageId}
+              duplicateSuccessImageId={duplicateSuccessImageId}
             />
           ))}
         </div>
@@ -675,8 +683,10 @@ interface MobileImageItemProps {
   onDoubleClick?: () => void;
   onMobileTap?: () => void;
   onDelete: () => void; // Fixed: properly typed delete function
-  onDuplicate: (generationId: string, position: number) => void; // Add duplicate function
+  onDuplicate?: (generationId: string, position: number) => void; // Add duplicate function
   hideDeleteButton?: boolean;
+  duplicatingImageId?: string | null;
+  duplicateSuccessImageId?: string | null;
 }
 
 const MobileImageItem: React.FC<MobileImageItemProps> = ({
@@ -689,6 +699,8 @@ const MobileImageItem: React.FC<MobileImageItemProps> = ({
   onDelete, // Add this
   onDuplicate,
   hideDeleteButton,
+  duplicatingImageId,
+  duplicateSuccessImageId,
 }) => {
   const imageUrl = image.thumbUrl || image.imageUrl;
   const displayUrl = getDisplayUrl(imageUrl);
@@ -732,13 +744,20 @@ const MobileImageItem: React.FC<MobileImageItemProps> = ({
             className="absolute top-1 left-1 h-7 w-7 p-0 rounded-full opacity-70 hover:opacity-100 transition-opacity z-10"
             onClick={(e) => {
               e.stopPropagation();
-              onDuplicate(image.id, index);
+              onDuplicate?.(image.id, index);
             }}
+            disabled={duplicatingImageId === image.id}
             title="Duplicate image"
           >
-            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-            </svg>
+            {duplicatingImageId === image.id ? (
+              <div className="h-3.5 w-3.5 animate-spin rounded-full border-b-2 border-white"></div>
+            ) : duplicateSuccessImageId === image.id ? (
+              <Check className="h-3.5 w-3.5" />
+            ) : (
+              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+            )}
           </Button>
         </>
       )}

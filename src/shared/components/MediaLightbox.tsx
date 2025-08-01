@@ -29,6 +29,9 @@ interface MediaLightboxProps {
   showDownload?: boolean;
   showMagicEdit?: boolean;
   videoPlayerComponent?: 'hover-scrub' | 'simple-player';
+  // Navigation availability
+  hasNext?: boolean;
+  hasPrevious?: boolean;
   // Workflow-specific props
   allShots?: Shot[];
   selectedShotId?: string;
@@ -56,6 +59,9 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   showDownload = true,
   showMagicEdit = false,
   videoPlayerComponent = 'hover-scrub',
+  // Navigation availability
+  hasNext = true,
+  hasPrevious = true,
   // Workflow-specific props
   allShots = [],
   selectedShotId,
@@ -343,7 +349,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               }}
             >
               {/* Navigation Controls - Left Arrow */}
-              {showNavigation && onPrevious && (
+              {showNavigation && onPrevious && hasPrevious && (
                 <Button
                   variant="secondary"
                   size="lg"
@@ -605,7 +611,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
                 {/* Mobile Navigation Controls */}
                 <div className="sm:hidden">
-                  {showNavigation && onPrevious && (
+                  {showNavigation && onPrevious && hasPrevious && (
                     <Button
                       variant="secondary"
                       size="lg"
@@ -616,7 +622,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     </Button>
                   )}
                   
-                  {showNavigation && onNext && (
+                  {showNavigation && onNext && hasNext && (
                     <Button
                       variant="secondary"
                       size="lg"
@@ -630,7 +636,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               </div>
 
               {/* Navigation Controls - Right Arrow (Desktop Only) */}
-              {showNavigation && onNext && (
+              {showNavigation && onNext && hasNext && (
                 <Button
                   variant="secondary"
                   size="lg"

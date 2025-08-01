@@ -183,7 +183,17 @@ export function useGenerationsPageLogic({
   };
 
   const handleAddToShot = (generationId: string, imageUrl?: string) => {
+    console.log('[ADDTOSHOT] handleAddToShot called', {
+      generationId,
+      imageUrl: imageUrl?.substring(0, 50) + '...',
+      lastAffectedShotId,
+      selectedProjectId,
+      excludePositioned,
+      timestamp: Date.now()
+    });
+
     if (!lastAffectedShotId) {
+      console.log('[ADDTOSHOT] Error: No lastAffectedShotId available');
       toast.error("No shot selected", {
         description: "Please select a shot in the gallery or create one first.",
       });
@@ -191,12 +201,19 @@ export function useGenerationsPageLogic({
     }
     
     // Check if we're trying to add to the same shot that's currently filtered with excludePositioned enabled
-    const shouldPositionExisting = selectedShotFilter !== 'all' && 
-                                  selectedShotFilter === lastAffectedShotId && 
+    const shouldPositionExisting = selectedShotFilter === lastAffectedShotId && 
                                   excludePositioned;
     
+    console.log('[ADDTOSHOT] Determined action type', {
+      shouldPositionExisting,
+      selectedShotFilter,
+      lastAffectedShotId,
+      excludePositioned
+    });
+
     return new Promise<boolean>((resolve) => {
       if (shouldPositionExisting) {
+        console.log('[ADDTOSHOT] Using positionExistingGenerationMutation');
         // Use the position existing function for items in the filtered list
         positionExistingGenerationMutation.mutate({
           shot_id: lastAffectedShotId,
@@ -204,9 +221,11 @@ export function useGenerationsPageLogic({
           project_id: selectedProjectId!,
         }, {
           onSuccess: () => {          
+            console.log('[ADDTOSHOT] positionExistingGenerationMutation SUCCESS');
             resolve(true);
           },
           onError: (error) => {
+            console.log('[ADDTOSHOT] positionExistingGenerationMutation ERROR', error);
             toast.error("Failed to position image in shot", {
               description: error.message,
             });
@@ -214,6 +233,7 @@ export function useGenerationsPageLogic({
           }
         });
       } else {
+        console.log('[ADDTOSHOT] Using addImageToShotMutation');
         // Use the regular add function
         addImageToShotMutation.mutate({
           shot_id: lastAffectedShotId,
@@ -221,9 +241,11 @@ export function useGenerationsPageLogic({
           project_id: selectedProjectId!,
         }, {
           onSuccess: () => {          
+            console.log('[ADDTOSHOT] addImageToShotMutation SUCCESS');
             resolve(true);
           },
           onError: (error) => {
+            console.log('[ADDTOSHOT] addImageToShotMutation ERROR', error);
             toast.error("Failed to add image to shot", {
               description: error.message,
             });

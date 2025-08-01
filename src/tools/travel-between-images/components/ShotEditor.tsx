@@ -33,9 +33,9 @@ import { parseRatio } from '@/shared/lib/aspectRatios';
 import { Skeleton } from '@/shared/components/ui/skeleton';
 import { usePanes } from '@/shared/contexts/PanesContext';
 import Timeline from '@/tools/travel-between-images/components/Timeline';
+import ShotImagesEditor from './ShotImagesEditor';
 
 import { useToolSettings } from '@/shared/hooks/useToolSettings';
-import { ToggleGroup, ToggleGroupItem } from "@/shared/components/ui/toggle-group";
 import { useListTasks, useCancelTask } from "@/shared/hooks/useTasks";
 import { useTaskQueueNotifier } from "@/shared/hooks/useTaskQueueNotifier";
 import { supabase } from "@/integrations/supabase/client";
@@ -233,6 +233,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const handleExternalImageDropMutation = useHandleExternalImageDrop();
   const [fileInputKey, setFileInputKey] = useState<number>(Date.now());
   const [deletingVideoId, setDeletingVideoId] = useState<string | null>(null);
+  const [duplicatingImageId, setDuplicatingImageId] = useState<string | null>(null);
+  const [duplicateSuccessImageId, setDuplicateSuccessImageId] = useState<string | null>(null);
   const [pendingFramePositions, setPendingFramePositions] = useState<Map<string, number>>(new Map());
   
   // Flag to skip next prop sync after successful operations
@@ -405,9 +407,17 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const [editingName, setEditingName] = useState(selectedShot?.name || '');
   
   // Accelerated mode and random seed from database settings
-  const accelerated = shotUISettings?.acceleratedMode ?? false;
+  // Default accelerated mode to true when it has never been explicitly set for this shot
+  const accelerated = shotUISettings?.acceleratedMode ?? true;
   const randomSeed = shotUISettings?.randomSeed ?? false;
   const [showStepsNotification, setShowStepsNotification] = useState(false);
+  
+  // Ensure the step count defaults to 8 when accelerated mode is enabled by default
+  useEffect(() => {
+    if (accelerated && batchVideoSteps !== 8) {
+      onBatchVideoStepsChange(8);
+    }
+  }, [accelerated, batchVideoSteps, onBatchVideoStepsChange]);
   
   const setAccelerated = useCallback((value: boolean) => {
     updateShotUISettings('shot', { acceleratedMode: value });
@@ -686,9 +696,19 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // Count unpositioned generations for this shot (excluding videos, which are expected to have null positions)
   const { data: unpositionedGenerationsCount = 0 } = useUnpositionedGenerationsCount(selectedShot?.id);
   
+  // Sync local state with props, but skip if we're uploading or have skipNextSyncRef set
   useEffect(() => {
-    console.log('[DragDebug:ShotEditor] Props sync useEffect triggered', {
-      skipNextSync: skipNextSyncRef.current,
+    console.log('[ADDTOSHOT] ShotEditor useEffect triggered - orderedShotImages changed', {
+      newLength: orderedShotImages?.length || 0,
+      currentLocalLength: localOrderedShotImages.length,
+      skipNextSyncRef: skipNextSyncRef.current,
+      isUploadingImage,
+      shotId: selectedShot?.id,
+      timestamp: Date.now()
+    });
+
+    console.log('[DragDebug:ShotEditor] orderedShotImages useEffect triggered', {
+      skipNextSyncRef: skipNextSyncRef.current,
       isUploadingImage,
       orderedShotImagesLength: orderedShotImages?.length || 0,
       localImagesLength: localOrderedShotImages.length,
@@ -697,6 +717,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     
     // Skip sync if we just finished uploading to prevent flicker
     if (skipNextSyncRef.current) {
+      console.log('[ADDTOSHOT] Skipping props sync due to skipNextSyncRef');
       console.log('[DragDebug:ShotEditor] Skipping props sync due to skipNextSyncRef');
       skipNextSyncRef.current = false;
       return;
@@ -705,11 +726,17 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     // Only sync from props if we are not in the middle of an upload.
     // The upload function will be the source of truth during the upload process.
     if (!isUploadingImage) {
+      console.log('[ADDTOSHOT] Syncing localOrderedShotImages from props', {
+        oldLength: localOrderedShotImages.length,
+        newLength: orderedShotImages?.length || 0,
+        shotId: selectedShot?.id
+      });
       console.log('[DragDebug:ShotEditor] Syncing localOrderedShotImages from props', {
         newLength: orderedShotImages?.length || 0
       });
       setLocalOrderedShotImages(orderedShotImages || []);
     } else {
+      console.log('[ADDTOSHOT] Skipping props sync - upload in progress');
       console.log('[DragDebug:ShotEditor] Skipping props sync - upload in progress');
     }
   }, [orderedShotImages, isUploadingImage]);
@@ -989,19 +1016,49 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   };
 
   const handleDuplicateImage = async (generationId: string, position: number) => {
+    console.log('[DUPLICATE] handleDuplicateImage called', {
+      generationId,
+      position,
+      timestamp: Date.now()
+    });
+
     if (!selectedShot || !selectedProjectId) {
       toast.error("Cannot duplicate image: No shot or project selected.");
       return;
     }
 
+    // Start loading state
+    setDuplicatingImageId(generationId);
+
     // Place the duplicate one position after the original (position + 1)
     const duplicatePosition = position + 1;
+
+    console.log('[DUPLICATE] Calling duplicateImageInShotMutation', {
+      duplicatePosition,
+      originalPosition: position
+    });
 
     duplicateImageInShotMutation.mutate({
       shot_id: selectedShot.id,
       generation_id: generationId,
       position: duplicatePosition,
       project_id: selectedProjectId,
+    }, {
+      onSuccess: () => {
+        console.log('[DUPLICATE] Duplicate mutation successful');
+        // Show success state
+        setDuplicateSuccessImageId(generationId);
+        // Clear success state after 2 seconds
+        setTimeout(() => setDuplicateSuccessImageId(null), 2000);
+      },
+      onError: (error) => {
+        console.error('[DUPLICATE] Duplicate mutation failed:', error);
+        toast.error(`Failed to duplicate image: ${error.message}`);
+      },
+      onSettled: () => {
+        // Clear loading state
+        setDuplicatingImageId(null);
+      }
     });
   };
 
@@ -1079,6 +1136,12 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       onSuccess: () => {
         console.log('[DragDebug:ShotEditor] Reorder mutation successful');
         // skipNextSyncRef was already set to true before the state update
+      },
+      onSettled: () => {
+        // CRITICAL: Reset skipNextSyncRef after mutation completes (success or error)
+        // This ensures subsequent mutations (delete, duplicate) can update the UI
+        console.log('[DragDebug:ShotEditor] Resetting skipNextSyncRef after reorder mutation settled');
+        skipNextSyncRef.current = false;
       }
     });
   }, [selectedShot, selectedProjectId, localOrderedShotImages, updateShotImageOrderMutation, orderedShotImages]);
@@ -1703,7 +1766,24 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     </div>
   );
 
-  return (
+  // Opens the Generations pane focused on un-positioned images for the current shot
+  const openUnpositionedGenerationsPane = useCallback(() => {
+    if (selectedShot?.id) {
+      updateGenerationsPaneSettings({
+        selectedShotFilter: selectedShot.id,
+        excludePositioned: true,
+      });
+    }
+
+    if (isMobile) {
+      const evt = new CustomEvent('mobilePaneOpen', { detail: { side: 'bottom' } });
+      window.dispatchEvent(evt);
+    } else {
+      setIsGenerationsPaneLocked(true);
+    }
+      }, [selectedShot, isMobile, updateGenerationsPaneSettings, setIsGenerationsPaneLocked]);
+  
+    return (
     <div className="flex flex-col space-y-4 pb-16">
       {/* Header */}
       <div className="flex-shrink-0 flex flex-wrap justify-between items-center gap-y-2 px-2">
@@ -1778,133 +1858,35 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         
         {/* Image Manager */}
         <div className="flex flex-col w-full gap-4">
-          <Card className="flex flex-col">
-            {!isModeReady ? (
-              <CardContent className="p-6">
-                <ImageManagerSkeleton />
-              </CardContent>
-            ) : (
-              <>
-                <CardHeader>
-                  {settingsError && (
-                    <div className="mb-4 p-3 rounded bg-yellow-100 text-yellow-800 text-sm">
-                      {settingsError}
-                    </div>
-                  )}
-                  <div className="flex items-center justify-between">
-                    <CardTitle>Manage Shot Images</CardTitle>
-                    {!isMobile && (
-                      <div className="flex items-center space-x-2">
-                        <ToggleGroup type="single" value={generationMode} onValueChange={(value: 'batch' | 'timeline') => value && onGenerationModeChange(value)} size="sm">
-                          <ToggleGroupItem value="batch" aria-label="Toggle batch">
-                            Batch
-                          </ToggleGroupItem>
-       
-                          <ToggleGroupItem value="timeline" aria-label="Toggle timeline">
-                            Timeline
-                          </ToggleGroupItem>
-                        </ToggleGroup>
-                      </div>
-                    )}
-                  </div>
-                  {nonVideoImages.length > 0 && (
-                    <>
-                      <p className="text-sm text-muted-foreground pt-1">
-                        {isMobile 
-                          ? 'Tap to select and move multiple images.'
-                          : generationMode === 'timeline' 
-                            ? 'Drag images to precise frame positions. Drop on other images to reorder.'
-                            : 'Drag to reorder. Ctrl+click to select and move multiple images.'
-                        }
-                      </p>
-                    </>
-                  )}
-                </CardHeader>
-                <CardContent className={nonVideoImages.length > 0 ? "" : ""}>
-                  <div className="p-1">
-                    {generationMode === 'timeline' ? (
-                      <Suspense fallback={
-                        <div className="flex items-center justify-center p-8">
-                          <div className="text-sm text-muted-foreground">Loading Timeline...</div>
-                        </div>
-                      }>
-                        <Timeline
-                          shotId={selectedShot.id}
-                          images={nonVideoImages}
-                          frameSpacing={batchVideoFrames}
-                          contextFrames={batchVideoContext}
-                          onImageReorder={handleReorderImagesInShot}
-                          onImageSaved={handleImageSaved}
-                          onContextFramesChange={onBatchVideoContextChange}
-                          onFramePositionsChange={setTimelineFramePositions}
-                          onImageDrop={handleTimelineImageDrop}
-                          pendingPositions={pendingFramePositions}
-                          onPendingPositionApplied={handlePendingPositionApplied}
-                        />
-                      </Suspense>
-                    ) : (
-                    <ShotImageManager
-                      images={nonVideoImages}
-                      onImageDelete={handleDeleteImageFromShot}
-                      onImageDuplicate={handleDuplicateImage}
-                      onImageReorder={handleReorderImagesInShot}
-                      columns={isMobile ? 3 : 6}
-                      generationMode={isMobile ? 'batch' : generationMode}
-                      onImageSaved={handleImageSaved}
-                      onMagicEdit={(imageUrl, prompt, numImages) => {
-                        // TODO: Implement magic edit generation
-                        console.log('Magic Edit:', { imageUrl, prompt, numImages });
-                      }}
-                    />
-                  )}
-                  </div>
-                  
-                  {/* Unpositioned generations message */}
-                  {unpositionedGenerationsCount > 0 && (
-                    <div className="mx-1 mt-4 p-3 bg-muted/50 rounded-lg flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">
-                        There {unpositionedGenerationsCount === 1 ? 'is' : 'are'} {unpositionedGenerationsCount} generation{unpositionedGenerationsCount === 1 ? '' : 's'} associated with this shot that {unpositionedGenerationsCount === 1 ? "doesn't" : "don't"} have a position
-                      </span>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          // Set the GenerationsPane filter to current shot and exclude positioned
-                          if (selectedShot?.id) {
-                          updateGenerationsPaneSettings({
-                            selectedShotFilter: selectedShot.id,
-                            excludePositioned: true
-                          });
-                          }
-                          
-                          if (isMobile) {
-                            // On mobile, just open the pane normally (no locking)
-                            const evt = new CustomEvent('mobilePaneOpen', { detail: { side: 'bottom' } });
-                            window.dispatchEvent(evt);
-                          } else {
-                            // On desktop, open the generations pane and set the locked state
-                            setIsGenerationsPaneLocked(true);
-                          }
-                        }}
-                      >
-                        Open Pane
-                      </Button>
-                    </div>
-                  )}
-                </CardContent>
-                <div className="p-4 border-t space-y-3">
-                  <FileInput
-                    key={fileInputKey}
-                    onFileChange={handleImageUploadToShot}
-                    acceptTypes={['image']}
-                    label="Add more images"
-                    disabled={isUploadingImage || !isModeReady}
-                    multiple
-                  />
-                </div>
-              </>
-            )}
-          </Card>
+          <ShotImagesEditor
+            isModeReady={isModeReady}
+            settingsError={settingsError}
+            isMobile={isMobile}
+            generationMode={generationMode}
+            onGenerationModeChange={onGenerationModeChange}
+            images={nonVideoImages}
+            selectedShotId={selectedShot.id}
+            batchVideoFrames={batchVideoFrames}
+            batchVideoContext={batchVideoContext}
+            onImageReorder={handleReorderImagesInShot}
+            onImageSaved={handleImageSaved}
+            onContextFramesChange={onBatchVideoContextChange}
+            onFramePositionsChange={setTimelineFramePositions}
+            onImageDrop={handleTimelineImageDrop}
+            pendingPositions={pendingFramePositions}
+            onPendingPositionApplied={handlePendingPositionApplied}
+            onImageDelete={handleDeleteImageFromShot}
+            onImageDuplicate={handleDuplicateImage}
+            columns={(isMobile ? 3 : 6) as 3 | 6}
+            skeleton={<ImageManagerSkeleton />}
+            unpositionedGenerationsCount={unpositionedGenerationsCount}
+            onOpenUnpositionedPane={openUnpositionedGenerationsPane}
+            fileInputKey={fileInputKey}
+            onImageUpload={handleImageUploadToShot}
+            isUploadingImage={isUploadingImage}
+            duplicatingImageId={duplicatingImageId}
+            duplicateSuccessImageId={duplicateSuccessImageId}
+          />
         </div>
 
         {/* Generation Settings */}
