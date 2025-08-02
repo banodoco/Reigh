@@ -442,11 +442,15 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
     
     // Desktop behavior
     if (event.metaKey || event.ctrlKey) {
+      // Ctrl/Cmd+click: Toggle selection (add/remove from current selection)
       setSelectedIds((prev) =>
         prev.includes(id) ? prev.filter((selectedId) => selectedId !== id) : [...prev, id],
       );
     } else {
-      setSelectedIds([id]);
+      // Single click: Toggle selection (add/remove from current selection)
+      setSelectedIds((prev) =>
+        prev.includes(id) ? prev.filter((selectedId) => selectedId !== id) : [...prev, id],
+      );
     }
   }, [isMobile, generationMode, mobileSelectedIds]);
 
@@ -670,7 +674,16 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
       onDragEnd={handleDragEnd}
     >
       <SortableContext items={currentImages.map((img) => img.shotImageEntryId)} strategy={rectSortingStrategy}>
-        <div className={cn("grid gap-3", gridColsClass)}>
+        <div 
+          className={cn("grid gap-3", gridColsClass)}
+          onDoubleClick={(e) => {
+            // Only deselect if double-clicking on the grid itself, not on an image
+            if (e.target === e.currentTarget) {
+              setSelectedIds([]);
+              setMobileSelectedIds([]);
+            }
+          }}
+        >
           {currentImages.map((image, index) => (
             <SortableImageItem
               key={image.shotImageEntryId}
@@ -680,13 +693,7 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
               onPointerDown={(e) => {
                 // Capture modifier key state ASAP to avoid losing it if the user releases before click fires
                 if (isMobile) return; // desktop-only multi-select enhancement
-                if (e.metaKey || e.ctrlKey) {
-                  setSelectedIds(prev =>
-                    prev.includes(image.shotImageEntryId)
-                      ? prev.filter(id => id !== image.shotImageEntryId)
-                      : [...prev, image.shotImageEntryId]
-                  );
-                }
+                // Remove the redundant Ctrl+click handling here since it's handled in onClick
               }}
               onClick={isMobile ? undefined : (e) => handleItemClick(image.shotImageEntryId, e)}
               onDelete={() => onImageDelete(image.shotImageEntryId)}

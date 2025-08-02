@@ -28,6 +28,8 @@ import { useLoraSync } from './hooks/useLoraSync';
 import { Header } from './ui/Header';
 import { ImageManagerSkeleton } from './ui/Skeleton';
 import { filterAndSortShotImages, getNonVideoImages, getVideoOutputs } from './utils/generation-utils';
+import { getDimensions, DEFAULT_RESOLUTION } from './utils/dimension-utils';
+import { ASPECT_RATIO_TO_RESOLUTION, findClosestAspectRatio } from '@/shared/lib/aspectRatios';
 
 const ShotEditor: React.FC<ShotEditorProps> = ({
   selectedShotId,
@@ -444,6 +446,151 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const isGenerationDisabledDueToApiKey = enhancePrompt && (!openaiApiKey || openaiApiKey.trim() === '');
   const isGenerationDisabled = generationActions.isEnqueuing || isGenerationDisabledDueToApiKey;
 
+  // Handle video generation
+  const handleGenerateBatch = useCallback(async () => {
+    if (!projectId) {
+      toast.error('No project selected. Please select a project first.');
+      return;
+    }
+
+    let resolution: string | undefined = undefined;
+
+    if ((dimensionSource || 'project') === 'firstImage' && nonVideoImages.length > 0) {
+      try {
+        const firstImage = nonVideoImages[0];
+        const imageUrl = getDisplayUrl(firstImage.imageUrl);
+        if (imageUrl) {          
+          const { width, height } = await getDimensions(imageUrl);
+          const imageAspectRatio = width / height;
+          const closestRatioKey = findClosestAspectRatio(imageAspectRatio);
+          resolution = ASPECT_RATIO_TO_RESOLUTION[closestRatioKey] || DEFAULT_RESOLUTION;
+        } else {
+          toast.warning("Could not get URL for the first image. Using project default resolution.");
+        }
+      } catch (error) {
+        console.error("Error getting first image dimensions:", error);
+        toast.warning("Could not determine first image dimensions. Using project default resolution.");
+      }
+    }
+
+    if (dimensionSource === 'custom') {
+      if (customWidth && customHeight) {
+        resolution = `${customWidth}x${customHeight}`;        
+      } else {
+        toast.error('Custom dimensions are selected, but width or height is not set.');
+        return;
+      }
+    }
+
+    // Use getDisplayUrl to convert relative paths to absolute URLs
+    // IMPORTANT: Use nonVideoImages to exclude generated video outputs
+    const absoluteImageUrls = nonVideoImages
+      .map((img) => getDisplayUrl(img.imageUrl)) // Use getDisplayUrl here
+      .filter((url): url is string => Boolean(url) && url !== '/placeholder.svg');
+
+    let basePrompts: string[];
+    let segmentFrames: number[];
+    let frameOverlap: number[];
+    let negativePrompts: string[];
+
+    if (generationMode === 'timeline') {
+      // Extract frame gaps from timeline positions
+      const sortedPositions = [...timelineFramePositions.entries()]
+        .map(([id, pos]) => ({ id, pos }))
+        .sort((a, b) => a.pos - b.pos);
+      
+      const frameGaps = [];
+      for (let i = 0; i < sortedPositions.length - 1; i++) {
+        const gap = sortedPositions[i + 1].pos - sortedPositions[i].pos;
+        frameGaps.push(gap);
+      }
+      
+      basePrompts = frameGaps.length > 0 ? frameGaps.map(() => batchVideoPrompt) : [batchVideoPrompt];
+      segmentFrames = frameGaps.length > 0 ? frameGaps : [batchVideoFrames];
+      frameOverlap = frameGaps.length > 0 ? frameGaps.map(() => batchVideoContext) : [batchVideoContext];
+      negativePrompts = frameGaps.length > 0 ? frameGaps.map(() => steerableMotionSettings.negative_prompt) : [steerableMotionSettings.negative_prompt];
+    } else {
+      // batch mode
+      basePrompts = [batchVideoPrompt];
+      segmentFrames = [batchVideoFrames];
+      frameOverlap = [batchVideoContext];
+      negativePrompts = [steerableMotionSettings.negative_prompt];
+    }
+
+    const requestBody: any = {
+      project_id: projectId,
+      shot_id: selectedShot.id,
+      image_urls: absoluteImageUrls,
+      base_prompts: basePrompts,
+      segment_frames: segmentFrames,
+      frame_overlap: frameOverlap,
+      negative_prompts: negativePrompts,
+      model_name: steerableMotionSettings.model_name,
+      seed: steerableMotionSettings.seed,
+      steps: batchVideoSteps,
+      debug: steerableMotionSettings.debug,
+      // Force these settings to false always, except apply_causvid which follows accelerated mode
+      apply_reward_lora: false,
+      apply_causvid: accelerated,
+      use_lighti2x_lora: false,
+      show_input_images: false,
+      colour_match_videos: steerableMotionSettings.colour_match_videos ?? true,
+      fade_in_duration: steerableMotionSettings.fade_in_duration,
+      fade_out_duration: steerableMotionSettings.fade_out_duration,
+      after_first_post_generation_saturation: steerableMotionSettings.after_first_post_generation_saturation,
+      after_first_post_generation_brightness: steerableMotionSettings.after_first_post_generation_brightness,
+      enhance_prompt: enhancePrompt,
+      openai_api_key: enhancePrompt ? openaiApiKey : '',
+      // Save UI state settings
+      dimension_source: dimensionSource,
+      generation_mode: generationMode,
+      accelerated_mode: accelerated,
+      random_seed: randomSeed,
+    };
+
+    if (loraManager.selectedLoras && loraManager.selectedLoras.length > 0) {
+      requestBody.loras = loraManager.selectedLoras.map(l => ({ 
+        path: l.path, 
+        strength: parseFloat(l.strength?.toString() ?? '0') || 0.0 
+      }));
+    }
+
+    if (resolution) {
+      requestBody.resolution = resolution;
+    }
+    
+    try {
+      await generationActions.enqueueTasks([{
+        functionName: 'steerable-motion',
+        payload: requestBody,
+      }]);
+      
+      // Success feedback is now handled by useTaskQueueNotifier
+    } catch (error) {
+      console.error('Error creating video generation task:', error);
+    }
+  }, [
+    projectId,
+    dimensionSource,
+    nonVideoImages,
+    customWidth,
+    customHeight,
+    generationMode,
+    timelineFramePositions,
+    batchVideoPrompt,
+    batchVideoFrames,
+    batchVideoContext,
+    steerableMotionSettings,
+    batchVideoSteps,
+    accelerated,
+    selectedShot,
+    enhancePrompt,
+    openaiApiKey,
+    randomSeed,
+    loraManager.selectedLoras,
+    generationActions.enqueueTasks
+  ]);
+
   // Opens the Generations pane focused on un-positioned images for the current shot
   const openUnpositionedGenerationsPane = useCallback(() => {
     if (selectedShot?.id) {
@@ -595,7 +742,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                                 size="lg" 
                                 className="w-full" 
                                 variant={generationActions.justQueued ? "success" : "default"}
-                                onClick={() => {}} // TODO: implement handleGenerateBatch
+                                onClick={handleGenerateBatch}
                                 disabled={isGenerationDisabled}
                             >
                                 {generationActions.justQueued

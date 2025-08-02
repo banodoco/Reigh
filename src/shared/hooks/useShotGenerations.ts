@@ -113,7 +113,7 @@ export const useAllShotGenerations = (
     queryKey: ['all-shot-generations', shotId],
     enabled: !!shotId,
     queryFn: async () => {
-      console.log('[ADDTOSHOT] useAllShotGenerations queryFn executing', { shotId, timestamp: Date.now() });
+      console.log('[VideoLoadSpeedIssue][ADDTOSHOT] useAllShotGenerations queryFn executing', { shotId, timestamp: Date.now() });
       let allGenerations: any[] = [];
       let offset = 0;
       const BATCH_SIZE = 1000;
@@ -157,9 +157,10 @@ export const useAllShotGenerations = (
           thumbUrl: sg.generation?.thumb_url || sg.generation?.thumbUrl,
         }));
 
-      console.log('[ADDTOSHOT] useAllShotGenerations queryFn completed', { 
+      console.log('[VideoLoadSpeedIssue][ADDTOSHOT] useAllShotGenerations queryFn completed', { 
         shotId, 
         resultCount: result.length,
+        videoCount: result.filter(r => r.type === 'video').length,
         timestamp: Date.now() 
       });
 
@@ -167,5 +168,10 @@ export const useAllShotGenerations = (
     },
     staleTime: 2 * 60 * 1000, // 2 minutes
     gcTime: 5 * 60 * 1000, // 5 minutes
+    meta: {
+      onInvalidate: () => {
+        console.log('[VideoLoadSpeedIssue] useAllShotGenerations query invalidated for shotId:', shotId);
+      }
+    }
   });
 }; 

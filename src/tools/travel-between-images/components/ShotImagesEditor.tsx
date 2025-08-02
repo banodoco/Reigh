@@ -139,13 +139,13 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
           )}
         </div>
         {images.length > 0 && (
-          <p className="text-sm text-muted-foreground pt-1">
-            {isMobile
-              ? "Tap to select and move multiple images."
-              : generationMode === "timeline"
-              ? "Drag images to precise frame positions. Drop on other images to reorder."
-              : "Drag to reorder. Ctrl+click to select and move multiple images."}
-          </p>
+          (isMobile || generationMode === "timeline") && (
+            <p className="text-sm text-muted-foreground pt-1">
+              {isMobile
+                ? "Tap to select and move multiple images."
+                : "Drag images to precise frame positions. Drop on other images to reorder."}
+            </p>
+          )
         )}
       </CardHeader>
 

@@ -3,7 +3,11 @@ import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { RealtimeChannel } from '@supabase/supabase-js';
-import { log } from '@/shared/lib/logger';
+
+// Simple logging function for performance debugging
+const log = (category: string, message: string, data?: any) => {
+  console.log(`[${category}] ${message}`, data);
+};
 
 export function useWebSocket(projectId: string | null) {
   const queryClient = useQueryClient();
@@ -19,27 +23,53 @@ export function useWebSocket(projectId: string | null) {
   // debounced timer then flushes the unique set of keys.
 
   // Using `JSON.stringify` to store keys allows us to dedupe array/object keys in a Set.
-  const pendingInvalidationsRef = useRef<Set<string>>(new Set());
   const flushTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingInvalidationsRef = useRef<Set<string>>(new Set());
 
   const scheduleInvalidation = (key: any) => {
     pendingInvalidationsRef.current.add(JSON.stringify(key));
+    
+    console.log('[VideoLoadSpeedIssue] Scheduled invalidation:', {
+      queryKey: key,
+      serializedKey: JSON.stringify(key),
+      totalPending: pendingInvalidationsRef.current.size,
+      timestamp: Date.now()
+    });
 
     if (!flushTimerRef.current) {
       flushTimerRef.current = setTimeout(() => {
         log('PerfDebug:WebSocketFlush', `Flushing ${pendingInvalidationsRef.current.size} invalidations`);
+        
+        console.log('[VideoLoadSpeedIssue] Flushing invalidations:', {
+          count: pendingInvalidationsRef.current.size,
+          keys: Array.from(pendingInvalidationsRef.current),
+          timestamp: Date.now()
+        });
 
         pendingInvalidationsRef.current.forEach((keyString) => {
           try {
             const parsedKey = JSON.parse(keyString);
+            console.log('[VideoLoadSpeedIssue] Invalidating query:', {
+              originalKey: keyString,
+              parsedKey,
+              timestamp: Date.now()
+            });
             queryClient.invalidateQueries({ queryKey: parsedKey });
           } catch (err) {
             // Fallback for primitive keys that can't be parsed
+            console.log('[VideoLoadSpeedIssue] Invalidating query (fallback):', {
+              keyString,
+              error: err,
+              timestamp: Date.now()
+            });
             queryClient.invalidateQueries({ queryKey: keyString as any });
           }
         });
         pendingInvalidationsRef.current.clear();
         flushTimerRef.current = null;
+        console.log('[VideoLoadSpeedIssue] Invalidation flush completed:', {
+          timestamp: Date.now()
+        });
       }, 100); // Flush once every 100 ms max
     }
   };
@@ -91,6 +121,11 @@ export function useWebSocket(projectId: string | null) {
                 break;
 
               case 'TASK_COMPLETED':
+                console.log('[VideoLoadSpeedIssue] TASK_COMPLETED broadcast received:', {
+                  projectId,
+                  payload: message.payload,
+                  timestamp: Date.now()
+                });
                 scheduleInvalidation(['tasks', { projectId }]);
                 scheduleInvalidation(['tasks']);
                 scheduleInvalidation(['generations', projectId]);
@@ -165,16 +200,40 @@ export function useWebSocket(projectId: string | null) {
             
             const newRecord = payload.new as any;
             
+            console.log('[VideoLoadSpeedIssue] Generation INSERT detected:', {
+              generationId: newRecord?.id,
+              projectId: newRecord?.project_id,
+              type: newRecord?.type,
+              params: newRecord?.params,
+              paramsKeys: newRecord?.params ? Object.keys(newRecord.params) : 'no params',
+              timestamp: Date.now()
+            });
+            
             // Invalidate generations and shots queries
             scheduleInvalidation(['generations', projectId]);
             scheduleInvalidation(['shots', projectId]);
             
             // If there's a shot_id in params, invalidate that specific shot
             const shotId = newRecord?.params?.shotId || newRecord?.params?.shot_id;
+            console.log('[VideoLoadSpeedIssue] Extracted shotId for invalidation:', {
+              shotId,
+              shotIdFromCamelCase: newRecord?.params?.shotId,
+              shotIdFromSnakeCase: newRecord?.params?.shot_id,
+              willInvalidateShot: !!shotId,
+              timestamp: Date.now()
+            });
+            
             if (shotId) {
               scheduleInvalidation(['shots', shotId]);
               // CRITICAL: Also invalidate the all-shot-generations query used by ShotEditor
               scheduleInvalidation(['all-shot-generations', shotId]);
+              console.log('[VideoLoadSpeedIssue] Scheduled invalidation for shot-specific queries:', {
+                shotId,
+                queryKeys: [`shots:${shotId}`, `all-shot-generations:${shotId}`],
+                timestamp: Date.now()
+              });
+            } else {
+              console.warn('[VideoLoadSpeedIssue] No shotId found in generation params - shot-specific invalidations skipped');
             }
           }
         )
@@ -191,6 +250,15 @@ export function useWebSocket(projectId: string | null) {
             const record = payload.new || payload.old;
             const shotId = (record as any)?.shot_id;
             
+            console.log('[VideoLoadSpeedIssue] Shot generation change detected:', {
+              event: payload.eventType,
+              shotId,
+              generationId: (record as any)?.generation_id,
+              position: (record as any)?.position,
+              recordKeys: record ? Object.keys(record) : 'no record',
+              timestamp: Date.now()
+            });
+            
             // Invalidate shots and generations
             scheduleInvalidation(['shots', projectId]);
             scheduleInvalidation(['generations', projectId]);
@@ -198,16 +266,25 @@ export function useWebSocket(projectId: string | null) {
             // CRITICAL: Also invalidate the specific shot's all-shot-generations query
             if (shotId) {
               scheduleInvalidation(['all-shot-generations', shotId]);
+              console.log('[VideoLoadSpeedIssue] Scheduled shot_generations invalidation:', {
+                shotId,
+                queryKey: `all-shot-generations:${shotId}`,
+                timestamp: Date.now()
+              });
+            } else {
+              console.warn('[VideoLoadSpeedIssue] No shotId in shot_generations change - skipping shot-specific invalidation');
             }
           }
         )
         .subscribe((status, err) => {
           if (status === 'CHANNEL_ERROR' && err) {
-            console.error('[WebSocket] Supabase Realtime channel error:', err);
-          } else if (status === 'TIMED_OUT') {
-            console.error('[WebSocket] Supabase Realtime connection timed out');
+            console.error('[VideoLoadSpeedIssue] WebSocket channel error:', { status, error: err, projectId, timestamp: Date.now() });
           } else if (status === 'CLOSED') {
-            console.log('[WebSocket] Disconnected from Supabase Realtime');
+            console.warn('[VideoLoadSpeedIssue] WebSocket channel closed:', { status, projectId, timestamp: Date.now() });
+          } else if (status === 'SUBSCRIBED') {
+            console.log('[VideoLoadSpeedIssue] WebSocket channel subscribed successfully:', { status, projectId, timestamp: Date.now() });
+          } else {
+            console.log('[VideoLoadSpeedIssue] WebSocket status change:', { status, projectId, timestamp: Date.now() });
           }
         });
 

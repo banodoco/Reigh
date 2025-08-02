@@ -70,14 +70,14 @@ const SimpleVideoPlayer: React.FC<SimpleVideoPlayerProps> = ({
         playsInline
         autoPlay
         preload="auto"
-        className="object-contain w-full sm:w-auto max-w-full"
+        className="object-contain w-full sm:w-auto max-w-full hide-video-controls"
         style={{ maxHeight: '85vh' }}
       >
         Your browser does not support the video tag.
       </video>
 
-      {/* Playback speed controls – overlay at bottom center */}
-      <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center space-x-2 bg-black/60 rounded-md px-2 py-1 backdrop-blur-sm">
+      {/* Playback speed controls – overlay at top left */}
+      <div className="absolute top-2 left-2 flex items-center space-x-2 bg-black/60 rounded-md px-2 py-1 backdrop-blur-sm z-10">
         {speedOptions.map((speed) => (
           <Button
             key={speed}

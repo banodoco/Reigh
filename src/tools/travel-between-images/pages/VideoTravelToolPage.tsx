@@ -840,7 +840,7 @@ const VideoTravelToolPage: React.FC = () => {
       ) : (
         // Show a loading state while settings or component are being fetched
         <Suspense fallback={
-          <PageFadeIn className="pt-5">
+          <PageFadeIn className="pt-2 sm:pt-5">
             <div className="flex flex-col space-y-4 pb-16">
               <div className="flex-shrink-0 flex flex-wrap justify-between items-center gap-y-2 px-2">
                 <Skeleton className="h-10 w-32" />
@@ -855,7 +855,7 @@ const VideoTravelToolPage: React.FC = () => {
             </div>
           </PageFadeIn>
         }>
-          <PageFadeIn className="pt-5">
+          <PageFadeIn className="pt-2 sm:pt-5">
             <ShotEditor
               selectedShotId={shotToEdit?.id || ''}
               projectId={selectedProjectId}
