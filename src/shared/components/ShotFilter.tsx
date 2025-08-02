@@ -3,13 +3,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/shared/components/ui/checkbox';
 import { Label } from '@/shared/components/ui/label';
 import { Shot } from '@/types/shots';
+import { RefObject } from 'react';
 
 interface ShotFilterProps {
   shots: Shot[];
   selectedShotId: string;
   onShotChange: (shotId: string) => void;
-  excludePositioned?: boolean;
-  onExcludePositionedChange?: (exclude: boolean) => void;
+  excludePositioned: boolean;
+  onExcludePositionedChange: (exclude: boolean) => void;
   showPositionFilter?: boolean;
   className?: string;
   triggerClassName?: string;
@@ -20,6 +21,8 @@ interface ShotFilterProps {
   size?: 'sm' | 'md';
   whiteText?: boolean;
   isMobile?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  contentRef?: RefObject<HTMLDivElement>;
 }
 
 export const ShotFilter: React.FC<ShotFilterProps> = ({
@@ -38,6 +41,8 @@ export const ShotFilter: React.FC<ShotFilterProps> = ({
   size = 'md',
   whiteText = false,
   isMobile = false,
+  onOpenChange,
+  contentRef,
 }) => {
   const heightClass = size === 'sm' ? 'h-8' : 'h-10';
   const textSizeClass = size === 'sm' ? 'text-xs' : 'text-sm';
@@ -61,11 +66,14 @@ export const ShotFilter: React.FC<ShotFilterProps> = ({
           </Label>
         )}
         
-        <Select value={selectedShotId} onValueChange={onShotChange}>
+        <Select value={selectedShotId} onValueChange={onShotChange} onOpenChange={onOpenChange}>
           <SelectTrigger className={triggerClassName || defaultTriggerClassName}>
             <SelectValue placeholder="Filter by shot..." />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent
+            className="w-[var(--radix-select-trigger-width)] bg-zinc-900 border-zinc-700 text-white max-h-60 overflow-y-auto"
+            ref={contentRef}
+          >
             <SelectItem value="all">All Shots</SelectItem>
             {shots?.map(shot => (
               <SelectItem key={shot.id} value={shot.id}>
@@ -78,7 +86,7 @@ export const ShotFilter: React.FC<ShotFilterProps> = ({
       
       {/* Position filter checkbox - only show when a specific shot is selected */}
       {showPositionFilter && selectedShotId !== 'all' && onExcludePositionedChange && (
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-2 mt-2">
           <Checkbox 
             id={checkboxId}
             checked={excludePositioned}

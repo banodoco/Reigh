@@ -48,7 +48,7 @@ const GenerationsPage: React.FC = () => {
 
     return (
     <div className="container mx-auto p-4 flex flex-col h-full">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">All Generations</h1>
       </div>
       

@@ -22,7 +22,6 @@ import { useListTasks } from "@/shared/hooks/useTasks";
 import { PageFadeIn } from '@/shared/components/transitions';
 import { useSearchParams } from 'react-router-dom';
 import { ToolPageHeader } from '@/shared/components/ToolPageHeader';
-import { useToolPageHeader } from '@/shared/contexts/ToolPageHeaderContext';
 import { timeEnd } from '@/shared/lib/logger';
 import { useIsMobile } from "@/shared/hooks/use-mobile";
 import { fetchGenerations } from "@/shared/hooks/useGenerations";
@@ -58,7 +57,6 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   const [isFilterChange, setIsFilterChange] = useState(false);
   const [mediaTypeFilter, setMediaTypeFilter] = useState<'all' | 'image' | 'video'>('all'); // Add media type filter state
   const [starredOnly, setStarredOnly] = useState<boolean>(false);
-  const [toolTypeFilterEnabled, setToolTypeFilterEnabled] = useState<boolean>(true); // State for the tool type filter checkbox
   const [formAssociatedShotId, setFormAssociatedShotId] = useState<string | null>(null); // Track the associated shot from the form
   const isMobile = useIsMobile();
   
@@ -78,14 +76,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   const galleryRef = useRef<HTMLDivElement>(null);
   const formContainerRef = useRef<HTMLDivElement>(null);
   const [searchParams] = useSearchParams();
-  const { setHeader, clearHeader } = useToolPageHeader();
   const { currentShotId } = useCurrentShot();
-
-  // Set the header when component mounts and clear when unmounting
-  useEffect(() => {
-    setHeader(<ToolPageHeader title="Image Generation" />);
-    return () => clearHeader();
-  }, [setHeader, clearHeader]);
 
   // Track project tasks to know when they appear in the TasksPane (must be after selectedProjectId)
   const { data: projectTasks } = useListTasks({ projectId: selectedProjectId });
@@ -102,7 +93,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     itemsPerPage, 
     loadGenerations,
     {
-      toolType: toolTypeFilterEnabled ? 'image-generation' : undefined,
+      toolType: 'image-generation', // Always true
       mediaType: mediaTypeFilter, // Use dynamic mediaType instead of hardcoded 'image'
       shotId: selectedShotFilter === 'all' ? undefined : selectedShotFilter,
       excludePositioned: selectedShotFilter !== 'all' ? excludePositioned : undefined,
@@ -130,7 +121,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   useEffect(() => {
     setIsFilterChange(true);
     setCurrentPage(1);
-  }, [toolTypeFilterEnabled]);
+  }, []);
 
   // Update last known total when we get valid data
   useEffect(() => {
@@ -506,6 +497,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
 
   return (
     <PageFadeIn>
+      <ToolPageHeader title="Image Generation" />
         {/* <Button variant="ghost" onClick={() => setShowSettingsModal(true)}>
           <Settings className="h-5 w-5" />
           <span className="sr-only">Settings</span>
@@ -565,7 +557,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
                 lastShotId={targetShotInfo.targetShotIdForButton}
                 lastShotNameForTooltip={targetShotInfo.targetShotNameForButtonTooltip}
                 currentToolType="image-generation"
-                initialFilterState={toolTypeFilterEnabled}
+                initialFilterState={true}
                 initialMediaTypeFilter={mediaTypeFilter}
                 itemsPerPage={itemsPerPage}
                 offset={(currentPage - 1) * itemsPerPage}
@@ -583,7 +575,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
                 onMediaTypeFilterChange={handleMediaTypeFilterChange}
                 initialStarredFilter={starredOnly}
                 onStarredFilterChange={setStarredOnly}
-                onToolTypeFilterChange={setToolTypeFilterEnabled}
+                onToolTypeFilterChange={() => {}}
                 formAssociatedShotId={formAssociatedShotId}
                 onSwitchToAssociatedShot={handleSwitchToAssociatedShot}
               />

@@ -6,9 +6,10 @@ interface UseSlidingPaneOptions {
   side: 'left' | 'right' | 'bottom';
   isLocked: boolean;
   onToggleLock: () => void;
+  additionalRefs?: React.RefObject<HTMLElement>[];
 }
 
-export const useSlidingPane = ({ side, isLocked, onToggleLock }: UseSlidingPaneOptions) => {
+export const useSlidingPane = ({ side, isLocked, onToggleLock, additionalRefs }: UseSlidingPaneOptions) => {
   const [isOpen, setIsOpen] = useState(isLocked);
   const leaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const paneRef = useRef<HTMLDivElement | null>(null);
@@ -66,7 +67,7 @@ export const useSlidingPane = ({ side, isLocked, onToggleLock }: UseSlidingPaneO
         return; // allow event to proceed
       }
 
-      if (paneRef.current && !paneRef.current.contains(targetEl)) {
+      if (paneRef.current && !paneRef.current.contains(targetEl) && !additionalRefs?.some(ref => ref.current?.contains(targetEl))) {
         // Prevent the click from triggering underlying UI actions
         event.preventDefault();
         event.stopPropagation();
@@ -76,7 +77,7 @@ export const useSlidingPane = ({ side, isLocked, onToggleLock }: UseSlidingPaneO
 
     document.addEventListener('pointerdown', handleClickOutside, true);
     return () => document.removeEventListener('pointerdown', handleClickOutside, true);
-  }, [isMobile, isOpen]);
+  }, [isMobile, isOpen, additionalRefs]);
 
   // Close on dragstart anywhere (mobile)
   useEffect(() => {

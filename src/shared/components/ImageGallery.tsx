@@ -142,6 +142,10 @@ interface ImageGalleryProps {
   onSwitchToAssociatedShot?: (shotId: string) => void;
   /** Reduce spacing for compact/pane usage */
   reducedSpacing?: boolean;
+  /** Hide pagination controls (when pagination is handled externally) */
+  hidePagination?: boolean;
+  /** Hide star and media type filters (when filters are handled externally) */
+  hideTopFilters?: boolean;
 }
 
 // Helper to format metadata for display
@@ -269,7 +273,9 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   initialStarredFilter = false,
   formAssociatedShotId,
   onSwitchToAssociatedShot,
-  reducedSpacing = false
+  reducedSpacing = false,
+  hidePagination = false,
+  hideTopFilters = false
 }) => {
   const [activeLightboxMedia, setActiveLightboxMedia] = useState<GenerationRow | null>(null);
   const [downloadingImageId, setDownloadingImageId] = useState<string | null>(null);
@@ -716,154 +722,186 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   return (
     <TooltipProvider>
       <div className={`${reducedSpacing ? 'space-y-3' : 'space-y-6'} ${reducedSpacing ? 'pb-2' : 'pb-8'}`}>
-        <div className={`flex flex-wrap justify-between items-center ${reducedSpacing ? 'mt-0' : 'mt-7'} mb-4 gap-x-4 gap-y-2`}> {/* Reduce top margin for compact/pane usage */}
-            <div className="flex items-center gap-2">
-                {/* Pagination Controls */}
-                {totalPages > 1 && (
-                  <>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        if (isServerPagination) {
-                          onServerPageChange!(Math.max(1, serverPage! - 1));
-                        } else {
-                          setPage((p) => Math.max(0, p - 1));
-                        }
-                      }}
-                      disabled={isServerPagination ? serverPage === 1 : page === 0}
-                    >
-                      Prev
-                    </Button>
-                    <span className={`text-sm ${whiteText ? 'text-white' : 'text-muted-foreground'} whitespace-nowrap mx-4`}>
-                      {rangeStart}-{rangeEnd} (out of {totalFilteredItems})
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        if (isServerPagination) {
-                          onServerPageChange!(serverPage! + 1);
-                        } else {
-                          setPage((p) => Math.min(totalPages - 1, p + 1));
-                        }
-                      }}
-                      disabled={isServerPagination ? serverPage >= totalPages : page >= totalPages - 1}
-                    >
-                      Next
-                    </Button>
-                  </>
-                )}
-                {totalPages === 1 && (
-                  <span className={`text-sm ${whiteText ? 'text-white' : 'text-muted-foreground'} whitespace-nowrap ml-auto`}>
-                    {rangeStart}-{rangeEnd} (out of {totalFilteredItems})
+        {/* Header section with pagination and filters */}
+        <div className={`${reducedSpacing ? 'mt-0' : 'mt-7'} space-y-3`}>
+            {/* Pagination row with starred filter */}
+            {totalPages > 1 && !hidePagination && (
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      if (isServerPagination) {
+                        onServerPageChange!(Math.max(1, serverPage! - 1));
+                      } else {
+                        setPage((p) => Math.max(0, p - 1));
+                      }
+                    }}
+                    disabled={isServerPagination ? serverPage === 1 : page === 0}
+                  >
+                    Prev
+                  </Button>
+                  <span className={`text-sm ${whiteText ? 'text-white' : 'text-muted-foreground'} whitespace-nowrap`}>
+                    {rangeStart}-{rangeEnd} of {totalFilteredItems}
                   </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      if (isServerPagination) {
+                        onServerPageChange!(serverPage! + 1);
+                      } else {
+                        setPage((p) => Math.min(totalPages - 1, p + 1));
+                      }
+                    }}
+                    disabled={isServerPagination ? serverPage >= totalPages : page >= totalPages - 1}
+                  >
+                    Next
+                  </Button>
+                </div>
+                
+                {/* Starred Filter on the right */}
+                {!hideTopFilters && (
+                  <div className="flex items-center space-x-2">
+                      <Checkbox 
+                          id="starred-filter-gallery"
+                          checked={showStarredOnly}
+                          onCheckedChange={(checked) => {
+                              const newStarredOnly = Boolean(checked);
+                              setShowStarredOnly(newStarredOnly);
+                              onStarredFilterChange?.(newStarredOnly);
+                          }}
+                          className={whiteText ? "border-zinc-600 data-[state=checked]:bg-zinc-600" : ""}
+                      />
+                      <Label 
+                          htmlFor="starred-filter-gallery" 
+                          className={`text-xs cursor-pointer flex items-center space-x-1 ${whiteText ? 'text-zinc-400' : 'text-muted-foreground'}`}
+                      >
+                          <Star className="h-3 w-3" />
+                          <span>Starred</span>
+                      </Label>
+                  </div>
                 )}
               </div>
-
-            <div className="flex items-center gap-x-4 gap-y-2 flex-wrap"> {/* Grouping filters, added flex-wrap */}
-                {/* Shot Filter */}
-                {showShotFilter && (
-                    <ShotFilter
-                        shots={allShots || []}
-                        selectedShotId={shotFilter}
-                        onShotChange={handleShotFilterChange}
-                        excludePositioned={excludePositioned}
-                        onExcludePositionedChange={handleExcludePositionedChange}
-                        size="sm"
-                        whiteText={whiteText}
-                        checkboxId="exclude-positioned-image-gallery"
-                        triggerWidth="w-[140px]"
-                        triggerClassName={`h-8 text-xs ${whiteText ? 'bg-zinc-800 border-zinc-600 text-white' : ''}`}
-                    />
-                )}
-
-                {/* Search */}
-                {showSearch && (
-                    <div className="flex items-center space-x-1.5">
-                        {!isSearchOpen ? (
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={toggleSearch}
-                                className={`h-8 px-2 ${whiteText ? 'text-white border-zinc-600 hover:bg-zinc-700' : ''}`}
-                                aria-label="Search prompts"
-                            >
-                                <Search className="h-4 w-4" />
-                            </Button>
-                        ) : (
-                            <div className={`flex items-center space-x-2 border rounded-md px-3 py-1 h-8 ${whiteText ? 'bg-zinc-800 border-zinc-600' : 'bg-background'}`}>
-                                <Search className={`h-4 w-4 ${whiteText ? 'text-zinc-400' : 'text-muted-foreground'}`} />
-                                <input
-                                    ref={searchInputRef}
-                                    type="text"
-                                    placeholder="Search prompts..."
-                                    value={searchTerm}
-                                    onChange={(e) => handleSearchChange(e.target.value)}
-                                    className={`bg-transparent border-none outline-none text-xs w-40 ${whiteText ? 'text-white placeholder-zinc-400' : ''}`}
-                                />
-                                {searchTerm && (
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={clearSearch}
-                                        className="h-auto p-0.5"
-                                    >
-                                        <X className="h-3 w-3" />
-                                    </Button>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                )}
+            )}
+            
+            {/* Single page count with starred filter */}
+            {totalPages === 1 && !hidePagination && (
+              <div className="flex justify-between items-center">
+                <span className={`text-sm ${whiteText ? 'text-white' : 'text-muted-foreground'}`}>
+                  Showing {rangeStart}-{rangeEnd} of {totalFilteredItems}
+                </span>
                 
-                {/* New Media Type Filter */}
-                <div className="flex items-center space-x-1.5">
-                    <Label htmlFor="media-type-filter" className={`text-sm font-medium ${whiteText ? 'text-white' : 'text-muted-foreground'}`}>Type:</Label>
-                    <Select value={mediaTypeFilter} onValueChange={(value: 'all' | 'image' | 'video') => {
-                      setMediaTypeFilter(value);
-                      onMediaTypeFilterChange?.(value);
-                    }}>
-                        <SelectTrigger id="media-type-filter" className="h-8 text-xs w-[100px]"> {/* Adjusted width slightly */}
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all" className="text-xs">All</SelectItem>
-                            <SelectItem value="image" className="text-xs">Images</SelectItem>
-                            <SelectItem value="video" className="text-xs">Videos</SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-
-                {/* Existing Tool Type Filter */}
-                {currentToolType && (
-                    <div className="flex items-center space-x-2"> {/* Removed pt-1 as alignment handled by flex group */}
-                        <Checkbox
-                            id={`filter-tool-${currentToolType}`}
-                            checked={filterByToolType}
-                            onCheckedChange={(checked) => {
-                                const isChecked = Boolean(checked);
-                                setFilterByToolType(isChecked);
-                                onToolTypeFilterChange?.(isChecked);
-                            }}
-                            aria-label={`Filter by ${currentToolType} tool`}
-                        />
-                        <Label htmlFor={`filter-tool-${currentToolType}`} className={`text-sm font-medium cursor-pointer ${whiteText ? 'text-white' : 'text-muted-foreground'}`}>
-                            Generated here
-                        </Label>
-                    </div>
+                {/* Starred Filter on the right */}
+                {!hideTopFilters && (
+                  <div className="flex items-center space-x-2">
+                      <Checkbox 
+                          id="starred-filter-gallery-single"
+                          checked={showStarredOnly}
+                          onCheckedChange={(checked) => {
+                              const newStarredOnly = Boolean(checked);
+                              setShowStarredOnly(newStarredOnly);
+                              onStarredFilterChange?.(newStarredOnly);
+                          }}
+                          className={whiteText ? "border-zinc-600 data-[state=checked]:bg-zinc-600" : ""}
+                      />
+                      <Label 
+                          htmlFor="starred-filter-gallery-single" 
+                          className={`text-xs cursor-pointer flex items-center space-x-1 ${whiteText ? 'text-zinc-400' : 'text-muted-foreground'}`}
+                      >
+                          <Star className="h-3 w-3" />
+                          <span>Starred</span>
+                      </Label>
+                  </div>
                 )}
+              </div>
+            )}
 
-                {/* Starred Filter */}
-                <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={handleStarredFilterToggle}
-                    className={`h-8 w-8 p-0 ${whiteText ? 'bg-accent text-accent-foreground border-accent hover:bg-accent/80' : ''} ${showStarredOnly ? 'bg-primary text-primary-foreground border-primary' : ''}`}
-                    aria-label="Filter by starred generations"
-                >
-                    <Star className={`h-4 w-4 ${showStarredOnly ? 'fill-current' : ''}`} />
-                </Button>
+            {/* Filters row - spread out to full width */}
+            <div className="flex justify-between items-center flex-wrap gap-y-2">
+                {/* Left side filters */}
+                <div className="flex items-center gap-3">
+                    {/* Shot Filter */}
+                    {showShotFilter && (
+                        <ShotFilter
+                            shots={allShots || []}
+                            selectedShotId={shotFilter}
+                            onShotChange={handleShotFilterChange}
+                            excludePositioned={excludePositioned}
+                            onExcludePositionedChange={handleExcludePositionedChange}
+                            size="sm"
+                            whiteText={whiteText}
+                            checkboxId="exclude-positioned-image-gallery"
+                            triggerWidth="w-[140px]"
+                            triggerClassName={`h-8 text-xs ${whiteText ? 'bg-zinc-800 border-zinc-600 text-white' : ''}`}
+                        />
+                    )}
+
+                    {/* Search */}
+                    {showSearch && (
+                        <div className="flex items-center">
+                            {!isSearchOpen ? (
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={toggleSearch}
+                                    className={`h-8 px-2 ${whiteText ? 'text-white border-zinc-600 hover:bg-zinc-700' : ''}`}
+                                    aria-label="Search prompts"
+                                >
+                                    <Search className="h-4 w-4" />
+                                </Button>
+                            ) : (
+                                <div className={`flex items-center space-x-2 border rounded-md px-3 py-1 h-8 ${whiteText ? 'bg-zinc-800 border-zinc-600' : 'bg-background'}`}>
+                                    <Search className={`h-4 w-4 ${whiteText ? 'text-zinc-400' : 'text-muted-foreground'}`} />
+                                    <input
+                                        ref={searchInputRef}
+                                        type="text"
+                                        placeholder="Search prompts..."
+                                        value={searchTerm}
+                                        onChange={(e) => handleSearchChange(e.target.value)}
+                                        className={`bg-transparent border-none outline-none text-xs w-32 sm:w-40 ${whiteText ? 'text-white placeholder-zinc-400' : ''}`}
+                                    />
+                                    {searchTerm && (
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={clearSearch}
+                                            className="h-auto p-0.5"
+                                        >
+                                            <X className="h-3 w-3" />
+                                        </Button>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+                
+                {/* Right side filters */}
+                <div className="flex items-center gap-3">
+                    {/* Media Type Filter */}
+                    {!hideTopFilters && (
+                      <div className="flex items-center space-x-2">
+                          <Label htmlFor="media-type-filter" className={`text-xs ${whiteText ? 'text-zinc-400' : 'text-muted-foreground'}`}>Type:</Label>
+                          <Select value={mediaTypeFilter} onValueChange={(value: 'all' | 'image' | 'video') => {
+                            setMediaTypeFilter(value);
+                            onMediaTypeFilterChange?.(value);
+                          }}>
+                              <SelectTrigger id="media-type-filter" className={`h-8 text-xs w-[80px] ${whiteText ? 'bg-zinc-800 border-zinc-700 text-white' : ''}`}>
+                                  <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                  <SelectItem value="all" className="text-xs">All</SelectItem>
+                                  <SelectItem value="image" className="text-xs">Images</SelectItem>
+                                  <SelectItem value="video" className="text-xs">Videos</SelectItem>
+                              </SelectContent>
+                          </Select>
+                      </div>
+                    )}
+
+
+                </div>
             </div>
         </div>
 
@@ -887,18 +925,26 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
         {/* Gallery content wrapper with minimum height to prevent layout jump when there are images */}
         <div className={paginatedImages.length > 0 && !reducedSpacing ? "min-h-[400px] sm:min-h-[500px] lg:min-h-[600px]" : ""}>
           {images.length > 0 && filteredImages.length === 0 && (filterByToolType || mediaTypeFilter !== 'all' || searchTerm.trim()) && (
-            <div className="text-center py-12 mt-8 text-muted-foreground border rounded-lg bg-card shadow-sm">
-              <Filter className="mx-auto h-10 w-10 mb-3 opacity-60" />
-              <p className="font-semibold">No items match the current filters.</p>
-              <p className="text-sm">Adjust the filters or clear the search to see all items.</p>
+            <div className={`text-center py-10 mt-6 rounded-lg ${
+              whiteText 
+                ? "text-zinc-400 border-zinc-700 bg-zinc-800/50" 
+                : "text-muted-foreground border bg-card shadow-sm"
+            }`}>
+              <Filter className={`mx-auto h-10 w-10 mb-3 opacity-60 ${whiteText ? "text-zinc-500" : ""}`} />
+              <p className={`font-semibold ${whiteText ? "text-zinc-300" : ""}`}>No items match the current filters.</p>
+              <p className={`text-sm ${whiteText ? "text-zinc-400" : ""}`}>Adjust the filters or clear the search to see all items.</p>
             </div>
           )}
 
           {images.length === 0 && (
-             <div className="text-center py-12 mt-8 text-muted-foreground border rounded-lg bg-card shadow-sm">
-               <Sparkles className="mx-auto h-10 w-10 mb-3 opacity-60" />
-               <p className="font-semibold">No images generated yet.</p>
-               <p className="text-sm">Use the controls above to generate some images.</p>
+             <div className={`text-center py-12 mt-8 rounded-lg ${
+               whiteText 
+                 ? "text-zinc-400 border-zinc-700 bg-zinc-800/50" 
+                 : "text-muted-foreground border bg-card shadow-sm"
+             }`}>
+               <Sparkles className={`mx-auto h-10 w-10 mb-3 opacity-60 ${whiteText ? "text-zinc-500" : ""}`} />
+               <p className={`font-semibold ${whiteText ? "text-zinc-300" : ""}`}>No images generated yet.</p>
+               <p className={`text-sm ${whiteText ? "text-zinc-400" : ""}`}>Use the controls above to generate some images.</p>
              </div>
           )}
 
@@ -937,7 +983,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
           )}
         </div>
         {/* Bottom Pagination Controls (moved inside container for better spacing) */}
-        {totalPages > 1 && !reducedSpacing && (
+        {totalPages > 1 && !reducedSpacing && !hidePagination && (
           <div className={`flex justify-center items-center mt-4 ${whiteText ? 'text-white' : 'text-gray-600'}`}>
             <Button
               variant="outline"
