@@ -21,6 +21,7 @@ interface ShotFilterProps {
   size?: 'sm' | 'md';
   whiteText?: boolean;
   isMobile?: boolean;
+  open?: boolean;
   onOpenChange?: (open: boolean) => void;
   contentRef?: RefObject<HTMLDivElement>;
 }
@@ -41,6 +42,7 @@ export const ShotFilter: React.FC<ShotFilterProps> = ({
   size = 'md',
   whiteText = false,
   isMobile = false,
+  open,
   onOpenChange,
   contentRef,
 }) => {
@@ -66,7 +68,7 @@ export const ShotFilter: React.FC<ShotFilterProps> = ({
           </Label>
         )}
         
-        <Select value={selectedShotId} onValueChange={onShotChange} onOpenChange={onOpenChange}>
+        <Select value={selectedShotId} onValueChange={onShotChange} open={open} onOpenChange={onOpenChange}>
           <SelectTrigger className={triggerClassName || defaultTriggerClassName}>
             <SelectValue placeholder="Filter by shot..." />
           </SelectTrigger>

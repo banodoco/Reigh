@@ -40,6 +40,10 @@ export const GenerationsPane: React.FC = () => {
   
   // Starred filter state
   const [showStarredOnly, setShowStarredOnly] = useState(false);
+  
+  // Dropdown states to prevent unwanted opening
+  const [shotFilterOpen, setShotFilterOpen] = useState(false);
+  const [mediaTypeFilterOpen, setMediaTypeFilterOpen] = useState(false);
 
   // Use the generalized logic
   const {
@@ -107,6 +111,8 @@ export const GenerationsPane: React.FC = () => {
   useEffect(() => {
     if (isOpen) {
       setIsInteractionDisabled(true);
+      setShotFilterOpen(false); // Ensure shot filter is closed when pane opens
+      setMediaTypeFilterOpen(false); // Ensure media type filter is closed when pane opens
       const timer = setTimeout(() => setIsInteractionDisabled(false), 300);
       return () => clearTimeout(timer);
     }
@@ -196,7 +202,19 @@ export const GenerationsPane: React.FC = () => {
                       )}
                     >
                       <span className="text-xs text-zinc-400">Type:</span>
-                      <Select value={mediaTypeFilter} onValueChange={(value: 'all' | 'image' | 'video') => setMediaTypeFilter(value)}>
+                      <Select 
+                        value={mediaTypeFilter} 
+                        onValueChange={(value: 'all' | 'image' | 'video') => setMediaTypeFilter(value)}
+                        open={mediaTypeFilterOpen}
+                        onOpenChange={(open) => {
+                          // Prevent dropdown from staying open during interaction-disabled period
+                          if (isInteractionDisabled && open) {
+                            setMediaTypeFilterOpen(false);
+                            return;
+                          }
+                          setMediaTypeFilterOpen(open);
+                        }}
+                      >
                         <SelectTrigger className="w-[80px] h-8 text-xs bg-zinc-800 border-zinc-700 text-white">
                           <SelectValue />
                         </SelectTrigger>
@@ -231,6 +249,15 @@ export const GenerationsPane: React.FC = () => {
                     isMobile={isMobile}
                     contentRef={shotFilterContentRef}
                     className="flex flex-col space-y-2"
+                    open={shotFilterOpen}
+                    onOpenChange={(open) => {
+                      // Prevent dropdown from staying open during interaction-disabled period
+                      if (isInteractionDisabled && open) {
+                        setShotFilterOpen(false);
+                        return;
+                      }
+                      setShotFilterOpen(open);
+                    }}
                   />
                 </div>
 
