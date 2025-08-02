@@ -276,33 +276,6 @@ See [README.md](README.md) for:
 
 ---
 
-## Recent Major Changes
-
-### GenerationsPane Enhancements (Latest)
-- **Redesigned header layout**: Moved Star and Media Type filters to the top row alongside the title, with pagination controls on the right
-- **Improved filter organization**: Shot filter now has its own row below the main header with pagination controls on the same horizontal level
-- **Enhanced mobile experience**: 
-  - Added interaction delay (300ms) to prevent accidental dropdown triggering on mobile
-  - Implemented dropdown portal protection to prevent pane closure when interacting with filters
-  - Added refs to track dropdown content for proper click-outside detection
-- **Better vertical alignment**: Fixed empty state message centering using proper flexbox layout
-- **Consistent spacing**: Added proper margins and transitions for all filter interactions
-- **State synchronization**: Centralized filter state management with proper prop passing to ImageGallery
-
-### ImageGallery Layout Improvements (Latest)
-- **Reorganized header structure**: 
-  - Separated pagination and filters into distinct rows for better mobile layout
-  - Moved starred filter to align with pagination controls
-  - Spread filters across full width using justify-between layout
-- **Removed "Generated here" filter**: Simplified interface by removing tool-type checkbox (always enabled on image generation page)
-- **Enhanced responsive design**: 
-  - Better spacing and wrapping on mobile devices
-  - Responsive search input width (w-32 sm:w-40)
-  - Improved filter grouping with left/right alignment
-- **Consistent styling**: Applied dark theme colors for empty state messages when in pane context
-
----
-
 <div align="center">
 
 **🎯 Quick Links**
