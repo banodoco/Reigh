@@ -106,14 +106,22 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
     }
     
     if (imageRetryCount < MAX_RETRIES) {
-      // Retry with cache busting
+      console.log(`[ImageGalleryItem] Auto-retrying image load for ${image.id} in ${1000 * (imageRetryCount + 1)}ms...`);
+      // Auto-retry with cache busting after a delay
       setTimeout(() => {
         setImageRetryCount(prev => prev + 1);
+        // Force reload by clearing and resetting the src
+        setActualSrc(null);
+        setTimeout(() => {
+          const retryUrl = getDisplayUrl(image.thumbUrl || image.url, true); // Force cache bust
+          setActualSrc(retryUrl);
+        }, 100);
       }, 1000 * (imageRetryCount + 1)); // Exponential backoff
     } else {
+      console.warn(`[ImageGalleryItem] Max retries exceeded for ${image.id}, showing error state`);
       setImageLoadError(true);
     }
-  }, [displayUrl, image.id, imageRetryCount]);
+  }, [displayUrl, image.id, imageRetryCount, image.thumbUrl, image.url]);
 
   // Reset error state when URL changes (new image)
   useEffect(() => {
