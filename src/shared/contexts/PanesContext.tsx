@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode, useCa
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
 import { ReighLoading } from '@/shared/components/ReighLoading';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
+import { PANE_CONFIG } from '@/shared/config/panes';
 
 interface PanesContextType {
   isGenerationsPaneLocked: boolean;
@@ -41,9 +42,9 @@ export const PanesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [isGenerationsPaneOpenState, setIsGenerationsPaneOpenState] = useState(false);
 
   // Pane dimensions (not persisted)
-  const [generationsPaneHeight, setGenerationsPaneHeightState] = useState(350);
-  const [shotsPaneWidth, setShotsPaneWidthState] = useState(300);
-  const [tasksPaneWidth, setTasksPaneWidthState] = useState(300);
+  const [generationsPaneHeight, setGenerationsPaneHeightState] = useState<number>(PANE_CONFIG.dimensions.DEFAULT_HEIGHT);
+  const [shotsPaneWidth, setShotsPaneWidthState] = useState<number>(PANE_CONFIG.dimensions.DEFAULT_WIDTH);
+  const [tasksPaneWidth, setTasksPaneWidthState] = useState<number>(PANE_CONFIG.dimensions.DEFAULT_WIDTH);
 
   // Hydrate local state once when settings load (desktop only)
   useEffect(() => {

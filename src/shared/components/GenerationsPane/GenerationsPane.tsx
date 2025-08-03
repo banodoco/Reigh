@@ -22,8 +22,7 @@ import {
 } from '@/shared/components/ui/select';
 import { Checkbox } from '@/shared/components/ui/checkbox';
 import { Label } from '@/shared/components/ui/label';
-
-const DEFAULT_PANE_HEIGHT = 350;
+import { PANE_CONFIG } from '@/shared/config/panes';
 const GENERATIONS_PER_PAGE = 18;
 
 export const GenerationsPane: React.FC = () => {

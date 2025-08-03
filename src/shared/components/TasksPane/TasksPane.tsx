@@ -13,6 +13,7 @@ import { useCancelAllPendingTasks, useTaskStatusCounts, usePaginatedTasks, type 
 import { useToast } from '@/shared/hooks/use-toast';
 import { TasksPaneProcessingWarning } from '../ProcessingWarnings';
 import { TASK_STATUS, TaskStatus } from '@/types/database';
+import { useBottomOffset } from '@/shared/hooks/useBottomOffset';
 
 const ITEMS_PER_PAGE = 50;
 
@@ -270,8 +271,6 @@ export const TasksPane: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
     onToggleLock: () => setIsTasksPaneLocked(!isTasksPaneLocked),
   });
 
-  const bottomOffset = (isGenerationsPaneLocked || isGenerationsPaneOpen) ? generationsPaneHeight : 0;
-
   // Calculate pagination info using display data to avoid flickering
   const totalTasks = displayPaginatedData?.total || 0;
   const totalPages = displayPaginatedData?.totalPages || 0;
@@ -285,7 +284,7 @@ export const TasksPane: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
         toggleLock={toggleLock}
         openPane={openPane}
         paneDimension={tasksPaneWidth}
-        bottomOffset={(isGenerationsPaneLocked || isGenerationsPaneOpen) ? generationsPaneHeight : 0}
+        bottomOffset={useBottomOffset()}
         handlePaneEnter={handlePaneEnter}
         handlePaneLeave={handlePaneLeave}
         thirdButton={{

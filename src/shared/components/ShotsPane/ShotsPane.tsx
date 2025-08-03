@@ -18,6 +18,7 @@ import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 import PaneControlTab from '../PaneControlTab';
 import { Skeleton } from '@/shared/components/ui/skeleton';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
+import { useBottomOffset } from '@/shared/hooks/useBottomOffset';
 import { useShotNavigation } from '@/shared/hooks/useShotNavigation';
 
 export const ShotsPane: React.FC = () => {
@@ -179,8 +180,6 @@ export const ShotsPane: React.FC = () => {
     // navigate('/tools/travel-between-images', { state: { fromShotClick: true } });
   };
 
-  const bottomOffset = (isGenerationsPaneLocked || isGenerationsPaneOpen) ? generationsPaneHeight : 0;
-
   return (
     <>
       <PaneControlTab
@@ -190,7 +189,7 @@ export const ShotsPane: React.FC = () => {
         toggleLock={toggleLock}
         openPane={openPane}
         paneDimension={shotsPaneWidth}
-        bottomOffset={(isGenerationsPaneLocked || isGenerationsPaneOpen) ? generationsPaneHeight : 0}
+        bottomOffset={useBottomOffset()}
         handlePaneEnter={handlePaneEnter}
         handlePaneLeave={handlePaneLeave}
         thirdButton={{

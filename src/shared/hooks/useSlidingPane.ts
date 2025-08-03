@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useLocation } from 'react-router-dom';
+import { PANE_CONFIG } from '@/shared/config/panes';
 
 interface UseSlidingPaneOptions {
   side: 'left' | 'right' | 'bottom';
@@ -131,7 +132,7 @@ export const useSlidingPane = ({ side, isLocked, onToggleLock, additionalRefs }:
     if (isLocked) return;
     leaveTimeoutRef.current = setTimeout(() => {
       setOpen(false);
-    }, 100);
+    }, PANE_CONFIG.timing.HOVER_DELAY);
   };
 
   const handlePaneEnter = () => {

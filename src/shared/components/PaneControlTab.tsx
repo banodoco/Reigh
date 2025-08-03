@@ -3,9 +3,11 @@ import { Button } from '@/shared/components/ui/button';
 import { LockIcon, UnlockIcon, ChevronLeft, ChevronRight, ChevronUp, Square } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
+import { PANE_CONFIG, PaneSide, PanePosition } from '@/shared/config/panes';
+import { usePositionStrategy } from '@/shared/hooks/pane-positioning/usePositionStrategy';
 
 interface PaneControlTabProps {
-  side: 'left' | 'right' | 'bottom';
+  side: PaneSide;
   isLocked: boolean;
   isOpen: boolean;
   toggleLock: (force?: boolean) => void;
@@ -29,7 +31,17 @@ interface PaneControlTabProps {
   };
 }
 
-const PaneControlTab: React.FC<PaneControlTabProps> = ({ side, isLocked, isOpen, toggleLock, openPane, paneDimension, bottomOffset = 0, handlePaneEnter, handlePaneLeave, thirdButton,
+const PaneControlTab: React.FC<PaneControlTabProps> = ({ 
+  side, 
+  isLocked, 
+  isOpen, 
+  toggleLock, 
+  openPane, 
+  paneDimension, 
+  bottomOffset = 0, 
+  handlePaneEnter, 
+  handlePaneLeave, 
+  thirdButton,
   horizontalOffset = 0,
 }) => {
   const isMobile = useIsMobile();
@@ -47,34 +59,52 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({ side, isLocked, isOpen,
   // Determine whether the pane is currently visible (same logic as useSlidingPane)
   const isVisible = isLocked || (isOpen && !isLocked);
 
-  const getDynamicStyle = (): React.CSSProperties => {
-    const style: React.CSSProperties = {};
+  // Create position object for strategy
+  const position: PanePosition = {
+    side,
+    dimension: paneDimension,
+    offsets: {
+      bottom: bottomOffset,
+      horizontal: horizontalOffset,
+    },
+    isVisible,
+  };
 
-    if (side === 'left' || side === 'right') {
-      // Set a static vertical anchor and move the offset logic into the transform.
-      // This allows the browser to animate only the transform property, which is
-      // much more performant than animating `top` with a dynamic calc().
-      style.top = '50%';
-      const verticalOffset = `calc(-50% - ${bottomOffset / 2}px)`;
+  // Get dynamic style using position strategy
+  const dynamicStyle = usePositionStrategy(position);
 
-      if (side === 'left') {
-        style.left = '0px';
-        style.transform = `translateX(${isVisible ? paneDimension : 0}px) translateY(${verticalOffset})`;
-      } else {
-        style.right = '0px';
-        style.transform = `translateX(${isVisible ? -paneDimension : 0}px) translateY(${verticalOffset})`;
-      }
-    } else if (side === 'bottom') {
-      style.left = '50%';
-      style.bottom = '0px';
-      // Centre within visible width by shifting half the horizontalOffset.
-      // translateX(-50%) centres on viewport; additional translateX accounts for
-      // asymmetrical side panes (e.g. shots/tasks) so the control remains centred
-      // within the bottom pane itself.
-      style.transform = `translateX(-50%) translateX(${horizontalOffset / 2}px) translateY(${isVisible ? -paneDimension : 0}px)`;
+  const getPositionClasses = () => {
+    switch (side) {
+      case 'left':
+        return 'left-0 flex-col';
+      case 'right':
+        return 'right-0 flex-col';
+      case 'bottom':
+        return 'left-1/2 -translate-x-1/2 bottom-0 flex-row';
+      default:
+        return '';
     }
+  };
 
-    return style;
+  const getIcon = () => {
+    switch (side) {
+        case 'left': return <ChevronRight className="h-4 w-4" />;
+        case 'right': return <ChevronLeft className="h-4 w-4" />;
+        case 'bottom': return <ChevronUp className="h-4 w-4" />;
+        default: return null;
+    }
+  };
+
+  const getFlexDirection = () => {
+    switch (side) {
+        case 'left':
+        case 'right':
+            return 'flex-col';
+        case 'bottom':
+            return 'flex-row';
+        default:
+            return '';
+    }
   };
 
   // Mobile: Only show button when pane is closed
@@ -82,35 +112,13 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({ side, isLocked, isOpen,
     if (selectionActive) return null; // hide when selection active
     // Don't show control when pane is open on mobile
     if (isOpen) return null;
-    
-    const getPositionClasses = () => {
-      switch (side) {
-        case 'left':
-          return 'left-0 flex-col';
-        case 'right':
-          return 'right-0 flex-col';
-        case 'bottom':
-          return 'left-1/2 -translate-x-1/2 bottom-0 flex-row';
-        default:
-          return '';
-      }
-    };
-
-    const getIcon = () => {
-      switch (side) {
-          case 'left': return <ChevronRight className="h-4 w-4" />;
-          case 'right': return <ChevronLeft className="h-4 w-4" />;
-          case 'bottom': return <ChevronUp className="h-4 w-4" />;
-          default: return null;
-      }
-    };
 
     return (
       <div
         data-pane-control
-        style={getDynamicStyle()}
+        style={dynamicStyle}
         className={cn(
-          'fixed z-[102] flex flex-col items-center p-1 bg-zinc-800/80 backdrop-blur-sm border border-zinc-700 rounded-md gap-1 transition-[transform,top] duration-300 ease-smooth',
+          `fixed z-[${PANE_CONFIG.zIndex.CONTROL_UNLOCKED}] flex flex-col items-center p-1 bg-zinc-800/80 backdrop-blur-sm border border-zinc-700 rounded-md gap-1 ${PANE_CONFIG.transition.PROPERTIES.TRANSFORM_OPACITY} duration-${PANE_CONFIG.timing.ANIMATION_DURATION} ${PANE_CONFIG.transition.EASING}`,
           getPositionClasses(),
           'opacity-100'
         )}
@@ -148,24 +156,13 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({ side, isLocked, isOpen,
   // Desktop behavior (original)
   // Show lock button at edge when pane is open but not locked
   if (isOpen && !isLocked) {
-    let positionClass = '';
-    switch (side) {
-        case 'left':
-        case 'right':
-            positionClass = 'flex-col';
-            break;
-        case 'bottom':
-            positionClass = 'flex-row';
-            break;
-    }
-
     return (
       <div
         data-pane-control
-        style={getDynamicStyle()}
+        style={dynamicStyle}
         className={cn(
-          'fixed z-[101] flex items-center p-1 bg-zinc-800/90 backdrop-blur-sm border border-zinc-700 rounded-md transition-transform duration-300 ease-smooth',
-          positionClass
+          `fixed z-[${PANE_CONFIG.zIndex.CONTROL_LOCKED}] flex items-center p-1 bg-zinc-800/90 backdrop-blur-sm border border-zinc-700 rounded-md ${PANE_CONFIG.transition.PROPERTIES.TRANSFORM_ONLY} duration-${PANE_CONFIG.timing.ANIMATION_DURATION} ${PANE_CONFIG.transition.EASING}`,
+          getFlexDirection()
         )}
         onMouseEnter={handlePaneEnter}
         onMouseLeave={handlePaneLeave}
@@ -195,24 +192,13 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({ side, isLocked, isOpen,
   }
 
   if (isLocked) {
-    let positionClass = '';
-    switch (side) {
-        case 'left':
-        case 'right':
-            positionClass = 'flex-col';
-            break;
-        case 'bottom':
-            positionClass = 'flex-row';
-            break;
-    }
-
     return (
       <div
         data-pane-control
-        style={getDynamicStyle()}
+        style={dynamicStyle}
         className={cn(
-          'fixed z-[101] flex items-center p-1 bg-zinc-800/90 backdrop-blur-sm border border-zinc-700 rounded-md transition-transform duration-300 ease-smooth',
-          positionClass
+          `fixed z-[${PANE_CONFIG.zIndex.CONTROL_LOCKED}] flex items-center p-1 bg-zinc-800/90 backdrop-blur-sm border border-zinc-700 rounded-md ${PANE_CONFIG.transition.PROPERTIES.TRANSFORM_ONLY} duration-${PANE_CONFIG.timing.ANIMATION_DURATION} ${PANE_CONFIG.transition.EASING}`,
+          getFlexDirection()
         )}
       >
         <Button
@@ -240,37 +226,15 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({ side, isLocked, isOpen,
   }
 
   // Pane is closed (desktop)
-  const getPositionClasses = () => {
-    switch (side) {
-      case 'left':
-        return 'left-0 flex-col';
-      case 'right':
-        return 'right-0 flex-col';
-      case 'bottom':
-        return 'left-1/2 -translate-x-1/2 bottom-0 flex-row';
-      default:
-        return '';
-    }
-  };
-
-  const getIcon = () => {
-    switch (side) {
-        case 'left': return <ChevronRight className="h-4 w-4" />;
-        case 'right': return <ChevronLeft className="h-4 w-4" />;
-        case 'bottom': return <ChevronUp className="h-4 w-4" />;
-        default: return null;
-    }
-  };
-
   return (
     <div
       data-pane-control
-      style={getDynamicStyle()}
-              className={cn(
-          'fixed z-[102] flex items-center p-1 bg-zinc-800/80 backdrop-blur-sm border border-zinc-700 rounded-md gap-1 transition-[transform,opacity] duration-300 ease-smooth',
-          getPositionClasses(),
-          isOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'
-        )}
+      style={dynamicStyle}
+      className={cn(
+        `fixed z-[${PANE_CONFIG.zIndex.CONTROL_UNLOCKED}] flex items-center p-1 bg-zinc-800/80 backdrop-blur-sm border border-zinc-700 rounded-md gap-1 ${PANE_CONFIG.transition.PROPERTIES.TRANSFORM_OPACITY} duration-${PANE_CONFIG.timing.ANIMATION_DURATION} ${PANE_CONFIG.transition.EASING}`,
+        getPositionClasses(),
+        isOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'
+      )}
     >
       <Button
         variant="ghost"
