@@ -369,9 +369,6 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
 
   // Ref for scrolling to top of gallery instead of top of page
   const galleryTopRef = useRef<HTMLDivElement>(null);
-  
-  // Ref to store loading cleanup function
-  const loadingCleanupRef = useRef<(() => void) | null>(null);
 
   // Pagination state - reduce items per page on mobile for faster initial render
   const ITEMS_PER_PAGE = actualItemsPerPage;
@@ -700,18 +697,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     if (loadingButton) return; // Prevent multiple clicks while any button is loading
     
     setLoadingButton(direction);
-    
-    // Simple rule: Adjacent pages (preloaded) = no loading state, others = show loading
-    const currentPageNum = isServerPagination ? (serverPage || 1) - 1 : page;
-    const isAdjacentPage = Math.abs(newPage - currentPageNum) === 1;
-    const skipLoading = isAdjacentPage && enableAdjacentPagePreloading;
-    
-    if (!skipLoading) {
-      setIsGalleryLoading(true);
-    }
-    
-    // Simple cleanup function
-    loadingCleanupRef.current = () => setIsGalleryLoading(false);
+    setIsGalleryLoading(true); // Immediately show loading state for all images
     
     if (isServerPagination && onServerPageChange) {
       // Server-side pagination: notify the parent, which will handle scrolling.
@@ -720,7 +706,6 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
       // We still manage the loading button state here.
       setTimeout(() => {
         setLoadingButton(null);
-        if (loadingCleanupRef.current) loadingCleanupRef.current();
       }, 500);
     } else {
       // Client-side pagination - show loading longer for bottom buttons
@@ -728,7 +713,6 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
       setPage(newPage);
       setTimeout(() => {
         setLoadingButton(null);
-        if (loadingCleanupRef.current) loadingCleanupRef.current();
         // Scroll to top of gallery AFTER page loads (only for bottom buttons)
         if (fromBottom && galleryTopRef.current) {
           const rect = galleryTopRef.current.getBoundingClientRect();
@@ -773,10 +757,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     images: paginatedImages,
     page,
     enabled: true,
-    onImagesReady: () => {
-      // Simple: just turn off gallery loading when images are ready
-      setIsGalleryLoading(false);
-    },
+    onImagesReady: () => setIsGalleryLoading(false), // Reset gallery loading when first batch is ready
   });
     
   // Progressive loading is now handled by the useProgressiveImageLoading hook

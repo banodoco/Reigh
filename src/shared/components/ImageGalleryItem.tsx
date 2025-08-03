@@ -157,29 +157,18 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
         return;
       }
       
-      // Simple loading strategy: priority images load immediately, others with short delay
-      const delay = isPriority ? 0 : 30;
+      setImageLoading(true);
+      // Small delay to ensure priority images start loading first
+      const delay = isPriority ? 0 : 50;
       
-      if (delay === 0) {
-        // Priority images - load immediately (likely cached from preloading)
-        setActualSrc(actualDisplayUrl);
-      } else {
-        // Non-priority images - short delay
-        setImageLoading(true);
-        
-        const timeout = setTimeout(() => {
-          if (isMounted && actualDisplayUrl !== '/placeholder.svg') {
-            setActualSrc(actualDisplayUrl);
-          }
-        }, delay);
-        
-        return () => {
-          clearTimeout(timeout);
-          isMounted = false;
-        };
-      }
+      const timeout = setTimeout(() => {
+        if (isMounted && actualDisplayUrl !== '/placeholder.svg') {
+          setActualSrc(actualDisplayUrl);
+        }
+      }, delay);
       
       return () => {
+        clearTimeout(timeout);
         isMounted = false;
       };
     }
