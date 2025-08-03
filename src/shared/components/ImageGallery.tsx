@@ -701,15 +701,25 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     
     setLoadingButton(direction);
     
-    // Smart loading state: only show if images might not be cached
-    // Give a small delay to see if images load immediately (indicating cache hit)
-    const loadingTimeout = setTimeout(() => {
-      setIsGalleryLoading(true);
-    }, 100); // 100ms delay to avoid flash for cached images
+    // Smart loading state: check if this page was likely preloaded
+    const isAdjacentPage = Math.abs(newPage - (isServerPagination ? (serverPage || 1) - 1 : page)) === 1;
+    
+    if (isAdjacentPage && enableAdjacentPagePreloading) {
+      // This page was likely preloaded - skip loading state entirely
+      console.log('[ImageGallery] Skipping loading state for likely preloaded page');
+      var loadingTimeout: NodeJS.Timeout | null = null;
+    } else {
+      // Unknown page - use minimal delay for cache detection
+      var loadingTimeout = setTimeout(() => {
+        setIsGalleryLoading(true);
+      }, 30); // Reduced to 30ms for faster cache detection
+    }
     
     // Store timeout for cleanup and make it accessible to progressive loading hook
     const cleanupLoading = () => {
-      clearTimeout(loadingTimeout);
+      if (loadingTimeout) {
+        clearTimeout(loadingTimeout);
+      }
       setIsGalleryLoading(false);
     };
     loadingCleanupRef.current = cleanupLoading;

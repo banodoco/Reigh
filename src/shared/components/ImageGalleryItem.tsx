@@ -157,45 +157,30 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
         return;
       }
       
-      // Smart loading state: check if image might be cached first
-      const img = new Image();
-      let hasShownLoading = false;
-      
-      // Set up loading timeout - only show loading if image takes time to load
-      const loadingTimeout = setTimeout(() => {
-        if (isMounted && !hasShownLoading) {
-          setImageLoading(true);
-          hasShownLoading = true;
-        }
-      }, 100); // 100ms delay to avoid flash for cached images
-      
-      img.onload = () => {
-        clearTimeout(loadingTimeout);
-        if (isMounted) {
-          setActualSrc(actualDisplayUrl);
-          setImageLoading(false);
-        }
-      };
-      
-      img.onerror = () => {
-        clearTimeout(loadingTimeout);
-        if (isMounted) {
-          setImageLoading(false);
-        }
-      };
-      
-      // Small delay to ensure priority images start loading first
-      const delay = isPriority ? 0 : 50;
-      
-      const timeout = setTimeout(() => {
-        if (isMounted && actualDisplayUrl !== '/placeholder.svg') {
-          img.src = actualDisplayUrl; // This triggers the load/cache check
-        }
-      }, delay);
+      // Cache-aware loading strategy
+      if (isPriority) {
+        // Priority images (first 10) - likely cached from preloading
+        // Load immediately and ensure loading state is false
+        setActualSrc(actualDisplayUrl);
+        setImageLoading(false);
+      } else {
+        // Non-priority images - show minimal loading state
+        setImageLoading(true);
+        
+        const timeout = setTimeout(() => {
+          if (isMounted && actualDisplayUrl !== '/placeholder.svg') {
+            setActualSrc(actualDisplayUrl);
+            setImageLoading(false); // Ensure loading state is cleared
+          }
+        }, 20); // Very short delay for non-priority
+        
+        return () => {
+          clearTimeout(timeout);
+          isMounted = false;
+        };
+      }
       
       return () => {
-        clearTimeout(timeout);
-        clearTimeout(loadingTimeout);
         isMounted = false;
       };
     }
@@ -404,7 +389,8 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
               )}
               
               {/* Show skeleton while image is loading or shouldLoad is false */}
-              {(!shouldLoad || !imageLoaded || imageLoading || isGalleryLoading) && (
+              {/* Priority images bypass gallery loading state to prevent flash */}
+              {(!shouldLoad || !imageLoaded || imageLoading || (isGalleryLoading && !isPriority)) && (
                 <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-gray-200 animate-pulse">
                   <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-gray-400"></div>
                 </div>
