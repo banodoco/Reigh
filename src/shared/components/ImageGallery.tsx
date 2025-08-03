@@ -697,7 +697,26 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     if (loadingButton) return; // Prevent multiple clicks while any button is loading
     
     setLoadingButton(direction);
-    setIsGalleryLoading(true); // Immediately show loading state for all images
+    
+    // Smart loading state: only show gallery loading for non-adjacent pages or when preloading is disabled
+    const currentPageNum = isServerPagination ? (serverPage || 1) - 1 : page;
+    const isAdjacentPage = Math.abs(newPage - currentPageNum) === 1;
+    const shouldShowGalleryLoading = !isAdjacentPage || !enableAdjacentPagePreloading;
+    
+    if (shouldShowGalleryLoading) {
+      setIsGalleryLoading(true); // Show loading state for distant pages or when preloading disabled
+    } else {
+      // For adjacent pages, set a fallback timeout in case images take unexpectedly long
+      const fallbackTimeout = setTimeout(() => {
+        setIsGalleryLoading(true);
+      }, 200); // Show loading if images aren't ready within 200ms
+      
+      // The progressive loading hook will clear the loading state once ready
+      // Store timeout for potential cleanup (though it will likely complete before cleanup)
+      setTimeout(() => {
+        clearTimeout(fallbackTimeout);
+      }, 1000);
+    }
     
     if (isServerPagination && onServerPageChange) {
       // Server-side pagination: notify the parent, which will handle scrolling.
@@ -726,7 +745,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
         }
       }, loadingDelay);
     }
-  }, [loadingButton, isServerPagination, onServerPageChange, setPage, isMobile]);
+  }, [loadingButton, isServerPagination, onServerPageChange, setPage, isMobile, page, serverPage, enableAdjacentPagePreloading]);
   
   // Calculate pagination helpers (must come after filteredImages is defined)
   const totalFilteredItems = isServerPagination ? (totalCount ?? (offset + images.length)) : filteredImages.length;
@@ -757,7 +776,11 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     images: paginatedImages,
     page,
     enabled: true,
-    onImagesReady: () => setIsGalleryLoading(false), // Reset gallery loading when first batch is ready
+    onImagesReady: () => {
+      // Only reset gallery loading if it was actually set (for distant page jumps)
+      // Adjacent pages might not have set it in the first place
+      setIsGalleryLoading(false);
+    },
   });
     
   // Progressive loading is now handled by the useProgressiveImageLoading hook
