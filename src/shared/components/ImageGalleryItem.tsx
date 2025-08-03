@@ -228,6 +228,10 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
     const minPadding = 60; // Minimum 60% height (for very wide images)
     const maxPadding = 200; // Maximum 200% height (for very tall images)
     aspectRatioPadding = `${Math.min(Math.max(calculatedPadding, minPadding), maxPadding)}%`;
+  } else if (isActuallyVideo) {
+    // For videos without dimensions, use a common video aspect ratio instead of square
+    // 16:9 is the most common video aspect ratio
+    aspectRatioPadding = '56.25%'; // 9/16 * 100% = 56.25% for 16:9 aspect ratio
   }
 
   // If it's a placeholder, render simplified placeholder item
