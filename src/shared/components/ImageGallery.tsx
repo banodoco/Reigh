@@ -329,6 +329,9 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   const [searchTerm, setSearchTerm] = useState<string>(initialSearchTerm);
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(!!initialSearchTerm);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  
+  // Pagination loading state
+  const [isPaginationLoading, setIsPaginationLoading] = useState<boolean>(false);
 
   // Pagination state - reduce items per page on mobile for faster initial render
   const ITEMS_PER_PAGE = actualItemsPerPage;
@@ -339,6 +342,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     const timer = setTimeout(() => setPage(0), 10);
     return () => clearTimeout(timer);
   }, [filterByToolType, mediaTypeFilter, searchTerm, showStarredOnly]);
+
+
 
   useEffect(() => {
     const newSelectedShotId = currentShotId || lastShotId || (simplifiedShotOptions.length > 0 ? simplifiedShotOptions[0].id : "");
@@ -658,6 +663,24 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   // Determine if we're in server-side pagination mode
   const isServerPagination = !!(onServerPageChange && serverPage);
   
+  // Handle pagination with loading state
+  const handlePageChange = React.useCallback((newPage: number) => {
+    if (isPaginationLoading) return; // Prevent multiple clicks
+    
+    setIsPaginationLoading(true);
+    
+    if (isServerPagination && onServerPageChange) {
+      // Server-side pagination
+      onServerPageChange(newPage);
+      // Reset loading state after a short delay to allow for server response
+      setTimeout(() => setIsPaginationLoading(false), 500);
+    } else {
+      // Client-side pagination - simulate brief loading for UX consistency
+      setPage(newPage);
+      setTimeout(() => setIsPaginationLoading(false), 100);
+    }
+  }, [isPaginationLoading, isServerPagination, onServerPageChange, setPage]);
+  
   // Calculate pagination helpers (must come after filteredImages is defined)
   const totalFilteredItems = isServerPagination ? (totalCount ?? (offset + images.length)) : filteredImages.length;
   const currentPageForCalc = isServerPagination ? (serverPage! - 1) : page;
@@ -736,14 +759,16 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                     variant="outline"
                     size="sm"
                     onClick={() => {
-                      if (isServerPagination) {
-                        onServerPageChange!(Math.max(1, serverPage! - 1));
-                      } else {
-                        setPage((p) => Math.max(0, p - 1));
-                      }
+                      const newPage = isServerPagination 
+                        ? Math.max(1, serverPage! - 1)
+                        : Math.max(0, page - 1);
+                      handlePageChange(newPage);
                     }}
-                    disabled={isServerPagination ? serverPage === 1 : page === 0}
+                    disabled={isPaginationLoading || (isServerPagination ? serverPage === 1 : page === 0)}
                   >
+                    {isPaginationLoading ? (
+                      <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-current mr-1"></div>
+                    ) : null}
                     Prev
                   </Button>
                   <span className={`text-sm ${whiteText ? 'text-white' : 'text-muted-foreground'} whitespace-nowrap`}>
@@ -753,14 +778,16 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                     variant="outline"
                     size="sm"
                     onClick={() => {
-                      if (isServerPagination) {
-                        onServerPageChange!(serverPage! + 1);
-                      } else {
-                        setPage((p) => Math.min(totalPages - 1, p + 1));
-                      }
+                      const newPage = isServerPagination 
+                        ? serverPage! + 1
+                        : Math.min(totalPages - 1, page + 1);
+                      handlePageChange(newPage);
                     }}
-                    disabled={isServerPagination ? serverPage >= totalPages : page >= totalPages - 1}
+                    disabled={isPaginationLoading || (isServerPagination ? serverPage >= totalPages : page >= totalPages - 1)}
                   >
+                    {isPaginationLoading ? (
+                      <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-current mr-1"></div>
+                    ) : null}
                     Next
                   </Button>
                 </div>
@@ -993,14 +1020,16 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
               variant="outline"
               size="sm"
               onClick={() => {
-                if (isServerPagination) {
-                  onServerPageChange!(Math.max(1, serverPage! - 1));
-                } else {
-                  setPage((p) => Math.max(0, p - 1));
-                }
+                const newPage = isServerPagination 
+                  ? Math.max(1, serverPage! - 1)
+                  : Math.max(0, page - 1);
+                handlePageChange(newPage);
               }}
-              disabled={isServerPagination ? serverPage === 1 : page === 0}
+              disabled={isPaginationLoading || (isServerPagination ? serverPage === 1 : page === 0)}
             >
+              {isPaginationLoading ? (
+                <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-current mr-1"></div>
+              ) : null}
               Prev
             </Button>
             <span className={`text-sm ${whiteText ? 'text-white' : 'text-muted-foreground'} whitespace-nowrap mx-4`}>
@@ -1010,14 +1039,16 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
               variant="outline"
               size="sm"
               onClick={() => {
-                if (isServerPagination) {
-                  onServerPageChange!(serverPage! + 1);
-                } else {
-                  setPage((p) => Math.min(totalPages - 1, p + 1));
-                }
+                const newPage = isServerPagination 
+                  ? serverPage! + 1
+                  : Math.min(totalPages - 1, page + 1);
+                handlePageChange(newPage);
               }}
-              disabled={isServerPagination ? serverPage >= totalPages : page >= totalPages - 1}
+              disabled={isPaginationLoading || (isServerPagination ? serverPage >= totalPages : page >= totalPages - 1)}
             >
+              {isPaginationLoading ? (
+                <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-current mr-1"></div>
+              ) : null}
               Next
             </Button>
           </div>
