@@ -157,18 +157,45 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
         return;
       }
       
-      setImageLoading(true);
+      // Smart loading state: check if image might be cached first
+      const img = new Image();
+      let hasShownLoading = false;
+      
+      // Set up loading timeout - only show loading if image takes time to load
+      const loadingTimeout = setTimeout(() => {
+        if (isMounted && !hasShownLoading) {
+          setImageLoading(true);
+          hasShownLoading = true;
+        }
+      }, 100); // 100ms delay to avoid flash for cached images
+      
+      img.onload = () => {
+        clearTimeout(loadingTimeout);
+        if (isMounted) {
+          setActualSrc(actualDisplayUrl);
+          setImageLoading(false);
+        }
+      };
+      
+      img.onerror = () => {
+        clearTimeout(loadingTimeout);
+        if (isMounted) {
+          setImageLoading(false);
+        }
+      };
+      
       // Small delay to ensure priority images start loading first
       const delay = isPriority ? 0 : 50;
       
       const timeout = setTimeout(() => {
         if (isMounted && actualDisplayUrl !== '/placeholder.svg') {
-          setActualSrc(actualDisplayUrl);
+          img.src = actualDisplayUrl; // This triggers the load/cache check
         }
       }, delay);
       
       return () => {
         clearTimeout(timeout);
+        clearTimeout(loadingTimeout);
         isMounted = false;
       };
     }
