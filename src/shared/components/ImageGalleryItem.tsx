@@ -21,6 +21,7 @@ import { useToast } from "@/shared/hooks/use-toast";
 import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { GeneratedImageWithMetadata, DisplayableMetadata, formatMetadataForDisplay } from "./ImageGallery";
 import { log } from '@/shared/lib/logger';
+import { cn } from "@/shared/lib/utils";
 
 interface ImageGalleryItemProps {
   image: GeneratedImageWithMetadata;
@@ -307,32 +308,37 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                   <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-gray-400"></div>
                 </div>
               )
+          ) : imageLoadError ? (
+            // Fallback when image fails to load after retries
+            <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-gray-100 text-gray-500">
+              <div className="text-center">
+                <AlertTriangle className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p className="text-xs">Failed to load image</p>
+                <button 
+                  onClick={() => {
+                    setImageLoadError(false);
+                    setImageRetryCount(0);
+                    setActualSrc(null);
+                    setImageLoaded(false);
+                    setImageLoading(false);
+                  }}
+                  className="text-xs underline hover:no-underline mt-1"
+                >
+                  Retry
+                </button>
+              </div>
+            </div>
           ) : (
-             imageLoadError ? (
-               // Fallback when image fails to load after retries
-               <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-gray-100 text-gray-500">
-                 <div className="text-center">
-                   <AlertTriangle className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                   <p className="text-xs">Failed to load image</p>
-                   <button 
-                     onClick={() => {
-                       setImageLoadError(false);
-                       setImageRetryCount(0);
-                       setActualSrc(null);
-                       setImageLoaded(false);
-                       setImageLoading(false);
-                     }}
-                     className="text-xs underline hover:no-underline mt-1"
-                   >
-                     Retry
-                   </button>
-                 </div>
-               </div>
-             ) : actualSrc ? (
-              <img
+            <>
+              {/* Always render the img tag if actualSrc is available, to trigger loading. */}
+              {actualSrc && (
+                <img
                   src={actualSrc}
                   alt={image.prompt || `Generated image ${index + 1}`}
-                  className="absolute inset-0 w-full h-full object-cover group-hover:opacity-80 transition-opacity duration-300"
+                  className={cn(
+                    "absolute inset-0 w-full h-full object-cover group-hover:opacity-80 transition-opacity duration-300",
+                    !imageLoaded && "opacity-0"
+                  )}
                   onDoubleClick={isMobile ? undefined : () => onOpenLightbox(image)}
                   onTouchEnd={isMobile ? (e) => {
                     e.preventDefault();
@@ -340,22 +346,24 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                   } : undefined}
                   style={{ cursor: 'pointer' }}
                   onError={handleImageError}
-                                     onLoad={() => {
-                     setImageLoading(false);
-                     setImageLoaded(true);
-                   }}
-                   onLoadStart={() => setImageLoading(true)}
-                   onAbort={() => {
-                     // Reset loading state if image load was aborted
-                     setImageLoading(false);
-                   }}
-              />
-             ) : (
-               // Image loading skeleton
-               <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-gray-200 animate-pulse">
-                 <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-gray-400"></div>
-               </div>
-             )
+                  onLoad={() => {
+                    setImageLoading(false);
+                    setImageLoaded(true);
+                  }}
+                  onLoadStart={() => setImageLoading(true)}
+                  onAbort={() => {
+                    // Reset loading state if image load was aborted
+                    setImageLoading(false);
+                  }}
+                />
+              )}
+              {/* Show skeleton while image is loading and there's no error */}
+              {!imageLoaded && (
+                <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-gray-200 animate-pulse">
+                  <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-gray-400"></div>
+                </div>
+              )}
+            </>
           )}
       </div>
       </div>
