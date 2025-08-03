@@ -701,28 +701,17 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     
     setLoadingButton(direction);
     
-    // Smart loading state: check if this page was likely preloaded
-    const isAdjacentPage = Math.abs(newPage - (isServerPagination ? (serverPage || 1) - 1 : page)) === 1;
+    // Simple rule: Adjacent pages (preloaded) = no loading state, others = show loading
+    const currentPageNum = isServerPagination ? (serverPage || 1) - 1 : page;
+    const isAdjacentPage = Math.abs(newPage - currentPageNum) === 1;
+    const skipLoading = isAdjacentPage && enableAdjacentPagePreloading;
     
-    if (isAdjacentPage && enableAdjacentPagePreloading) {
-      // This page was likely preloaded - skip loading state entirely
-      console.log('[ImageGallery] Skipping loading state for likely preloaded page');
-      var loadingTimeout: NodeJS.Timeout | null = null;
-    } else {
-      // Unknown page - use minimal delay for cache detection
-      var loadingTimeout = setTimeout(() => {
-        setIsGalleryLoading(true);
-      }, 30); // Reduced to 30ms for faster cache detection
+    if (!skipLoading) {
+      setIsGalleryLoading(true);
     }
     
-    // Store timeout for cleanup and make it accessible to progressive loading hook
-    const cleanupLoading = () => {
-      if (loadingTimeout) {
-        clearTimeout(loadingTimeout);
-      }
-      setIsGalleryLoading(false);
-    };
-    loadingCleanupRef.current = cleanupLoading;
+    // Simple cleanup function
+    loadingCleanupRef.current = () => setIsGalleryLoading(false);
     
     if (isServerPagination && onServerPageChange) {
       // Server-side pagination: notify the parent, which will handle scrolling.
@@ -731,7 +720,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
       // We still manage the loading button state here.
       setTimeout(() => {
         setLoadingButton(null);
-        cleanupLoading(); // Clean up gallery loading state
+        if (loadingCleanupRef.current) loadingCleanupRef.current();
       }, 500);
     } else {
       // Client-side pagination - show loading longer for bottom buttons
@@ -739,7 +728,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
       setPage(newPage);
       setTimeout(() => {
         setLoadingButton(null);
-        cleanupLoading(); // Clean up gallery loading state
+        if (loadingCleanupRef.current) loadingCleanupRef.current();
         // Scroll to top of gallery AFTER page loads (only for bottom buttons)
         if (fromBottom && galleryTopRef.current) {
           const rect = galleryTopRef.current.getBoundingClientRect();
@@ -785,13 +774,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     page,
     enabled: true,
     onImagesReady: () => {
-      // Images are ready - cancel any pending loading timeout and hide loading state
-      if (loadingCleanupRef.current) {
-        loadingCleanupRef.current();
-        loadingCleanupRef.current = null; // Clear ref after use
-      } else {
-        setIsGalleryLoading(false); // Fallback
-      }
+      // Simple: just turn off gallery loading when images are ready
+      setIsGalleryLoading(false);
     },
   });
     
