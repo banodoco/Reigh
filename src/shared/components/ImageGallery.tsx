@@ -767,9 +767,10 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                     disabled={loadingButton !== null || (isServerPagination ? serverPage === 1 : page === 0)}
                   >
                     {loadingButton === 'prev' ? (
-                      <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-current mr-1"></div>
-                    ) : null}
-                    Prev
+                      <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-current"></div>
+                    ) : (
+                      'Prev'
+                    )}
                   </Button>
                   <span className={`text-sm ${whiteText ? 'text-white' : 'text-muted-foreground'} whitespace-nowrap`}>
                     {rangeStart}-{rangeEnd} of {totalFilteredItems}
@@ -786,9 +787,10 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                     disabled={loadingButton !== null || (isServerPagination ? serverPage >= totalPages : page >= totalPages - 1)}
                   >
                     {loadingButton === 'next' ? (
-                      <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-current mr-1"></div>
-                    ) : null}
-                    Next
+                      <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-current"></div>
+                    ) : (
+                      'Next'
+                    )}
                   </Button>
                 </div>
                 
@@ -1028,9 +1030,10 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
               disabled={loadingButton !== null || (isServerPagination ? serverPage === 1 : page === 0)}
             >
               {loadingButton === 'prev' ? (
-                <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-current mr-1"></div>
-              ) : null}
-              Prev
+                <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-current"></div>
+              ) : (
+                'Prev'
+              )}
             </Button>
             <span className={`text-sm ${whiteText ? 'text-white' : 'text-muted-foreground'} whitespace-nowrap mx-4`}>
               {rangeStart}-{rangeEnd} (out of {totalFilteredItems})
@@ -1047,9 +1050,10 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
               disabled={loadingButton !== null || (isServerPagination ? serverPage >= totalPages : page >= totalPages - 1)}
             >
               {loadingButton === 'next' ? (
-                <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-current mr-1"></div>
-              ) : null}
-              Next
+                <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-current"></div>
+              ) : (
+                'Next'
+              )}
             </Button>
           </div>
         )}
