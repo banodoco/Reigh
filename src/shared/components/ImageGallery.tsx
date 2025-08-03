@@ -757,6 +757,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     images: paginatedImages,
     page,
     enabled: true,
+    onImagesReady: () => setIsGalleryLoading(false), // Reset gallery loading when first batch is ready
   });
     
   // Progressive loading is now handled by the useProgressiveImageLoading hook

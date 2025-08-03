@@ -4,12 +4,14 @@ interface UseProgressiveImageLoadingProps {
   images: any[];
   page: number;
   enabled?: boolean;
+  onImagesReady?: () => void; // Callback when first batch is ready
 }
 
 export const useProgressiveImageLoading = ({ 
   images, 
   page, 
-  enabled = true 
+  enabled = true,
+  onImagesReady
 }: UseProgressiveImageLoadingProps) => {
   const [showImageIndices, setShowImageIndices] = useState<Set<number>>(new Set());
 
@@ -19,8 +21,14 @@ export const useProgressiveImageLoading = ({
     let isCurrentPage = true; // Flag to check if this effect is still valid
     const timeouts: NodeJS.Timeout[] = [];
 
-    // Reset and show first 10 images immediately
-    setShowImageIndices(new Set(Array.from({ length: Math.min(10, images.length) }, (_, i) => i)));
+    // Reset and show first 10 images immediately (this ensures clean state for new page)
+    const initialIndices = new Set(Array.from({ length: Math.min(10, images.length) }, (_, i) => i));
+    setShowImageIndices(initialIndices);
+    
+    // Notify that initial images are ready
+    if (onImagesReady) {
+      onImagesReady();
+    }
 
     // Progressive loading for remaining images (if more than 10)
     if (images.length > 10) {
@@ -51,8 +59,7 @@ export const useProgressiveImageLoading = ({
     return () => {
       isCurrentPage = false; // Mark this effect as stale
       timeouts.forEach(timeout => clearTimeout(timeout));
-      // Hard reset to prevent any stale state from affecting new page
-      setShowImageIndices(new Set());
+      // Don't clear showImageIndices here - let the new effect handle setting them
     };
   }, [images, page, enabled]);
 
