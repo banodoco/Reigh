@@ -332,6 +332,10 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   
   // Pagination loading state - track which button is loading
   const [loadingButton, setLoadingButton] = useState<'prev' | 'next' | null>(null);
+  
+  // Progressive loading state - prioritize first 10 images
+  const [loadedImageIds, setLoadedImageIds] = useState<Set<string>>(new Set());
+  const [showImageIndices, setShowImageIndices] = useState<Set<number>>(new Set());
 
   // Pagination state - reduce items per page on mobile for faster initial render
   const ITEMS_PER_PAGE = actualItemsPerPage;
@@ -579,6 +583,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     }
   }, [searchTerm, isSearchOpen]);
 
+
+
   const filteredImages = React.useMemo(() => {
     // Start with all images
     let currentFiltered = images;
@@ -704,6 +710,48 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     }
     return filteredImages.slice(page * ITEMS_PER_PAGE, (page + 1) * ITEMS_PER_PAGE);
   }, [filteredImages, page, isServerPagination]);
+
+  // Progressive loading effect - show first 10 images immediately, then load others with delay
+  useEffect(() => {
+    if (paginatedImages.length === 0) return;
+    
+    // Reset visible images when paginatedImages changes (new page/filter)
+    setShowImageIndices(new Set());
+    
+    // Show first 10 images immediately (priority loading)
+    const priorityCount = Math.min(10, paginatedImages.length);
+    const initialIndices = new Set(Array.from({ length: priorityCount }, (_, i) => i));
+    setShowImageIndices(initialIndices);
+    
+    // Progressive loading for remaining images
+    const timeouts: NodeJS.Timeout[] = [];
+    
+    if (paginatedImages.length > 10) {
+      // Load remaining images in batches of 5 with staggered delays
+      for (let i = 10; i < paginatedImages.length; i += 5) {
+        const batchNumber = Math.floor((i - 10) / 5);
+        const delay = (batchNumber + 1) * 150; // 150ms between batches
+        
+        const timeout = setTimeout(() => {
+          setShowImageIndices(prev => {
+            const newSet = new Set(prev);
+            // Add next batch of 5 images (or remaining if less than 5)
+            for (let j = i; j < Math.min(i + 5, paginatedImages.length); j++) {
+              newSet.add(j);
+            }
+            return newSet;
+          });
+        }, delay);
+        
+        timeouts.push(timeout);
+      }
+    }
+    
+    // Cleanup timeouts on unmount or dependency change
+    return () => {
+      timeouts.forEach(timeout => clearTimeout(timeout));
+    };
+  }, [paginatedImages]);
 
   const rangeStart = totalFilteredItems === 0 ? 0 : (isServerPagination ? offset : page * ITEMS_PER_PAGE) + 1;
   const rangeEnd = rangeStart + paginatedImages.length - 1;
@@ -983,35 +1031,55 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
 
           {paginatedImages.length > 0 && (
                 <div className={`grid ${reducedSpacing ? 'gap-2 sm:gap-4' : 'gap-4'} ${reducedSpacing ? 'mb-4' : 'mb-12'} ${gridColumnClasses}`}>
-            {paginatedImages.map((image, index) => (
-              <ImageGalleryItem
-                key={image.id || `image-${index}`}
-                image={image}
-                index={index}
-                isDeleting={isDeleting === image.id}
-                onDelete={onDelete}
-                onApplySettings={onApplySettings}
-                onOpenLightbox={handleOpenLightbox}
-                onAddToLastShot={onAddToLastShot}
-                onDownloadImage={handleDownloadImage}
-                onToggleStar={onToggleStar}
-                selectedShotIdLocal={selectedShotIdLocal}
-                simplifiedShotOptions={simplifiedShotOptions}
-                showTickForImageId={showTickForImageId}
-                onShowTick={handleShowTick}
-                addingToShotImageId={addingToShotImageId}
-                setAddingToShotImageId={setAddingToShotImageId}
-                downloadingImageId={downloadingImageId}
-                isMobile={isMobile}
-                mobileActiveImageId={mobileActiveImageId}
-                mobilePopoverOpenImageId={mobilePopoverOpenImageId}
-                onMobileTap={handleMobileTap}
-                setMobilePopoverOpenImageId={setMobilePopoverOpenImageId}
-                setSelectedShotIdLocal={setSelectedShotIdLocal}
-                setLastAffectedShotId={setLastAffectedShotId}
-                toggleStarMutation={toggleStarMutation}
-              />
-            ))}
+            {paginatedImages.map((image, index) => {
+              const shouldShow = showImageIndices.has(index);
+              
+              if (!shouldShow) {
+                // Show loading skeleton for images that haven't loaded yet
+                return (
+                  <div 
+                    key={`skeleton-${index}`}
+                    className="border rounded-lg overflow-hidden bg-muted animate-pulse"
+                  >
+                    <div style={{ paddingBottom: '100%' }} className="relative">
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-muted-foreground opacity-30"></div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+              
+              return (
+                <ImageGalleryItem
+                  key={image.id || `image-${index}`}
+                  image={image}
+                  index={index}
+                  isDeleting={isDeleting === image.id}
+                  onDelete={onDelete}
+                  onApplySettings={onApplySettings}
+                  onOpenLightbox={handleOpenLightbox}
+                  onAddToLastShot={onAddToLastShot}
+                  onDownloadImage={handleDownloadImage}
+                  onToggleStar={onToggleStar}
+                  selectedShotIdLocal={selectedShotIdLocal}
+                  simplifiedShotOptions={simplifiedShotOptions}
+                  showTickForImageId={showTickForImageId}
+                  onShowTick={handleShowTick}
+                  addingToShotImageId={addingToShotImageId}
+                  setAddingToShotImageId={setAddingToShotImageId}
+                  downloadingImageId={downloadingImageId}
+                  isMobile={isMobile}
+                  mobileActiveImageId={mobileActiveImageId}
+                  mobilePopoverOpenImageId={mobilePopoverOpenImageId}
+                  onMobileTap={handleMobileTap}
+                  setMobilePopoverOpenImageId={setMobilePopoverOpenImageId}
+                  setSelectedShotIdLocal={setSelectedShotIdLocal}
+                  setLastAffectedShotId={setLastAffectedShotId}
+                  toggleStarMutation={toggleStarMutation}
+                />
+              );
+            })}
             </div>
           )}
         </div>

@@ -142,6 +142,19 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
     [onImageDelete]
   );
 
+  // Individual delete function that clears selection if needed
+  const handleIndividualDelete = React.useCallback(
+    (id: string) => {
+      // Clear selection if the deleted item was selected
+      setSelectedIds(prev => prev.filter(selectedId => selectedId !== id));
+      setMobileSelectedIds(prev => prev.filter(selectedId => selectedId !== id));
+      
+      // Execute deletion
+      onImageDelete(id);
+    },
+    [onImageDelete]
+  );
+
   // Deselect when clicking outside the entire image manager area (mobile selection mode)
   useEffect(() => {
     if (!isMobile) return;
@@ -539,7 +552,7 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
                      isSelected={isSelected}
                      index={index}
                      onMobileTap={() => handleMobileTap(image.shotImageEntryId, index)}
-                     onDelete={() => onImageDelete(image.shotImageEntryId)}
+                     onDelete={() => handleIndividualDelete(image.shotImageEntryId)}
                      onDuplicate={onImageDuplicate}
                      hideDeleteButton={mobileSelectedIds.length > 0}
                      duplicatingImageId={duplicatingImageId}
@@ -696,7 +709,7 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
                 // Remove the redundant Ctrl+click handling here since it's handled in onClick
               }}
               onClick={isMobile ? undefined : (e) => handleItemClick(image.shotImageEntryId, e)}
-              onDelete={() => onImageDelete(image.shotImageEntryId)}
+              onDelete={() => handleIndividualDelete(image.shotImageEntryId)}
               onDuplicate={onImageDuplicate}
               position={(image as any).position ?? index}
               onDoubleClick={isMobile ? () => {} : () => setLightboxIndex(index)}
