@@ -36,8 +36,6 @@ export function useGenerationsPageLogic({
   
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [starredOnly, setStarredOnly] = useState<boolean>(false);
-  const [lastKnownTotal, setLastKnownTotal] = useState<number>(0);
-  const [currentItems, setCurrentItems] = useState<GeneratedImageWithMetadata[]>([]);
   const [isPageChange, setIsPageChange] = useState(false);
   
   const { data: shotsData } = useListShots(selectedProjectId);
@@ -93,8 +91,6 @@ export function useGenerationsPageLogic({
   // Reset to page 1 when shot filter or position filter changes
   useEffect(() => {
     setPage(1);
-    // Don't clear items when filters change - let them transition smoothly
-    // setCurrentItems([]) was causing layout jump
   }, [selectedShotFilter, excludePositioned]);
 
   // Reset to page 1 when media type or starred filter changes
@@ -102,7 +98,7 @@ export function useGenerationsPageLogic({
     setPage(1);
   }, [mediaType, starredOnly]);
 
-  const { data: generationsResponse, isLoading, isError, error } = useGenerations(
+  const { data: generationsResponse, isLoading, isFetching, isError, error } = useGenerations(
     selectedProjectId, 
     page, 
     itemsPerPage, 
@@ -124,31 +120,18 @@ export function useGenerationsPageLogic({
   const deleteGenerationMutation = useDeleteGeneration();
   const toggleStarMutation = useToggleGenerationStar();
 
-  // Update last known total when we get valid data
-  useEffect(() => {
-    if (generationsResponse?.total !== undefined && generationsResponse.total > 0) {
-      setLastKnownTotal(generationsResponse.total);
-    }
-  }, [generationsResponse?.total]);
-
-  // Update current items when generationsResponse changes, maintaining previous items during loading
-  useEffect(() => {
-    if (generationsResponse?.items) {
-      setCurrentItems(generationsResponse.items);
-    }
-  }, [generationsResponse?.items]);
-
-  // Server-side pagination - data is already paginated
+  // Server-side pagination - data is now derived directly from the query response
   const paginatedData = useMemo(() => {
-    const total = generationsResponse?.total ?? lastKnownTotal;
+    const items = generationsResponse?.items ?? [];
+    const total = generationsResponse?.total ?? 0;
     const totalPages = Math.ceil(total / itemsPerPage);
     
     return { 
-      items: currentItems, 
+      items, 
       totalPages, 
       currentPage: page 
     };
-  }, [currentItems, generationsResponse?.total, lastKnownTotal, page, itemsPerPage]);
+  }, [generationsResponse, page, itemsPerPage]);
 
   useEffect(() => {
     // If there is no "last affected shot" but there are shots available,
@@ -263,7 +246,7 @@ export function useGenerationsPageLogic({
     generationsResponse,
     paginatedData,
     lastAffectedShotId,
-    totalCount: generationsResponse?.total ?? lastKnownTotal,
+    totalCount: generationsResponse?.total ?? 0,
     
     // State
     page,
@@ -281,6 +264,7 @@ export function useGenerationsPageLogic({
     
     // Loading states
     isLoading,
+    isFetching,
     isError,
     error,
     isDeleting: deleteGenerationMutation.isPending ? deleteGenerationMutation.variables as string : null,

@@ -273,9 +273,9 @@ export function useGenerations(
   
   return useQuery<GenerationsPaginatedResponse, Error>({
     queryKey: ['generations', projectId, page, limit, filters],
-    staleTime: 30 * 1000,
     queryFn: () => fetchGenerations(projectId, limit, offset, filters),
-    enabled: !!projectId && enabled
+    enabled: !!projectId && enabled,
+    placeholderData: (previousData) => previousData,
   });
 }
 

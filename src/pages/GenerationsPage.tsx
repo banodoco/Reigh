@@ -22,6 +22,7 @@ const GenerationsPage: React.FC = () => {
     searchTerm,
     starredOnly,
     isLoading,
+    isFetching,
     isError,
     error,
     isDeleting,
@@ -62,7 +63,7 @@ const GenerationsPage: React.FC = () => {
         <div className="text-center py-10">Please select a project to view generations.</div>
       ) : isError ? (
         <div className="text-center py-10 text-red-500">Error loading generations: {error?.message}</div>
-      ) : isLoading && paginatedData.items.length === 0 ? (
+      ) : (isLoading || isFetching) && paginatedData.items.length === 0 ? (
         <SkeletonGallery 
           count={GENERATIONS_PER_PAGE}
           columns={{ base: 2, sm: 3, md: 4, lg: 5, xl: 6 }}
