@@ -47,6 +47,9 @@ interface ImageGalleryItemProps {
   setSelectedShotIdLocal: (id: string) => void;
   setLastAffectedShotId: (id: string) => void;
   toggleStarMutation: any;
+  // Progressive loading props
+  shouldLoad?: boolean;
+  isPriority?: boolean;
 }
 
 export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
@@ -74,6 +77,8 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   setSelectedShotIdLocal,
   setLastAffectedShotId,
   toggleStarMutation,
+  shouldLoad = true,
+  isPriority = false,
 }) => {
   const { toast } = useToast();
   const displayUrl = getDisplayUrl(image.thumbUrl || image.url);
@@ -81,6 +86,8 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   const [imageLoadError, setImageLoadError] = useState<boolean>(false);
   const [imageRetryCount, setImageRetryCount] = useState<number>(0);
   const [isInfoOpen, setIsInfoOpen] = useState<boolean>(false);
+  const [imageLoaded, setImageLoaded] = useState<boolean>(false);
+  const [imageLoading, setImageLoading] = useState<boolean>(false);
   const MAX_RETRIES = 2;
 
   // Handle image load error with retry mechanism
@@ -101,7 +108,12 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   useEffect(() => {
     setImageLoadError(false);
     setImageRetryCount(0);
+    setImageLoaded(false);
+    setImageLoading(false);
   }, [displayUrl]);
+
+  // Progressive loading: only set src when shouldLoad is true
+  const [actualSrc, setActualSrc] = useState<string | null>(null);
 
   // Generate display URL with retry cache busting
   const actualDisplayUrl = useMemo(() => {
@@ -110,6 +122,21 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
     }
     return displayUrl;
   }, [displayUrl, image.thumbUrl, image.url, imageRetryCount]);
+
+  // Progressive loading effect: only set src when shouldLoad is true
+  useEffect(() => {
+    if (shouldLoad && !actualSrc && !imageLoading) {
+      setImageLoading(true);
+      // Small delay to ensure priority images start loading first
+      const delay = isPriority ? 0 : 50;
+      
+      const timeout = setTimeout(() => {
+        setActualSrc(actualDisplayUrl);
+      }, delay);
+      
+      return () => clearTimeout(timeout);
+    }
+  }, [shouldLoad, actualSrc, imageLoading, actualDisplayUrl, isPriority]);
 
   // Only format metadata when actually needed (Info tooltip/popover is opened)
   // This prevents 150-200ms of string building work during initial render on mobile
@@ -193,21 +220,33 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
         className="relative bg-gray-200"
       >
           {isActuallyVideo ? (
-              <video
-                  src={actualDisplayUrl}
-                  controls
-                  playsInline
-                  loop
-                  muted
-                  className="absolute inset-0 w-full h-full object-contain group-hover:opacity-80 transition-opacity duration-300 bg-black"
-                  onDoubleClick={isMobile ? undefined : () => onOpenLightbox(image)}
-                  onTouchEnd={isMobile ? (e) => {
-                    e.preventDefault();
-                    onMobileTap(image);
-                  } : undefined}
-                  style={{ cursor: 'pointer' }}
-                  onError={handleImageError}
-              />
+              actualSrc ? (
+                <video
+                    src={actualSrc}
+                    controls
+                    playsInline
+                    loop
+                    muted
+                    className="absolute inset-0 w-full h-full object-contain group-hover:opacity-80 transition-opacity duration-300 bg-black"
+                    onDoubleClick={isMobile ? undefined : () => onOpenLightbox(image)}
+                    onTouchEnd={isMobile ? (e) => {
+                      e.preventDefault();
+                      onMobileTap(image);
+                    } : undefined}
+                    style={{ cursor: 'pointer' }}
+                    onError={handleImageError}
+                    onLoadStart={() => setImageLoading(true)}
+                    onLoadedData={() => {
+                      setImageLoading(false);
+                      setImageLoaded(true);
+                    }}
+                />
+              ) : (
+                // Video loading skeleton
+                <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-gray-200 animate-pulse">
+                  <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-gray-400"></div>
+                </div>
+              )
           ) : (
              imageLoadError ? (
                // Fallback when image fails to load after retries
@@ -219,6 +258,9 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                      onClick={() => {
                        setImageLoadError(false);
                        setImageRetryCount(0);
+                       setActualSrc(null);
+                       setImageLoaded(false);
+                       setImageLoading(false);
                      }}
                      className="text-xs underline hover:no-underline mt-1"
                    >
@@ -226,9 +268,9 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                    </button>
                  </div>
                </div>
-             ) : (
+             ) : actualSrc ? (
               <img
-                  src={actualDisplayUrl}
+                  src={actualSrc}
                   alt={image.prompt || `Generated image ${index + 1}`}
                   className="absolute inset-0 w-full h-full object-cover group-hover:opacity-80 transition-opacity duration-300"
                   onDoubleClick={isMobile ? undefined : () => onOpenLightbox(image)}
@@ -237,9 +279,18 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                     onMobileTap(image);
                   } : undefined}
                   style={{ cursor: 'pointer' }}
-                  loading="lazy"
                   onError={handleImageError}
+                  onLoad={() => {
+                    setImageLoading(false);
+                    setImageLoaded(true);
+                  }}
+                  onLoadStart={() => setImageLoading(true)}
               />
+             ) : (
+               // Image loading skeleton
+               <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-gray-200 animate-pulse">
+                 <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-gray-400"></div>
+               </div>
              )
           )}
       </div>

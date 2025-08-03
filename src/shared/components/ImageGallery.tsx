@@ -1033,22 +1033,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                 <div className={`grid ${reducedSpacing ? 'gap-2 sm:gap-4' : 'gap-4'} ${reducedSpacing ? 'mb-4' : 'mb-12'} ${gridColumnClasses}`}>
             {paginatedImages.map((image, index) => {
               const shouldShow = showImageIndices.has(index);
-              
-              if (!shouldShow) {
-                // Show loading skeleton for images that haven't loaded yet
-                return (
-                  <div 
-                    key={`skeleton-${index}`}
-                    className="border rounded-lg overflow-hidden bg-muted animate-pulse"
-                  >
-                    <div style={{ paddingBottom: '100%' }} className="relative">
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-muted-foreground opacity-30"></div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              }
+              const isPriority = index < 10; // First 10 images are priority
               
               return (
                 <ImageGalleryItem
@@ -1077,6 +1062,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                   setSelectedShotIdLocal={setSelectedShotIdLocal}
                   setLastAffectedShotId={setLastAffectedShotId}
                   toggleStarMutation={toggleStarMutation}
+                  shouldLoad={shouldShow}
+                  isPriority={isPriority}
                 />
               );
             })}
