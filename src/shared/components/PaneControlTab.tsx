@@ -51,15 +51,18 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({ side, isLocked, isOpen,
     const style: React.CSSProperties = {};
 
     if (side === 'left' || side === 'right') {
-      style.top = `calc(50% - ${bottomOffset / 2}px)`; // keep vertically centred
-      // Anchor to the edge (left:0 / right:0) and slide with translateX so it
-      // uses the same transform compositor path as the pane itself.
+      // Set a static vertical anchor and move the offset logic into the transform.
+      // This allows the browser to animate only the transform property, which is
+      // much more performant than animating `top` with a dynamic calc().
+      style.top = '50%';
+      const verticalOffset = `calc(-50% - ${bottomOffset / 2}px)`;
+
       if (side === 'left') {
         style.left = '0px';
-        style.transform = `translateX(${isVisible ? paneDimension : 0}px) translateY(-50%)`;
+        style.transform = `translateX(${isVisible ? paneDimension : 0}px) translateY(${verticalOffset})`;
       } else {
         style.right = '0px';
-        style.transform = `translateX(${isVisible ? -paneDimension : 0}px) translateY(-50%)`;
+        style.transform = `translateX(${isVisible ? -paneDimension : 0}px) translateY(${verticalOffset})`;
       }
     } else if (side === 'bottom') {
       style.left = '50%';
@@ -161,7 +164,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({ side, isLocked, isOpen,
         data-pane-control
         style={getDynamicStyle()}
         className={cn(
-          'fixed z-[101] flex items-center p-1 bg-zinc-800/90 backdrop-blur-sm border border-zinc-700 rounded-md transition-[transform,top] duration-300 ease-smooth',
+          'fixed z-[101] flex items-center p-1 bg-zinc-800/90 backdrop-blur-sm border border-zinc-700 rounded-md transition-transform duration-300 ease-smooth',
           positionClass
         )}
         onMouseEnter={handlePaneEnter}
@@ -208,7 +211,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({ side, isLocked, isOpen,
         data-pane-control
         style={getDynamicStyle()}
         className={cn(
-          'fixed z-[101] flex items-center p-1 bg-zinc-800/90 backdrop-blur-sm border border-zinc-700 rounded-md transition-[transform,top] duration-300 ease-smooth',
+          'fixed z-[101] flex items-center p-1 bg-zinc-800/90 backdrop-blur-sm border border-zinc-700 rounded-md transition-transform duration-300 ease-smooth',
           positionClass
         )}
       >
@@ -264,7 +267,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({ side, isLocked, isOpen,
       data-pane-control
       style={getDynamicStyle()}
               className={cn(
-          'fixed z-[102] flex items-center p-1 bg-zinc-800/80 backdrop-blur-sm border border-zinc-700 rounded-md gap-1 transition-[transform,top] duration-300 ease-smooth',
+          'fixed z-[102] flex items-center p-1 bg-zinc-800/80 backdrop-blur-sm border border-zinc-700 rounded-md gap-1 transition-[transform,opacity] duration-300 ease-smooth',
           getPositionClasses(),
           isOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'
         )}
