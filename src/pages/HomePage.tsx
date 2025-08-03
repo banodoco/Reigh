@@ -155,22 +155,48 @@ export default function HomePage() {
 
   useEffect(() => {
     // Initialize auth session tracking
-    supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('[AuthDebug] Initial session check:', !!session?.user?.id);
       setSession(session);
     });
+    
+    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('[AuthDebug] Auth state change:', event, !!session?.user?.id);
+      setSession(session);
+      
+      // If we get a successful sign-in, navigate to tools
+      if (event === 'SIGNED_IN' && session) {
+        console.log('[AuthDebug] Successful sign-in, navigating to /tools');
+        navigate('/tools');
+      }
+    });
+    
     return () => {
       listener.subscription.unsubscribe();
     };
-  }, []);
+  }, [navigate]);
 
   const handleDiscordSignIn = async () => {
-    await supabase.auth.signInWithOAuth({
-      provider: 'discord',
-      options: {
-        redirectTo: window.location.origin,
-      },
-    });
+    try {
+      console.log('[AuthDebug] Starting Discord OAuth flow');
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'discord',
+        options: {
+          redirectTo: window.location.origin,
+        },
+      });
+      
+      if (error) {
+        console.error('[AuthDebug] OAuth error:', error);
+        toast({ description: 'Failed to start Discord sign-in. Please try again.' });
+        return;
+      }
+      
+      console.log('[AuthDebug] OAuth initiated successfully');
+    } catch (err) {
+      console.error('[AuthDebug] Unexpected error during OAuth:', err);
+      toast({ description: 'An unexpected error occurred. Please try again.' });
+    }
   };
 
   const handleSignOut = async () => {

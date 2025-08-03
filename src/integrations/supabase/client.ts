@@ -13,7 +13,7 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     // Faster auth token refresh for mobile
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: false, // Faster mobile startup
+    detectSessionInUrl: true, // Required for OAuth redirects to work properly
   },
   global: {
     // Mobile-optimized HTTP settings
