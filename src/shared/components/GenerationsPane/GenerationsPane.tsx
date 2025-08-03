@@ -1,7 +1,9 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useRenderLogger } from '@/shared/hooks/useRenderLogger';
 import { useSlidingPane } from '@/shared/hooks/useSlidingPane';
-import { cn } from '@/shared/lib/utils';
+import { cn, getDisplayUrl } from '@/shared/lib/utils';
+import { useQueryClient } from '@tanstack/react-query';
+import { fetchGenerations } from '@/shared/hooks/useGenerations';
 import { Button } from '@/shared/components/ui/button';
 import { LockIcon, UnlockIcon, Square, ChevronLeft, ChevronRight, Star } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -28,6 +30,7 @@ const GENERATIONS_PER_PAGE = 18;
 export const GenerationsPane: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
   
   // Check if we're on the generations page
   const isOnGenerationsPage = location.pathname === '/generations';
@@ -69,7 +72,47 @@ export const GenerationsPane: React.FC = () => {
   // Log every render with item count & page for loop detection
   useRenderLogger('GenerationsPane', { page, totalItems: totalCount });
 
+  // Prefetch adjacent pages callback for ImageGallery
+  const handlePrefetchAdjacentPages = useCallback((prevPage: number | null, nextPage: number | null) => {
+    if (!selectedProjectId) return;
 
+    const filters = { 
+      mediaType: mediaTypeFilter,
+      shotId: selectedShotFilter === 'all' ? undefined : selectedShotFilter,
+      excludePositioned: selectedShotFilter !== 'all' ? excludePositioned : undefined,
+      starredOnly
+    };
+
+    // Prefetch next page
+    if (nextPage) {
+      queryClient.prefetchQuery({
+        queryKey: ['generations', selectedProjectId, nextPage, GENERATIONS_PER_PAGE, filters],
+        queryFn: () => fetchGenerations(selectedProjectId, GENERATIONS_PER_PAGE, (nextPage - 1) * GENERATIONS_PER_PAGE, filters),
+        staleTime: 30 * 1000,
+      }).then(() => {
+        const cached = queryClient.getQueryData(['generations', selectedProjectId, nextPage, GENERATIONS_PER_PAGE, filters]) as any;
+        cached?.items?.forEach((img: any) => {
+          const preloadImg = new Image();
+          preloadImg.src = getDisplayUrl(img.url);
+        });
+      });
+    }
+
+    // Prefetch previous page
+    if (prevPage) {
+      queryClient.prefetchQuery({
+        queryKey: ['generations', selectedProjectId, prevPage, GENERATIONS_PER_PAGE, filters],
+        queryFn: () => fetchGenerations(selectedProjectId, GENERATIONS_PER_PAGE, (prevPage - 1) * GENERATIONS_PER_PAGE, filters),
+        staleTime: 30 * 1000,
+      }).then(() => {
+        const cached = queryClient.getQueryData(['generations', selectedProjectId, prevPage, GENERATIONS_PER_PAGE, filters]) as any;
+        cached?.items?.forEach((img: any) => {
+          const preloadImg = new Image();
+          preloadImg.src = getDisplayUrl(img.url);
+        });
+      });
+    }
+  }, [selectedProjectId, queryClient, mediaTypeFilter, selectedShotFilter, excludePositioned, starredOnly]);
 
   const {
     isGenerationsPaneLocked,
@@ -310,9 +353,10 @@ export const GenerationsPane: React.FC = () => {
                     onStarredFilterChange={setStarredOnly}
                     reducedSpacing={true}
                     hidePagination={true}
-                    hideTopFilters={true}
-                    serverPage={page}
-                    onServerPageChange={handleServerPageChange}
+                                    hideTopFilters={true}
+                serverPage={page}
+                onServerPageChange={handleServerPageChange}
+                onPrefetchAdjacentPages={handlePrefetchAdjacentPages}
                 />
             )}
             {paginatedData.items.length === 0 && !isLoading && (

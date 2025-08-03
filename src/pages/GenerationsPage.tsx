@@ -1,13 +1,17 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { ImageGallery } from '@/shared/components/ImageGallery';
 import { useGenerationsPageLogic } from '@/shared/hooks/useGenerationsPageLogic';
 import { SkeletonGallery } from '@/shared/components/ui/skeleton-gallery';
 import { useProject } from '@/shared/contexts/ProjectContext';
+import { useQueryClient } from '@tanstack/react-query';
+import { fetchGenerations } from '@/shared/hooks/useGenerations';
+import { getDisplayUrl } from '@/shared/lib/utils';
 
 const GENERATIONS_PER_PAGE = 30; // 30 items per page for consistency
 
 const GenerationsPage: React.FC = () => {
   const { isLoadingProjects } = useProject();
+  const queryClient = useQueryClient();
   // Add state for media type filter
   const [mediaTypeFilter, setMediaTypeFilter] = React.useState<'all' | 'image' | 'video'>('all');
   
@@ -45,6 +49,48 @@ const GenerationsPage: React.FC = () => {
     setMediaTypeFilter(newMediaType);
     // Page reset is now handled in the hook via useEffect
   };
+
+  // Prefetch adjacent pages callback for ImageGallery
+  const handlePrefetchAdjacentPages = useCallback((prevPage: number | null, nextPage: number | null) => {
+    if (!selectedProjectId) return;
+
+    const filters = { 
+      mediaType: mediaTypeFilter,
+      shotId: selectedShotFilter === 'all' ? undefined : selectedShotFilter,
+      excludePositioned: selectedShotFilter !== 'all' ? excludePositioned : undefined,
+      starredOnly
+    };
+
+    // Prefetch next page
+    if (nextPage) {
+      queryClient.prefetchQuery({
+        queryKey: ['generations', selectedProjectId, nextPage, GENERATIONS_PER_PAGE, filters],
+        queryFn: () => fetchGenerations(selectedProjectId, GENERATIONS_PER_PAGE, (nextPage - 1) * GENERATIONS_PER_PAGE, filters),
+        staleTime: 30 * 1000,
+      }).then(() => {
+        const cached = queryClient.getQueryData(['generations', selectedProjectId, nextPage, GENERATIONS_PER_PAGE, filters]) as any;
+        cached?.items?.forEach((img: any) => {
+          const preloadImg = new Image();
+          preloadImg.src = getDisplayUrl(img.url);
+        });
+      });
+    }
+
+    // Prefetch previous page
+    if (prevPage) {
+      queryClient.prefetchQuery({
+        queryKey: ['generations', selectedProjectId, prevPage, GENERATIONS_PER_PAGE, filters],
+        queryFn: () => fetchGenerations(selectedProjectId, GENERATIONS_PER_PAGE, (prevPage - 1) * GENERATIONS_PER_PAGE, filters),
+        staleTime: 30 * 1000,
+      }).then(() => {
+        const cached = queryClient.getQueryData(['generations', selectedProjectId, prevPage, GENERATIONS_PER_PAGE, filters]) as any;
+        cached?.items?.forEach((img: any) => {
+          const preloadImg = new Image();
+          preloadImg.src = getDisplayUrl(img.url);
+        });
+      });
+    }
+  }, [selectedProjectId, queryClient, mediaTypeFilter, selectedShotFilter, excludePositioned, starredOnly]);
 
 
     return (
@@ -96,6 +142,7 @@ const GenerationsPage: React.FC = () => {
           onToggleStar={handleToggleStar}
           initialStarredFilter={starredOnly}
           onStarredFilterChange={setStarredOnly}
+          onPrefetchAdjacentPages={handlePrefetchAdjacentPages}
         />
       )}
     </div>
