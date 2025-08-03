@@ -715,13 +715,21 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   useEffect(() => {
     if (paginatedImages.length === 0) return;
     
+    // Create a stable identifier for this page to prevent race conditions
+    const pageId = `${page}-${paginatedImages.map(img => img.id || img.url).join(',').slice(0, 50)}`;
+    let isCurrentPage = true; // Flag to check if this effect is still valid
+    
     // Reset visible images when paginatedImages changes (new page/filter)
     setShowImageIndices(new Set());
     
     // Show first 10 images immediately (priority loading)
     const priorityCount = Math.min(10, paginatedImages.length);
     const initialIndices = new Set(Array.from({ length: priorityCount }, (_, i) => i));
-    setShowImageIndices(initialIndices);
+    
+    // Only update if this is still the current page
+    if (isCurrentPage) {
+      setShowImageIndices(initialIndices);
+    }
     
     // Progressive loading for remaining images
     const timeouts: NodeJS.Timeout[] = [];
@@ -733,25 +741,29 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
         const delay = (batchNumber + 1) * 150; // 150ms between batches
         
         const timeout = setTimeout(() => {
-          setShowImageIndices(prev => {
-            const newSet = new Set(prev);
-            // Add next batch of 5 images (or remaining if less than 5)
-            for (let j = i; j < Math.min(i + 5, paginatedImages.length); j++) {
-              newSet.add(j);
-            }
-            return newSet;
-          });
+          // Check if this is still the current page before updating
+          if (isCurrentPage) {
+            setShowImageIndices(prev => {
+              const newSet = new Set(prev);
+              // Add next batch of 5 images (or remaining if less than 5)
+              for (let j = i; j < Math.min(i + 5, paginatedImages.length); j++) {
+                newSet.add(j);
+              }
+              return newSet;
+            });
+          }
         }, delay);
         
         timeouts.push(timeout);
       }
     }
     
-    // Cleanup timeouts on unmount or dependency change
+    // Cleanup function that runs when dependencies change or component unmounts
     return () => {
+      isCurrentPage = false; // Mark this effect as stale
       timeouts.forEach(timeout => clearTimeout(timeout));
     };
-  }, [paginatedImages]);
+  }, [paginatedImages, page]);
 
   const rangeStart = totalFilteredItems === 0 ? 0 : (isServerPagination ? offset : page * ITEMS_PER_PAGE) + 1;
   const rangeEnd = rangeStart + paginatedImages.length - 1;

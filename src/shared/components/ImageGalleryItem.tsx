@@ -136,6 +136,13 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
       
       return () => clearTimeout(timeout);
     }
+    
+    // Reset loading states if shouldLoad becomes false (page change)
+    if (!shouldLoad && (actualSrc || imageLoading)) {
+      setActualSrc(null);
+      setImageLoading(false);
+      setImageLoaded(false);
+    }
   }, [shouldLoad, actualSrc, imageLoading, actualDisplayUrl, isPriority]);
 
   // Only format metadata when actually needed (Info tooltip/popover is opened)
