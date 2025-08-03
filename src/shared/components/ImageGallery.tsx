@@ -29,6 +29,8 @@ import { getDisplayUrl } from "@/shared/lib/utils";
 import { ShotFilter } from "@/shared/components/ShotFilter";
 import { useIsMobile } from "@/shared/hooks/use-mobile";
 import { useAdjacentPagePreloading } from "@/shared/hooks/useAdjacentPagePreloading";
+import { useProgressiveImageLoading } from "@/shared/hooks/useProgressiveImageLoading";
+import { ImageGalleryPagination } from "./ImageGalleryPagination";
 import { TimeStamp } from "@/shared/components/TimeStamp";
 import { useToggleGenerationStar } from '@/shared/hooks/useGenerations';
 import * as PopoverPrimitive from "@radix-ui/react-popover";
@@ -363,8 +365,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   // Gallery loading state - when true, all images show loading skeletons
   const [isGalleryLoading, setIsGalleryLoading] = useState<boolean>(false);
   
-  // Progressive loading state - prioritize first 10 images
-  const [showImageIndices, setShowImageIndices] = useState<Set<number>>(new Set());
+  // Progressive loading state - will be defined after paginatedImages
 
   // Ref for scrolling to top of gallery instead of top of page
   const galleryTopRef = useRef<HTMLDivElement>(null);
@@ -373,9 +374,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   const ITEMS_PER_PAGE = actualItemsPerPage;
   const [page, setPage] = React.useState(0);
   
-  // Ref to track current page for progressive loading optimization
-  const currentPageRef = useRef(page);
-  currentPageRef.current = page;
+  // Page tracking is now handled by the useProgressiveImageLoading hook
 
   // When filters change, reset to first page (debounced to avoid rapid state changes)
   React.useEffect(() => {
@@ -383,10 +382,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     return () => clearTimeout(timer);
   }, [filterByToolType, mediaTypeFilter, searchTerm, showStarredOnly]);
 
-  // Clear progressive loading state when page changes to prevent accumulation
-  React.useEffect(() => {
-    setShowImageIndices(new Set());
-  }, [page]);
+  // Progressive loading state cleanup is now handled by the useProgressiveImageLoading hook
 
   // Update media type filter when the prop changes (sync from parent)
   useEffect(() => {
@@ -756,70 +752,14 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     return filteredImages.slice(page * ITEMS_PER_PAGE, (page + 1) * ITEMS_PER_PAGE);
   }, [filteredImages, page, isServerPagination]);
 
-  // Progressive loading effect - show first 10 images immediately, then load others with delay
-  useEffect(() => {
-    if (paginatedImages.length === 0) return;
-    
-    // Use a simple page identifier to avoid expensive string operations
-    let isCurrentPage = true; // Flag to check if this effect is still valid
-    
-    // Reset visible images when paginatedImages changes (new page/filter)
-    setShowImageIndices(new Set());
-    
-    // Show first 10 images immediately (priority loading)
-    const priorityCount = Math.min(10, paginatedImages.length);
-    const initialIndices = new Set(Array.from({ length: priorityCount }, (_, i) => i));
-    
-    // Only update if this is still the current page
-    if (isCurrentPage) {
-      setShowImageIndices(initialIndices);
-      // Reset gallery loading state when new images are ready
-      setIsGalleryLoading(false);
-    }
-    
-    // Progressive loading for remaining images
-    const timeouts: NodeJS.Timeout[] = [];
-    
-    if (paginatedImages.length > 10) {
-      // Load remaining images in larger batches with shorter delays for better performance
-      const remainingImages = paginatedImages.length - 10;
-      const batchSize = Math.min(10, remainingImages); // Larger batches, max 10 at a time
-      
-      // Limit progressive loading complexity on high page numbers to maintain performance
-      const maxBatches = page > 10 ? 2 : Math.ceil(remainingImages / batchSize); // Reduce batching on later pages
-      let batchCount = 0;
-      
-      for (let i = 10; i < paginatedImages.length && batchCount < maxBatches; i += batchSize) {
-        const batchNumber = Math.floor((i - 10) / batchSize);
-        const delay = (batchNumber + 1) * 100; // Shorter delay between batches
-        
-        const timeout = setTimeout(() => {
-          // Check if this is still the current page before updating
-          if (isCurrentPage && currentPageRef.current === page) {
-            setShowImageIndices(prev => {
-              const newSet = new Set(prev);
-              // Add next batch of images (or remaining if less than batchSize)
-              for (let j = i; j < Math.min(i + batchSize, paginatedImages.length); j++) {
-                newSet.add(j);
-              }
-              return newSet;
-            });
-          }
-        }, delay);
-        
-        timeouts.push(timeout);
-        batchCount++;
-      }
-    }
-    
-    // Cleanup function that runs when dependencies change or component unmounts
-    return () => {
-      isCurrentPage = false; // Mark this effect as stale
-      timeouts.forEach(timeout => clearTimeout(timeout));
-      // Hard reset to prevent any stale state from affecting new page
-      setShowImageIndices(new Set());
-    };
-  }, [paginatedImages, page]);
+  // Progressive loading state - use custom hook  
+  const { showImageIndices } = useProgressiveImageLoading({
+    images: paginatedImages,
+    page,
+    enabled: true,
+  });
+
+  // Progressive loading is now handled by the useProgressiveImageLoading hook
 
   // Use the adjacent page preloading hook
   useAdjacentPagePreloading({
@@ -1151,50 +1091,21 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
             </div>
           )}
         </div>
-        {/* Bottom Pagination Controls (moved inside container for better spacing) */}
-        {totalPages > 1 && !reducedSpacing && !hidePagination && (
-          <div className={`flex justify-center items-center mt-4 ${whiteText ? 'text-white' : 'text-gray-600'}`}>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={(e) => {
-                e.preventDefault(); // Prevent any default scroll behavior
-                const newPage = isServerPagination 
-                  ? Math.max(1, serverPage! - 1)
-                  : Math.max(0, page - 1);
-                handlePageChange(newPage, 'prev', true); // fromBottom = true for bottom buttons
-              }}
-              disabled={loadingButton !== null || (isServerPagination ? serverPage === 1 : page === 0)}
-            >
-              {loadingButton === 'prev' ? (
-                <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-current"></div>
-              ) : (
-                'Prev'
-              )}
-            </Button>
-            <span className={`text-sm ${whiteText ? 'text-white' : 'text-muted-foreground'} whitespace-nowrap mx-4`}>
-              {rangeStart}-{rangeEnd} (out of {totalFilteredItems})
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={(e) => {
-                e.preventDefault(); // Prevent any default scroll behavior
-                const newPage = isServerPagination 
-                  ? serverPage! + 1
-                  : Math.min(totalPages - 1, page + 1);
-                handlePageChange(newPage, 'next', true); // fromBottom = true for bottom buttons
-              }}
-              disabled={loadingButton !== null || (isServerPagination ? serverPage >= totalPages : page >= totalPages - 1)}
-            >
-              {loadingButton === 'next' ? (
-                <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-current"></div>
-              ) : (
-                'Next'
-              )}
-            </Button>
-          </div>
-        )}
+        {/* Bottom Pagination Controls */}
+        <ImageGalleryPagination
+          totalPages={totalPages}
+          currentPage={page}
+          isServerPagination={isServerPagination}
+          serverPage={serverPage}
+          rangeStart={rangeStart}
+          rangeEnd={rangeEnd}
+          totalFilteredItems={totalFilteredItems}
+          loadingButton={loadingButton}
+          whiteText={whiteText}
+          reducedSpacing={reducedSpacing}
+          hidePagination={hidePagination}
+          onPageChange={handlePageChange}
+        />
       </div>
       
       {/* Lightbox Modal */}
