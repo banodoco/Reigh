@@ -311,6 +311,27 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   const [showTickForImageId, setShowTickForImageId] = useState<string | null>(null);
   const [addingToShotImageId, setAddingToShotImageId] = useState<string | null>(null);
 
+  // Fix race condition: Update selectedShotIdLocal when shots data loads or context changes
+  useEffect(() => {
+    // Only update if current selection is empty/invalid
+    const isCurrentSelectionValid = selectedShotIdLocal && simplifiedShotOptions.find(shot => shot.id === selectedShotIdLocal);
+    
+    if (!isCurrentSelectionValid) {
+      const newSelection = currentShotId || lastShotId || (simplifiedShotOptions.length > 0 ? simplifiedShotOptions[0].id : "");
+      if (newSelection && newSelection !== selectedShotIdLocal) {
+        console.log('[ImageGallery] Fixing selectedShotIdLocal race condition:', {
+          oldSelection: selectedShotIdLocal,
+          newSelection,
+          currentShotId,
+          lastShotId,
+          availableShots: simplifiedShotOptions.length,
+          firstShotId: simplifiedShotOptions[0]?.id
+        });
+        setSelectedShotIdLocal(newSelection);
+      }
+    }
+  }, [currentShotId, lastShotId, simplifiedShotOptions, selectedShotIdLocal]);
+
   // State for the filter checkbox
   const [filterByToolType, setFilterByToolType] = useState<boolean>(initialFilterState);
   // State for the new media type filter
