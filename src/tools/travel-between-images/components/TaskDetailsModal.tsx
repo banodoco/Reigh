@@ -37,6 +37,8 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
   const [taskId, setTaskId] = useState<string | null>(null);
   const [showDetailedParams, setShowDetailedParams] = useState(false);
   const [showAllImages, setShowAllImages] = useState(false);
+  const [showFullPrompt, setShowFullPrompt] = useState(false);
+  const [showFullNegativePrompt, setShowFullNegativePrompt] = useState(false);
 
   // Use the new hooks
   const getTaskIdMutation = useGetTaskIdForGeneration();
@@ -200,45 +202,92 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
                       </div>
                     );
                   })()}
-                  {/* Prompts Section */}
-                  <div className="grid grid-cols-1 gap-4">
-                    <div className="space-y-1">
-                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Prompt</p>
-                      <p className="text-sm font-medium break-words whitespace-pre-wrap">
-                        {orchestratorPayload?.base_prompts_expanded?.[0] || (task as any)?.params?.prompt || 'N/A'}
-                      </p>
+                  {/* Prompts and Technical Settings Section */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {/* Prompts Section - Left side (50% width) */}
+                    <div className="space-y-4">
+                      <div className="space-y-1">
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Prompt</p>
+                        {(() => {
+                          const prompt = orchestratorPayload?.base_prompts_expanded?.[0] || (task as any)?.params?.prompt || 'N/A';
+                          const maxLength = 150;
+                          const shouldTruncate = prompt.length > maxLength;
+                          const displayText = showFullPrompt || !shouldTruncate ? prompt : prompt.slice(0, maxLength) + '...';
+                          
+                          return (
+                            <div>
+                              <p className="text-sm font-medium break-words whitespace-pre-wrap">
+                                {displayText}
+                              </p>
+                              {shouldTruncate && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setShowFullPrompt(!showFullPrompt)}
+                                  className="h-6 px-0 text-xs text-primary mt-1"
+                                >
+                                  {showFullPrompt ? 'Show Less' : 'Show More'}
+                                </Button>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Negative Prompt</p>
+                        {(() => {
+                          const negativePrompt = orchestratorPayload?.negative_prompts_expanded?.[0] || (task as any)?.params?.negative_prompt || 'N/A';
+                          const maxLength = 150;
+                          const shouldTruncate = negativePrompt.length > maxLength;
+                          const displayText = showFullNegativePrompt || !shouldTruncate ? negativePrompt : negativePrompt.slice(0, maxLength) + '...';
+                          
+                          return (
+                            <div>
+                              <p className="text-sm font-medium break-words whitespace-pre-wrap">
+                                {displayText}
+                              </p>
+                              {shouldTruncate && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setShowFullNegativePrompt(!showFullNegativePrompt)}
+                                  className="h-6 px-0 text-xs text-primary mt-1"
+                                >
+                                  {showFullNegativePrompt ? 'Show Less' : 'Show More'}
+                                </Button>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </div>
                     </div>
-                    <div className="space-y-1">
-                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Negative Prompt</p>
-                      <p className="text-sm font-medium break-words whitespace-pre-wrap">
-                        {orchestratorPayload?.negative_prompts_expanded?.[0] || (task as any)?.params?.negative_prompt || 'N/A'}
-                      </p>
-                    </div>
-                  </div>
-                  
-                  {/* Technical Settings */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-3 border-t border-muted-foreground/20">
-                    <div className="space-y-1">
-                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Steps</p>
-                      <p className="text-sm font-medium">
-                        {orchestratorPayload?.steps || (task as any)?.params?.num_inference_steps || 'N/A'}
-                      </p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Resolution</p>
-                      <p className="text-sm font-medium">{(task as any)?.params?.parsed_resolution_wh || 'N/A'}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Frames / Segment</p>
-                      <p className="text-sm font-medium">
-                        {orchestratorPayload?.segment_frames_expanded?.[0] || (task as any)?.params?.segment_frames_expanded || 'N/A'}
-                      </p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Context Frames</p>
-                      <p className="text-sm font-medium">
-                        {(task as any)?.params?.frame_overlap_settings_expanded?.[0] || orchestratorPayload?.frame_overlap_expanded?.[0] || (task as any)?.params?.frame_overlap_expanded || 'N/A'}
-                      </p>
+                    
+                    {/* Technical Settings - Right side (50% width, 2x2 grid) */}
+                    <div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Steps</p>
+                          <p className="text-sm font-medium">
+                            {orchestratorPayload?.steps || (task as any)?.params?.num_inference_steps || 'N/A'}
+                          </p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Resolution</p>
+                          <p className="text-sm font-medium">{(task as any)?.params?.parsed_resolution_wh || 'N/A'}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Frames / Segment</p>
+                          <p className="text-sm font-medium">
+                            {orchestratorPayload?.segment_frames_expanded?.[0] || (task as any)?.params?.segment_frames_expanded || 'N/A'}
+                          </p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Context Frames</p>
+                          <p className="text-sm font-medium">
+                            {(task as any)?.params?.frame_overlap_settings_expanded?.[0] || orchestratorPayload?.frame_overlap_expanded?.[0] || (task as any)?.params?.frame_overlap_expanded || 'N/A'}
+                          </p>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
