@@ -758,7 +758,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     page,
     enabled: true,
   });
-
+    
   // Progressive loading is now handled by the useProgressiveImageLoading hook
 
   // Use the adjacent page preloading hook
