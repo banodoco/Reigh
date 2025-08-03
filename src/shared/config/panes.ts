@@ -8,9 +8,9 @@ export const PANE_CONFIG = {
     ANIMATION_DURATION: 300,
   },
   zIndex: {
-    PANE: 60,
-    CONTROL_LOCKED: 101,
-    CONTROL_UNLOCKED: 102,
+    PANE: 'z-[60]',
+    CONTROL_LOCKED: 'z-[101]',
+    CONTROL_UNLOCKED: 'z-[102]',
   },
   transition: {
     EASING: 'ease-smooth',

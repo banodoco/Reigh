@@ -118,7 +118,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
         data-pane-control
         style={dynamicStyle}
         className={cn(
-          `fixed z-[${PANE_CONFIG.zIndex.CONTROL_UNLOCKED}] flex flex-col items-center p-1 bg-zinc-800/80 backdrop-blur-sm border border-zinc-700 rounded-md gap-1 ${PANE_CONFIG.transition.PROPERTIES.TRANSFORM_OPACITY} duration-${PANE_CONFIG.timing.ANIMATION_DURATION} ${PANE_CONFIG.transition.EASING}`,
+          `fixed ${PANE_CONFIG.zIndex.CONTROL_UNLOCKED} flex flex-col items-center p-1 bg-zinc-800/80 backdrop-blur-sm border border-zinc-700 rounded-md gap-1 ${PANE_CONFIG.transition.PROPERTIES.TRANSFORM_OPACITY} duration-${PANE_CONFIG.timing.ANIMATION_DURATION} ${PANE_CONFIG.transition.EASING}`,
           getPositionClasses(),
           'opacity-100'
         )}
@@ -161,7 +161,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
         data-pane-control
         style={dynamicStyle}
         className={cn(
-          `fixed z-[${PANE_CONFIG.zIndex.CONTROL_LOCKED}] flex items-center p-1 bg-zinc-800/90 backdrop-blur-sm border border-zinc-700 rounded-md ${PANE_CONFIG.transition.PROPERTIES.TRANSFORM_ONLY} duration-${PANE_CONFIG.timing.ANIMATION_DURATION} ${PANE_CONFIG.transition.EASING}`,
+          `fixed ${PANE_CONFIG.zIndex.CONTROL_LOCKED} flex items-center p-1 bg-zinc-800/90 backdrop-blur-sm border border-zinc-700 rounded-md ${PANE_CONFIG.transition.PROPERTIES.TRANSFORM_ONLY} duration-${PANE_CONFIG.timing.ANIMATION_DURATION} ${PANE_CONFIG.transition.EASING}`,
           getFlexDirection()
         )}
         onMouseEnter={handlePaneEnter}
@@ -197,7 +197,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
         data-pane-control
         style={dynamicStyle}
         className={cn(
-          `fixed z-[${PANE_CONFIG.zIndex.CONTROL_LOCKED}] flex items-center p-1 bg-zinc-800/90 backdrop-blur-sm border border-zinc-700 rounded-md ${PANE_CONFIG.transition.PROPERTIES.TRANSFORM_ONLY} duration-${PANE_CONFIG.timing.ANIMATION_DURATION} ${PANE_CONFIG.transition.EASING}`,
+          `fixed ${PANE_CONFIG.zIndex.CONTROL_LOCKED} flex items-center p-1 bg-zinc-800/90 backdrop-blur-sm border border-zinc-700 rounded-md ${PANE_CONFIG.transition.PROPERTIES.TRANSFORM_ONLY} duration-${PANE_CONFIG.timing.ANIMATION_DURATION} ${PANE_CONFIG.transition.EASING}`,
           getFlexDirection()
         )}
       >
@@ -231,7 +231,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
       data-pane-control
       style={dynamicStyle}
       className={cn(
-        `fixed z-[${PANE_CONFIG.zIndex.CONTROL_UNLOCKED}] flex items-center p-1 bg-zinc-800/80 backdrop-blur-sm border border-zinc-700 rounded-md gap-1 ${PANE_CONFIG.transition.PROPERTIES.TRANSFORM_OPACITY} duration-${PANE_CONFIG.timing.ANIMATION_DURATION} ${PANE_CONFIG.transition.EASING}`,
+        `fixed ${PANE_CONFIG.zIndex.CONTROL_UNLOCKED} flex items-center p-1 bg-zinc-800/80 backdrop-blur-sm border border-zinc-700 rounded-md gap-1 ${PANE_CONFIG.transition.PROPERTIES.TRANSFORM_OPACITY} duration-${PANE_CONFIG.timing.ANIMATION_DURATION} ${PANE_CONFIG.transition.EASING}`,
         getPositionClasses(),
         isOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'
       )}
