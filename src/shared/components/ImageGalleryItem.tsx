@@ -91,11 +91,19 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   const MAX_RETRIES = 2;
 
   // Handle image load error with retry mechanism
-  const handleImageError = useCallback(() => {
-    console.warn(`Image load failed for ${image.id}: ${displayUrl}, retry ${imageRetryCount + 1}/${MAX_RETRIES}`);
+  const handleImageError = useCallback((errorEvent?: React.SyntheticEvent<HTMLImageElement | HTMLVideoElement>) => {
+    const failedSrc = (errorEvent?.target as HTMLImageElement | HTMLVideoElement)?.src || displayUrl;
+    console.warn(`[ImageGalleryItem] Image load failed for ${image.id}: ${failedSrc}, retry ${imageRetryCount + 1}/${MAX_RETRIES}`);
     
     // Always reset loading state on error
     setImageLoading(false);
+    
+    // Don't retry placeholder URLs or obviously invalid URLs
+    if (failedSrc?.includes('/placeholder.svg') || failedSrc?.includes('undefined') || !failedSrc) {
+      console.warn(`[ImageGalleryItem] Not retrying invalid URL: ${failedSrc}`);
+      setImageLoadError(true);
+      return;
+    }
     
     if (imageRetryCount < MAX_RETRIES) {
       // Retry with cache busting
@@ -131,13 +139,19 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
     let isMounted = true; // Flag to prevent state updates after unmount
     
     if (shouldLoad && !actualSrc) {
-      // Remove imageLoading gate - make this idempotent
+      // Don't load placeholder URLs - they indicate missing/invalid image data
+      if (actualDisplayUrl === '/placeholder.svg' || !actualDisplayUrl) {
+        console.warn(`[ImageGalleryItem] Skipping load for invalid URL: ${actualDisplayUrl}, image:`, image);
+        setImageLoadError(true);
+        return;
+      }
+      
       setImageLoading(true);
       // Small delay to ensure priority images start loading first
       const delay = isPriority ? 0 : 50;
       
       const timeout = setTimeout(() => {
-        if (isMounted) {
+        if (isMounted && actualDisplayUrl !== '/placeholder.svg') {
           setActualSrc(actualDisplayUrl);
         }
       }, delay);
@@ -158,7 +172,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [shouldLoad, actualSrc, actualDisplayUrl, isPriority]); // Removed imageLoading from deps
+  }, [shouldLoad, actualSrc, actualDisplayUrl, isPriority, image]); // Added image to deps for logging
 
   // Only format metadata when actually needed (Info tooltip/popover is opened)
   // This prevents 150-200ms of string building work during initial render on mobile
