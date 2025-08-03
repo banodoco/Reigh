@@ -430,6 +430,8 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     setIsPageChange(true);
     setIsPageChangeFromBottom(!!fromBottom);
     setCurrentPage(page);
+    // Clear existing images to show immediate loading feedback
+    setGeneratedImages([]);
   }, []);
 
   // Handle media type filter change
@@ -494,7 +496,16 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   useEffect(() => {
     if (generationsResponse && isPageChange) {
       if (isPageChangeFromBottom) {
-        galleryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        if (galleryRef.current) {
+          const rect = galleryRef.current.getBoundingClientRect();
+          const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+          const targetPosition = rect.top + scrollTop - (isMobile ? 80 : 20); // Account for mobile nav/header
+          
+          window.scrollTo({
+            top: Math.max(0, targetPosition), // Ensure we don't scroll above page top
+            behavior: 'smooth'
+          });
+        }
       } else {
         // restore scroll position only for page changes, not filter changes
         window.scrollTo({ top: scrollPosRef.current, behavior: 'auto' });

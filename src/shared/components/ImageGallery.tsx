@@ -332,6 +332,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   
   // Pagination loading state - track which button is loading
   const [loadingButton, setLoadingButton] = useState<'prev' | 'next' | null>(null);
+  // Gallery loading state - when true, all images show loading skeletons
+  const [isGalleryLoading, setIsGalleryLoading] = useState<boolean>(false);
   
   // Progressive loading state - prioritize first 10 images
   const [loadedImageIds, setLoadedImageIds] = useState<Set<string>>(new Set());
@@ -663,6 +665,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     if (loadingButton) return; // Prevent multiple clicks while any button is loading
     
     setLoadingButton(direction);
+    setIsGalleryLoading(true); // Immediately show loading state for all images
     
     if (isServerPagination && onServerPageChange) {
       // Server-side pagination: notify the parent, which will handle scrolling.
@@ -680,11 +683,18 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
         setLoadingButton(null);
         // Scroll to top of gallery AFTER page loads (only for bottom buttons)
         if (fromBottom && galleryTopRef.current) {
-          galleryTopRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          const rect = galleryTopRef.current.getBoundingClientRect();
+          const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+          const targetPosition = rect.top + scrollTop - (isMobile ? 80 : 20); // Account for mobile nav/header
+          
+          window.scrollTo({
+            top: Math.max(0, targetPosition), // Ensure we don't scroll above page top
+            behavior: 'smooth'
+          });
         }
       }, loadingDelay);
     }
-  }, [loadingButton, isServerPagination, onServerPageChange, setPage]);
+  }, [loadingButton, isServerPagination, onServerPageChange, setPage, isMobile]);
   
   // Calculate pagination helpers (must come after filteredImages is defined)
   const totalFilteredItems = isServerPagination ? (totalCount ?? (offset + images.length)) : filteredImages.length;
@@ -728,6 +738,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     // Only update if this is still the current page
     if (isCurrentPage) {
       setShowImageIndices(initialIndices);
+      // Reset gallery loading state when new images are ready
+      setIsGalleryLoading(false);
     }
     
     // Progressive loading for remaining images
@@ -1077,6 +1089,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                   toggleStarMutation={toggleStarMutation}
                   shouldLoad={shouldShow}
                   isPriority={isPriority}
+                  isGalleryLoading={isGalleryLoading}
                 />
               );
             })}

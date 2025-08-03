@@ -51,6 +51,7 @@ interface ImageGalleryItemProps {
   // Progressive loading props
   shouldLoad?: boolean;
   isPriority?: boolean;
+  isGalleryLoading?: boolean;
 }
 
 export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
@@ -80,6 +81,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   toggleStarMutation,
   shouldLoad = true,
   isPriority = false,
+  isGalleryLoading = false,
 }) => {
   const { toast } = useToast();
   const displayUrl = getDisplayUrl(image.thumbUrl || image.url);
@@ -143,11 +145,11 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
     return displayUrl;
   }, [displayUrl, image.thumbUrl, image.url, imageRetryCount]);
 
-  // Progressive loading effect: only set src when shouldLoad is true
+  // Always start loading images immediately for better prefetching
   useEffect(() => {
     let isMounted = true; // Flag to prevent state updates after unmount
     
-    if (shouldLoad && !actualSrc) {
+    if (!actualSrc) {
       // Don't load placeholder URLs - they indicate missing/invalid image data
       if (actualDisplayUrl === '/placeholder.svg' || !actualDisplayUrl) {
         console.warn(`[ImageGalleryItem] Skipping load for invalid URL: ${actualDisplayUrl}, image:`, image);
@@ -171,17 +173,10 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
       };
     }
     
-    // Reset loading states if shouldLoad becomes false (page change)
-    if (!shouldLoad) {
-      setActualSrc(null);
-      setImageLoading(false);
-      setImageLoaded(false);
-    }
-    
     return () => {
       isMounted = false;
     };
-  }, [shouldLoad, actualSrc, actualDisplayUrl, isPriority, image]); // Added image to deps for logging
+  }, [actualSrc, actualDisplayUrl, isPriority, image]); // Removed shouldLoad dependency
 
   // Only format metadata when actually needed (Info tooltip/popover is opened)
   // This prevents 150-200ms of string building work during initial render on mobile
@@ -265,7 +260,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
         className="relative bg-gray-200"
       >
           {isActuallyVideo ? (
-              actualSrc ? (
+              shouldLoad && actualSrc && !isGalleryLoading ? (
                 <video
                     src={actualSrc}
                     playsInline
@@ -303,10 +298,24 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                     }}
                 />
               ) : (
-                // Video loading skeleton
-                <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-gray-200 animate-pulse">
-                  <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-gray-400"></div>
-                </div>
+                <>
+                  {/* Hidden video for background loading when shouldLoad is false */}
+                  {!shouldLoad && actualSrc && (
+                    <video
+                      src={actualSrc}
+                      style={{ display: 'none' }}
+                      onLoadedData={() => {
+                        setImageLoading(false);
+                        setImageLoaded(true);
+                      }}
+                      onError={handleImageError}
+                    />
+                  )}
+                  {/* Video loading skeleton or progressive loading placeholder */}
+                  <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-gray-200 animate-pulse">
+                    <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-gray-400"></div>
+                  </div>
+                </>
               )
           ) : imageLoadError ? (
             // Fallback when image fails to load after retries
@@ -330,21 +339,27 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
             </div>
           ) : (
             <>
-              {/* Always render the img tag if actualSrc is available, to trigger loading. */}
-              {actualSrc && (
+              {/* Visible image when shouldLoad is true and image is loaded */}
+              {shouldLoad && actualSrc && imageLoaded && !isGalleryLoading && (
                 <img
                   src={actualSrc}
                   alt={image.prompt || `Generated image ${index + 1}`}
-                  className={cn(
-                    "absolute inset-0 w-full h-full object-cover group-hover:opacity-80 transition-opacity duration-300",
-                    !imageLoaded && "opacity-0"
-                  )}
+                  className="absolute inset-0 w-full h-full object-cover group-hover:opacity-80 transition-opacity duration-300"
                   onDoubleClick={isMobile ? undefined : () => onOpenLightbox(image)}
                   onTouchEnd={isMobile ? (e) => {
                     e.preventDefault();
                     onMobileTap(image);
                   } : undefined}
                   style={{ cursor: 'pointer' }}
+                />
+              )}
+              
+              {/* Hidden image for background loading when shouldLoad is false or image not loaded yet */}
+              {actualSrc && (!shouldLoad || !imageLoaded) && (
+                <img
+                  src={actualSrc}
+                  alt={image.prompt || `Generated image ${index + 1}`}
+                  style={{ display: 'none' }}
                   onError={handleImageError}
                   onLoad={() => {
                     setImageLoading(false);
@@ -352,13 +367,13 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                   }}
                   onLoadStart={() => setImageLoading(true)}
                   onAbort={() => {
-                    // Reset loading state if image load was aborted
                     setImageLoading(false);
                   }}
                 />
               )}
-              {/* Show skeleton while image is loading and there's no error */}
-              {!imageLoaded && (
+              
+              {/* Show skeleton while image is loading or shouldLoad is false */}
+              {(!shouldLoad || !imageLoaded || imageLoading || isGalleryLoading) && (
                 <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-gray-200 animate-pulse">
                   <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-gray-400"></div>
                 </div>
