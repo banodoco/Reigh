@@ -98,6 +98,13 @@ export function useGenerationsPageLogic({
     setPage(1);
   }, [mediaType, starredOnly]);
 
+  // Reset excludePositioned when switching to video to avoid confusion
+  useEffect(() => {
+    if (mediaType === 'video') {
+      setExcludePositioned(false);
+    }
+  }, [mediaType]);
+
   const { data: generationsResponse, isLoading, isFetching, isError, error } = useGenerations(
     selectedProjectId, 
     page, 

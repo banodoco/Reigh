@@ -107,7 +107,7 @@ interface ImageGalleryProps {
   /** Initial media type filter state ('all' | 'image' | 'video') */
   initialMediaTypeFilter?: 'all' | 'image' | 'video';
   /** Callback for server-side pagination */
-  onServerPageChange?: (page: number) => void;
+  onServerPageChange?: (page: number, fromBottom?: boolean) => void;
   /** Current server page (1-based) */
   serverPage?: number;
   /** Enable shot filtering dropdown */
@@ -337,6 +337,9 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   const [loadedImageIds, setLoadedImageIds] = useState<Set<string>>(new Set());
   const [showImageIndices, setShowImageIndices] = useState<Set<number>>(new Set());
 
+  // Ref for scrolling to top of gallery instead of top of page
+  const galleryTopRef = useRef<HTMLDivElement>(null);
+
   // Pagination state - reduce items per page on mobile for faster initial render
   const ITEMS_PER_PAGE = actualItemsPerPage;
   const [page, setPage] = React.useState(0);
@@ -347,26 +350,12 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     return () => clearTimeout(timer);
   }, [filterByToolType, mediaTypeFilter, searchTerm, showStarredOnly]);
 
-
-
+  // Update media type filter when the prop changes (sync from parent)
   useEffect(() => {
-    const newSelectedShotId = currentShotId || lastShotId || (simplifiedShotOptions.length > 0 ? simplifiedShotOptions[0].id : "");
-    setSelectedShotIdLocal(newSelectedShotId);
-    if (newSelectedShotId) {
-      setLastAffectedShotId(newSelectedShotId);
-    }
-  }, [currentShotId, lastShotId, simplifiedShotOptions, setLastAffectedShotId]);
+    setMediaTypeFilter(initialMediaTypeFilter);
+  }, [initialMediaTypeFilter]);
 
-  useEffect(() => {
-    // When the component mounts or initialFilterState prop changes, update the filter state
-    setFilterByToolType(initialFilterState);
-  }, [initialFilterState]);
-
-  useEffect(() => {
-    // When the component mounts or initialShotFilter prop changes, update the shot filter state
-    setShotFilter(initialShotFilter);
-  }, [initialShotFilter]);
-
+  // Existing effect
   useEffect(() => {
     // When the component mounts or initialStarredFilter prop changes, update the starred filter state
     setShowStarredOnly(initialStarredFilter);
@@ -676,15 +665,12 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     setLoadingButton(direction);
     
     if (isServerPagination && onServerPageChange) {
-      // Server-side pagination
-      onServerPageChange(newPage);
-      // Reset loading state after a short delay to allow for server response
+      // Server-side pagination: notify the parent, which will handle scrolling.
+      onServerPageChange(newPage, fromBottom); 
+      
+      // We still manage the loading button state here.
       setTimeout(() => {
         setLoadingButton(null);
-        // Scroll to top AFTER page loads (only for bottom buttons)
-        if (fromBottom) {
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
       }, 500);
     } else {
       // Client-side pagination - show loading longer for bottom buttons
@@ -692,9 +678,9 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
       setPage(newPage);
       setTimeout(() => {
         setLoadingButton(null);
-        // Scroll to top AFTER page loads (only for bottom buttons)
-        if (fromBottom) {
-          window.scrollTo({ top: 0, behavior: 'smooth' });
+        // Scroll to top of gallery AFTER page loads (only for bottom buttons)
+        if (fromBottom && galleryTopRef.current) {
+          galleryTopRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
       }, loadingDelay);
     }
@@ -825,7 +811,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     <TooltipProvider>
       <div className={`${reducedSpacing ? 'space-y-3' : 'space-y-6'} ${reducedSpacing ? 'pb-2' : 'pb-8'}`}>
         {/* Header section with pagination and filters */}
-        <div className={`${reducedSpacing ? 'mt-0' : 'mt-7'} space-y-3`}>
+        <div ref={galleryTopRef} className={`${reducedSpacing ? 'mt-0' : 'mt-7'} space-y-3`}>
             {/* Pagination row with starred filter */}
             {totalPages > 1 && !hidePagination && (
               <div className="flex justify-between items-center">

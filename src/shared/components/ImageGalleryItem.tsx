@@ -267,7 +267,6 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
               actualSrc ? (
                 <video
                     src={actualSrc}
-                    controls
                     playsInline
                     loop
                     muted
@@ -277,6 +276,19 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                       e.preventDefault();
                       onMobileTap(image);
                     } : undefined}
+                    onMouseEnter={(e) => {
+                      if (!isMobile) {
+                        (e.target as HTMLVideoElement).play().catch(() => {
+                          // Ignore autoplay errors (e.g., if browser blocks autoplay)
+                        });
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isMobile) {
+                        (e.target as HTMLVideoElement).pause();
+                        (e.target as HTMLVideoElement).currentTime = 0; // Reset to beginning
+                      }
+                    }}
                     style={{ cursor: 'pointer' }}
                     onError={handleImageError}
                     onLoadStart={() => setImageLoading(true)}

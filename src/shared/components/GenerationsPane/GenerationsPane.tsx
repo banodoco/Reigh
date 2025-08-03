@@ -37,9 +37,6 @@ export const GenerationsPane: React.FC = () => {
   // Media type filter state
   const [mediaTypeFilter, setMediaTypeFilter] = useState<'all' | 'image' | 'video'>('image');
   
-  // Starred filter state
-  const [showStarredOnly, setShowStarredOnly] = useState(false);
-  
   // Dropdown states to prevent unwanted opening
   const [shotFilterOpen, setShotFilterOpen] = useState(false);
   const [mediaTypeFilterOpen, setMediaTypeFilterOpen] = useState(false);
@@ -57,8 +54,10 @@ export const GenerationsPane: React.FC = () => {
     isLoading,
     error,
     isDeleting,
+    starredOnly,
     setSelectedShotFilter,
     setExcludePositioned,
+    setStarredOnly,
     handleServerPageChange,
     handleDeleteGeneration,
     handleAddToShot,
@@ -180,8 +179,8 @@ export const GenerationsPane: React.FC = () => {
                     >
                       <Checkbox 
                         id="starred-filter-pane"
-                        checked={showStarredOnly}
-                        onCheckedChange={(checked) => setShowStarredOnly(!!checked)}
+                        checked={starredOnly}
+                        onCheckedChange={(checked) => setStarredOnly(!!checked)}
                         className="border-zinc-600 data-[state=checked]:bg-zinc-600"
                       />
                       <Label 
@@ -307,8 +306,8 @@ export const GenerationsPane: React.FC = () => {
                     columnsPerRow={isMobile ? 3 : 6}
                     initialMediaTypeFilter={mediaTypeFilter}
                     onMediaTypeFilterChange={setMediaTypeFilter}
-                    initialStarredFilter={showStarredOnly}
-                    onStarredFilterChange={setShowStarredOnly}
+                    initialStarredFilter={starredOnly}
+                    onStarredFilterChange={setStarredOnly}
                     reducedSpacing={true}
                     hidePagination={true}
                     hideTopFilters={true}

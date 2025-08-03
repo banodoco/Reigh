@@ -54,6 +54,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [lastKnownTotal, setLastKnownTotal] = useState<number>(0);
   const [isPageChange, setIsPageChange] = useState(false);
+  const [isPageChangeFromBottom, setIsPageChangeFromBottom] = useState(false);
   const [isFilterChange, setIsFilterChange] = useState(false);
   const [mediaTypeFilter, setMediaTypeFilter] = useState<'all' | 'image' | 'video'>('all'); // Add media type filter state
   const [starredOnly, setStarredOnly] = useState<boolean>(false);
@@ -422,11 +423,14 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
 
   const scrollPosRef = useRef<number>(0);
 
-  const handleServerPageChange = useCallback((page:number)=>{
-    scrollPosRef.current = window.scrollY;
+  const handleServerPageChange = useCallback((page: number, fromBottom?: boolean) => {
+    if (!fromBottom) {
+      scrollPosRef.current = window.scrollY;
+    }
     setIsPageChange(true);
+    setIsPageChangeFromBottom(!!fromBottom);
     setCurrentPage(page);
-  },[]);
+  }, []);
 
   // Handle media type filter change
   const handleMediaTypeFilterChange = useCallback((newMediaType: 'all' | 'image' | 'video') => {
@@ -487,13 +491,18 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     }
   }, [selectedProjectId, currentPage, itemsPerPage, queryClient, loadGenerations, mediaTypeFilter, selectedShotFilter, excludePositioned, starredOnly]);
 
-  useEffect(()=>{
-    if(generationsResponse && isPageChange){
-      // restore scroll position only for page changes, not filter changes
-      window.scrollTo({top:scrollPosRef.current,behavior:'auto'});
+  useEffect(() => {
+    if (generationsResponse && isPageChange) {
+      if (isPageChangeFromBottom) {
+        galleryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else {
+        // restore scroll position only for page changes, not filter changes
+        window.scrollTo({ top: scrollPosRef.current, behavior: 'auto' });
+      }
       setIsPageChange(false);
+      setIsPageChangeFromBottom(false);
     }
-  },[generationsResponse, isPageChange]);
+  }, [generationsResponse, isPageChange, isPageChangeFromBottom]);
 
   return (
     <PageFadeIn>
