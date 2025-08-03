@@ -670,13 +670,10 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   const isServerPagination = !!(onServerPageChange && serverPage);
   
   // Handle pagination with loading state
-  const handlePageChange = React.useCallback((newPage: number, direction: 'prev' | 'next', preventScroll = false) => {
+  const handlePageChange = React.useCallback((newPage: number, direction: 'prev' | 'next', fromBottom = false) => {
     if (loadingButton) return; // Prevent multiple clicks while any button is loading
     
     setLoadingButton(direction);
-    
-    // Store current scroll position if we want to prevent scroll
-    const currentScrollY = preventScroll ? window.scrollY : null;
     
     if (isServerPagination && onServerPageChange) {
       // Server-side pagination
@@ -684,20 +681,20 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
       // Reset loading state after a short delay to allow for server response
       setTimeout(() => {
         setLoadingButton(null);
-        // Restore scroll position if requested
-        if (currentScrollY !== null) {
-          window.scrollTo({ top: currentScrollY, behavior: 'instant' });
+        // Scroll to top AFTER page loads (only for bottom buttons)
+        if (fromBottom) {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
         }
       }, 500);
     } else {
-      // Client-side pagination - show loading longer to ensure user sees feedback
-      const loadingDelay = preventScroll ? 300 : 100; // Longer delay for bottom buttons
+      // Client-side pagination - show loading longer for bottom buttons
+      const loadingDelay = fromBottom ? 300 : 100;
       setPage(newPage);
       setTimeout(() => {
         setLoadingButton(null);
-        // Restore scroll position if requested
-        if (currentScrollY !== null) {
-          window.scrollTo({ top: currentScrollY, behavior: 'instant' });
+        // Scroll to top AFTER page loads (only for bottom buttons)
+        if (fromBottom) {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
         }
       }, loadingDelay);
     }
@@ -1111,7 +1108,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                 const newPage = isServerPagination 
                   ? Math.max(1, serverPage! - 1)
                   : Math.max(0, page - 1);
-                handlePageChange(newPage, 'prev', true); // preventScroll = true for bottom buttons
+                handlePageChange(newPage, 'prev', true); // fromBottom = true for bottom buttons
               }}
               disabled={loadingButton !== null || (isServerPagination ? serverPage === 1 : page === 0)}
             >
@@ -1132,7 +1129,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                 const newPage = isServerPagination 
                   ? serverPage! + 1
                   : Math.min(totalPages - 1, page + 1);
-                handlePageChange(newPage, 'next', true); // preventScroll = true for bottom buttons
+                handlePageChange(newPage, 'next', true); // fromBottom = true for bottom buttons
               }}
               disabled={loadingButton !== null || (isServerPagination ? serverPage >= totalPages : page >= totalPages - 1)}
             >
