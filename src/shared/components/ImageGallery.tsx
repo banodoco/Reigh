@@ -146,6 +146,10 @@ interface ImageGalleryProps {
   hidePagination?: boolean;
   /** Hide star and media type filters (when filters are handled externally) */
   hideTopFilters?: boolean;
+  /** Optional callback to prefetch data for adjacent pages (for server-side pagination) */
+  onPrefetchAdjacentPages?: (prevPage: number | null, nextPage: number | null) => void;
+  /** Enable adjacent page image preloading (default: true) */
+  enableAdjacentPagePreloading?: boolean;
 }
 
 // Helper to format metadata for display
@@ -275,7 +279,9 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   onSwitchToAssociatedShot,
   reducedSpacing = false,
   hidePagination = false,
-  hideTopFilters = false
+  hideTopFilters = false,
+  onPrefetchAdjacentPages,
+  enableAdjacentPagePreloading = true
 }) => {
   const [activeLightboxMedia, setActiveLightboxMedia] = useState<GenerationRow | null>(null);
   const [downloadingImageId, setDownloadingImageId] = useState<string | null>(null);
@@ -813,6 +819,69 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
       setShowImageIndices(new Set());
     };
   }, [paginatedImages, page]);
+
+  // Adjacent page preloading for better navigation performance
+  useEffect(() => {
+    if (!enableAdjacentPagePreloading) return;
+    
+    // Debounce preloading to avoid excessive requests on rapid page changes
+    const preloadTimer = setTimeout(() => {
+      const totalPages = Math.max(1, Math.ceil(totalFilteredItems / ITEMS_PER_PAGE));
+      const currentPageForPreload = isServerPagination ? (serverPage! - 1) : page;
+      
+      // Calculate adjacent pages
+      const prevPage = currentPageForPreload > 0 ? currentPageForPreload - 1 : null;
+      const nextPage = currentPageForPreload < totalPages - 1 ? currentPageForPreload + 1 : null;
+      
+      if (isServerPagination) {
+        // For server-side pagination, call the callback to prefetch data
+        if (onPrefetchAdjacentPages) {
+          const serverPrevPage = prevPage !== null ? prevPage + 1 : null; // Convert back to 1-based
+          const serverNextPage = nextPage !== null ? nextPage + 1 : null; // Convert back to 1-based
+          onPrefetchAdjacentPages(serverPrevPage, serverNextPage);
+        }
+      } else {
+        // For client-side pagination, preload images from adjacent pages
+        const preloadImages = (pageIndex: number) => {
+          if (pageIndex < 0 || pageIndex >= totalPages) return;
+          
+          const startIdx = pageIndex * ITEMS_PER_PAGE;
+          const endIdx = Math.min(startIdx + ITEMS_PER_PAGE, filteredImages.length);
+          
+          // Preload first 5 images from the page for performance
+          const imagesToPreload = filteredImages.slice(startIdx, Math.min(endIdx, startIdx + 5));
+          
+          imagesToPreload.forEach((img, idx) => {
+            // Stagger the preloading to avoid blocking the main thread
+            setTimeout(() => {
+              const preloadImg = new Image();
+              preloadImg.src = getDisplayUrl(img.thumbUrl || img.url);
+              // Also preload the full image for priority items
+              if (idx < 2) {
+                const fullImg = new Image();
+                fullImg.src = getDisplayUrl(img.url);
+              }
+            }, idx * 50); // 50ms stagger between images
+          });
+        };
+        
+        // Preload adjacent pages
+        if (prevPage !== null) preloadImages(prevPage);
+        if (nextPage !== null) preloadImages(nextPage);
+      }
+    }, 500); // 500ms debounce
+    
+    return () => clearTimeout(preloadTimer);
+  }, [
+    enableAdjacentPagePreloading, 
+    isServerPagination, 
+    page, 
+    serverPage, 
+    totalFilteredItems, 
+    ITEMS_PER_PAGE, 
+    filteredImages, 
+    onPrefetchAdjacentPages
+  ]);
 
   const rangeStart = totalFilteredItems === 0 ? 0 : (isServerPagination ? offset : page * ITEMS_PER_PAGE) + 1;
   const rangeEnd = rangeStart + paginatedImages.length - 1;

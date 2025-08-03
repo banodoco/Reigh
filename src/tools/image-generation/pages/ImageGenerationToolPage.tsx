@@ -450,8 +450,8 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     timeEnd('NavPerf', 'PageLoad:/tools/image-generation');
   }, []);
 
-  // Prefetch next and previous pages for smoother navigation
-  useEffect(() => {
+  // Prefetch adjacent pages callback for ImageGallery
+  const handlePrefetchAdjacentPages = useCallback((prevPage: number | null, nextPage: number | null) => {
     if (!selectedProjectId || !loadGenerations) return;
 
     const filters = { 
@@ -461,29 +461,28 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
       starredOnly
     };
 
-    const nextPage = currentPage + 1;
-    
-    queryClient.prefetchQuery({
-      queryKey: ['generations', selectedProjectId, nextPage, itemsPerPage, filters],
-      queryFn: () => fetchGenerations(selectedProjectId, itemsPerPage, (nextPage - 1) * itemsPerPage, filters),
-      staleTime: 30 * 1000,
-    }).then(() => {
-      const cached = queryClient.getQueryData(['generations', selectedProjectId, nextPage, itemsPerPage, filters]) as GenerationsPaginatedResponse | undefined;
-      cached?.items.forEach(img => {
-        const preloadImg = new Image();
-        preloadImg.src = getDisplayUrl(img.url);
+    // Prefetch next page
+    if (nextPage) {
+      queryClient.prefetchQuery({
+        queryKey: ['generations', selectedProjectId, nextPage, itemsPerPage, filters],
+        queryFn: () => fetchGenerations(selectedProjectId, itemsPerPage, (nextPage - 1) * itemsPerPage, filters),
+        staleTime: 30 * 1000,
+      }).then(() => {
+        const cached = queryClient.getQueryData(['generations', selectedProjectId, nextPage, itemsPerPage, filters]) as GenerationsPaginatedResponse | undefined;
+        cached?.items.forEach(img => {
+          const preloadImg = new Image();
+          preloadImg.src = getDisplayUrl(img.url);
+        });
       });
-    });
+    }
 
-    if (currentPage > 1) {
-      const prevPage = currentPage - 1;
-      
+    // Prefetch previous page
+    if (prevPage) {
       queryClient.prefetchQuery({
         queryKey: ['generations', selectedProjectId, prevPage, itemsPerPage, filters],
         queryFn: () => fetchGenerations(selectedProjectId, itemsPerPage, (prevPage - 1) * itemsPerPage, filters),
         staleTime: 30 * 1000,
       }).then(() => {
-        
         const cachedPrev = queryClient.getQueryData(['generations', selectedProjectId, prevPage, itemsPerPage, filters]) as GenerationsPaginatedResponse | undefined;
         cachedPrev?.items.forEach(img => {
           const preloadImg = new Image();
@@ -491,7 +490,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
         });
       });
     }
-  }, [selectedProjectId, currentPage, itemsPerPage, queryClient, loadGenerations, mediaTypeFilter, selectedShotFilter, excludePositioned, starredOnly]);
+  }, [selectedProjectId, itemsPerPage, queryClient, loadGenerations, mediaTypeFilter, selectedShotFilter, excludePositioned, starredOnly]);
 
   useEffect(() => {
     if (generationsResponse && isPageChange) {
@@ -598,6 +597,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
                 onToolTypeFilterChange={() => {}}
                 formAssociatedShotId={formAssociatedShotId}
                 onSwitchToAssociatedShot={handleSwitchToAssociatedShot}
+                onPrefetchAdjacentPages={handlePrefetchAdjacentPages}
               />
             )}
           </div>
