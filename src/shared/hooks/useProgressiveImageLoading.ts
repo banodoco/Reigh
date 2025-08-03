@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 
 interface UseProgressiveImageLoadingProps {
   images: any[];
@@ -14,6 +14,8 @@ export const useProgressiveImageLoading = ({
   onImagesReady
 }: UseProgressiveImageLoadingProps) => {
   const [showImageIndices, setShowImageIndices] = useState<Set<number>>(new Set());
+  const currentPageRef = useRef(page);
+  currentPageRef.current = page;
 
   useEffect(() => {
     if (!enabled || images.length === 0) return;
@@ -25,30 +27,41 @@ export const useProgressiveImageLoading = ({
     const initialIndices = new Set(Array.from({ length: Math.min(10, images.length) }, (_, i) => i));
     setShowImageIndices(initialIndices);
     
-    // Notify that initial images are ready
+    // Notify that initial images are ready (with small delay to avoid layout thrashing)
     if (onImagesReady) {
-      onImagesReady();
+      const readyTimeout = setTimeout(() => {
+        if (isCurrentPage && currentPageRef.current === page) {
+          onImagesReady();
+        }
+      }, 16); // Next frame timing for smoother transitions
+      timeouts.push(readyTimeout);
     }
 
     // Progressive loading for remaining images (if more than 10)
     if (images.length > 10) {
+      // Restore original optimized batching logic
+      const remainingImages = images.length - 10;
+      const batchSize = Math.min(10, remainingImages); // Dynamic batch size like original
+      const maxBatches = page > 10 ? 2 : Math.ceil(remainingImages / batchSize); // Smart limits
       let batchCount = 0;
-      // Limit to avoid excessive complexity on high page numbers
-      const maxBatches = page > 10 ? 2 : Math.ceil((images.length - 10) / 10);
       
-      for (let i = 10; i < images.length && batchCount < maxBatches; i += 10) {
+      for (let i = 10; i < images.length && batchCount < maxBatches; i += batchSize) {
+        const batchNumber = Math.floor((i - 10) / batchSize);
+        const delay = (batchNumber + 1) * 100; // Shorter delay like original
+        
         const timeout = setTimeout(() => {
-          if (isCurrentPage) {
+          // Enhanced race condition check like original
+          if (isCurrentPage && currentPageRef.current === page) {
             setShowImageIndices(prev => {
               const newSet = new Set(prev);
-              // Add next batch of 10 images (or remaining if less than 10)
-              for (let j = i; j < Math.min(i + 10, images.length); j++) {
+              // Add next batch (or remaining if less than batchSize)
+              for (let j = i; j < Math.min(i + batchSize, images.length); j++) {
                 newSet.add(j);
               }
               return newSet;
             });
           }
-        }, (batchCount + 1) * 100); // 100ms between batches
+        }, delay);
         
         timeouts.push(timeout);
         batchCount++;
