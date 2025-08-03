@@ -36,6 +36,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
   const [replaceImages, setReplaceImages] = useState(true);
   const [taskId, setTaskId] = useState<string | null>(null);
   const [showDetailedParams, setShowDetailedParams] = useState(false);
+  const [showAllImages, setShowAllImages] = useState(false);
 
   // Use the new hooks
   const getTaskIdMutation = useGetTaskIdForGeneration();
@@ -159,28 +160,46 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
                 </div>
                 <div className="space-y-4 p-4 bg-muted/30 rounded-lg border">
                   {/* Input Images Section - Inside Generation Summary */}
-                  {inputImages.length > 0 && (
-                    <div className="space-y-3">
-                      <div className="flex items-center space-x-2">
-                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Input Images</p>
-                        <span className="text-xs text-muted-foreground">({inputImages.length} image{inputImages.length !== 1 ? 's' : ''})</span>
-                      </div>
-                      <div className="grid grid-cols-6 gap-2">
-                        {inputImages.map((img: string, index: number) => (
-                          <div key={index} className="relative group">
-                            <img 
-                              src={img} 
-                              alt={`Input image ${index + 1}`} 
-                              className="w-full aspect-square object-cover rounded-md border shadow-sm transition-transform group-hover:scale-105"
-                            />
-                            <div className="absolute bottom-1 right-1 bg-black/70 text-white text-xs px-1 py-0.5 rounded">
-                              {index + 1}
-                            </div>
+                  {inputImages.length > 0 && (() => {
+                    const imagesPerRow = 6;
+                    const imagesToShow = showAllImages ? inputImages : inputImages.slice(0, imagesPerRow);
+                    const remainingCount = inputImages.length - imagesPerRow;
+                    
+                    return (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Input Images</p>
+                            <span className="text-xs text-muted-foreground">({inputImages.length} image{inputImages.length !== 1 ? 's' : ''})</span>
                           </div>
-                        ))}
+                          {inputImages.length > imagesPerRow && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setShowAllImages(!showAllImages)}
+                              className="h-6 px-2 text-xs"
+                            >
+                              {showAllImages ? 'Show Less' : `Show ${remainingCount} More`}
+                            </Button>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-6 gap-2">
+                          {imagesToShow.map((img: string, index: number) => (
+                            <div key={index} className="relative group">
+                              <img 
+                                src={img} 
+                                alt={`Input image ${index + 1}`} 
+                                className="w-full aspect-square object-cover rounded-md border shadow-sm transition-transform group-hover:scale-105"
+                              />
+                              <div className="absolute bottom-1 right-1 bg-black/70 text-white text-xs px-1 py-0.5 rounded">
+                                {index + 1}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
                   {/* Prompts Section */}
                   <div className="grid grid-cols-1 gap-4">
                     <div className="space-y-1">
