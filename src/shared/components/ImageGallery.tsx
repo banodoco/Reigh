@@ -670,20 +670,36 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   const isServerPagination = !!(onServerPageChange && serverPage);
   
   // Handle pagination with loading state
-  const handlePageChange = React.useCallback((newPage: number, direction: 'prev' | 'next') => {
+  const handlePageChange = React.useCallback((newPage: number, direction: 'prev' | 'next', preventScroll = false) => {
     if (loadingButton) return; // Prevent multiple clicks while any button is loading
     
     setLoadingButton(direction);
+    
+    // Store current scroll position if we want to prevent scroll
+    const currentScrollY = preventScroll ? window.scrollY : null;
     
     if (isServerPagination && onServerPageChange) {
       // Server-side pagination
       onServerPageChange(newPage);
       // Reset loading state after a short delay to allow for server response
-      setTimeout(() => setLoadingButton(null), 500);
+      setTimeout(() => {
+        setLoadingButton(null);
+        // Restore scroll position if requested
+        if (currentScrollY !== null) {
+          window.scrollTo({ top: currentScrollY, behavior: 'instant' });
+        }
+      }, 500);
     } else {
-      // Client-side pagination - simulate brief loading for UX consistency
+      // Client-side pagination - show loading longer to ensure user sees feedback
+      const loadingDelay = preventScroll ? 300 : 100; // Longer delay for bottom buttons
       setPage(newPage);
-      setTimeout(() => setLoadingButton(null), 100);
+      setTimeout(() => {
+        setLoadingButton(null);
+        // Restore scroll position if requested
+        if (currentScrollY !== null) {
+          window.scrollTo({ top: currentScrollY, behavior: 'instant' });
+        }
+      }, loadingDelay);
     }
   }, [loadingButton, isServerPagination, onServerPageChange, setPage]);
   
@@ -1090,11 +1106,12 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => {
+              onClick={(e) => {
+                e.preventDefault(); // Prevent any default scroll behavior
                 const newPage = isServerPagination 
                   ? Math.max(1, serverPage! - 1)
                   : Math.max(0, page - 1);
-                handlePageChange(newPage, 'prev');
+                handlePageChange(newPage, 'prev', true); // preventScroll = true for bottom buttons
               }}
               disabled={loadingButton !== null || (isServerPagination ? serverPage === 1 : page === 0)}
             >
@@ -1110,11 +1127,12 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => {
+              onClick={(e) => {
+                e.preventDefault(); // Prevent any default scroll behavior
                 const newPage = isServerPagination 
                   ? serverPage! + 1
                   : Math.min(totalPages - 1, page + 1);
-                handlePageChange(newPage, 'next');
+                handlePageChange(newPage, 'next', true); // preventScroll = true for bottom buttons
               }}
               disabled={loadingButton !== null || (isServerPagination ? serverPage >= totalPages : page >= totalPages - 1)}
             >
