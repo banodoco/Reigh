@@ -1002,7 +1002,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
               ? "Added to queue!"
               : isGenerating
                 ? "Creating tasks..."
-                : `Generate ${imagesPerPrompt * prompts.length} Images`}
+                : `Generate ${imagesPerPrompt * actionablePromptsCount} ${imagesPerPrompt * actionablePromptsCount === 1 ? 'Image' : 'Images'}`}
           </Button>
         </div>
       </form>

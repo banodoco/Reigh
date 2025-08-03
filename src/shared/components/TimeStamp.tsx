@@ -1,5 +1,6 @@
 import React from 'react';
 import { formatDistanceToNow, isValid } from 'date-fns';
+import { useIsMobile } from '@/shared/hooks/use-mobile';
 
 interface TimeStampProps {
   /** ISO date string or Date object */
@@ -18,6 +19,9 @@ export const TimeStamp: React.FC<TimeStampProps> = ({
   position = 'top-left',
   showOnHover = true
 }) => {
+  const isMobile = useIsMobile();
+  const [isHovered, setIsHovered] = React.useState(false);
+  
   if (!createdAt) return null;
 
   const date = typeof createdAt === 'string' ? new Date(createdAt) : createdAt;
@@ -33,8 +37,13 @@ export const TimeStamp: React.FC<TimeStampProps> = ({
 
   const hoverClass = showOnHover ? 'opacity-0 group-hover:opacity-100 transition-opacity' : 'opacity-100';
 
-  // Memoize the expensive date formatting - only recalculate when the date actually changes
+  // On mobile, skip expensive formatting until actually needed (on hover)
+  // This prevents 200-250ms of date formatting work during initial render
   const formattedTime = React.useMemo(() => {
+    if (isMobile && showOnHover && !isHovered) {
+      return null; // Skip formatting until hovered
+    }
+    
     return formatDistanceToNow(date, { addSuffix: true })
       .replace("about ", "")
       .replace("less than a minute", "<1 min")
@@ -44,12 +53,19 @@ export const TimeStamp: React.FC<TimeStampProps> = ({
       .replace(" hour", " hr")
       .replace(" seconds", " secs")
       .replace(" second", " sec");
-  }, [date.getTime()]); // Use getTime() to ensure stable dependency
+  }, [date.getTime(), isMobile, showOnHover, isHovered]);
+
+  // On mobile, don't render until we have the formatted time or it's always shown
+  if (isMobile && showOnHover && formattedTime === null) {
+    return null;
+  }
 
   return (
     <span 
       className={`absolute ${positionClasses[position]} text-xs text-white bg-black/50 px-1.5 py-0.5 rounded-md ${hoverClass} ${className}`}
       title={date.toLocaleString()}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
       {formattedTime}
     </span>

@@ -254,7 +254,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   totalCount, 
   whiteText = false, 
   columnsPerRow = 5, 
-  itemsPerPage = 45, 
+  itemsPerPage, 
   initialMediaTypeFilter = 'all', 
   onServerPageChange, 
   serverPage, 
@@ -283,6 +283,10 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   const { setLastAffectedShotId } = useLastAffectedShot();
   const { currentShotId } = useCurrentShot();
   const isMobile = useIsMobile();
+  
+  // Use mobile-optimized defaults to improve initial render performance
+  const defaultItemsPerPage = isMobile ? 20 : 45;
+  const actualItemsPerPage = itemsPerPage ?? defaultItemsPerPage;
   const simplifiedShotOptions = React.useMemo(() => allShots.map(s => ({ id: s.id, name: s.name })), [allShots]);
   
   // Memoize grid column classes to prevent unnecessary recalculations
@@ -326,8 +330,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(!!initialSearchTerm);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Pagination state (45 items per page)
-  const ITEMS_PER_PAGE = itemsPerPage;
+  // Pagination state - reduce items per page on mobile for faster initial render
+  const ITEMS_PER_PAGE = actualItemsPerPage;
   const [page, setPage] = React.useState(0);
 
   // When filters change, reset to first page (debounced to avoid rapid state changes)
