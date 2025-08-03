@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useRef } from 'react';
 import { ImageGallery } from '@/shared/components/ImageGallery';
 import { useGenerationsPageLogic } from '@/shared/hooks/useGenerationsPageLogic';
 import { SkeletonGallery } from '@/shared/components/ui/skeleton-gallery';
@@ -50,9 +50,27 @@ const GenerationsPage: React.FC = () => {
     // Page reset is now handled in the hook via useEffect
   };
 
-  // Prefetch adjacent pages callback for ImageGallery
+  // Ref to track ongoing server-side prefetch operations
+  const prefetchOperationsRef = useRef<{
+    images: HTMLImageElement[];
+    currentPrefetchId: string;
+  }>({ images: [], currentPrefetchId: '' });
+
+  // Prefetch adjacent pages callback for ImageGallery with cancellation
   const handlePrefetchAdjacentPages = useCallback((prevPage: number | null, nextPage: number | null) => {
     if (!selectedProjectId) return;
+
+    // Cancel previous image preloads immediately
+    const prevOps = prefetchOperationsRef.current;
+    prevOps.images.forEach(img => {
+      img.onload = null;
+      img.onerror = null;
+      img.src = ''; // Cancel loading
+    });
+
+    // Reset tracking with new prefetch ID
+    const prefetchId = `${nextPage}-${prevPage}-${Date.now()}`;
+    prefetchOperationsRef.current = { images: [], currentPrefetchId: prefetchId };
 
     const filters = { 
       mediaType: mediaTypeFilter,
@@ -61,7 +79,45 @@ const GenerationsPage: React.FC = () => {
       starredOnly
     };
 
-    // Prefetch next page
+    // Helper to preload images with cancellation checks
+    const preloadImagesWithCancel = (cachedData: any, priority: 'next' | 'prev', currentPrefetchId: string) => {
+      if (!cachedData?.items) return;
+      
+      cachedData.items.forEach((img: any, idx: number) => {
+        // Skip if this prefetch is no longer current
+        if (prefetchOperationsRef.current.currentPrefetchId !== currentPrefetchId) return;
+        
+        // Priority-based delays: next page images load faster
+        const baseDelay = priority === 'next' ? 50 : 200;
+        const staggerDelay = idx * 30;
+        
+        setTimeout(() => {
+          // Double-check this is still current before creating image
+          if (prefetchOperationsRef.current.currentPrefetchId !== currentPrefetchId) return;
+          
+          const preloadImg = new Image();
+          prefetchOperationsRef.current.images.push(preloadImg);
+          
+          preloadImg.onload = () => {
+            const imgIndex = prefetchOperationsRef.current.images.indexOf(preloadImg);
+            if (imgIndex > -1) {
+              prefetchOperationsRef.current.images.splice(imgIndex, 1);
+            }
+          };
+          
+          preloadImg.onerror = () => {
+            const imgIndex = prefetchOperationsRef.current.images.indexOf(preloadImg);
+            if (imgIndex > -1) {
+              prefetchOperationsRef.current.images.splice(imgIndex, 1);
+            }
+          };
+          
+          preloadImg.src = getDisplayUrl(img.url);
+        }, baseDelay + staggerDelay);
+      });
+    };
+
+    // Prefetch next page first (higher priority)
     if (nextPage) {
       queryClient.prefetchQuery({
         queryKey: ['generations', selectedProjectId, nextPage, GENERATIONS_PER_PAGE, filters],
@@ -69,14 +125,11 @@ const GenerationsPage: React.FC = () => {
         staleTime: 30 * 1000,
       }).then(() => {
         const cached = queryClient.getQueryData(['generations', selectedProjectId, nextPage, GENERATIONS_PER_PAGE, filters]) as any;
-        cached?.items?.forEach((img: any) => {
-          const preloadImg = new Image();
-          preloadImg.src = getDisplayUrl(img.url);
-        });
+        preloadImagesWithCancel(cached, 'next', prefetchId);
       });
     }
 
-    // Prefetch previous page
+    // Prefetch previous page second (lower priority)
     if (prevPage) {
       queryClient.prefetchQuery({
         queryKey: ['generations', selectedProjectId, prevPage, GENERATIONS_PER_PAGE, filters],
@@ -84,10 +137,7 @@ const GenerationsPage: React.FC = () => {
         staleTime: 30 * 1000,
       }).then(() => {
         const cached = queryClient.getQueryData(['generations', selectedProjectId, prevPage, GENERATIONS_PER_PAGE, filters]) as any;
-        cached?.items?.forEach((img: any) => {
-          const preloadImg = new Image();
-          preloadImg.src = getDisplayUrl(img.url);
-        });
+        preloadImagesWithCancel(cached, 'prev', prefetchId);
       });
     }
   }, [selectedProjectId, queryClient, mediaTypeFilter, selectedShotFilter, excludePositioned, starredOnly]);

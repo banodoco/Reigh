@@ -820,12 +820,41 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     };
   }, [paginatedImages, page]);
 
-  // Adjacent page preloading for better navigation performance
+  // Ref to track and cancel ongoing preload operations
+  const preloadOperationsRef = useRef<{
+    timeouts: NodeJS.Timeout[];
+    images: HTMLImageElement[];
+    currentPageId: string;
+  }>({ timeouts: [], images: [], currentPageId: '' });
+
+  // Adjacent page preloading with proper cancellation and prioritization
   useEffect(() => {
     if (!enableAdjacentPagePreloading) return;
     
+    // Cancel all previous preload operations immediately when page changes
+    const prevOperations = preloadOperationsRef.current;
+    prevOperations.timeouts.forEach(timeout => clearTimeout(timeout));
+    prevOperations.images.forEach(img => {
+      img.onload = null;
+      img.onerror = null;
+      img.src = ''; // Cancel loading
+    });
+    
+    // Reset operations tracking
+    const currentPageId = `${isServerPagination ? serverPage : page}-${Date.now()}`;
+    preloadOperationsRef.current = { 
+      timeouts: [], 
+      images: [], 
+      currentPageId 
+    };
+    
     // Debounce preloading to avoid excessive requests on rapid page changes
     const preloadTimer = setTimeout(() => {
+      // Check if this is still the current page (rapid navigation check)
+      if (preloadOperationsRef.current.currentPageId !== currentPageId) {
+        return; // Page changed during debounce, skip preloading
+      }
+      
       const totalPages = Math.max(1, Math.ceil(totalFilteredItems / ITEMS_PER_PAGE));
       const currentPageForPreload = isServerPagination ? (serverPage! - 1) : page;
       
@@ -841,8 +870,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
           onPrefetchAdjacentPages(serverPrevPage, serverNextPage);
         }
       } else {
-        // For client-side pagination, preload images from adjacent pages
-        const preloadImages = (pageIndex: number) => {
+        // For client-side pagination, preload images with prioritization
+        const preloadImages = (pageIndex: number, priority: 'next' | 'prev') => {
           if (pageIndex < 0 || pageIndex >= totalPages) return;
           
           const startIdx = pageIndex * ITEMS_PER_PAGE;
@@ -852,26 +881,85 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
           const imagesToPreload = filteredImages.slice(startIdx, Math.min(endIdx, startIdx + 5));
           
           imagesToPreload.forEach((img, idx) => {
-            // Stagger the preloading to avoid blocking the main thread
-            setTimeout(() => {
+            // Priority-based delays: next page gets faster loading than previous
+            const baseDelay = priority === 'next' ? 100 : 300; // Next page starts sooner
+            const staggerDelay = idx * 50; // 50ms stagger between images
+            const totalDelay = baseDelay + staggerDelay;
+            
+            const timeout = setTimeout(() => {
+              // Double-check this is still the current page before creating image
+              if (preloadOperationsRef.current.currentPageId !== currentPageId) {
+                return; // Page changed, don't start preload
+              }
+              
+              // Create and track image preloading
               const preloadImg = new Image();
+              preloadOperationsRef.current.images.push(preloadImg);
+              
+              preloadImg.onload = () => {
+                // Remove from tracking when loaded successfully
+                const imgIndex = preloadOperationsRef.current.images.indexOf(preloadImg);
+                if (imgIndex > -1) {
+                  preloadOperationsRef.current.images.splice(imgIndex, 1);
+                }
+              };
+              
+              preloadImg.onerror = () => {
+                // Remove from tracking when failed
+                const imgIndex = preloadOperationsRef.current.images.indexOf(preloadImg);
+                if (imgIndex > -1) {
+                  preloadOperationsRef.current.images.splice(imgIndex, 1);
+                }
+              };
+              
               preloadImg.src = getDisplayUrl(img.thumbUrl || img.url);
-              // Also preload the full image for priority items
-              if (idx < 2) {
+              
+              // Also preload the full image for priority items (first 2 of next page)
+              if (idx < 2 && priority === 'next') {
                 const fullImg = new Image();
+                preloadOperationsRef.current.images.push(fullImg);
+                
+                fullImg.onload = () => {
+                  const imgIndex = preloadOperationsRef.current.images.indexOf(fullImg);
+                  if (imgIndex > -1) {
+                    preloadOperationsRef.current.images.splice(imgIndex, 1);
+                  }
+                };
+                
+                fullImg.onerror = () => {
+                  const imgIndex = preloadOperationsRef.current.images.indexOf(fullImg);
+                  if (imgIndex > -1) {
+                    preloadOperationsRef.current.images.splice(imgIndex, 1);
+                  }
+                };
+                
                 fullImg.src = getDisplayUrl(img.url);
               }
-            }, idx * 50); // 50ms stagger between images
+            }, totalDelay);
+            
+            preloadOperationsRef.current.timeouts.push(timeout);
           });
         };
         
-        // Preload adjacent pages
-        if (prevPage !== null) preloadImages(prevPage);
-        if (nextPage !== null) preloadImages(nextPage);
+        // Prioritize: next page first, then previous page
+        if (nextPage !== null) preloadImages(nextPage, 'next');
+        if (prevPage !== null) preloadImages(prevPage, 'prev');
       }
     }, 500); // 500ms debounce
     
-    return () => clearTimeout(preloadTimer);
+    preloadOperationsRef.current.timeouts.push(preloadTimer);
+    
+    return () => {
+      // Cleanup function: cancel all ongoing operations
+      const operations = preloadOperationsRef.current;
+      operations.timeouts.forEach(timeout => clearTimeout(timeout));
+      operations.images.forEach(img => {
+        img.onload = null;
+        img.onerror = null;
+        img.src = ''; // Cancel loading
+      });
+      preloadOperationsRef.current = { timeouts: [], images: [], currentPageId: '' };
+    };
   }, [
     enableAdjacentPagePreloading, 
     isServerPagination, 
