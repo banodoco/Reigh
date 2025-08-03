@@ -5,7 +5,7 @@ import { Label } from "@/shared/components/ui/label";
 import { Textarea } from "@/shared/components/ui/textarea";
 import { LoraSelectorModal, LoraModel } from "@/shared/components/LoraSelectorModal";
 import { DisplayableMetadata } from "@/shared/components/ImageGallery";
-import { UploadCloud, PlusCircle, Edit3, Trash2 } from "lucide-react";
+import { UploadCloud, PlusCircle, Edit3, Trash2, X } from "lucide-react";
 import { ActiveLoRAsDisplay, ActiveLora } from "@/shared/components/ActiveLoRAsDisplay";
 import { useLoraManager } from '@/shared/hooks/useLoraManager';
 import { toast } from "sonner";
@@ -772,7 +772,34 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Associated Shot Selector */}
           <div className="space-y-2 md:col-start-1 md:row-start-1 self-start w-full">
-            <Label htmlFor="associatedShot" className="inline-block">Associated with Shot</Label>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="associatedShot" className="inline-block">Associated with Shot</Label>
+              {associatedShotId && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          markAsInteracted();
+                          setAssociatedShotId(null);
+                        }}
+                        disabled={!hasApiKey || isGenerating}
+                        className="h-6 w-6 p-0 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                        aria-label="Clear shot selection"
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      <p>Clear selection</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </div>
             {/* Select dropdown and create button */}
             <div className="flex items-center gap-2">
             <Select
