@@ -94,6 +94,9 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   const handleImageError = useCallback(() => {
     console.warn(`Image load failed for ${image.id}: ${displayUrl}, retry ${imageRetryCount + 1}/${MAX_RETRIES}`);
     
+    // Always reset loading state on error
+    setImageLoading(false);
+    
     if (imageRetryCount < MAX_RETRIES) {
       // Retry with cache busting
       setTimeout(() => {
@@ -125,25 +128,37 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
 
   // Progressive loading effect: only set src when shouldLoad is true
   useEffect(() => {
-    if (shouldLoad && !actualSrc && !imageLoading) {
+    let isMounted = true; // Flag to prevent state updates after unmount
+    
+    if (shouldLoad && !actualSrc) {
+      // Remove imageLoading gate - make this idempotent
       setImageLoading(true);
       // Small delay to ensure priority images start loading first
       const delay = isPriority ? 0 : 50;
       
       const timeout = setTimeout(() => {
-        setActualSrc(actualDisplayUrl);
+        if (isMounted) {
+          setActualSrc(actualDisplayUrl);
+        }
       }, delay);
       
-      return () => clearTimeout(timeout);
+      return () => {
+        clearTimeout(timeout);
+        isMounted = false;
+      };
     }
     
     // Reset loading states if shouldLoad becomes false (page change)
-    if (!shouldLoad && (actualSrc || imageLoading)) {
+    if (!shouldLoad) {
       setActualSrc(null);
       setImageLoading(false);
       setImageLoaded(false);
     }
-  }, [shouldLoad, actualSrc, imageLoading, actualDisplayUrl, isPriority]);
+    
+    return () => {
+      isMounted = false;
+    };
+  }, [shouldLoad, actualSrc, actualDisplayUrl, isPriority]); // Removed imageLoading from deps
 
   // Only format metadata when actually needed (Info tooltip/popover is opened)
   // This prevents 150-200ms of string building work during initial render on mobile
@@ -247,6 +262,10 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                       setImageLoading(false);
                       setImageLoaded(true);
                     }}
+                    onAbort={() => {
+                      // Reset loading state if video load was aborted
+                      setImageLoading(false);
+                    }}
                 />
               ) : (
                 // Video loading skeleton
@@ -287,11 +306,15 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                   } : undefined}
                   style={{ cursor: 'pointer' }}
                   onError={handleImageError}
-                  onLoad={() => {
-                    setImageLoading(false);
-                    setImageLoaded(true);
-                  }}
-                  onLoadStart={() => setImageLoading(true)}
+                                     onLoad={() => {
+                     setImageLoading(false);
+                     setImageLoaded(true);
+                   }}
+                   onLoadStart={() => setImageLoading(true)}
+                   onAbort={() => {
+                     // Reset loading state if image load was aborted
+                     setImageLoading(false);
+                   }}
               />
              ) : (
                // Image loading skeleton

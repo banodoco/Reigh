@@ -762,6 +762,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     return () => {
       isCurrentPage = false; // Mark this effect as stale
       timeouts.forEach(timeout => clearTimeout(timeout));
+      // Hard reset to prevent any stale state from affecting new page
+      setShowImageIndices(new Set());
     };
   }, [paginatedImages, page]);
 
