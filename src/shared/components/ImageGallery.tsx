@@ -357,7 +357,6 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   const [isGalleryLoading, setIsGalleryLoading] = useState<boolean>(false);
   
   // Progressive loading state - prioritize first 10 images
-  const [loadedImageIds, setLoadedImageIds] = useState<Set<string>>(new Set());
   const [showImageIndices, setShowImageIndices] = useState<Set<number>>(new Set());
 
   // Ref for scrolling to top of gallery instead of top of page
@@ -366,12 +365,21 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   // Pagination state - reduce items per page on mobile for faster initial render
   const ITEMS_PER_PAGE = actualItemsPerPage;
   const [page, setPage] = React.useState(0);
+  
+  // Ref to track current page for progressive loading optimization
+  const currentPageRef = useRef(page);
+  currentPageRef.current = page;
 
   // When filters change, reset to first page (debounced to avoid rapid state changes)
   React.useEffect(() => {
     const timer = setTimeout(() => setPage(0), 10);
     return () => clearTimeout(timer);
   }, [filterByToolType, mediaTypeFilter, searchTerm, showStarredOnly]);
+
+  // Clear progressive loading state when page changes to prevent accumulation
+  React.useEffect(() => {
+    setShowImageIndices(new Set());
+  }, [page]);
 
   // Update media type filter when the prop changes (sync from parent)
   useEffect(() => {
@@ -745,8 +753,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   useEffect(() => {
     if (paginatedImages.length === 0) return;
     
-    // Create a stable identifier for this page to prevent race conditions
-    const pageId = `${page}-${paginatedImages.map(img => img.id || img.url).join(',').slice(0, 50)}`;
+    // Use a simple page identifier to avoid expensive string operations
     let isCurrentPage = true; // Flag to check if this effect is still valid
     
     // Reset visible images when paginatedImages changes (new page/filter)
@@ -767,18 +774,25 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     const timeouts: NodeJS.Timeout[] = [];
     
     if (paginatedImages.length > 10) {
-      // Load remaining images in batches of 5 with staggered delays
-      for (let i = 10; i < paginatedImages.length; i += 5) {
-        const batchNumber = Math.floor((i - 10) / 5);
-        const delay = (batchNumber + 1) * 150; // 150ms between batches
+      // Load remaining images in larger batches with shorter delays for better performance
+      const remainingImages = paginatedImages.length - 10;
+      const batchSize = Math.min(10, remainingImages); // Larger batches, max 10 at a time
+      
+      // Limit progressive loading complexity on high page numbers to maintain performance
+      const maxBatches = page > 10 ? 2 : Math.ceil(remainingImages / batchSize); // Reduce batching on later pages
+      let batchCount = 0;
+      
+      for (let i = 10; i < paginatedImages.length && batchCount < maxBatches; i += batchSize) {
+        const batchNumber = Math.floor((i - 10) / batchSize);
+        const delay = (batchNumber + 1) * 100; // Shorter delay between batches
         
         const timeout = setTimeout(() => {
           // Check if this is still the current page before updating
-          if (isCurrentPage) {
+          if (isCurrentPage && currentPageRef.current === page) {
             setShowImageIndices(prev => {
               const newSet = new Set(prev);
-              // Add next batch of 5 images (or remaining if less than 5)
-              for (let j = i; j < Math.min(i + 5, paginatedImages.length); j++) {
+              // Add next batch of images (or remaining if less than batchSize)
+              for (let j = i; j < Math.min(i + batchSize, paginatedImages.length); j++) {
                 newSet.add(j);
               }
               return newSet;
@@ -787,6 +801,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
         }, delay);
         
         timeouts.push(timeout);
+        batchCount++;
       }
     }
     
