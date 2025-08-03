@@ -731,34 +731,46 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   // Show a minimal skeleton while settings hydrate so the layout is visible immediately
   if (!ready) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-pulse">
-        {/* Prompts Section Skeleton */}
-        <div className="space-y-4">
-          <div className="h-8 bg-muted rounded" /> {/* Header */}
-          <div className="space-y-3">
-            <div className="h-20 bg-muted rounded" /> {/* Prompt 1 */}
-            <div className="h-20 bg-muted rounded" /> {/* Prompt 2 */}
+      <div className="space-y-6">
+        <div className="flex flex-col md:flex-row gap-6 animate-pulse">
+          {/* Left Column Skeleton */}
+          <div className="flex-1 space-y-6">
+            {/* Associated Shot Skeleton */}
+            <div className="space-y-2">
+              <div className="h-6 bg-muted rounded w-32" />
+              <div className="h-10 bg-muted rounded" />
+            </div>
+            
+            {/* Prompts Section Skeleton */}
+            <div className="space-y-4">
+              <div className="h-8 bg-muted rounded" /> {/* Header */}
+              <div className="space-y-3">
+                <div className="h-20 bg-muted rounded" /> {/* Prompt 1 */}
+                <div className="h-20 bg-muted rounded" /> {/* Prompt 2 */}
+              </div>
+              <div className="h-10 bg-muted rounded w-32" /> {/* Add button */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="h-24 bg-muted rounded" /> {/* Before */}
+                <div className="h-24 bg-muted rounded" /> {/* After */}
+              </div>
+              <div className="h-16 bg-muted rounded" /> {/* Slider */}
+            </div>
           </div>
-          <div className="h-10 bg-muted rounded w-32" /> {/* Add button */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="h-24 bg-muted rounded" /> {/* Before */}
-            <div className="h-24 bg-muted rounded" /> {/* After */}
-          </div>
-          <div className="h-16 bg-muted rounded" /> {/* Slider */}
-        </div>
-        
-        {/* LoRA Section Skeleton */}
-        <div className="space-y-6">
-          <div>
-            <div className="h-8 bg-muted rounded" /> {/* Label + Button */}
-            <div className="mt-4 space-y-2">
-              <div className="h-24 bg-muted rounded" /> {/* Active LoRAs */}
+          
+          {/* Right Column Skeleton */}
+          <div className="flex-1">
+            {/* LoRA Section Skeleton */}
+            <div className="space-y-4">
+              <div className="h-8 bg-muted rounded" /> {/* Label + Button */}
+              <div className="space-y-2">
+                <div className="h-24 bg-muted rounded" /> {/* Active LoRAs */}
+              </div>
             </div>
           </div>
         </div>
         
         {/* Button Skeleton */}
-        <div className="md:col-span-2 flex justify-center mt-4">
+        <div className="flex justify-center">
           <div className="h-10 bg-muted rounded w-full md:w-1/2" />
         </div>
       </div>
@@ -768,10 +780,12 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   return (
     <>
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Main Content Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Associated Shot Selector */}
-          <div className="space-y-2 md:col-start-1 md:row-start-1 self-start w-full">
+        {/* Main Content Layout */}
+        <div className="flex flex-col md:flex-row gap-6">
+          {/* Left Column */}
+          <div className="flex-1 space-y-6">
+            {/* Associated Shot Selector */}
+            <div className="space-y-2">
             <div className="flex items-center gap-2">
               <Label htmlFor="associatedShot" className="inline-block">Associated with Shot</Label>
               {associatedShotId && (
@@ -865,156 +879,160 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
             })()}
           </div>
 
-          {/* LoRA Header (label + manage button) */}
-          <div className="flex items-center gap-2 md:col-start-2 md:row-start-1 self-start">
-            <Label>LoRA Models (Wan)</Label>
-            <Button
-              type="button"
-              variant="outline"
-              className="mt-1"
-              onClick={() => loraManager.setIsLoraModalOpen(true)}
-              disabled={isGenerating}
-            >
-              Add or Manage LoRA Models
-            </Button>
-          </div>
+            {/* Prompts Section */}
+            <div className="space-y-4">
+              <div>
+                <div className="flex justify-between items-center mb-2">
+                  <Label className="text-lg font-semibold">Prompts</Label>
+                  <div className="flex items-center space-x-2">
+                    {/* Manage Prompts button (hidden when >3 prompts) */}
+                    {prompts.length <= 3 && (
+                      <TooltipProvider delayDuration={300}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => setIsPromptModalOpen(true)}
+                              disabled={!hasApiKey || isGenerating}
+                              aria-label="Manage Prompts"
+                            >
+                              <Edit3 className="h-4 w-4 mr-0 sm:mr-2" />
+                              <span className="hidden sm:inline">Manage Prompts</span>
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top">
+                            Manage Prompts
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    )}
+                  </div>
+                </div>
 
-          {/* Prompts Section */}
-          <div className="space-y-4">
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <Label className="text-lg font-semibold">Prompts</Label>
-                <div className="flex items-center space-x-2">
-                  {/* Manage Prompts button (hidden when >3 prompts) */}
-                  {prompts.length <= 3 && (
+                <div className="space-y-3">
+                  {prompts.length <= 3 ? (
+                    prompts.map((promptEntry, index) => (
+                      <PromptInputRow
+                        key={promptEntry.id}
+                        promptEntry={promptEntry}
+                        onUpdate={handleUpdatePrompt}
+                        onRemove={handleRemovePrompt}
+                        canRemove={prompts.length > 1}
+                        isGenerating={isGenerating}
+                        hasApiKey={hasApiKey}
+                        index={index}
+                        onEditWithAI={() => { /* Placeholder for direct form AI edit */ }}
+                        aiEditButtonIcon={null} 
+                        onSetActiveForFullView={setDirectFormActivePromptId}
+                        isActiveForFullView={directFormActivePromptId === promptEntry.id}
+                      />
+                    ))
+                  ) : (
+                    <div className="p-3 border rounded-md text-center bg-slate-50/50 hover:border-primary/50 cursor-pointer" onClick={() => setIsPromptModalOpen(true)}>
+                        <p className="text-sm text-muted-foreground"><span className="font-semibold text-primary">{prompts.length} prompts</span> currently active.</p>
+                        <p className="text-xs text-primary">(Click to Edit)</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Add Prompt button below list, larger, left-aligned */}
+                {prompts.length <= 3 && (
+                  <div className="mt-3">
                     <TooltipProvider delayDuration={300}>
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button
                             type="button"
                             variant="outline"
-                            onClick={() => setIsPromptModalOpen(true)}
+                            onClick={() => handleAddPrompt('form')}
                             disabled={!hasApiKey || isGenerating}
-                            aria-label="Manage Prompts"
+                            aria-label="Add Prompt"
                           >
-                            <Edit3 className="h-4 w-4 mr-0 sm:mr-2" />
-                            <span className="hidden sm:inline">Manage Prompts</span>
+                            <PlusCircle className="h-4 w-4 mr-2" />
+                            <span>Add Prompt</span>
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent side="top">
-                          Manage Prompts
+                          Add Prompt
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
-                  )}
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                {prompts.length <= 3 ? (
-                  prompts.map((promptEntry, index) => (
-                    <PromptInputRow
-                      key={promptEntry.id}
-                      promptEntry={promptEntry}
-                      onUpdate={handleUpdatePrompt}
-                      onRemove={handleRemovePrompt}
-                      canRemove={prompts.length > 1}
-                      isGenerating={isGenerating}
-                      hasApiKey={hasApiKey}
-                      index={index}
-                      onEditWithAI={() => { /* Placeholder for direct form AI edit */ }}
-                      aiEditButtonIcon={null} 
-                      onSetActiveForFullView={setDirectFormActivePromptId}
-                      isActiveForFullView={directFormActivePromptId === promptEntry.id}
-                    />
-                  ))
-                ) : (
-                  <div className="p-3 border rounded-md text-center bg-slate-50/50 hover:border-primary/50 cursor-pointer" onClick={() => setIsPromptModalOpen(true)}>
-                      <p className="text-sm text-muted-foreground"><span className="font-semibold text-primary">{prompts.length} prompts</span> currently active.</p>
-                      <p className="text-xs text-primary">(Click to Edit)</p>
                   </div>
                 )}
               </div>
 
-              {/* Add Prompt button below list, larger, left-aligned */}
-              {prompts.length <= 3 && (
-                <div className="mt-3">
-                  <TooltipProvider delayDuration={300}>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => handleAddPrompt('form')}
-                          disabled={!hasApiKey || isGenerating}
-                          aria-label="Add Prompt"
-                        >
-                          <PlusCircle className="h-4 w-4 mr-2" />
-                          <span>Add Prompt</span>
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="top">
-                        Add Prompt
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
+              {/* Before / After prompt modifiers */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="beforeEachPromptText">Before each prompt</Label>
+                  <Textarea
+                    id="beforeEachPromptText"
+                    value={beforeEachPromptText}
+                    onChange={handleTextChange(setBeforeEachPromptText)}
+                    placeholder="Text to prepend"
+                    disabled={!hasApiKey || isGenerating}
+                    className="mt-1"
+                  />
                 </div>
-              )}
-            </div>
+                <div>
+                  <Label htmlFor="afterEachPromptText">After each prompt</Label>
+                  <Textarea
+                    id="afterEachPromptText"
+                    value={afterEachPromptText}
+                    onChange={handleTextChange(setAfterEachPromptText)}
+                    placeholder="Text to append"
+                    disabled={!hasApiKey || isGenerating}
+                    className="mt-1"
+                  />
+                </div>
+              </div>
 
-            {/* Before / After prompt modifiers */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="beforeEachPromptText">Before each prompt</Label>
-                <Textarea
-                  id="beforeEachPromptText"
-                  value={beforeEachPromptText}
-                  onChange={handleTextChange(setBeforeEachPromptText)}
-                  placeholder="Text to prepend"
+              {/* Images per Prompt Slider */}
+              <div className="mt-4">
+                <SliderWithValue
+                  label="Images per Prompt"
+                  value={imagesPerPrompt}
+                  onChange={handleSliderChange(setImagesPerPrompt)}
+                  min={1}
+                  max={16}
+                  step={1}
                   disabled={!hasApiKey || isGenerating}
-                  className="mt-1"
                 />
               </div>
-              <div>
-                <Label htmlFor="afterEachPromptText">After each prompt</Label>
-                <Textarea
-                  id="afterEachPromptText"
-                  value={afterEachPromptText}
-                  onChange={handleTextChange(setAfterEachPromptText)}
-                  placeholder="Text to append"
-                  disabled={!hasApiKey || isGenerating}
-                  className="mt-1"
-                />
-              </div>
             </div>
-
-            {/* Images per Prompt Slider */}
-            <div className="mt-4">
-              <SliderWithValue
-                label="Images per Prompt"
-                value={imagesPerPrompt}
-                onChange={handleSliderChange(setImagesPerPrompt)}
-                min={1}
-                max={16}
-                step={1}
-                disabled={!hasApiKey || isGenerating}
-              />
-            </div>
-
           </div>
           
-          {/* LoRA Active List Section */}
-          <div className="space-y-4 md:order-2 md:row-start-2 md:col-start-2">
+          {/* Right Column */}
+          <div className="flex-1">
+            {/* LoRA Section - Combined Header and Active List */}
+            <div className="space-y-4">
+            {/* LoRA Header (label + manage button) */}
+            <div className="flex items-center gap-2">
+              <Label>LoRA Models (Wan)</Label>
+              <Button
+                type="button"
+                variant="outline"
+                className="mt-1"
+                onClick={() => loraManager.setIsLoraModalOpen(true)}
+                disabled={isGenerating}
+              >
+                Add or Manage LoRA Models
+              </Button>
+            </div>
+
+            {/* Active LoRAs Display */}
             <ActiveLoRAsDisplay
               selectedLoras={loraManager.selectedLoras}
               onRemoveLora={handleRemoveLora}
               onLoraStrengthChange={handleLoraStrengthChange}
               isGenerating={isGenerating}
               availableLoras={availableLoras}
-              className="mt-1"
+              className=""
               onAddTriggerWord={loraManager.handleAddTriggerWord}
               renderHeaderActions={loraManager.renderHeaderActions}
             />
+            </div>
           </div>
         </div>
 
