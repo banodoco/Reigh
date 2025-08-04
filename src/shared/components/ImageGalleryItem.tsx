@@ -131,12 +131,21 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
 
   // Reset error state when URL changes (new image)
   useEffect(() => {
+    if (index < 3) {
+      console.log(`[ImageGalleryItem-${index}] Image changed, resetting state`, {
+        oldSrc: actualSrc,
+        newUrl: displayUrl,
+        imageId: image.id
+      });
+    }
     setImageLoadError(false);
     setImageRetryCount(0);
     // Check if the new image is already cached using centralized function
     const isNewImageCached = isImageCached(image);
     setImageLoaded(isNewImageCached);
     setImageLoading(false);
+    // CRITICAL: Reset actualSrc so the loading effect can run for the new image
+    setActualSrc(null);
   }, [displayUrl, image]);
 
   // Progressive loading: only set src when shouldLoad is true
@@ -155,6 +164,12 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
     let isMounted = true; // Flag to prevent state updates after unmount
     
     if (!actualSrc) {
+      if (index < 3) {
+        console.log(`[ImageGalleryItem-${index}] Starting load sequence`, {
+          actualDisplayUrl,
+          imageId: image.id
+        });
+      }
       // Don't load placeholder URLs - they indicate missing/invalid image data
       if (actualDisplayUrl === '/placeholder.svg' || !actualDisplayUrl) {
         console.warn(`[ImageGalleryItem] Skipping load for invalid URL: ${actualDisplayUrl}, image:`, image);
@@ -321,10 +336,12 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                       onError={handleImageError}
                     />
                   )}
-                  {/* Video loading skeleton or progressive loading placeholder */}
-                  <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-gray-200 animate-pulse">
-                    <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-gray-400"></div>
-                  </div>
+                  {/* Video loading skeleton - only show if video hasn't loaded yet */}
+                  {(!imageLoaded || imageLoading) && (
+                    <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-gray-200 animate-pulse">
+                      <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-gray-400"></div>
+                    </div>
+                  )}
                 </>
               )
           ) : imageLoadError ? (
@@ -383,7 +400,8 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
               )}
               
               {/* Show skeleton only while the media is still loading */}
-              {(!shouldLoad || !imageLoaded || imageLoading || (isGalleryLoading && !imageLoaded)) && (
+              {/* Only show skeleton if image hasn't loaded yet - never show it for already-loaded images */}
+              {(!imageLoaded || imageLoading) && (
                 <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-gray-200 animate-pulse">
                   <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-gray-400"></div>
                 </div>
