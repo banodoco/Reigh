@@ -371,6 +371,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   const [previousPageImages, setPreviousPageImages] = useState<GeneratedImageWithMetadata[]>([]);
   const [isTransitioning, setIsTransitioning] = useState<boolean>(false);
   const [transitionDirection, setTransitionDirection] = useState<'next' | 'prev'>('next');
+  const [showNewImages, setShowNewImages] = useState<boolean>(true); // Controls when to show new page after transition
   
   // Progressive loading state - will be defined after paginatedImages
 
@@ -392,9 +393,24 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     if (isTransitioning) {
       setIsTransitioning(false);
       setPreviousPageImages([]);
+      setShowNewImages(true);
     }
     return () => clearTimeout(timer);
   }, [filterByToolType, mediaTypeFilter, searchTerm, showStarredOnly, isTransitioning]);
+
+  // Failsafe: Ensure transition state doesn't get stuck
+  React.useEffect(() => {
+    if (isTransitioning) {
+      const fallbackTimer = setTimeout(() => {
+        console.warn('[ImageGallery] Transition fallback triggered - forcing cleanup');
+        setIsTransitioning(false);
+        setShowNewImages(true);
+        setPreviousPageImages([]);
+      }, 2000); // 2 second fallback
+      
+      return () => clearTimeout(fallbackTimer);
+    }
+  }, [isTransitioning]);
 
   // Progressive loading state cleanup is now handled by the useProgressiveImageLoading hook
 
@@ -717,6 +733,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
       setPreviousPageImages(currentPaginatedImagesRef.current);
       setTransitionDirection(direction);
       setIsTransitioning(true);
+      setShowNewImages(false); // Hide new images until transition completes
     }
     
     // Smart loading state: only show gallery loading for non-adjacent pages or when preloading is disabled
@@ -807,23 +824,21 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
       // Adjacent pages might not have set it in the first place
       setIsGalleryLoading(false);
       
-      // End transition when new images are ready
+      // If we're transitioning, wait for the slide animation to complete before showing new images
       if (isTransitioning) {
-        // Start the fade-in immediately, then cleanup after transition
-        setIsTransitioning(false);
-        // Clean up previous images after transition completes
+        // Wait for CSS transition to complete (300ms) then show new images
         setTimeout(() => {
-          setPreviousPageImages([]);
-        }, 300); // Match transition duration
-      }
-      
-      // Fallback: Force cleanup if transition gets stuck
-      if (previousPageImages.length > 0 && !isTransitioning) {
-        setTimeout(() => {
-          if (!isTransitioning) {
+          setShowNewImages(true);
+          setIsTransitioning(false);
+          // Clean up previous images after showing new ones
+          setTimeout(() => {
             setPreviousPageImages([]);
-          }
-        }, 1000);
+          }, 50); // Small delay to ensure smooth handoff
+        }, 300); // Match CSS transition duration
+      } else {
+        // No transition happening, show images immediately
+        setShowNewImages(true);
+        setPreviousPageImages([]); // Ensure cleanup
       }
     },
   });
@@ -1118,7 +1133,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
              </div>
           )}
 
-          {(paginatedImages.length > 0 || previousPageImages.length > 0) && (
+          {(paginatedImages.length > 0 || previousPageImages.length > 0 || isTransitioning) && (
             <div className="relative overflow-hidden" style={{ willChange: isTransitioning ? 'transform' : 'auto' }}>
               {/* Previous page images (shown during transition) */}
               {previousPageImages.length > 0 && (
@@ -1162,8 +1177,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                 </div>
               )}
               
-              {/* Current page images */}
-              {paginatedImages.length > 0 && (
+              {/* Current page images - only show when transition allows */}
+              {paginatedImages.length > 0 && showNewImages && (
                 <div className={`grid ${reducedSpacing ? 'gap-2 sm:gap-4' : 'gap-4'} ${reducedSpacing ? 'mb-4' : 'mb-12'} ${gridColumnClasses} ${previousPageImages.length > 0 ? 'absolute inset-0' : ''} transition-[transform,opacity] duration-300 ease-out ${
                   isTransitioning 
                     ? `${transitionDirection === 'next' ? 'translate-x-full' : '-translate-x-full'} opacity-0` 
@@ -1206,6 +1221,14 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                       />
                     );
                   })}
+                </div>
+              )}
+              
+              {/* Loading state after transition completes but before new images show */}
+              {!showNewImages && !isTransitioning && previousPageImages.length === 0 && (
+                <div className="flex items-center justify-center py-8">
+                  <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-current"></div>
+                  <span className="ml-2 text-sm text-muted-foreground">Loading...</span>
                 </div>
               )}
             </div>
