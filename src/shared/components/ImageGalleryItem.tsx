@@ -269,7 +269,8 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
         className="relative bg-gray-200"
       >
           {isActuallyVideo ? (
-              shouldLoad && actualSrc && !isGalleryLoading ? (
+              // Show the video as soon as it's loaded, regardless of the gallery loading state
+              shouldLoad && actualSrc && imageLoaded ? (
                 <video
                     src={actualSrc}
                     playsInline
@@ -348,8 +349,8 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
             </div>
           ) : (
             <>
-              {/* Visible image when shouldLoad is true and image is loaded */}
-              {shouldLoad && actualSrc && imageLoaded && !isGalleryLoading && (
+              {/* Display the image as soon as it has finished loading, even if the gallery is still in a global loading state */}
+              {shouldLoad && actualSrc && imageLoaded && (
                 <img
                   src={actualSrc}
                   alt={image.prompt || `Generated image ${index + 1}`}
@@ -381,8 +382,8 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                 />
               )}
               
-              {/* Show skeleton while image is loading or shouldLoad is false */}
-              {(!shouldLoad || !imageLoaded || imageLoading || isGalleryLoading) && (
+              {/* Show skeleton only while the media is still loading */}
+              {(!shouldLoad || !imageLoaded || imageLoading || (isGalleryLoading && !imageLoaded)) && (
                 <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-gray-200 animate-pulse">
                   <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-gray-400"></div>
                 </div>
