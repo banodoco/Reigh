@@ -97,10 +97,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     starredOnly
   };
   
-  console.log('[ImageGalleryDebug] Generations filters:', {
-    selectedShotFilter,
-    filters: generationsFilters
-  });
+  // Debug logging removed for performance
   
   const { data: generationsResponse, isLoading: isLoadingGenerations } = useGenerations(
     selectedProjectId, 
@@ -417,17 +414,12 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
           thumbUrl: thumbUrl,
           project_id: selectedProjectId, 
         });
-        console.log('[ImageGalleryDebug] Add to shot result:', {
-          generationId,
-          shotId: targetShotInfo.targetShotIdForButton,
-          result
-        });
+        // Debug logging removed for performance
       }
       setLastAffectedShotId(targetShotInfo.targetShotIdForButton);
       
       // Force refresh of generations data to show updated positioning
       queryClient.invalidateQueries({ queryKey: ['generations', selectedProjectId] });
-      console.log('[ImageGalleryDebug] Invalidated generations cache after adding to shot');
       
       return true;
     } catch (error) {

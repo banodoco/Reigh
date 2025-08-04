@@ -87,7 +87,7 @@ export async function fetchGenerations(
 
   if (countError) throw countError;
 
-  // Get paginated data with same filters, including shot associations
+  // Always include shot associations but optimize the query
   let dataQuery = supabase
     .from('generations')
     .select(`
@@ -139,12 +139,7 @@ export async function fetchGenerations(
       generationIds = unpositionedIds;
     }
     
-    console.log('[ImageGalleryDebug] Shot filter applied:', {
-      shotId: filters.shotId,
-      excludePositioned: filters.excludePositioned,
-      totalFound: shotGenerations?.length || 0,
-      filteredIds: generationIds.length
-    });
+    // Debug logging removed for performance
     
     if (generationIds.length > 0) {
       dataQuery = dataQuery.in('id', generationIds);
@@ -179,16 +174,25 @@ export async function fetchGenerations(
     const shotGenerations = item.shot_generations || [];
     
     if (shotGenerations.length > 0) {
-      // Always include all shot associations for positioning checks
+      // Optimize: Only create full associations array if there are multiple shots
+      // For single shot, use simpler structure
+      if (shotGenerations.length === 1) {
+        const singleShot = shotGenerations[0];
+        return {
+          ...baseItem,
+          shot_id: singleShot.shot_id,
+          position: singleShot.position,
+        };
+      }
+      
+      // Multiple shots: include all associations for positioning checks
       const allAssociations = shotGenerations.map(sg => ({
         shot_id: sg.shot_id,
         position: sg.position
       }));
       
       // When filtering by specific shot, use that shot as primary
-      // Otherwise, use first shot as primary for backward compatibility
       let primaryShot = shotGenerations[0];
-      
       if (filters?.shotId) {
         const matchingShot = shotGenerations.find(sg => sg.shot_id === filters.shotId);
         if (matchingShot) {
@@ -196,40 +200,18 @@ export async function fetchGenerations(
         }
       }
       
-      const itemWithShot = {
+      return {
         ...baseItem,
         shot_id: primaryShot.shot_id,
         position: primaryShot.position,
         all_shot_associations: allAssociations,
       };
-      
-      console.log('[ImageGalleryDebug] Item with shot data (from JOIN):', {
-        itemId: item.id,
-        primaryShotId: primaryShot.shot_id,
-        primaryPosition: primaryShot.position,
-        totalShotAssociations: shotGenerations.length,
-        allAssociations,
-        filteringShotId: filters?.shotId
-      });
-      return itemWithShot;
     }
     
     return baseItem;
   }) || [];
 
-  // Debug: Show summary of shot associations
-  const itemsWithShotData = items.filter((item): item is typeof item & { shot_id: string } => 
-    'shot_id' in item && item.shot_id != null
-  );
-  console.log('[ImageGalleryDebug] Data processing summary:', {
-    totalItems: items.length,
-    itemsWithShotData: itemsWithShotData.length,
-    sampleItemsWithShots: itemsWithShotData.slice(0, 3).map(item => ({
-      id: item.id,
-      shot_id: item.shot_id,
-      position: (item as any).position
-    }))
-  });
+  // Debug logging removed for performance
 
   const total = count || 0;
   const hasMore = offset + limit < total;

@@ -252,39 +252,23 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   const isAlreadyPositionedInSelectedShot = useMemo(() => {
     if (!selectedShotIdLocal || !image.id) return false;
     
-    // Check using all_shot_associations if available, otherwise fallback to shot_id/position
-    let matchingAssociation = null;
+    // Optimized: Check single shot first (most common case)
+    if (image.shot_id === selectedShotIdLocal) {
+      return image.position !== null && image.position !== undefined;
+    }
     
-    if (image.all_shot_associations && image.all_shot_associations.length > 0) {
-      // Find the association that matches the selected shot
-      matchingAssociation = image.all_shot_associations.find(
+    // Check multiple shot associations only if needed
+    if (image.all_shot_associations) {
+      const matchingAssociation = image.all_shot_associations.find(
         assoc => assoc.shot_id === selectedShotIdLocal
       );
-    } else if (image.shot_id === selectedShotIdLocal) {
-      // Fallback to single shot association
-      matchingAssociation = { shot_id: image.shot_id, position: image.position };
+      return matchingAssociation && 
+             matchingAssociation.position !== null && 
+             matchingAssociation.position !== undefined;
     }
     
-    const isPositioned = matchingAssociation && 
-                        matchingAssociation.position !== null && 
-                        matchingAssociation.position !== undefined;
-    
-    // Debug logging for first few items
-    if (index < 3) {
-      console.log('[ImageGalleryDebug] Item positioning check:', {
-        index,
-        imageId: image.id,
-        selectedShotIdLocal,
-        imageShotId: image.shot_id,
-        imagePosition: image.position,
-        allAssociations: image.all_shot_associations,
-        matchingAssociation,
-        isPositioned
-      });
-    }
-    
-    return !!isPositioned;
-  }, [selectedShotIdLocal, image.id, image.shot_id, image.position, image.all_shot_associations, index]);
+    return false;
+  }, [selectedShotIdLocal, image.id, image.shot_id, image.position, image.all_shot_associations]);
   
   let aspectRatioPadding = '100%'; 
   let minHeight = '120px'; // Minimum height for very small images
