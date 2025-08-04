@@ -499,6 +499,9 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
           prefetchOperationsRef.current.images.push(preloadImg);
           
           preloadImg.onload = () => {
+            // Mark this image as cached for instant display
+            (img as any).__memoryCached = true;
+            
             const imgIndex = prefetchOperationsRef.current.images.indexOf(preloadImg);
             if (imgIndex > -1) {
               prefetchOperationsRef.current.images.splice(imgIndex, 1);
@@ -513,6 +516,11 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
           };
           
           preloadImg.src = getDisplayUrl(img.url);
+          
+          // Check if it was already cached (loads synchronously from memory)
+          if (preloadImg.complete && preloadImg.naturalWidth > 0) {
+            (img as any).__memoryCached = true;
+          }
         }, baseDelay + staggerDelay);
       });
     };
