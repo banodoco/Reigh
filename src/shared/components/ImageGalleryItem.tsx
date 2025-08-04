@@ -89,7 +89,9 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   const [imageLoadError, setImageLoadError] = useState<boolean>(false);
   const [imageRetryCount, setImageRetryCount] = useState<number>(0);
   const [isInfoOpen, setIsInfoOpen] = useState<boolean>(false);
-  const [imageLoaded, setImageLoaded] = useState<boolean>(false);
+  // Check if this image was already cached by the preloader
+  const isPreloadedAndCached = (image as any).__memoryCached === true;
+  const [imageLoaded, setImageLoaded] = useState<boolean>(isPreloadedAndCached);
   const [imageLoading, setImageLoading] = useState<boolean>(false);
   const MAX_RETRIES = 2;
 
@@ -130,9 +132,11 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   useEffect(() => {
     setImageLoadError(false);
     setImageRetryCount(0);
-    setImageLoaded(false);
+    // Check if the new image is already cached
+    const isNewImageCached = (image as any).__memoryCached === true;
+    setImageLoaded(isNewImageCached);
     setImageLoading(false);
-  }, [displayUrl]);
+  }, [displayUrl, image]);
 
   // Progressive loading: only set src when shouldLoad is true
   const [actualSrc, setActualSrc] = useState<string | null>(null);

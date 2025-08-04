@@ -83,11 +83,22 @@ export const useAdjacentPagePreloading = ({
           operations.images.push(preloadImg);
           
           preloadImg.onload = () => {
+            // Mark this image as cached for instant display
+            image.__memoryCached = true;
+            
             const imgIndex = operations.images.indexOf(preloadImg);
             if (imgIndex > -1) {
               operations.images.splice(imgIndex, 1);
             }
           };
+          
+          // Set the source to start loading
+          preloadImg.src = getDisplayUrl(image.url);
+          
+          // Check if it was already cached (loads synchronously from memory)
+          if (preloadImg.complete && preloadImg.naturalWidth > 0) {
+            image.__memoryCached = true;
+          }
           
           preloadImg.onerror = () => {
             const imgIndex = operations.images.indexOf(preloadImg);
@@ -96,14 +107,15 @@ export const useAdjacentPagePreloading = ({
             }
           };
           
-          preloadImg.src = getDisplayUrl(image.url);
-          
           // Priority: preload full image for first 2 images of next page
           if (priority === 'next' && idx < 2 && image.fullImageUrl) {
             const fullImg = new Image();
             operations.images.push(fullImg);
             
             fullImg.onload = () => {
+              // Mark full image as cached too
+              image.__fullImageCached = true;
+              
               const fullImgIndex = operations.images.indexOf(fullImg);
               if (fullImgIndex > -1) {
                 operations.images.splice(fullImgIndex, 1);
@@ -118,6 +130,11 @@ export const useAdjacentPagePreloading = ({
             };
             
             fullImg.src = getDisplayUrl(image.fullImageUrl);
+            
+            // Check if full image was already cached
+            if (fullImg.complete && fullImg.naturalWidth > 0) {
+              image.__fullImageCached = true;
+            }
           }
         }, baseDelay + (idx * 30));
         
