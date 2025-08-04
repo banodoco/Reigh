@@ -388,8 +388,13 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   // When filters change, reset to first page (debounced to avoid rapid state changes)
   React.useEffect(() => {
     const timer = setTimeout(() => setPage(0), 10);
+    // Clear any ongoing transitions when filters change to prevent conflicts
+    if (isTransitioning) {
+      setIsTransitioning(false);
+      setPreviousPageImages([]);
+    }
     return () => clearTimeout(timer);
-  }, [filterByToolType, mediaTypeFilter, searchTerm, showStarredOnly]);
+  }, [filterByToolType, mediaTypeFilter, searchTerm, showStarredOnly, isTransitioning]);
 
   // Progressive loading state cleanup is now handled by the useProgressiveImageLoading hook
 
@@ -703,7 +708,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   
   // Handle pagination with loading state
   const handlePageChange = React.useCallback((newPage: number, direction: 'prev' | 'next', fromBottom = false) => {
-    if (loadingButton) return; // Prevent multiple clicks while any button is loading
+    if (loadingButton || isTransitioning) return; // Prevent multiple clicks while any button is loading or transitioning
     
     setLoadingButton(direction);
     
@@ -810,6 +815,15 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
         setTimeout(() => {
           setPreviousPageImages([]);
         }, 300); // Match transition duration
+      }
+      
+      // Fallback: Force cleanup if transition gets stuck
+      if (previousPageImages.length > 0 && !isTransitioning) {
+        setTimeout(() => {
+          if (!isTransitioning) {
+            setPreviousPageImages([]);
+          }
+        }, 1000);
       }
     },
   });
@@ -1105,10 +1119,10 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
           )}
 
           {(paginatedImages.length > 0 || previousPageImages.length > 0) && (
-            <div className="relative overflow-hidden">
+            <div className="relative overflow-hidden" style={{ willChange: isTransitioning ? 'transform' : 'auto' }}>
               {/* Previous page images (shown during transition) */}
               {previousPageImages.length > 0 && (
-                <div className={`grid ${reducedSpacing ? 'gap-2 sm:gap-4' : 'gap-4'} ${reducedSpacing ? 'mb-4' : 'mb-12'} ${gridColumnClasses} transition-all duration-300 ease-out ${
+                <div className={`grid ${reducedSpacing ? 'gap-2 sm:gap-4' : 'gap-4'} ${reducedSpacing ? 'mb-4' : 'mb-12'} ${gridColumnClasses} transition-[transform,opacity] duration-300 ease-out ${
                   !isTransitioning 
                     ? `${transitionDirection === 'next' ? '-translate-x-full' : 'translate-x-full'} opacity-0` 
                     : 'translate-x-0 opacity-100'
@@ -1150,7 +1164,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
               
               {/* Current page images */}
               {paginatedImages.length > 0 && (
-                <div className={`grid ${reducedSpacing ? 'gap-2 sm:gap-4' : 'gap-4'} ${reducedSpacing ? 'mb-4' : 'mb-12'} ${gridColumnClasses} ${previousPageImages.length > 0 ? 'absolute inset-0' : ''} transition-all duration-300 ease-out ${
+                <div className={`grid ${reducedSpacing ? 'gap-2 sm:gap-4' : 'gap-4'} ${reducedSpacing ? 'mb-4' : 'mb-12'} ${gridColumnClasses} ${previousPageImages.length > 0 ? 'absolute inset-0' : ''} transition-[transform,opacity] duration-300 ease-out ${
                   isTransitioning 
                     ? `${transitionDirection === 'next' ? 'translate-x-full' : '-translate-x-full'} opacity-0` 
                     : 'translate-x-0 opacity-100'
