@@ -372,6 +372,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   const [isTransitioning, setIsTransitioning] = useState<boolean>(false);
   const [transitionDirection, setTransitionDirection] = useState<'next' | 'prev'>('next');
   const [transitionPhase, setTransitionPhase] = useState<'idle' | 'start' | 'end'>('idle');
+  const [waitingForData, setWaitingForData] = useState<boolean>(false);
   
   // Progressive loading state - will be defined after paginatedImages
 
@@ -394,6 +395,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
       setIsTransitioning(false);
       setPreviousPageImages([]);
       setTransitionPhase('idle');
+      setWaitingForData(false);
     }
     return () => clearTimeout(timer);
   }, [filterByToolType, mediaTypeFilter, searchTerm, showStarredOnly, isTransitioning]);
@@ -406,6 +408,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
         setIsTransitioning(false);
         setTransitionPhase('idle');
         setPreviousPageImages([]);
+        setWaitingForData(false);
       }, 2000); // 2 second fallback
       
       return () => clearTimeout(fallbackTimer);
@@ -735,6 +738,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
       setTransitionDirection(direction);
       setIsTransitioning(true);
       setTransitionPhase('start');
+      setWaitingForData(true); // Flag that we're waiting for new data
+      console.log('[ImageGallery] Set waitingForData = true');
     }
     
     // Smart loading state: only show gallery loading for non-adjacent pages or when preloading is disabled
@@ -824,6 +829,10 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
       // Only reset gallery loading if it was actually set (for distant page jumps)
       // Adjacent pages might not have set it in the first place
       setIsGalleryLoading(false);
+      
+      console.log('[ImageGallery] New images are ready - data available');
+      setWaitingForData(false); // New data has arrived!
+      console.log('[ImageGallery] Set waitingForData = false');
       
       // If we're transitioning, trigger the slide animation
       if (isTransitioning && transitionPhase === 'start') {
@@ -1190,8 +1199,11 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                 </div>
               )}
               
-              {/* Current page images */}
-              {paginatedImages.length > 0 && (
+              {/* Current page images - only when data is ready */}
+              {paginatedImages.length > 0 && !waitingForData && (() => {
+                console.log('[ImageGallery] Rendering current page images (waitingForData=false)');
+                return true;
+              })() && (
                 <div className={`grid ${reducedSpacing ? 'gap-2 sm:gap-4' : 'gap-4'} ${reducedSpacing ? 'mb-4' : 'mb-12'} ${gridColumnClasses} ${previousPageImages.length > 0 && transitionPhase !== 'idle' ? 'absolute inset-0' : ''} transition-[transform,opacity] duration-300 ease-out ${
                   (() => {
                     const classes = transitionPhase === 'start'
@@ -1241,8 +1253,11 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                 </div>
               )}
               
-              {/* Loading state during transition preparation */}
-              {transitionPhase === 'start' && !isTransitioning && previousPageImages.length === 0 && (
+              {/* Loading state when waiting for new data after animation */}
+              {waitingForData && transitionPhase === 'idle' && (() => {
+                console.log('[ImageGallery] Showing loading state (waitingForData=true, phase=idle)');
+                return true;
+              })() && (
                 <div className="flex items-center justify-center py-8">
                   <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-current"></div>
                   <span className="ml-2 text-sm text-muted-foreground">Loading...</span>
