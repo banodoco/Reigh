@@ -284,8 +284,8 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
         className="relative bg-gray-200"
       >
           {isActuallyVideo ? (
-              // Show the video as soon as it's loaded, regardless of the gallery loading state
-              shouldLoad && actualSrc && imageLoaded ? (
+              // Show video once it's loaded, regardless of shouldLoad state
+              actualSrc && imageLoaded ? (
                 <video
                     src={actualSrc}
                     playsInline
@@ -366,8 +366,8 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
             </div>
           ) : (
             <>
-              {/* Display the image as soon as it has finished loading, even if the gallery is still in a global loading state */}
-              {shouldLoad && actualSrc && imageLoaded && (
+              {/* Show image once it's loaded, regardless of shouldLoad state */}
+              {actualSrc && imageLoaded && (
                 <img
                   src={actualSrc}
                   alt={image.prompt || `Generated image ${index + 1}`}
@@ -389,6 +389,14 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                   style={{ display: 'none' }}
                   onError={handleImageError}
                   onLoad={() => {
+                    if (index < 3) {
+                      console.log(`[ImageGalleryItem-${index}] Image loaded successfully`, {
+                        imageId: image.id,
+                        src: actualSrc,
+                        imageLoaded,
+                        imageLoading
+                      });
+                    }
                     setImageLoading(false);
                     setImageLoaded(true);
                   }}
@@ -402,6 +410,12 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
               {/* Show skeleton only while the media is still loading */}
               {/* Only show skeleton if image hasn't loaded yet - never show it for already-loaded images */}
               {(!imageLoaded || imageLoading) && (
+                index < 3 && console.log(`[ImageGalleryItem-${index}] Showing skeleton`, {
+                  imageId: image.id,
+                  imageLoaded,
+                  imageLoading,
+                  actualSrc
+                }),
                 <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-gray-200 animate-pulse">
                   <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-gray-400"></div>
                 </div>
