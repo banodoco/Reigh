@@ -730,6 +730,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     
     // Capture current images for smooth transition (only if there are current images)
     if (currentPaginatedImagesRef.current.length > 0) {
+      console.log(`[ImageGallery] Starting ${direction} transition`);
       setPreviousPageImages(currentPaginatedImagesRef.current);
       setTransitionDirection(direction);
       setIsTransitioning(true);
@@ -826,14 +827,20 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
       
       // If we're transitioning, trigger the slide animation
       if (isTransitioning && transitionPhase === 'start') {
-        // Start the animation by changing to end phase
-        setTransitionPhase('end');
-        // Clean up after animation completes
-        setTimeout(() => {
-          setIsTransitioning(false);
-          setTransitionPhase('idle');
-          setPreviousPageImages([]);
-        }, 300); // Match CSS transition duration
+        // Give browser time to render the 'start' state, then trigger animation
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            console.log('[ImageGallery] Triggering slide animation (start -> end)');
+            setTransitionPhase('end');
+            // Clean up after animation completes
+            setTimeout(() => {
+              console.log('[ImageGallery] Transition cleanup (end -> idle)');
+              setIsTransitioning(false);
+              setTransitionPhase('idle');
+              setPreviousPageImages([]);
+            }, 300); // Match CSS transition duration
+          });
+        });
       } else if (!isTransitioning) {
         // No transition happening, ensure clean state
         setTransitionPhase('idle');
@@ -1133,13 +1140,20 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
           )}
 
           {(paginatedImages.length > 0 || previousPageImages.length > 0 || isTransitioning) && (
-            <div className="relative overflow-hidden" style={{ willChange: isTransitioning ? 'transform' : 'auto' }}>
+            <div className="relative overflow-hidden" style={{ 
+              willChange: isTransitioning ? 'transform' : 'auto',
+              transform: 'translateZ(0)' // Force GPU acceleration
+            }}>
               {/* Previous page images (shown during transition) */}
               {previousPageImages.length > 0 && (
                 <div className={`grid ${reducedSpacing ? 'gap-2 sm:gap-4' : 'gap-4'} ${reducedSpacing ? 'mb-4' : 'mb-12'} ${gridColumnClasses} transition-[transform,opacity] duration-300 ease-out ${
-                  transitionPhase === 'start' 
-                    ? 'translate-x-0 opacity-100'
-                    : `${transitionDirection === 'next' ? '-translate-x-full' : 'translate-x-full'} opacity-0`
+                  (() => {
+                    const classes = transitionPhase === 'start' 
+                      ? 'translate-x-0 opacity-100'
+                      : `${transitionDirection === 'next' ? '-translate-x-full' : 'translate-x-full'} opacity-0`;
+                    console.log(`[ImageGallery] Previous images classes (phase: ${transitionPhase}, direction: ${transitionDirection}):`, classes);
+                    return classes;
+                  })()
                 }`}>
                   {previousPageImages.map((image, index) => (
                     <ImageGalleryItem
@@ -1179,9 +1193,13 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
               {/* Current page images */}
               {paginatedImages.length > 0 && (
                 <div className={`grid ${reducedSpacing ? 'gap-2 sm:gap-4' : 'gap-4'} ${reducedSpacing ? 'mb-4' : 'mb-12'} ${gridColumnClasses} ${previousPageImages.length > 0 ? 'absolute inset-0' : ''} transition-[transform,opacity] duration-300 ease-out ${
-                  transitionPhase === 'start'
-                    ? `${transitionDirection === 'next' ? 'translate-x-full' : '-translate-x-full'} opacity-0`
-                    : 'translate-x-0 opacity-100'
+                  (() => {
+                    const classes = transitionPhase === 'start'
+                      ? `${transitionDirection === 'next' ? 'translate-x-full' : '-translate-x-full'} opacity-0`
+                      : 'translate-x-0 opacity-100';
+                    console.log(`[ImageGallery] Current images classes (phase: ${transitionPhase}, direction: ${transitionDirection}):`, classes);
+                    return classes;
+                  })()
                 }`}>
                   {paginatedImages.map((image, index) => {
                     const shouldShow = showImageIndices.has(index);
