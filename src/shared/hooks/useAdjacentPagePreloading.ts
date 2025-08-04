@@ -22,26 +22,68 @@ export const isImageCached = (image: any): boolean => {
   return (image as any).__memoryCached === true;
 };
 
-// Centralized preload function with cache detection
-export const preloadImageWithCacheDetection = (imageUrl: string, image: any): Promise<void> => {
-  return new Promise((resolve, reject) => {
-    const preloadImg = new Image();
+// Centralized function to initialize prefetch operations
+export const initializePrefetchOperations = (
+  prefetchOperationsRef: React.MutableRefObject<{
+    currentPrefetchId: string;
+    images: HTMLImageElement[];
+  }>,
+  prefetchId: string
+) => {
+  prefetchOperationsRef.current = { images: [], currentPrefetchId: prefetchId };
+};
+
+// Centralized function for preloading images with cancellation checks
+export const preloadImagesWithCancel = (
+  cachedData: any,
+  priority: 'next' | 'prev',
+  currentPrefetchId: string,
+  prefetchOperationsRef: React.MutableRefObject<{
+    currentPrefetchId: string;
+    images: HTMLImageElement[];
+  }>
+) => {
+  if (!cachedData?.items) return;
+  
+  cachedData.items.forEach((img: any, idx: number) => {
+    // Skip if this prefetch is no longer current
+    if (prefetchOperationsRef.current.currentPrefetchId !== currentPrefetchId) return;
     
-    preloadImg.onload = () => {
-      markImageAsCached(image, true);
-      resolve();
-    };
+    // Priority-based delays: next page images load faster
+    const baseDelay = priority === 'next' ? 50 : 200;
+    const staggerDelay = idx * 30;
     
-    preloadImg.onerror = () => {
-      reject(new Error(`Failed to load image: ${imageUrl}`));
-    };
-    
-    preloadImg.src = imageUrl;
-    
-    // Check if it was already cached (loads synchronously from memory)
-    if (preloadImg.complete && preloadImg.naturalWidth > 0) {
-      markImageAsCached(image, true);
-    }
+    setTimeout(() => {
+      // Double-check this is still current before creating image
+      if (prefetchOperationsRef.current.currentPrefetchId !== currentPrefetchId) return;
+      
+      const preloadImg = new Image();
+      prefetchOperationsRef.current.images.push(preloadImg);
+      
+      preloadImg.onload = () => {
+        // Use centralized cache marking function
+        markImageAsCached(img, true);
+        
+        const imgIndex = prefetchOperationsRef.current.images.indexOf(preloadImg);
+        if (imgIndex > -1) {
+          prefetchOperationsRef.current.images.splice(imgIndex, 1);
+        }
+      };
+      
+      preloadImg.onerror = () => {
+        const imgIndex = prefetchOperationsRef.current.images.indexOf(preloadImg);
+        if (imgIndex > -1) {
+          prefetchOperationsRef.current.images.splice(imgIndex, 1);
+        }
+      };
+      
+      preloadImg.src = getDisplayUrl(img.url);
+      
+      // Check if it was already cached (loads synchronously from memory)
+      if (preloadImg.complete && preloadImg.naturalWidth > 0) {
+        markImageAsCached(img, true);
+      }
+    }, baseDelay + staggerDelay);
   });
 };
 

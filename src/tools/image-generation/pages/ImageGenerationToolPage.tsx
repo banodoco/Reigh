@@ -26,7 +26,7 @@ import { timeEnd } from '@/shared/lib/logger';
 import { useIsMobile } from "@/shared/hooks/use-mobile";
 import { fetchGenerations } from "@/shared/hooks/useGenerations";
 import { getDisplayUrl } from '@/shared/lib/utils';
-import { markImageAsCached } from '@/shared/hooks/useAdjacentPagePreloading';
+import { preloadImagesWithCancel, initializePrefetchOperations } from '@/shared/hooks/useAdjacentPagePreloading';
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 import { ShotFilter } from '@/shared/components/ShotFilter';
 import { SkeletonGallery } from '@/shared/components/ui/skeleton-gallery';
@@ -471,7 +471,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
 
     // Reset tracking with new prefetch ID
     const prefetchId = `${nextPage}-${prevPage}-${Date.now()}`;
-    prefetchOperationsRef.current = { images: [], currentPrefetchId: prefetchId };
+          initializePrefetchOperations(prefetchOperationsRef, prefetchId);
 
     const filters = { 
       mediaType: mediaTypeFilter,
@@ -480,51 +480,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
       starredOnly
     };
 
-    // Helper to preload images with cancellation checks
-    const preloadImagesWithCancel = (cachedData: GenerationsPaginatedResponse | undefined, priority: 'next' | 'prev', currentPrefetchId: string) => {
-      if (!cachedData?.items) return;
-      
-      cachedData.items.forEach((img, idx) => {
-        // Skip if this prefetch is no longer current
-        if (prefetchOperationsRef.current.currentPrefetchId !== currentPrefetchId) return;
-        
-        // Priority-based delays: next page images load faster
-        const baseDelay = priority === 'next' ? 50 : 200;
-        const staggerDelay = idx * 30;
-        
-        setTimeout(() => {
-          // Double-check this is still current before creating image
-          if (prefetchOperationsRef.current.currentPrefetchId !== currentPrefetchId) return;
-          
-          const preloadImg = new Image();
-          prefetchOperationsRef.current.images.push(preloadImg);
-          
-          preloadImg.onload = () => {
-            // Use centralized cache marking function
-            markImageAsCached(img, true);
-            
-            const imgIndex = prefetchOperationsRef.current.images.indexOf(preloadImg);
-            if (imgIndex > -1) {
-              prefetchOperationsRef.current.images.splice(imgIndex, 1);
-            }
-          };
-          
-          preloadImg.onerror = () => {
-            const imgIndex = prefetchOperationsRef.current.images.indexOf(preloadImg);
-            if (imgIndex > -1) {
-              prefetchOperationsRef.current.images.splice(imgIndex, 1);
-            }
-          };
-          
-          preloadImg.src = getDisplayUrl(img.url);
-          
-          // Check if it was already cached (loads synchronously from memory)
-          if (preloadImg.complete && preloadImg.naturalWidth > 0) {
-            markImageAsCached(img, true);
-          }
-        }, baseDelay + staggerDelay);
-      });
-    };
+    // Using centralized preload function from shared hooks
 
     // Prefetch next page first (higher priority)
     if (nextPage) {
@@ -534,7 +490,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
         staleTime: 30 * 1000,
       }).then(() => {
         const cached = queryClient.getQueryData(['generations', selectedProjectId, nextPage, itemsPerPage, filters]) as GenerationsPaginatedResponse | undefined;
-        preloadImagesWithCancel(cached, 'next', prefetchId);
+        preloadImagesWithCancel(cached, 'next', prefetchId, prefetchOperationsRef);
       });
     }
 
@@ -546,7 +502,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
         staleTime: 30 * 1000,
       }).then(() => {
         const cachedPrev = queryClient.getQueryData(['generations', selectedProjectId, prevPage, itemsPerPage, filters]) as GenerationsPaginatedResponse | undefined;
-        preloadImagesWithCancel(cachedPrev, 'prev', prefetchId);
+        preloadImagesWithCancel(cachedPrev, 'prev', prefetchId, prefetchOperationsRef);
       });
     }
   }, [selectedProjectId, itemsPerPage, queryClient, loadGenerations, mediaTypeFilter, selectedShotFilter, excludePositioned, starredOnly]);
