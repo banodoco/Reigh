@@ -318,6 +318,14 @@ export const PromptInputRow: React.FC<PromptInputRowProps> = React.memo(({
   );
 });
 
+// Track if this is the first visit to this page in the session
+const hasVisitedImageGeneration = (() => {
+  if (typeof window !== 'undefined') {
+    return window.sessionStorage.getItem('hasVisitedImageGeneration') === 'true';
+  }
+  return false;
+})();
+
 export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerationFormProps>(({
   onGenerate,
   isGenerating = false,
@@ -335,6 +343,13 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [directFormActivePromptId, setDirectFormActivePromptId] = useState<string | null>(null);
   const generationMode: GenerationMode = 'wan-local';
+  
+  // Mark that we've visited this page in the session
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.setItem('hasVisitedImageGeneration', 'true');
+    }
+  }, []);
 
   // Text to prepend/append to every prompt
   const [beforeEachPromptText, setBeforeEachPromptText] = useState("");
@@ -729,7 +744,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   }, [prompts]);
 
   // Show a minimal skeleton while settings hydrate so the layout is visible immediately
-  if (!ready) {
+  // Only show skeleton on first visit to prevent flash on subsequent visits
+  if (!ready && !hasVisitedImageGeneration) {
     return (
       <div className="space-y-6">
         <div className="flex flex-col md:flex-row gap-6 animate-pulse">

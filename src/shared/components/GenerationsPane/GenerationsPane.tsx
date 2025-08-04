@@ -354,7 +354,7 @@ export const GenerationsPane: React.FC = () => {
             {isLoading && (
                 <SkeletonGallery 
                     count={12}
-                    columns={{ base: 2, sm: 3, md: 4, lg: 5, xl: 6 }}
+                    columns={{ base: 2, sm: 3, md: 4, lg: 5, xl: 6, '2xl': 6 }}
                     whiteText={true}
                     showControls={false}
                 />

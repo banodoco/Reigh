@@ -125,7 +125,7 @@ const GenerationsPage: React.FC = () => {
       {isLoadingProjects ? (
         <SkeletonGallery 
           count={GENERATIONS_PER_PAGE}
-          columns={{ base: 2, sm: 3, md: 4, lg: 5, xl: 6 }}
+          columns={{ base: 2, sm: 3, md: 4, lg: 5, xl: 6, '2xl': 6 }}
           showControls={true}
         />
       ) : !selectedProjectId ? (
@@ -135,7 +135,7 @@ const GenerationsPage: React.FC = () => {
       ) : (isLoading || isFetching) && paginatedData.items.length === 0 ? (
         <SkeletonGallery 
           count={GENERATIONS_PER_PAGE}
-          columns={{ base: 2, sm: 3, md: 4, lg: 5, xl: 6 }}
+          columns={{ base: 2, sm: 3, md: 4, lg: 5, xl: 6, '2xl': 6 }}
           showControls={true}
         />
       ) : (

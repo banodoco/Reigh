@@ -580,7 +580,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
             {isLoadingGenerations && imagesToShow.length === 0 ? (
               <SkeletonGallery
                 count={20}
-                columns={{ base: 2, sm: 3, md: 4, lg: 5 }}
+                columns={{ base: 2, sm: 3, md: 4, lg: 5, xl: 5, '2xl': 5 }}
                 showControls={true}
               />
             ) : (

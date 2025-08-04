@@ -11,6 +11,7 @@ interface SkeletonGalleryProps {
     md?: number;
     lg?: number;
     xl?: number;
+    '2xl'?: number;
   };
   /** Whether to use white text/styling (for dark panes) */
   whiteText?: boolean;
@@ -63,7 +64,13 @@ export function SkeletonGallery({
     columns.xl && columns.xl === 3 && 'xl:grid-cols-3',
     columns.xl && columns.xl === 4 && 'xl:grid-cols-4',
     columns.xl && columns.xl === 5 && 'xl:grid-cols-5', 
-    columns.xl && columns.xl === 6 && 'xl:grid-cols-6'
+    columns.xl && columns.xl === 6 && 'xl:grid-cols-6',
+    columns['2xl'] && columns['2xl'] === 1 && '2xl:grid-cols-1',
+    columns['2xl'] && columns['2xl'] === 2 && '2xl:grid-cols-2',
+    columns['2xl'] && columns['2xl'] === 3 && '2xl:grid-cols-3',
+    columns['2xl'] && columns['2xl'] === 4 && '2xl:grid-cols-4',
+    columns['2xl'] && columns['2xl'] === 5 && '2xl:grid-cols-5',
+    columns['2xl'] && columns['2xl'] === 6 && '2xl:grid-cols-6'
   );
 
   const skeletonBg = whiteText ? 'bg-zinc-700/60' : 'bg-muted';
@@ -71,23 +78,35 @@ export function SkeletonGallery({
   return (
     <div className={cn('space-y-6 pb-8', className)}>
       {showControls && (
-        <div className="flex flex-wrap justify-between items-center mb-4 gap-x-4 gap-y-2">
-          {/* Left side - Pagination controls skeleton */}
-          <div className="flex items-center gap-2">
-            <div className={cn('h-8 w-16 rounded animate-pulse', skeletonBg)} />
-            <div className={cn('h-4 w-40 rounded animate-pulse', skeletonBg)} />
-            <div className={cn('h-8 w-16 rounded animate-pulse', skeletonBg)} />
+        <div className="mt-7 space-y-3">
+          {/* Pagination row - matches ImageGallery pagination section */}
+          <div className="flex justify-between items-center">
+            {/* Left side - Pagination controls skeleton */}
+            <div className="flex items-center gap-2">
+              <div className={cn('h-8 w-16 rounded animate-pulse', skeletonBg)} />
+              <div className={cn('h-4 w-40 rounded animate-pulse', skeletonBg)} />
+              <div className={cn('h-8 w-16 rounded animate-pulse', skeletonBg)} />
+            </div>
+
+            {/* Right side - Starred filter skeleton */}
+            <div className="flex items-center space-x-2">
+              <div className={cn('h-4 w-4 rounded animate-pulse', skeletonBg)} />
+              <div className={cn('h-4 w-12 rounded animate-pulse', skeletonBg)} />
+            </div>
           </div>
 
-          {/* Right side - Filters skeleton */}
-          <div className="flex items-center gap-x-4 gap-y-2 flex-wrap">
-            {/* Shot Filter skeleton */}
-            <div className={cn('h-8 w-[140px] rounded animate-pulse', skeletonBg)} />
+          {/* Filters row - matches ImageGallery filters section */}
+          <div className="flex justify-between items-center flex-wrap gap-y-2">
+            {/* Left side - Filters skeleton */}
+            <div className="flex items-center gap-3">
+              {/* Shot Filter skeleton */}
+              <div className={cn('h-8 w-[140px] rounded animate-pulse', skeletonBg)} />
+              
+              {/* Search skeleton */}
+              <div className={cn('h-8 w-8 rounded animate-pulse', skeletonBg)} />
+            </div>
             
-            {/* Search skeleton */}
-            <div className={cn('h-8 w-8 rounded animate-pulse', skeletonBg)} />
-            
-            {/* Media Type Filter skeleton */}
+            {/* Right side - Media Type Filter skeleton */}
             <div className="flex items-center space-x-1.5">
               <div className={cn('h-4 w-8 rounded animate-pulse', skeletonBg)} />
               <div className={cn('h-8 w-[100px] rounded animate-pulse', skeletonBg)} />
