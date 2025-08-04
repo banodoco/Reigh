@@ -583,9 +583,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
           </div>
 
           <div ref={galleryRef} className="mt-2">
-            {/* Show SkeletonGallery only on the very first load when no images are available yet.
-               During subsequent page changes we keep the existing gallery visible so its
-               header/controls do not disappear. */}
+            {/* Show SkeletonGallery on initial load or when filter changes take too long */}
             {isLoadingGenerations && imagesToShow.length === 0 ? (
               <SkeletonGallery
                 count={20}
@@ -593,7 +591,8 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
                 showControls={true}
               />
             ) : (
-              <ImageGallery
+              <div className={isLoadingGenerations && isFilterChange ? 'opacity-60 pointer-events-none transition-opacity duration-200' : ''}>
+                <ImageGallery
                 images={imagesToShow}
                 onDelete={handleDeleteImage}
                 onImageSaved={handleImageSaved}
@@ -626,6 +625,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
                 onSwitchToAssociatedShot={handleSwitchToAssociatedShot}
                 onPrefetchAdjacentPages={handlePrefetchAdjacentPages}
               />
+              </div>
             )}
           </div>
         </>
