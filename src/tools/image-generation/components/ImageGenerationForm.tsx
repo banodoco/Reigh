@@ -1052,7 +1052,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         </div>
       </form>
 
-      <Suspense fallback={<div>Loading LoraSelectorModal...</div>}>
+      <Suspense fallback={<div className="sr-only">Loading...</div>}>
         <LazyLoraSelectorModal
           isOpen={loraManager.isLoraModalOpen}
           onClose={() => loraManager.setIsLoraModalOpen(false)}
@@ -1073,14 +1073,11 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         />
       </Suspense>
         
-      <Suspense fallback={<div>Loading PromptEditorModal...</div>}>
+      <Suspense fallback={<div className="sr-only">Loading...</div>}>
         <DynamicImportErrorBoundary
           fallback={() => (
-            <div>
-              Failed to load PromptEditorModal. Please try again later.
-              <button onClick={() => window.location.reload()} className="ml-2 text-primary hover:underline">
-                Retry
-              </button>
+            <div className="sr-only">
+              Modal loading error - please refresh if needed
             </div>
           )}
         >

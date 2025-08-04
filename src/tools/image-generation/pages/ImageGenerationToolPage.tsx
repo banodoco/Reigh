@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { ToolSettingsGate } from "@/shared/components/ToolSettingsGate";
+
 import ImageGenerationForm, { ImageGenerationFormHandles, PromptEntry } from "../components/ImageGenerationForm";
 import { ImageGallery, GeneratedImageWithMetadata, DisplayableMetadata, MetadataLora } from "@/shared/components/ImageGallery";
 import SettingsModal from "@/shared/components/SettingsModal";
@@ -562,20 +562,15 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
       {hasValidFalApiKey && (
         <>
           <div ref={formContainerRef} className="p-6 border rounded-lg shadow-sm bg-card w-full max-w-full">
-            <ToolSettingsGate
-              ready={true}
-              loadingMessage="Loading image generation settings..."
-            >
-              <ImageGenerationForm
-                ref={imageGenerationFormRef}
-                onGenerate={handleNewGenerate}
-                isGenerating={isGenerating}
-                hasApiKey={hasValidFalApiKey}
-                apiKey={falApiKey}
-                openaiApiKey={openaiApiKey}
-                justQueued={justQueued}
-              />
-            </ToolSettingsGate>
+            <ImageGenerationForm
+              ref={imageGenerationFormRef}
+              onGenerate={handleNewGenerate}
+              isGenerating={isGenerating}
+              hasApiKey={hasValidFalApiKey}
+              apiKey={falApiKey}
+              openaiApiKey={openaiApiKey}
+              justQueued={justQueued}
+            />
           </div>
 
           <div ref={galleryRef} className="mt-2">
