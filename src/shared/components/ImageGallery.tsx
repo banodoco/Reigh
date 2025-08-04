@@ -367,11 +367,16 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   const [loadingButton, setLoadingButton] = useState<'prev' | 'next' | null>(null);
   // Gallery loading state - when true, all images show loading skeletons
   const [isGalleryLoading, setIsGalleryLoading] = useState<boolean>(false);
+  // Previous page images for smooth transitions
+  const [previousPageImages, setPreviousPageImages] = useState<GeneratedImageWithMetadata[]>([]);
+  const [isTransitioning, setIsTransitioning] = useState<boolean>(false);
   
   // Progressive loading state - will be defined after paginatedImages
 
   // Ref for scrolling to top of gallery instead of top of page
   const galleryTopRef = useRef<HTMLDivElement>(null);
+  // Ref to track current paginated images for transition capture
+  const currentPaginatedImagesRef = useRef<GeneratedImageWithMetadata[]>([]);
 
   // Pagination state - reduce items per page on mobile for faster initial render
   const ITEMS_PER_PAGE = actualItemsPerPage;
@@ -701,6 +706,12 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     
     setLoadingButton(direction);
     
+    // Capture current images for smooth transition (only if there are current images)
+    if (currentPaginatedImagesRef.current.length > 0) {
+      setPreviousPageImages(currentPaginatedImagesRef.current);
+      setIsTransitioning(true);
+    }
+    
     // Smart loading state: only show gallery loading for non-adjacent pages or when preloading is disabled
     const currentPageNum = isServerPagination ? (serverPage || 1) - 1 : page;
     const isAdjacentPage = Math.abs(newPage - currentPageNum) === 1;
@@ -774,6 +785,11 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     return filteredImages.slice(page * ITEMS_PER_PAGE, (page + 1) * ITEMS_PER_PAGE);
   }, [filteredImages, page, isServerPagination]);
 
+  // Keep ref updated with current images
+  React.useEffect(() => {
+    currentPaginatedImagesRef.current = paginatedImages;
+  }, [paginatedImages]);
+
   // Progressive loading state - use custom hook  
   const { showImageIndices } = useProgressiveImageLoading({
     images: paginatedImages,
@@ -783,6 +799,16 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
       // Only reset gallery loading if it was actually set (for distant page jumps)
       // Adjacent pages might not have set it in the first place
       setIsGalleryLoading(false);
+      
+      // End transition when new images are ready
+      if (isTransitioning) {
+        // Start the fade-in immediately, then cleanup after transition
+        setIsTransitioning(false);
+        // Clean up previous images after transition completes
+        setTimeout(() => {
+          setPreviousPageImages([]);
+        }, 300); // Match transition duration
+      }
     },
   });
     
@@ -1076,45 +1102,88 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
              </div>
           )}
 
-          {paginatedImages.length > 0 && (
-                <div className={`grid ${reducedSpacing ? 'gap-2 sm:gap-4' : 'gap-4'} ${reducedSpacing ? 'mb-4' : 'mb-12'} ${gridColumnClasses}`}>
-            {paginatedImages.map((image, index) => {
-              const shouldShow = showImageIndices.has(index);
-              const isPriority = index < 10; // First 10 images are priority
+          {(paginatedImages.length > 0 || (isTransitioning && previousPageImages.length > 0)) && (
+            <div className="relative">
+              {/* Previous page images (shown during transition) */}
+              {isTransitioning && previousPageImages.length > 0 && (
+                <div className={`grid ${reducedSpacing ? 'gap-2 sm:gap-4' : 'gap-4'} ${reducedSpacing ? 'mb-4' : 'mb-12'} ${gridColumnClasses} transition-opacity duration-300 ${isTransitioning ? 'opacity-100' : 'opacity-0'}`}>
+                  {previousPageImages.map((image, index) => (
+                    <ImageGalleryItem
+                      key={`prev-${image.id || `image-${index}`}`}
+                      image={image}
+                      index={index}
+                      isDeleting={false} // Disable interactions during transition
+                      onDelete={undefined}
+                      onApplySettings={undefined}
+                      onOpenLightbox={() => {}} // Disable during transition
+                      onAddToLastShot={async () => false}
+                      onDownloadImage={() => {}}
+                      onToggleStar={undefined}
+                      selectedShotIdLocal={selectedShotIdLocal}
+                      simplifiedShotOptions={simplifiedShotOptions}
+                      showTickForImageId={null}
+                      onShowTick={() => {}}
+                      addingToShotImageId={null}
+                      setAddingToShotImageId={() => {}}
+                      downloadingImageId={null}
+                      isMobile={isMobile}
+                      mobileActiveImageId={null}
+                      mobilePopoverOpenImageId={null}
+                      onMobileTap={() => {}}
+                      setMobilePopoverOpenImageId={() => {}}
+                      setSelectedShotIdLocal={() => {}}
+                      setLastAffectedShotId={() => {}}
+                      toggleStarMutation={toggleStarMutation}
+                      shouldLoad={true}
+                      isPriority={false}
+                      isGalleryLoading={false}
+                    />
+                  ))}
+                </div>
+              )}
               
-              return (
-                <ImageGalleryItem
-                  key={image.id || `image-${index}`}
-                  image={image}
-                  index={index}
-                  isDeleting={isDeleting === image.id}
-                  onDelete={onDelete}
-                  onApplySettings={onApplySettings}
-                  onOpenLightbox={handleOpenLightbox}
-                  onAddToLastShot={onAddToLastShot}
-                  onDownloadImage={handleDownloadImage}
-                  onToggleStar={onToggleStar}
-                  selectedShotIdLocal={selectedShotIdLocal}
-                  simplifiedShotOptions={simplifiedShotOptions}
-                  showTickForImageId={showTickForImageId}
-                  onShowTick={handleShowTick}
-                  addingToShotImageId={addingToShotImageId}
-                  setAddingToShotImageId={setAddingToShotImageId}
-                  downloadingImageId={downloadingImageId}
-                  isMobile={isMobile}
-                  mobileActiveImageId={mobileActiveImageId}
-                  mobilePopoverOpenImageId={mobilePopoverOpenImageId}
-                  onMobileTap={handleMobileTap}
-                  setMobilePopoverOpenImageId={setMobilePopoverOpenImageId}
-                  setSelectedShotIdLocal={setSelectedShotIdLocal}
-                  setLastAffectedShotId={setLastAffectedShotId}
-                  toggleStarMutation={toggleStarMutation}
-                  shouldLoad={shouldShow}
-                  isPriority={isPriority}
-                  isGalleryLoading={isGalleryLoading}
-                />
-              );
-            })}
+              {/* Current page images */}
+              {paginatedImages.length > 0 && (
+                <div className={`grid ${reducedSpacing ? 'gap-2 sm:gap-4' : 'gap-4'} ${reducedSpacing ? 'mb-4' : 'mb-12'} ${gridColumnClasses} ${isTransitioning ? 'absolute inset-0' : ''} transition-all duration-300 ease-out ${isTransitioning ? 'opacity-0 translate-y-2' : 'opacity-100 translate-y-0'}`}>
+                  {paginatedImages.map((image, index) => {
+                    const shouldShow = showImageIndices.has(index);
+                    const isPriority = index < 10; // First 10 images are priority
+                    
+                    return (
+                      <ImageGalleryItem
+                        key={image.id || `image-${index}`}
+                        image={image}
+                        index={index}
+                        isDeleting={isDeleting === image.id}
+                        onDelete={onDelete}
+                        onApplySettings={onApplySettings}
+                        onOpenLightbox={handleOpenLightbox}
+                        onAddToLastShot={onAddToLastShot}
+                        onDownloadImage={handleDownloadImage}
+                        onToggleStar={onToggleStar}
+                        selectedShotIdLocal={selectedShotIdLocal}
+                        simplifiedShotOptions={simplifiedShotOptions}
+                        showTickForImageId={showTickForImageId}
+                        onShowTick={handleShowTick}
+                        addingToShotImageId={addingToShotImageId}
+                        setAddingToShotImageId={setAddingToShotImageId}
+                        downloadingImageId={downloadingImageId}
+                        isMobile={isMobile}
+                        mobileActiveImageId={mobileActiveImageId}
+                        mobilePopoverOpenImageId={mobilePopoverOpenImageId}
+                        onMobileTap={handleMobileTap}
+                        setMobilePopoverOpenImageId={setMobilePopoverOpenImageId}
+                        setSelectedShotIdLocal={setSelectedShotIdLocal}
+                        setLastAffectedShotId={setLastAffectedShotId}
+                        toggleStarMutation={toggleStarMutation}
+                        shouldLoad={shouldShow || isTransitioning} // Load immediately during transition
+                        isPriority={isPriority}
+                        isGalleryLoading={isGalleryLoading}
+                      />
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
         </div>
