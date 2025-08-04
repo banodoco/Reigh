@@ -264,10 +264,10 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
 
     const { generationMode, associatedShotId, ...restOfFormData } = formData;
 
-    // Clear existing images and reset to page 1 if needed
+    // Clear existing images but keep current page position
     if (restOfFormData.prompts.length * restOfFormData.imagesPerPrompt > 0) {
       setGeneratedImages([]);
-      setCurrentPage(1);
+      // Don't reset page - let user stay where they are
     }
 
     if (generationMode === 'wan-local') {
