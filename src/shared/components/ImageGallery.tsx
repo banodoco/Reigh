@@ -832,9 +832,9 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
           requestAnimationFrame(() => {
             console.log('[ImageGallery] Triggering slide animation (start -> end)');
             setTransitionPhase('end');
-            // Clean up after animation completes
+            // Clean up when animation completes
             setTimeout(() => {
-              console.log('[ImageGallery] Transition cleanup (end -> idle)');
+              console.log('[ImageGallery] Animation complete - cleaning up');
               setIsTransitioning(false);
               setTransitionPhase('idle');
               setPreviousPageImages([]);
@@ -1145,7 +1145,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
               transform: 'translateZ(0)' // Force GPU acceleration
             }}>
               {/* Previous page images (shown during transition) */}
-              {previousPageImages.length > 0 && (
+              {previousPageImages.length > 0 && transitionPhase !== 'idle' && (
                 <div className={`grid ${reducedSpacing ? 'gap-2 sm:gap-4' : 'gap-4'} ${reducedSpacing ? 'mb-4' : 'mb-12'} ${gridColumnClasses} transition-[transform,opacity] duration-300 ease-out ${
                   (() => {
                     const classes = transitionPhase === 'start' 
@@ -1192,7 +1192,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
               
               {/* Current page images */}
               {paginatedImages.length > 0 && (
-                <div className={`grid ${reducedSpacing ? 'gap-2 sm:gap-4' : 'gap-4'} ${reducedSpacing ? 'mb-4' : 'mb-12'} ${gridColumnClasses} ${previousPageImages.length > 0 ? 'absolute inset-0' : ''} transition-[transform,opacity] duration-300 ease-out ${
+                <div className={`grid ${reducedSpacing ? 'gap-2 sm:gap-4' : 'gap-4'} ${reducedSpacing ? 'mb-4' : 'mb-12'} ${gridColumnClasses} ${previousPageImages.length > 0 && transitionPhase !== 'idle' ? 'absolute inset-0' : ''} transition-[transform,opacity] duration-300 ease-out ${
                   (() => {
                     const classes = transitionPhase === 'start'
                       ? `${transitionDirection === 'next' ? 'translate-x-full' : '-translate-x-full'} opacity-0`
