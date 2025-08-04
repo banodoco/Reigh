@@ -6,7 +6,7 @@ import { useProject } from '@/shared/contexts/ProjectContext';
 import { useQueryClient } from '@tanstack/react-query';
 import { fetchGenerations } from '@/shared/hooks/useGenerations';
 import { getDisplayUrl } from '@/shared/lib/utils';
-import { preloadImagesWithCancel, initializePrefetchOperations } from '@/shared/hooks/useAdjacentPagePreloading';
+import { preloadImagesWithCancel, initializePrefetchOperations, cleanupOldPaginationCache, triggerImageGarbageCollection } from '@/shared/hooks/useAdjacentPagePreloading';
 
 const GENERATIONS_PER_PAGE = 30; // 30 items per page for consistency
 
@@ -71,7 +71,15 @@ const GenerationsPage: React.FC = () => {
 
     // Reset tracking with new prefetch ID
     const prefetchId = `${nextPage}-${prevPage}-${Date.now()}`;
-          initializePrefetchOperations(prefetchOperationsRef, prefetchId);
+    initializePrefetchOperations(prefetchOperationsRef, prefetchId);
+
+    // Clean up old pagination cache to prevent memory leaks
+    cleanupOldPaginationCache(queryClient, page, selectedProjectId, 10, 'generations');
+    
+    // Trigger image garbage collection every 10 pages to free browser memory
+    if (page % 10 === 0) {
+      triggerImageGarbageCollection();
+    }
 
     const filters = { 
       mediaType: mediaTypeFilter,

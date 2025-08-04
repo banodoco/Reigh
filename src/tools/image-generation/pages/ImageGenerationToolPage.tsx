@@ -26,7 +26,7 @@ import { timeEnd } from '@/shared/lib/logger';
 import { useIsMobile } from "@/shared/hooks/use-mobile";
 import { fetchGenerations } from "@/shared/hooks/useGenerations";
 import { getDisplayUrl } from '@/shared/lib/utils';
-import { preloadImagesWithCancel, initializePrefetchOperations } from '@/shared/hooks/useAdjacentPagePreloading';
+import { preloadImagesWithCancel, initializePrefetchOperations, cleanupOldPaginationCache, triggerImageGarbageCollection } from '@/shared/hooks/useAdjacentPagePreloading';
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 import { ShotFilter } from '@/shared/components/ShotFilter';
 import { SkeletonGallery } from '@/shared/components/ui/skeleton-gallery';
@@ -471,7 +471,15 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
 
     // Reset tracking with new prefetch ID
     const prefetchId = `${nextPage}-${prevPage}-${Date.now()}`;
-          initializePrefetchOperations(prefetchOperationsRef, prefetchId);
+    initializePrefetchOperations(prefetchOperationsRef, prefetchId);
+
+    // Clean up old pagination cache to prevent memory leaks
+    cleanupOldPaginationCache(queryClient, currentPage, selectedProjectId, 10, 'generations');
+    
+    // Trigger image garbage collection every 10 pages to free browser memory
+    if (currentPage % 10 === 0) {
+      triggerImageGarbageCollection();
+    }
 
     const filters = { 
       mediaType: mediaTypeFilter,

@@ -276,6 +276,12 @@ export function useGenerations(
     queryFn: () => fetchGenerations(projectId, limit, offset, filters),
     enabled: !!projectId && enabled,
     placeholderData: (previousData) => previousData,
+    // Cache management to prevent memory leaks as pagination grows
+    staleTime: 2 * 60 * 1000, // 2 minutes - shorter for pagination data
+    gcTime: 5 * 60 * 1000, // 5 minutes - cleanup old pages after this time
+    // Prevent background refetches for pagination data
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 }
 

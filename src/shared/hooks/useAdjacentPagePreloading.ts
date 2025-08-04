@@ -22,6 +22,84 @@ export const isImageCached = (image: any): boolean => {
   return (image as any).__memoryCached === true;
 };
 
+// Centralized function to clean up old pagination cache entries
+export const cleanupOldPaginationCache = (
+  queryClient: any,
+  currentPage: number,
+  projectId: string,
+  maxCachedPages: number = 10,
+  baseQueryKey: string = 'generations'
+) => {
+  // Get all generation queries from cache
+  const allQueries = queryClient.getQueryCache().getAll();
+  
+  // Find generation queries with page numbers
+  const generationQueries = allQueries.filter((query: any) => {
+    const queryKey = query.queryKey;
+    return queryKey?.[0] === baseQueryKey && 
+           queryKey?.[1] === projectId && 
+           typeof queryKey?.[2] === 'number'; // page number
+  });
+
+  // Sort by page distance from current page
+  const queriesWithDistance = generationQueries.map((query: any) => ({
+    query,
+    page: query.queryKey[2],
+    distance: Math.abs(query.queryKey[2] - currentPage)
+  }));
+
+  // Keep queries within reasonable distance, remove distant ones
+  const queriesToRemove = queriesWithDistance
+    .filter(item => item.distance > Math.floor(maxCachedPages / 2))
+    .sort((a, b) => b.distance - a.distance) // Remove most distant first
+    .slice(0, Math.max(0, generationQueries.length - maxCachedPages));
+
+  // Clean up image cache for removed queries
+  queriesToRemove.forEach(({ query }) => {
+    const queryData = query.state?.data;
+    if (queryData?.items) {
+      // Clear memory cache flags from images
+      queryData.items.forEach((image: any) => {
+        delete (image as any).__memoryCached;
+        delete (image as any).__fullImageCached;
+      });
+    }
+  });
+
+  // Remove distant queries from cache
+  queriesToRemove.forEach(({ query }) => {
+    console.log(`[CacheCleanup] Removing distant page cache:`, query.queryKey);
+    queryClient.removeQueries({ queryKey: query.queryKey });
+  });
+
+  if (queriesToRemove.length > 0) {
+    console.log(`[CacheCleanup] Cleaned up ${queriesToRemove.length} old pagination pages`);
+  }
+};
+
+// Centralized function to trigger garbage collection for images (browser-level cleanup)
+export const triggerImageGarbageCollection = () => {
+  // Force browser to evaluate memory pressure and potentially clean up unused images
+  if ('gc' in window && typeof (window as any).gc === 'function') {
+    // Only available in Chrome with --js-flags="--expose-gc"
+    try {
+      (window as any).gc();
+      console.log('[CacheCleanup] Manual garbage collection triggered');
+    } catch (e) {
+      // Ignore if not available
+    }
+  }
+  
+  // Alternative: Create memory pressure to encourage cleanup
+  if (typeof window !== 'undefined') {
+    // Small memory pressure technique
+    setTimeout(() => {
+      const temp = new Array(1000).fill(null);
+      temp.length = 0;
+    }, 100);
+  }
+};
+
 // Centralized function to initialize prefetch operations
 export const initializePrefetchOperations = (
   prefetchOperationsRef: React.MutableRefObject<{

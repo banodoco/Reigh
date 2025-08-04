@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useRenderLogger } from '@/shared/hooks/useRenderLogger';
 import { useSlidingPane } from '@/shared/hooks/useSlidingPane';
 import { cn, getDisplayUrl } from '@/shared/lib/utils';
-import { preloadImagesWithCancel, initializePrefetchOperations } from '@/shared/hooks/useAdjacentPagePreloading';
+import { preloadImagesWithCancel, initializePrefetchOperations, cleanupOldPaginationCache, triggerImageGarbageCollection } from '@/shared/hooks/useAdjacentPagePreloading';
 import { useQueryClient } from '@tanstack/react-query';
 import { fetchGenerations } from '@/shared/hooks/useGenerations';
 import { Button } from '@/shared/components/ui/button';
@@ -94,6 +94,16 @@ export const GenerationsPane: React.FC = () => {
     // Reset tracking with new prefetch ID
     const prefetchId = `${nextPage}-${prevPage}-${Date.now()}`;
     initializePrefetchOperations(prefetchOperationsRef, prefetchId);
+
+    // Clean up old pagination cache to prevent memory leaks
+    // Use nextPage-1 as approximation of current page for cleanup
+    const currentPage = nextPage ? nextPage - 1 : (prevPage ? prevPage + 1 : 1);
+    cleanupOldPaginationCache(queryClient, currentPage, selectedProjectId, 8, 'generations');
+    
+    // Trigger image garbage collection periodically for pane to free browser memory
+    if (currentPage % 8 === 0) {
+      triggerImageGarbageCollection();
+    }
 
     const filters = { 
       mediaType: mediaTypeFilter,

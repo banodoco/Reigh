@@ -706,10 +706,10 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     if (shouldShowGalleryLoading) {
       setIsGalleryLoading(true); // Show loading state for distant pages or when preloading disabled
     } else {
-      // For adjacent pages, set a fallback timeout in case images take unexpectedly long
+      // For adjacent pages, set a shorter fallback timeout since images should be preloaded
       const fallbackTimeout = setTimeout(() => {
         setIsGalleryLoading(true);
-      }, 200); // Show loading if images aren't ready within 200ms
+      }, 50); // Reduced from 200ms - shorter timeout for preloaded pages
       
       // The progressive loading hook will clear the loading state once ready
       // Store timeout for potential cleanup (though it will likely complete before cleanup)
