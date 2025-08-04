@@ -12,6 +12,39 @@ interface UseAdjacentPagePreloadingProps {
   allImages?: any[]; // For client-side pagination
 }
 
+// Centralized function to mark images as cached
+export const markImageAsCached = (image: any, isCached: boolean = true) => {
+  (image as any).__memoryCached = isCached;
+};
+
+// Centralized function to check if image is cached
+export const isImageCached = (image: any): boolean => {
+  return (image as any).__memoryCached === true;
+};
+
+// Centralized preload function with cache detection
+export const preloadImageWithCacheDetection = (imageUrl: string, image: any): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    const preloadImg = new Image();
+    
+    preloadImg.onload = () => {
+      markImageAsCached(image, true);
+      resolve();
+    };
+    
+    preloadImg.onerror = () => {
+      reject(new Error(`Failed to load image: ${imageUrl}`));
+    };
+    
+    preloadImg.src = imageUrl;
+    
+    // Check if it was already cached (loads synchronously from memory)
+    if (preloadImg.complete && preloadImg.naturalWidth > 0) {
+      markImageAsCached(image, true);
+    }
+  });
+};
+
 interface PreloadOperation {
   images: HTMLImageElement[];
   timeouts: NodeJS.Timeout[];
@@ -83,8 +116,8 @@ export const useAdjacentPagePreloading = ({
           operations.images.push(preloadImg);
           
           preloadImg.onload = () => {
-            // Mark this image as cached for instant display
-            image.__memoryCached = true;
+            // Use centralized cache marking function
+            markImageAsCached(image, true);
             
             const imgIndex = operations.images.indexOf(preloadImg);
             if (imgIndex > -1) {
@@ -97,7 +130,7 @@ export const useAdjacentPagePreloading = ({
           
           // Check if it was already cached (loads synchronously from memory)
           if (preloadImg.complete && preloadImg.naturalWidth > 0) {
-            image.__memoryCached = true;
+            markImageAsCached(image, true);
           }
           
           preloadImg.onerror = () => {
@@ -113,8 +146,8 @@ export const useAdjacentPagePreloading = ({
             operations.images.push(fullImg);
             
             fullImg.onload = () => {
-              // Mark full image as cached too
-              image.__fullImageCached = true;
+              // Mark full image as cached too (using a different flag)
+              (image as any).__fullImageCached = true;
               
               const fullImgIndex = operations.images.indexOf(fullImg);
               if (fullImgIndex > -1) {
@@ -133,7 +166,7 @@ export const useAdjacentPagePreloading = ({
             
             // Check if full image was already cached
             if (fullImg.complete && fullImg.naturalWidth > 0) {
-              image.__fullImageCached = true;
+              (image as any).__fullImageCached = true;
             }
           }
         }, baseDelay + (idx * 30));

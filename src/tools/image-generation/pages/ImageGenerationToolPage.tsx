@@ -26,6 +26,7 @@ import { timeEnd } from '@/shared/lib/logger';
 import { useIsMobile } from "@/shared/hooks/use-mobile";
 import { fetchGenerations } from "@/shared/hooks/useGenerations";
 import { getDisplayUrl } from '@/shared/lib/utils';
+import { markImageAsCached } from '@/shared/hooks/useAdjacentPagePreloading';
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 import { ShotFilter } from '@/shared/components/ShotFilter';
 import { SkeletonGallery } from '@/shared/components/ui/skeleton-gallery';
@@ -499,8 +500,8 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
           prefetchOperationsRef.current.images.push(preloadImg);
           
           preloadImg.onload = () => {
-            // Mark this image as cached for instant display
-            (img as any).__memoryCached = true;
+            // Use centralized cache marking function
+            markImageAsCached(img, true);
             
             const imgIndex = prefetchOperationsRef.current.images.indexOf(preloadImg);
             if (imgIndex > -1) {
@@ -519,7 +520,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
           
           // Check if it was already cached (loads synchronously from memory)
           if (preloadImg.complete && preloadImg.naturalWidth > 0) {
-            (img as any).__memoryCached = true;
+            markImageAsCached(img, true);
           }
         }, baseDelay + staggerDelay);
       });

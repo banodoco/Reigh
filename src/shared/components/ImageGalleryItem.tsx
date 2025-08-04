@@ -16,6 +16,7 @@ import {
 } from "@/shared/components/ui/select";
 import { DraggableImage } from "@/shared/components/DraggableImage";
 import { getDisplayUrl } from "@/shared/lib/utils";
+import { isImageCached } from "@/shared/hooks/useAdjacentPagePreloading";
 import { TimeStamp } from "@/shared/components/TimeStamp";
 import { useToast } from "@/shared/hooks/use-toast";
 import * as PopoverPrimitive from "@radix-ui/react-popover";
@@ -89,8 +90,8 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   const [imageLoadError, setImageLoadError] = useState<boolean>(false);
   const [imageRetryCount, setImageRetryCount] = useState<number>(0);
   const [isInfoOpen, setIsInfoOpen] = useState<boolean>(false);
-  // Check if this image was already cached by the preloader
-  const isPreloadedAndCached = (image as any).__memoryCached === true;
+  // Check if this image was already cached by the preloader using centralized function
+  const isPreloadedAndCached = isImageCached(image);
   const [imageLoaded, setImageLoaded] = useState<boolean>(isPreloadedAndCached);
   const [imageLoading, setImageLoading] = useState<boolean>(false);
   const MAX_RETRIES = 2;
@@ -132,8 +133,8 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   useEffect(() => {
     setImageLoadError(false);
     setImageRetryCount(0);
-    // Check if the new image is already cached
-    const isNewImageCached = (image as any).__memoryCached === true;
+    // Check if the new image is already cached using centralized function
+    const isNewImageCached = isImageCached(image);
     setImageLoaded(isNewImageCached);
     setImageLoading(false);
   }, [displayUrl, image]);

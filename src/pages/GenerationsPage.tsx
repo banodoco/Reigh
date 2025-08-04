@@ -6,6 +6,7 @@ import { useProject } from '@/shared/contexts/ProjectContext';
 import { useQueryClient } from '@tanstack/react-query';
 import { fetchGenerations } from '@/shared/hooks/useGenerations';
 import { getDisplayUrl } from '@/shared/lib/utils';
+import { markImageAsCached } from '@/shared/hooks/useAdjacentPagePreloading';
 
 const GENERATIONS_PER_PAGE = 30; // 30 items per page for consistency
 
@@ -99,6 +100,9 @@ const GenerationsPage: React.FC = () => {
           prefetchOperationsRef.current.images.push(preloadImg);
           
           preloadImg.onload = () => {
+            // Use centralized cache marking function
+            markImageAsCached(img, true);
+            
             const imgIndex = prefetchOperationsRef.current.images.indexOf(preloadImg);
             if (imgIndex > -1) {
               prefetchOperationsRef.current.images.splice(imgIndex, 1);
@@ -113,6 +117,11 @@ const GenerationsPage: React.FC = () => {
           };
           
           preloadImg.src = getDisplayUrl(img.url);
+          
+          // Check if it was already cached (loads synchronously from memory)
+          if (preloadImg.complete && preloadImg.naturalWidth > 0) {
+            markImageAsCached(img, true);
+          }
         }, baseDelay + staggerDelay);
       });
     };

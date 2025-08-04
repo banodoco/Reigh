@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useRenderLogger } from '@/shared/hooks/useRenderLogger';
 import { useSlidingPane } from '@/shared/hooks/useSlidingPane';
 import { cn, getDisplayUrl } from '@/shared/lib/utils';
+import { markImageAsCached } from '@/shared/hooks/useAdjacentPagePreloading';
 import { useQueryClient } from '@tanstack/react-query';
 import { fetchGenerations } from '@/shared/hooks/useGenerations';
 import { Button } from '@/shared/components/ui/button';
@@ -121,6 +122,9 @@ export const GenerationsPane: React.FC = () => {
           prefetchOperationsRef.current.images.push(preloadImg);
           
           preloadImg.onload = () => {
+            // Use centralized cache marking function
+            markImageAsCached(img, true);
+            
             const imgIndex = prefetchOperationsRef.current.images.indexOf(preloadImg);
             if (imgIndex > -1) {
               prefetchOperationsRef.current.images.splice(imgIndex, 1);
@@ -135,6 +139,11 @@ export const GenerationsPane: React.FC = () => {
           };
           
           preloadImg.src = getDisplayUrl(img.url);
+          
+          // Check if it was already cached (loads synchronously from memory)
+          if (preloadImg.complete && preloadImg.naturalWidth > 0) {
+            markImageAsCached(img, true);
+          }
         }, baseDelay + staggerDelay);
       });
     };
