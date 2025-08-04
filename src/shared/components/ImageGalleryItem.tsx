@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Trash2, Info, Settings, CheckCircle, AlertTriangle, Download, PlusCircle, Check, Sparkles, Star } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
 import { 
@@ -85,7 +85,8 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   isGalleryLoading = false,
 }) => {
   const { toast } = useToast();
-  const displayUrl = getDisplayUrl(image.thumbUrl || image.url);
+  // Memoize displayUrl to prevent unnecessary recalculations
+  const displayUrl = useMemo(() => getDisplayUrl(image.thumbUrl || image.url), [image.thumbUrl, image.url]);
   // Track loading state for this specific image
   const [imageLoadError, setImageLoadError] = useState<boolean>(false);
   const [imageRetryCount, setImageRetryCount] = useState<number>(0);
@@ -95,6 +96,9 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   const [imageLoaded, setImageLoaded] = useState<boolean>(isPreloadedAndCached);
   const [imageLoading, setImageLoading] = useState<boolean>(false);
   const MAX_RETRIES = 2;
+  
+  // Track previous image ID to detect actual changes vs re-renders
+  const prevImageIdRef = useRef<string | undefined>(image.id);
 
   // Handle image load error with retry mechanism
   const handleImageError = useCallback((errorEvent?: React.SyntheticEvent<HTMLImageElement | HTMLVideoElement>) => {
@@ -131,11 +135,20 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
 
   // Reset error state when URL changes (new image)
   useEffect(() => {
+    // Only reset if this is actually a different image
+    if (prevImageIdRef.current === image.id && actualSrc !== null) {
+      return; // Same image, don't reset
+    }
+    
+    prevImageIdRef.current = image.id;
+    
     if (index < 3) {
       console.log(`[ImageGalleryItem-${index}] Image changed, resetting state`, {
         oldSrc: actualSrc,
         newUrl: displayUrl,
-        imageId: image.id
+        imageId: image.id,
+        imageUrl: image.url,
+        imageThumbUrl: image.thumbUrl
       });
     }
     setImageLoadError(false);
@@ -149,7 +162,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
     }
     // CRITICAL: Reset actualSrc so the loading effect can run for the new image
     setActualSrc(null);
-  }, [displayUrl, image]);
+  }, [displayUrl, image.id, image.url, image.thumbUrl]); // Use specific props instead of entire object
 
   // Progressive loading: only set src when shouldLoad is true
   const [actualSrc, setActualSrc] = useState<string | null>(null);
@@ -202,7 +215,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [actualSrc, actualDisplayUrl, isPriority, image]); // Removed shouldLoad dependency
+  }, [actualSrc, actualDisplayUrl, isPriority, image.id]); // Use image.id instead of entire object
 
   // Only format metadata when actually needed (Info tooltip/popover is opened)
   // This prevents 150-200ms of string building work during initial render on mobile
