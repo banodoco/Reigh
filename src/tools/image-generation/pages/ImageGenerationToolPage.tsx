@@ -89,18 +89,25 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   const positionExistingGenerationMutation = usePositionExistingGenerationInShot();
   const { lastAffectedShotId, setLastAffectedShotId } = useLastAffectedShot();
   const itemsPerPage = isMobile ? 24 : 25;
+  const generationsFilters = {
+    toolType: 'image-generation', // Always true
+    mediaType: mediaTypeFilter, // Use dynamic mediaType instead of hardcoded 'image'
+    shotId: selectedShotFilter === 'all' ? undefined : selectedShotFilter,
+    excludePositioned: selectedShotFilter !== 'all' ? excludePositioned : undefined,
+    starredOnly
+  };
+  
+  console.log('[ImageGalleryDebug] Generations filters:', {
+    selectedShotFilter,
+    filters: generationsFilters
+  });
+  
   const { data: generationsResponse, isLoading: isLoadingGenerations } = useGenerations(
     selectedProjectId, 
     currentPage, 
     itemsPerPage, 
     loadGenerations,
-    {
-      toolType: 'image-generation', // Always true
-      mediaType: mediaTypeFilter, // Use dynamic mediaType instead of hardcoded 'image'
-      shotId: selectedShotFilter === 'all' ? undefined : selectedShotFilter,
-      excludePositioned: selectedShotFilter !== 'all' ? excludePositioned : undefined,
-      starredOnly
-    }
+    generationsFilters
   );
   const deleteGenerationMutation = useDeleteGeneration();
   const updateGenerationLocationMutation = useUpdateGenerationLocation();
@@ -403,15 +410,25 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
         });
       } else {
         // Use the regular add function
-        await addImageToShotMutation?.mutateAsync({
+        const result = await addImageToShotMutation?.mutateAsync({
           shot_id: targetShotInfo.targetShotIdForButton,
           generation_id: generationId,
           imageUrl: imageUrl,
           thumbUrl: thumbUrl,
           project_id: selectedProjectId, 
         });
+        console.log('[ImageGalleryDebug] Add to shot result:', {
+          generationId,
+          shotId: targetShotInfo.targetShotIdForButton,
+          result
+        });
       }
       setLastAffectedShotId(targetShotInfo.targetShotIdForButton);
+      
+      // Force refresh of generations data to show updated positioning
+      queryClient.invalidateQueries({ queryKey: ['generations', selectedProjectId] });
+      console.log('[ImageGalleryDebug] Invalidated generations cache after adding to shot');
+      
       return true;
     } catch (error) {
       console.error("Error adding image to target shot:", error);

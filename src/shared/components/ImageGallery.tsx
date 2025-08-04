@@ -83,6 +83,9 @@ export interface GeneratedImageWithMetadata {
   unsaved?: boolean; // Optional flag for images not saved to DB
   createdAt?: string; // Add a creation timestamp
   starred?: boolean; // Whether this generation is starred
+  shot_id?: string; // Shot association (when filtering by shot)
+  position?: number | null; // Position in shot (when filtering by shot)
+  all_shot_associations?: Array<{ shot_id: string; position: number | null }>; // All shot associations
 }
 
 interface ImageGalleryProps {

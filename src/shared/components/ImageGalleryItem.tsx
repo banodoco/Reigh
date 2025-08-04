@@ -248,6 +248,44 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   const isPlaceholder = !image.id && actualDisplayUrl === "/placeholder.svg";
   const currentTargetShotName = selectedShotIdLocal ? simplifiedShotOptions.find(s => s.id === selectedShotIdLocal)?.name : undefined;
   
+  // Check if image is already positioned in the selected shot
+  const isAlreadyPositionedInSelectedShot = useMemo(() => {
+    if (!selectedShotIdLocal || !image.id) return false;
+    
+    // Check using all_shot_associations if available, otherwise fallback to shot_id/position
+    let matchingAssociation = null;
+    
+    if (image.all_shot_associations && image.all_shot_associations.length > 0) {
+      // Find the association that matches the selected shot
+      matchingAssociation = image.all_shot_associations.find(
+        assoc => assoc.shot_id === selectedShotIdLocal
+      );
+    } else if (image.shot_id === selectedShotIdLocal) {
+      // Fallback to single shot association
+      matchingAssociation = { shot_id: image.shot_id, position: image.position };
+    }
+    
+    const isPositioned = matchingAssociation && 
+                        matchingAssociation.position !== null && 
+                        matchingAssociation.position !== undefined;
+    
+    // Debug logging for first few items
+    if (index < 3) {
+      console.log('[ImageGalleryDebug] Item positioning check:', {
+        index,
+        imageId: image.id,
+        selectedShotIdLocal,
+        imageShotId: image.shot_id,
+        imagePosition: image.position,
+        allAssociations: image.all_shot_associations,
+        matchingAssociation,
+        isPositioned
+      });
+    }
+    
+    return !!isPositioned;
+  }, [selectedShotIdLocal, image.id, image.shot_id, image.position, image.all_shot_associations, index]);
+  
   let aspectRatioPadding = '100%'; 
   let minHeight = '120px'; // Minimum height for very small images
   
@@ -510,6 +548,11 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                           size="icon"
                           className={`h-7 w-7 p-0 rounded-full bg-black/50 hover:bg-black/70 text-white ${showTickForImageId === image.id ? 'bg-green-500 hover:bg-green-600 !text-white' : ''}`}
                           onClick={async () => {
+                              // If already positioned in shot, do nothing
+                              if (isAlreadyPositionedInSelectedShot) {
+                                  return;
+                              }
+                              
                               if (!selectedShotIdLocal) {
                                   toast({ title: "Select a Shot", description: "Please select a shot first to add this image.", variant: "destructive" });
                                   return;
@@ -589,13 +632,19 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                                   setAddingToShotImageId(null);
                               }
                           }}
-                          disabled={!selectedShotIdLocal || showTickForImageId === image.id || addingToShotImageId === image.id}
-                          aria-label={showTickForImageId === image.id ? `Added to ${currentTargetShotName}` : (currentTargetShotName ? `Add to shot: ${currentTargetShotName}` : "Add to selected shot")}
+                          disabled={!selectedShotIdLocal || showTickForImageId === image.id || addingToShotImageId === image.id || isAlreadyPositionedInSelectedShot}
+                          aria-label={
+                              isAlreadyPositionedInSelectedShot ? `Already positioned in ${currentTargetShotName}` :
+                              showTickForImageId === image.id ? `Added to ${currentTargetShotName}` : 
+                              (currentTargetShotName ? `Add to shot: ${currentTargetShotName}` : "Add to selected shot")
+                          }
                           onPointerDown={(e) => e.stopPropagation()}
                       >
                           {addingToShotImageId === image.id ? (
                               <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-white"></div>
                           ) : showTickForImageId === image.id ? (
+                              <Check className="h-4 w-4" />
+                          ) : isAlreadyPositionedInSelectedShot ? (
                               <Check className="h-4 w-4" />
                           ) : (
                               <PlusCircle className="h-4 w-4" />
@@ -603,7 +652,8 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                       </Button>
                   </TooltipTrigger>
                   <TooltipContent side="bottom">
-                      {showTickForImageId === image.id ? `Added to ${currentTargetShotName || 'shot'}` :
+                      {isAlreadyPositionedInSelectedShot ? `Already positioned in ${currentTargetShotName || 'shot'}` :
+                      showTickForImageId === image.id ? `Added to ${currentTargetShotName || 'shot'}` :
                       (selectedShotIdLocal && currentTargetShotName ? `Add to: ${currentTargetShotName}` : "Select a shot then click to add")}
                   </TooltipContent>
               </Tooltip>

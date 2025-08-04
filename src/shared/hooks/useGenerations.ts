@@ -87,10 +87,13 @@ export async function fetchGenerations(
 
   if (countError) throw countError;
 
-  // Get paginated data with same filters
+  // Get paginated data with same filters, including shot associations
   let dataQuery = supabase
     .from('generations')
-    .select('*')
+    .select(`
+      *,
+      shot_generations(shot_id, position)
+    `)
     .eq('project_id', projectId);
 
   // Apply same filters to data query
@@ -118,7 +121,7 @@ export async function fetchGenerations(
 
   // Apply shot filter to data query
   if (filters?.shotId) {
-    // Use the same generation IDs from count query
+    // Get shot associations for filtering
     const { data: shotGenerations, error: sgError } = await supabase
       .from('shot_generations')
       .select('generation_id, position')
@@ -136,8 +139,18 @@ export async function fetchGenerations(
       generationIds = unpositionedIds;
     }
     
+    console.log('[ImageGalleryDebug] Shot filter applied:', {
+      shotId: filters.shotId,
+      excludePositioned: filters.excludePositioned,
+      totalFound: shotGenerations?.length || 0,
+      filteredIds: generationIds.length
+    });
+    
     if (generationIds.length > 0) {
       dataQuery = dataQuery.in('id', generationIds);
+    } else {
+      // No generations for this shot/filter combination
+      return { items: [], total: 0, hasMore: false };
     }
   }
 
@@ -147,19 +160,76 @@ export async function fetchGenerations(
   
   if (error) throw error;
 
-  const items = data?.map((item: any) => ({
-    id: item.id,
-    url: item.location,
-    thumbUrl: item.thumb_url,
-    prompt: item.params?.originalParams?.orchestrator_details?.prompt || 
-            item.params?.prompt || 
-            item.metadata?.prompt || 
-            'No prompt',
-    metadata: item.params || item.metadata || {},
-    createdAt: item.created_at,
-    isVideo: item.type?.includes('video'),
-    starred: item.starred || false,
-  })) || [];
+  const items = data?.map((item: any) => {
+    const baseItem = {
+      id: item.id,
+      url: item.location,
+      thumbUrl: item.thumb_url,
+      prompt: item.params?.originalParams?.orchestrator_details?.prompt || 
+              item.params?.prompt || 
+              item.metadata?.prompt || 
+              'No prompt',
+      metadata: item.params || item.metadata || {},
+      createdAt: item.created_at,
+      isVideo: item.type?.includes('video'),
+      starred: item.starred || false,
+    };
+    
+    // Include shot association data from LEFT JOIN
+    const shotGenerations = item.shot_generations || [];
+    
+    if (shotGenerations.length > 0) {
+      // Always include all shot associations for positioning checks
+      const allAssociations = shotGenerations.map(sg => ({
+        shot_id: sg.shot_id,
+        position: sg.position
+      }));
+      
+      // When filtering by specific shot, use that shot as primary
+      // Otherwise, use first shot as primary for backward compatibility
+      let primaryShot = shotGenerations[0];
+      
+      if (filters?.shotId) {
+        const matchingShot = shotGenerations.find(sg => sg.shot_id === filters.shotId);
+        if (matchingShot) {
+          primaryShot = matchingShot;
+        }
+      }
+      
+      const itemWithShot = {
+        ...baseItem,
+        shot_id: primaryShot.shot_id,
+        position: primaryShot.position,
+        all_shot_associations: allAssociations,
+      };
+      
+      console.log('[ImageGalleryDebug] Item with shot data (from JOIN):', {
+        itemId: item.id,
+        primaryShotId: primaryShot.shot_id,
+        primaryPosition: primaryShot.position,
+        totalShotAssociations: shotGenerations.length,
+        allAssociations,
+        filteringShotId: filters?.shotId
+      });
+      return itemWithShot;
+    }
+    
+    return baseItem;
+  }) || [];
+
+  // Debug: Show summary of shot associations
+  const itemsWithShotData = items.filter((item): item is typeof item & { shot_id: string } => 
+    'shot_id' in item && item.shot_id != null
+  );
+  console.log('[ImageGalleryDebug] Data processing summary:', {
+    totalItems: items.length,
+    itemsWithShotData: itemsWithShotData.length,
+    sampleItemsWithShots: itemsWithShotData.slice(0, 3).map(item => ({
+      id: item.id,
+      shot_id: item.shot_id,
+      position: (item as any).position
+    }))
+  });
 
   const total = count || 0;
   const hasMore = offset + limit < total;
