@@ -98,7 +98,9 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   const MAX_RETRIES = 2;
   
   // Track previous image ID to detect actual changes vs re-renders
-  const prevImageIdRef = useRef<string | undefined>(image.id);
+  // Create a stable identifier for the image
+  const imageIdentifier = image.id || `${image.url}-${image.thumbUrl}`;
+  const prevImageIdentifierRef = useRef<string>(imageIdentifier);
 
   // Handle image load error with retry mechanism
   const handleImageError = useCallback((errorEvent?: React.SyntheticEvent<HTMLImageElement | HTMLVideoElement>) => {
@@ -135,22 +137,26 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
 
   // Reset error state when URL changes (new image)
   useEffect(() => {
-    // Only reset if this is actually a different image
-    if (prevImageIdRef.current === image.id && actualSrc !== null) {
-      return; // Same image, don't reset
+    // Log if image.id is undefined
+    if (index < 3 && !image.id) {
+      console.warn(`[ImageGalleryItem-${index}] Image has no ID!`, image);
     }
     
-    prevImageIdRef.current = image.id;
+    // Check if this is actually a new image
+    if (prevImageIdentifierRef.current === imageIdentifier) {
+      return; // Same image ID, don't reset
+    }
     
     if (index < 3) {
       console.log(`[ImageGalleryItem-${index}] Image changed, resetting state`, {
-        oldSrc: actualSrc,
-        newUrl: displayUrl,
-        imageId: image.id,
-        imageUrl: image.url,
-        imageThumbUrl: image.thumbUrl
+        prevId: prevImageIdentifierRef.current,
+        newId: imageIdentifier
       });
     }
+    
+    // Update the ref AFTER logging
+    prevImageIdentifierRef.current = imageIdentifier;
+    
     setImageLoadError(false);
     setImageRetryCount(0);
     // Check if the new image is already cached using centralized function
@@ -162,7 +168,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
     }
     // CRITICAL: Reset actualSrc so the loading effect can run for the new image
     setActualSrc(null);
-  }, [displayUrl, image.id, image.url, image.thumbUrl]); // Use specific props instead of entire object
+  }, [imageIdentifier]); // Only reset when image ID changes
 
   // Progressive loading: only set src when shouldLoad is true
   const [actualSrc, setActualSrc] = useState<string | null>(null);
