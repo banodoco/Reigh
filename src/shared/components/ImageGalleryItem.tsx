@@ -339,6 +339,13 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                     onError={handleImageError}
                     onLoadStart={() => setImageLoading(true)}
                     onLoadedData={() => {
+                      if (index < 3) {
+                        console.log(`[ImageGalleryItem-${index}] Video loaded (visible element)`, {
+                          imageId: image.id,
+                          src: actualSrc,
+                          imageLoaded
+                        });
+                      }
                       setImageLoading(false);
                       setImageLoaded(true);
                     }}
@@ -349,16 +356,24 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                 />
               ) : (
                 <>
-                  {/* Hidden video for background loading when shouldLoad is false */}
-                  {!shouldLoad && actualSrc && (
+                  {/* Hidden video for background loading - always render to ensure loading happens */}
+                  {actualSrc && !imageLoaded && (
                     <video
                       src={actualSrc}
                       style={{ display: 'none' }}
+                      onLoadStart={() => setImageLoading(true)}
                       onLoadedData={() => {
+                        if (index < 3) {
+                          console.log(`[ImageGalleryItem-${index}] Video loaded (hidden element)`, {
+                            imageId: image.id,
+                            src: actualSrc
+                          });
+                        }
                         setImageLoading(false);
                         setImageLoaded(true);
                       }}
                       onError={handleImageError}
+                      onAbort={() => setImageLoading(false)}
                     />
                   )}
                   {/* Video loading skeleton - only show if video hasn't loaded yet */}
