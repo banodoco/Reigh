@@ -143,7 +143,10 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
     // Check if the new image is already cached using centralized function
     const isNewImageCached = isImageCached(image);
     setImageLoaded(isNewImageCached);
-    setImageLoading(false);
+    // Only set loading to false if not cached (if cached, we never start loading)
+    if (!isNewImageCached) {
+      setImageLoading(false);
+    }
     // CRITICAL: Reset actualSrc so the loading effect can run for the new image
     setActualSrc(null);
   }, [displayUrl, image]);
@@ -177,7 +180,10 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
         return;
       }
       
-      setImageLoading(true);
+      // Only set loading if the image isn't already cached/loaded
+      if (!isImageCached(image)) {
+        setImageLoading(true);
+      }
       // Small delay to ensure priority images start loading first
       const delay = isPriority ? 0 : 50;
       
@@ -337,7 +343,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                     />
                   )}
                   {/* Video loading skeleton - only show if video hasn't loaded yet */}
-                  {(!imageLoaded || imageLoading) && (
+                  {!imageLoaded && (
                     <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-gray-200 animate-pulse">
                       <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-gray-400"></div>
                     </div>
@@ -409,7 +415,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
               
               {/* Show skeleton only while the media is still loading */}
               {/* Only show skeleton if image hasn't loaded yet - never show it for already-loaded images */}
-              {(!imageLoaded || imageLoading) && (
+              {!imageLoaded && (
                 index < 3 && console.log(`[ImageGalleryItem-${index}] Showing skeleton`, {
                   imageId: image.id,
                   imageLoaded,
