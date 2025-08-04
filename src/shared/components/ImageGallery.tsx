@@ -370,6 +370,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   // Previous page images for smooth transitions
   const [previousPageImages, setPreviousPageImages] = useState<GeneratedImageWithMetadata[]>([]);
   const [isTransitioning, setIsTransitioning] = useState<boolean>(false);
+  const [transitionDirection, setTransitionDirection] = useState<'next' | 'prev'>('next');
   
   // Progressive loading state - will be defined after paginatedImages
 
@@ -709,6 +710,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     // Capture current images for smooth transition (only if there are current images)
     if (currentPaginatedImagesRef.current.length > 0) {
       setPreviousPageImages(currentPaginatedImagesRef.current);
+      setTransitionDirection(direction);
       setIsTransitioning(true);
     }
     
@@ -1102,11 +1104,15 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
              </div>
           )}
 
-          {(paginatedImages.length > 0 || (isTransitioning && previousPageImages.length > 0)) && (
-            <div className="relative">
+          {(paginatedImages.length > 0 || previousPageImages.length > 0) && (
+            <div className="relative overflow-hidden">
               {/* Previous page images (shown during transition) */}
-              {isTransitioning && previousPageImages.length > 0 && (
-                <div className={`grid ${reducedSpacing ? 'gap-2 sm:gap-4' : 'gap-4'} ${reducedSpacing ? 'mb-4' : 'mb-12'} ${gridColumnClasses} transition-opacity duration-300 ${isTransitioning ? 'opacity-100' : 'opacity-0'}`}>
+              {previousPageImages.length > 0 && (
+                <div className={`grid ${reducedSpacing ? 'gap-2 sm:gap-4' : 'gap-4'} ${reducedSpacing ? 'mb-4' : 'mb-12'} ${gridColumnClasses} transition-all duration-300 ease-out ${
+                  !isTransitioning 
+                    ? `${transitionDirection === 'next' ? '-translate-x-full' : 'translate-x-full'} opacity-0` 
+                    : 'translate-x-0 opacity-100'
+                }`}>
                   {previousPageImages.map((image, index) => (
                     <ImageGalleryItem
                       key={`prev-${image.id || `image-${index}`}`}
@@ -1144,7 +1150,11 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
               
               {/* Current page images */}
               {paginatedImages.length > 0 && (
-                <div className={`grid ${reducedSpacing ? 'gap-2 sm:gap-4' : 'gap-4'} ${reducedSpacing ? 'mb-4' : 'mb-12'} ${gridColumnClasses} ${isTransitioning ? 'absolute inset-0' : ''} transition-all duration-300 ease-out ${isTransitioning ? 'opacity-0 translate-y-2' : 'opacity-100 translate-y-0'}`}>
+                <div className={`grid ${reducedSpacing ? 'gap-2 sm:gap-4' : 'gap-4'} ${reducedSpacing ? 'mb-4' : 'mb-12'} ${gridColumnClasses} ${previousPageImages.length > 0 ? 'absolute inset-0' : ''} transition-all duration-300 ease-out ${
+                  isTransitioning 
+                    ? `${transitionDirection === 'next' ? 'translate-x-full' : '-translate-x-full'} opacity-0` 
+                    : 'translate-x-0 opacity-100'
+                }`}>
                   {paginatedImages.map((image, index) => {
                     const shouldShow = showImageIndices.has(index);
                     const isPriority = index < 10; // First 10 images are priority
