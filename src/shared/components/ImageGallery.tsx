@@ -367,8 +367,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   const [loadingButton, setLoadingButton] = useState<'prev' | 'next' | null>(null);
   // Gallery loading state - when true, all images show loading skeletons
   const [isGalleryLoading, setIsGalleryLoading] = useState<boolean>(false);
-  // Simple fade transition
-  const [isTransitioning, setIsTransitioning] = useState<boolean>(false);
+
   
   // Progressive loading state - will be defined after paginatedImages
 
@@ -384,12 +383,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   // When filters change, reset to first page (debounced to avoid rapid state changes)
   React.useEffect(() => {
     const timer = setTimeout(() => setPage(0), 10);
-    // Clear any ongoing transitions when filters change to prevent conflicts
-    if (isTransitioning) {
-      setIsTransitioning(false);
-    }
     return () => clearTimeout(timer);
-  }, [filterByToolType, mediaTypeFilter, searchTerm, showStarredOnly, isTransitioning]);
+  }, [filterByToolType, mediaTypeFilter, searchTerm, showStarredOnly]);
 
   // Progressive loading state cleanup is now handled by the useProgressiveImageLoading hook
 
@@ -703,12 +698,9 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   
   // Handle pagination with loading state
   const handlePageChange = React.useCallback((newPage: number, direction: 'prev' | 'next', fromBottom = false) => {
-    if (loadingButton || isTransitioning) return; // Prevent multiple clicks while any button is loading or transitioning
+    if (loadingButton) return; // Prevent multiple clicks while any button is loading
     
     setLoadingButton(direction);
-    
-    // Simple transition fade
-    setIsTransitioning(true);
     
     // Smart loading state: only show gallery loading for non-adjacent pages or when preloading is disabled
     const currentPageNum = isServerPagination ? (serverPage || 1) - 1 : page;
@@ -794,13 +786,6 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
       // Only reset gallery loading if it was actually set (for distant page jumps)
       // Adjacent pages might not have set it in the first place
       setIsGalleryLoading(false);
-      
-      // Simple transition - just fade in
-      if (isTransitioning) {
-        setTimeout(() => {
-          setIsTransitioning(false);
-        }, 200); // Quick fade
-      }
     },
   });
     
@@ -1095,7 +1080,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
           )}
 
           {paginatedImages.length > 0 && (
-            <div className={`transition-opacity duration-200 ease-out ${isTransitioning ? 'opacity-60' : 'opacity-100'}`}>
+            <div>
               <div className={`grid ${reducedSpacing ? 'gap-2 sm:gap-4' : 'gap-4'} ${reducedSpacing ? 'mb-4' : 'mb-12'} ${gridColumnClasses}`}>
                 {paginatedImages.map((image, index) => {
                   const shouldShow = showImageIndices.has(index);
