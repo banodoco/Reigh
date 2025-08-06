@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, Suspense, useMemo, useLayoutEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { SteerableMotionSettings } from '../components/ShotEditor';
+import { SteerableMotionSettings, DEFAULT_STEERABLE_MOTION_SETTINGS } from '../components/ShotEditor/state/types';
 import { useCreateShot, useHandleExternalImageDrop, useUpdateShotName } from '@/shared/hooks/useShots';
 import { useShots } from '@/shared/contexts/ShotsContext';
 import { Shot } from '@/types/shots';
@@ -310,21 +310,7 @@ const VideoTravelToolPage: React.FC = () => {
     }
   }, [isLoading, shots, selectedShot, location.pathname, location.search, location.hash, navigate]);
   
-  const [steerableMotionSettings, setSteerableMotionSettings] = useState<SteerableMotionSettings>({
-    negative_prompt: '',
-    model_name: 'vace_14B',
-    seed: 789,
-    debug: true,
-    apply_reward_lora: false,
-    colour_match_videos: true,
-    apply_causvid: true,
-    use_lighti2x_lora: false,
-    fade_in_duration: '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
-    fade_out_duration: '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
-    after_first_post_generation_saturation: 1,
-    after_first_post_generation_brightness: 0,
-    show_input_images: false,
-  });
+  const [steerableMotionSettings, setSteerableMotionSettings] = useState<SteerableMotionSettings>(DEFAULT_STEERABLE_MOTION_SETTINGS);
 
   const hasLoadedInitialSettings = useRef(false);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -426,21 +412,7 @@ const VideoTravelToolPage: React.FC = () => {
       setVideoPairConfigs(settingsToApply.pairConfigs || []);
       setGenerationMode(settingsToApply.generationMode === 'by-pair' ? 'batch' : (settingsToApply.generationMode || 'batch'));
       setPairConfigs(settingsToApply.pairConfigs || []);
-      setSteerableMotionSettings(settingsToApply.steerableMotionSettings || {
-    negative_prompt: '',
-    model_name: 'vace_14B',
-    seed: 789,
-    debug: true,
-    apply_reward_lora: false,
-    colour_match_videos: true,
-    apply_causvid: true,
-    use_lighti2x_lora: false,
-    fade_in_duration: '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
-    fade_out_duration: '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
-    after_first_post_generation_saturation: 1,
-    after_first_post_generation_brightness: 0,
-    show_input_images: false,
-  });
+      setSteerableMotionSettings(settingsToApply.steerableMotionSettings || DEFAULT_STEERABLE_MOTION_SETTINGS);
     }
   }, [settings, isLoadingSettings, selectedShot?.id, updateSettings]);
 
@@ -879,21 +851,7 @@ const VideoTravelToolPage: React.FC = () => {
               onCustomWidthChange={handleCustomWidthChange}
               customHeight={isLoadingSettings ? undefined : customHeight}
               onCustomHeightChange={handleCustomHeightChange}
-              steerableMotionSettings={isLoadingSettings ? {
-                negative_prompt: '',
-                model_name: 'vace_14B',
-                seed: 789,
-                debug: true,
-                apply_reward_lora: false,
-                colour_match_videos: true,
-                apply_causvid: true,
-                use_lighti2x_lora: false,
-                fade_in_duration: '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
-                fade_out_duration: '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
-                after_first_post_generation_saturation: 1,
-                after_first_post_generation_brightness: 0,
-                show_input_images: false,
-              } : steerableMotionSettings}
+              steerableMotionSettings={isLoadingSettings ? DEFAULT_STEERABLE_MOTION_SETTINGS : steerableMotionSettings}
               onSteerableMotionSettingsChange={isLoadingSettings ? noOpCallback : handleSteerableMotionSettingsChange}
               onGenerateAllSegments={noOpCallback}
               // LoRA props removed - now managed internally by ShotEditor

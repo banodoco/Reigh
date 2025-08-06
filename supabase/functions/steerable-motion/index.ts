@@ -20,6 +20,9 @@ const ASPECT_RATIO_TO_RESOLUTION: Record<string, string> = {
 
 const DEFAULT_ASPECT_RATIO = "1:1";
 
+// Default steerable motion settings
+const DEFAULT_COLOUR_MATCH_VIDEOS = false;
+
 // Initialize Supabase client
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -182,7 +185,7 @@ serve(async (req) => {
       seed_base: body.seed ?? 789,
       steps: stepsValue,
       apply_reward_lora: body.apply_reward_lora ?? false,
-      colour_match_videos: body.colour_match_videos ?? true,
+      colour_match_videos: body.colour_match_videos ?? DEFAULT_COLOUR_MATCH_VIDEOS,
       apply_causvid: body.apply_causvid ?? true,
       use_lighti2x_lora: body.use_lighti2x_lora ?? false,
       fade_in_params_json_str: typeof body.fade_in_duration === "object" && body.fade_in_duration !== null

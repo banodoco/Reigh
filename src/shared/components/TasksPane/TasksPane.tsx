@@ -4,7 +4,7 @@ import { useRenderLogger } from '@/shared/hooks/useRenderLogger';
 import TaskList from './TaskList';
 import { cn } from '@/shared/lib/utils'; // For conditional classnames
 import { Button } from '@/shared/components/ui/button'; // For the lock button
-import { LockIcon, UnlockIcon, ChevronLeft, ChevronRight } from 'lucide-react'; // Example icons
+import { LockIcon, UnlockIcon, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'; // Example icons
 import { useSlidingPane } from '@/shared/hooks/useSlidingPane';
 import { usePanes } from '@/shared/contexts/PanesContext';
 import PaneControlTab from '../PaneControlTab';
@@ -319,8 +319,16 @@ export const TasksPane: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
                 size="sm"
                 onClick={handleCancelAllPending}
                 disabled={cancelAllPendingMutation.isPending || cancellableTaskCount === 0}
+                className="flex items-center gap-2"
               >
-                {cancelAllPendingMutation.isPending ? 'Cancelling All...' : 'Cancel All'}
+                {cancelAllPendingMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Cancel All
+                  </>
+                ) : (
+                  'Cancel All'
+                )}
               </Button>
           </div>
           

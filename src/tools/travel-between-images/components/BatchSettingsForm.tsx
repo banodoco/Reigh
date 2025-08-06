@@ -10,7 +10,7 @@ import { ChevronsUpDown, Info } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from "@/shared/components/ui/radio-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/components/ui/tooltip";
 import { Checkbox } from "@/shared/components/ui/checkbox";
-import { SteerableMotionSettings } from './ShotEditor';
+import { SteerableMotionSettings, DEFAULT_STEERABLE_MOTION_SETTINGS } from './ShotEditor/state/types';
 import { Project } from '@/types/project';
 import { ASPECT_RATIO_TO_RESOLUTION } from '@/shared/lib/aspectRatios';
 import { ActiveLora } from '@/shared/components/ActiveLoRAsDisplay';
@@ -308,7 +308,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                   <div className="flex items-center space-x-2">
                     <Switch
                       id="debug"
-                      checked={steerableMotionSettings.debug ?? true}
+                      checked={steerableMotionSettings.debug ?? DEFAULT_STEERABLE_MOTION_SETTINGS.debug}
                       onCheckedChange={(v) => onSteerableMotionSettingsChange({ debug: v })}
                     />
                     <Label htmlFor="debug">Debug Mode</Label>

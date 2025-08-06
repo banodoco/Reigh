@@ -21,7 +21,7 @@ import { useShots } from '@/shared/contexts/ShotsContext';
 import SettingsModal from '@/shared/components/SettingsModal';
 
 // Import modular components and hooks
-import { ShotEditorProps, GenerationsPaneSettings } from './state/types';
+import { ShotEditorProps, GenerationsPaneSettings, DEFAULT_STEERABLE_MOTION_SETTINGS } from './state/types';
 import { useShotEditorState } from './state/useShotEditorState';
 import { useGenerationActions } from './hooks/useGenerationActions';
 import { useLoraSync } from './hooks/useLoraSync';
@@ -272,7 +272,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       onSteerableMotionSettingsChange({ seed: newSeed });
     } else {
       // Set to default seed
-      onSteerableMotionSettingsChange({ seed: 789 });
+      onSteerableMotionSettingsChange({ seed: DEFAULT_STEERABLE_MOTION_SETTINGS.seed });
     }
   }, [setRandomSeed, onSteerableMotionSettingsChange]);
 
@@ -528,17 +528,17 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       model_name: steerableMotionSettings.model_name,
       seed: steerableMotionSettings.seed,
       steps: batchVideoSteps,
-      debug: steerableMotionSettings.debug,
-      // Force these settings to false always, except apply_causvid which follows accelerated mode
-      apply_reward_lora: false,
+      debug: steerableMotionSettings.debug ?? DEFAULT_STEERABLE_MOTION_SETTINGS.debug,
+      // Force these settings to consistent defaults, except apply_causvid which follows accelerated mode
+      apply_reward_lora: DEFAULT_STEERABLE_MOTION_SETTINGS.apply_reward_lora,
       apply_causvid: accelerated,
-      use_lighti2x_lora: false,
-      show_input_images: false,
-      colour_match_videos: steerableMotionSettings.colour_match_videos ?? true,
-      fade_in_duration: steerableMotionSettings.fade_in_duration,
-      fade_out_duration: steerableMotionSettings.fade_out_duration,
-      after_first_post_generation_saturation: steerableMotionSettings.after_first_post_generation_saturation,
-      after_first_post_generation_brightness: steerableMotionSettings.after_first_post_generation_brightness,
+      use_lighti2x_lora: DEFAULT_STEERABLE_MOTION_SETTINGS.use_lighti2x_lora,
+      show_input_images: DEFAULT_STEERABLE_MOTION_SETTINGS.show_input_images,
+      colour_match_videos: DEFAULT_STEERABLE_MOTION_SETTINGS.colour_match_videos, // Force to false, ignore saved settings
+      fade_in_duration: steerableMotionSettings.fade_in_duration ?? DEFAULT_STEERABLE_MOTION_SETTINGS.fade_in_duration,
+      fade_out_duration: steerableMotionSettings.fade_out_duration ?? DEFAULT_STEERABLE_MOTION_SETTINGS.fade_out_duration,
+      after_first_post_generation_saturation: steerableMotionSettings.after_first_post_generation_saturation ?? DEFAULT_STEERABLE_MOTION_SETTINGS.after_first_post_generation_saturation,
+      after_first_post_generation_brightness: steerableMotionSettings.after_first_post_generation_brightness ?? DEFAULT_STEERABLE_MOTION_SETTINGS.after_first_post_generation_brightness,
       enhance_prompt: enhancePrompt,
       openai_api_key: enhancePrompt ? openaiApiKey : '',
       // Save UI state settings

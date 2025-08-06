@@ -156,10 +156,6 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
             <div className="overflow-y-auto pr-2 space-y-6" style={{ maxHeight: 'calc(80vh - 140px)' }}>
               {/* Generation Summary Section */}
               <div className="space-y-3">
-                <div className="flex items-center space-x-2">
-                  <div className="w-2 h-2 bg-primary rounded-full"></div>
-                  <h3 className="text-lg font-semibold text-foreground">Generation Summary</h3>
-                </div>
                 <div className="space-y-4 p-4 bg-muted/30 rounded-lg border">
                   {/* Input Images Section - Inside Generation Summary */}
                   {inputImages.length > 0 && (() => {
@@ -326,7 +322,6 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-primary rounded-full"></div>
                     <h3 className="text-lg font-semibold text-foreground">Detailed Task Parameters</h3>
                   </div>
                   <Button

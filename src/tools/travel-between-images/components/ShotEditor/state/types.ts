@@ -52,6 +52,23 @@ export interface SteerableMotionSettings {
   show_input_images: boolean;
 }
 
+// Default values for steerable motion settings - single source of truth
+export const DEFAULT_STEERABLE_MOTION_SETTINGS: SteerableMotionSettings = {
+  negative_prompt: '',
+  model_name: 'vace_14B',
+  seed: 789,
+  debug: true,
+  apply_reward_lora: false,
+  colour_match_videos: false,
+  apply_causvid: true,
+  use_lighti2x_lora: false,
+  fade_in_duration: '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
+  fade_out_duration: '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
+  after_first_post_generation_saturation: 1,
+  after_first_post_generation_brightness: 0,
+  show_input_images: false,
+};
+
 // Shot settings interface
 export interface ShotSettings {
   videoControlMode: 'individual' | 'batch';

@@ -117,7 +117,7 @@ serve(async (req) => {
     const orchestratorPayload: Record<string, unknown> = {
       run_id: runId,
       prompt: body.prompt,
-      model: body.model_name ?? "t2v",
+      model: body.model_name ?? "vace_14B",
       resolution: finalResolution,
       seed: body.seed ?? 11111,
       negative_prompt: body.negative_prompt ?? "",
