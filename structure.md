@@ -194,11 +194,25 @@ tool-name/
 
 #### Recent Architecture Updates
 
-**Task Queue Refactor (Latest):**
+**Generation Method Preferences (Latest):**
+- **User Control**: Users can now choose whether to allow cloud processing, local processing, or both via Settings Modal
+- **Database Storage**: Preferences stored in `users.settings.ui.generationMethods` (onComputer/inCloud booleans)
+- **Task Filtering**: `claim_next_task` Edge Function respects preferences:
+  - Service role path (cloud): Only claims tasks from users who allow cloud processing (`inCloud: true`)
+  - PAT path (local): Only claims tasks for users who allow local processing (`onComputer: true`)
+- **Default Behavior**: Both options enabled by default for backward compatibility
+
+**Task Queue Refactor:**
 - **New Hook**: Added `useTaskQueueNotifier` to `src/shared/hooks/` for centralized task creation with realtime feedback
 - **Enhanced UX**: Replaced individual `useCreateTask` patterns across Image Generation and Video Travel tools
 - **Better Monitoring**: Added comprehensive debug logging throughout task lifecycle for improved troubleshooting
 - **UI Improvements**: TasksPane now shows "Cancel All" button consistently (disabled when no cancellable tasks)
+
+**Image Generation Form UX:**
+- **Collapsible Form**: Image generation form can now be collapsed/expanded to save screen space
+- **Persistent State**: Form expand/collapse state is saved per project via `usePersistentToolState`
+- **Visual Design**: Collapsed state shows gradient button with animated sparkles, similar to AI Prompt section in PromptEditorModal
+- **Sticky UI**: When collapsed, form toggle button sticks to top of screen while scrolling; clicking expands form and scrolls to it
 
 ---
 

@@ -35,9 +35,11 @@ src/tools/image-generation/
 ### `ImageGenerationForm.tsx`
 **Simplified generation form**
 - **Inputs**: Prompts, images-per-prompt, before/after prompt text
-- **Features**: Wan LoRA picker integration
+- **Features**: Wan LoRA picker integration, collapsible form UI
 - **Removed**: ControlNet sliders, starting-image inputs
-- **State**: Persistent via `usePersistentToolState`
+- **State**: Persistent via `usePersistentToolState` (including form expand/collapse state)
+- **UX**: Form can be collapsed to save space, state persisted per project
+- **Sticky UI**: When collapsed, shows sticky button that attaches to top of screen while scrolling
 
 ### `PromptGenerationControls.tsx`
 **AI-powered prompt management interface**

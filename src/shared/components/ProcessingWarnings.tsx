@@ -15,6 +15,11 @@ interface ProcessingWarningsProps {
 export const GlobalProcessingWarning: React.FC<ProcessingWarningsProps> = ({ onOpenSettings }) => {
   const { balance, isLoadingBalance } = useCredits();
   const { tokens, isLoading: isLoadingTokens } = useApiTokens();
+  
+  // TEMPORARY: Use localStorage to prevent blocking during initial app load
+  // ProcessingWarnings renders early in Layout.tsx and was causing ProjectContext timeout
+  // when using useUserUIState (database calls during critical loading phase)
+  // TODO: Sync with database preferences after app has fully loaded
   const [inCloudChecked, setInCloudChecked] = usePersistentState<boolean>("generation-in-cloud", true);
   const [onComputerChecked] = usePersistentState<boolean>("generation-on-computer", true);
   
@@ -129,6 +134,8 @@ interface TasksPaneProcessingWarningProps {
 export const TasksPaneProcessingWarning: React.FC<ProcessingWarningsProps> = ({ onOpenSettings }) => {
   const { balance } = useCredits();
   const { tokens } = useApiTokens();
+  
+  // TEMPORARY: Use localStorage to prevent blocking during app initialization
   const [inCloudChecked] = usePersistentState<boolean>("generation-in-cloud", true);
 
   const hasCredits = balance && balance.balance > 0;

@@ -229,6 +229,28 @@ serve(async (req) => {
         return credits;
       }
 
+      // Cache for user generation preferences
+      const userGenerationPrefsCache = new Map<string, { onComputer: boolean; inCloud: boolean }>();
+      
+      async function getUserGenerationPreferences(userId: string): Promise<{ onComputer: boolean; inCloud: boolean }> {
+        if (userGenerationPrefsCache.has(userId)) return userGenerationPrefsCache.get(userId)!;
+        
+        const { data } = await supabaseAdmin
+          .from("users")
+          .select("settings")
+          .eq("id", userId)
+          .single();
+        
+        const generationMethods = data?.settings?.ui?.generationMethods;
+        const prefs = {
+          onComputer: generationMethods?.onComputer ?? true,  // Default to true
+          inCloud: generationMethods?.inCloud ?? true        // Default to true
+        };
+        
+        userGenerationPrefsCache.set(userId, prefs);
+        return prefs;
+      }
+
       // Get all queued tasks and manually check dependencies
       const statusFilter = includeActive ? ["Queued", "In Progress"] : ["Queued"];
       const { data: eligibleTasks, error: findError } = await supabaseAdmin
@@ -303,6 +325,14 @@ serve(async (req) => {
           }
           
           if (taskOwnerId) {
+            // Check if user allows cloud processing (service role path)
+            const userPrefs = await getUserGenerationPreferences(taskOwnerId);
+            if (!userPrefs.inCloud) {
+              // Skip this task – user doesn't allow cloud processing
+              console.log(`⚠️ Skipping task ${task.id} - user ${taskOwnerId} doesn't allow cloud processing`);
+              continue;
+            }
+
             // Check if user has credits
             const userCredits = await getUserCredits(taskOwnerId);
             if (userCredits <= 0) {
@@ -554,6 +584,23 @@ serve(async (req) => {
               console.log(`User ${callerId} already has ${inProgressCount} tasks In Progress – at limit.`);
               rpcResponse = { data: [], error: null };
             } else {
+              // Check if user allows local processing (PAT path)
+              const { data: userData } = await supabaseAdmin
+                .from("users")
+                .select("settings")
+                .eq("id", callerId)
+                .single();
+              
+              const generationMethods = userData?.settings?.ui?.generationMethods;
+              const userPrefs = {
+                onComputer: generationMethods?.onComputer ?? true,  // Default to true
+                inCloud: generationMethods?.inCloud ?? true        // Default to true
+              };
+              
+              if (!userPrefs.onComputer) {
+                console.log(`⚠️ User ${callerId} doesn't allow local processing - no tasks for PAT path`);
+                rpcResponse = { data: [], error: null };
+              } else {
               // Get queued tasks for user projects and manually check dependencies
               console.log(`DEBUG: Finding eligible tasks with dependency checking for ${projectIds.length} projects`);
               
@@ -656,6 +703,7 @@ serve(async (req) => {
             }
           }
         }
+        } // Close the generation preference check
       } catch (e) {
         console.error("Error claiming user task:", e);
         rpcResponse = { data: [], error: null };

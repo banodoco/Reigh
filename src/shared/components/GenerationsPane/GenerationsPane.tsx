@@ -16,6 +16,7 @@ import { SkeletonGallery } from '@/shared/components/ui/skeleton-gallery';
 import { ShotFilter } from '@/shared/components/ShotFilter';
 import { useGenerationsPageLogic } from '@/shared/hooks/useGenerationsPageLogic';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
+
 import { 
   Select,
   SelectContent,
@@ -33,8 +34,9 @@ export const GenerationsPane: React.FC = () => {
   const location = useLocation();
   const queryClient = useQueryClient();
   
-  // Check if we're on the generations page
+  // Check if we're on the generations page or image generation tool page
   const isOnGenerationsPage = location.pathname === '/generations';
+  const isOnImageGenerationPage = location.pathname === '/tools/image-generation';
   
   const isMobile = useIsMobile();
 
@@ -69,6 +71,8 @@ export const GenerationsPane: React.FC = () => {
     itemsPerPage: GENERATIONS_PER_PAGE,
     mediaType: mediaTypeFilter
   });
+
+
 
   // Log every render with item count & page for loop detection
   useRenderLogger('GenerationsPane', { page, totalItems: totalCount });
@@ -189,17 +193,17 @@ export const GenerationsPane: React.FC = () => {
     setIsGenerationsPaneOpen(isOpen);
   }, [isOpen, setIsGenerationsPaneOpen]);
 
-  // Close the pane when navigating to generations page
+  // Close the pane when navigating to generations page or image generation tool page
   useEffect(() => {
-    if (isOnGenerationsPage && (isOpen || isLocked)) {
+    if ((isOnGenerationsPage || isOnImageGenerationPage) && (isOpen || isLocked)) {
       setIsGenerationsPaneLocked(false);
     }
-  }, [isOnGenerationsPage, isOpen, isLocked, setIsGenerationsPaneLocked]);
+  }, [isOnGenerationsPage, isOnImageGenerationPage, isOpen, isLocked, setIsGenerationsPaneLocked]);
 
   return (
     <>
-      {/* Hide the control tab when on the generations page */}
-      {!isOnGenerationsPage && (
+      {/* Hide the control tab when on the generations page or image generation tool page */}
+      {!isOnGenerationsPage && !isOnImageGenerationPage && (
         <PaneControlTab
           side="bottom"
           isLocked={isLocked}
@@ -216,9 +220,9 @@ export const GenerationsPane: React.FC = () => {
           thirdButton={{
             onClick: () => {
               setIsGenerationsPaneLocked(false); // Unlock and close the pane immediately
-              navigate('/generations'); // Then navigate to generations page
+              navigate('/tools/image-generation?formCollapsed=true'); // Navigate with collapsed form parameter
             },
-            ariaLabel: "Open Generations page"
+            ariaLabel: "Open Image Generation Tool"
           }}
         />
       )}

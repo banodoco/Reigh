@@ -34,6 +34,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/shared/components/ui/tooltip";
+import { useUserUIState } from "@/shared/hooks/useUserUIState";
 import CreditsManagement from "./CreditsManagement";
 
 interface SettingsModalProps {
@@ -83,9 +84,15 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   // Computer type preference (persistent)
   const [computerType, setComputerType] = usePersistentState<string>("computer-type", "linux");
   
-  // Generation method preferences (persistent)
-  const [onComputerChecked, setOnComputerChecked] = usePersistentState<boolean>("generation-on-computer", true);
-  const [inCloudChecked, setInCloudChecked] = usePersistentState<boolean>("generation-in-cloud", true);
+  // Generation method preferences (database-backed)
+  const { 
+    value: generationMethods, 
+    update: updateGenerationMethods, 
+    isLoading: isLoadingGenerationMethods 
+  } = useUserUIState('generationMethods', { onComputer: true, inCloud: true });
+  
+  const onComputerChecked = generationMethods.onComputer;
+  const inCloudChecked = generationMethods.inCloud;
 
   // Copy command feedback states
   const [copiedInstallCommand, setCopiedInstallCommand] = useState(false);
@@ -318,40 +325,49 @@ python headless.py --db-type supabase \\
                 <h3 className="font-semibold">How would you like to generate?</h3>
               )}
               
-              <div className="space-y-3">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="in-cloud"
-                    checked={inCloudChecked}
-                    onCheckedChange={(checked) => setInCloudChecked(checked === true)}
-                  />
-                  <label
-                    htmlFor="in-cloud"
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                  >
-                    In the cloud
-                  </label>
+              {isLoadingGenerationMethods ? (
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-2 opacity-50">
+                    <div className="w-4 h-4 border-2 border-gray-300 rounded"></div>
+                    <span className="text-sm text-muted-foreground">Loading preferences...</span>
+                  </div>
                 </div>
-                
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="on-computer"
-                    checked={onComputerChecked}
-                    onCheckedChange={(checked) => setOnComputerChecked(checked === true)}
-                  />
-                  <label
-                    htmlFor="on-computer"
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                  >
-                    On my computer
-                  </label>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="in-cloud"
+                      checked={inCloudChecked}
+                      onCheckedChange={(checked) => updateGenerationMethods({ inCloud: checked === true })}
+                    />
+                    <label
+                      htmlFor="in-cloud"
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    >
+                      In the cloud
+                    </label>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="on-computer"
+                      checked={onComputerChecked}
+                      onCheckedChange={(checked) => updateGenerationMethods({ onComputer: checked === true })}
+                    />
+                    <label
+                      htmlFor="on-computer"
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    >
+                      On my computer
+                    </label>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
             {/* Right column: GIF */}
             <div className="flex justify-start items-start">
-              {!onComputerChecked && !inCloudChecked && (
+              {!isLoadingGenerationMethods && !onComputerChecked && !inCloudChecked && (
                 <img
                   src="https://wczysqzxlwdndgxitrvc.supabase.co/storage/v1/object/public/image_uploads/files/ds.gif"
                   alt="Choose generation method"
@@ -363,8 +379,16 @@ python headless.py --db-type supabase \\
         </div>
 
         <div className={`space-y-8 ${isMobile ? 'pb-8' : 'pb-4'}`}>
+          {/* Loading state for generation sections */}
+          {isLoadingGenerationMethods && (
+            <div className="text-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <p className="text-muted-foreground">Loading your generation preferences...</p>
+            </div>
+          )}
+
           {/* Credits Management Section */}
-          {inCloudChecked && (
+          {!isLoadingGenerationMethods && inCloudChecked && (
             <div className="space-y-4">
               <div className="flex items-center gap-2 mb-2">
                 <Coins className="w-6 h-6 text-blue-600" />
@@ -375,7 +399,7 @@ python headless.py --db-type supabase \\
           )}
 
           {/* Local Generation Section */}
-          {onComputerChecked && (
+          {!isLoadingGenerationMethods && onComputerChecked && (
             <div className="space-y-4">
               <div className="flex items-center gap-2 mb-2">
                 <Monitor className="w-6 h-6 text-green-600" />
@@ -501,8 +525,7 @@ python headless.py --db-type supabase \\
                               <button
                                 className="text-blue-600 hover:text-blue-700 underline font-medium transition-colors duration-200 hover:bg-blue-50 px-1 py-0.5 rounded"
                                 onClick={() => {
-                                  setOnComputerChecked(false);
-                                  setInCloudChecked(true);
+                                  updateGenerationMethods({ onComputer: false, inCloud: true });
                                 }}
                               >
                                 Process in the cloud

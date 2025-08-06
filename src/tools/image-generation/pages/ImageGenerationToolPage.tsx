@@ -12,7 +12,7 @@ import { useProject } from "@/shared/contexts/ProjectContext";
 import { uploadImageToStorage } from '@/shared/lib/imageUploader';
 import { nanoid } from 'nanoid';
 import { useGenerations, useDeleteGeneration, useUpdateGenerationLocation, GenerationsPaginatedResponse } from "@/shared/hooks/useGenerations";
-import { Settings } from "lucide-react";
+
 import { useApiKeys } from '@/shared/hooks/useApiKeys';
 import { useTaskQueueNotifier } from '@/shared/hooks/useTaskQueueNotifier';
 import { useQueryClient } from '@tanstack/react-query';
@@ -30,6 +30,10 @@ import { preloadImagesWithCancel, initializePrefetchOperations, cleanupOldPagina
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 import { ShotFilter } from '@/shared/components/ShotFilter';
 import { SkeletonGallery } from '@/shared/components/ui/skeleton-gallery';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/shared/components/ui/collapsible';
+import { ChevronDown, ChevronRight, Sparkles, Settings2 } from 'lucide-react';
+import { usePersistentToolState } from '@/shared/hooks/usePersistentToolState';
+import { usePanes } from '@/shared/contexts/PanesContext';
 
 // Remove unnecessary environment detection - tool should work in all environments
 
@@ -60,7 +64,18 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   const [mediaTypeFilter, setMediaTypeFilter] = useState<'all' | 'image' | 'video'>('all'); // Add media type filter state
   const [starredOnly, setStarredOnly] = useState<boolean>(false);
   const [formAssociatedShotId, setFormAssociatedShotId] = useState<string | null>(null); // Track the associated shot from the form
+  const [isFormExpanded, setIsFormExpanded] = useState<boolean | undefined>(undefined); // No default - wait for persistence
+  const [isSticky, setIsSticky] = useState(false);
+  const [isScrollingToForm, setIsScrollingToForm] = useState(false);
   const isMobile = useIsMobile();
+  
+  // Get pane states to adjust sticky header position
+  const { 
+    isShotsPaneLocked, 
+    isTasksPaneLocked,
+    shotsPaneWidth,
+    tasksPaneWidth
+  } = usePanes();
   
   // Early prefetch of public LoRAs to reduce loading time
   useListPublicResources('lora');
@@ -77,12 +92,48 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   const imageGenerationFormRef = useRef<ImageGenerationFormHandles>(null);
   const galleryRef = useRef<HTMLDivElement>(null);
   const formContainerRef = useRef<HTMLDivElement>(null);
+  const collapsibleContainerRef = useRef<HTMLDivElement>(null);
   const [searchParams] = useSearchParams();
   const { currentShotId } = useCurrentShot();
 
   // Track project tasks to know when they appear in the TasksPane (must be after selectedProjectId)
   const { data: projectTasks } = useListTasks({ projectId: selectedProjectId });
   const { data: shots, isLoading: isLoadingShots, error: shotsError } = useListShots(selectedProjectId);
+
+  // Persistent state for form collapse
+  const { ready: formStateReady, markAsInteracted: markFormStateInteracted } = usePersistentToolState(
+    'image-generation-ui',
+    { projectId: selectedProjectId },
+    {
+      isFormExpanded: [isFormExpanded, setIsFormExpanded],
+    }
+  );
+
+
+
+  // Handle URL parameter to override saved state when specified (run only once)
+  useEffect(() => {
+    const formCollapsedParam = searchParams.get('formCollapsed');
+    
+    // Only run this logic once when the component mounts and state is ready
+    if (formStateReady && formCollapsedParam === 'true') {
+      setIsFormExpanded(false);
+      markFormStateInteracted(); // Save this preference
+      
+      // Clear the URL parameter after applying it
+      const newSearchParams = new URLSearchParams(searchParams);
+      newSearchParams.delete('formCollapsed');
+      const newUrl = newSearchParams.toString() 
+        ? `${window.location.pathname}?${newSearchParams.toString()}`
+        : window.location.pathname;
+      window.history.replaceState({}, '', newUrl);
+    }
+    // Set default only if no saved state exists and no URL param
+    else if (formStateReady && isFormExpanded === undefined && !formCollapsedParam) {
+      setIsFormExpanded(true);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formStateReady]); // Only depend on formStateReady to run once when ready
 
 
   const addImageToShotMutation = useAddImageToShot();
@@ -172,11 +223,15 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   // Handle scrolling to gallery when coming from "View All" in GenerationsPane
   useEffect(() => {
     if (searchParams.get('scrollToGallery') === 'true') {
-      // Wait for the form container to be loaded and then scroll to it
+      // Wait for the gallery to be loaded and then scroll to it
       const checkAndScroll = () => {
-        if (formContainerRef.current && !isLoadingGenerations) {
-          // Scroll to the form container (above the gallery) instead of the gallery itself
-          formContainerRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        if (galleryRef.current && !isLoadingGenerations) {
+          // If form is collapsed, scroll to gallery directly, otherwise to form container
+          if (!isFormExpanded && galleryRef.current) {
+            galleryRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          } else if (formContainerRef.current) {
+            formContainerRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
         } else {
           // If not ready yet, try again in a bit
           setTimeout(checkAndScroll, 100);
@@ -186,7 +241,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
       // Start checking after a small initial delay
       setTimeout(checkAndScroll, 150);
     }
-  }, [searchParams, generationsResponse, isLoadingGenerations]);
+  }, [searchParams, generationsResponse, isLoadingGenerations, isFormExpanded]);
 
   const handleDeleteImage = useCallback(async (id: string) => {
     deleteGenerationMutation?.mutate(id);
@@ -455,6 +510,94 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     setSelectedShotFilter(shotId);
   }, []); // Remove dependencies to prevent stale closure issues
 
+  // Handle toggling the form expand/collapse state
+  const handleToggleFormExpanded = useCallback(() => {
+    const wasExpanded = isFormExpanded === true;
+    setIsFormExpanded(prev => prev !== true); // Explicitly toggle to boolean
+    markFormStateInteracted();
+
+    // If we're expanding (was collapsed), initiate scroll behavior
+    if (!wasExpanded) {
+      setIsScrollingToForm(true);
+      
+      // Wait longer for form expansion to complete, then use RAF for smooth scroll
+      setTimeout(() => {
+        // Use requestAnimationFrame to ensure DOM has fully updated
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            if (collapsibleContainerRef.current) {
+              try {
+                // Calculate a scroll position that shows the button above the form
+                const element = collapsibleContainerRef.current;
+                const elementRect = element.getBoundingClientRect();
+                const headerHeight = isMobile ? 80 : 96;
+                const bufferSpace = 30; // Increased buffer for better visibility
+                
+                // Calculate target scroll position
+                const targetScrollTop = window.scrollY + elementRect.top - headerHeight - bufferSpace;
+                
+                window.scrollTo({
+                  top: Math.max(0, targetScrollTop),
+                  behavior: 'smooth'
+                });
+              } catch (error) {
+                console.warn('Scroll calculation failed:', error);
+                // Fallback to simple scrollIntoView
+                collapsibleContainerRef.current?.scrollIntoView({ 
+                  behavior: 'smooth', 
+                  block: 'start' 
+                });
+              }
+            }
+            
+            // Reset scrolling state after scroll completes
+            setTimeout(() => {
+              setIsScrollingToForm(false);
+            }, 1000);
+          });
+        });
+      }, 300); // Increased delay to let form fully expand
+    }
+  }, [isFormExpanded, markFormStateInteracted]);
+
+  // Effect for sticky header
+  useEffect(() => {
+    const collapsibleDiv = collapsibleContainerRef.current;
+    let throttleTimer: NodeJS.Timeout | null = null;
+
+    const handleScroll = () => {
+      if (throttleTimer) return; // Throttle to prevent excessive calls
+      
+      throttleTimer = setTimeout(() => {
+        throttleTimer = null;
+        
+        if (collapsibleDiv) {
+          const rect = collapsibleDiv.getBoundingClientRect();
+          // Sticky when the top of the container is scrolled past the header
+          const headerHeight = isMobile ? 80 : 96; // Match actual header heights
+          // Account for header height when determining if we've scrolled past
+          const shouldBeSticky = rect.top < headerHeight;
+          
+          // Only update state if it actually changed
+          if (shouldBeSticky !== isSticky) {
+            setIsSticky(shouldBeSticky);
+          }
+        }
+      }, 16); // ~60fps throttling
+    };
+
+    // Also check on mount
+    handleScroll();
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      if (throttleTimer) {
+        clearTimeout(throttleTimer);
+      }
+    };
+  }, [isFormExpanded, isMobile, isSticky]);
+
   // [NavPerf] Stop timers when page has mounted
   useEffect(() => {
     timeEnd('NavPerf', 'PageLoad:/tools/image-generation');
@@ -567,20 +710,105 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
         </div>
       )}
 
-      {/* Render only if API key is valid */}
-      {hasValidFalApiKey && (
-        <>
-          <div ref={formContainerRef} className="p-6 border rounded-lg shadow-sm bg-card w-full max-w-full">
-            <ImageGenerationForm
-              ref={imageGenerationFormRef}
-              onGenerate={handleNewGenerate}
-              isGenerating={isGenerating}
-              hasApiKey={hasValidFalApiKey}
-              apiKey={falApiKey}
-              openaiApiKey={openaiApiKey}
-              justQueued={justQueued}
-            />
+      {/* Show loading state while persistent state is loading */}
+      {hasValidFalApiKey && isFormExpanded === undefined && (
+        <div className="p-6 border rounded-lg shadow-sm bg-card w-full max-w-full animate-pulse">
+          <div className="h-4 bg-muted rounded w-48 mb-4"></div>
+          <div className="space-y-3">
+            <div className="h-3 bg-muted rounded w-full"></div>
+            <div className="h-3 bg-muted rounded w-3/4"></div>
+            <div className="h-3 bg-muted rounded w-1/2"></div>
           </div>
+        </div>
+      )}
+
+      {/* Render only if API key is valid and state is loaded */}
+      {hasValidFalApiKey && isFormExpanded !== undefined && (
+        <>
+          <div ref={collapsibleContainerRef}>
+            <Collapsible 
+              open={isFormExpanded} 
+              onOpenChange={setIsFormExpanded}
+            >
+              {/* This trigger is only visible when the form is expanded OR when it's collapsed but not sticky */}
+              {!(!isFormExpanded && isSticky) && (
+                <CollapsibleTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    className={`${isFormExpanded ? 'w-full justify-between p-4 mb-4 hover:bg-accent/50' : 'w-full justify-between p-4 mb-4 bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-pink-500/20 border border-blue-400/40 hover:from-blue-500/30 hover:to-pink-500/30'} transition-colors duration-300`}
+                    onClick={handleToggleFormExpanded}
+                    type="button"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Settings2 className="h-4 w-4" />
+                      <span className="font-medium flex items-center gap-1">
+                        Image Generation Settings
+                        {!isFormExpanded && <Sparkles className="h-3 w-3 text-blue-400 animate-pulse" />}
+                      </span>
+                    </div>
+                    {isFormExpanded ? (
+                      <ChevronDown className="h-4 w-4" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4" />
+                    )}
+                  </Button>
+                </CollapsibleTrigger>
+              )}
+              <CollapsibleContent>
+                <div ref={formContainerRef} className="p-6 border rounded-lg shadow-sm bg-card w-full max-w-full">
+                  <ImageGenerationForm
+                    ref={imageGenerationFormRef}
+                    onGenerate={handleNewGenerate}
+                    isGenerating={isGenerating}
+                    hasApiKey={hasValidFalApiKey}
+                    apiKey={falApiKey}
+                    openaiApiKey={openaiApiKey}
+                    justQueued={justQueued}
+                  />
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          </div>
+
+          {/* Sticky form toggle button (only when collapsed and scrolled past) */}
+          {(hasValidFalApiKey && isFormExpanded === false && (isSticky || isScrollingToForm)) && (() => {
+            // Calculate positioning based on header and panes
+            const headerHeight = isMobile ? 80 : 96; // Mobile header is 80px (h-20), desktop is 96px (h-24)
+            const topPosition = headerHeight + 12; // Add 12px gap below header
+            
+            // Calculate horizontal constraints based on locked panes
+            const leftOffset = isShotsPaneLocked ? shotsPaneWidth : 0;
+            const rightOffset = isTasksPaneLocked ? tasksPaneWidth : 0;
+            
+            return (
+              <div 
+                className={`fixed z-50 flex justify-center transition-all duration-300 ease-out animate-in fade-in slide-in-from-top-2`}
+                style={{
+                  top: `${topPosition}px`,
+                  left: `${leftOffset}px`,
+                  right: `${rightOffset}px`,
+                  paddingLeft: '16px',
+                  paddingRight: '16px',
+                }}
+              >
+                <Button
+                  variant="ghost"
+                  className={`justify-between ${isMobile ? 'p-3 text-sm' : 'p-4'} w-full max-w-2xl bg-gradient-to-r from-blue-500/60 via-purple-500/60 to-pink-500/60 border border-blue-400/80 hover:from-blue-500/70 hover:to-pink-500/70 backdrop-blur-md shadow-xl transition-all duration-300 rounded-lg`}
+                  onClick={handleToggleFormExpanded}
+                  type="button"
+                >
+                  <div className="flex items-center gap-2">
+                    <Settings2 className="h-4 w-4" />
+                    <span className="font-medium flex items-center gap-1">
+                      {isMobile ? 'Image Settings' : 'Image Generation Settings'}
+                      <Sparkles className="h-3 w-3 text-blue-400 animate-pulse" />
+                    </span>
+                  </div>
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+              </div>
+            );
+          })()}
 
           <div ref={galleryRef} className="mt-2">
             {/* Show SkeletonGallery on initial load or when filter changes take too long */}

@@ -4,6 +4,7 @@ import { Button } from '@/shared/components/ui/button';
 import { Gift, Sparkles, Smartphone, Download, ChevronRight, X, ChevronLeft, Palette, Users, Monitor, Coins, Settings, Check } from 'lucide-react';
 import { Checkbox } from '@/shared/components/ui/checkbox';
 import usePersistentState from '@/shared/hooks/usePersistentState';
+import { useUserUIState } from '@/shared/hooks/useUserUIState';
 
 interface WelcomeBonusModalProps {
   isOpen: boolean;
@@ -269,8 +270,34 @@ const PWAInstallStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
 
 // Step 4: Generation Method Selection
 const GenerationMethodStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
-  const [onComputerChecked, setOnComputerChecked] = usePersistentState<boolean>("generation-on-computer", false);
-  const [inCloudChecked, setInCloudChecked] = usePersistentState<boolean>("generation-in-cloud", true);
+  // Use database-backed generation preferences (same as SettingsModal)
+  const { 
+    value: generationMethods, 
+    update: updateGenerationMethods,
+    isLoading: isLoadingGenerationMethods
+  } = useUserUIState('generationMethods', { onComputer: true, inCloud: true });
+  
+  const onComputerChecked = generationMethods.onComputer;
+  const inCloudChecked = generationMethods.inCloud;
+
+  // Show loading state while preferences are being fetched
+  if (isLoadingGenerationMethods) {
+    return (
+      <>
+        <DialogHeader className="text-center space-y-4">
+          <div className="mx-auto w-16 h-16 bg-orange-100 dark:bg-orange-900/20 rounded-full flex items-center justify-center">
+            <Monitor className="w-8 h-8 text-orange-600 dark:text-orange-400" />
+          </div>
+          <DialogTitle className="text-2xl font-bold text-center">
+            Loading your preferences...
+          </DialogTitle>
+        </DialogHeader>
+        <div className="text-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600 mx-auto"></div>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
@@ -291,7 +318,7 @@ const GenerationMethodStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
                  <div className="space-y-4">
            <div 
              className="p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
-             onClick={() => setInCloudChecked(!inCloudChecked)}
+             onClick={() => updateGenerationMethods({ inCloud: !inCloudChecked })}
            >
              <div className="flex items-center space-x-3">
                <Checkbox
@@ -312,7 +339,7 @@ const GenerationMethodStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
            
            <div 
              className="p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer relative"
-             onClick={() => setOnComputerChecked(!onComputerChecked)}
+             onClick={() => updateGenerationMethods({ onComputer: !onComputerChecked })}
            >
              <div className="absolute top-2 right-2">
                <span className="bg-green-500 text-white text-xs font-medium px-2 py-1 rounded-full">
