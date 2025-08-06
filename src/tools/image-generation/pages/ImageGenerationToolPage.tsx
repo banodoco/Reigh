@@ -530,7 +530,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
                 // Calculate a scroll position that shows the button above the form
                 const element = collapsibleContainerRef.current;
                 const elementRect = element.getBoundingClientRect();
-                const headerHeight = isMobile ? 80 : 96;
+                const headerHeight = isMobile ? 150 : 96;
                 const bufferSpace = 30; // Increased buffer for better visibility
                 
                 // Calculate target scroll position
@@ -574,7 +574,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
         if (collapsibleDiv) {
           const rect = collapsibleDiv.getBoundingClientRect();
           // Sticky when the top of the container is scrolled past the header
-          const headerHeight = isMobile ? 80 : 96; // Match actual header heights
+          const headerHeight = isMobile ? 150 : 96; // Match actual header heights
           // Account for header height when determining if we've scrolled past
           const shouldBeSticky = rect.top < headerHeight;
           
@@ -773,7 +773,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
           {/* Sticky form toggle button (only when collapsed and scrolled past) */}
           {(hasValidFalApiKey && isFormExpanded === false && (isSticky || isScrollingToForm)) && (() => {
             // Calculate positioning based on header and panes
-            const headerHeight = isMobile ? 80 : 96; // Mobile header is 80px (h-20), desktop is 96px (h-24)
+            const headerHeight = isMobile ? 150 : 96; // Mobile header adjusted to 150px, desktop is 96px (h-24)
             const topPosition = headerHeight + 12; // Add 12px gap below header
             
             // Calculate horizontal constraints based on locked panes
