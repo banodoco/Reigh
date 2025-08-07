@@ -18,6 +18,7 @@ import { useNavigate } from 'react-router-dom';
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 import { formatDistanceToNow, isValid } from 'date-fns';
 import MediaLightbox from '@/shared/components/MediaLightbox';
+import { useTaskTimestamp } from '@/shared/hooks/useUpdatingTimestamp';
 import { GenerationRow } from '@/types/shots';
 import { useListShots, useAddImageToShot } from '@/shared/hooks/useShots';
 import { useLastAffectedShot } from '@/shared/hooks/useLastAffectedShot';
@@ -44,29 +45,16 @@ interface TaskItemProps {
   isNew?: boolean;
 }
 
-// Helper to abbreviate distance strings (e.g., "5 minutes ago" -> "5 mins ago")
-const abbreviateDistance = (str: string) => {
-  // Handle "less than a minute ago" special case
-  if (str.includes('less than a minute')) {
-    return '<1 min ago';
-  }
-  
-  return str
-    .replace(/1 minutes ago/, '1 min ago')
-    .replace(/1 hours ago/, '1 hr ago')
-    .replace(/1 seconds ago/, '1 sec ago')
-    .replace(/1 days ago/, '1 day ago')
-    .replace(/minutes?/, 'mins')
-    .replace(/hours?/, 'hrs')
-    .replace(/seconds?/, 'secs')
-    .replace(/days?/, 'days');
-};
+// Timestamp formatting now handled by useTaskTimestamp hook
 
 const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
   const { toast } = useToast();
 
   // Access project context early so it can be used in other hooks
   const { selectedProjectId } = useProject();
+  
+  // Get live-updating timestamp
+  const createdTimeAgo = useTaskTimestamp(task.createdAt || (task as any).created_at);
 
   // Mutations
   const cancelTaskMutation = useCancelTask(selectedProjectId);
@@ -486,16 +474,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
       )}
       <div className="flex items-center text-xs text-zinc-400">
         <span className="flex-1">
-          Created: {(() => {
-            // Handle both createdAt and created_at field names from database
-            const dateStr = task.createdAt || (task as any).created_at;
-            if (!dateStr) return 'Unknown';
-            
-            const date = new Date(dateStr);
-            if (!isValid(date)) return 'Unknown';
-            
-            return abbreviateDistance(formatDistanceToNow(date, { addSuffix: true }));
-          })()}
+          Created: {createdTimeAgo}
         </span>
         
         {/* Action buttons for queued/in progress tasks */}

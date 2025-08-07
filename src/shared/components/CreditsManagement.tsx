@@ -28,6 +28,7 @@ import { Checkbox } from '@/shared/components/ui/checkbox';
 import { useCredits } from '@/shared/hooks/useCredits';
 import { useTaskLog } from '@/shared/hooks/useTaskLog';
 import { formatDistanceToNow } from 'date-fns';
+import { UpdatingTimeCell } from '@/shared/components/UpdatingTimeCell';
 
 interface CreditsManagementProps {
   initialTab?: 'purchase' | 'history' | 'task-log';
@@ -401,7 +402,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                     {ledgerData?.entries?.filter(tx => tx.type !== 'spend').map((tx, index) => (
                       <TableRow key={index}>
                         <TableCell>
-                          {formatDistanceToNow(new Date(tx.created_at), { addSuffix: true })}
+                          <UpdatingTimeCell date={tx.created_at} />
                         </TableCell>
                         <TableCell>
                           <Badge
@@ -772,7 +773,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                       {taskLogData?.tasks?.map((task) => (
                         <TableRow key={task.id}>
                           <TableCell className="text-sm">
-                            {formatDistanceToNow(new Date(task.createdAt), { addSuffix: true })}
+                            <UpdatingTimeCell date={task.createdAt} />
                           </TableCell>
                           <TableCell>
                             <Badge variant="outline" className="capitalize py-1.5 my-1 text-xs">

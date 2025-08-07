@@ -8,6 +8,7 @@ import { useTrainingData } from '../hooks/useTrainingData';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/shared/components/ui/alert-dialog';
 import { cropFilename } from '@/shared/lib/utils';
 import { formatDistanceToNow, isValid } from 'date-fns';
+import { useUpdatingTimestamp } from '@/shared/hooks/useUpdatingTimestamp';
 
 // Helper to abbreviate distance strings (e.g., "5 minutes ago" -> "5 mins ago")
 const abbreviateDistance = (str: string) => {
@@ -25,6 +26,16 @@ const abbreviateDistance = (str: string) => {
     .replace(/hours?/, 'hrs')
     .replace(/seconds?/, 'secs')
     .replace(/days?/, 'days');
+};
+
+// Component for live-updating video upload timestamp
+const VideoUploadTimestamp: React.FC<{ createdAt: string }> = ({ createdAt }) => {
+  const timeAgo = useUpdatingTimestamp({
+    date: createdAt,
+    abbreviate: abbreviateDistance
+  });
+  
+  return <span>Uploaded: {timeAgo}</span>;
 };
 
 interface VideoUploadListProps {
@@ -160,11 +171,7 @@ export function VideoUploadList({ videos, selectedVideo, onVideoSelect, segments
                 </div>
 
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <span>Uploaded: {(() => {
-                    const date = new Date(video.createdAt);
-                    if (!isValid(date)) return 'Unknown';
-                    return abbreviateDistance(formatDistanceToNow(date, { addSuffix: true }));
-                  })()}</span>
+                  <VideoUploadTimestamp createdAt={video.createdAt} />
                 </div>
 
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">

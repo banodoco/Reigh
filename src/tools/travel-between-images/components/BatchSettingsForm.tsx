@@ -204,7 +204,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                       </div>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>Accelerating speeds up the generation but loses prompt-adherence and motion quality.</p>
+                      <p>Accelerated mode enables the lighti2x LoRA for faster generation but may affect motion quality.</p>
                     </TooltipContent>
                   </Tooltip>
                 </div>

@@ -10,6 +10,7 @@ import { Textarea } from '@/shared/components/ui/textarea';
 import { TrainingDataBatch, TrainingDataVideo, TrainingDataSegment } from '../hooks/useTrainingData';
 import { toast } from 'sonner';
 import { formatDistanceToNow, isValid } from 'date-fns';
+import { useUpdatingTimestamp } from '@/shared/hooks/useUpdatingTimestamp';
 
 interface BatchSelectorProps {
   batches: TrainingDataBatch[];
@@ -33,6 +34,16 @@ const abbreviateDistance = (str: string) => {
     .replace(/\s+months?\s+/g, ' mos ')
     .replace(/\s+years?\s+/g, ' yrs ')
     .replace(/less than a minute/g, '<1 min');
+};
+
+// Component for live-updating batch created timestamp
+const BatchCreatedTimestamp: React.FC<{ createdAt: string }> = ({ createdAt }) => {
+  const timeAgo = useUpdatingTimestamp({
+    date: createdAt,
+    abbreviate: abbreviateDistance
+  });
+  
+  return <>Created {timeAgo}</>;
 };
 
 export function BatchSelector({ batches, selectedBatchId, onSelectBatch, onCreateBatch, onUpdateBatch, onDeleteBatch, videos, segments, getVideoUrl }: BatchSelectorProps) {
@@ -483,7 +494,7 @@ File Size: ${segmentBlob.size} bytes`;
                       </p>
                     )}
                     <p className="text-xs text-muted-foreground mt-2">
-                      Created {abbreviateDistance(formatDistanceToNow(new Date(selectedBatch.createdAt), { addSuffix: true }))}
+                      <BatchCreatedTimestamp createdAt={selectedBatch.createdAt} />
                     </p>
                     <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
                       <span>{videos.filter(v => v.batchId === selectedBatchId).length} videos</span>

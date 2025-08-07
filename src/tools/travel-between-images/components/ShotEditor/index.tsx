@@ -325,10 +325,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         apply_causvid: false // Disable causvid for Wan 2.2
       });
       
-      // Disable accelerated mode for Wan 2.2
+      // Disable accelerated mode for Wan 2.2 (which controls lighti2x LoRA)
       setAccelerated(false);
       
-      toast.info("Wan 2.2 selected: Accelerated mode disabled, Causvid disabled, Steps set to 10");
+      toast.info("Wan 2.2 selected: Accelerated mode disabled, lighti2x LoRA disabled, Steps set to 10");
     } else {
       // Wan 2.1 (default settings)
       onSteerableMotionSettingsChange({ 
@@ -336,10 +336,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         apply_causvid: true // Re-enable causvid for Wan 2.1
       });
       
-      // Restore accelerated mode to default (true) for Wan 2.1
+      // Restore accelerated mode to default (true) for Wan 2.1 (which controls lighti2x LoRA)
       setAccelerated(true);
       
-      toast.info("Wan 2.1 selected: Accelerated mode enabled, Standard settings restored");
+      toast.info("Wan 2.1 selected: Accelerated mode enabled, lighti2x LoRA enabled, Standard settings restored");
     }
     // Note: Steps are automatically handled by the unified system when model changes
   }, [onSteerableMotionSettingsChange, setAccelerated]);
@@ -576,10 +576,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       seed: steerableMotionSettings.seed,
       steps: batchVideoSteps,
       debug: steerableMotionSettings.debug ?? DEFAULT_STEERABLE_MOTION_SETTINGS.debug,
-      // Force these settings to consistent defaults, except apply_causvid which follows accelerated mode (unless Wan 2.2)
+      // Force these settings to consistent defaults, except use_lighti2x_lora which follows accelerated mode (unless Wan 2.2)
       apply_reward_lora: DEFAULT_STEERABLE_MOTION_SETTINGS.apply_reward_lora,
-      apply_causvid: steerableMotionSettings.model_name === 'vace_14B_cocktail_2_2' ? false : accelerated,
-      use_lighti2x_lora: DEFAULT_STEERABLE_MOTION_SETTINGS.use_lighti2x_lora,
+      apply_causvid: DEFAULT_STEERABLE_MOTION_SETTINGS.apply_causvid,
+      use_lighti2x_lora: steerableMotionSettings.model_name === 'vace_14B_cocktail_2_2' ? false : accelerated,
       show_input_images: DEFAULT_STEERABLE_MOTION_SETTINGS.show_input_images,
       colour_match_videos: DEFAULT_STEERABLE_MOTION_SETTINGS.colour_match_videos, // Force to false, ignore saved settings
       fade_in_duration: steerableMotionSettings.fade_in_duration ?? DEFAULT_STEERABLE_MOTION_SETTINGS.fade_in_duration,
