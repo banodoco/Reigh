@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { getDisplayUrl } from '@/shared/lib/utils';
 import { Button } from '@/shared/components/ui/button';
@@ -43,7 +43,7 @@ interface HoverScrubVideoProps extends Omit<React.HTMLAttributes<HTMLDivElement>
 }
 
 /**
- * Simple video component that plays on hover and pauses when mouse leaves.
+ * Video component that scrubs based on mouse position and plays when mouse stops moving.
  */
 const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
   src,
@@ -61,22 +61,64 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
   ...rest
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const mouseMoveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isHoveringRef = useRef(false);
   const [playbackRate, setPlaybackRate] = useState(1);
+  const [duration, setDuration] = useState(0);
+  const [scrubberPosition, setScrubberPosition] = useState<number | null>(null);
   const speedOptions = [0.25, 0.5, 1, 1.5, 2];
 
-  const handleMouseEnter = () => {
-    if (videoRef.current) {
-      videoRef.current.play().catch(() => {
-        // Ignore play errors (e.g., if video is already playing)
-      });
-    }
-  };
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (!videoRef.current || !containerRef.current || duration === 0) return;
 
-  const handleMouseLeave = () => {
+    const rect = containerRef.current.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const progress = Math.max(0, Math.min(1, mouseX / rect.width));
+    const targetTime = progress * duration;
+
+    // Update scrubber position (percentage)
+    setScrubberPosition(progress * 100);
+
+    // Pause the video and seek to the position
+    videoRef.current.pause();
+    videoRef.current.currentTime = targetTime;
+
+    // Clear existing timeout
+    if (mouseMoveTimeoutRef.current) {
+      clearTimeout(mouseMoveTimeoutRef.current);
+    }
+
+    // Set a new timeout to start playing after mouse stops moving
+    mouseMoveTimeoutRef.current = setTimeout(() => {
+      if (videoRef.current && isHoveringRef.current) {
+        videoRef.current.play().catch(() => {
+          // Ignore play errors
+        });
+      }
+    }, 150); // Start playing 150ms after mouse stops moving
+  }, [duration]);
+
+  const handleMouseEnter = useCallback(() => {
+    isHoveringRef.current = true;
     if (videoRef.current) {
+      // Don't start playing immediately, wait for mouse movement or timeout
       videoRef.current.pause();
     }
-  };
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    isHoveringRef.current = false;
+    setScrubberPosition(null); // Hide scrubber
+    if (mouseMoveTimeoutRef.current) {
+      clearTimeout(mouseMoveTimeoutRef.current);
+      mouseMoveTimeoutRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.currentTime = 0; // Reset to beginning
+    }
+  }, []);
 
   const handleSpeedChange = (speed: number) => {
     if (videoRef.current) {
@@ -85,6 +127,21 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
     }
   };
 
+  const handleLoadedMetadata = useCallback(() => {
+    if (videoRef.current) {
+      setDuration(videoRef.current.duration);
+      // Ensure we can see the first frame by seeking to the start
+      if (videoRef.current.currentTime === 0) {
+        videoRef.current.currentTime = 0.1;
+        setTimeout(() => {
+          if (videoRef.current) {
+            videoRef.current.currentTime = 0;
+          }
+        }, 100);
+      }
+    }
+  }, []);
+
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -92,19 +149,26 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
     // Ensure the video starts paused
     video.pause();
     video.currentTime = 0;
+    setDuration(0);
 
     return () => {
       if (video) {
         video.pause();
+      }
+      if (mouseMoveTimeoutRef.current) {
+        clearTimeout(mouseMoveTimeoutRef.current);
+        mouseMoveTimeoutRef.current = null;
       }
     };
   }, [src]);
 
   return (
     <div
+      ref={containerRef}
       className={cn('relative group', className)}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
+      onMouseMove={handleMouseMove}
       {...rest}
     >
       <video
@@ -113,17 +177,7 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
         poster={poster ? getDisplayUrl(poster) : undefined}
         preload={preloadProp}
         controls={showNativeControls}
-        onLoadedMetadata={(e) => {
-          // Ensure we can see the first frame by seeking to the start
-          if (e.currentTarget && e.currentTarget.currentTime === 0) {
-            e.currentTarget.currentTime = 0.1;
-            setTimeout(() => {
-              if (e.currentTarget) {
-                e.currentTarget.currentTime = 0;
-              }
-            }, 100);
-          }
-        }}
+        onLoadedMetadata={handleLoadedMetadata}
         loop={loop}
         muted={muted}
         playsInline
@@ -135,6 +189,24 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
       >
         Your browser does not support the video tag.
       </video>
+
+      {/* Scrubber Line */}
+      {scrubberPosition !== null && (
+        <div 
+          className="absolute top-0 bottom-0 w-0.5 bg-white shadow-lg z-30 pointer-events-none"
+          style={{ left: `${scrubberPosition}%` }}
+        >
+          {/* Scrubber handle/dot */}
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-lg border-2 border-black/20" />
+          
+          {/* Time indicator */}
+          <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-black/80 text-white text-xs px-2 py-1 rounded whitespace-nowrap">
+            {duration > 0 && (
+              `${Math.floor((scrubberPosition / 100) * duration)}s / ${Math.floor(duration)}s`
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Speed controls overlay */}
       {showSpeedControls && (

@@ -234,7 +234,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   
   // Unified step management system
   const getRecommendedSteps = useCallback((modelName: string, isAccelerated: boolean) => {
-    if (modelName === 'vace_14B_cocktail_2_2') {
+    if (modelName === 'vace_14B_cocktail_2_2' || modelName === 'vace_14B_fakeface') {
       return 10; // Wan 2.2 always uses 10 steps
     }
     return isAccelerated ? 8 : 20; // Wan 2.1 uses 8 for accelerated, 20 for normal
@@ -319,9 +319,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // Handle model changes with automatic settings adjustment
   const handleModelChange = useCallback((modelName: string) => {
     if (modelName === 'vace_14B_cocktail_2_2') {
-      // Wan 2.2 specific settings
+      // Wan 2.2 specific settings - use vace_14B_fakeface as the actual model_name
       onSteerableMotionSettingsChange({ 
-        model_name: modelName,
+        model_name: 'vace_14B_fakeface',
         apply_causvid: false // Disable causvid for Wan 2.2
       });
       
@@ -578,7 +578,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       debug: steerableMotionSettings.debug ?? DEFAULT_STEERABLE_MOTION_SETTINGS.debug,
       // Force these settings to consistent defaults, except use_lighti2x_lora which follows accelerated mode (unless Wan 2.2)
       apply_reward_lora: DEFAULT_STEERABLE_MOTION_SETTINGS.apply_reward_lora,
-      apply_causvid: DEFAULT_STEERABLE_MOTION_SETTINGS.apply_causvid,
+      apply_causvid: steerableMotionSettings.apply_causvid,
       use_lighti2x_lora: steerableMotionSettings.model_name === 'vace_14B_cocktail_2_2' ? false : accelerated,
       show_input_images: DEFAULT_STEERABLE_MOTION_SETTINGS.show_input_images,
       colour_match_videos: DEFAULT_STEERABLE_MOTION_SETTINGS.colour_match_videos, // Force to false, ignore saved settings
@@ -865,7 +865,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                                         type="radio"
                                         name="model"
                                         value="vace_14B_cocktail_2_2"
-                                        checked={steerableMotionSettings.model_name === 'vace_14B_cocktail_2_2'}
+                                        checked={steerableMotionSettings.model_name === 'vace_14B_cocktail_2_2' || steerableMotionSettings.model_name === 'vace_14B_fakeface'}
                                         onChange={() => handleModelChange('vace_14B_cocktail_2_2')}
                                         className="w-4 h-4 text-primary"
                                     />
