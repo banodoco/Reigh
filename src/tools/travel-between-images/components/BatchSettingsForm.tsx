@@ -85,7 +85,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
     const [showAdvanced, setShowAdvanced] = React.useState(false);
 
     return (
-        <div className="space-y-6 mb-8">
+        <div className="space-y-4">
           <div className="p-4 border rounded-lg bg-card shadow-md space-y-4">
 
 
@@ -188,25 +188,28 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-              <div className="relative">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div className="flex items-center space-x-2 pt-2">
-                      <Switch
-                        id="accelerated"
-                        checked={accelerated}
-                        onCheckedChange={onAcceleratedChange}
-                      />
-                      <Label htmlFor="accelerated" className="text-sm cursor-help">Enable Accelerated Mode</Label>
-                      <Info className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Accelerating speeds up the generation but loses prompt-adherence and motion quality.</p>
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-              <div className="relative md:col-span-3">
+              {/* Only show Accelerated Mode toggle if not using Wan 2.2 */}
+              {steerableMotionSettings.model_name !== 'vace_14B_cocktail_2_2' && (
+                <div className="relative">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="flex items-center space-x-2 pt-2">
+                        <Switch
+                          id="accelerated"
+                          checked={accelerated}
+                          onCheckedChange={onAcceleratedChange}
+                        />
+                        <Label htmlFor="accelerated" className="text-sm cursor-help">Enable Accelerated Mode</Label>
+                        <Info className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Accelerating speeds up the generation but loses prompt-adherence and motion quality.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+              )}
+              <div className={`relative ${steerableMotionSettings.model_name === 'vace_14B_cocktail_2_2' ? 'md:col-span-4' : 'md:col-span-3'}`}>
                 <Label htmlFor="batchVideoSteps" className="text-sm font-medium block mb-1">Generation Steps: {batchVideoSteps}</Label>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -228,7 +231,10 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                 />
                 {showStepsNotification && (
                   <p className="text-sm text-yellow-600 mt-1">
-                    Note: We recommend {accelerated ? '8' : '20'} steps for {accelerated ? 'Accelerated' : 'Normal'} mode
+                    {steerableMotionSettings.model_name === 'vace_14B_cocktail_2_2' 
+                      ? 'Note: We recommend 10 steps for Wan 2.2'
+                      : `Note: We recommend ${accelerated ? '8' : '20'} steps for ${accelerated ? 'Accelerated' : 'Normal'} mode`
+                    }
                   </p>
                 )}
               </div>

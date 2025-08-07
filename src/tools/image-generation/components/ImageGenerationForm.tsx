@@ -897,7 +897,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
 
             {/* Prompts Section */}
             <div className="space-y-4">
-              <div>
                 <div className="flex justify-between items-center mb-2">
                   <Label className="text-lg font-semibold">Prompts</Label>
                   <div className="flex items-center space-x-2">
@@ -976,7 +975,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
                     </TooltipProvider>
                   </div>
                 )}
-              </div>
 
               {/* Before / After prompt modifiers */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

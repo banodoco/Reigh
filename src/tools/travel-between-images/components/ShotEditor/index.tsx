@@ -232,20 +232,36 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const accelerated = shotUISettings?.acceleratedMode ?? true;
   const randomSeed = shotUISettings?.randomSeed ?? false;
   
-  // Jump to appropriate step count when accelerated mode changes (but don't enforce afterward)
-  const prevAcceleratedRef = useRef(accelerated);
-  useEffect(() => {
-    // Only change steps when accelerated mode actually changes, not on every render
-    if (prevAcceleratedRef.current !== accelerated) {
-      prevAcceleratedRef.current = accelerated;
-      
-      if (accelerated) {
-        onBatchVideoStepsChange(8);
-      } else {
-        onBatchVideoStepsChange(20);
-      }
+  // Unified step management system
+  const getRecommendedSteps = useCallback((modelName: string, isAccelerated: boolean) => {
+    if (modelName === 'vace_14B_cocktail_2_2') {
+      return 10; // Wan 2.2 always uses 10 steps
     }
-  }, [accelerated, onBatchVideoStepsChange]);
+    return isAccelerated ? 8 : 20; // Wan 2.1 uses 8 for accelerated, 20 for normal
+  }, []);
+
+  const updateStepsForCurrentSettings = useCallback(() => {
+    const recommendedSteps = getRecommendedSteps(steerableMotionSettings.model_name, accelerated);
+    onBatchVideoStepsChange(recommendedSteps);
+  }, [getRecommendedSteps, steerableMotionSettings.model_name, accelerated, onBatchVideoStepsChange]);
+
+  // Track previous values to detect changes
+  const prevAcceleratedRef = useRef(accelerated);
+  const prevModelRef = useRef(steerableMotionSettings.model_name);
+  
+  useEffect(() => {
+    const acceleratedChanged = prevAcceleratedRef.current !== accelerated;
+    const modelChanged = prevModelRef.current !== steerableMotionSettings.model_name;
+    
+    // Only auto-adjust steps when accelerated mode or model changes (not manual user input)
+    if (acceleratedChanged || modelChanged) {
+      updateStepsForCurrentSettings();
+    }
+    
+    // Update refs
+    prevAcceleratedRef.current = accelerated;
+    prevModelRef.current = steerableMotionSettings.model_name;
+  }, [accelerated, steerableMotionSettings.model_name, updateStepsForCurrentSettings]);
   
   const setAccelerated = useCallback((value: boolean) => {
     updateShotUISettings('shot', { acceleratedMode: value });
@@ -283,19 +299,50 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     // Note: Step changes are handled automatically by the useEffect above
   }, [setAccelerated, actions]);
   
-  // Handle manual steps change in accelerated mode
+  // Handle manual steps change
   const handleStepsChange = useCallback((steps: number) => {
     onBatchVideoStepsChange(steps);
     
-    // Show notification if manually changing steps in accelerated mode (but allow the change)
-    if (accelerated && steps !== 8) {
+    // Show notification if manually changing steps away from recommended value
+    const recommendedSteps = getRecommendedSteps(steerableMotionSettings.model_name, accelerated);
+    const isWan21 = steerableMotionSettings.model_name === 'vace_14B';
+    
+    if (isWan21 && accelerated && steps !== recommendedSteps) {
       actions.setShowStepsNotification(true);
       // Hide notification after 5 seconds
       setTimeout(() => actions.setShowStepsNotification(false), 5000);
     } else {
       actions.setShowStepsNotification(false);
     }
-  }, [accelerated, onBatchVideoStepsChange, actions]);
+  }, [accelerated, steerableMotionSettings.model_name, getRecommendedSteps, onBatchVideoStepsChange, actions]);
+
+  // Handle model changes with automatic settings adjustment
+  const handleModelChange = useCallback((modelName: string) => {
+    if (modelName === 'vace_14B_cocktail_2_2') {
+      // Wan 2.2 specific settings
+      onSteerableMotionSettingsChange({ 
+        model_name: modelName,
+        apply_causvid: false // Disable causvid for Wan 2.2
+      });
+      
+      // Disable accelerated mode for Wan 2.2
+      setAccelerated(false);
+      
+      toast.info("Wan 2.2 selected: Accelerated mode disabled, Causvid disabled, Steps set to 10");
+    } else {
+      // Wan 2.1 (default settings)
+      onSteerableMotionSettingsChange({ 
+        model_name: modelName,
+        apply_causvid: true // Re-enable causvid for Wan 2.1
+      });
+      
+      // Restore accelerated mode to default (true) for Wan 2.1
+      setAccelerated(true);
+      
+      toast.info("Wan 2.1 selected: Accelerated mode enabled, Standard settings restored");
+    }
+    // Note: Steps are automatically handled by the unified system when model changes
+  }, [onSteerableMotionSettingsChange, setAccelerated]);
 
   // Update editing name when selected shot changes
   useEffect(() => {
@@ -529,9 +576,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       seed: steerableMotionSettings.seed,
       steps: batchVideoSteps,
       debug: steerableMotionSettings.debug ?? DEFAULT_STEERABLE_MOTION_SETTINGS.debug,
-      // Force these settings to consistent defaults, except apply_causvid which follows accelerated mode
+      // Force these settings to consistent defaults, except apply_causvid which follows accelerated mode (unless Wan 2.2)
       apply_reward_lora: DEFAULT_STEERABLE_MOTION_SETTINGS.apply_reward_lora,
-      apply_causvid: accelerated,
+      apply_causvid: steerableMotionSettings.model_name === 'vace_14B_cocktail_2_2' ? false : accelerated,
       use_lighti2x_lora: DEFAULT_STEERABLE_MOTION_SETTINGS.use_lighti2x_lora,
       show_input_images: DEFAULT_STEERABLE_MOTION_SETTINGS.show_input_images,
       colour_match_videos: DEFAULT_STEERABLE_MOTION_SETTINGS.colour_match_videos, // Force to false, ignore saved settings
@@ -716,6 +763,37 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                             imageCount={nonVideoImages.length}
                         />
                         
+                        {/* Model Selection (Mobile) */}
+                        <div className="block lg:hidden mt-6">
+                            <div className="space-y-4 p-4 border rounded-lg bg-card mb-4">
+                                <h3 className="font-semibold text-sm">Which model would you like to use:</h3>
+                                <div className="space-y-2">
+                                    <label className="flex items-center space-x-2 cursor-pointer">
+                                        <input
+                                            type="radio"
+                                            name="model-mobile"
+                                            value="vace_14B"
+                                            checked={steerableMotionSettings.model_name === 'vace_14B'}
+                                            onChange={() => handleModelChange('vace_14B')}
+                                            className="w-4 h-4 text-primary"
+                                        />
+                                        <span className="text-sm">Wan 2.1</span>
+                                    </label>
+                                    <label className="flex items-center space-x-2 cursor-pointer">
+                                        <input
+                                            type="radio"
+                                            name="model-mobile"
+                                            value="vace_14B_cocktail_2_2"
+                                            checked={steerableMotionSettings.model_name === 'vace_14B_cocktail_2_2'}
+                                            onChange={() => handleModelChange('vace_14B_cocktail_2_2')}
+                                            className="w-4 h-4 text-primary"
+                                        />
+                                        <span className="text-sm">Wan 2.2</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        
                         {/* LoRA Settings (Mobile) */}
                         <div className="block lg:hidden mt-6">
                             <div className="space-y-4 p-4 border rounded-lg bg-card">
@@ -765,8 +843,38 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                         </div>
                     </div>
 
-                    {/* Right Column: LoRA Settings (Desktop) */}
+                    {/* Right Column: Model & LoRA Settings (Desktop) */}
                     <div className="hidden lg:block lg:w-80 order-1 lg:order-2">
+                        {/* Model Selection */}
+                        <div className="space-y-4 p-4 border rounded-lg bg-card mb-4">
+                            <h3 className="font-semibold text-sm">Which model would you like to use:</h3>
+                            <div className="space-y-2">
+                                <label className="flex items-center space-x-2 cursor-pointer">
+                                    <input
+                                        type="radio"
+                                        name="model"
+                                        value="vace_14B"
+                                        checked={steerableMotionSettings.model_name === 'vace_14B'}
+                                        onChange={() => handleModelChange('vace_14B')}
+                                        className="w-4 h-4 text-primary"
+                                    />
+                                    <span className="text-sm">Wan 2.1</span>
+                                </label>
+                                <label className="flex items-center space-x-2 cursor-pointer">
+                                    <input
+                                        type="radio"
+                                        name="model"
+                                        value="vace_14B_cocktail_2_2"
+                                        checked={steerableMotionSettings.model_name === 'vace_14B_cocktail_2_2'}
+                                        onChange={() => handleModelChange('vace_14B_cocktail_2_2')}
+                                        className="w-4 h-4 text-primary"
+                                    />
+                                    <span className="text-sm">Wan 2.2</span>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        {/* LoRA Settings */}
                         <div className="space-y-4 p-4 border rounded-lg bg-card">
                             <h3 className="font-semibold text-sm">LoRA Models</h3>
                             
