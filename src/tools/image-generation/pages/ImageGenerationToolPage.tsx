@@ -18,7 +18,7 @@ import { useTaskQueueNotifier } from '@/shared/hooks/useTaskQueueNotifier';
 import { useQueryClient } from '@tanstack/react-query';
 import { useListPublicResources } from '@/shared/hooks/useResources';
 
-import { useListTasks } from "@/shared/hooks/useTasks";
+// Removed useListTasks import - was causing performance issues with 1000+ tasks
 import { PageFadeIn } from '@/shared/components/transitions';
 import { useSearchParams } from 'react-router-dom';
 import { ToolPageHeader } from '@/shared/components/ToolPageHeader';
@@ -96,8 +96,8 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   const [searchParams] = useSearchParams();
   const { currentShotId } = useCurrentShot();
 
-  // Track project tasks to know when they appear in the TasksPane (must be after selectedProjectId)
-  const { data: projectTasks } = useListTasks({ projectId: selectedProjectId });
+  // Removed projectTasks tracking - was causing performance issues with 1000+ tasks
+  // TaskQueueNotifier now handles task tracking internally
   const { data: shots, isLoading: isLoadingShots, error: shotsError } = useListShots(selectedProjectId);
 
   // Persistent state for form collapse

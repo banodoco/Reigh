@@ -89,16 +89,24 @@ export const useCreateTask = (options?: { showToast?: boolean }) => {
   
       }
       
-      // Invalidate the tasks query to trigger a refetch
-      // This ensures the TasksPane updates automatically
+      // GALLERY PATTERN: Only invalidate first page where new tasks appear
       if (selectedProjectId) {
-        console.log('[useCreateTask] Invalidating tasks query for projectId:', selectedProjectId);
-        queryClient.invalidateQueries({ queryKey: ['tasks', selectedProjectId] });
+        console.log('[PollingBreakageIssue] [useCreateTask] Using GALLERY PATTERN invalidation:', {
+          projectId: selectedProjectId,
+          timestamp: Date.now()
+        });
+        
+        // Only invalidate the lightweight status counts
+        queryClient.invalidateQueries({ queryKey: ['task-status-counts', selectedProjectId] });
+        
+        // GALLERY PATTERN: Only invalidate first page (where new tasks appear)
+        queryClient.invalidateQueries({ queryKey: ['tasks', 'paginated', selectedProjectId, 1, 50, undefined] });
+        
+        // Do NOT invalidate other pages - they'll update via realtime
       } else {
-        // If there's no project context, invalidate the generic 'tasks' query
-        // which might be used in other parts of the app
+        // Fallback: invalidate generic queries (should rarely happen)
         console.log('[useCreateTask] Invalidating generic tasks query');
-        queryClient.invalidateQueries({ queryKey: ['tasks'] });
+        queryClient.invalidateQueries({ queryKey: ['task-status-counts'] });
       }
     },
     onError: (error: Error, variables) => {
@@ -159,23 +167,34 @@ export const useGetTask = (taskId: string) => {
   });
 };
 
-// Hook to list tasks
+// DEPRECATED: Hook to list ALL tasks - DO NOT USE with large datasets
+// Use usePaginatedTasks instead for better performance
 export const useListTasks = (params: ListTasksParams) => {
   const { projectId, status } = params;
+  
+  // Add warning for large datasets
+  console.warn('[PollingBreakageIssue] useListTasks is DEPRECATED for performance reasons. Use usePaginatedTasks instead.');
   
   return useQuery<Task[], Error>({
     queryKey: [TASKS_QUERY_KEY, projectId, status],
     queryFn: async () => {
+      console.log('[PollingBreakageIssue] useListTasks query executing - DEPRECATED:', {
+        projectId,
+        status,
+        timestamp: Date.now()
+      });
+      
       if (!projectId) {
         return []; 
       }
       
-      // Build query
+      // Build query with LIMIT to prevent massive queries
       let query = supabase
         .from('tasks')
         .select('*')
         .eq('project_id', projectId)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(100); // CRITICAL: Limit to prevent query storms
 
       // Apply status filter if provided
       if (status && status.length > 0) {
@@ -184,50 +203,140 @@ export const useListTasks = (params: ListTasksParams) => {
 
       const { data, error } = await query;
 
-      if (error) throw error;
+      if (error) {
+        console.error('[PollingBreakageIssue] useListTasks query error:', {
+          projectId,
+          status,
+          error,
+          timestamp: Date.now()
+        });
+        throw error;
+      }
+      
       const tasks = (data || []).map(mapDbTaskToTask);
+      
+      console.log('[PollingBreakageIssue] useListTasks query completed - LIMITED to 100:', {
+        projectId,
+        status,
+        taskCount: tasks.length,
+        timestamp: Date.now()
+      });
+      
       return tasks;
     },
-    enabled: !!projectId, // Only run the query if projectId is available
+    enabled: !!projectId,
+    // CRITICAL: Prevent excessive background refetches
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 };
 
-// Hook to list tasks with pagination
+// Hook to list tasks with pagination - GALLERY PATTERN
 export const usePaginatedTasks = (params: PaginatedTasksParams) => {
   const { projectId, status, limit = 50, offset = 0 } = params;
+  const page = Math.floor(offset / limit) + 1;
   
   return useQuery<PaginatedTasksResponse, Error>({
-    queryKey: [TASKS_QUERY_KEY, 'paginated', projectId, status, limit, offset],
+    // CRITICAL: Use page-based cache keys like gallery
+    queryKey: [TASKS_QUERY_KEY, 'paginated', projectId, page, limit, status],
     queryFn: async () => {
+      console.log('[PollingBreakageIssue] Paginated tasks query - GALLERY PATTERN:', {
+        projectId,
+        page,
+        limit,
+        status,
+        timestamp: Date.now()
+      });
+      
       if (!projectId) {
         return { tasks: [], total: 0, hasMore: false, totalPages: 0 }; 
       }
       
-      // First, get ALL visible tasks for this filter to get accurate count
-      let allTasksQuery = supabase
+      // GALLERY PATTERN: Get count and data separately, efficiently
+      
+      // 1. Get total count with lightweight query
+      let countQuery = supabase
+        .from('tasks')
+        .select('*', { count: 'exact', head: true })
+        .eq('project_id', projectId)
+        .is('params->orchestrator_task_id_ref', null); // Only parent tasks
+
+      if (status && status.length > 0) {
+        countQuery = countQuery.in('status', status);
+      }
+
+      // 2. Get paginated data directly from database with proper status ordering
+      // Since PostgREST doesn't support custom CASE statements in order(),
+      // we'll fetch and sort on client-side, but limit the fetch size
+      let dataQuery = supabase
         .from('tasks')
         .select('*')
         .eq('project_id', projectId)
         .is('params->orchestrator_task_id_ref', null) // Only parent tasks
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(Math.min(limit * 2, 100)); // Fetch 2x records (max 100) for sorting, prevent huge queries
 
-      // Apply status filter if provided
       if (status && status.length > 0) {
-        allTasksQuery = allTasksQuery.in('status', status);
+        dataQuery = dataQuery.in('status', status);
       }
 
-      const { data: allTasksData, error: allTasksError } = await allTasksQuery;
+      // Execute both queries
+      const [{ count, error: countError }, { data, error: dataError }] = await Promise.all([
+        countQuery,
+        dataQuery
+      ]);
       
-      if (allTasksError) throw allTasksError;
+      if (countError) throw countError;
+      if (dataError) throw dataError;
       
-      // Convert and filter to only visible tasks
-      const allTasks = (allTasksData || []).map(mapDbTaskToTask);
-      const allVisibleTasks = filterVisibleTasks(allTasks);
+      // Apply client-side filtering and sorting
+      const allTasks = (data || []).map(mapDbTaskToTask);
+      const visibleTasks = filterVisibleTasks(allTasks);
       
-      // Get the paginated slice
-      const paginatedTasks = allVisibleTasks.slice(offset, offset + limit);
+      // FIXED: Client-side sorting to prioritize "In Progress" over "Queued"
+      const sortedTasks = visibleTasks.sort((a, b) => {
+        // Priority: In Progress (1), Queued (2), Others (3)
+        const getStatusPriority = (status: string) => {
+          switch (status) {
+            case 'In Progress': return 1;
+            case 'Queued': return 2;
+            default: return 3;
+          }
+        };
+        
+        const aPriority = getStatusPriority(a.status);
+        const bPriority = getStatusPriority(b.status);
+        
+        if (aPriority !== bPriority) {
+          return aPriority - bPriority; // Lower number = higher priority
+        }
+        
+        // Within same status, sort by created_at descending (newest first)
+        const aDate = new Date(a.createdAt || 0);
+        const bDate = new Date(b.createdAt || 0);
+        return bDate.getTime() - aDate.getTime();
+      });
       
-      const total = allVisibleTasks.length;
+      // Apply pagination to sorted results
+      const paginatedTasks = sortedTasks.slice(offset, offset + limit);
+      
+      // Debug log to verify sorting is working (throttled to prevent spam)
+      if (paginatedTasks.length > 0 && Math.random() < 0.1) { // Only log 10% of the time
+        const statusCounts = paginatedTasks.reduce((acc, task) => {
+          acc[task.status] = (acc[task.status] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>);
+        console.log('[PollingBreakageIssue] Task sorting applied - status distribution:', {
+          statusCounts,
+          firstTaskStatus: paginatedTasks[0]?.status,
+          totalTasks: paginatedTasks.length,
+          timestamp: Date.now()
+        });
+      }
+      
+      const total = count || 0;
       const totalPages = Math.ceil(total / limit);
       const hasMore = offset + limit < total;
 
@@ -238,7 +347,13 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
         totalPages,
       };
     },
-    enabled: !!projectId, // Only run the query if projectId is available
+    enabled: !!projectId,
+    // CRITICAL: Gallery cache settings - prevent background refetches
+    placeholderData: (previousData) => previousData,
+    staleTime: 2 * 60 * 1000, // 2 minutes
+    gcTime: 5 * 60 * 1000, // 5 minutes  
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 };
 
@@ -425,6 +540,11 @@ export const useTaskStatusCounts = (projectId: string | null) => {
   return useQuery({
     queryKey: ['task-status-counts', projectId],
     queryFn: async () => {
+      console.log('[PollingBreakageIssue] useTaskStatusCounts query executing - backup polling active:', {
+        projectId,
+        timestamp: Date.now()
+      });
+      
       if (!projectId) {
         return { processing: 0, recentSuccesses: 0, recentFailures: 0 };
       }
@@ -440,7 +560,14 @@ export const useTaskStatusCounts = (projectId: string | null) => {
         .in('status', ['Queued', 'In Progress'])
         .is('params->orchestrator_task_id_ref', null); // Only parent tasks
 
-      if (processingError) throw processingError;
+      if (processingError) {
+        console.error('[PollingBreakageIssue] useTaskStatusCounts query error (processing):', {
+          projectId,
+          error: processingError,
+          timestamp: Date.now()
+        });
+        throw processingError;
+      }
 
       // Query for recent successes (last hour)
       const { count: successCount, error: successError } = await supabase
@@ -451,7 +578,14 @@ export const useTaskStatusCounts = (projectId: string | null) => {
         .gte('updated_at', oneHourAgo)
         .is('params->orchestrator_task_id_ref', null); // Only parent tasks
 
-      if (successError) throw successError;
+      if (successError) {
+        console.error('[PollingBreakageIssue] useTaskStatusCounts query error (success):', {
+          projectId,
+          error: successError,
+          timestamp: Date.now()
+        });
+        throw successError;
+      }
 
       // Query for recent failures (last hour)
       const { count: failureCount, error: failureError } = await supabase
@@ -462,13 +596,26 @@ export const useTaskStatusCounts = (projectId: string | null) => {
         .gte('updated_at', oneHourAgo)
         .is('params->orchestrator_task_id_ref', null); // Only parent tasks
 
-      if (failureError) throw failureError;
+      if (failureError) {
+        console.error('[PollingBreakageIssue] useTaskStatusCounts query error (failure):', {
+          projectId,
+          error: failureError,
+          timestamp: Date.now()
+        });
+        throw failureError;
+      }
 
       const result = {
         processing: processingCount || 0,
         recentSuccesses: successCount || 0,
         recentFailures: failureCount || 0,
       };
+      
+      console.log('[PollingBreakageIssue] useTaskStatusCounts query completed:', {
+        projectId,
+        result,
+        timestamp: Date.now()
+      });
       
       return result;
     },

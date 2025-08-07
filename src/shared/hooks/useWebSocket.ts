@@ -146,7 +146,10 @@ export function useWebSocket(projectId: string | null) {
             // Keep broadcast handling for backwards compatibility and custom events
             switch (message.type) {
               case 'TASK_CREATED':
-                scheduleInvalidation(['tasks', { projectId }]);
+                console.log('[PollingBreakageIssue] TASK_CREATED broadcast, using GALLERY PATTERN invalidation');
+                scheduleInvalidation(['task-status-counts', projectId]);
+                // Only invalidate first page where new tasks appear
+                scheduleInvalidation(['tasks', 'paginated', projectId, 1, 50, undefined]);
                 break;
 
               case 'TASK_COMPLETED':
@@ -154,12 +157,24 @@ export function useWebSocket(projectId: string | null) {
                   projectId,
                   timestamp: Date.now()
                 });
-                scheduleInvalidation(['tasks', { projectId }]);
+                console.log('[PollingBreakageIssue] TASK_COMPLETED broadcast, using GALLERY PATTERN invalidation');
+                scheduleInvalidation(['task-status-counts', projectId]);
+                // Invalidate all cached task pages since status changes can move tasks between filters
+                const taskQueries = queryClient.getQueriesData({
+                  queryKey: ['tasks', 'paginated', projectId]
+                });
+                taskQueries.forEach(([queryKey]) => scheduleInvalidation(queryKey));
                 scheduleInvalidation(['generations', projectId]);
                 break;
 
               case 'TASKS_STATUS_UPDATE':
-                scheduleInvalidation(['tasks', { projectId }]);
+                console.log('[PollingBreakageIssue] TASKS_STATUS_UPDATE broadcast, using GALLERY PATTERN invalidation');
+                scheduleInvalidation(['task-status-counts', projectId]);
+                // Invalidate cached task pages since status changes can move tasks between filters
+                const statusUpdateQueries = queryClient.getQueriesData({
+                  queryKey: ['tasks', 'paginated', projectId]
+                });
+                statusUpdateQueries.forEach(([queryKey]) => scheduleInvalidation(queryKey));
                 break;
 
               case 'GENERATIONS_UPDATED':
@@ -199,9 +214,29 @@ export function useWebSocket(projectId: string | null) {
             const newRecord = payload.new as any;
             const oldRecord = payload.old as any;
             
-            // Optimized invalidation: Only invalidate the most specific queries needed
-            scheduleInvalidation(['tasks', { projectId }]);
+            // FIXED: Use targeted invalidation to prevent cascade storms
+            console.log('[PollingBreakageIssue] Task status changed, using SMART invalidation:', {
+              projectId,
+              taskId: payload.new?.id,
+              newStatus: newRecord?.status,
+              timestamp: Date.now()
+            });
+            
+            // Strategy: Only invalidate queries that are currently cached and relevant
+            // This prevents the massive invalidation storm we were seeing
+            
+            // Always invalidate status counts (lightweight)
             scheduleInvalidation(['task-status-counts', projectId]);
+            
+            // Only invalidate first page of Processing tasks (where status changes matter most)
+            // Use the exact same cache key format as usePaginatedTasks
+            const processingStatuses = ['Queued', 'In Progress'];
+            scheduleInvalidation(['tasks', 'paginated', projectId, 1, 50, processingStatuses]);
+            
+            // Only invalidate video outputs if this was a task completion
+            if (newRecord?.status === 'Complete' && oldRecord?.status !== 'Complete') {
+              scheduleInvalidation(['video-outputs', projectId]);
+            }
             
             // If task completed, also invalidate generations
             if (newRecord?.status === 'Complete' && oldRecord?.status !== 'Complete') {

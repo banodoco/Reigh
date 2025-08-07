@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { useListTasks, type PaginatedTasksResponse } from '@/shared/hooks/useTasks';
+import { type PaginatedTasksResponse } from '@/shared/hooks/useTasks';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import TaskItem from './TaskItem';
 import { TaskStatus, Task } from '@/types/tasks';
@@ -87,28 +87,10 @@ const TaskList: React.FC<TaskListProps> = ({
   }, [filterStatuses, currentPage]);
 
   // Filter out travel_segment and travel_stitch tasks so they do not appear in the sidebar
+  // NOTE: Sorting is now done at the query level in usePaginatedTasks for better performance
   const filteredTasks = useMemo(() => {
     if (!tasks) return [] as Task[];
-    const visibleTasks = filterVisibleTasks(tasks);
-    // Sort: In Progress first, then by status-specific ordering
-    return visibleTasks.sort((a, b) => {
-      const aInProgress = a.status === 'In Progress';
-      const bInProgress = b.status === 'In Progress';
-      if (aInProgress && !bInProgress) return -1;
-      if (!aInProgress && bInProgress) return 1;
-      
-      // Handle both createdAt and created_at field names
-      const aDate = new Date((a.createdAt || (a as any).created_at) || 0);
-      const bDate = new Date((b.createdAt || (b as any).created_at) || 0);
-      
-      // For Queued tasks, sort in ascending order (oldest first)
-      if (a.status === 'Queued' && b.status === 'Queued') {
-        return aDate.getTime() - bDate.getTime();
-      }
-      
-      // For all other tasks, sort in descending order (newest first)
-      return bDate.getTime() - aDate.getTime();
-    });
+    return filterVisibleTasks(tasks);
   }, [tasks]);
 
   const summaryMessage = useMemo(() => {

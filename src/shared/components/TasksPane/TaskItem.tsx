@@ -9,7 +9,7 @@ import {
 import { Button } from "@/shared/components/ui/button";
 import { Task } from '@/types/tasks';
 import { getTaskDisplayName, taskSupportsProgress } from '@/shared/lib/taskConfig';
-import { useListTasks, useCancelTask } from '@/shared/hooks/useTasks';
+import { useCancelTask } from '@/shared/hooks/useTasks';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { useToast } from '@/shared/hooks/use-toast';
 import { toast } from 'sonner';
@@ -71,8 +71,8 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
   // Mutations
   const cancelTaskMutation = useCancelTask(selectedProjectId);
 
-  // Access all tasks for project (used for progress checking)
-  const { data: allProjectTasks, refetch: refetchAllTasks } = useListTasks({ projectId: selectedProjectId });
+  // Progress checking will be done via direct API calls when needed
+  // No longer loading all 1000+ tasks into memory
 
   // Shot-related hooks
   const { data: shots } = useListShots(selectedProjectId);
@@ -295,34 +295,41 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
     });
   };
 
-  // Always refetch the latest tasks before computing progress so that we use
-  // up-to-date information rather than potentially stale cached data.
-  const handleCheckProgress = () => {
+  // Fetch tasks directly for progress checking - no more deprecated useListTasks
+  const handleCheckProgress = async () => {
     console.log('[TaskProgressDebug] Check Progress clicked for task:', task.id, 'taskType:', task.taskType);
-    console.log('[TaskProgressDebug] Current allProjectTasks length:', allProjectTasks?.length || 0);
+    console.log('[PollingBreakageIssue] TaskItem progress check - using direct API call instead of deprecated useListTasks');
     
-    refetchAllTasks()
-      .then(({ data }) => {
-        console.log('[TaskProgressDebug] Refetch completed, data length:', data?.length || 0);
-        // Prefer freshly-fetched data when available
-        if (data && data.length > 0) {
-          console.log('[TaskProgressDebug] Using freshly fetched data');
-          computeAndShowProgress(data);
-        } else if (allProjectTasks) {
-          console.log('[TaskProgressDebug] Using cached allProjectTasks');
-          // Fallback to existing cached data if refetch didn't return anything
-          computeAndShowProgress(allProjectTasks);
-        } else {
-          console.log('[TaskProgressDebug] No data available for progress computation');
-        }
-      })
-      .catch(() => {
-        console.log('[TaskProgressDebug] Refetch failed, using cached data if available');
-        // If refetch fails, still attempt to compute progress from cached data
-        if (allProjectTasks) {
-          computeAndShowProgress(allProjectTasks);
-        }
-      });
+    if (!selectedProjectId) {
+      console.error('[TaskProgressDebug] No project selected');
+      return;
+    }
+    
+    try {
+      // Direct API call for progress checking - only fetch what we need
+      const { data: tasks, error } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('project_id', selectedProjectId)
+        .order('created_at', { ascending: false })
+        .limit(500); // Reasonable limit for progress checking
+        
+      if (error) throw error;
+      
+      console.log('[TaskProgressDebug] Fetched tasks for progress:', tasks?.length || 0);
+      console.log('[PollingBreakageIssue] TaskItem progress check completed successfully');
+      
+      if (tasks) {
+        computeAndShowProgress(tasks);
+      } else {
+        console.log('[TaskProgressDebug] No data available for progress computation');
+        toast.error('Failed to load tasks for progress computation');
+      }
+    } catch (error) {
+      console.error('[TaskProgressDebug] Error fetching tasks for progress:', error);
+      console.error('[PollingBreakageIssue] TaskItem progress check failed:', error);
+      toast.error('Failed to load tasks for progress computation');
+    }
   };
 
   const computeAndShowProgress = (tasksData: Task[]) => {
