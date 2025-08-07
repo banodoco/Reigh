@@ -1,0 +1,94 @@
+import React, { useMemo } from 'react';
+import { formatDistanceToNow, isValid } from 'date-fns';
+import { useTimestampUpdater } from './useTimestampUpdater';
+
+/**
+ * Simple hook that returns a live-updating formatted timestamp string
+ * Perfect for inline timestamps in task lists, galleries, etc.
+ */
+
+interface UseUpdatingTimestampOptions {
+  /** Date to format */
+  date?: string | Date | null;
+  /** Custom abbreviation function */
+  abbreviate?: (str: string) => string;
+  /** Disable automatic updates */
+  disabled?: boolean;
+}
+
+// Default abbreviation function
+const defaultAbbreviate = (str: string) => {
+  // Handle "less than a minute ago" special case
+  if (str.includes('less than a minute')) {
+    return '<1 min ago';
+  }
+  
+  return str
+    .replace(/1 minutes ago/, '1 min ago')
+    .replace(/1 hours ago/, '1 hr ago')
+    .replace(/1 seconds ago/, '1 sec ago')
+    .replace(/1 days ago/, '1 day ago')
+    .replace(/minutes?/, 'mins')
+    .replace(/hours?/, 'hrs')
+    .replace(/seconds?/, 'secs')
+    .replace(/days?/, 'days');
+};
+
+/**
+ * Hook that returns a formatted, live-updating timestamp string
+ * 
+ * @example
+ * const timeAgo = useUpdatingTimestamp({ date: task.createdAt });
+ * return <span>Created: {timeAgo}</span>;
+ */
+export function useUpdatingTimestamp({ 
+  date, 
+  abbreviate = defaultAbbreviate,
+  disabled = false 
+}: UseUpdatingTimestampOptions = {}) {
+  
+  const parsedDate = useMemo(() => {
+    if (!date) return null;
+    const parsed = typeof date === 'string' ? new Date(date) : date;
+    return isValid(parsed) ? parsed : null;
+  }, [date]);
+  
+  // Get live update trigger
+  const { updateTrigger } = useTimestampUpdater({
+    date: parsedDate,
+    disabled,
+    isVisible: true // Explicitly set to ensure TaskPane timestamps update
+  });
+  
+  // Debug logging for task timestamps
+  React.useEffect(() => {
+    if (parsedDate && parsedDate.getTime() > Date.now() - 24 * 60 * 60 * 1000) { // Only log for recent tasks
+      console.log('[TimestampDebug] Task timestamp hook:', {
+        date: parsedDate.toISOString(),
+        updateTrigger,
+        age: Date.now() - parsedDate.getTime(),
+        timestamp: Date.now()
+      });
+    }
+  }, [updateTrigger, parsedDate]);
+  
+  // Format timestamp with live updates
+  const formattedTime = useMemo(() => {
+    if (!parsedDate) return 'Unknown';
+    
+    const formatted = formatDistanceToNow(parsedDate, { addSuffix: true });
+    return abbreviate(formatted);
+  }, [parsedDate?.getTime(), updateTrigger, abbreviate]);
+  
+  return formattedTime;
+}
+
+/**
+ * Hook specifically for task timestamps with consistent abbreviation
+ */
+export function useTaskTimestamp(date?: string | Date | null) {
+  return useUpdatingTimestamp({ 
+    date,
+    abbreviate: defaultAbbreviate 
+  });
+}
