@@ -216,6 +216,15 @@ tool-name/
 
 ---
 
+**Service-Role Active Task Filtering (Latest):**
+- New migration `20250808000001_filter_active_to_cloud_for_service_role.sql` refines how the service role counts active tasks.
+- When `include_active=true` in service-role analysis/counts, only cloud-claimed In Progress tasks are included (identified by non-null `worker_id`). Local user-claimed tasks are excluded from this path.
+- Introduced/updated SQL functions:
+  - `count_eligible_tasks_service_role(p_include_active boolean)`
+  - `analyze_task_availability_service_role(p_include_active boolean)`
+- Rationale: Align service role scheduling with cloud capacity by excluding local runs from active task pressure.
+
+
 ### 🔄 Shared Elements (`/src/shared/`)
 
 For the complete catalog, see [`shared_hooks_contexts.md`](structure_detail/shared_hooks_contexts.md).
