@@ -4,9 +4,27 @@ import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { RealtimeChannel } from '@supabase/supabase-js';
 
-// Simple logging function for performance debugging
+  // Simple logging function for performance debugging
 const log = (category: string, message: string, data?: any) => {
   console.log(`[${category}] ${message}`, data);
+};
+
+// Throttle function to prevent excessive invalidations of the same key
+const createThrottledInvalidation = () => {
+  const lastInvalidationTimes = new Map<string, number>();
+  const THROTTLE_DELAY = 500; // Don't invalidate the same key more than once per 500ms
+  
+  return (key: any): boolean => {
+    const keyString = JSON.stringify(key);
+    const now = Date.now();
+    const lastTime = lastInvalidationTimes.get(keyString) || 0;
+    
+    if (now - lastTime > THROTTLE_DELAY) {
+      lastInvalidationTimes.set(keyString, now);
+      return true; // Allow invalidation
+    }
+    return false; // Skip invalidation (too recent)
+  };
 };
 
 export function useWebSocket(projectId: string | null) {
@@ -25,8 +43,18 @@ export function useWebSocket(projectId: string | null) {
   // Using `JSON.stringify` to store keys allows us to dedupe array/object keys in a Set.
   const flushTimerRef = useRef<NodeJS.Timeout | null>(null);
   const pendingInvalidationsRef = useRef<Set<string>>(new Set());
+  const shouldThrottle = useRef(createThrottledInvalidation());
 
   const scheduleInvalidation = (key: any) => {
+    // Check if this key should be throttled
+    if (!shouldThrottle.current(key)) {
+      console.log('[VideoLoadSpeedIssue] Skipped invalidation (throttled):', {
+        queryKey: key,
+        timestamp: Date.now()
+      });
+      return;
+    }
+    
     pendingInvalidationsRef.current.add(JSON.stringify(key));
     
     console.log('[VideoLoadSpeedIssue] Scheduled invalidation:', {
@@ -38,39 +66,40 @@ export function useWebSocket(projectId: string | null) {
 
     if (!flushTimerRef.current) {
       flushTimerRef.current = setTimeout(() => {
-        log('PerfDebug:WebSocketFlush', `Flushing ${pendingInvalidationsRef.current.size} invalidations`);
+        const invalidationCount = pendingInvalidationsRef.current.size;
+        log('PerfDebug:WebSocketFlush', `Flushing ${invalidationCount} invalidations`);
         
         console.log('[VideoLoadSpeedIssue] Flushing invalidations:', {
-          count: pendingInvalidationsRef.current.size,
+          count: invalidationCount,
           keys: Array.from(pendingInvalidationsRef.current),
           timestamp: Date.now()
         });
 
+        let successCount = 0;
         pendingInvalidationsRef.current.forEach((keyString) => {
           try {
             const parsedKey = JSON.parse(keyString);
-            console.log('[VideoLoadSpeedIssue] Invalidating query:', {
-              originalKey: keyString,
-              parsedKey,
-              timestamp: Date.now()
-            });
             queryClient.invalidateQueries({ queryKey: parsedKey });
+            successCount++;
           } catch (err) {
             // Fallback for primitive keys that can't be parsed
-            console.log('[VideoLoadSpeedIssue] Invalidating query (fallback):', {
+            console.warn('[VideoLoadSpeedIssue] Failed to parse query key:', {
               keyString,
               error: err,
               timestamp: Date.now()
             });
             queryClient.invalidateQueries({ queryKey: keyString as any });
+            successCount++;
           }
         });
+        
         pendingInvalidationsRef.current.clear();
         flushTimerRef.current = null;
         console.log('[VideoLoadSpeedIssue] Invalidation flush completed:', {
+          processed: successCount,
           timestamp: Date.now()
         });
-      }, 100); // Flush once every 100 ms max
+      }, 200); // Flush once every 200 ms max (reduced frequency)
     }
   };
   // --- END batching invalidations logic ---
@@ -123,11 +152,9 @@ export function useWebSocket(projectId: string | null) {
               case 'TASK_COMPLETED':
                 console.log('[VideoLoadSpeedIssue] TASK_COMPLETED broadcast received:', {
                   projectId,
-                  payload: message.payload,
                   timestamp: Date.now()
                 });
                 scheduleInvalidation(['tasks', { projectId }]);
-                scheduleInvalidation(['tasks']);
                 scheduleInvalidation(['generations', projectId]);
                 break;
 
@@ -172,12 +199,8 @@ export function useWebSocket(projectId: string | null) {
             const newRecord = payload.new as any;
             const oldRecord = payload.old as any;
             
-            // Invalidate tasks queries on any update
+            // Optimized invalidation: Only invalidate the most specific queries needed
             scheduleInvalidation(['tasks', { projectId }]);
-            scheduleInvalidation(['tasks']);
-            
-            // Also invalidate task status counts since any status change affects counts
-            console.log(`[${Date.now()}] [WebSocket] Invalidating task status counts for projectId:`, projectId);
             scheduleInvalidation(['task-status-counts', projectId]);
             
             // If task completed, also invalidate generations
@@ -204,8 +227,6 @@ export function useWebSocket(projectId: string | null) {
               generationId: newRecord?.id,
               projectId: newRecord?.project_id,
               type: newRecord?.type,
-              params: newRecord?.params,
-              paramsKeys: newRecord?.params ? Object.keys(newRecord.params) : 'no params',
               timestamp: Date.now()
             });
             
@@ -215,25 +236,15 @@ export function useWebSocket(projectId: string | null) {
             
             // If there's a shot_id in params, invalidate that specific shot
             const shotId = newRecord?.params?.shotId || newRecord?.params?.shot_id;
-            console.log('[VideoLoadSpeedIssue] Extracted shotId for invalidation:', {
-              shotId,
-              shotIdFromCamelCase: newRecord?.params?.shotId,
-              shotIdFromSnakeCase: newRecord?.params?.shot_id,
-              willInvalidateShot: !!shotId,
-              timestamp: Date.now()
-            });
             
             if (shotId) {
               scheduleInvalidation(['shots', shotId]);
               // CRITICAL: Also invalidate the all-shot-generations query used by ShotEditor
               scheduleInvalidation(['all-shot-generations', shotId]);
-              console.log('[VideoLoadSpeedIssue] Scheduled invalidation for shot-specific queries:', {
+              console.log('[VideoLoadSpeedIssue] Scheduled shot invalidation:', {
                 shotId,
-                queryKeys: [`shots:${shotId}`, `all-shot-generations:${shotId}`],
                 timestamp: Date.now()
               });
-            } else {
-              console.warn('[VideoLoadSpeedIssue] No shotId found in generation params - shot-specific invalidations skipped');
             }
           }
         )
@@ -250,12 +261,9 @@ export function useWebSocket(projectId: string | null) {
             const record = payload.new || payload.old;
             const shotId = (record as any)?.shot_id;
             
-            console.log('[VideoLoadSpeedIssue] Shot generation change detected:', {
+            console.log('[VideoLoadSpeedIssue] Shot generation change:', {
               event: payload.eventType,
               shotId,
-              generationId: (record as any)?.generation_id,
-              position: (record as any)?.position,
-              recordKeys: record ? Object.keys(record) : 'no record',
               timestamp: Date.now()
             });
             
@@ -266,13 +274,6 @@ export function useWebSocket(projectId: string | null) {
             // CRITICAL: Also invalidate the specific shot's all-shot-generations query
             if (shotId) {
               scheduleInvalidation(['all-shot-generations', shotId]);
-              console.log('[VideoLoadSpeedIssue] Scheduled shot_generations invalidation:', {
-                shotId,
-                queryKey: `all-shot-generations:${shotId}`,
-                timestamp: Date.now()
-              });
-            } else {
-              console.warn('[VideoLoadSpeedIssue] No shotId in shot_generations change - skipping shot-specific invalidation');
             }
           }
         )
