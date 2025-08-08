@@ -30,6 +30,8 @@ import { ImageManagerSkeleton } from './ui/Skeleton';
 import { filterAndSortShotImages, getNonVideoImages, getVideoOutputs } from './utils/generation-utils';
 import { getDimensions, DEFAULT_RESOLUTION } from './utils/dimension-utils';
 import { ASPECT_RATIO_TO_RESOLUTION, findClosestAspectRatio } from '@/shared/lib/aspectRatios';
+import { supabase } from '@/integrations/supabase/client';
+import { useAddImageToShot, useRemoveImageFromShot } from '@/shared/hooks/useShots';
 
 const ShotEditor: React.FC<ShotEditorProps> = ({
   selectedShotId,
@@ -319,9 +321,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // Handle model changes with automatic settings adjustment
   const handleModelChange = useCallback((modelName: string) => {
     if (modelName === 'vace_14B_cocktail_2_2') {
-      // Wan 2.2 specific settings - use vace_14B_fakeface as the actual model_name
+      // Wan 2.2 specific settings - select vace_14B_cocktail_2_2 as the actual model_name
       onSteerableMotionSettingsChange({ 
-        model_name: 'vace_14B_fakeface',
+        model_name: 'vace_14B_cocktail_2_2',
         apply_causvid: false // Disable causvid for Wan 2.2
       });
       
@@ -441,6 +443,171 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const videoOutputs = useMemo(() => {
     return getVideoOutputs(filteredOrderedShotImages);
   }, [filteredOrderedShotImages]);
+
+  // Mutations for applying settings/images from a task
+  const addImageToShotMutation = useAddImageToShot();
+  const removeImageFromShotMutation = useRemoveImageFromShot();
+
+  const applySettingsFromTask = useCallback(async (taskId: string, replaceImages: boolean, inputImages: string[]) => {
+    try {
+      // Fetch the task to extract params
+      const { data: taskRow, error } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('id', taskId)
+        .single();
+      if (error || !taskRow) {
+        return;
+      }
+
+      const params: any = taskRow.params || {};
+      const orchestrator: any = params.full_orchestrator_payload || {};
+
+      // Extract settings with sensible fallbacks
+      const newPrompt: string | undefined = orchestrator.base_prompts_expanded?.[0] ?? params.prompt;
+      const newNegativePrompt: string | undefined = orchestrator.negative_prompts_expanded?.[0] ?? params.negative_prompt;
+      const newSteps: number | undefined = orchestrator.steps ?? params.num_inference_steps;
+      const newFrames: number | undefined = orchestrator.segment_frames_expanded?.[0] ?? params.segment_frames_expanded;
+      const newContext: number | undefined = (params.frame_overlap_settings_expanded?.[0]) ?? orchestrator.frame_overlap_expanded?.[0] ?? params.frame_overlap_expanded;
+      const newModel: string | undefined = params.model_name || orchestrator.model_name;
+      const parsedResolution: string | undefined = params.parsed_resolution_wh;
+
+      if (newModel && newModel !== steerableMotionSettings.model_name) {
+        // Apply model first so we can override steps after
+        handleModelChange(newModel);
+      }
+
+      if (typeof newPrompt === 'string') {
+        onBatchVideoPromptChange(newPrompt);
+      }
+      if (typeof newNegativePrompt === 'string') {
+        onSteerableMotionSettingsChange({ negative_prompt: newNegativePrompt });
+      }
+      if (typeof newFrames === 'number' && !Number.isNaN(newFrames)) {
+        onBatchVideoFramesChange(newFrames);
+      }
+      if (typeof newContext === 'number' && !Number.isNaN(newContext)) {
+        onBatchVideoContextChange(newContext);
+      }
+      if (typeof newSteps === 'number' && !Number.isNaN(newSteps)) {
+        // Override any model-based defaults with the exact task steps
+        onBatchVideoStepsChange(newSteps);
+      }
+
+      if (typeof parsedResolution === 'string' && /^(\d+)x(\d+)$/.test(parsedResolution)) {
+        const match = parsedResolution.match(/^(\d+)x(\d+)$/);
+        if (match) {
+          const [, w, h] = match;
+          onDimensionSourceChange('custom');
+          onCustomWidthChange(parseInt(w, 10));
+          onCustomHeightChange(parseInt(h, 10));
+        }
+      }
+
+      // Replace images if requested
+      if (replaceImages && selectedShot?.id && projectId) {
+        try {
+          // Remove existing non-video images
+          const deletions = nonVideoImages
+            .filter(img => !!img.shotImageEntryId)
+            .map(img => removeImageFromShotMutation.mutateAsync({
+              shot_id: selectedShot.id,
+              shotImageEntryId: img.shotImageEntryId!,
+              project_id: projectId,
+            }));
+          if (deletions.length > 0) {
+            await Promise.allSettled(deletions);
+          }
+
+          // Add input images in order
+          const additions = (inputImages || []).map(url => addImageToShotMutation.mutateAsync({
+            shot_id: selectedShot.id,
+            generation_id: '',
+            project_id: projectId,
+            imageUrl: url,
+            thumbUrl: url,
+          }));
+          if (additions.length > 0) {
+            await Promise.allSettled(additions);
+          }
+        } catch (e) {
+          console.error('Error replacing images from task:', e);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to apply settings from task:', e);
+    }
+  }, [
+    projectId,
+    selectedShot?.id,
+    nonVideoImages,
+    handleModelChange,
+    onBatchVideoPromptChange,
+    onSteerableMotionSettingsChange,
+    onBatchVideoFramesChange,
+    onBatchVideoContextChange,
+    onBatchVideoStepsChange,
+    onDimensionSourceChange,
+    onCustomWidthChange,
+    onCustomHeightChange,
+    addImageToShotMutation,
+    removeImageFromShotMutation,
+  ]);
+
+  const applySettingsDirect = useCallback((settings: any) => {
+    try {
+      const orchestrator: any = settings?.full_orchestrator_payload || {};
+      const newPrompt: string | undefined = orchestrator.base_prompts_expanded?.[0] ?? settings?.prompt;
+      const newNegativePrompt: string | undefined = orchestrator.negative_prompts_expanded?.[0] ?? settings?.negative_prompt;
+      const newSteps: number | undefined = orchestrator.steps ?? settings?.num_inference_steps;
+      const newFrames: number | undefined = orchestrator.segment_frames_expanded?.[0] ?? settings?.segment_frames_expanded;
+      const newContext: number | undefined = (settings?.frame_overlap_settings_expanded?.[0]) ?? orchestrator.frame_overlap_expanded?.[0] ?? settings?.frame_overlap_expanded;
+      const newModel: string | undefined = settings?.model_name || orchestrator.model_name;
+      const parsedResolution: string | undefined = settings?.parsed_resolution_wh;
+
+      if (newModel && newModel !== steerableMotionSettings.model_name) {
+        handleModelChange(newModel);
+      }
+      if (typeof newPrompt === 'string') {
+        onBatchVideoPromptChange(newPrompt);
+      }
+      if (typeof newNegativePrompt === 'string') {
+        onSteerableMotionSettingsChange({ negative_prompt: newNegativePrompt });
+      }
+      if (typeof newFrames === 'number' && !Number.isNaN(newFrames)) {
+        onBatchVideoFramesChange(newFrames);
+      }
+      if (typeof newContext === 'number' && !Number.isNaN(newContext)) {
+        onBatchVideoContextChange(newContext);
+      }
+      if (typeof newSteps === 'number' && !Number.isNaN(newSteps)) {
+        onBatchVideoStepsChange(newSteps);
+      }
+      if (typeof parsedResolution === 'string' && /^(\d+)x(\d+)$/.test(parsedResolution)) {
+        const match = parsedResolution.match(/^(\d+)x(\d+)$/);
+        if (match) {
+          const [, w, h] = match;
+          onDimensionSourceChange('custom');
+          onCustomWidthChange(parseInt(w, 10));
+          onCustomHeightChange(parseInt(h, 10));
+        }
+      }
+
+    } catch (e) {
+      console.error('Failed to apply settings:', e);
+    }
+  }, [
+    handleModelChange,
+    onBatchVideoPromptChange,
+    onSteerableMotionSettingsChange,
+    onBatchVideoFramesChange,
+    onBatchVideoContextChange,
+    onBatchVideoStepsChange,
+    onDimensionSourceChange,
+    onCustomWidthChange,
+    onCustomHeightChange,
+    steerableMotionSettings.model_name,
+  ]);
 
   // Early return check after all hooks are called (Rules of Hooks)
   if (!selectedShot) {
@@ -681,8 +848,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           videoOutputs={videoOutputs} 
           onDelete={generationActions.handleDeleteVideoOutput}
           deletingVideoId={state.deletingVideoId}
-          onApplySettings={() => {}} // TODO: implement
-          onApplySettingsFromTask={() => {}} // TODO: implement
+          onApplySettings={applySettingsDirect}
+          onApplySettingsFromTask={applySettingsFromTask}
         />
       </div>
 
