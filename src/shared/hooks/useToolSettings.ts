@@ -50,10 +50,21 @@ interface UpdateToolSettingsParams {
  * Fetch and merge tool settings from all scopes using direct Supabase calls
  * This replaces the Express API approach for better mobile reliability
  */
+// Helper function to add timeout to auth calls
+async function getUserWithTimeout(timeoutMs = 5000) {
+  return Promise.race([
+    supabase.auth.getUser(),
+    new Promise<{ data: { user: null }, error: Error }>((_, reject) =>
+      setTimeout(() => reject(new Error('Auth timeout - please check your connection')), timeoutMs)
+    )
+  ]);
+}
+
 async function fetchToolSettingsSupabase(toolId: string, ctx: ToolSettingsContext): Promise<unknown> {
   try {
     // Mobile optimization: Cache user info to avoid repeated auth calls
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    // Add timeout to prevent hanging on mobile connections
+    const { data: { user }, error: authError } = await getUserWithTimeout(5000);
     if (authError || !user) {
       throw new Error('Authentication required');
     }
@@ -114,6 +125,10 @@ async function fetchToolSettingsSupabase(toolId: string, ctx: ToolSettingsContex
     // Mobile-friendly error handling - provide more context
     if (error?.message?.includes('Failed to fetch')) {
       throw new Error('Network connection issue. Please check your internet connection.');
+    }
+    if (error?.message?.includes('Auth timeout')) {
+      console.warn('[fetchToolSettingsSupabase] Auth timeout - continuing with defaults');
+      throw new Error('Authentication timeout - using default settings');
     }
     throw error;
   }
@@ -237,8 +252,8 @@ export function useToolSettings<T>(
       let idForScope: string | undefined;
       
       if (scope === 'user') {
-        // Get userId from auth for user scope
-        const { data: { user } } = await supabase.auth.getUser();
+        // Get userId from auth for user scope with timeout protection
+        const { data: { user } } = await getUserWithTimeout(5000);
         idForScope = user?.id;
       } else if (scope === 'project') {
         idForScope = projectId;

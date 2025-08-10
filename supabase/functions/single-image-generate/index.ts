@@ -117,11 +117,10 @@ serve(async (req) => {
     const orchestratorPayload: Record<string, unknown> = {
       run_id: runId,
       prompt: body.prompt,
-      model: body.model_name ?? "vace_14B",
+      model: body.model_name ?? "optimised-t2i",
       resolution: finalResolution,
       seed: body.seed ?? 11111,
       negative_prompt: body.negative_prompt ?? "",
-      use_causvid_lora: true,
     };
 
     if (additionalLoras) {
@@ -137,6 +136,9 @@ serve(async (req) => {
         params: {
           orchestrator_details: orchestratorPayload,
           task_id: taskId,
+          model: body.model_name ?? "optimised-t2i",
+          prompt: body.prompt,
+          resolution: finalResolution,
           ...(body.shot_id ? { shot_id: body.shot_id } : {}),
         },
         status: "Queued",

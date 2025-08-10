@@ -3,6 +3,7 @@ import { Shot, GenerationRow } from '../../../types/shots'; // Corrected import 
 import { useUpdateShotName, useDeleteShot, useDuplicateShot } from '../../../shared/hooks/useShots'; // Import new hooks
 import { Input } from '@/shared/components/ui/input';
 import { Button } from '@/shared/components/ui/button';
+import { Skeleton } from '@/shared/components/ui/skeleton';
 import { Pencil, Trash2, Check, X, Copy, GripVertical } from 'lucide-react'; // Icons
 import { toast } from 'sonner';
 import { getDisplayUrl } from '@/shared/lib/utils';
@@ -16,9 +17,126 @@ interface VideoShotDisplayProps {
     disabled?: boolean;
     [key: string]: any; // For drag attributes and listeners
   };
+  shouldLoadImages?: boolean;
+  shotIndex?: number;
 }
 
-const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot, currentProjectId, dragHandleProps }) => {
+// Component for individual shot image with loading state
+interface ShotImageProps {
+  image: GenerationRow;
+  index: number;
+  onSelectShot: () => void;
+  shotName: string;
+  shouldLoad?: boolean;
+  shotIndex?: number;
+}
+
+const ShotImage: React.FC<ShotImageProps> = ({ image, index, onSelectShot, shotName, shouldLoad = true, shotIndex = 0 }) => {
+  // Handle both old and new field naming conventions
+  const imageUrl = image.imageUrl || image.location;
+  const thumbUrl = image.thumbUrl || (image as any).thumb_url;
+  const displayUrl = getDisplayUrl(thumbUrl || imageUrl);
+  
+  // Check if image is already cached by browser (similar to ImageGallery approach)
+  const checkIfImageCached = (url: string): boolean => {
+    if (!url) return false;
+    
+    try {
+      const testImg = new Image();
+      testImg.src = url;
+      // If image is cached, complete will be true immediately
+      return testImg.complete && testImg.naturalWidth > 0;
+    } catch {
+      return false;
+    }
+  };
+  
+  const isImageCached = checkIfImageCached(displayUrl);
+  const [imageLoaded, setImageLoaded] = useState(isImageCached);
+  const [imageLoadError, setImageLoadError] = useState(false);
+
+  console.log(`[ShotImage-${index}] Rendering image:`, {
+    imageUrl,
+    thumbUrl,
+    displayUrl,
+    hasImageUrl: !!imageUrl,
+    hasThumbUrl: !!thumbUrl,
+    hasDisplayUrl: !!displayUrl,
+    isImageCached,
+    imageLoaded,
+    shouldLoad
+  });
+
+  const handleImageLoad = () => {
+    console.log(`[ShotImage-${index}] Image loaded successfully`);
+    setImageLoaded(true);
+  };
+
+  const handleImageError = () => {
+    console.error(`[ShotImage-${index}] Image failed to load:`, { displayUrl });
+    setImageLoadError(true);
+  };
+
+  // Don't render anything if we don't have a valid URL
+  if (!displayUrl) {
+    console.warn(`[ShotImage-${index}] No valid URL found for image:`, image);
+    return null;
+  }
+
+  return (
+    <div 
+      className="flex-shrink-0 w-32 h-32 rounded overflow-hidden border cursor-pointer hover:shadow-md transition-shadow duration-200 hover:scale-[1.02] transform transition-transform relative bg-gray-200"
+      style={{ 
+        animationDelay: `${index * 0.1}s`
+      }}
+      onClick={(e) => {
+        e.stopPropagation();
+        onSelectShot();
+      }}
+    >
+      {imageLoadError ? (
+        // Error state
+        <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-gray-100 text-gray-500">
+          <div className="text-center">
+            <div className="h-4 w-4 mx-auto mb-1 opacity-50">⚠️</div>
+            <p className="text-xs">Failed to load</p>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Show image once it's loaded */}
+          {imageLoaded && (
+            <img
+              src={displayUrl}
+              alt={`Shot image ${index + 1} for ${shotName}`}
+              className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+            />
+          )}
+          
+          {/* Hidden image for background loading - only start loading when shouldLoad is true OR image is cached */}
+          {!imageLoaded && (shouldLoad || isImageCached) && (
+            <img
+              src={displayUrl}
+              alt={`Shot image ${index + 1} for ${shotName}`}
+              style={{ display: 'none' }}
+              onLoad={handleImageLoad}
+              onError={handleImageError}
+            />
+          )}
+          
+          {/* Show skeleton only while the image is still loading */}
+          {!imageLoaded && (
+            <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-gray-200 animate-pulse">
+              <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-gray-400"></div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+};
+
+const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot, currentProjectId, dragHandleProps, shouldLoadImages = true, shotIndex = 0 }) => {
   const [isEditingName, setIsEditingName] = useState(false);
   const [editableName, setEditableName] = useState(shot.name);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -138,6 +256,21 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
   const imagesOnly = shot.images?.filter(image => image.type !== 'video' && image.type !== 'video_travel_output') || [];
   const imagesToShow: GenerationRow[] = imagesOnly.slice(0, 5);
 
+  // Debug logging
+  console.log(`[VideoShotDisplay] Shot "${shot.name}" (index ${shotIndex}):`, {
+    totalImages: shot.images?.length || 0,
+    imagesOnly: imagesOnly.length,
+    imagesToShow: imagesToShow.length,
+    shouldLoadImages,
+    isPriority: shotIndex < 3,
+    shotImages: shot.images?.map(img => ({
+      id: img.id,
+      type: img.type,
+      hasImageUrl: !!(img.imageUrl || img.location),
+      hasThumbUrl: !!(img.thumbUrl || (img as any).thumb_url)
+    }))
+  });
+
   return (
     <>
       <div 
@@ -215,29 +348,23 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
         <div className="flex space-x-2 overflow-hidden pb-2">
           {imagesToShow.length > 0 ? (
             imagesToShow.map((image, index) => (
-              <div 
-                key={image.shotImageEntryId || `img-${index}`} 
-                className="flex-shrink-0 w-32 h-32 rounded overflow-hidden border animate-in fade-in-up cursor-pointer hover:shadow-md transition-shadow duration-200 hover:scale-[1.02] transform transition-transform"
-                style={{ animationDelay: `${index * 0.1}s` }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onSelectShot();
-                }}
-              >
-                <img 
-                  src={getDisplayUrl(image.thumbUrl || image.imageUrl)} 
-                  alt={`Shot image ${index + 1} for ${shot.name}`}
-                  className="w-full h-full object-cover pointer-events-none"
-                  loading="lazy"
-                />
-              </div>
+              <ShotImage
+                key={image.shotImageEntryId || `img-${index}`}
+                image={image}
+                index={index}
+                onSelectShot={onSelectShot}
+                shotName={shot.name}
+                shouldLoad={shouldLoadImages}
+                shotIndex={shotIndex}
+              />
             ))
           ) : (
             <p className="text-sm text-muted-foreground italic">No images in this shot yet.</p>
           )}
           {imagesOnly.length > 5 && (
             <div 
-              className="flex-shrink-0 w-32 h-32 rounded border bg-muted flex items-center justify-center cursor-pointer hover:bg-muted/80 transition-colors duration-200"
+              className="flex-shrink-0 w-32 h-32 rounded border bg-muted flex items-center justify-center cursor-pointer hover:bg-muted/80 transition-colors duration-200 animate-in fade-in-up"
+              style={{ animationDelay: `${imagesToShow.length * 0.1}s` }}
               onClick={(e) => {
                 e.stopPropagation();
                 onSelectShot();

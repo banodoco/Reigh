@@ -52,7 +52,7 @@ src/tools/travel-between-images/
 - Handles shot selection and navigation
 
 ### `ShotListDisplay.tsx` & `SortableShotItem.tsx`
-**Shot reordering system**
+**Shot reordering system with progressive loading**
 - **Drag-and-Drop Interface**: Shots can be reordered by dragging the grip handle (⋮⋮)
 - **Integrated Button Design**: Grip handle appears as the first action button, styled consistently
 - **Database Integration**: Auto-saves new order using position field with `useReorderShots` hook
@@ -60,6 +60,13 @@ src/tools/travel-between-images/
 - **Visual Feedback**: Dragged items become semi-transparent, disabling during save operations
 - **Touch Support**: Configured for mobile with delay/tolerance for drag activation
 - **Error Handling**: Toast notifications for failed reorder operations
+
+**Progressive Loading Performance**
+- **Priority Batching**: First 3 shots load immediately, then batches of 3 every 500ms
+- **Browser Cache Detection**: `checkIfImageCached()` detects images already loaded in ShotsPane
+- **Smart Loading**: Cached images appear instantly, bypassing priority queue
+- **Loading States**: Skeleton animations with spinning indicators during image loading
+- **Staggered Animations**: Images reveal with 0.1s delays for smooth visual progression
 
 ### `ShotEditor.tsx`
 **Core editing environment**

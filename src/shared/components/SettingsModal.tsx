@@ -217,25 +217,20 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     const token = generatedToken || getActiveToken()?.token || 'your-api-token';
     
     if (computerType === "windows") {
-      return `git clone --recursive https://github.com/peteromallet/Headless-Wan2GP; \`
+      return `git clone https://github.com/peteromallet/Headless-Wan2GP; \`
 cd Headless-Wan2GP; \`
 python -m venv venv; \`
 & venv\\Scripts\\Activate.ps1; \`
 pip install --no-cache-dir torch==2.6.0 torchvision torchaudio -f https://download.pytorch.org/whl/cu124; \`
 pip install --no-cache-dir -r Wan2GP/requirements.txt; \`
 pip install --no-cache-dir -r requirements.txt; \`
-python headless.py --db-type supabase \`
+python worker.py --db-type supabase \`
   --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \`
   --supabase-anon-key ${SUPABASE_ANON_KEY} \`
-  --supabase-access-token ${token}
-
-REM Prerequisites (install manually if not already installed):
-REM - Python 3.10+ from https://python.org
-REM - Git from https://git-scm.com/download/win
-REM - FFmpeg from https://ffmpeg.org/download.html (add to PATH)`;
+  --supabase-access-token ${token}`;
     } else {
       // Linux command (existing)
-      return `git clone --recursive https://github.com/peteromallet/Headless-Wan2GP && \\
+      return `git clone https://github.com/peteromallet/Headless-Wan2GP && \\
 cd Headless-Wan2GP && \\
 apt-get update && apt-get install -y python3.10-venv ffmpeg && \\
 python3.10 -m venv venv && \\
@@ -243,7 +238,7 @@ source venv/bin/activate && \\
 pip install --no-cache-dir torch==2.6.0 torchvision torchaudio -f https://download.pytorch.org/whl/cu124 && \\
 pip install --no-cache-dir -r Wan2GP/requirements.txt && \\
 pip install --no-cache-dir -r requirements.txt && \\
-python headless.py --db-type supabase \\
+python worker.py --db-type supabase \\
   --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
   --supabase-anon-key ${SUPABASE_ANON_KEY} \\
   --supabase-access-token ${token}`;
@@ -255,17 +250,17 @@ python headless.py --db-type supabase \\
     const token = generatedToken || getActiveToken()?.token || 'your-api-token';
     
     if (computerType === "windows") {
-      return `git pull --recurse-submodules; \`
+      return `git pull; \`
 & venv\\Scripts\\Activate.ps1; \`
-python headless.py --db-type supabase \`
+python worker.py --db-type supabase \`
   --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \`
   --supabase-anon-key ${SUPABASE_ANON_KEY} \`
   --supabase-access-token ${token}`;
     } else {
       // Linux / Mac command
-      return `git pull --recurse-submodules && \\
+      return `git pull && \\
 source venv/bin/activate && \\
-python headless.py --db-type supabase \\
+python worker.py --db-type supabase \\
   --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
   --supabase-anon-key ${SUPABASE_ANON_KEY} \\
   --supabase-access-token ${token}`;
@@ -600,6 +595,52 @@ python headless.py --db-type supabase \\
                             >
                               Hide command
                             </Button>
+                          )}
+
+                          {computerType === "windows" && (
+                            <Alert>
+                              <AlertDescription>
+                                <p className="text-sm">
+                                  Prerequisites (install manually if not already installed):
+                                </p>
+                                <ul className="list-disc pl-5 mt-2 text-sm space-y-1">
+                                  <li>
+                                    Python 3.10+ from {""}
+                                    <a
+                                      href="https://python.org"
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="underline text-blue-600 hover:text-blue-800"
+                                    >
+                                      python.org
+                                    </a>
+                                  </li>
+                                  <li>
+                                    Git from {""}
+                                    <a
+                                      href="https://git-scm.com/download/win"
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="underline text-blue-600 hover:text-blue-800"
+                                    >
+                                      git-scm.com/download/win
+                                    </a>
+                                  </li>
+                                  <li>
+                                    FFmpeg from {""}
+                                    <a
+                                      href="https://ffmpeg.org/download.html"
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="underline text-blue-600 hover:text-blue-800"
+                                    >
+                                      ffmpeg.org/download.html
+                                    </a>{" "}
+                                    (add to PATH)
+                                  </li>
+                                </ul>
+                              </AlertDescription>
+                            </Alert>
                           )}
 
                           <Button 
