@@ -412,7 +412,10 @@ const VideoTravelToolPage: React.FC = () => {
       setVideoPairConfigs(settingsToApply.pairConfigs || []);
       setGenerationMode(settingsToApply.generationMode === 'by-pair' ? 'batch' : (settingsToApply.generationMode || 'batch'));
       setPairConfigs(settingsToApply.pairConfigs || []);
-      setSteerableMotionSettings(settingsToApply.steerableMotionSettings || DEFAULT_STEERABLE_MOTION_SETTINGS);
+      setSteerableMotionSettings({
+        ...(settingsToApply.steerableMotionSettings || DEFAULT_STEERABLE_MOTION_SETTINGS),
+        apply_causvid: false // Force apply_causvid to false regardless of saved settings
+      });
     }
   }, [settings, isLoadingSettings, selectedShot?.id, updateSettings]);
 

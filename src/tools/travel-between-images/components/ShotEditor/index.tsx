@@ -335,7 +335,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       // Wan 2.1 (default settings)
       onSteerableMotionSettingsChange({ 
         model_name: modelName,
-        apply_causvid: true // Re-enable causvid for Wan 2.1
+        apply_causvid: false // Keep causvid disabled for Wan 2.1 as well
       });
       
       // Restore accelerated mode to default (true) for Wan 2.1 (which controls lighti2x LoRA)

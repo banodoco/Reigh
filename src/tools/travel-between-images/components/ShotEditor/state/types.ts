@@ -60,7 +60,7 @@ export const DEFAULT_STEERABLE_MOTION_SETTINGS: SteerableMotionSettings = {
   debug: true,
   apply_reward_lora: false,
   colour_match_videos: false,
-  apply_causvid: true,
+  apply_causvid: false,
   use_lighti2x_lora: false,
   fade_in_duration: '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
   fade_out_duration: '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',

@@ -186,7 +186,7 @@ serve(async (req) => {
       steps: stepsValue,
       apply_reward_lora: body.apply_reward_lora ?? false,
       colour_match_videos: body.colour_match_videos ?? DEFAULT_COLOUR_MATCH_VIDEOS,
-      apply_causvid: body.apply_causvid ?? true,
+      apply_causvid: body.apply_causvid ?? false,
       use_lighti2x_lora: body.use_lighti2x_lora ?? false,
       fade_in_params_json_str: typeof body.fade_in_duration === "object" && body.fade_in_duration !== null
         ? JSON.stringify(body.fade_in_duration)
