@@ -144,6 +144,14 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     return null;
   }
 
+  console.log('[TaskDetails] MediaLightbox props:', {
+    showTaskDetails,
+    showTaskDetailsModal,
+    mediaId: media.id,
+    isMobile,
+    hasOnApplySettingsFromTask: !!onApplySettingsFromTask
+  });
+
   const isVideo = media.type === 'video' || media.type === 'video_travel_output' || media.location?.endsWith('.mp4');
   const displayUrl = getDisplayUrl(media.location || media.imageUrl);
 
@@ -534,8 +542,12 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     <Button
                       variant="secondary"
                       size="sm"
-                      onClick={() => setShowTaskDetailsModal(!showTaskDetailsModal)}
+                      onClick={() => {
+                        console.log('[TaskDetails] Info button clicked, current state:', showTaskDetailsModal);
+                        setShowTaskDetailsModal(!showTaskDetailsModal);
+                      }}
                       className="transition-colors bg-black/50 hover:bg-black/70 text-white"
+                      title="Show task details"
                     >
                       <Info className="h-4 w-4" />
                     </Button>
@@ -737,6 +749,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       : "w-[35vw] max-h-[95vh] overflow-y-auto"
                   )}
                 >
+                  {console.log('[TaskDetails] Rendering TaskDetailsContent for generation:', media.id)}
                   <TaskDetailsContent
                     generationId={media.id}
                     onApplySettings={onApplySettings}
