@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, X, FlipHorizontal, Save, Download, Trash2, Settings, PlusCircle, CheckCircle, Star } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, FlipHorizontal, Save, Download, Trash2, Settings, PlusCircle, CheckCircle, Star, Info } from 'lucide-react';
 import { GenerationRow } from '@/types/shots';
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Button } from '@/shared/components/ui/button';
@@ -10,6 +10,8 @@ import HoverScrubVideo from '@/shared/components/HoverScrubVideo';
 import SimpleVideoPlayer from '@/tools/travel-between-images/components/SimpleVideoPlayer';
 import { useToggleGenerationStar } from '@/shared/hooks/useGenerations';
 import MagicEditLauncher from '@/shared/components/MagicEditLauncher';
+import TaskDetailsContent from '@/tools/travel-between-images/components/TaskDetailsContent';
+import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { toast } from 'sonner';
 
 interface Shot {
@@ -46,6 +48,9 @@ interface MediaLightboxProps {
   // Star functionality
   starred?: boolean;
   onToggleStar?: (id: string, starred: boolean) => void;
+  // Task details functionality
+  showTaskDetails?: boolean;
+  onApplySettingsFromTask?: (taskId: string, replaceImages: boolean, inputImages: string[]) => void;
 }
 
 const MediaLightbox: React.FC<MediaLightboxProps> = ({ 
@@ -75,16 +80,21 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   onMagicEdit,
   // Star functionality
   starred = false,
-  onToggleStar
+  onToggleStar,
+  // Task details functionality
+  showTaskDetails = false,
+  onApplySettingsFromTask
 }) => {
   const [isFlippedHorizontally, setIsFlippedHorizontally] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
+  const [showTaskDetailsModal, setShowTaskDetailsModal] = useState(false);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   // Ref for the dialog content so we can programmatically focus it, enabling keyboard shortcuts immediately
   const contentRef = useRef<HTMLDivElement>(null);
+  const isMobile = useIsMobile();
   
 
   
@@ -341,42 +351,91 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
             onPointerDownOutside={onClose}
           >
             <div 
-              className="relative flex items-center justify-center"
+              className={cn(
+                "relative",
+                isMobile && showTaskDetails && showTaskDetailsModal 
+                  ? "flex flex-col max-h-[95vh] max-w-[95vw]" 
+                  : !isMobile && showTaskDetails && showTaskDetailsModal
+                  ? "flex flex-row max-h-[95vh] max-w-[95vw] gap-4"
+                  : "flex items-center justify-center max-h-[95vh] max-w-[95vw]"
+              )}
               style={{
-                maxHeight: '95vh',
-                maxWidth: '95vw',
                 width: 'auto'
               }}
             >
-              {/* Navigation Controls - Left Arrow */}
-              {showNavigation && onPrevious && hasPrevious && (
-                <Button
-                  variant="secondary"
-                  size="lg"
-                  onClick={onPrevious}
-                  className="hidden sm:flex bg-black/50 hover:bg-black/70 text-white z-20 h-10 w-10 sm:h-12 sm:w-12 absolute left-2 top-1/2 -translate-y-1/2"
-                >
-                  <ChevronLeft className="h-6 w-6 sm:h-8 sm:w-8" />
-                </Button>
-              )}
+              {/* Media Content Container */}
+              <div 
+                className={cn(
+                  "relative",
+                  isMobile && showTaskDetails && showTaskDetailsModal 
+                    ? "flex items-center justify-center flex-shrink-0" 
+                    : !isMobile && showTaskDetails && showTaskDetailsModal
+                    ? "flex items-center justify-center flex-shrink-0"
+                    : "flex items-center justify-center"
+                )}
+                style={{
+                  ...(isMobile && showTaskDetails && showTaskDetailsModal 
+                    ? { maxHeight: '50vh', maxWidth: '95vw' }
+                    : !isMobile && showTaskDetails && showTaskDetailsModal
+                    ? { maxHeight: '95vh', maxWidth: '60vw' }
+                    : { maxHeight: '95vh', maxWidth: '95vw' })
+                }}
+              >
+                {/* Navigation Controls - Left Arrow */}
+                {showNavigation && onPrevious && hasPrevious && (
+                  <Button
+                    variant="secondary"
+                    size="lg"
+                    onClick={onPrevious}
+                    className="hidden sm:flex bg-black/50 hover:bg-black/70 text-white z-20 h-10 w-10 sm:h-12 sm:w-12 absolute left-2 top-1/2 -translate-y-1/2"
+                  >
+                    <ChevronLeft className="h-6 w-6 sm:h-8 sm:w-8" />
+                  </Button>
+                )}
 
-              {/* Media Content */}
-              <div className="relative">
+                {/* Media Content */}
+                <div className="relative">
                 {isVideo ? (
                   videoPlayerComponent === 'simple-player' ? (
-                    <div style={{ maxWidth: '95vw' }}>
+                    <div style={{ 
+                      maxWidth: isMobile && showTaskDetails && showTaskDetailsModal 
+                        ? '95vw' 
+                        : !isMobile && showTaskDetails && showTaskDetailsModal
+                        ? '60vw'
+                        : '95vw' 
+                    }}>
                       <SimpleVideoPlayer
                         src={displayUrl}
                         poster={media.thumbUrl}
-                        className="h-auto max-h-[85vh] sm:max-h-[85vh] object-contain"
+                        className={cn(
+                          "h-auto object-contain",
+                          isMobile && showTaskDetails && showTaskDetailsModal 
+                            ? "max-h-[40vh]"
+                            : !isMobile && showTaskDetails && showTaskDetailsModal
+                            ? "max-h-[85vh]"
+                            : "max-h-[85vh] sm:max-h-[85vh]"
+                        )}
                       />
                     </div>
                   ) : (
                     <HoverScrubVideo
                       src={displayUrl}
                       poster={media.thumbUrl}
-                      className="h-auto max-h-[85vh] sm:max-h-[85vh] object-contain w-[95vw] sm:w-auto"
-                      style={{ maxWidth: '95vw' }}
+                      className={cn(
+                        "h-auto object-contain",
+                        isMobile && showTaskDetails && showTaskDetailsModal 
+                          ? "max-h-[40vh] w-[95vw]"
+                          : !isMobile && showTaskDetails && showTaskDetailsModal
+                          ? "max-h-[85vh] w-auto"
+                          : "max-h-[85vh] sm:max-h-[85vh] object-contain w-[95vw] sm:w-auto"
+                      )}
+                      style={{ 
+                        maxWidth: isMobile && showTaskDetails && showTaskDetailsModal 
+                          ? '95vw' 
+                          : !isMobile && showTaskDetails && showTaskDetailsModal
+                          ? '60vw'
+                          : '95vw' 
+                      }}
                     />
                   )
                 ) : (
@@ -407,8 +466,16 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           isFlippedHorizontally ? 'scale-x-[-1]' : ''
                         }`}
                         style={{ 
-                          maxHeight: '85vh',
-                          maxWidth: '95vw',
+                          maxHeight: isMobile && showTaskDetails && showTaskDetailsModal 
+                            ? '40vh'
+                            : !isMobile && showTaskDetails && showTaskDetailsModal
+                            ? '85vh'
+                            : '85vh',
+                          maxWidth: isMobile && showTaskDetails && showTaskDetailsModal 
+                            ? '95vw' 
+                            : !isMobile && showTaskDetails && showTaskDetailsModal
+                            ? '60vw'
+                            : '95vw',
                           width: 'auto',
                           height: 'auto',
                           transform: isFlippedHorizontally ? 'scaleX(-1)' : 'none'
@@ -461,6 +528,18 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   >
                     <Star className={`h-4 w-4 ${localStarred ? 'fill-current' : ''}`} />
                   </Button>
+
+                  {/* Task Details Button */}
+                  {showTaskDetails && (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setShowTaskDetailsModal(!showTaskDetailsModal)}
+                      className="transition-colors bg-black/50 hover:bg-black/70 text-white"
+                    >
+                      <Info className="h-4 w-4" />
+                    </Button>
+                  )}
 
                   {!isVideo && showMagicEdit && (
                     <MagicEditLauncher
@@ -645,6 +724,25 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                 >
                   <ChevronRight className="h-6 w-6 sm:h-8 sm:w-8" />
                 </Button>
+              )}
+
+              {/* Task Details Panel */}
+              {showTaskDetails && showTaskDetailsModal && (
+                <div 
+                  className={cn(
+                    "bg-black/90 rounded-lg border border-white/20",
+                    isMobile 
+                      ? "w-full max-h-[40vh] overflow-y-auto" 
+                      : "w-[35vw] max-h-[95vh] overflow-y-auto"
+                  )}
+                >
+                  <TaskDetailsContent
+                    generationId={media.id}
+                    onApplySettings={onApplySettings}
+                    onApplySettingsFromTask={onApplySettingsFromTask}
+                    onClose={() => setShowTaskDetailsModal(false)}
+                  />
+                </div>
               )}
             </div>
           </DialogPrimitive.Content>

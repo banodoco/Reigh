@@ -203,6 +203,8 @@ export const useTaskQueueNotifier = ({
         console.log('[PollingBreakageIssue] TaskQueueNotifier fallback polling executing:', {
           projectId,
           target: expectedTotal,
+          visibilityState: document.visibilityState,
+          isHidden: document.hidden,
           timestamp: Date.now()
         });
         
@@ -216,6 +218,7 @@ export const useTaskQueueNotifier = ({
           console.error('[PollingBreakageIssue] TaskQueueNotifier fallback polling error:', {
             projectId,
             error,
+            visibilityState: document.visibilityState,
             timestamp: Date.now()
           });
           return;
@@ -226,6 +229,7 @@ export const useTaskQueueNotifier = ({
           projectId,
           count,
           target: expectedTotal,
+          visibilityState: document.visibilityState,
           timestamp: Date.now()
         });
         
@@ -235,6 +239,7 @@ export const useTaskQueueNotifier = ({
             projectId,
             count,
             target: expectedTotal,
+            visibilityState: document.visibilityState,
             timestamp: Date.now()
           });
           handleSuccessWithCleanup();

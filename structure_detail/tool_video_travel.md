@@ -31,7 +31,8 @@ src/tools/travel-between-images/
 │   ├── BatchSettingsForm.tsx          # Video generation settings
 │   ├── VideoOutputsGallery.tsx        # Generated video display
 │   ├── SimpleVideoPlayer.tsx          # Lightweight player
-│   ├── TaskDetailsModal.tsx           # Generation parameters
+│   ├── TaskDetailsModal.tsx           # Generation parameters (dialog wrapper)
+│   ├── TaskDetailsContent.tsx         # Task details content component
 │   ├── VideoShotDisplay.tsx           # Shot preview card
 │   ├── ShotListDisplay.tsx            # Shot grid view with drag-and-drop reordering
 │   ├── SortableShotItem.tsx           # Draggable shot card wrapper
@@ -133,11 +134,19 @@ src/tools/travel-between-images/
 - Frame-by-frame navigation
 
 ### `TaskDetailsModal.tsx`
-**Generation parameter viewer**
-- Shows complete generation settings
+**Generation parameter viewer (dialog wrapper)**
+- Shows complete generation settings in a modal dialog
 - *Use These Settings* button
 - Applies parameters to `BatchSettingsForm`
 - Deduplicates prompts automatically
+
+### `TaskDetailsContent.tsx`
+**Task details content component (reusable)**
+- Embeddable task details component without dialog wrapper
+- Used in MediaLightbox for side-by-side video + task details layout
+- Shows input images, prompts, technical settings (steps, resolution, frames, context)
+- Compact mobile-friendly layout with collapsible sections
+- Supports both standalone usage and integration in larger UI components
 - Expands array parameters
 
 ---

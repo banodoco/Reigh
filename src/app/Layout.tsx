@@ -16,6 +16,8 @@ import { GlobalProcessingWarning } from '@/shared/components/ProcessingWarnings'
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 import { useWelcomeBonus } from '@/shared/hooks/useWelcomeBonus';
 import { WelcomeBonusModal } from '@/shared/components/WelcomeBonusModal';
+import { usePageVisibility } from '@/shared/hooks/usePageVisibility';
+import '@/shared/lib/debugPolling';
 
 // Scroll to top component
 function ScrollToTop() {
@@ -40,6 +42,9 @@ const Layout: React.FC = () => {
   } = usePanes();
   const { header } = useHeaderState();
   const { setCurrentShotId } = useCurrentShot();
+  
+  // Track page visibility for debugging polling issues
+  usePageVisibility();
 
   // Get content-responsive breakpoints for app-wide use
   const { isSm, isMd, isLg, isXl, is2Xl, contentWidth, contentHeight } = useContentResponsive();

@@ -247,6 +247,8 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
         page,
         limit,
         status,
+        visibilityState: document.visibilityState,
+        isHidden: document.hidden,
         timestamp: Date.now()
       });
       
@@ -354,6 +356,17 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
     gcTime: 5 * 60 * 1000, // 5 minutes  
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
+    // Add background polling for active tasks
+    refetchInterval: (query) => {
+      // Only poll if there are active tasks (Queued or In Progress)
+      const data = query.state.data;
+      if (!data) return false;
+      const hasActiveTasks = data.tasks?.some(task => 
+        task.status === 'Queued' || task.status === 'In Progress'
+      ) ?? false;
+      return hasActiveTasks ? 10000 : false; // Poll every 10 seconds if there are active tasks
+    },
+    refetchIntervalInBackground: true, // CRITICAL: Continue polling when tab is not visible
   });
 };
 
@@ -542,6 +555,8 @@ export const useTaskStatusCounts = (projectId: string | null) => {
     queryFn: async () => {
       console.log('[PollingBreakageIssue] useTaskStatusCounts query executing - backup polling active:', {
         projectId,
+        visibilityState: document.visibilityState,
+        isHidden: document.hidden,
         timestamp: Date.now()
       });
       
@@ -552,68 +567,122 @@ export const useTaskStatusCounts = (projectId: string | null) => {
       // Get 1 hour ago timestamp
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
 
-      // Query for processing tasks (any time)
-      const { count: processingCount, error: processingError } = await supabase
-        .from('tasks')
-        .select('id', { count: 'exact', head: true })
-        .eq('project_id', projectId)
-        .in('status', ['Queued', 'In Progress'])
-        .is('params->orchestrator_task_id_ref', null); // Only parent tasks
+      // Execute all queries in parallel with error resilience
+      const [processingResult, successResult, failureResult] = await Promise.allSettled([
+        // Query for processing tasks (any time)
+        supabase
+          .from('tasks')
+          .select('id', { count: 'exact', head: true })
+          .eq('project_id', projectId)
+          .in('status', ['Queued', 'In Progress'])
+          .is('params->orchestrator_task_id_ref', null), // Only parent tasks
+          
+        // Query for recent successes (last hour)
+        supabase
+          .from('tasks')
+          .select('id', { count: 'exact', head: true })
+          .eq('project_id', projectId)
+          .eq('status', 'Complete')
+          .gte('updated_at', oneHourAgo)
+          .is('params->orchestrator_task_id_ref', null), // Only parent tasks
+          
+        // Query for recent failures (last hour)
+        supabase
+          .from('tasks')
+          .select('id', { count: 'exact', head: true })
+          .eq('project_id', projectId)
+          .in('status', ['Failed', 'Cancelled'])
+          .gte('updated_at', oneHourAgo)
+          .is('params->orchestrator_task_id_ref', null) // Only parent tasks
+      ]);
 
-      if (processingError) {
-        console.error('[PollingBreakageIssue] useTaskStatusCounts query error (processing):', {
+      // Handle processing count result
+      let processingCount = 0;
+      if (processingResult.status === 'fulfilled') {
+        const { count, error } = processingResult.value;
+        if (error) {
+          console.error('[PollingBreakageIssue] useTaskStatusCounts query error (processing):', {
+            projectId,
+            error,
+            errorMessage: error.message,
+            errorCode: error.code,
+            errorDetails: error.details,
+            errorHint: error.hint,
+            timestamp: Date.now()
+          });
+        } else {
+          processingCount = count || 0;
+        }
+      } else {
+        console.error('[PollingBreakageIssue] Processing query promise rejected:', {
           projectId,
-          error: processingError,
+          reason: processingResult.reason,
           timestamp: Date.now()
         });
-        throw processingError;
       }
 
-      // Query for recent successes (last hour)
-      const { count: successCount, error: successError } = await supabase
-        .from('tasks')
-        .select('id', { count: 'exact', head: true })
-        .eq('project_id', projectId)
-        .eq('status', 'Complete')
-        .gte('updated_at', oneHourAgo)
-        .is('params->orchestrator_task_id_ref', null); // Only parent tasks
-
-      if (successError) {
-        console.error('[PollingBreakageIssue] useTaskStatusCounts query error (success):', {
+      // Handle success count result
+      let successCount = 0;
+      if (successResult.status === 'fulfilled') {
+        const { count, error } = successResult.value;
+        if (error) {
+          console.error('[PollingBreakageIssue] useTaskStatusCounts query error (success):', {
+            projectId,
+            error,
+            errorMessage: error.message,
+            errorCode: error.code,
+            errorDetails: error.details,
+            errorHint: error.hint,
+            timestamp: Date.now()
+          });
+        } else {
+          successCount = count || 0;
+        }
+      } else {
+        console.error('[PollingBreakageIssue] Success query promise rejected:', {
           projectId,
-          error: successError,
+          reason: successResult.reason,
           timestamp: Date.now()
         });
-        throw successError;
       }
 
-      // Query for recent failures (last hour)
-      const { count: failureCount, error: failureError } = await supabase
-        .from('tasks')
-        .select('id', { count: 'exact', head: true })
-        .eq('project_id', projectId)
-        .in('status', ['Failed', 'Cancelled'])
-        .gte('updated_at', oneHourAgo)
-        .is('params->orchestrator_task_id_ref', null); // Only parent tasks
-
-      if (failureError) {
-        console.error('[PollingBreakageIssue] useTaskStatusCounts query error (failure):', {
+      // Handle failure count result
+      let failureCount = 0;
+      if (failureResult.status === 'fulfilled') {
+        const { count, error } = failureResult.value;
+        if (error) {
+          console.error('[PollingBreakageIssue] useTaskStatusCounts query error (failure):', {
+            projectId,
+            error,
+            errorMessage: error.message,
+            errorCode: error.code,
+            errorDetails: error.details,
+            errorHint: error.hint,
+            timestamp: Date.now()
+          });
+        } else {
+          failureCount = count || 0;
+        }
+      } else {
+        console.error('[PollingBreakageIssue] Failure query promise rejected:', {
           projectId,
-          error: failureError,
+          reason: failureResult.reason,
           timestamp: Date.now()
         });
-        throw failureError;
       }
 
       const result = {
-        processing: processingCount || 0,
-        recentSuccesses: successCount || 0,
-        recentFailures: failureCount || 0,
+        processing: processingCount,
+        recentSuccesses: successCount,
+        recentFailures: failureCount,
       };
       
       console.log('[PollingBreakageIssue] useTaskStatusCounts query completed:', {
         projectId,
         result,
+        processingStatus: processingResult.status,
+        successStatus: successResult.status,
+        failureStatus: failureResult.status,
         timestamp: Date.now()
       });
       
@@ -621,5 +690,6 @@ export const useTaskStatusCounts = (projectId: string | null) => {
     },
     enabled: !!projectId,
     refetchInterval: 5000, // Refresh every 5 seconds for live updates
+    refetchIntervalInBackground: true, // CRITICAL: Continue polling when tab is not visible
   });
 }; 

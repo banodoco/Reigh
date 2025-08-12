@@ -67,6 +67,7 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
   const [playbackRate, setPlaybackRate] = useState(1);
   const [duration, setDuration] = useState(0);
   const [scrubberPosition, setScrubberPosition] = useState<number | null>(null);
+  const [scrubberVisible, setScrubberVisible] = useState(true);
   const speedOptions = [0.25, 0.5, 1, 1.5, 2];
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
@@ -77,8 +78,9 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
     const progress = Math.max(0, Math.min(1, mouseX / rect.width));
     const targetTime = progress * duration;
 
-    // Update scrubber position (percentage)
+    // Update scrubber position (percentage) and make it visible
     setScrubberPosition(progress * 100);
+    setScrubberVisible(true);
 
     // Pause the video and seek to the position
     videoRef.current.pause();
@@ -92,6 +94,9 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
     // Set a new timeout to start playing after mouse stops moving
     mouseMoveTimeoutRef.current = setTimeout(() => {
       if (videoRef.current && isHoveringRef.current) {
+        // Start fade out of scrubber before video plays
+        setScrubberVisible(false);
+        
         videoRef.current.play().catch(() => {
           // Ignore play errors
         });
@@ -110,6 +115,7 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
   const handleMouseLeave = useCallback(() => {
     isHoveringRef.current = false;
     setScrubberPosition(null); // Hide scrubber
+    setScrubberVisible(true); // Reset visibility for next hover
     if (mouseMoveTimeoutRef.current) {
       clearTimeout(mouseMoveTimeoutRef.current);
       mouseMoveTimeoutRef.current = null;
@@ -193,7 +199,10 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
       {/* Scrubber Line */}
       {scrubberPosition !== null && (
         <div 
-          className="absolute top-0 bottom-0 w-0.5 bg-white shadow-lg z-30 pointer-events-none"
+          className={cn(
+            "absolute top-0 bottom-0 w-0.5 bg-white shadow-lg z-30 pointer-events-none transition-opacity duration-300",
+            scrubberVisible ? "opacity-100" : "opacity-0"
+          )}
           style={{ left: `${scrubberPosition}%` }}
         >
           {/* Scrubber handle/dot */}

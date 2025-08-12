@@ -189,7 +189,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
               {/* Only show Accelerated Mode toggle if not using Wan 2.2 */}
-              {steerableMotionSettings.model_name !== 'vace_14B_cocktail_2_2' && (
+              {steerableMotionSettings.model_name !== 'vace_14B_fake_cocktail_2_2' && (
                 <div className="relative">
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -209,7 +209,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                   </Tooltip>
                 </div>
               )}
-              <div className={`relative ${(steerableMotionSettings.model_name === 'vace_14B_cocktail_2_2' || steerableMotionSettings.model_name === 'vace_14B_fakeface') ? 'md:col-span-4' : 'md:col-span-3'}`}>
+              <div className={`relative ${(steerableMotionSettings.model_name === 'vace_14B_fake_cocktail_2_2' || steerableMotionSettings.model_name === 'vace_14B_fakeface') ? 'md:col-span-4' : 'md:col-span-3'}`}>
                 <Label htmlFor="batchVideoSteps" className="text-sm font-medium block mb-1">Generation Steps: {batchVideoSteps}</Label>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -231,7 +231,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                 />
                 {showStepsNotification && (
                   <p className="text-sm text-yellow-600 mt-1">
-                    {(steerableMotionSettings.model_name === 'vace_14B_cocktail_2_2' || steerableMotionSettings.model_name === 'vace_14B_fakeface')
+                    {(steerableMotionSettings.model_name === 'vace_14B_fake_cocktail_2_2' || steerableMotionSettings.model_name === 'vace_14B_fakeface')
                       ? 'Note: We recommend 10 steps for Wan 2.2'
                       : `Note: We recommend ${accelerated ? '8' : '20'} steps for ${accelerated ? 'Accelerated' : 'Normal'} mode`
                     }
