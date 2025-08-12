@@ -712,6 +712,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     </Button>
                   )}
                 </div>
+                </div> {/* Close media content div */}
               </div>
 
               {/* Navigation Controls - Right Arrow (Desktop Only) */}
