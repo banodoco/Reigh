@@ -144,14 +144,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     return null;
   }
 
-  console.log('[TaskDetails] MediaLightbox props:', {
-    showTaskDetails,
-    showTaskDetailsModal,
-    mediaId: media.id,
-    isMobile,
-    hasOnApplySettingsFromTask: !!onApplySettingsFromTask
-  });
-
   const isVideo = media.type === 'video' || media.type === 'video_travel_output' || media.location?.endsWith('.mp4');
   const displayUrl = getDisplayUrl(media.location || media.imageUrl);
 
@@ -542,12 +534,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     <Button
                       variant="secondary"
                       size="sm"
-                      onClick={() => {
-                        console.log('[TaskDetails] Info button clicked, current state:', showTaskDetailsModal);
-                        setShowTaskDetailsModal(!showTaskDetailsModal);
-                      }}
+                      onClick={() => setShowTaskDetailsModal(!showTaskDetailsModal)}
                       className="transition-colors bg-black/50 hover:bg-black/70 text-white"
-                      title="Show task details"
                     >
                       <Info className="h-4 w-4" />
                     </Button>
@@ -739,23 +727,16 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                 </Button>
               )}
 
-              {/* Task Details Panel - Positioned absolutely to ensure visibility */}
+              {/* Task Details Panel */}
               {showTaskDetails && showTaskDetailsModal && (
                 <div 
-                  className="fixed bg-red-500/90 rounded-lg border-4 border-yellow-400 overflow-y-auto"
-                  style={{
-                    top: '10px',
-                    right: '10px',
-                    width: isMobile ? '90vw' : '400px',
-                    maxHeight: isMobile ? '50vh' : '80vh',
-                    minHeight: '200px',
-                    zIndex: 10001
-                  }}
+                  className={cn(
+                    "bg-black/90 rounded-lg border border-white/20",
+                    isMobile 
+                      ? "w-full max-h-[40vh] overflow-y-auto" 
+                      : "w-[35vw] max-h-[95vh] overflow-y-auto"
+                  )}
                 >
-                  {console.log('[TaskDetails] Rendering TaskDetailsContent for generation:', media.id)}
-                  <div className="p-4 text-white font-bold">
-                    DEBUG: Task Details Panel Visible! Fixed Position!
-                  </div>
                   <TaskDetailsContent
                     generationId={media.id}
                     onApplySettings={onApplySettings}

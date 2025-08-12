@@ -7,7 +7,7 @@ import { Separator } from '@/shared/components/ui/separator';
 import HoverScrubVideo from '@/shared/components/HoverScrubVideo';
 import { getDisplayUrl } from '@/shared/lib/utils';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/shared/components/ui/pagination';
-import MediaLightbox from '@/shared/components/MediaLightbox';
+import MediaLightboxWithTaskDetails from '@/tools/travel-between-images/components/MediaLightboxWithTaskDetails';
 import TaskDetailsModal from '@/tools/travel-between-images/components/TaskDetailsModal';
 import { TimeStamp } from '@/shared/components/TimeStamp';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
@@ -241,27 +241,17 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
         )}
 
         {lightboxIndex !== null && (
-          <MediaLightbox
-            media={(() => {
-              const media = sortedVideoOutputs[lightboxIndex];
-              console.log('[StarDebug:VideoOutputsGallery] MediaLightbox media', {
-                mediaId: media.id,
-                mediaKeys: Object.keys(media),
-                hasStarred: 'starred' in media,
-                starredValue: (media as { starred?: boolean }).starred,
-                timestamp: Date.now()
-              });
-              return media;
-            })()}
+          <MediaLightboxWithTaskDetails
+            media={sortedVideoOutputs[lightboxIndex]}
             onClose={() => setLightboxIndex(null)}
             onNext={handleNext}
             onPrevious={handlePrevious}
             onImageSaved={onImageSaved}
+            onApplySettings={onApplySettings}
+            onApplySettingsFromTask={onApplySettingsFromTask}
             showNavigation={true}
             showImageEditTools={false}
             showDownload={true}
-            showTaskDetails={true}
-            onApplySettingsFromTask={onApplySettingsFromTask}
             videoPlayerComponent="simple-player"
             hasNext={lightboxIndex < sortedVideoOutputs.length - 1}
             hasPrevious={lightboxIndex > 0}
