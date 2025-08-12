@@ -739,24 +739,22 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                 </Button>
               )}
 
-              {/* Task Details Panel */}
+              {/* Task Details Panel - Positioned absolutely to ensure visibility */}
               {showTaskDetails && showTaskDetailsModal && (
                 <div 
-                  className={cn(
-                    "bg-red-500/90 rounded-lg border-4 border-yellow-400",
-                    isMobile 
-                      ? "w-full max-h-[40vh] overflow-y-auto" 
-                      : "w-[35vw] max-h-[95vh] overflow-y-auto"
-                  )}
+                  className="fixed bg-red-500/90 rounded-lg border-4 border-yellow-400 overflow-y-auto"
                   style={{
+                    top: '10px',
+                    right: '10px',
+                    width: isMobile ? '90vw' : '400px',
+                    maxHeight: isMobile ? '50vh' : '80vh',
                     minHeight: '200px',
-                    minWidth: '300px',
                     zIndex: 10001
                   }}
                 >
                   {console.log('[TaskDetails] Rendering TaskDetailsContent for generation:', media.id)}
                   <div className="p-4 text-white font-bold">
-                    DEBUG: Task Details Panel Visible!
+                    DEBUG: Task Details Panel Visible! Fixed Position!
                   </div>
                   <TaskDetailsContent
                     generationId={media.id}
