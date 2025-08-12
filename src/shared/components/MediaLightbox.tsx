@@ -743,13 +743,21 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               {showTaskDetails && showTaskDetailsModal && (
                 <div 
                   className={cn(
-                    "bg-black/90 rounded-lg border border-white/20",
+                    "bg-red-500/90 rounded-lg border-4 border-yellow-400",
                     isMobile 
                       ? "w-full max-h-[40vh] overflow-y-auto" 
                       : "w-[35vw] max-h-[95vh] overflow-y-auto"
                   )}
+                  style={{
+                    minHeight: '200px',
+                    minWidth: '300px',
+                    zIndex: 10001
+                  }}
                 >
                   {console.log('[TaskDetails] Rendering TaskDetailsContent for generation:', media.id)}
+                  <div className="p-4 text-white font-bold">
+                    DEBUG: Task Details Panel Visible!
+                  </div>
                   <TaskDetailsContent
                     generationId={media.id}
                     onApplySettings={onApplySettings}
