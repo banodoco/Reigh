@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, X, FlipHorizontal, Save, Download, Trash2, Settings, PlusCircle, CheckCircle, Star, Info } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, FlipHorizontal, Save, Download, Trash2, Settings, PlusCircle, CheckCircle, Star } from 'lucide-react';
 import { GenerationRow } from '@/types/shots';
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Button } from '@/shared/components/ui/button';
@@ -8,11 +8,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { getDisplayUrl, cn } from '@/shared/lib/utils';
 import HoverScrubVideo from '@/shared/components/HoverScrubVideo';
 import SimpleVideoPlayer from '@/tools/travel-between-images/components/SimpleVideoPlayer';
+import TaskDetailsPanel from '@/tools/travel-between-images/components/TaskDetailsPanel';
 import { useToggleGenerationStar } from '@/shared/hooks/useGenerations';
 import MagicEditLauncher from '@/shared/components/MagicEditLauncher';
-import TaskDetailsContent from '@/tools/travel-between-images/components/TaskDetailsContent';
-import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { toast } from 'sonner';
+import { useIsMobile } from '@/shared/hooks/use-mobile';
 
 interface Shot {
   id: string;
@@ -50,7 +50,15 @@ interface MediaLightboxProps {
   onToggleStar?: (id: string, starred: boolean) => void;
   // Task details functionality
   showTaskDetails?: boolean;
-  onApplySettingsFromTask?: (taskId: string, replaceImages: boolean, inputImages: string[]) => void;
+  taskDetailsData?: {
+    task: any;
+    isLoading: boolean;
+    error: any;
+    inputImages: string[];
+    taskId: string | null;
+    onApplyTaskSettings?: (settings: any) => void;
+    onApplySettingsFromTask?: (taskId: string, replaceImages: boolean, inputImages: string[]) => void;
+  };
 }
 
 const MediaLightbox: React.FC<MediaLightboxProps> = ({ 
@@ -83,17 +91,18 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   onToggleStar,
   // Task details functionality
   showTaskDetails = false,
-  onApplySettingsFromTask
+  taskDetailsData
 }) => {
   const [isFlippedHorizontally, setIsFlippedHorizontally] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
-  const [showTaskDetailsModal, setShowTaskDetailsModal] = useState(false);
+  const [replaceImages, setReplaceImages] = useState(true);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   // Ref for the dialog content so we can programmatically focus it, enabling keyboard shortcuts immediately
   const contentRef = useRef<HTMLDivElement>(null);
+  
   const isMobile = useIsMobile();
   
 
@@ -344,98 +353,517 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               contentRef.current?.focus();
             }}
             className={cn(
-              "fixed left-[50%] top-[50%] z-[10000] translate-x-[-50%] translate-y-[-50%] duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]",
-              "w-auto h-auto p-0 border-none bg-transparent shadow-none"
+              "fixed z-[10000] duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
+              "p-0 border-none bg-transparent shadow-none",
+              showTaskDetails && !isMobile
+                ? "left-0 top-0 w-full h-full" // Full screen layout for desktop with task details
+                : "left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] w-auto h-auto data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]"
             )}
             onKeyDown={handleKeyDown}
-            onPointerDownOutside={onClose}
+            onPointerDownOutside={showTaskDetails && !isMobile ? undefined : onClose}
           >
-            <div 
-              className={cn(
-                "relative",
-                isMobile && showTaskDetails && showTaskDetailsModal 
-                  ? "flex flex-col max-h-[95vh] max-w-[95vw]" 
-                  : !isMobile && showTaskDetails && showTaskDetailsModal
-                  ? "flex flex-row max-h-[95vh] max-w-[95vw] gap-4"
-                  : "flex items-center justify-center max-h-[95vh] max-w-[95vw]"
-              )}
-              style={{
-                width: 'auto'
-              }}
-            >
-              {/* Media Content Container */}
+            {showTaskDetails && !isMobile ? (
+              // Desktop layout with task details - side by side
               <div 
-                className={cn(
-                  "relative",
-                  isMobile && showTaskDetails && showTaskDetailsModal 
-                    ? "flex items-center justify-center flex-shrink-0" 
-                    : !isMobile && showTaskDetails && showTaskDetailsModal
-                    ? "flex items-center justify-center flex-shrink-0"
-                    : "flex items-center justify-center"
-                )}
-                style={{
-                  ...(isMobile && showTaskDetails && showTaskDetailsModal 
-                    ? { maxHeight: '50vh', maxWidth: '95vw' }
-                    : !isMobile && showTaskDetails && showTaskDetailsModal
-                    ? { maxHeight: '95vh', maxWidth: '60vw' }
-                    : { maxHeight: '95vh', maxWidth: '95vw' })
+                className="w-full h-full flex bg-black/90"
+                onClick={(e) => {
+                  // Close if clicking on the background (not on content)
+                  if (e.target === e.currentTarget) {
+                    onClose();
+                  }
                 }}
               >
-                {/* Navigation Controls - Left Arrow */}
-                {showNavigation && onPrevious && hasPrevious && (
-                  <Button
-                    variant="secondary"
-                    size="lg"
-                    onClick={onPrevious}
-                    className="hidden sm:flex bg-black/50 hover:bg-black/70 text-white z-20 h-10 w-10 sm:h-12 sm:w-12 absolute left-2 top-1/2 -translate-y-1/2"
-                  >
-                    <ChevronLeft className="h-6 w-6 sm:h-8 sm:w-8" />
-                  </Button>
-                )}
+                {/* Media section - Left side (60% width) */}
+                <div 
+                  className="flex-1 flex items-center justify-center relative"
+                  style={{ width: '60%' }}
+                  onClick={(e) => {
+                    // Close if clicking on the media section background (not on content)
+                    if (e.target === e.currentTarget) {
+                      onClose();
+                    }
+                  }}
+                >
+                  {/* Navigation Controls - Left Arrow */}
+                  {showNavigation && onPrevious && hasPrevious && (
+                    <Button
+                      variant="secondary"
+                      size="lg"
+                      onClick={onPrevious}
+                      className="bg-black/50 hover:bg-black/70 text-white z-20 h-10 w-10 sm:h-12 sm:w-12 absolute left-4 top-1/2 -translate-y-1/2"
+                    >
+                      <ChevronLeft className="h-6 w-6 sm:h-8 sm:w-8" />
+                    </Button>
+                  )}
 
-                {/* Media Content */}
-                <div className="relative">
+                  {/* Media Content */}
+                  <div className="relative max-w-full max-h-full flex items-center justify-center">
+                    {isVideo ? (
+                      videoPlayerComponent === 'simple-player' ? (
+                        <div style={{ maxWidth: '55vw', maxHeight: '90vh' }}>
+                          <SimpleVideoPlayer
+                            src={displayUrl}
+                            poster={media.thumbUrl}
+                            className="w-full h-full object-contain"
+                          />
+                        </div>
+                      ) : (
+                        <HoverScrubVideo
+                          src={displayUrl}
+                          poster={media.thumbUrl}
+                          className="object-contain"
+                          style={{ maxWidth: '55vw', maxHeight: '90vh' }}
+                        />
+                      )
+                    ) : (
+                      <div className="relative">
+                        {isSaving ? (
+                          <div 
+                            className="flex items-center justify-center bg-black/20 rounded-lg object-contain"
+                            style={{ 
+                              maxHeight: '90vh',
+                              maxWidth: '55vw',
+                              aspectRatio: imageDimensions ? `${imageDimensions.width}/${imageDimensions.height}` : '1',
+                              minWidth: '300px',
+                              minHeight: '300px'
+                            }}
+                          >
+                            <div className="text-white text-center">
+                              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-2"></div>
+                              <p>Saving image...</p>
+                            </div>
+                          </div>
+                        ) : (
+                          <img 
+                            src={displayUrl} 
+                            alt="Media content"
+                            className={`object-contain ${
+                              isFlippedHorizontally ? 'scale-x-[-1]' : ''
+                            }`}
+                            style={{ 
+                              maxHeight: '90vh',
+                              maxWidth: '55vw',
+                              transform: isFlippedHorizontally ? 'scaleX(-1)' : 'none'
+                            }}
+                            onLoad={(e) => {
+                              const img = e.target as HTMLImageElement;
+                              setImageDimensions({
+                                width: img.naturalWidth,
+                                height: img.naturalHeight
+                              });
+                            }}
+                          />
+                        )}
+                        {/* Hidden canvas for image processing */}
+                        <canvas 
+                          ref={canvasRef}
+                          className="hidden"
+                        />
+                      </div>
+                    )}
+
+                    {/* Top Controls */}
+                    <div className="absolute top-4 right-4 flex items-center space-x-2 z-10">
+                      {/* Star Button */}
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => {
+                          const newStarred = !localStarred;
+                          console.log('[StarDebug:MediaLightbox] Star button clicked', {
+                            mediaId: media.id,
+                            oldLocalStarred: localStarred,
+                            newStarred,
+                            hasOnToggleStar: !!onToggleStar,
+                            timestamp: Date.now()
+                          });
+                          
+                          setLocalStarred(newStarred); // Optimistic UI update
+
+                          if (onToggleStar) {
+                            console.log('[StarDebug:MediaLightbox] Calling onToggleStar prop');
+                            onToggleStar(media.id, newStarred);
+                          } else {
+                            console.log('[StarDebug:MediaLightbox] Calling toggleStarMutation');
+                            toggleStarMutation.mutate({ id: media.id, starred: newStarred });
+                          }
+                        }}
+                        disabled={toggleStarMutation.isPending}
+                        className="transition-colors bg-black/50 hover:bg-black/70 text-white"
+                      >
+                        <Star className={`h-4 w-4 ${localStarred ? 'fill-current' : ''}`} />
+                      </Button>
+
+                      {!isVideo && showMagicEdit && (
+                        <MagicEditLauncher
+                          imageUrl={displayUrl}
+                          imageDimensions={imageDimensions}
+                        />
+                      )}
+
+                      {!isVideo && showImageEditTools && (
+                        <>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={handleFlip}
+                                className="bg-black/50 hover:bg-black/70 text-white"
+                              >
+                                <FlipHorizontal className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Flip horizontally</TooltipContent>
+                          </Tooltip>
+
+                          {hasChanges && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  onClick={handleSave}
+                                  disabled={isSaving}
+                                  className="bg-green-600/80 hover:bg-green-600 text-white disabled:opacity-50"
+                                >
+                                  <Save className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>{isSaving ? 'Saving...' : 'Save changes'}</TooltipContent>
+                            </Tooltip>
+                          )}
+                        </>
+                      )}
+
+                      {showDownload && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={handleDownload}
+                              className="bg-black/50 hover:bg-black/70 text-white"
+                            >
+                              <Download className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Download {isVideo ? 'video' : 'image'}</TooltipContent>
+                        </Tooltip>
+                      )}
+
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={onClose}
+                        className="bg-black/50 hover:bg-black/70 text-white"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+
+                    {/* Bottom Workflow Controls */}
+                    {(onAddToShot || onDelete || onApplySettings) && (
+                      <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex items-center space-x-2 z-10">
+                        <div className="bg-black/80 backdrop-blur-sm rounded-lg p-2 flex items-center space-x-2">
+                          {/* Shot Selection and Add to Shot */}
+                          {onAddToShot && allShots.length > 0 && (
+                            <>
+                              <Select value={selectedShotId} onValueChange={onShotChange}>
+                                <SelectTrigger className="w-32 h-8 bg-black/50 border-white/20 text-white text-xs">
+                                  <SelectValue placeholder="Select shot" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {allShots.map((shot) => (
+                                    <SelectItem key={shot.id} value={shot.id}>
+                                      {shot.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={handleAddToShot}
+                                    disabled={!selectedShotId}
+                                    className="bg-blue-600/80 hover:bg-blue-600 text-white h-8 px-3"
+                                  >
+                                    {showTickForImageId === media.id ? (
+                                      <CheckCircle className="h-4 w-4" />
+                                    ) : (
+                                      <PlusCircle className="h-4 w-4" />
+                                    )}
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Add to shot</TooltipContent>
+                              </Tooltip>
+                            </>
+                          )}
+
+                          {/* Apply Settings */}
+                          {onApplySettings && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  onClick={handleApplySettings}
+                                  className="bg-purple-600/80 hover:bg-purple-600 text-white h-8 px-3"
+                                >
+                                  <Settings className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Apply settings</TooltipContent>
+                            </Tooltip>
+                          )}
+
+                          {/* Delete */}
+                          {onDelete && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  onClick={handleDelete}
+                                  disabled={isDeleting === media.id}
+                                  className="bg-red-600/80 hover:bg-red-600 text-white h-8 px-3"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Delete image</TooltipContent>
+                            </Tooltip>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Navigation Controls - Right Arrow */}
+                  {showNavigation && onNext && hasNext && (
+                    <Button
+                      variant="secondary"
+                      size="lg"
+                      onClick={onNext}
+                      className="bg-black/50 hover:bg-black/70 text-white z-20 h-10 w-10 sm:h-12 sm:w-12 absolute right-4 top-1/2 -translate-y-1/2"
+                    >
+                      <ChevronRight className="h-6 w-6 sm:h-8 sm:w-8" />
+                    </Button>
+                  )}
+                </div>
+
+                {/* Task Details Panel - Right side (40% width) */}
+                <div 
+                  className="bg-background border-l border-border overflow-hidden"
+                  style={{ width: '40%' }}
+                >
+                  {taskDetailsData && (
+                    <TaskDetailsPanel
+                      task={taskDetailsData.task}
+                      isLoading={taskDetailsData.isLoading}
+                      error={taskDetailsData.error}
+                      inputImages={taskDetailsData.inputImages}
+                      taskId={taskDetailsData.taskId}
+                      replaceImages={replaceImages}
+                      onReplaceImagesChange={setReplaceImages}
+                      onApplySettings={taskDetailsData.onApplyTaskSettings}
+                      onApplySettingsFromTask={taskDetailsData.onApplySettingsFromTask}
+                      className="h-full"
+                    />
+                  )}
+                </div>
+              </div>
+            ) : showTaskDetails && isMobile ? (
+              // Mobile layout with task details - stacked
+              <div className="w-full h-full flex flex-col bg-black/90">
+                {/* Media section - Top (60% height) */}
+                <div 
+                  className="flex-1 flex items-center justify-center relative"
+                  style={{ height: '60%' }}
+                >
+                  {/* Media Content - same as above but adapted for mobile */}
+                  <div className="relative w-full h-full flex items-center justify-center">
+                    {isVideo ? (
+                      videoPlayerComponent === 'simple-player' ? (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <SimpleVideoPlayer
+                            src={displayUrl}
+                            poster={media.thumbUrl}
+                            className="max-w-full max-h-full object-contain"
+                          />
+                        </div>
+                      ) : (
+                        <HoverScrubVideo
+                          src={displayUrl}
+                          poster={media.thumbUrl}
+                          className="max-w-full max-h-full object-contain"
+                        />
+                      )
+                    ) : (
+                      <div className="relative">
+                        {isSaving ? (
+                          <div 
+                            className="flex items-center justify-center bg-black/20 rounded-lg object-contain"
+                            style={{ 
+                              maxHeight: '50vh',
+                              maxWidth: '95vw',
+                              aspectRatio: imageDimensions ? `${imageDimensions.width}/${imageDimensions.height}` : '1',
+                              minWidth: '200px',
+                              minHeight: '200px'
+                            }}
+                          >
+                            <div className="text-white text-center">
+                              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2"></div>
+                              <p>Saving image...</p>
+                            </div>
+                          </div>
+                        ) : (
+                          <img 
+                            src={displayUrl} 
+                            alt="Media content"
+                            className={`object-contain ${
+                              isFlippedHorizontally ? 'scale-x-[-1]' : ''
+                            }`}
+                            style={{ 
+                              maxHeight: '50vh',
+                              maxWidth: '95vw',
+                              transform: isFlippedHorizontally ? 'scaleX(-1)' : 'none'
+                            }}
+                            onLoad={(e) => {
+                              const img = e.target as HTMLImageElement;
+                              setImageDimensions({
+                                width: img.naturalWidth,
+                                height: img.naturalHeight
+                              });
+                            }}
+                          />
+                        )}
+                        {/* Hidden canvas for image processing */}
+                        <canvas 
+                          ref={canvasRef}
+                          className="hidden"
+                        />
+                      </div>
+                    )}
+
+                    {/* Mobile controls - same as existing mobile controls */}
+                    <div className="absolute top-2 right-2 flex items-center space-x-1 z-10">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => {
+                          const newStarred = !localStarred;
+                          setLocalStarred(newStarred);
+                          if (onToggleStar) {
+                            onToggleStar(media.id, newStarred);
+                          } else {
+                            toggleStarMutation.mutate({ id: media.id, starred: newStarred });
+                          }
+                        }}
+                        disabled={toggleStarMutation.isPending}
+                        className="transition-colors bg-black/50 hover:bg-black/70 text-white"
+                      >
+                        <Star className={`h-4 w-4 ${localStarred ? 'fill-current' : ''}`} />
+                      </Button>
+
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={onClose}
+                        className="bg-black/50 hover:bg-black/70 text-white"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+
+                    {/* Mobile navigation */}
+                    {showNavigation && onPrevious && hasPrevious && (
+                      <Button
+                        variant="secondary"
+                        size="lg"
+                        onClick={onPrevious}
+                        className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white z-10 h-12 w-12"
+                      >
+                        <ChevronLeft className="h-6 w-6" />
+                      </Button>
+                    )}
+                    
+                    {showNavigation && onNext && hasNext && (
+                      <Button
+                        variant="secondary"
+                        size="lg"
+                        onClick={onNext}
+                        className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white z-10 h-12 w-12"
+                      >
+                        <ChevronRight className="h-6 w-6" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Task Details Panel - Bottom (40% height) */}
+                <div 
+                  className="bg-background border-t border-border overflow-hidden"
+                  style={{ height: '40%' }}
+                >
+                  {taskDetailsData && (
+                    <TaskDetailsPanel
+                      task={taskDetailsData.task}
+                      isLoading={taskDetailsData.isLoading}
+                      error={taskDetailsData.error}
+                      inputImages={taskDetailsData.inputImages}
+                      taskId={taskDetailsData.taskId}
+                      replaceImages={replaceImages}
+                      onReplaceImagesChange={setReplaceImages}
+                      onApplySettings={taskDetailsData.onApplyTaskSettings}
+                      onApplySettingsFromTask={taskDetailsData.onApplySettingsFromTask}
+                      className="h-full"
+                    />
+                  )}
+                </div>
+              </div>
+            ) : (
+              // Original layout without task details
+              <div 
+                className="relative flex items-center justify-center"
+                style={{
+                  maxHeight: '95vh',
+                  maxWidth: '95vw',
+                  width: 'auto'
+                }}
+              >
+              {/* Navigation Controls - Left Arrow */}
+              {showNavigation && onPrevious && hasPrevious && (
+                <Button
+                  variant="secondary"
+                  size="lg"
+                  onClick={onPrevious}
+                  className="hidden sm:flex bg-black/50 hover:bg-black/70 text-white z-20 h-10 w-10 sm:h-12 sm:w-12 absolute left-2 top-1/2 -translate-y-1/2"
+                >
+                  <ChevronLeft className="h-6 w-6 sm:h-8 sm:w-8" />
+                </Button>
+              )}
+
+              {/* Media Content */}
+              <div className="relative">
                 {isVideo ? (
                   videoPlayerComponent === 'simple-player' ? (
-                    <div style={{ 
-                      maxWidth: isMobile && showTaskDetails && showTaskDetailsModal 
-                        ? '95vw' 
-                        : !isMobile && showTaskDetails && showTaskDetailsModal
-                        ? '60vw'
-                        : '95vw' 
-                    }}>
+                    <div style={{ maxWidth: '95vw' }}>
                       <SimpleVideoPlayer
                         src={displayUrl}
                         poster={media.thumbUrl}
-                        className={cn(
-                          "h-auto object-contain",
-                          isMobile && showTaskDetails && showTaskDetailsModal 
-                            ? "max-h-[40vh]"
-                            : !isMobile && showTaskDetails && showTaskDetailsModal
-                            ? "max-h-[85vh]"
-                            : "max-h-[85vh] sm:max-h-[85vh]"
-                        )}
+                        className="h-auto max-h-[85vh] sm:max-h-[85vh] object-contain"
                       />
                     </div>
                   ) : (
                     <HoverScrubVideo
                       src={displayUrl}
                       poster={media.thumbUrl}
-                      className={cn(
-                        "h-auto object-contain",
-                        isMobile && showTaskDetails && showTaskDetailsModal 
-                          ? "max-h-[40vh] w-[95vw]"
-                          : !isMobile && showTaskDetails && showTaskDetailsModal
-                          ? "max-h-[85vh] w-auto"
-                          : "max-h-[85vh] sm:max-h-[85vh] object-contain w-[95vw] sm:w-auto"
-                      )}
-                      style={{ 
-                        maxWidth: isMobile && showTaskDetails && showTaskDetailsModal 
-                          ? '95vw' 
-                          : !isMobile && showTaskDetails && showTaskDetailsModal
-                          ? '60vw'
-                          : '95vw' 
-                      }}
+                      className="h-auto max-h-[85vh] sm:max-h-[85vh] object-contain w-[95vw] sm:w-auto"
+                      style={{ maxWidth: '95vw' }}
                     />
                   )
                 ) : (
@@ -466,16 +894,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           isFlippedHorizontally ? 'scale-x-[-1]' : ''
                         }`}
                         style={{ 
-                          maxHeight: isMobile && showTaskDetails && showTaskDetailsModal 
-                            ? '40vh'
-                            : !isMobile && showTaskDetails && showTaskDetailsModal
-                            ? '85vh'
-                            : '85vh',
-                          maxWidth: isMobile && showTaskDetails && showTaskDetailsModal 
-                            ? '95vw' 
-                            : !isMobile && showTaskDetails && showTaskDetailsModal
-                            ? '60vw'
-                            : '95vw',
+                          maxHeight: '85vh',
+                          maxWidth: '95vw',
                           width: 'auto',
                           height: 'auto',
                           transform: isFlippedHorizontally ? 'scaleX(-1)' : 'none'
@@ -528,18 +948,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   >
                     <Star className={`h-4 w-4 ${localStarred ? 'fill-current' : ''}`} />
                   </Button>
-
-                  {/* Task Details Button */}
-                  {showTaskDetails && (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => setShowTaskDetailsModal(!showTaskDetailsModal)}
-                      className="transition-colors bg-black/50 hover:bg-black/70 text-white"
-                    >
-                      <Info className="h-4 w-4" />
-                    </Button>
-                  )}
 
                   {!isVideo && showMagicEdit && (
                     <MagicEditLauncher
@@ -712,7 +1120,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     </Button>
                   )}
                 </div>
-                </div> {/* Close media content div */}
               </div>
 
               {/* Navigation Controls - Right Arrow (Desktop Only) */}
@@ -726,26 +1133,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   <ChevronRight className="h-6 w-6 sm:h-8 sm:w-8" />
                 </Button>
               )}
-
-              {/* Task Details Panel */}
-              {showTaskDetails && showTaskDetailsModal && (
-                <div 
-                  className={cn(
-                    "bg-black/90 rounded-lg border border-white/20",
-                    isMobile 
-                      ? "w-full max-h-[40vh] overflow-y-auto" 
-                      : "w-[35vw] max-h-[95vh] overflow-y-auto"
-                  )}
-                >
-                  <TaskDetailsContent
-                    generationId={media.id}
-                    onApplySettings={onApplySettings}
-                    onApplySettingsFromTask={onApplySettingsFromTask}
-                    onClose={() => setShowTaskDetailsModal(false)}
-                  />
-                </div>
-              )}
-            </div>
+              </div>
+            )}
           </DialogPrimitive.Content>
         </DialogPrimitive.Portal>
       </DialogPrimitive.Root>

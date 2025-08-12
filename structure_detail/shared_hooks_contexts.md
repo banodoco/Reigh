@@ -155,8 +155,6 @@ Located in `/ui/` - Full shadcn-ui component library including:
   - Star/unstar functionality
   - Navigation, download, editing tools
   - Shot workflow integration
-  - **NEW**: Task details panel integration (side-by-side on desktop, stacked on mobile)
-  - Supports inline TaskDetailsContent for video generation metadata
 - **`HoverScrubVideo`** - Video preview on hover
 - **`DraggableImage`** - Drag-and-drop images
 - **`TimeStamp`** - Consistent relative time display ("X mins ago")

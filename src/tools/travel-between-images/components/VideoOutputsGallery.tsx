@@ -7,10 +7,12 @@ import { Separator } from '@/shared/components/ui/separator';
 import HoverScrubVideo from '@/shared/components/HoverScrubVideo';
 import { getDisplayUrl } from '@/shared/lib/utils';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/shared/components/ui/pagination';
-import MediaLightboxWithTaskDetails from '@/tools/travel-between-images/components/MediaLightboxWithTaskDetails';
+import MediaLightbox from '@/shared/components/MediaLightbox';
 import TaskDetailsModal from '@/tools/travel-between-images/components/TaskDetailsModal';
 import { TimeStamp } from '@/shared/components/TimeStamp';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
+import { useGetTaskIdForGeneration } from '@/shared/hooks/useGenerations';
+import { useGetTask } from '@/shared/hooks/useTasks';
 
 interface VideoOutputsGalleryProps {
   videoOutputs: GenerationRow[];
@@ -52,9 +54,25 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   const [currentPage, setCurrentPage] = useState(1);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [selectedVideoForDetails, setSelectedVideoForDetails] = useState<GenerationRow | null>(null);
+  const [taskId, setTaskId] = useState<string | null>(null);
   const itemsPerPage = 6;
   const taskDetailsButtonRef = useRef<HTMLButtonElement>(null);
   const isMobile = useIsMobile();
+
+  // Hooks for task details
+  const getTaskIdMutation = useGetTaskIdForGeneration();
+  const { data: task, isLoading: isLoadingTask, error: taskError } = useGetTask(taskId || '');
+
+  // Derive input images from multiple possible locations within task params
+  const inputImages: string[] = useMemo(() => {
+    const p = (task as any)?.params || {};
+    if (Array.isArray(p.input_images) && p.input_images.length > 0) return p.input_images;
+    if (p.full_orchestrator_payload && Array.isArray(p.full_orchestrator_payload.input_image_paths_resolved)) {
+      return p.full_orchestrator_payload.input_image_paths_resolved;
+    }
+    if (Array.isArray(p.input_image_paths_resolved)) return p.input_image_paths_resolved;
+    return [];
+  }, [task]);
 
   // Mobile double-tap detection refs
   const lastTouchTimeRef = useRef<number>(0);
@@ -65,6 +83,67 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
       taskDetailsButtonRef.current.click();
     }
   }, [selectedVideoForDetails]);
+
+  // Sort video outputs by creation date
+  const sortedVideoOutputs = useMemo(() => {
+    return [...videoOutputs]
+      .map(v => ({ v, time: new Date(v.createdAt || (v as { created_at?: string | null }).created_at || 0).getTime() }))
+      .sort((a, b) => b.time - a.time)
+      .map(({ v }) => v);
+  }, [videoOutputs]);
+
+  // Get current video for lightbox
+  const currentVideo = lightboxIndex !== null ? sortedVideoOutputs[lightboxIndex] : null;
+
+  // Fetch task details when lightbox opens or video changes
+  useEffect(() => {
+    let cancelled = false;
+    
+    console.log('[VideoOutputsGallery] Task details useEffect triggered', { 
+      lightboxIndex, 
+      currentVideoId: currentVideo?.id,
+      timestamp: Date.now() 
+    });
+    
+    const fetchTaskDetails = async () => {
+      if (!currentVideo) {
+        console.log('[VideoOutputsGallery] No current video, clearing task ID');
+        setTaskId(null);
+        return;
+      }
+      
+      console.log('[VideoOutputsGallery] Fetching task details for video', currentVideo.id);
+      
+      try {
+        const result = await getTaskIdMutation.mutateAsync(currentVideo.id);
+        
+        if (cancelled) {
+          console.log('[VideoOutputsGallery] Task fetch cancelled');
+          return;
+        }
+
+        if (!result.taskId) {
+          console.log(`[VideoOutputsGallery] No task ID found for generation ID: ${currentVideo.id}`);
+          setTaskId(null);
+          return;
+        }
+        
+        console.log('[VideoOutputsGallery] Task ID found:', result.taskId);
+        setTaskId(result.taskId);
+
+      } catch (error: any) {
+        if (cancelled) return;
+        console.error(`[VideoOutputsGallery] Error fetching task details:`, error);
+        setTaskId(null);
+      }
+    };
+
+    fetchTaskDetails();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentVideo?.id]);
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -100,13 +179,6 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     
     lastTouchTimeRef.current = currentTime;
   };
-
-  const sortedVideoOutputs = useMemo(() => {
-    return [...videoOutputs]
-      .map(v => ({ v, time: new Date(v.createdAt || (v as { created_at?: string | null }).created_at || 0).getTime() }))
-      .sort((a, b) => b.time - a.time)
-      .map(({ v }) => v);
-  }, [videoOutputs]);
 
   const totalPages = Math.ceil(sortedVideoOutputs.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -241,14 +313,22 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
         )}
 
         {lightboxIndex !== null && (
-          <MediaLightboxWithTaskDetails
-            media={sortedVideoOutputs[lightboxIndex]}
+          <MediaLightbox
+            media={(() => {
+              const media = sortedVideoOutputs[lightboxIndex];
+              console.log('[StarDebug:VideoOutputsGallery] MediaLightbox media', {
+                mediaId: media.id,
+                mediaKeys: Object.keys(media),
+                hasStarred: 'starred' in media,
+                starredValue: (media as { starred?: boolean }).starred,
+                timestamp: Date.now()
+              });
+              return media;
+            })()}
             onClose={() => setLightboxIndex(null)}
             onNext={handleNext}
             onPrevious={handlePrevious}
             onImageSaved={onImageSaved}
-            onApplySettings={onApplySettings}
-            onApplySettingsFromTask={onApplySettingsFromTask}
             showNavigation={true}
             showImageEditTools={false}
             showDownload={true}
@@ -256,6 +336,16 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
             hasNext={lightboxIndex < sortedVideoOutputs.length - 1}
             hasPrevious={lightboxIndex > 0}
             starred={(sortedVideoOutputs[lightboxIndex] as { starred?: boolean }).starred || false}
+            showTaskDetails={!isMobile}
+            taskDetailsData={{
+              task,
+              isLoading: getTaskIdMutation.isPending || isLoadingTask,
+              error: getTaskIdMutation.error || taskError,
+              inputImages,
+              taskId,
+              onApplyTaskSettings: onApplySettings,
+              onApplySettingsFromTask
+            }}
           />
         )}
 
