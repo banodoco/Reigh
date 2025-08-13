@@ -20,6 +20,8 @@ import { Task } from '@/types/tasks';
 import { supabase } from '@/integrations/supabase/client';
 import { useGetTaskIdForGeneration, useCreateGeneration } from '@/shared/hooks/useGenerations';
 import { useGetTask } from '@/shared/hooks/useTasks';
+import { Check, X } from 'lucide-react';
+import { SharedTaskDetails } from './SharedTaskDetails';
 
 
 interface TaskDetailsModalProps {
@@ -55,11 +57,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
     return [];
   }, [task]);
 
-  // Helper to safely access orchestrator payload
-  const orchestratorPayload = (task as any)?.params?.full_orchestrator_payload as any;
-  
-  // Get LoRAs from the correct location (orchestrator payload first, then fallback to params)
-  const additionalLoras = (orchestratorPayload?.additional_loras || (task as any)?.params?.additional_loras) as Record<string, any> | undefined;
+
 
   useEffect(() => {
     let cancelled = false; // guard to avoid state updates after unmount
@@ -156,167 +154,18 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
             <div className="overflow-y-auto pr-2 space-y-6" style={{ maxHeight: 'calc(80vh - 140px)' }}>
               {/* Generation Summary Section */}
               <div className="space-y-3">
-                <div className="space-y-4 p-4 bg-muted/30 rounded-lg border">
-                  {/* Input Images Section - Inside Generation Summary */}
-                  {inputImages.length > 0 && (() => {
-                    const imagesPerRow = 6;
-                    const imagesToShow = showAllImages ? inputImages : inputImages.slice(0, imagesPerRow);
-                    const remainingCount = inputImages.length - imagesPerRow;
-                    
-                    return (
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-2">
-                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Input Images</p>
-                            <span className="text-xs text-muted-foreground">({inputImages.length} image{inputImages.length !== 1 ? 's' : ''})</span>
-                          </div>
-                          {inputImages.length > imagesPerRow && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setShowAllImages(!showAllImages)}
-                              className="h-6 px-2 text-xs"
-                            >
-                              {showAllImages ? 'Show Less' : `Show ${remainingCount} More`}
-                            </Button>
-                          )}
-                        </div>
-                        <div className="grid grid-cols-6 gap-2">
-                          {imagesToShow.map((img: string, index: number) => (
-                            <div key={index} className="relative group">
-                              <img 
-                                src={img} 
-                                alt={`Input image ${index + 1}`} 
-                                className="w-full aspect-square object-cover rounded-md border shadow-sm transition-transform group-hover:scale-105"
-                              />
-                              <div className="absolute bottom-1 right-1 bg-black/70 text-white text-xs px-1 py-0.5 rounded">
-                                {index + 1}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })()}
-                  {/* Prompts and Technical Settings Section */}
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    {/* Prompts Section - Left side (50% width) */}
-                    <div className="space-y-4">
-                      <div className="space-y-1">
-                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Prompt</p>
-                        {(() => {
-                          const prompt = orchestratorPayload?.base_prompts_expanded?.[0] || (task as any)?.params?.prompt || 'N/A';
-                          const maxLength = 150;
-                          const shouldTruncate = prompt.length > maxLength;
-                          const displayText = showFullPrompt || !shouldTruncate ? prompt : prompt.slice(0, maxLength) + '...';
-                          
-                          return (
-                            <div>
-                              <p className="text-sm font-medium break-words whitespace-pre-wrap">
-                                {displayText}
-                              </p>
-                              {shouldTruncate && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => setShowFullPrompt(!showFullPrompt)}
-                                  className="h-6 px-0 text-xs text-primary mt-1"
-                                >
-                                  {showFullPrompt ? 'Show Less' : 'Show More'}
-                                </Button>
-                              )}
-                            </div>
-                          );
-                        })()}
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Negative Prompt</p>
-                        {(() => {
-                          const negativePrompt = orchestratorPayload?.negative_prompts_expanded?.[0] || (task as any)?.params?.negative_prompt || 'N/A';
-                          const maxLength = 150;
-                          const shouldTruncate = negativePrompt.length > maxLength;
-                          const displayText = showFullNegativePrompt || !shouldTruncate ? negativePrompt : negativePrompt.slice(0, maxLength) + '...';
-                          
-                          return (
-                            <div>
-                              <p className="text-sm font-medium break-words whitespace-pre-wrap">
-                                {displayText}
-                              </p>
-                              {shouldTruncate && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => setShowFullNegativePrompt(!showFullNegativePrompt)}
-                                  className="h-6 px-0 text-xs text-primary mt-1"
-                                >
-                                  {showFullNegativePrompt ? 'Show Less' : 'Show More'}
-                                </Button>
-                              )}
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    </div>
-                    
-                    {/* Technical Settings - Right side (50% width, 2x2 grid) */}
-                    <div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Steps</p>
-                          <p className="text-sm font-medium">
-                            {orchestratorPayload?.steps || (task as any)?.params?.num_inference_steps || 'N/A'}
-                          </p>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Resolution</p>
-                          <p className="text-sm font-medium">{(task as any)?.params?.parsed_resolution_wh || 'N/A'}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Frames / Segment</p>
-                          <p className="text-sm font-medium">
-                            {orchestratorPayload?.segment_frames_expanded?.[0] || (task as any)?.params?.segment_frames_expanded || 'N/A'}
-                          </p>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Context Frames</p>
-                          <p className="text-sm font-medium">
-                            {(task as any)?.params?.frame_overlap_settings_expanded?.[0] || orchestratorPayload?.frame_overlap_expanded?.[0] || (task as any)?.params?.frame_overlap_expanded || 'N/A'}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* LoRAs Section */}
-                  {additionalLoras && Object.keys(additionalLoras).length > 0 && (
-                    <div className="pt-3 border-t border-muted-foreground/20">
-                      <div className="space-y-2">
-                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">LoRAs Used</p>
-                        <div className="space-y-2">
-                          {Object.entries(additionalLoras).map(([url, strength]) => {
-                            const fileName = url.split('/').pop() || 'Unknown';
-                            const displayName = fileName.replace(/\.(safetensors|ckpt|pt)$/, '');
-                            return (
-                              <div key={url} className="flex items-center justify-between p-2 bg-background/50 rounded border">
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-medium truncate" title={displayName}>
-                                    {displayName}
-                                  </p>
-                                  <p className="text-xs text-muted-foreground truncate" title={url}>
-                                    {url}
-                                  </p>
-                                </div>
-                                <div className="text-sm font-medium text-muted-foreground ml-2">
-                                  {strength}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                <SharedTaskDetails
+                  task={task}
+                  inputImages={inputImages}
+                  variant="modal"
+                  isMobile={isMobile}
+                  showAllImages={showAllImages}
+                  onShowAllImagesChange={setShowAllImages}
+                  showFullPrompt={showFullPrompt}
+                  onShowFullPromptChange={setShowFullPrompt}
+                  showFullNegativePrompt={showFullNegativePrompt}
+                  onShowFullNegativePromptChange={setShowFullNegativePrompt}
+                />
               </div>
               
               <div className="space-y-3">

@@ -25,6 +25,134 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
  * - 500 Internal Server Error
  */
 
+/**
+ * Handles cascading task failures/cancellations for orchestrated tasks.
+ * When a task fails or is cancelled, this function:
+ * 1. Finds the orchestrator task (if the failed task references one)
+ * 2. Finds all sibling tasks that reference the same orchestrator
+ * 3. Marks them all as Failed/Cancelled appropriately
+ */
+async function handleCascadingTaskFailure(
+  supabaseAdmin: any,
+  failedTaskId: string,
+  failureStatus: string,
+  failedTaskData: any
+) {
+  try {
+    console.log(`[CascadeFailure] Processing cascading failure for task ${failedTaskId} with status ${failureStatus}`);
+    
+    // Extract orchestrator_task_id_ref from the failed task's params
+    let orchestratorTaskId: string | null = null;
+    let isOrchestratorTask = false;
+    
+    if (failedTaskData.params) {
+      const params = typeof failedTaskData.params === 'string' 
+        ? JSON.parse(failedTaskData.params) 
+        : failedTaskData.params;
+      
+      orchestratorTaskId = params.orchestrator_task_id_ref || params.orchestrator_task_id;
+      
+      // Check if this task IS the orchestrator (has orchestrator_details)
+      if (!orchestratorTaskId && params.orchestrator_details) {
+        orchestratorTaskId = failedTaskId;
+        isOrchestratorTask = true;
+        console.log(`[CascadeFailure] Task ${failedTaskId} appears to be the orchestrator task itself`);
+      }
+    }
+    
+    if (!orchestratorTaskId) {
+      console.log(`[CascadeFailure] No orchestrator_task_id_ref found and not an orchestrator task for ${failedTaskId}, skipping cascade`);
+      return;
+    }
+    
+    console.log(`[CascadeFailure] Found orchestrator task ID: ${orchestratorTaskId}`);
+    
+    // Find all tasks that reference this orchestrator (including the orchestrator itself)
+    let query;
+    
+    if (isOrchestratorTask) {
+      // If the failed task IS the orchestrator, find all children that reference it
+      console.log(`[CascadeFailure] Finding children tasks that reference orchestrator ${orchestratorTaskId}`);
+      query = supabaseAdmin
+        .from("tasks")
+        .select("id, task_type, status, params")
+        .or(`params->>orchestrator_task_id_ref.eq.${orchestratorTaskId},params->>orchestrator_task_id.eq.${orchestratorTaskId}`)
+        .neq("id", failedTaskId) // Don't include the orchestrator itself
+        .neq("status", "Failed")
+        .neq("status", "Cancelled")
+        .neq("status", "Complete");
+    } else {
+      // If a child task failed, find orchestrator + all siblings
+      console.log(`[CascadeFailure] Finding orchestrator and sibling tasks for orchestrator ${orchestratorTaskId}`);
+      query = supabaseAdmin
+        .from("tasks")
+        .select("id, task_type, status, params")
+        .or(`id.eq.${orchestratorTaskId},params->>orchestrator_task_id_ref.eq.${orchestratorTaskId},params->>orchestrator_task_id.eq.${orchestratorTaskId}`)
+        .neq("status", "Failed")
+        .neq("status", "Cancelled")
+        .neq("status", "Complete");
+    }
+    
+    const { data: relatedTasks, error: fetchError } = await query;
+    
+    if (fetchError) {
+      console.error(`[CascadeFailure] Error fetching related tasks:`, fetchError);
+      return;
+    }
+    
+    if (!relatedTasks || relatedTasks.length === 0) {
+      console.log(`[CascadeFailure] No related tasks found to cascade failure to`);
+      return;
+    }
+    
+    console.log(`[CascadeFailure] Found ${relatedTasks.length} related tasks to update:`, 
+      relatedTasks.map(t => `${t.id} (${t.task_type}, ${t.status})`));
+    
+    // Update all related tasks to Failed/Cancelled
+    const tasksToUpdate = relatedTasks.filter(task => task.id !== failedTaskId);
+    
+    if (tasksToUpdate.length === 0) {
+      console.log(`[CascadeFailure] No additional tasks to update after filtering`);
+      return;
+    }
+    
+    const updatePromises = tasksToUpdate.map(async (task) => {
+      console.log(`[CascadeFailure] Updating task ${task.id} (${task.task_type}) to ${failureStatus}`);
+      
+      const updatePayload = {
+        status: failureStatus,
+        updated_at: new Date().toISOString(),
+        error_message: `Cascaded ${failureStatus.toLowerCase()} from related task ${failedTaskId}`
+      };
+      
+      const { error } = await supabaseAdmin
+        .from("tasks")
+        .update(updatePayload)
+        .eq("id", task.id);
+      
+      if (error) {
+        console.error(`[CascadeFailure] Failed to update task ${task.id}:`, error);
+      } else {
+        console.log(`[CascadeFailure] Successfully updated task ${task.id} to ${failureStatus}`);
+      }
+      
+      return { taskId: task.id, error };
+    });
+    
+    const results = await Promise.all(updatePromises);
+    const failedUpdates = results.filter(r => r.error);
+    
+    if (failedUpdates.length > 0) {
+      console.error(`[CascadeFailure] ${failedUpdates.length} tasks failed to update:`, failedUpdates);
+    } else {
+      console.log(`[CascadeFailure] Successfully cascaded ${failureStatus} to ${tasksToUpdate.length} related tasks`);
+    }
+    
+  } catch (error) {
+    console.error(`[CascadeFailure] Unexpected error in handleCascadingTaskFailure:`, error);
+  }
+}
+
 serve(async (req) => {
   // Only accept POST requests
   if (req.method !== "POST") {
@@ -200,6 +328,11 @@ serve(async (req) => {
     }
 
     console.log(`Successfully updated task ${task_id} to status '${status}'`);
+
+    // Handle cascading failures/cancellations for orchestrated tasks
+    if (status === "Failed" || status === "Cancelled") {
+      await handleCascadingTaskFailure(supabaseAdmin, task_id, status, updateResult.data);
+    }
     
     return new Response(JSON.stringify({
       success: true,

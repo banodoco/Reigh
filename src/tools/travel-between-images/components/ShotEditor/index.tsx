@@ -236,7 +236,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   
   // Unified step management system
   const getRecommendedSteps = useCallback((modelName: string, isAccelerated: boolean) => {
-    if (modelName === 'vace_14B_fake_cocktail_2_2' || modelName === 'vace_14B_fakeface') {
+    if (modelName === 'vace_14B_fake_cocktail_2_2') {
       return 10; // Wan 2.2 always uses 10 steps
     }
     return isAccelerated ? 8 : 20; // Wan 2.1 uses 8 for accelerated, 20 for normal
@@ -345,6 +345,15 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     }
     // Note: Steps are automatically handled by the unified system when model changes
   }, [onSteerableMotionSettingsChange, setAccelerated]);
+
+  // Ensure a valid model is always selected - default to Wan 2.1 if invalid/missing
+  useEffect(() => {
+    const validModels = ['vace_14B', 'vace_14B_fake_cocktail_2_2'];
+    if (!validModels.includes(steerableMotionSettings.model_name)) {
+      console.log(`[ShotEditor] Invalid model name "${steerableMotionSettings.model_name}", defaulting to Wan 2.1`);
+      handleModelChange('vace_14B');
+    }
+  }, [steerableMotionSettings.model_name, handleModelChange]);
 
   // Update editing name when selected shot changes
   useEffect(() => {
@@ -940,7 +949,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                                             type="radio"
                                             name="model-mobile"
                                             value="vace_14B"
-                                            checked={steerableMotionSettings.model_name === 'vace_14B'}
+                                            checked={steerableMotionSettings.model_name === 'vace_14B' || !['vace_14B', 'vace_14B_fake_cocktail_2_2'].includes(steerableMotionSettings.model_name)}
                                             onChange={() => handleModelChange('vace_14B')}
                                             className="w-4 h-4 text-primary"
                                         />
@@ -1021,7 +1030,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                                         type="radio"
                                         name="model"
                                         value="vace_14B"
-                                        checked={steerableMotionSettings.model_name === 'vace_14B'}
+                                        checked={steerableMotionSettings.model_name === 'vace_14B' || !['vace_14B', 'vace_14B_fake_cocktail_2_2'].includes(steerableMotionSettings.model_name)}
                                         onChange={() => handleModelChange('vace_14B')}
                                         className="w-4 h-4 text-primary"
                                     />
@@ -1032,7 +1041,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                                         type="radio"
                                         name="model"
                                         value="vace_14B_fake_cocktail_2_2"
-                                        checked={steerableMotionSettings.model_name === 'vace_14B_fake_cocktail_2_2' || steerableMotionSettings.model_name === 'vace_14B_fakeface'}
+                                        checked={steerableMotionSettings.model_name === 'vace_14B_fake_cocktail_2_2'}
                                         onChange={() => handleModelChange('vace_14B_fake_cocktail_2_2')}
                                         className="w-4 h-4 text-primary"
                                     />

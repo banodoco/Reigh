@@ -249,7 +249,8 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
         status,
         visibilityState: document.visibilityState,
         isHidden: document.hidden,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        queryContextMessage: 'EXECUTING DATABASE QUERY'
       });
       
       if (!projectId) {
@@ -352,19 +353,58 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
     enabled: !!projectId,
     // CRITICAL: Gallery cache settings - prevent background refetches
     placeholderData: (previousData) => previousData,
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: 10 * 1000, // FIXED: 10 seconds - allow refetchInterval to work properly
     gcTime: 5 * 60 * 1000, // 5 minutes  
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
-    // Add background polling for active tasks
+    // Add background polling for active tasks with resurrection mechanism
     refetchInterval: (query) => {
       // Only poll if there are active tasks (Queued or In Progress)
       const data = query.state.data;
-      if (!data) return false;
+      const isStale = query.state.isStale;
+      const dataUpdatedAt = query.state.dataUpdatedAt;
+      const now = Date.now();
+      
+      if (!data) {
+        // If no data yet, poll slowly to get initial data
+        console.log('[PollingBreakageIssue] No data yet, using slow polling (30s):', {
+          projectId: params.projectId,
+          isStale,
+          timestamp: now
+        });
+        return 30000; // 30 seconds
+      }
+      
       const hasActiveTasks = data.tasks?.some(task => 
         task.status === 'Queued' || task.status === 'In Progress'
       ) ?? false;
-      return hasActiveTasks ? 10000 : false; // Poll every 10 seconds if there are active tasks
+      
+      const dataAge = now - dataUpdatedAt;
+      
+      if (hasActiveTasks) {
+        console.log('[PollingBreakageIssue] Active tasks detected, using fast polling (10s):', {
+          projectId: params.projectId,
+          taskCount: data.tasks?.length,
+          activeTasks: data.tasks?.filter(t => t.status === 'Queued' || t.status === 'In Progress').length,
+          isStale,
+          dataAge,
+          dataUpdatedAt,
+          timestamp: now
+        });
+        return 10000; // Poll every 10 seconds if there are active tasks
+      } else {
+        // RESURRECTION FIX: Even with no active tasks, poll occasionally 
+        // to catch new tasks that might be created while polling was stopped
+        console.log('[PollingBreakageIssue] No active tasks, using resurrection polling (60s):', {
+          projectId: params.projectId,
+          taskCount: data.tasks?.length,
+          isStale,
+          dataAge,
+          dataUpdatedAt,
+          timestamp: now
+        });
+        return 60000; // Poll every 60 seconds as backup to catch new tasks
+      }
     },
     refetchIntervalInBackground: true, // CRITICAL: Continue polling when tab is not visible
   });
@@ -557,7 +597,8 @@ export const useTaskStatusCounts = (projectId: string | null) => {
         projectId,
         visibilityState: document.visibilityState,
         isHidden: document.hidden,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        queryContextMessage: 'EXECUTING DATABASE QUERY'
       });
       
       if (!projectId) {
@@ -689,6 +730,7 @@ export const useTaskStatusCounts = (projectId: string | null) => {
       return result;
     },
     enabled: !!projectId,
+    staleTime: 4 * 1000, // 4 seconds - allow 5s refetchInterval to work properly
     refetchInterval: 5000, // Refresh every 5 seconds for live updates
     refetchIntervalInBackground: true, // CRITICAL: Continue polling when tab is not visible
   });
