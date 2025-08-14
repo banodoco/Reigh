@@ -274,7 +274,7 @@ export const useGenerationActions = ({
     } finally {
       actions.setDeletingVideoId(null);
     }
-  }, [selectedShot, projectId, actions, deleteGenerationMutation, onShotImagesUpdate, orderedShotImages]);
+  }, [selectedShot?.id, projectId, actions, deleteGenerationMutation, onShotImagesUpdate, orderedShotImages]);
 
   const handleDeleteImageFromShot = useCallback(async (shotImageEntryId: string) => {
     if (!selectedShot || !projectId) {
@@ -295,7 +295,7 @@ export const useGenerationActions = ({
         actions.setLocalOrderedShotImages(orderedShotImages);
       }
     });
-  }, [selectedShot, projectId, actions, removeImageFromShotMutation, orderedShotImages]);
+  }, [selectedShot?.id, projectId, actions, removeImageFromShotMutation, orderedShotImages]);
 
   const handleDuplicateImage = useCallback(async (shotImageEntryId: string, position: number) => {
     console.log('[DUPLICATE] handleDuplicateImage called', {
@@ -349,7 +349,7 @@ export const useGenerationActions = ({
         actions.setDuplicatingImageId(null);
       }
     });
-  }, [state.localOrderedShotImages, selectedShot, projectId, actions, duplicateImageInShotMutation]);
+  }, [state.localOrderedShotImages, selectedShot?.id, projectId, actions, duplicateImageInShotMutation]);
 
   const handleTimelineImageDrop = useCallback(async (files: File[], targetFrame?: number) => {
     if (!selectedShot?.id || !projectId) {

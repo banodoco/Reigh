@@ -12,18 +12,22 @@ import MediaLightbox from '@/shared/components/MediaLightbox';
 import TaskDetailsModal from '@/tools/travel-between-images/components/TaskDetailsModal';
 import { TimeStamp } from '@/shared/components/TimeStamp';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
-import { useGetTaskIdForGeneration } from '@/shared/hooks/useGenerations';
 import { useGetTask } from '@/shared/hooks/useTasks';
 import { Badge } from '@/shared/components/ui/badge';
 import { Check, X } from 'lucide-react';
 import { SharedTaskDetails } from './SharedTaskDetails';
 import { useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { useUnifiedGenerations, useTaskFromUnifiedCache } from '@/shared/hooks/useUnifiedGenerations';
+import { useGenerationTaskPreloader, useEnhancedGenerations } from '@/shared/contexts/GenerationTaskContext';
 
 
 
 interface VideoOutputsGalleryProps {
-  videoOutputs: GenerationRow[];
+  // Data source
+  projectId: string | null;
+  shotId: string | null;
+  
+  // Event handlers (keeping the same interface for compatibility)
   onDelete: (generationId: string) => void;
   deletingVideoId: string | null;
   /**
@@ -49,22 +53,28 @@ interface VideoOutputsGalleryProps {
    */
   onApplySettingsFromTask: (taskId: string, replaceImages: boolean, inputImages: string[]) => void;
   onImageSaved?: (newImageUrl: string, createNew?: boolean) => Promise<void>;
+  /**
+   * Key to identify which shot/context these videos belong to - used to reset state when shot changes
+   */
+  shotKey?: string;
 }
 
 const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
-  videoOutputs,
+  projectId,
+  shotId,
   onDelete,
   deletingVideoId,
   onApplySettings,
   onApplySettingsFromTask,
   onImageSaved,
+  shotKey,
 }) => {
+  
+
   const [currentPage, setCurrentPage] = useState(1);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [selectedVideoForDetails, setSelectedVideoForDetails] = useState<GenerationRow | null>(null);
-  const [taskId, setTaskId] = useState<string | null>(null);
   const [hoveredVideo, setHoveredVideo] = useState<GenerationRow | null>(null);
-  const [hoveredTaskId, setHoveredTaskId] = useState<string | null>(null);
   const [hoverPosition, setHoverPosition] = useState<{ x: number; y: number; positioning?: 'above' | 'below' } | null>(null);
   const [isInitialHover, setIsInitialHover] = useState(false);
   const itemsPerPage = 6;
@@ -72,111 +82,81 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isMobile = useIsMobile();
 
-  // Hooks for task details
-  const getTaskIdMutation = useGetTaskIdForGeneration();
-  const { data: task, isLoading: isLoadingTask, error: taskError } = useGetTask(taskId || '');
-  
-  // Hooks for hover preview
-  const getHoverTaskIdMutation = useGetTaskIdForGeneration();
-  const { data: hoverTask, isLoading: isLoadingHoverTask } = useGetTask(hoveredTaskId || '');
-  
-  // Background preloading
-  const queryClient = useQueryClient();
-  const [preloadedTaskIds, setPreloadedTaskIds] = useState<Set<string>>(new Set());
-  const [isPreloading, setIsPreloading] = useState(false);
+  // Use unified generations hook with task data preloading
+  const { data: generationsData, isLoading: isLoadingGenerations, error: generationsError } = useUnifiedGenerations({
+    projectId,
+    mode: 'shot-specific',
+    shotId,
+    page: currentPage,
+    limit: itemsPerPage,
+    filters: {
+      mediaType: 'video', // Only get videos for this gallery
+    },
+    includeTaskData: false, // We'll load task data on-demand for hover/lightbox
+    preloadTaskData: true, // Background preload for better UX
+    enabled: !!(projectId && shotId),
+  });
 
-  // Background preloading function
-  const preloadTaskDetails = useCallback(async (videosToPreload: GenerationRow[]) => {
-    if (isPreloading) return;
+  // Get video outputs from unified data
+  const videoOutputs = useMemo(() => {
+    if (!(generationsData as any)?.items) return [];
     
-    setIsPreloading(true);
-    console.log('[TaskPreload] Starting background preload for', videosToPreload.length, 'videos');
-    
-    try {
-      // Process videos in small batches to avoid overwhelming the server
-      const batchSize = 3;
-      for (let i = 0; i < videosToPreload.length; i += batchSize) {
-        const batch = videosToPreload.slice(i, i + batchSize);
-        
-        await Promise.all(batch.map(async (video) => {
-          try {
-            // Check if we already have this task ID cached
-            if (preloadedTaskIds.has(video.id)) return;
-            
-            console.log('[TaskPreload] Preloading task for video:', video.id);
-            
-            // Get task ID
-            const { data: generationData } = await supabase
-              .from('generations')
-              .select('tasks')
-              .eq('id', video.id)
-              .single();
-            
-            if (!generationData?.tasks) return;
-            
-            const tasksArray = generationData.tasks as string[] | null;
-            const taskId = Array.isArray(tasksArray) && tasksArray.length > 0 ? tasksArray[0] : null;
-            
-            if (!taskId) return;
-            
-            // Prefetch task details into React Query cache
-            await queryClient.prefetchQuery({
-              queryKey: ['tasks', 'single', taskId],
-              queryFn: async () => {
-                const { data, error } = await supabase
-                  .from('tasks')
-                  .select('*')
-                  .eq('id', taskId)
-                  .single();
-                
-                if (error) {
-                  throw new Error(`Task with ID ${taskId} not found: ${error.message}`);
-                }
-                
-                // Map the data same way as in useTasks.ts
-                return {
-                  id: data.id,
-                  project_id: data.project_id,
-                  status: data.status,
-                  task_type: data.task_type,
-                  params: data.params,
-                  result: data.result,
-                  error: data.error,
-                  claimed_at: data.claimed_at,
-                  completed_at: data.completed_at,
-                  created_at: data.created_at,
-                  updated_at: data.updated_at,
-                  worker_id: data.worker_id,
-                  cost: data.cost,
-                  credits_used: data.credits_used,
-                  processing_started_at: data.processing_started_at,
-                  processing_completed_at: data.processing_completed_at,
-                };
-              },
-              staleTime: 5 * 60 * 1000, // 5 minutes
-            });
-            
-            // Also prefetch the generation -> task ID mapping
-            queryClient.setQueryData(['tasks', 'taskId', video.id], { taskId });
-            
-            setPreloadedTaskIds(prev => new Set([...prev, video.id]));
-            console.log('[TaskPreload] Successfully preloaded task for video:', video.id, 'taskId:', taskId);
-            
-          } catch (error) {
-            console.warn('[TaskPreload] Failed to preload task for video:', video.id, error);
-          }
-        }));
-        
-        // Small delay between batches to be nice to the server
-        if (i + batchSize < videosToPreload.length) {
-          await new Promise(resolve => setTimeout(resolve, 100));
-        }
-      }
-    } finally {
-      setIsPreloading(false);
-      console.log('[TaskPreload] Background preload completed');
-    }
-  }, [isPreloading, preloadedTaskIds, queryClient]);
+    // Transform to GenerationRow format for compatibility
+    return ((generationsData as any).items as any[]).map((item: any) => ({
+      id: item.id,
+      imageUrl: item.url,
+      location: item.url,
+      thumbUrl: item.thumbUrl,
+      type: item.isVideo ? 'video_travel_output' : 'single_image',
+      created_at: item.createdAt,
+      metadata: item.metadata,
+      shotImageEntryId: item.shotImageEntryId,
+      position: item.position,
+      // Include task data if available
+      ...(item.taskId && { taskId: item.taskId }),
+    })) as GenerationRow[];
+  }, [(generationsData as any)?.items]);
+
+  // Enhanced generations with automatic task data preloading via context
+  const enhancedVideoOutputs = useEnhancedGenerations(videoOutputs);
+  
+  // Background preload task data for current page
+  useGenerationTaskPreloader(videoOutputs, !!projectId && !!shotId);
+  
+  // Debug logging for VideoOutputsGallery data updates
+  React.useEffect(() => {
+    console.log('[VideoGalleryDebug] Gallery data updated:', {
+      projectId,
+      shotId,
+      currentPage,
+      itemsPerPage,
+      videoOutputsCount: videoOutputs.length,
+      enhancedVideoOutputsCount: enhancedVideoOutputs.length,
+      isLoadingGenerations,
+      generationsError: generationsError?.message,
+      visibilityState: document.visibilityState,
+      timestamp: Date.now(),
+      videoDetails: videoOutputs.slice(0, 3).map(video => ({
+        id: video.id,
+        type: video.type,
+        createdAt: (video as any).created_at,
+        hasTaskId: !!(video as any).taskId,
+        shotImageEntryId: (video as any).shotImageEntryId
+      }))
+    });
+  }, [videoOutputs, enhancedVideoOutputs, currentPage, isLoadingGenerations, generationsError]);
+
+  // Hooks for task details (now using unified cache)
+  const lightboxVideoId = lightboxIndex !== null && videoOutputs[lightboxIndex] ? videoOutputs[lightboxIndex].id : null;
+  const { data: lightboxTaskMapping } = useTaskFromUnifiedCache(lightboxVideoId || '');
+  const { data: task, isLoading: isLoadingTask, error: taskError } = useGetTask(lightboxTaskMapping?.taskId || '');
+  
+  // Hooks for hover preview (now using unified cache)
+  const { data: hoverTaskMapping } = useTaskFromUnifiedCache(hoveredVideo?.id || '');
+  const { data: hoverTask, isLoading: isLoadingHoverTask } = useGetTask(hoverTaskMapping?.taskId || '');
+  
+  // Track the current shot key to detect changes
+  const prevShotKeyRef = useRef<string | undefined>(shotKey);
 
   // Derive input images from multiple possible locations within task params
   const inputImages: string[] = useMemo(() => {
@@ -193,7 +173,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   const hoverInputImages: string[] = useMemo(() => {
     console.log('[HoverDebug] Processing hover task for input images:', {
       hoverTask: !!hoverTask,
-      hoveredTaskId,
+      hoveredVideoId: hoveredVideo?.id,
       hoverTaskParams: hoverTask ? Object.keys((hoverTask as any)?.params || {}) : []
     });
     
@@ -204,7 +184,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     }
     if (Array.isArray(p.input_image_paths_resolved)) return p.input_image_paths_resolved;
     return [];
-  }, [hoverTask, hoveredTaskId]);
+  }, [hoverTask, hoveredVideo?.id]);
 
 
 
@@ -229,55 +209,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   // Get current video for lightbox
   const currentVideo = lightboxIndex !== null ? sortedVideoOutputs[lightboxIndex] : null;
 
-  // Fetch task details when lightbox opens or video changes
-  useEffect(() => {
-    let cancelled = false;
-    
-    console.log('[VideoOutputsGallery] Task details useEffect triggered', { 
-      lightboxIndex, 
-      currentVideoId: currentVideo?.id,
-      timestamp: Date.now() 
-    });
-    
-    const fetchTaskDetails = async () => {
-      if (!currentVideo) {
-        console.log('[VideoOutputsGallery] No current video, clearing task ID');
-        setTaskId(null);
-        return;
-      }
-      
-      console.log('[VideoOutputsGallery] Fetching task details for video', currentVideo.id);
-      
-      try {
-        const result = await getTaskIdMutation.mutateAsync(currentVideo.id);
-        
-        if (cancelled) {
-          console.log('[VideoOutputsGallery] Task fetch cancelled');
-          return;
-        }
-
-        if (!result.taskId) {
-          console.log(`[VideoOutputsGallery] No task ID found for generation ID: ${currentVideo.id}`);
-          setTaskId(null);
-          return;
-        }
-        
-        console.log('[VideoOutputsGallery] Task ID found:', result.taskId);
-        setTaskId(result.taskId);
-
-      } catch (error: any) {
-        if (cancelled) return;
-        console.error(`[VideoOutputsGallery] Error fetching task details:`, error);
-        setTaskId(null);
-      }
-    };
-
-    fetchTaskDetails();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [currentVideo?.id]);
+  // Simple loading state management - task data is now handled by unified cache
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -291,8 +223,42 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     };
   }, []);
 
+  // Reset internal state when shot changes
+  useEffect(() => {
+    const hasChanged = prevShotKeyRef.current !== shotKey;
+    
+    if (hasChanged && prevShotKeyRef.current !== undefined) {
+      console.log('[VideoOutputsGallery] Shot changed, resetting internal state', {
+        prevShotKey: prevShotKeyRef.current,
+        newShotKey: shotKey,
+        timestamp: Date.now()
+      });
+      
+      // Reset all internal state
+      setCurrentPage(1);
+      setLightboxIndex(null);
+      setSelectedVideoForDetails(null);
+      setHoveredVideo(null);
+      setHoverPosition(null);
+      setIsInitialHover(false);
+      
+      // Clear any pending timeouts
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+        hoverTimeoutRef.current = null;
+      }
+      if (doubleTapTimeoutRef.current) {
+        clearTimeout(doubleTapTimeoutRef.current);
+        doubleTapTimeoutRef.current = null;
+      }
+    }
+    
+    // Update the ref for next comparison
+    prevShotKeyRef.current = shotKey;
+  }, [shotKey]);
+
   // Handle hover for task details preview
-  const handleHoverStart = async (video: GenerationRow, event: React.MouseEvent) => {
+  const handleHoverStart = (video: GenerationRow, event: React.MouseEvent) => {
     if (isMobile) return; // Don't show hover preview on mobile
     
     console.log('[HoverDebug] Starting hover for video:', video.id);
@@ -335,41 +301,12 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     }
     
     setHoverPosition({ x, y, positioning });
-    
     setHoveredVideo(video);
+    
     console.log('[HoverDebug] Set hovered video:', video.id, 'positioning:', positioning);
     
-    // Check if we have preloaded task ID data
-    const cachedTaskId = queryClient.getQueryData(['tasks', 'taskId', video.id]) as { taskId: string } | undefined;
-    
-    if (cachedTaskId?.taskId) {
-      console.log('[HoverDebug] Using preloaded task ID:', cachedTaskId.taskId, 'for video:', video.id);
-      setHoveredTaskId(cachedTaskId.taskId);
-      setIsInitialHover(false);
-    } else {
-      console.log('[HoverDebug] No preloaded data, will fetch task ID for video:', video.id);
-      setIsInitialHover(true);
-      
-      // Delay fetching task details slightly to avoid rapid API calls
-      hoverTimeoutRef.current = setTimeout(async () => {
-        setIsInitialHover(false);
-        console.log('[HoverDebug] Timeout triggered, fetching task details for:', video.id);
-        try {
-          const result = await getHoverTaskIdMutation.mutateAsync(video.id);
-          console.log('[HoverDebug] Task ID result:', result);
-          if (result.taskId) {
-            console.log('[HoverDebug] Setting hover task ID:', result.taskId);
-            setHoveredTaskId(result.taskId);
-          } else {
-            console.log('[HoverDebug] No task ID found for video:', video.id);
-            setHoveredTaskId(null);
-          }
-        } catch (error) {
-          console.error('[HoverDebug] Error fetching hover task details:', error);
-          setHoveredTaskId(null);
-        }
-      }, 500);
-    }
+    // Task data will be handled automatically by useTaskFromUnifiedCache
+    // No need for complex manual fetching or caching logic
   };
 
   const handleHoverEnd = () => {
@@ -379,7 +316,6 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
       hoverTimeoutRef.current = null;
     }
     setHoveredVideo(null);
-    setHoveredTaskId(null);
     setHoverPosition(null);
     setIsInitialHover(false);
   };
@@ -432,69 +368,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   const endIndex = startIndex + itemsPerPage;
   const currentVideoOutputs = sortedVideoOutputs.slice(startIndex, endIndex);
 
-  // Background preloading effect
-  useEffect(() => {
-    if (currentVideoOutputs.length === 0) return;
-    
-    // Check if any videos in current view are not preloaded
-    const unpreloadedVideos = currentVideoOutputs.filter(video => !preloadedTaskIds.has(video.id));
-    
-    if (unpreloadedVideos.length === 0) {
-      console.log('[TaskPreload] All videos on current page already preloaded');
-      return;
-    }
-    
-    console.log('[TaskPreload] Found', unpreloadedVideos.length, 'unpreloaded videos on current page');
-    
-    // If it's a fresh page load (most videos unpreloaded), add delay
-    // If it's just a few new videos (like after deletion), preload immediately
-    const shouldDelay = unpreloadedVideos.length >= currentVideoOutputs.length * 0.8; // 80% or more unpreloaded
-    const delay = shouldDelay ? 1000 : 200; // 1s for fresh page, 200ms for new videos
-    
-    const timer = setTimeout(() => {
-      preloadTaskDetails(unpreloadedVideos);
-    }, delay);
-
-    return () => clearTimeout(timer);
-  }, [currentVideoOutputs, currentPage, preloadTaskDetails, preloadedTaskIds]); // Re-run when page or preloaded set changes
-
-  // Clean up preloaded cache when videos are deleted
-  useEffect(() => {
-    const currentVideoIds = new Set(sortedVideoOutputs.map(v => v.id));
-    const preloadedIds = Array.from(preloadedTaskIds);
-    const staleIds = preloadedIds.filter(id => !currentVideoIds.has(id));
-    
-    if (staleIds.length > 0) {
-      console.log('[TaskPreload] Cleaning up', staleIds.length, 'stale preloaded entries');
-      setPreloadedTaskIds(prev => {
-        const newSet = new Set(prev);
-        staleIds.forEach(id => newSet.delete(id));
-        return newSet;
-      });
-    }
-  }, [sortedVideoOutputs, preloadedTaskIds]);
-
-  // Preload next page for faster pagination
-  useEffect(() => {
-    if (totalPages <= 1) return; // No next page
-    
-    const timer = setTimeout(() => {
-      const nextPage = currentPage + 1;
-      if (nextPage <= totalPages) {
-        const nextStartIndex = (nextPage - 1) * itemsPerPage;
-        const nextEndIndex = nextStartIndex + itemsPerPage;
-        const nextPageVideos = sortedVideoOutputs.slice(nextStartIndex, nextEndIndex);
-        const unpreloadedNextPageVideos = nextPageVideos.filter(video => !preloadedTaskIds.has(video.id));
-        
-        if (unpreloadedNextPageVideos.length > 0) {
-          console.log('[TaskPreload] Preloading', unpreloadedNextPageVideos.length, 'videos from next page');
-          preloadTaskDetails(unpreloadedNextPageVideos);
-        }
-      }
-    }, 3000); // 3 seconds after current page loads
-
-    return () => clearTimeout(timer);
-  }, [currentPage, totalPages, itemsPerPage, sortedVideoOutputs, preloadedTaskIds, preloadTaskDetails]);
+  // Background preloading is now handled by the unified generations system
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
@@ -660,10 +534,10 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
             showTaskDetails={!isMobile}
             taskDetailsData={{
               task,
-              isLoading: getTaskIdMutation.isPending || isLoadingTask,
-              error: getTaskIdMutation.error || taskError,
+              isLoading: isLoadingTask,
+              error: taskError,
               inputImages,
-              taskId,
+              taskId: lightboxTaskMapping?.taskId || null,
               onApplyTaskSettings: onApplySettings,
               onApplySettingsFromTask
             }}
@@ -698,7 +572,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
         (() => {
           console.log('[HoverDebug] Rendering hover preview:', {
             hoveredVideoId: hoveredVideo.id,
-            hoveredTaskId,
+            hoverTaskId: hoverTaskMapping?.taskId,
             isLoadingHoverTask,
             hoverTask: !!hoverTask,
             hoverTaskKeys: hoverTask ? Object.keys(hoverTask) : []
@@ -727,7 +601,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
                     <div className="absolute bottom-px left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-3 border-r-3 border-t-3 border-l-transparent border-r-transparent border-t-background"></div>
                   </div>
                 )}
-                {(isInitialHover || getHoverTaskIdMutation.isPending || isLoadingHoverTask || (hoveredTaskId && !hoverTask)) ? (
+                {(isInitialHover || isLoadingHoverTask || (hoverTaskMapping?.taskId && !hoverTask)) ? (
                   <div className="flex items-center space-y-2">
                     <svg className="animate-spin h-4 w-4 text-primary mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>

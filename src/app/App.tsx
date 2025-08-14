@@ -15,8 +15,10 @@ import { PanesProvider } from '@/shared/contexts/PanesContext';
 import { CurrentShotProvider } from '@/shared/contexts/CurrentShotContext';
 import { ToolPageHeaderProvider } from '@/shared/contexts/ToolPageHeaderContext';
 import { ShotsProvider } from '@/shared/contexts/ShotsContext';
+import { GenerationTaskProvider } from '@/shared/contexts/GenerationTaskContext';
 // [MobileStallFix] Import debug utilities for console debugging
 import '@/shared/lib/mobileProjectDebug';
+import { initPollingDebugHelpers } from '@/shared/lib/pollingDebugHelpers';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -229,6 +231,16 @@ const AppInternalContent = () => {
 
 function App() {
   React.useEffect(() => {
+    // Initialize debug helpers for console debugging
+    console.log('[DebugHelpers] Initializing polling debug helpers...');
+    try {
+      initPollingDebugHelpers(queryClient);
+      console.log('[DebugHelpers] Debug helpers initialized successfully');
+      console.log('[DebugHelpers] Try: debugPolling.inspectAllCaches("your-project-id")');
+    } catch (error) {
+      console.error('[DebugHelpers] Failed to initialize debug helpers:', error);
+    }
+    
     return () => {
     };
   }, []);
@@ -237,15 +249,17 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ProjectProvider>
         <ShotsProvider>
-          <PanesProvider>
-            <LastAffectedShotProvider>
-              <CurrentShotProvider>
-                <ToolPageHeaderProvider>
-                  <AppInternalContent />
-                </ToolPageHeaderProvider>
-              </CurrentShotProvider>
-            </LastAffectedShotProvider>
-          </PanesProvider>
+          <GenerationTaskProvider>
+            <PanesProvider>
+              <LastAffectedShotProvider>
+                <CurrentShotProvider>
+                  <ToolPageHeaderProvider>
+                    <AppInternalContent />
+                  </ToolPageHeaderProvider>
+                </CurrentShotProvider>
+              </LastAffectedShotProvider>
+            </PanesProvider>
+          </GenerationTaskProvider>
         </ShotsProvider>
       </ProjectProvider>
     </QueryClientProvider>

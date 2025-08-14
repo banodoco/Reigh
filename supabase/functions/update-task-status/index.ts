@@ -269,6 +269,10 @@ serve(async (req) => {
     if (status === "In Progress") {
       updatePayload.generation_started_at = new Date().toISOString();
     }
+    
+    if (status === "Complete") {
+      updatePayload.generation_processed_at = new Date().toISOString();
+    }
 
     if (requestBody.output_location) {
       updatePayload.output_location = requestBody.output_location;

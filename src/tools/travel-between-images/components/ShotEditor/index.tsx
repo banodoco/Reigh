@@ -653,7 +653,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         // The mutation's onError will handle showing the error message and reverting optimistic updates
       }
     });
-  }, [selectedShot, projectId, updateShotImageOrderMutation]);
+  }, [selectedShot?.id, projectId, updateShotImageOrderMutation]);
 
   const handlePendingPositionApplied = useCallback((generationId: string) => {
     const newMap = new Map(state.pendingFramePositions);
@@ -854,11 +854,13 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       {/* Output Videos Section - Now at the top */}
       <div className="">
         <VideoOutputsGallery 
-          videoOutputs={videoOutputs} 
+          projectId={projectId}
+          shotId={selectedShotId}
           onDelete={generationActions.handleDeleteVideoOutput}
           deletingVideoId={state.deletingVideoId}
           onApplySettings={applySettingsDirect}
           onApplySettingsFromTask={applySettingsFromTask}
+          shotKey={selectedShotId}
         />
       </div>
 

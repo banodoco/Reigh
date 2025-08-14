@@ -51,6 +51,9 @@ const mapDbTaskToTask = (row: any): Task => ({
   createdAt: row.created_at,
   updatedAt: row.updated_at ?? undefined,
   projectId: row.project_id,
+  costCents: row.cost_cents ?? undefined,
+  generationStartedAt: row.generation_started_at ?? undefined,
+  generationProcessedAt: row.generation_processed_at ?? undefined,
 });
 
 /**
@@ -242,15 +245,18 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
     // CRITICAL: Use page-based cache keys like gallery
     queryKey: [TASKS_QUERY_KEY, 'paginated', projectId, page, limit, status],
     queryFn: async () => {
-      console.log('[PollingBreakageIssue] Paginated tasks query - GALLERY PATTERN:', {
+      console.log('[TaskPollingDebug] Starting paginated tasks query - GALLERY PATTERN:', {
         projectId,
         page,
         limit,
+        offset,
         status,
         visibilityState: document.visibilityState,
         isHidden: document.hidden,
+        userAgent: navigator.userAgent,
         timestamp: Date.now(),
-        queryContextMessage: 'EXECUTING DATABASE QUERY'
+        queryContextMessage: 'EXECUTING DATABASE QUERY',
+        cacheKey: [TASKS_QUERY_KEY, 'paginated', projectId, page, limit, status].join(':')
       });
       
       if (!projectId) {
@@ -286,13 +292,45 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
       }
 
       // Execute both queries
+      console.log('[TaskPollingDebug] Executing count and data queries...', {
+        projectId,
+        page,
+        timestamp: Date.now()
+      });
+      
       const [{ count, error: countError }, { data, error: dataError }] = await Promise.all([
         countQuery,
         dataQuery
       ]);
       
-      if (countError) throw countError;
-      if (dataError) throw dataError;
+      console.log('[TaskPollingDebug] Query results received:', {
+        projectId,
+        page,
+        count,
+        dataLength: data?.length,
+        countError: countError?.message,
+        dataError: dataError?.message,
+        timestamp: Date.now()
+      });
+      
+      if (countError) {
+        console.error('[TaskPollingDebug] Count query failed:', {
+          projectId,
+          page,
+          error: countError,
+          timestamp: Date.now()
+        });
+        throw countError;
+      }
+      if (dataError) {
+        console.error('[TaskPollingDebug] Data query failed:', {
+          projectId,
+          page,
+          error: dataError,
+          timestamp: Date.now()
+        });
+        throw dataError;
+      }
       
       // Apply client-side filtering and sorting
       const allTasks = (data || []).map(mapDbTaskToTask);
@@ -343,12 +381,32 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
       const totalPages = Math.ceil(total / limit);
       const hasMore = offset + limit < total;
 
-      return {
+      const result = {
         tasks: paginatedTasks,
         total,
         hasMore,
         totalPages,
       };
+
+      console.log('[TaskPollingDebug] Query completed successfully:', {
+        projectId,
+        page,
+        limit,
+        offset,
+        total,
+        totalPages,
+        hasMore,
+        tasksReturned: paginatedTasks.length,
+        filteredFrom: visibleTasks.length,
+        rawFetched: allTasks.length,
+        statusBreakdown: paginatedTasks.reduce((acc, task) => {
+          acc[task.status] = (acc[task.status] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>),
+        timestamp: Date.now()
+      });
+
+      return result;
     },
     enabled: !!projectId,
     // CRITICAL: Gallery cache settings - prevent background refetches
@@ -363,13 +421,20 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
       const data = query.state.data;
       const isStale = query.state.isStale;
       const dataUpdatedAt = query.state.dataUpdatedAt;
+      const isFetching = query.state.isFetching;
+      const isError = query.state.isError;
+      const error = query.state.error;
       const now = Date.now();
       
       if (!data) {
         // If no data yet, poll slowly to get initial data
-        console.log('[PollingBreakageIssue] No data yet, using slow polling (30s):', {
+        console.log('[TaskPollingDebug] No data yet, using slow polling (30s):', {
           projectId: params.projectId,
+          page,
           isStale,
+          isFetching,
+          isError,
+          errorMessage: error?.message,
           timestamp: now
         });
         return 30000; // 30 seconds
@@ -381,29 +446,62 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
       
       const dataAge = now - dataUpdatedAt;
       
+      console.log('[TaskPollingDebug] Polling interval calculation:', {
+        projectId: params.projectId,
+        page,
+        hasActiveTasks,
+        activeTaskCount: data.tasks?.filter(t => t.status === 'Queued' || t.status === 'In Progress').length || 0,
+        totalTasks: data.tasks?.length || 0,
+        dataAge: Math.round(dataAge / 1000) + 's',
+        isStale,
+        isFetching,
+        isError,
+        errorMessage: error?.message,
+        visibilityState: document.visibilityState,
+        timestamp: now
+      });
+      
       if (hasActiveTasks) {
-        console.log('[PollingBreakageIssue] Active tasks detected, using fast polling (10s):', {
+        const pollInterval = 10000; // 10 seconds for active tasks
+        console.log('[TaskPollingDebug] Active tasks detected, using FAST polling:', {
           projectId: params.projectId,
+          page,
           taskCount: data.tasks?.length,
           activeTasks: data.tasks?.filter(t => t.status === 'Queued' || t.status === 'In Progress').length,
+          activeTasksDetails: data.tasks?.filter(t => t.status === 'Queued' || t.status === 'In Progress').map(t => ({
+            id: t.id,
+            status: t.status,
+            taskType: t.taskType,
+            createdAt: t.createdAt
+          })),
+          pollIntervalMs: pollInterval,
           isStale,
-          dataAge,
-          dataUpdatedAt,
+          dataAge: Math.round(dataAge / 1000) + 's',
+          dataUpdatedAt: new Date(dataUpdatedAt).toISOString(),
           timestamp: now
         });
-        return 10000; // Poll every 10 seconds if there are active tasks
+        return pollInterval;
       } else {
         // RESURRECTION FIX: Even with no active tasks, poll occasionally 
         // to catch new tasks that might be created while polling was stopped
-        console.log('[PollingBreakageIssue] No active tasks, using resurrection polling (60s):', {
+        const pollInterval = 60000; // 60 seconds for inactive state
+        console.log('[TaskPollingDebug] No active tasks, using SLOW resurrection polling:', {
           projectId: params.projectId,
+          page,
           taskCount: data.tasks?.length,
+          recentTasksDetails: data.tasks?.slice(0, 3).map(t => ({
+            id: t.id,
+            status: t.status,
+            taskType: t.taskType,
+            createdAt: t.createdAt
+          })),
+          pollIntervalMs: pollInterval,
           isStale,
-          dataAge,
-          dataUpdatedAt,
+          dataAge: Math.round(dataAge / 1000) + 's',
+          dataUpdatedAt: new Date(dataUpdatedAt).toISOString(),
           timestamp: now
         });
-        return 60000; // Poll every 60 seconds as backup to catch new tasks
+        return pollInterval;
       }
     },
     refetchIntervalInBackground: true, // CRITICAL: Continue polling when tab is not visible

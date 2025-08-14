@@ -120,7 +120,26 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
   }, [images, isOptimisticUpdate]);
 
   // Use optimistic order everywhere instead of the parent `images` prop
-  const currentImages = optimisticOrder;
+  // Memoize to prevent unstable references during re-renders
+  const currentImages = useMemo(() => {
+    // Safety check: ensure we have valid images during component re-renders
+    if (!optimisticOrder || optimisticOrder.length === 0) {
+      return images || [];
+    }
+    return optimisticOrder;
+  }, [optimisticOrder, images]);
+
+  // Use ref pattern to create stable function reference that doesn't change
+  const onImageReorderRef = useRef(onImageReorder);
+  onImageReorderRef.current = onImageReorder;
+  
+  const stableOnImageReorder = useCallback((orderedIds: string[]) => {
+    if (onImageReorderRef.current) {
+      onImageReorderRef.current(orderedIds);
+    }
+  }, []); // Empty dependency array - function never changes
+
+
 
   // Mobile double-tap detection refs
   const doubleTapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -193,7 +212,7 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
     // Update optimistic order immediately, then notify parent
     setIsOptimisticUpdate(true); // Flag that we're doing an optimistic update
     setOptimisticOrder(newOrder);
-    onImageReorder(newOrder.map(img => img.shotImageEntryId));
+    stableOnImageReorder(newOrder.map(img => img.shotImageEntryId));
     setMobileSelectedIds([]); // Clear selection after move
   };
 
@@ -203,6 +222,12 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
   const handleMobileTap = useCallback((id: string, index: number) => {
     const currentTime = Date.now();
     const timeDiff = currentTime - lastTouchTimeRef.current;
+    
+    // Safety check: ensure we have valid images during re-renders
+    if (!currentImages || currentImages.length === 0 || index >= currentImages.length) {
+      console.log('[DragDebug:ShotImageManager] Skipping mobile tap - invalid state during re-render');
+      return;
+    }
     
     if (timeDiff < 300) {
       // Double tap detected
@@ -256,21 +281,19 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
     };
   }, []);
 
+  // Always call hooks in the same order. Adjust activation constraints per breakpoint
   const sensors = useSensors(
     useSensor(MouseSensor, {
-      // Increased distance to prevent accidental drags and reduce performance load
       activationConstraint: {
         distance: 8,
       },
     }),
-    // Only enable TouchSensor on desktop to avoid interfering with mobile selection
-    ...(!isMobile ? [useSensor(TouchSensor, {
-      // Reduced delay for better responsiveness but with tolerance
-      activationConstraint: {
-        delay: 150,
-        tolerance: 8,
-      },
-    })] : []),
+    useSensor(TouchSensor, {
+      // On mobile, set an effectively unreachable constraint so it won't interfere
+      activationConstraint: isMobile
+        ? { distance: 99999 }
+        : { delay: 150, tolerance: 8 },
+    }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     }),
@@ -322,6 +345,12 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
       return;
     }
 
+    // Safety check: ensure we have valid images and callbacks during re-renders
+    if (!currentImages || currentImages.length === 0) {
+      console.log('[DragDebug:ShotImageManager] Skipping reorder - invalid state during re-render');
+      return;
+    }
+
     const activeIsSelected = selectedIds.includes(active.id as string);
 
     if (!activeIsSelected || selectedIds.length <= 1) {
@@ -342,7 +371,7 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
         
         // 2. Notify parent so React state becomes eventually consistent
         console.log('[DragDebug:ShotImageManager] Calling onImageReorder for single item');
-        onImageReorder(newOrder.map((img) => img.shotImageEntryId));
+        stableOnImageReorder(newOrder.map((img) => img.shotImageEntryId));
       }
       setSelectedIds([]);
       return;
@@ -434,9 +463,9 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
     
     // 2. Notify parent so React state becomes eventually consistent
     console.log('[DragDebug:ShotImageManager] Calling onImageReorder for multi-drag');
-    onImageReorder(newItems.map((img) => img.shotImageEntryId));
+    stableOnImageReorder(newItems.map((img) => img.shotImageEntryId));
     setSelectedIds([]);
-  }, [selectedIds, currentImages, onImageReorder]);
+  }, [selectedIds, currentImages, stableOnImageReorder]);
 
   const handleItemClick = useCallback((id: string, event: React.MouseEvent) => {
     event.preventDefault(); // Prevent any default behavior like navigation

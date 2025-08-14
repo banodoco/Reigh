@@ -448,6 +448,71 @@ This pattern prevents UI flickering while ensuring data consistency.
 
 ---
 
+## 🔄 Unified Generations System ✨ **NEW**
+
+### Problem Solved
+Previously, `ImageGallery` and `VideoOutputsGallery` used completely different data fetching patterns:
+- ImageGallery: Used `useGenerations` with proper caching and realtime updates
+- VideoOutputsGallery: Used ad-hoc mutations and manual preloading, causing race conditions
+
+### Solution: `useUnifiedGenerations`
+A flexible hook that serves both gallery types while respecting their unique requirements:
+
+```typescript
+// Project-wide mode (ImageGallery)
+const { data } = useUnifiedGenerations({
+  projectId,
+  mode: 'project-wide',
+  filters: { mediaType: 'image', toolType: 'image-generation' }
+});
+
+// Shot-specific mode (VideoOutputsGallery)  
+const { data } = useUnifiedGenerations({
+  projectId,
+  mode: 'shot-specific',
+  shotId,
+  filters: { mediaType: 'video' },
+  preloadTaskData: true // Background task preloading
+});
+```
+
+### Key Benefits
+- **Consistent caching**: Both galleries use same cache invalidation system
+- **Task integration**: Automatic task data preloading eliminates race conditions
+- **Realtime updates**: Enhanced WebSocket invalidation for both modes
+- **Performance**: Shared cache eliminates duplicate API calls
+
+### Cache Strategy
+```typescript
+// Project-wide cache keys
+['unified-generations', 'project', projectId, page, limit, filters]
+
+// Shot-specific cache keys  
+['unified-generations', 'shot', shotId, page, limit, filters]
+
+// Task mapping cache
+['tasks', 'taskId', generationId] // Shared across both modes
+```
+
+### Enhanced Realtime Invalidation
+The WebSocket system now invalidates unified cache keys:
+
+```typescript
+// In useWebSocket.ts
+case 'GENERATIONS_UPDATED':
+  // Invalidate project-wide unified cache
+  const unifiedProjectQueries = queryClient.getQueriesData({
+    queryKey: ['unified-generations', 'project', projectId]
+  });
+  
+  // Invalidate shot-specific unified cache  
+  const unifiedShotQueries = queryClient.getQueriesData({
+    queryKey: ['unified-generations', 'shot', shotId]
+  });
+```
+
+---
+
 <div align="center">
 
 **📚 Related Documentation**

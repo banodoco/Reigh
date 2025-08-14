@@ -41,7 +41,7 @@ export const useShotGenerations = (
           shot_generation_id: sg.id,
           position: sg.position,
           imageUrl: sg.generation?.location || sg.generation?.imageUrl,
-          thumbUrl: sg.generation?.thumb_url || sg.generation?.thumbUrl,
+          thumbUrl: sg.generation?.location || sg.generation?.thumbUrl,
         }));
 
       return {
@@ -154,7 +154,7 @@ export const useAllShotGenerations = (
           shot_generation_id: sg.id,
           position: sg.position,
           imageUrl: sg.generation?.location || sg.generation?.imageUrl,
-          thumbUrl: sg.generation?.thumb_url || sg.generation?.thumbUrl,
+          thumbUrl: sg.generation?.location || sg.generation?.thumbUrl,
         }));
 
       console.log('[VideoLoadSpeedIssue][ADDTOSHOT] useAllShotGenerations queryFn completed', { 

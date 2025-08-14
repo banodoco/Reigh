@@ -57,10 +57,18 @@ export function useWebSocket(projectId: string | null) {
     
     pendingInvalidationsRef.current.add(JSON.stringify(key));
     
-    console.log('[VideoLoadSpeedIssue] Scheduled invalidation:', {
+    // Enhanced logging for task/generation debugging
+    const isTaskQuery = Array.isArray(key) && key[0] === 'tasks';
+    const isGenerationQuery = Array.isArray(key) && (key[0] === 'generations' || key[0] === 'unified-generations');
+    
+    console.log('[CacheInvalidationDebug] Scheduled invalidation:', {
       queryKey: key,
       serializedKey: JSON.stringify(key),
       totalPending: pendingInvalidationsRef.current.size,
+      isTaskQuery,
+      isGenerationQuery,
+      projectId,
+      visibilityState: document.visibilityState,
       timestamp: Date.now()
     });
 
@@ -143,27 +151,48 @@ export function useWebSocket(projectId: string | null) {
           try {
             const message = payload.payload;
             
+            console.log('[RealtimeDebug] Received broadcast message:', {
+              messageType: message.type,
+              payload: message.payload,
+              projectId,
+              visibilityState: document.visibilityState,
+              timestamp: Date.now(),
+              fullMessage: message
+            });
+            
             // Keep broadcast handling for backwards compatibility and custom events
             switch (message.type) {
               case 'TASK_CREATED':
-                console.log('[PollingBreakageIssue] TASK_CREATED broadcast, using GALLERY PATTERN invalidation');
+                console.log('[RealtimeDebug] TASK_CREATED - invalidating task caches:', {
+                  projectId,
+                  cacheKeysToInvalidate: [
+                    ['task-status-counts', projectId],
+                    ['tasks', 'paginated', projectId, 1, 50, undefined]
+                  ],
+                  timestamp: Date.now()
+                });
                 scheduleInvalidation(['task-status-counts', projectId]);
                 // Only invalidate first page where new tasks appear
                 scheduleInvalidation(['tasks', 'paginated', projectId, 1, 50, undefined]);
                 break;
 
               case 'TASK_COMPLETED':
-                console.log('[VideoLoadSpeedIssue] TASK_COMPLETED broadcast received:', {
-                  projectId,
-                  timestamp: Date.now()
-                });
-                console.log('[PollingBreakageIssue] TASK_COMPLETED broadcast, using GALLERY PATTERN invalidation');
-                scheduleInvalidation(['task-status-counts', projectId]);
-                // Invalidate all cached task pages since status changes can move tasks between filters
-                const taskQueries = queryClient.getQueriesData({
+                const taskQueryData = queryClient.getQueriesData({
                   queryKey: ['tasks', 'paginated', projectId]
                 });
-                taskQueries.forEach(([queryKey]) => scheduleInvalidation(queryKey));
+                console.log('[RealtimeDebug] TASK_COMPLETED - invalidating task and generation caches:', {
+                  projectId,
+                  taskPagesFound: taskQueryData.length,
+                  cacheKeysToInvalidate: [
+                    ['task-status-counts', projectId],
+                    ['generations', projectId],
+                    ...taskQueryData.map(([key]) => key)
+                  ],
+                  timestamp: Date.now()
+                });
+                scheduleInvalidation(['task-status-counts', projectId]);
+                // Invalidate all cached task pages since status changes can move tasks between filters
+                taskQueryData.forEach(([queryKey]) => scheduleInvalidation(queryKey));
                 scheduleInvalidation(['generations', projectId]);
                 break;
 
@@ -179,10 +208,46 @@ export function useWebSocket(projectId: string | null) {
 
               case 'GENERATIONS_UPDATED':
                 const { shotId } = message.payload;
+                
+                // Collect unified generations queries for both modes
+                const unifiedProjectQueries = queryClient.getQueriesData({
+                  queryKey: ['unified-generations', 'project', projectId]
+                });
+                const unifiedShotQueries = shotId ? queryClient.getQueriesData({
+                  queryKey: ['unified-generations', 'shot', shotId]
+                }) : [];
+                
+                console.log('[RealtimeDebug] GENERATIONS_UPDATED - invalidating generation caches:', {
+                  projectId,
+                  shotId,
+                  unifiedProjectQueriesFound: unifiedProjectQueries.length,
+                  unifiedShotQueriesFound: unifiedShotQueries.length,
+                  cacheKeysToInvalidate: [
+                    ['shots', projectId],
+                    ['generations', projectId],
+                    ...unifiedProjectQueries.map(([key]) => key),
+                    ...(shotId ? [['shots', shotId], ['all-shot-generations', shotId]] : []),
+                    ...unifiedShotQueries.map(([key]) => key)
+                  ],
+                  timestamp: Date.now()
+                });
+                
                 scheduleInvalidation(['shots', projectId]);
                 scheduleInvalidation(['generations', projectId]);
+                
+                // Invalidate unified generations cache for both project-wide and shot-specific modes
+                unifiedProjectQueries.forEach(([queryKey]) => scheduleInvalidation(queryKey));
+                
                 if (shotId) {
                   scheduleInvalidation(['shots', shotId]);
+                  // Invalidate unified generations cache for this specific shot
+                  const unifiedShotQueries = queryClient.getQueriesData({
+                    queryKey: ['unified-generations', 'shot', shotId]
+                  });
+                  unifiedShotQueries.forEach(([queryKey]) => scheduleInvalidation(queryKey));
+                  
+                  // Also invalidate legacy shot generations cache
+                  scheduleInvalidation(['all-shot-generations', shotId]);
                 }
                 break;
 
@@ -203,16 +268,26 @@ export function useWebSocket(projectId: string | null) {
             filter: `project_id=eq.${projectId}`
           }, 
           (payload) => {
-            log('PerfDebug:DBChange', 'Task updated:', payload);
-            console.log(`[${Date.now()}] [WebSocket] Task status changed:`, {
-              taskId: payload.new?.id,
-              oldStatus: payload.old?.status,
-              newStatus: payload.new?.status,
-              projectId,
-            });
-            
             const newRecord = payload.new as any;
             const oldRecord = payload.old as any;
+            
+            console.log('[RealtimeDebug] Database UPDATE on tasks table:', {
+              taskId: newRecord?.id,
+              oldStatus: oldRecord?.status,
+              newStatus: newRecord?.status,
+              oldUpdatedAt: oldRecord?.updated_at,
+              newUpdatedAt: newRecord?.updated_at,
+              projectId,
+              taskType: newRecord?.task_type,
+              outputLocation: newRecord?.output_location,
+              errorMessage: newRecord?.error_message,
+              generationCreated: newRecord?.generation_created,
+              visibilityState: document.visibilityState,
+              timestamp: Date.now(),
+              fullPayload: payload
+            });
+            
+            log('PerfDebug:DBChange', 'Task updated:', payload);
             
             // FIXED: Use targeted invalidation to prevent cascade storms
             console.log('[PollingBreakageIssue] Task status changed, using SMART invalidation:', {
@@ -242,6 +317,12 @@ export function useWebSocket(projectId: string | null) {
             if (newRecord?.status === 'Complete' && oldRecord?.status !== 'Complete') {
               log('PerfDebug:DBChange', 'Task completed, invalidating generations');
               scheduleInvalidation(['generations', projectId]);
+              
+              // Invalidate unified generations cache
+              const unifiedProjectQueries = queryClient.getQueriesData({
+                queryKey: ['unified-generations', 'project', projectId]
+              });
+              unifiedProjectQueries.forEach(([queryKey]) => scheduleInvalidation(queryKey));
             }
           }
         )
@@ -254,28 +335,67 @@ export function useWebSocket(projectId: string | null) {
             filter: `project_id=eq.${projectId}`
           }, 
           (payload) => {
-            log('PerfDebug:DBChange', 'Generation created:', payload);
-            
             const newRecord = payload.new as any;
             
-            console.log('[VideoLoadSpeedIssue] Generation INSERT detected:', {
+            // Extract shot ID from various possible locations
+            const shotId = newRecord?.params?.shotId || 
+                          newRecord?.params?.shot_id ||
+                          newRecord?.metadata?.shotId ||
+                          newRecord?.metadata?.shot_id;
+            
+            // Collect unified generations queries that will be invalidated
+            const unifiedProjectQueries = queryClient.getQueriesData({
+              queryKey: ['unified-generations', 'project', projectId]
+            });
+            const unifiedShotQueries = shotId ? queryClient.getQueriesData({
+              queryKey: ['unified-generations', 'shot', shotId]
+            }) : [];
+            
+            console.log('[RealtimeDebug] Database INSERT on generations table:', {
               generationId: newRecord?.id,
               projectId: newRecord?.project_id,
               type: newRecord?.type,
-              timestamp: Date.now()
+              mediaType: newRecord?.type?.includes('video') ? 'video' : 'image',
+              location: newRecord?.location,
+              starred: newRecord?.starred,
+              shotId,
+              tasks: newRecord?.tasks,
+              unifiedProjectQueriesFound: unifiedProjectQueries.length,
+              unifiedShotQueriesFound: unifiedShotQueries.length,
+              cacheKeysToInvalidate: [
+                ['generations', projectId],
+                ['shots', projectId],
+                ...unifiedProjectQueries.map(([key]) => key),
+                ...(shotId ? [['shots', shotId], ['all-shot-generations', shotId]] : []),
+                ...unifiedShotQueries.map(([key]) => key)
+              ],
+              visibilityState: document.visibilityState,
+              timestamp: Date.now(),
+              fullPayload: payload
             });
+            
+            log('PerfDebug:DBChange', 'Generation created:', payload);
             
             // Invalidate generations and shots queries
             scheduleInvalidation(['generations', projectId]);
             scheduleInvalidation(['shots', projectId]);
             
-            // If there's a shot_id in params, invalidate that specific shot
-            const shotId = newRecord?.params?.shotId || newRecord?.params?.shot_id;
+            // Invalidate unified generations cache for project-wide queries (already declared above)
+            unifiedProjectQueries.forEach(([queryKey]) => scheduleInvalidation(queryKey));
+            
+            // If there's a shot_id in params, invalidate that specific shot (shotId already declared above)
             
             if (shotId) {
               scheduleInvalidation(['shots', shotId]);
               // CRITICAL: Also invalidate the all-shot-generations query used by ShotEditor
               scheduleInvalidation(['all-shot-generations', shotId]);
+              
+              // Invalidate unified generations cache for this specific shot
+              const unifiedShotQueries = queryClient.getQueriesData({
+                queryKey: ['unified-generations', 'shot', shotId]
+              });
+              unifiedShotQueries.forEach(([queryKey]) => scheduleInvalidation(queryKey));
+              
               console.log('[VideoLoadSpeedIssue] Scheduled shot invalidation:', {
                 shotId,
                 timestamp: Date.now()

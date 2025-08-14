@@ -53,13 +53,13 @@ export interface Shot {
 export interface Generation {
   id: string;
   location?: string;
-  thumb_url?: string;
   type?: string;
   created_at: string;
   metadata?: Record<string, unknown>;
   params?: Record<string, unknown>;
   project_id: string;
   tasks?: string[];
+  starred?: boolean;
 }
 
 export interface ShotGeneration {
@@ -81,6 +81,7 @@ export interface Task {
   projectId: string;
   costCents?: number;
   generationStartedAt?: string;
+  generationProcessedAt?: string;
 }
 
 export interface Worker {

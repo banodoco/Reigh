@@ -19,11 +19,13 @@ import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 import { formatDistanceToNow, isValid } from 'date-fns';
 import MediaLightbox from '@/shared/components/MediaLightbox';
 import { useTaskTimestamp } from '@/shared/hooks/useUpdatingTimestamp';
+import { useProcessingTimestamp, useCompletedTimestamp } from '@/shared/hooks/useProcessingTimestamp';
 import { GenerationRow } from '@/types/shots';
 import { useListShots, useAddImageToShot } from '@/shared/hooks/useShots';
 import { useLastAffectedShot } from '@/shared/hooks/useLastAffectedShot';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useTaskGenerationMapping } from '@/shared/lib/generationTaskBridge';
 
 // Function to create abbreviated task names for tight spaces
 const getAbbreviatedTaskName = (fullName: string): string => {
@@ -55,6 +57,16 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
   
   // Get live-updating timestamp
   const createdTimeAgo = useTaskTimestamp(task.createdAt || (task as any).created_at);
+  
+  // Get processing timestamp for In Progress tasks
+  const processingTime = useProcessingTimestamp({ 
+    generationStartedAt: task.generationStartedAt || (task as any).generation_started_at
+  });
+  
+  // Get completed timestamp for Complete tasks
+  const completedTime = useCompletedTimestamp({
+    generationProcessedAt: task.generationProcessedAt || (task as any).generation_processed_at
+  });
 
   // Mutations
   const cancelTaskMutation = useCancelTask(selectedProjectId);
@@ -153,10 +165,18 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
   }, [task.taskType, task.status, task.outputLocation]);
 
   // Fetch the actual generation record for this task
-  const { data: actualGeneration } = useQuery({
-    queryKey: ['generation-for-task', task.id, task.outputLocation],
+  // Use the generalized bridge for task-to-generation mapping
+  const { data: actualGeneration } = useTaskGenerationMapping(
+    task.id, 
+    hasGeneratedImage ? task.outputLocation : null, 
+    task.projectId
+  );
+  
+  // Legacy fallback - can be removed once bridge is stable
+  const { data: legacyGeneration } = useQuery({
+    queryKey: ['generation-for-task-legacy', task.id, task.outputLocation],
     queryFn: async () => {
-      if (!hasGeneratedImage || !task.outputLocation) return null;
+      if (!hasGeneratedImage || !task.outputLocation || actualGeneration !== undefined) return null;
       
       // Debug: Check if this task has the generation_created flag set
       const { data: taskCheck, error: taskCheckError } = await supabase
@@ -235,7 +255,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
       id: actualGeneration.id, // Use the real generation ID
       location: actualGeneration.location,
       imageUrl: actualGeneration.location,
-      thumbUrl: actualGeneration.thumb_url || actualGeneration.location,
+      thumbUrl: actualGeneration.location,
       type: actualGeneration.type || 'image',
       created_at: actualGeneration.created_at,
       metadata: actualGeneration.metadata || {},
@@ -472,9 +492,14 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
           </div>
         </div>
       )}
-      <div className="flex items-center text-xs text-zinc-400">
+      <div className="flex items-center text-[11px] text-zinc-400">
         <span className="flex-1">
-          Created: {createdTimeAgo}
+          {task.status === 'In Progress' && processingTime ? 
+            processingTime : 
+            task.status === 'Complete' && completedTime ?
+            completedTime :
+            `Created: ${createdTimeAgo}`
+          }
         </span>
         
         {/* Action buttons for queued/in progress tasks */}
@@ -486,7 +511,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
                 size="sm"
                 onClick={handleCheckProgress}
                 disabled={progressPercent !== null}
-                className="px-1 py-1 min-w-[120px] h-auto text-blue-400 hover:bg-blue-900/20 hover:text-blue-300 flex flex-col items-center justify-center"
+                className="px-2 py-1 min-w-[80px] h-auto text-blue-400 hover:bg-blue-900/20 hover:text-blue-300 flex flex-col items-center justify-center"
               >
                 <div className="text-xs leading-tight">
                   {progressPercent === null ? (

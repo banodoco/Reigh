@@ -34,7 +34,7 @@ interface ShotImageProps {
 const ShotImage: React.FC<ShotImageProps> = ({ image, index, onSelectShot, shotName, shouldLoad = true, shotIndex = 0 }) => {
   // Handle both old and new field naming conventions
   const imageUrl = image.imageUrl || image.location;
-  const thumbUrl = image.thumbUrl || (image as any).thumb_url;
+  const thumbUrl = image.thumbUrl || image.location;
   const displayUrl = getDisplayUrl(thumbUrl || imageUrl);
   
   // Check if image is already cached by browser (similar to ImageGallery approach)
@@ -267,7 +267,7 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
       id: img.id,
       type: img.type,
       hasImageUrl: !!(img.imageUrl || img.location),
-      hasThumbUrl: !!(img.thumbUrl || (img as any).thumb_url)
+      hasThumbUrl: !!(img.thumbUrl || img.location)
     }))
   });
 

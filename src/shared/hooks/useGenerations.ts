@@ -159,7 +159,7 @@ export async function fetchGenerations(
     const baseItem = {
       id: item.id,
       url: item.location,
-      thumbUrl: item.thumb_url,
+      thumbUrl: item.location, // Use main location as thumbnail fallback
       prompt: item.params?.originalParams?.orchestrator_details?.prompt || 
               item.params?.prompt || 
               item.metadata?.prompt || 
@@ -233,25 +233,7 @@ async function updateGenerationLocation(id: string, location: string): Promise<v
   }
 }
 
-/**
- * Get task ID for a generation using direct Supabase call
- */
-async function getTaskIdForGeneration(generationId: string): Promise<{ taskId: string | null }> {
-  const { data, error } = await supabase
-    .from('generations')
-    .select('tasks')
-    .eq('id', generationId)
-    .single();
-
-  if (error) {
-    throw new Error(`Generation not found or has no task: ${error.message}`);
-  }
-
-  const tasksArray = data?.tasks as string[] | null;
-  const taskId = Array.isArray(tasksArray) && tasksArray.length > 0 ? tasksArray[0] : null;
-
-  return { taskId };
-}
+// NOTE: getTaskIdForGeneration moved to generationTaskBridge.ts for centralization
 
 /**
  * Create a new generation using direct Supabase call
@@ -380,14 +362,8 @@ export function useUpdateGenerationLocation() {
   });
 }
 
-export function useGetTaskIdForGeneration() {
-  return useMutation({
-    mutationFn: getTaskIdForGeneration,
-    onError: (error: Error) => {
-      console.error('Error getting task ID for generation:', error);
-    },
-  });
-}
+// NOTE: useGetTaskIdForGeneration moved to generationTaskBridge.ts for centralization
+// Import from: import { useGetTaskIdForGeneration } from '@/shared/lib/generationTaskBridge';
 
 export function useCreateGeneration() {
     const queryClient = useQueryClient();

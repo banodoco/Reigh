@@ -21,6 +21,8 @@
 |------|---------|-------------|
 | **`useFalImageGeneration`** | FAL AI integration | `generate()`, `upscale()`, progress tracking |
 | **`useGenerations`** | Media CRUD operations | `list()`, `delete()`, `upscale()` |
+| **`useUnifiedGenerations`** | ✨ **NEW**: Unified gallery data | Project-wide & shot-specific modes, task preloading |
+| **`useTaskFromUnifiedCache`** | ✨ **NEW**: Cached task lookup | Efficient task data retrieval from unified cache |
 | **`useShots`** | Shot management | `create()`, `update()`, `delete()`, `reorder()` |
 | **`useVideoScrubbing`** | Video playback control | Frame-accurate scrubbing |
 
@@ -32,6 +34,7 @@
 | **`useTasks`** | Task queue management | Status updates, progress, cancellation |
 | **`useTaskCost`** | Cost calculations | Pre-flight cost estimates |
 | **`useAIInteractionService`** | AI service wrapper | Unified AI API interface |
+| **`useTaskQueueNotifier`** | Centralized task creation | Unified task enqueueing with realtime feedback |
 
 ### 🔑 Authentication & API
 
@@ -143,6 +146,13 @@ Located in `/ui/` - Full shadcn-ui component library including:
 - **`PageFadeIn`** - Smooth page entry animation
 - **`FadeInSection`** - Staggered list animations
 
+### 🔧 Task & Generation Components
+- **`TaskItem`** - Individual task display with progress tracking, cancellation
+- **`TasksPane`** - Task queue management with filtering, pagination, real-time updates  
+- **`SharedTaskDetails`** - ✨ **NEW**: Reusable task info display with hover/modal/panel variants
+- **`TaskDetailsPanel`** - ✨ **NEW**: Full task details view used in MediaLightbox
+- **`TaskDetailsModal`** - ✨ **NEW**: Standalone task modal for mobile-friendly viewing
+
 ### 📸 Media Components
 - **`ImageGallery`** - Grid display with lightbox
   - Server-side pagination support
@@ -150,11 +160,16 @@ Located in `/ui/` - Full shadcn-ui component library including:
   - Shot-based filtering with position exclusion
   - Prompt search functionality
   - Drag-and-drop support for desktop
+- **`VideoOutputsGallery`** - ✨ **NEW**: Now uses unified data system (`useUnifiedGenerations`)
+  - Background task preloading for better performance
+  - Real-time updates via enhanced WebSocket system
+  - Eliminates race conditions and duplicate API calls
 - **`MediaLightbox`** - Full-screen media viewer
   - Magic-edit task creation with loading/success states
   - Star/unstar functionality
   - Navigation, download, editing tools
   - Shot workflow integration
+  - ✨ **NEW**: Enhanced task details integration
 - **`HoverScrubVideo`** - Video preview on hover
 - **`DraggableImage`** - Drag-and-drop images
 - **`TimeStamp`** - Consistent relative time display ("X mins ago")

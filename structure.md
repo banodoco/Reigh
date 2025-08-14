@@ -208,6 +208,25 @@ tool-name/
 - **Better Monitoring**: Added comprehensive debug logging throughout task lifecycle for improved troubleshooting
 - **UI Improvements**: TasksPane now shows "Cancel All" button consistently (disabled when no cancellable tasks)
 
+**Unified Generations System ✨ NEW:**
+- **Problem**: ImageGallery and VideoOutputsGallery used incompatible data patterns causing reliability issues
+- **Solution**: New `useUnifiedGenerations` hook serves both gallery types with consistent caching and realtime updates
+- **Benefits**: Eliminates race conditions, reduces API calls, background task preloading, shared cache invalidation
+- **Components**: Enhanced task display components (`SharedTaskDetails`, `TaskDetailsPanel`, `TaskDetailsModal`)
+
+**Generation-Task Integration Bridge ✨ NEW:**
+- **Problem**: Generation-to-task mapping logic duplicated across 6+ components (useGenerations, TaskDetailsModal, TaskItem, VideoOutputsGallery, etc.)
+- **Solution**: Centralized `GenerationTaskBridge` utility with React context for seamless data integration
+- **Features**: Batch task ID lookups, background preloading, cache management, bi-directional mapping (generation↔task)
+- **Context**: `GenerationTaskProvider` with hooks for automatic preloading and enhanced data access
+
+**React Hooks Stability Fixes ✨ NEW:**
+- **Problem**: "Rendered more/fewer hooks than during the previous render" errors during fast navigation and window resizing
+- **Root Cause**: Conditional hook execution in `ShotImageManager` (TouchSensor only called when `!isMobile`) and unstable function references
+- **Solution**: Always call hooks in same order, use activation constraints to gate behavior instead of conditional execution
+- **Key Fixes**: Stable `useSensor` calls, stable `onImageReorder` reference with useRef pattern, dependency array stabilization
+- **Components**: Enhanced `ShotImageManager`, `ShotEditor`, and `useGenerationActions` for consistent hook execution
+
 **Image Generation Form UX:**
 - **Collapsible Form**: Image generation form can now be collapsed/expanded to save screen space
 - **Persistent State**: Form expand/collapse state is saved per project via `usePersistentToolState`

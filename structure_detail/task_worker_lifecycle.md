@@ -6,6 +6,7 @@ Reigh uses an async task queue pattern for all AI generation workloads. This dec
 
 ## Flow Diagram
 
+### High-Level Overview
 ```
 ┌─────────┐     ┌──────────────┐     ┌─────────┐     ┌────────────┐
 │ Client  │────▶│ create_task  │────▶│   DB    │◀────│   Worker   │
@@ -18,6 +19,9 @@ Reigh uses an async task queue pattern for all AI generation workloads. This dec
                 │  Broadcast   │         (status updates)
                 └──────────────┘
 ```
+
+### Detailed Processing Flow  
+For a complete step-by-step breakdown with error handling, see: [**Task Processing Deep Dive**](task_processing_deep_dive.md)
 
 ## Detailed Steps
 
