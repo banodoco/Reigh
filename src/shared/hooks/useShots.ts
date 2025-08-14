@@ -241,23 +241,34 @@ export const useListShots = (projectId?: string | null) => {
       const shotPromises = shots.map(async (shot) => {
         const { data: shotGenerations, error: sgError } = await supabase
           .from('shot_generations')
-          .select(`*, generation:generations(*)`)
+          .select(`
+            id,
+            position,
+            generation:generations(
+              id,
+              location,
+              type,
+              created_at
+            )
+          `)
           .eq('shot_id', shot.id)
           .order('position', { ascending: true, nullsFirst: false })
-          // Load ALL images so ShotsPane always reflects the current state
-          ;
+          .order('created_at', { ascending: false })
+          .limit(5); // Actually limit to 5 thumbnails for performance
         
         if (sgError) {
           throw sgError;
         }
         
-        const transformedImages = (shotGenerations || []).map(sg => ({
-          ...sg.generation,
-          shotImageEntryId: sg.id,
-          position: sg.position,
-          imageUrl: sg.generation.imageUrl || sg.generation.location,
-          thumbUrl: sg.generation.thumbUrl || sg.generation.location,
-        }));
+        const transformedImages = (shotGenerations || [])
+          .filter(sg => sg.generation) // Filter out any null generations
+          .map(sg => ({
+            ...sg.generation,
+            shotImageEntryId: sg.id,
+            position: sg.position,
+            imageUrl: sg.generation.location,
+            thumbUrl: sg.generation.location,
+          }));
         
         return {
           ...shot,

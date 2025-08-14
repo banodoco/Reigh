@@ -79,7 +79,17 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // Load complete shot data and images
   const { shots } = useShots(); // Get shots from context for shot metadata
   const selectedShot = shots?.find(shot => shot.id === selectedShotId);
-  const { data: orderedShotImages = [] } = useAllShotGenerations(selectedShotId);
+  
+  // Use context images when available (thumbnails for most cases), fall back to full query for editing
+  const contextImages = selectedShot?.images || [];
+  const needsFullImageData = contextImages.length === 5; // If we hit the thumbnail limit, we need full data
+  const { data: fullShotImages = [], isLoading: isLoadingFullImages } = useAllShotGenerations(
+    needsFullImageData ? selectedShotId : null // Only fetch full data when needed
+  );
+  
+  // Use full data if available, otherwise use context images
+  // Keep context images visible while full data loads for better UX
+  const orderedShotImages = fullShotImages.length > 0 ? fullShotImages : contextImages;
   const updateShotImageOrderMutation = useUpdateShotImageOrder();
   
   // Flag to skip next prop sync after successful operations
@@ -179,21 +189,27 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
   // Detect if settings never finish loading (e.g., network hiccup on mobile)
   useEffect(() => {
-    if (!settingsLoading) {
-      // Reset any existing error once loading completes successfully
+    const anySettingsLoading = settingsLoading || isShotUISettingsLoading || isShotLoraSettingsLoading;
+    
+    if (!anySettingsLoading) {
+      // Reset any existing error once all settings loading completes successfully
       actions.setSettingsError(null);
       return;
     }
 
-    // Give the settings query a reasonable grace period before timing-out
+    // Give ALL settings queries a reasonable grace period before timing-out
     const fallbackTimer = setTimeout(() => {
-      console.warn('[ShotEditor] Settings failed to load within expected time. Falling back to defaults.');
-      actions.setSettingsError('Failed to load saved settings – using defaults.');
+      console.warn('[ShotEditor] One or more settings failed to load within expected time. Falling back to defaults.', {
+        settingsLoading,
+        isShotUISettingsLoading,
+        isShotLoraSettingsLoading
+      });
+      actions.setSettingsError('Failed to load some settings – using defaults.');
       actions.setModeReady(true);
-    }, 5000); // 5s timeout - now reasonable with optimized queries and retry logic
+    }, 3000); // 3s timeout - faster fallback for better UX
 
     return () => clearTimeout(fallbackTimer);
-  }, [settingsLoading, actions]);
+  }, [settingsLoading, isShotUISettingsLoading, isShotLoraSettingsLoading, actions]);
 
   // Reset mode readiness when shot changes
   useEffect(() => {

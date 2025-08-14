@@ -59,6 +59,8 @@ interface MediaLightboxProps {
     onApplyTaskSettings?: (settings: any) => void;
     onApplySettingsFromTask?: (taskId: string, replaceImages: boolean, inputImages: string[]) => void;
   };
+  // Mobile video task details toggle
+  onShowTaskDetails?: () => void;
 }
 
 const MediaLightbox: React.FC<MediaLightboxProps> = ({ 
@@ -91,7 +93,9 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   onToggleStar,
   // Task details functionality
   showTaskDetails = false,
-  taskDetailsData
+  taskDetailsData,
+  // Mobile video task details toggle
+  onShowTaskDetails
 }) => {
   const [isFlippedHorizontally, setIsFlippedHorizontally] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
@@ -828,12 +832,15 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
             ) : (
               // Original layout without task details
               <div 
-                className="relative flex items-center justify-center"
+                className="flex flex-col items-center justify-center"
                 style={{
                   maxHeight: '95vh',
                   maxWidth: '95vw',
                   width: 'auto'
                 }}
+              >
+              <div 
+                className="relative flex items-center justify-center"
               >
               {/* Navigation Controls - Left Arrow */}
               {showNavigation && onPrevious && hasPrevious && (
@@ -1120,6 +1127,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     </Button>
                   )}
                 </div>
+                
+
               </div>
 
               {/* Navigation Controls - Right Arrow (Desktop Only) */}
@@ -1132,6 +1141,34 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                 >
                   <ChevronRight className="h-6 w-6 sm:h-8 sm:w-8" />
                 </Button>
+              )}
+              </div>
+
+              {/* Mobile Task Details Button for Videos - Below the video */}
+              {isMobile && isVideo && onShowTaskDetails && (
+                <div className="mt-4 flex justify-center">
+                  <Button
+                    variant="secondary"
+                    size="default"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      console.log('[TaskToggle] MediaLightbox: Task Details button clicked', { hasOnShowTaskDetails: !!onShowTaskDetails, mediaId: media.id });
+                      if (onShowTaskDetails) {
+                        console.log('[TaskToggle] MediaLightbox: Calling onShowTaskDetails');
+                        onShowTaskDetails();
+                      } else {
+                        console.error('[TaskToggle] MediaLightbox: No onShowTaskDetails callback provided');
+                      }
+                    }}
+                    onPointerDown={(e) => {
+                      e.stopPropagation();
+                    }}
+                    className="bg-black/80 hover:bg-black/90 text-white backdrop-blur-sm"
+                  >
+                    Show Task Details
+                  </Button>
+                </div>
               )}
               </div>
             )}

@@ -77,6 +77,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   const [hoveredVideo, setHoveredVideo] = useState<GenerationRow | null>(null);
   const [hoverPosition, setHoverPosition] = useState<{ x: number; y: number; positioning?: 'above' | 'below' } | null>(null);
   const [isInitialHover, setIsInitialHover] = useState(false);
+  const [showTaskDetailsModal, setShowTaskDetailsModal] = useState(false);
   const itemsPerPage = 6;
   const taskDetailsButtonRef = useRef<HTMLButtonElement>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -86,6 +87,16 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   const filters = useMemo(() => ({
     mediaType: 'video' as const, // Only get videos for this gallery
   }), []);
+
+  // Debug logging for hook inputs
+  console.log('[VideoGenMissing] VideoOutputsGallery props received:', {
+    projectId,
+    shotId,
+    currentPage,
+    itemsPerPage,
+    enabled: !!(projectId && shotId),
+    timestamp: Date.now()
+  });
 
   // Use unified generations hook with task data preloading
   const { data: generationsData, isLoading: isLoadingGenerations, error: generationsError } = useUnifiedGenerations({
@@ -214,6 +225,34 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
 
   // Get current video for lightbox
   const currentVideo = lightboxIndex !== null ? sortedVideoOutputs[lightboxIndex] : null;
+
+  // Stable callback for showing task details
+  const handleShowTaskDetails = useCallback(() => {
+    console.log('[TaskToggle] VideoOutputsGallery: handleShowTaskDetails called', { 
+      lightboxIndex, 
+      video: sortedVideoOutputs[lightboxIndex]?.id,
+      showTaskDetailsModal,
+      selectedVideoForDetails: selectedVideoForDetails?.id
+    });
+    const currentVideo = sortedVideoOutputs[lightboxIndex];
+    if (currentVideo) {
+      // Set up task details modal state first
+      setSelectedVideoForDetails(currentVideo);
+      // Use setTimeout to ensure state update happens before opening modal
+      setTimeout(() => {
+        setShowTaskDetailsModal(true);
+        // Close lightbox after modal is set to open
+        setLightboxIndex(null);
+        console.log('[TaskToggle] VideoOutputsGallery: State updated for task details modal', {
+          newSelectedVideo: currentVideo.id,
+          newShowModal: true,
+          closedLightbox: true
+        });
+      }, 100);
+    } else {
+      console.error('[TaskToggle] VideoOutputsGallery: No current video found for lightboxIndex:', lightboxIndex);
+    }
+  }, [lightboxIndex, sortedVideoOutputs, showTaskDetailsModal, selectedVideoForDetails]);
 
   // Simple loading state management - task data is now handled by unified cache
 
@@ -547,21 +586,45 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
               onApplyTaskSettings: onApplySettings,
               onApplySettingsFromTask
             }}
+            onShowTaskDetails={isMobile ? handleShowTaskDetails : undefined}
           />
         )}
 
-        {selectedVideoForDetails && (
+        {selectedVideoForDetails && showTaskDetailsModal && (
           <TaskDetailsModal
             generationId={selectedVideoForDetails.id}
+            open={showTaskDetailsModal}
+            onOpenChange={(open) => {
+              console.log('[TaskToggle] VideoOutputsGallery: TaskDetailsModal onOpenChange', { open, selectedVideo: selectedVideoForDetails?.id });
+              if (!open) {
+                // When closing, reset both states
+                setShowTaskDetailsModal(false);
+                setSelectedVideoForDetails(null);
+              }
+            }}
             onApplySettings={(settings) => {
               onApplySettings(settings);
               setSelectedVideoForDetails(null);
+              setShowTaskDetailsModal(false);
             }}
             onApplySettingsFromTask={(taskId, replaceImages, inputImages) => {
               onApplySettingsFromTask(taskId, replaceImages, inputImages);
               setSelectedVideoForDetails(null);
+              setShowTaskDetailsModal(false);
             }}
-            onClose={() => setSelectedVideoForDetails(null)}
+            onClose={() => {
+              setSelectedVideoForDetails(null);
+              setShowTaskDetailsModal(false);
+            }}
+            onShowVideo={isMobile ? () => {
+              setShowTaskDetailsModal(false);
+              const index = sortedVideoOutputs.findIndex(v => v.id === selectedVideoForDetails.id);
+              if (index !== -1) {
+                setLightboxIndex(index);
+              }
+              setSelectedVideoForDetails(null);
+            } : undefined}
+            isVideoContext={isMobile}
           >
             <Button 
               ref={taskDetailsButtonRef}

@@ -9,6 +9,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
+import { useAllShotGenerations } from '@/shared/hooks/useShotGenerations';
 
 const ShotsPage: React.FC = () => {
   const { selectedProjectId } = useProject();
@@ -27,17 +28,22 @@ const ShotsPage: React.FC = () => {
     return shots.find(s => s.id === currentShotId) || null;
   }, [currentShotId, shots]);
 
+  // When a shot is selected, fetch full images for that shot to avoid thumbnail-only limitation
+  const { data: fullSelectedShotImages = [] } = useAllShotGenerations(selectedShot?.id ?? null);
+
   // Local state for the images being managed, which can be updated optimistically.
   const [managedImages, setManagedImages] = useState<GenerationRow[]>([]);
 
-  // This effect syncs the managedImages with the derived selectedShot.
+  // This effect syncs the managedImages with the derived selectedShot, preferring full data
   useEffect(() => {
-    if (selectedShot?.images) {
+    if (fullSelectedShotImages && fullSelectedShotImages.length > 0) {
+      setManagedImages(fullSelectedShotImages);
+    } else if (selectedShot?.images) {
       setManagedImages(selectedShot.images);
     } else {
       setManagedImages([]);
     }
-  }, [selectedShot]);
+  }, [selectedShot, fullSelectedShotImages]);
 
   // This effect handles selecting a shot based on navigation state.
   useEffect(() => {

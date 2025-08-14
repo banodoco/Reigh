@@ -116,33 +116,72 @@ export const useAllShotGenerations = (
       console.log('[VideoLoadSpeedIssue][ADDTOSHOT] useAllShotGenerations queryFn executing', { shotId, timestamp: Date.now() });
       let allGenerations: any[] = [];
       let offset = 0;
-      const BATCH_SIZE = 1000;
+      const INITIAL_LOAD = 200; // Fast initial load for first 200 items
+      const BATCH_SIZE = 500; // Smaller batches for better responsiveness
 
-      // Fetch in batches to handle large datasets
-      while (true) {
-        const { data, error } = await supabase
-          .from('shot_generations')
-          .select(`
-            *,
-            generation:generations(*)
-          `)
-          .eq('shot_id', shotId!)
-          .order('position', { ascending: true, nullsFirst: false })
-          .order('created_at', { ascending: false })
-          .range(offset, offset + BATCH_SIZE - 1);
+      // First, load initial batch quickly with minimal fields for fast rendering
+      const { data: initialData, error: initialError } = await supabase
+        .from('shot_generations')
+        .select(`
+          id,
+          position,
+          generation:generations(
+            id,
+            location,
+            type,
+            created_at,
+            params,
+            metadata
+          )
+        `)
+        .eq('shot_id', shotId!)
+        .order('position', { ascending: true, nullsFirst: false })
+        .order('created_at', { ascending: false })
+        .range(0, INITIAL_LOAD - 1);
 
-        if (error) throw error;
+      if (initialError) throw initialError;
 
-        if (!data || data.length === 0) break;
+      if (initialData) {
+        allGenerations = initialData;
+        offset = initialData.length;
+      }
 
-        allGenerations = allGenerations.concat(data);
-        
-        if (data.length < BATCH_SIZE) break;
-        
-        offset += BATCH_SIZE;
-        
-        // Safety limit
-        if (offset > 10000) break;
+      // If there might be more data, fetch the rest in background
+      if (initialData && initialData.length === INITIAL_LOAD) {
+        // Fetch remaining data in smaller batches
+        while (true) {
+          const { data, error } = await supabase
+            .from('shot_generations')
+            .select(`
+              id,
+              position,
+              generation:generations(
+                id,
+                location,
+                type,
+                created_at,
+                params,
+                metadata
+              )
+            `)
+            .eq('shot_id', shotId!)
+            .order('position', { ascending: true, nullsFirst: false })
+            .order('created_at', { ascending: false })
+            .range(offset, offset + BATCH_SIZE - 1);
+
+          if (error) throw error;
+
+          if (!data || data.length === 0) break;
+
+          allGenerations = allGenerations.concat(data);
+          
+          if (data.length < BATCH_SIZE) break;
+          
+          offset += BATCH_SIZE;
+          
+          // Safety limit
+          if (offset > 10000) break;
+        }
       }
 
       // Transform to match GenerationRow interface
@@ -153,8 +192,8 @@ export const useAllShotGenerations = (
           shotImageEntryId: sg.id,
           shot_generation_id: sg.id,
           position: sg.position,
-          imageUrl: sg.generation?.location || sg.generation?.imageUrl,
-          thumbUrl: sg.generation?.location || sg.generation?.thumbUrl,
+          imageUrl: sg.generation?.location,
+          thumbUrl: sg.generation?.location,
         }));
 
       console.log('[VideoLoadSpeedIssue][ADDTOSHOT] useAllShotGenerations queryFn completed', { 

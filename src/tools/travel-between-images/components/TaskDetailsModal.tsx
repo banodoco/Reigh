@@ -27,15 +27,29 @@ import { SharedTaskDetails } from './SharedTaskDetails';
 
 interface TaskDetailsModalProps {
   generationId: string;
-  children: ReactNode;
+  children?: ReactNode;
   onApplySettings?: (settings: any) => void;
   onApplySettingsFromTask?: (taskId: string, replaceImages: boolean, inputImages: string[]) => void;
   onClose?: () => void;
+  onShowVideo?: () => void;
+  isVideoContext?: boolean;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
-const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, children, onApplySettings, onApplySettingsFromTask, onClose }) => {
+const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, children, onApplySettings, onApplySettingsFromTask, onClose, onShowVideo, isVideoContext, open, onOpenChange }) => {
   const isMobile = useIsMobile();
-  const [isOpen, setIsOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  
+  // Use controlled state if provided, otherwise fall back to internal state
+  const isOpen = open !== undefined ? open : internalOpen;
+  const setIsOpen = (value: boolean) => {
+    if (onOpenChange) {
+      onOpenChange(value);
+    } else {
+      setInternalOpen(value);
+    }
+  };
   const [replaceImages, setReplaceImages] = useState(true);
   const [taskId, setTaskId] = useState<string | null>(null);
   const [showDetailedParams, setShowDetailedParams] = useState(false);
@@ -126,10 +140,10 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
         }
       }}
     >
-      <DialogTrigger asChild>{children}</DialogTrigger>
+      {children && <DialogTrigger asChild>{children}</DialogTrigger>}
       <DialogContent 
         className={`sm:max-w-[700px] flex flex-col ${
-          isMobile ? 'mx-2 my-5 max-h-[calc(100vh-2.5rem)]' : ''
+          isMobile ? 'mx-2 max-h-[calc(100vh-4rem)] top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] fixed' : ''
         }`}
         aria-describedby="task-details-description"
       >
@@ -221,6 +235,19 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
         <DialogFooter className="flex-shrink-0 pt-4 border-t">
           <div className="flex justify-between w-full items-center">
             <div className="flex items-center space-x-4">
+              {/* Show Video button for mobile video context */}
+              {isMobile && isVideoContext && onShowVideo && (
+                <Button 
+                  variant="secondary" 
+                  onClick={() => {
+                    setIsOpen(false);
+                    onShowVideo();
+                  }}
+                  className="text-sm whitespace-pre-line leading-tight py-3 px-4 min-h-[3rem]"
+                >
+                  {'Show\nVideo'}
+                </Button>
+              )}
               {inputImages.length > 0 && (
                 <div className="flex items-center space-x-4">
                   <div className="flex items-center space-x-2">
@@ -229,17 +256,17 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
                       checked={replaceImages}
                       onCheckedChange={(checked) => setReplaceImages(checked as boolean)}
                     />
-                    <Label htmlFor="replaceImages" className="text-sm font-medium">
-                      Replace these images
+                    <Label htmlFor="replaceImages" className={`text-sm font-medium ${isMobile ? 'whitespace-pre-line leading-tight' : ''}`}>
+                      {isMobile ? 'Replace\nthese\nimages' : 'Replace these images'}
                     </Label>
                   </div>
                   {onApplySettingsFromTask && task && taskId && (
                     <Button 
                       variant="default" 
                       onClick={handleApplySettingsFromTask}
-                      className="text-sm"
+                      className={`text-sm ${isMobile ? 'whitespace-pre-line leading-tight py-3 px-4 min-h-[4rem]' : ''}`}
                     >
-                      Apply These Settings
+                      {isMobile ? 'Apply\nThese\nSettings' : 'Apply These Settings'}
                     </Button>
                   )}
                 </div>
@@ -248,7 +275,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
             <Button
               variant="outline"
               onClick={() => setIsOpen(false)}
-              className="text-sm"
+              className={`text-sm ${isMobile ? 'whitespace-pre-line leading-tight py-3 px-4 min-h-[2.5rem]' : ''}`}
             >
               Close
             </Button>

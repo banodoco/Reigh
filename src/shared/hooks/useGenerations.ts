@@ -311,9 +311,27 @@ export function useGenerations(
     enabled: !!projectId && enabled,
     placeholderData: (previousData) => previousData,
     // Cache management to prevent memory leaks as pagination grows
-    staleTime: 2 * 60 * 1000, // 2 minutes - shorter for pagination data
+    staleTime: 30 * 1000, // 30 seconds - shorter than polling for faster WebSocket response
     gcTime: 5 * 60 * 1000, // 5 minutes - cleanup old pages after this time
-    // Prevent background refetches for pagination data
+    // Smart fallback polling for resilience (like task system)
+    refetchInterval: (query) => {
+      const dataAge = Date.now() - query.state.dataUpdatedAt;
+      const status = query.state.status;
+      
+      console.log('[GenerationsPolling] Using fallback polling for image gallery:', {
+        projectId,
+        page,
+        limit,
+        dataAge: Math.round(dataAge / 1000) + 's',
+        status,
+        visibilityState: document.visibilityState,
+        timestamp: Date.now()
+      });
+      
+      // Moderate polling for image galleries - balance between responsiveness and efficiency
+      return 45000; // 45 seconds - resurrection polling to catch missed WebSocket events
+    },
+    refetchIntervalInBackground: true, // CRITICAL: Continue polling when tab is hidden (like tasks)
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
   });

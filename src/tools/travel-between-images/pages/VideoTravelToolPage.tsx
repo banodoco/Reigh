@@ -442,7 +442,7 @@ const VideoTravelToolPage: React.FC = () => {
       if (selectedShot) {
         const updatedShotFromList = shots.find(s => s.id === selectedShot.id && s.project_id === selectedProjectId);
         if (updatedShotFromList) {
-          if (JSON.stringify(selectedShot) !== JSON.stringify(updatedShotFromList)) {
+          if (!deepEqual(selectedShot, updatedShotFromList)) {
             setSelectedShot(updatedShotFromList);
           }
         } else {
