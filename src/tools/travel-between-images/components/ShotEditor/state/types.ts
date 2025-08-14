@@ -45,6 +45,7 @@ export interface SteerableMotionSettings {
   colour_match_videos: boolean;
   apply_causvid: boolean;
   use_lighti2x_lora: boolean;
+  use_styleboost_loras: boolean;
   fade_in_duration: string;
   fade_out_duration: string;
   after_first_post_generation_saturation: number;
@@ -62,6 +63,7 @@ export const DEFAULT_STEERABLE_MOTION_SETTINGS: SteerableMotionSettings = {
   colour_match_videos: false,
   apply_causvid: false,
   use_lighti2x_lora: false,
+  use_styleboost_loras: true,
   fade_in_duration: '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
   fade_out_duration: '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
   after_first_post_generation_saturation: 1,

@@ -50,6 +50,7 @@ interface TravelRequestBody {
   colour_match_videos?: boolean;
   apply_causvid?: boolean;
   use_lighti2x_lora?: boolean;
+  use_styleboost_loras?: boolean;
   fade_in_duration?: any;
   fade_out_duration?: any;
   after_first_post_generation_saturation?: number;
@@ -188,6 +189,7 @@ serve(async (req) => {
       colour_match_videos: body.colour_match_videos ?? DEFAULT_COLOUR_MATCH_VIDEOS,
       apply_causvid: body.apply_causvid ?? false,
       use_lighti2x_lora: body.use_lighti2x_lora ?? false,
+      use_styleboost_loras: body.use_styleboost_loras ?? true,
       fade_in_params_json_str: typeof body.fade_in_duration === "object" && body.fade_in_duration !== null
         ? JSON.stringify(body.fade_in_duration)
         : body.fade_in_duration ?? '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',

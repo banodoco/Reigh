@@ -187,13 +187,14 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                 )}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+            {/* Toggles row */}
+            <div className="flex flex-wrap gap-4 items-center">
               {/* Only show Accelerated Mode toggle if not using Wan 2.2 */}
               {steerableMotionSettings.model_name !== 'vace_14B_fake_cocktail_2_2' && (
                 <div className="relative">
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <div className="flex items-center space-x-2 pt-2">
+                      <div className="flex items-center space-x-2">
                         <Switch
                           id="accelerated"
                           checked={accelerated}
@@ -209,7 +210,31 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                   </Tooltip>
                 </div>
               )}
-              <div className={`relative ${steerableMotionSettings.model_name === 'vace_14B_fake_cocktail_2_2' ? 'md:col-span-4' : 'md:col-span-3'}`}>
+              
+              {/* Style Boost LoRAs toggle */}
+              <div className="relative">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="styleboost"
+                        checked={steerableMotionSettings.use_styleboost_loras}
+                        onCheckedChange={(value) => onSteerableMotionSettingsChange({ use_styleboost_loras: value })}
+                      />
+                      <Label htmlFor="styleboost" className="text-sm cursor-help">Apply Style Boost LoRAs</Label>
+                      <Info className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Applies curated style enhancement LoRAs to improve visual quality and aesthetic appeal.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+            </div>
+
+            {/* Steps slider in its own row */}
+            <div className="grid grid-cols-1 gap-4 items-end">
+              <div className="relative">
                 <Label htmlFor="batchVideoSteps" className="text-sm font-medium block mb-1">Generation Steps: {batchVideoSteps}</Label>
                 <Tooltip>
                   <TooltipTrigger asChild>

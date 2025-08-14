@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { Info } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/card";
 import { useProject } from "@/shared/contexts/ProjectContext";
@@ -329,8 +330,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       
       // Disable accelerated mode for Wan 2.2 (which controls lighti2x LoRA)
       setAccelerated(false);
-      
-      toast.info("Wan 2.2 selected: Accelerated mode disabled, lighti2x LoRA disabled, Steps set to 10");
     } else {
       // Wan 2.1 (default settings)
       onSteerableMotionSettingsChange({ 
@@ -340,8 +339,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       
       // Restore accelerated mode to default (true) for Wan 2.1 (which controls lighti2x LoRA)
       setAccelerated(true);
-      
-      toast.info("Wan 2.1 selected: Accelerated mode enabled, lighti2x LoRA enabled, Standard settings restored");
     }
     // Note: Steps are automatically handled by the unified system when model changes
   }, [onSteerableMotionSettingsChange, setAccelerated]);
@@ -756,6 +753,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       apply_reward_lora: DEFAULT_STEERABLE_MOTION_SETTINGS.apply_reward_lora,
       apply_causvid: steerableMotionSettings.apply_causvid,
       use_lighti2x_lora: steerableMotionSettings.model_name === 'vace_14B_fake_cocktail_2_2' ? false : accelerated,
+      use_styleboost_loras: steerableMotionSettings.use_styleboost_loras ?? DEFAULT_STEERABLE_MOTION_SETTINGS.use_styleboost_loras,
       show_input_images: DEFAULT_STEERABLE_MOTION_SETTINGS.show_input_images,
       colour_match_videos: DEFAULT_STEERABLE_MOTION_SETTINGS.colour_match_videos, // Force to false, ignore saved settings
       fade_in_duration: steerableMotionSettings.fade_in_duration ?? DEFAULT_STEERABLE_MOTION_SETTINGS.fade_in_duration,
@@ -1058,6 +1056,18 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                                     <span className="text-sm">Wan 2.2</span>
                                 </label>
                             </div>
+                            
+                            {/* Wan 2.2 Warning */}
+                            {steerableMotionSettings.model_name === 'vace_14B_fake_cocktail_2_2' && (
+                              <div className="p-3 border border-yellow-200 bg-yellow-50 dark:bg-yellow-900/20 dark:border-yellow-800 rounded-md">
+                                <div className="flex items-start">
+                                  <Info className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mr-2 mt-0.5 flex-shrink-0" />
+                                  <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                                    <strong>Wan 2.2 is a work in progress.</strong> It currently has better motion and resolution but inferior image adherence.
+                                  </p>
+                                </div>
+                              </div>
+                            )}
                         </div>
                         
                         {/* LoRA Settings */}
