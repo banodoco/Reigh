@@ -6,7 +6,7 @@ import SettingsModal from "@/shared/components/SettingsModal";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/shared/components/ui/button";
-import { useListShots, useAddImageToShot, usePositionExistingGenerationInShot } from "@/shared/hooks/useShots";
+import { useListShots, useAddImageToShot, usePositionExistingGenerationInShot, useCreateShot } from "@/shared/hooks/useShots";
 import { useLastAffectedShot } from "@/shared/hooks/useLastAffectedShot";
 import { useProject } from "@/shared/contexts/ProjectContext";
 import { uploadImageToStorage } from '@/shared/lib/imageUploader';
@@ -138,6 +138,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
 
   const addImageToShotMutation = useAddImageToShot();
   const positionExistingGenerationMutation = usePositionExistingGenerationInShot();
+  const createShotMutation = useCreateShot();
   const { lastAffectedShotId, setLastAffectedShotId } = useLastAffectedShot();
   const itemsPerPage = isMobile ? 24 : 25;
   const generationsFilters = {
@@ -510,6 +511,37 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     setSelectedShotFilter(shotId);
   }, []); // Remove dependencies to prevent stale closure issues
 
+  // Handle creating a new shot
+  const handleCreateShot = useCallback(async (shotName: string, files: File[]) => {
+    if (!selectedProjectId) {
+      toast.error("No project selected");
+      return;
+    }
+
+    try {
+      const result = await createShotMutation.mutateAsync({
+        name: shotName,
+        projectId: selectedProjectId,
+        shouldSelectAfterCreation: false
+      });
+
+      // Invalidate and refetch shots to update the list
+      await queryClient.invalidateQueries({ queryKey: ['shots', selectedProjectId] });
+      await queryClient.refetchQueries({ queryKey: ['shots', selectedProjectId] });
+      
+      // Set the newly created shot as the target for "Add to Shot" actions
+      // but don't change the gallery filter to keep existing images visible
+      if (result.shot?.id) {
+        setLastAffectedShotId(result.shot.id);
+        // Note: We're NOT changing setSelectedShotFilter here to keep the gallery populated
+      }
+    } catch (error) {
+      console.error('Error creating shot:', error);
+      toast.error("Failed to create shot");
+      throw error; // Re-throw so the modal can handle the error state
+    }
+  }, [selectedProjectId, createShotMutation, queryClient, setLastAffectedShotId]);
+
   // Handle toggling the form expand/collapse state
   const handleToggleFormExpanded = useCallback(() => {
     const wasExpanded = isFormExpanded === true;
@@ -852,6 +884,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
                 formAssociatedShotId={formAssociatedShotId}
                 onSwitchToAssociatedShot={handleSwitchToAssociatedShot}
                 onPrefetchAdjacentPages={handlePrefetchAdjacentPages}
+                onCreateShot={handleCreateShot}
               />
               </div>
             )}

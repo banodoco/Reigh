@@ -816,7 +816,13 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
   // Opens the Generations pane focused on un-positioned images for the current shot
   const openUnpositionedGenerationsPane = useCallback(() => {
+    console.log('[ShotFilterAutoSelectIssue] Opening generations pane for shot:', selectedShot?.id);
+    
     if (selectedShot?.id) {
+      console.log('[ShotFilterAutoSelectIssue] Updating generations pane settings:', {
+        selectedShotFilter: selectedShot.id,
+        excludePositioned: true,
+      });
       updateGenerationsPaneSettings({
         selectedShotFilter: selectedShot.id,
         excludePositioned: true,
@@ -824,9 +830,11 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     }
 
     if (isMobile) {
+      console.log('[ShotFilterAutoSelectIssue] Dispatching openGenerationsPane event (mobile)');
       // Dispatch a global event to request the Generations pane to open
       window.dispatchEvent(new CustomEvent('openGenerationsPane'));
     } else {
+      console.log('[ShotFilterAutoSelectIssue] Setting generations pane locked (desktop)');
       setIsGenerationsPaneLocked(true);
     }
       }, [selectedShot, isMobile, updateGenerationsPaneSettings, setIsGenerationsPaneLocked]);

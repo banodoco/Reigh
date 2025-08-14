@@ -23,6 +23,7 @@ import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { GeneratedImageWithMetadata, DisplayableMetadata, formatMetadataForDisplay } from "./ImageGallery";
 import { log } from '@/shared/lib/logger';
 import { cn } from "@/shared/lib/utils";
+import CreateShotModal from "@/shared/components/CreateShotModal";
 
 interface ImageGalleryItemProps {
   image: GeneratedImageWithMetadata;
@@ -53,6 +54,8 @@ interface ImageGalleryItemProps {
   shouldLoad?: boolean;
   isPriority?: boolean;
   isGalleryLoading?: boolean;
+  // Shot creation props
+  onCreateShot?: (shotName: string, files: File[]) => Promise<void>;
 }
 
 export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
@@ -83,6 +86,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   shouldLoad = true,
   isPriority = false,
   isGalleryLoading = false,
+  onCreateShot,
 }) => {
   const { toast } = useToast();
   // Memoize displayUrl to prevent unnecessary recalculations
@@ -91,11 +95,38 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   const [imageLoadError, setImageLoadError] = useState<boolean>(false);
   const [imageRetryCount, setImageRetryCount] = useState<number>(0);
   const [isInfoOpen, setIsInfoOpen] = useState<boolean>(false);
+  // State for CreateShotModal
+  const [isCreateShotModalOpen, setIsCreateShotModalOpen] = useState<boolean>(false);
+  const [isCreatingShot, setIsCreatingShot] = useState<boolean>(false);
   // Check if this image was already cached by the preloader using centralized function
   const isPreloadedAndCached = isImageCached(image);
   const [imageLoaded, setImageLoaded] = useState<boolean>(isPreloadedAndCached);
   const [imageLoading, setImageLoading] = useState<boolean>(false);
   const MAX_RETRIES = 2;
+  
+  // Handle shot creation
+  const handleCreateShot = async (shotName: string, files: File[]) => {
+    if (!onCreateShot) return;
+    
+    setIsCreatingShot(true);
+    try {
+      await onCreateShot(shotName, files);
+      setIsCreateShotModalOpen(false);
+      toast({ 
+        title: "Shot Created", 
+        description: `"${shotName}" has been created successfully.` 
+      });
+    } catch (error) {
+      console.error("Error creating shot:", error);
+      toast({ 
+        title: "Error Creating Shot", 
+        description: "Failed to create the shot. Please try again.",
+        variant: "destructive" 
+      });
+    } finally {
+      setIsCreatingShot(false);
+    }
+  };
   
   // Track previous image ID to detect actual changes vs re-renders
   // Create a stable identifier for the image
@@ -517,6 +548,23 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                       </SelectValue>
                   </SelectTrigger>
                   <SelectContent className="z-[9999]" style={{ zIndex: 10000 }}>
+                      {onCreateShot && (
+                        <div className="p-1">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full h-8 text-xs justify-center"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setIsCreateShotModalOpen(true);
+                            }}
+                          >
+                            <PlusCircle className="h-3 w-3 mr-1" />
+                            Add Shot
+                          </Button>
+                        </div>
+                      )}
                       {simplifiedShotOptions.map(shot => (
                           <SelectItem key={shot.id} value={shot.id} className="text-xs">
                               {shot.name}
@@ -793,10 +841,26 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   return isMobile ? (
     <React.Fragment key={imageKey}>
       {imageContent}
+      {onCreateShot && (
+        <CreateShotModal
+          isOpen={isCreateShotModalOpen}
+          onClose={() => setIsCreateShotModalOpen(false)}
+          onSubmit={handleCreateShot}
+          isLoading={isCreatingShot}
+        />
+      )}
     </React.Fragment>
   ) : (
     <DraggableImage key={`draggable-${imageKey}`} image={image}>
       {imageContent}
+      {onCreateShot && (
+        <CreateShotModal
+          isOpen={isCreateShotModalOpen}
+          onClose={() => setIsCreateShotModalOpen(false)}
+          onSubmit={handleCreateShot}
+          isLoading={isCreatingShot}
+        />
+      )}
     </DraggableImage>
   );
 };

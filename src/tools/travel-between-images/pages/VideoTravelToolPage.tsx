@@ -282,6 +282,7 @@ const VideoTravelToolPage: React.FC = () => {
     if (hashShotId && selectedShot?.id !== hashShotId) {
       const matchingShot = shots.find((s) => s.id === hashShotId);
       if (matchingShot) {
+        console.log('[ShotFilterAutoSelectIssue] Setting shot from hash:', hashShotId);
         setSelectedShot(matchingShot);
         setCurrentShotId(matchingShot.id);
         // Return early to allow state update before sync

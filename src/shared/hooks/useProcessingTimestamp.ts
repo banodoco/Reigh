@@ -37,7 +37,7 @@ const formatProcessingDuration = (startDate: Date): string => {
   
   // 1-59 minutes
   if (diffMinutes < 60) {
-    return `Processing: For ${diffMinutes} min${diffMinutes === 1 ? '' : 's'}`;
+    return `Processing: for ${diffMinutes} min${diffMinutes === 1 ? '' : 's'}`;
   }
   
   // Hours and minutes
@@ -45,9 +45,9 @@ const formatProcessingDuration = (startDate: Date): string => {
   const remainingMinutes = diffMinutes % 60;
   
   if (remainingMinutes === 0) {
-    return `Processing: For ${hours} hr${hours === 1 ? '' : 's'}`;
+    return `Processing: for ${hours} hr${hours === 1 ? '' : 's'}`;
   } else {
-    return `Processing: For ${hours} hr${hours === 1 ? '' : 's'}, ${remainingMinutes} min${remainingMinutes === 1 ? '' : 's'}`;
+    return `Processing: for ${hours} hr${hours === 1 ? '' : 's'}, ${remainingMinutes} min${remainingMinutes === 1 ? '' : 's'}`;
   }
 };
 

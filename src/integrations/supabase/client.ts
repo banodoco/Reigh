@@ -20,9 +20,11 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     fetch: (url, options = {}) => {
       const controller = new AbortController();
       // Longer timeout for edge functions (especially AI functions that can take 30+ seconds)
-      // Regular DB requests are still fast, but AI edge functions need more time
+      // Storage uploads also need longer timeout for large files
+      // Regular DB requests are still fast, but AI edge functions and storage uploads need more time
       const isEdgeFunction = url.includes('/functions/v1/');
-      const timeoutMs = isEdgeFunction ? 60000 : 8000; // 60s for edge functions, 8s for other requests
+      const isStorageUpload = url.includes('/storage/v1/object/');
+      const timeoutMs = isEdgeFunction ? 60000 : (isStorageUpload ? 30000 : 8000); // 60s for edge functions, 30s for storage, 8s for other requests
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
       
       return fetch(url, {

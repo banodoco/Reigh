@@ -55,6 +55,40 @@ export function useGenerationsPageLogic({
     };
   };
 
+  // Function to get settings but always default to current shot filter when in shot context
+  const getShotSettingsWithShotDefault = (shotId: string, justSwitchedToShot: boolean): GenerationsPaneSettings => {
+    const saved = shotSettings[shotId];
+    if (!saved) {
+      // No saved settings - default to current shot
+      return {
+        selectedShotFilter: shotId,
+        excludePositioned: true
+      };
+    }
+    
+    // When just switching to a shot, always default to current shot regardless of saved settings
+    if (justSwitchedToShot) {
+      console.log('[ShotFilterAutoSelectIssue] Just switched to shot, defaulting to current shot:', shotId);
+      return {
+        selectedShotFilter: shotId,
+        excludePositioned: true
+      };
+    }
+    
+    // When reopening pane for same shot, but saved filter is 'all', prefer the current shot
+    // This handles the case where 'all' was set from a different context
+    if (saved.selectedShotFilter === 'all') {
+      console.log('[ShotFilterAutoSelectIssue] Saved settings has "all" filter, defaulting to current shot:', shotId);
+      return {
+        ...saved,
+        selectedShotFilter: shotId
+      };
+    }
+    
+    // Use saved settings as-is (user explicitly chose a different shot filter)
+    return saved;
+  };
+
   // Function to save settings for a specific shot
   const saveShotSettings = (shotId: string, settings: GenerationsPaneSettings) => {
     setShotSettings(prev => ({
@@ -63,19 +97,49 @@ export function useGenerationsPageLogic({
     }));
   };
 
+  // Track if we've just switched to viewing a specific shot (to override saved settings)
+  const [lastCurrentShotId, setLastCurrentShotId] = useState<string | null>(null);
+
   // Set shot filter to current shot when it changes, but respect saved settings
   useEffect(() => {
+    console.log('[ShotFilterAutoSelectIssue] Effect triggered:', {
+      currentShotId,
+      lastCurrentShotId,
+      shotsDataLength: shotsData?.length,
+      hasMatchingShot: shotsData?.some(shot => shot.id === currentShotId)
+    });
+
     if (currentShotId && shotsData?.length && shotsData.some(shot => shot.id === currentShotId)) {
-      // Load saved settings for this shot, or use defaults
-      const savedSettings = getShotSettings(currentShotId);
-      setSelectedShotFilter(savedSettings.selectedShotFilter);
-      setExcludePositioned(savedSettings.excludePositioned);
+      // Check if we just switched to a different shot
+      const justSwitchedToShot = lastCurrentShotId !== currentShotId;
+      
+      console.log('[ShotFilterAutoSelectIssue] In shot context:', {
+        currentShotId,
+        justSwitchedToShot,
+        lastCurrentShotId
+      });
+
+      // Always use the shot-defaulting function which prioritizes current shot appropriately
+      const settingsToApply = getShotSettingsWithShotDefault(currentShotId, justSwitchedToShot);
+      console.log('[ShotFilterAutoSelectIssue] Applying settings for shot:', {
+        currentShotId,
+        justSwitchedToShot,
+        settingsToApply
+      });
+      setSelectedShotFilter(settingsToApply.selectedShotFilter);
+      setExcludePositioned(settingsToApply.excludePositioned);
+      
+      setLastCurrentShotId(currentShotId);
     } else if (!currentShotId) {
       // When no shot is selected, revert to 'all' shots
+      console.log('[ShotFilterAutoSelectIssue] No current shot, reverting to all shots');
       setSelectedShotFilter('all');
       setExcludePositioned(true);
+      setLastCurrentShotId(null);
+    } else {
+      console.log('[ShotFilterAutoSelectIssue] Waiting for shots data or shot not found');
     }
-  }, [currentShotId, shotsData]);
+  }, [currentShotId, shotsData, lastCurrentShotId]);
 
   // Save settings whenever the user changes them (only when viewing a specific shot)
   useEffect(() => {

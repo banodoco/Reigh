@@ -72,8 +72,6 @@ export const GenerationsPane: React.FC = () => {
     mediaType: mediaTypeFilter
   });
 
-
-
   // Log every render with item count & page for loop detection
   useRenderLogger('GenerationsPane', { page, totalItems: totalCount });
 
@@ -164,6 +162,16 @@ export const GenerationsPane: React.FC = () => {
     onToggleLock: () => setIsGenerationsPaneLocked(!isGenerationsPaneLocked),
     additionalRefs: [shotFilterContentRef, mediaTypeContentRef],
   });
+
+  // Debug: Log GenerationsPane state when it opens/changes
+  useEffect(() => {
+    console.log('[ShotFilterAutoSelectIssue] GenerationsPane state changed:', {
+      isOpen,
+      location: location.pathname,
+      selectedShotFilter,
+      excludePositioned
+    });
+  }, [isOpen, location.pathname, selectedShotFilter, excludePositioned]);
 
   // Listen for custom event to open the pane (used on mobile from other components)
   useEffect(() => {

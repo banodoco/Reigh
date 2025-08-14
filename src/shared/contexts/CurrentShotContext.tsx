@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, ReactNode, useMemo } from 'react';
+import React, { createContext, useState, useContext, ReactNode, useMemo, useEffect } from 'react';
 
 interface CurrentShotContextType {
   currentShotId: string | null;
@@ -9,6 +9,11 @@ const CurrentShotContext = createContext<CurrentShotContextType | undefined>(und
 
 export const CurrentShotProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [currentShotId, setCurrentShotId] = useState<string | null>(null);
+
+  // Debug: Log when currentShotId changes
+  useEffect(() => {
+    console.log('[ShotFilterAutoSelectIssue] currentShotId changed:', currentShotId);
+  }, [currentShotId]);
 
   const value = useMemo(() => ({
     currentShotId,

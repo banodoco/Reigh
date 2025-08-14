@@ -156,6 +156,8 @@ interface ImageGalleryProps {
   onPrefetchAdjacentPages?: (prevPage: number | null, nextPage: number | null) => void;
   /** Enable adjacent page image preloading (default: true) */
   enableAdjacentPagePreloading?: boolean;
+  /** Callback for creating a new shot */
+  onCreateShot?: (shotName: string, files: File[]) => Promise<void>;
 }
 
 // Helper to format metadata for display
@@ -287,7 +289,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   hidePagination = false,
   hideTopFilters = false,
   onPrefetchAdjacentPages,
-  enableAdjacentPagePreloading = true
+  enableAdjacentPagePreloading = true,
+  onCreateShot
 }) => {
   const [activeLightboxMedia, setActiveLightboxMedia] = useState<GenerationRow | null>(null);
   const [downloadingImageId, setDownloadingImageId] = useState<string | null>(null);
@@ -299,7 +302,12 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   // Use mobile-optimized defaults to improve initial render performance
   const defaultItemsPerPage = isMobile ? 20 : 45;
   const actualItemsPerPage = itemsPerPage ?? defaultItemsPerPage;
-  const simplifiedShotOptions = React.useMemo(() => allShots.map(s => ({ id: s.id, name: s.name })), [allShots]);
+  const simplifiedShotOptions = React.useMemo(() => 
+    allShots
+      .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()) // Sort by created_at desc (most recent first)
+      .map(s => ({ id: s.id, name: s.name })), 
+    [allShots]
+  );
   
   // Memoize grid column classes to prevent unnecessary recalculations
   const gridColumnClasses = React.useMemo(() => {
@@ -331,7 +339,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     if (!isCurrentSelectionValid) {
       const newSelection = currentShotId || lastShotId || (simplifiedShotOptions.length > 0 ? simplifiedShotOptions[0].id : "");
       if (newSelection && newSelection !== selectedShotIdLocal) {
-        console.log('[ImageGallery] Fixing selectedShotIdLocal race condition:', {
+        console.log('[ShotSelectionDebug] Fixing selectedShotIdLocal race condition:', {
           oldSelection: selectedShotIdLocal,
           newSelection,
           currentShotId,
@@ -343,6 +351,31 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
       }
     }
   }, [currentShotId, lastShotId, simplifiedShotOptions, selectedShotIdLocal]);
+
+  // Sync selection when lastShotId changes to ensure newly created shots become selected in the gallery dropdown
+  useEffect(() => {
+    if (!lastShotId) return;
+
+    const existsInShots = simplifiedShotOptions.some(s => s.id === lastShotId);
+    if (existsInShots && lastShotId !== selectedShotIdLocal) {
+      console.log('[ShotSelectionDebug] Syncing selection to lastShotId change:', {
+        previousSelection: selectedShotIdLocal,
+        nextSelection: lastShotId,
+        shotsCount: simplifiedShotOptions.length,
+        timestamp: Date.now()
+      });
+      setSelectedShotIdLocal(lastShotId);
+      // Also update last affected shot context for consistency
+      setLastAffectedShotId(lastShotId);
+    } else {
+      console.log('[ShotSelectionDebug] No selection change on lastShotId update:', {
+        lastShotId,
+        selectedShotIdLocal,
+        existsInShots,
+        timestamp: Date.now()
+      });
+    }
+  }, [lastShotId, simplifiedShotOptions, selectedShotIdLocal, setLastAffectedShotId]);
 
   // State for the filter checkbox
   const [filterByToolType, setFilterByToolType] = useState<boolean>(initialFilterState);
@@ -1116,6 +1149,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                       shouldLoad={shouldShow}
                       isPriority={isPriority}
                       isGalleryLoading={isGalleryLoading}
+                      onCreateShot={onCreateShot}
                     />
                   );
                 })}
