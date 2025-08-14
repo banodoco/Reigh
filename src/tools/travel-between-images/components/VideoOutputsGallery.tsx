@@ -82,6 +82,11 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isMobile = useIsMobile();
 
+  // Stable filters object to prevent infinite re-renders
+  const filters = useMemo(() => ({
+    mediaType: 'video' as const, // Only get videos for this gallery
+  }), []);
+
   // Use unified generations hook with task data preloading
   const { data: generationsData, isLoading: isLoadingGenerations, error: generationsError } = useUnifiedGenerations({
     projectId,
@@ -89,9 +94,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     shotId,
     page: currentPage,
     limit: itemsPerPage,
-    filters: {
-      mediaType: 'video', // Only get videos for this gallery
-    },
+    filters,
     includeTaskData: false, // We'll load task data on-demand for hover/lightbox
     preloadTaskData: true, // Background preload for better UX
     enabled: !!(projectId && shotId),
@@ -125,7 +128,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   
   // Debug logging for VideoOutputsGallery data updates
   React.useEffect(() => {
-    console.log('[VideoGalleryDebug] Gallery data updated:', {
+    console.log('[VideoGenMissing] Gallery data updated:', {
       projectId,
       shotId,
       currentPage,
@@ -136,6 +139,9 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
       generationsError: generationsError?.message,
       visibilityState: document.visibilityState,
       timestamp: Date.now(),
+      rawGenerationsData: generationsData,
+      generationsDataItems: (generationsData as any)?.items,
+      generationsDataTotal: (generationsData as any)?.total,
       videoDetails: videoOutputs.slice(0, 3).map(video => ({
         id: video.id,
         type: video.type,
@@ -144,7 +150,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
         shotImageEntryId: (video as any).shotImageEntryId
       }))
     });
-  }, [videoOutputs, enhancedVideoOutputs, currentPage, isLoadingGenerations, generationsError]);
+  }, [videoOutputs, enhancedVideoOutputs, currentPage, isLoadingGenerations, generationsError, generationsData]);
 
   // Hooks for task details (now using unified cache)
   const lightboxVideoId = lightboxIndex !== null && videoOutputs[lightboxIndex] ? videoOutputs[lightboxIndex].id : null;
@@ -171,7 +177,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
 
   // Derive hover input images from hover task
   const hoverInputImages: string[] = useMemo(() => {
-    console.log('[HoverDebug] Processing hover task for input images:', {
+    console.log('[VideoGenMissing] Processing hover task for input images:', {
       hoverTask: !!hoverTask,
       hoveredVideoId: hoveredVideo?.id,
       hoverTaskParams: hoverTask ? Object.keys((hoverTask as any)?.params || {}) : []
@@ -261,7 +267,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   const handleHoverStart = (video: GenerationRow, event: React.MouseEvent) => {
     if (isMobile) return; // Don't show hover preview on mobile
     
-    console.log('[HoverDebug] Starting hover for video:', video.id);
+    console.log('[VideoGenMissing] Starting hover for video:', video.id);
     
     // Clear any existing timeout
     if (hoverTimeoutRef.current) {
@@ -303,14 +309,14 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     setHoverPosition({ x, y, positioning });
     setHoveredVideo(video);
     
-    console.log('[HoverDebug] Set hovered video:', video.id, 'positioning:', positioning);
+    console.log('[VideoGenMissing] Set hovered video:', video.id, 'positioning:', positioning);
     
     // Task data will be handled automatically by useTaskFromUnifiedCache
     // No need for complex manual fetching or caching logic
   };
 
   const handleHoverEnd = () => {
-    console.log('[HoverDebug] Ending hover');
+    console.log('[VideoGenMissing] Ending hover');
     if (hoverTimeoutRef.current) {
       clearTimeout(hoverTimeoutRef.current);
       hoverTimeoutRef.current = null;
@@ -570,7 +576,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
       {/* Hover Preview Tooltip - Rendered via Portal to escape stacking context */}
       {!isMobile && hoveredVideo && hoverPosition && createPortal(
         (() => {
-          console.log('[HoverDebug] Rendering hover preview:', {
+          console.log('[VideoGenMissing] Rendering hover preview:', {
             hoveredVideoId: hoveredVideo.id,
             hoverTaskId: hoverTaskMapping?.taskId,
             isLoadingHoverTask,

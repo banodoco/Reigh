@@ -53,10 +53,13 @@ interface UnifiedGenerationsResponse {
 export const getUnifiedGenerationsCacheKey = (options: UseUnifiedGenerationsOptions) => {
   const { mode, projectId, shotId, page, limit, filters, includeTaskData } = options;
   
+  // Serialize filters to ensure stable cache keys
+  const filtersKey = filters ? JSON.stringify(filters) : null;
+  
   if (mode === 'shot-specific') {
-    return ['unified-generations', 'shot', shotId, page, limit, filters, includeTaskData];
+    return ['unified-generations', 'shot', shotId, page, limit, filtersKey, includeTaskData];
   } else {
-    return ['unified-generations', 'project', projectId, page, limit, filters, includeTaskData];
+    return ['unified-generations', 'project', projectId, page, limit, filtersKey, includeTaskData];
   }
 };
 
@@ -94,7 +97,7 @@ async function fetchShotSpecificGenerations({
   includeTaskData: boolean;
 }): Promise<UnifiedGenerationsResponse> {
   
-  console.log('[GenerationsPollingDebug] Starting shot-specific generations fetch:', {
+  console.log('[VideoGenMissing] Starting shot-specific generations fetch:', {
     projectId,
     shotId,
     offset,
@@ -105,18 +108,21 @@ async function fetchShotSpecificGenerations({
     timestamp: Date.now()
   });
   
-  // Count query
+  // Count query - can't filter on joined tables, so we'll count all and estimate
   let countQuery = supabase
     .from('shot_generations')
     .select('generation_id', { count: 'exact', head: true })
     .eq('shot_id', shotId);
   
-  // Apply exclude positioned filter
+  // Apply exclude positioned filter (this works because it's on shot_generations table)
   if (filters?.excludePositioned) {
     countQuery = countQuery.is('position', null);
   }
   
-  // Data query with optional task data
+  // For VideoOutputsGallery, fetch ALL data when filtering by video to show everything
+  const fetchLimit = filters?.mediaType === 'video' ? 1000 : limit; // Fetch ALL for video filtering
+  const fetchOffset = filters?.mediaType === 'video' ? 0 : offset; // Start from beginning for videos
+  
   let dataQuery = supabase
     .from('shot_generations')
     .select(`
@@ -131,17 +137,20 @@ async function fetchShotSpecificGenerations({
         starred${includeTaskData ? ',tasks' : ''}
       )
     `)
-    .eq('shot_id', shotId)
-    .order('position', { ascending: true, nullsFirst: false })
-    .order('created_at', { ascending: false });
+    .eq('shot_id', shotId);
   
-  // Apply filters
+  // Apply other filters that work on shot_generations table
   if (filters?.excludePositioned) {
     dataQuery = dataQuery.is('position', null);
   }
   
+  // Apply ordering
+  dataQuery = dataQuery
+    .order('position', { ascending: true, nullsFirst: false })
+    .order('created_at', { ascending: false });
+  
   // Execute queries
-  console.log('[GenerationsPollingDebug] Executing shot-specific queries...', {
+  console.log('[VideoGenMissing] Executing shot-specific queries...', {
     projectId,
     shotId,
     offset,
@@ -151,10 +160,10 @@ async function fetchShotSpecificGenerations({
   
   const [{ count, error: countError }, { data, error: dataError }] = await Promise.all([
     countQuery,
-    dataQuery.range(offset, offset + limit - 1)
+    dataQuery.range(fetchOffset, fetchOffset + fetchLimit - 1)
   ]);
   
-  console.log('[GenerationsPollingDebug] Shot-specific query results:', {
+  console.log('[VideoGenMissing] Shot-specific query results:', {
     projectId,
     shotId,
     count,
@@ -165,7 +174,7 @@ async function fetchShotSpecificGenerations({
   });
   
   if (countError) {
-    console.error('[GenerationsPollingDebug] Shot-specific count query failed:', {
+    console.error('[VideoGenMissing] Shot-specific count query failed:', {
       projectId,
       shotId,
       error: countError,
@@ -174,7 +183,7 @@ async function fetchShotSpecificGenerations({
     throw countError;
   }
   if (dataError) {
-    console.error('[GenerationsPollingDebug] Shot-specific data query failed:', {
+    console.error('[VideoGenMissing] Shot-specific data query failed:', {
       projectId,
       shotId,
       error: dataError,
@@ -185,8 +194,8 @@ async function fetchShotSpecificGenerations({
   
   // Transform data
   let items = (data || [])
-    .filter(sg => sg.generation)
-    .map(sg => {
+    .filter((sg: any) => sg.generation)
+    .map((sg: any) => {
       const gen = sg.generation;
       const baseItem: GenerationWithTask = {
         id: gen.id,
@@ -210,6 +219,25 @@ async function fetchShotSpecificGenerations({
       return baseItem;
     });
   
+  console.log('[VideoGenMissing] Raw transformed items before filtering:', {
+    projectId,
+    shotId,
+    totalItems: items.length,
+    videoItems: items.filter(i => i.isVideo).length,
+    imageItems: items.filter(i => !i.isVideo).length,
+    itemDetails: items.slice(0, 5).map(item => ({
+      id: item.id,
+      type: item.isVideo ? 'video' : 'image',
+      rawType: (data as any)?.find((sg: any) => sg.generation?.id === item.id)?.generation?.type,
+      position: item.position,
+      createdAt: item.createdAt
+    })),
+    timestamp: Date.now()
+  });
+  
+  // Store original count before client-side filtering
+  const originalItemsCount = items.length;
+  
   // Apply client-side filters
   if (filters?.mediaType && filters.mediaType !== 'all') {
     items = items.filter(item => {
@@ -230,19 +258,38 @@ async function fetchShotSpecificGenerations({
     );
   }
   
-  const total = count || 0;
-  const hasMore = offset + limit < total;
+  // For video filtering, show ALL videos without pagination
+  let finalItems, finalTotal, finalHasMore;
   
-  const result = { items, total, hasMore };
+  if (filters?.mediaType === 'video') {
+    // Show ALL videos found - no pagination for video gallery
+    finalItems = items;
+    finalTotal = items.length;
+    finalHasMore = false; // We fetched everything
+  } else {
+    // For other cases, use normal pagination
+    finalItems = items.slice(offset, offset + limit);
+    const filteringRatio = originalItemsCount > 0 ? items.length / originalItemsCount : 1;
+    finalTotal = Math.round((count || 0) * filteringRatio);
+    finalHasMore = items.length > limit;
+  }
   
-  console.log('[GenerationsPollingDebug] Shot-specific fetch completed:', {
+  const result = { items: finalItems, total: finalTotal, hasMore: finalHasMore };
+  
+  console.log('[VideoGenMissing] Shot-specific fetch completed:', {
     projectId,
     shotId,
     offset,
     limit,
-    total,
-    hasMore,
-    itemsReturned: items.length,
+    fetchedLimit: fetchLimit,
+    rawCount: count,
+    originalItemsCount,
+    filteredItemsCount: items.length,
+    finalItemsCount: finalItems.length,
+    isVideoMode: filters?.mediaType === 'video',
+    showingAllVideos: filters?.mediaType === 'video',
+    total: finalTotal,
+    hasMore: finalHasMore,
     appliedFilters: {
       mediaType: filters?.mediaType,
       starredOnly: filters?.starredOnly,
@@ -271,7 +318,7 @@ async function fetchProjectWideGenerations({
   includeTaskData: boolean;
 }): Promise<UnifiedGenerationsResponse> {
   
-  console.log('[GenerationsPollingDebug] Starting project-wide generations fetch:', {
+  console.log('[VideoGenMissing] Starting project-wide generations fetch:', {
     projectId,
     offset,
     limit,
@@ -284,7 +331,7 @@ async function fetchProjectWideGenerations({
   // Use existing fetchGenerations but extend with task data if needed
   const { fetchGenerations } = await import('./useGenerations');
   
-  console.log('[GenerationsPollingDebug] Calling fetchGenerations...', {
+  console.log('[VideoGenMissing] Calling fetchGenerations...', {
     projectId,
     limit,
     offset,
@@ -298,7 +345,7 @@ async function fetchProjectWideGenerations({
     starredOnly: filters?.starredOnly,
   });
   
-  console.log('[GenerationsPollingDebug] fetchGenerations response:', {
+  console.log('[VideoGenMissing] fetchGenerations response:', {
     projectId,
     totalItems: response.items.length,
     totalCount: response.total,
@@ -343,7 +390,7 @@ async function fetchProjectWideGenerations({
     hasMore: response.hasMore,
   };
   
-  console.log('[GenerationsPollingDebug] Project-wide fetch completed:', {
+  console.log('[VideoGenMissing] Project-wide fetch completed:', {
     projectId,
     offset,
     limit,
@@ -362,6 +409,10 @@ async function fetchProjectWideGenerations({
 // Main hook
 export function useUnifiedGenerations(options: UseUnifiedGenerationsOptions) {
   const queryClient = useQueryClient();
+  const hookInstanceIdRef = React.useRef<string>(Math.random().toString(36).slice(2, 8));
+  const prevCacheKeyRef = React.useRef<string>("");
+  const lastSuccessSigRef = React.useRef<string>("");
+  const lastStateSigRef = React.useRef<string>("");
   
   const {
     enabled = true,
@@ -372,25 +423,33 @@ export function useUnifiedGenerations(options: UseUnifiedGenerationsOptions) {
   
   const cacheKey = getUnifiedGenerationsCacheKey(options);
   
-  console.log('[GenerationsPollingDebug] useUnifiedGenerations hook called:', {
-    mode: options.mode,
-    projectId: options.projectId,
-    shotId: options.shotId,
-    page: options.page,
-    limit: options.limit,
-    filters: options.filters,
-    includeTaskData: options.includeTaskData,
-    preloadTaskData,
-    enabled: enabled && !!options.projectId,
-    cacheKey: cacheKey.join(':'),
-    visibilityState: document.visibilityState,
-    timestamp: Date.now()
-  });
+  {
+    const cacheKeyStr = cacheKey.join(':');
+    if (prevCacheKeyRef.current !== cacheKeyStr) {
+      prevCacheKeyRef.current = cacheKeyStr;
+      console.log('[VideoGenMissing] useUnifiedGenerations hook called:', {
+        instanceId: hookInstanceIdRef.current,
+        mode: options.mode,
+        projectId: options.projectId,
+        shotId: options.shotId,
+        page: options.page,
+        limit: options.limit,
+        filters: options.filters,
+        includeTaskData: options.includeTaskData,
+        preloadTaskData,
+        enabled: enabled && !!options.projectId,
+        cacheKey: cacheKeyStr,
+        visibilityState: document.visibilityState,
+        timestamp: Date.now(),
+      });
+    }
+  }
   
   const query = useQuery({
     queryKey: cacheKey,
     queryFn: () => {
-      console.log('[GenerationsPollingDebug] Executing unified generations query:', {
+      console.log('[VideoGenMissing] Executing unified generations query:', {
+        instanceId: hookInstanceIdRef.current,
         mode: options.mode,
         projectId: options.projectId,
         shotId: options.shotId,
@@ -406,35 +465,66 @@ export function useUnifiedGenerations(options: UseUnifiedGenerationsOptions) {
     // Prevent background refetches for pagination data  
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
-    onSuccess: (data) => {
-      console.log('[GenerationsPollingDebug] Unified generations query success:', {
-        mode: options.mode,
-        projectId: options.projectId,
-        shotId: options.shotId,
-        itemsCount: data?.items?.length || 0,
-        total: data?.total || 0,
-        hasMore: data?.hasMore || false,
-        cacheKey: cacheKey.join(':'),
-        timestamp: Date.now()
+  });
+  
+  // Log query results
+  React.useEffect(() => {
+    if (query.data) {
+      const cacheKeyStr = cacheKey.join(':');
+      const sig = `${cacheKeyStr}:${(query.data.items as any[])?.length || 0}:${query.data.total || 0}:${query.data.hasMore ? 1 : 0}`;
+      if (lastSuccessSigRef.current !== sig) {
+        lastSuccessSigRef.current = sig;
+        console.log('[VideoGenMissing] Unified generations query success:', {
+          instanceId: hookInstanceIdRef.current,
+          mode: options.mode,
+          projectId: options.projectId,
+          shotId: options.shotId,
+          itemsCount: query.data?.items?.length || 0,
+          total: query.data?.total || 0,
+          hasMore: query.data?.hasMore || false,
+          cacheKey: cacheKeyStr,
+          timestamp: Date.now()
+        });
+      }
+    }
+  }, [query.data, options.mode, options.projectId, options.shotId, cacheKey]);
+  
+  // Log query state transitions (deduped)
+  React.useEffect(() => {
+    const cacheKeyStr = cacheKey.join(':');
+    const stateSig = `${cacheKeyStr}:${query.status}:${query.fetchStatus}:${query.isFetching ? 1 : 0}:${query.isStale ? 1 : 0}`;
+    if (lastStateSigRef.current !== stateSig) {
+      lastStateSigRef.current = stateSig;
+      console.log('[VideoGenMissing] Query state:', {
+        instanceId: hookInstanceIdRef.current,
+        cacheKey: cacheKeyStr,
+        status: query.status,
+        fetchStatus: query.fetchStatus,
+        isFetching: query.isFetching,
+        isStale: query.isStale,
+        timestamp: Date.now(),
       });
-    },
-    onError: (error) => {
-      console.error('[GenerationsPollingDebug] Unified generations query error:', {
+    }
+  }, [cacheKey, query.status, query.fetchStatus, query.isFetching, query.isStale]);
+
+  React.useEffect(() => {
+    if (query.error) {
+      console.error('[VideoGenMissing] Unified generations query error:', {
         mode: options.mode,
         projectId: options.projectId,
         shotId: options.shotId,
-        error: error instanceof Error ? error.message : String(error),
+        error: query.error instanceof Error ? query.error.message : String(query.error),
         cacheKey: cacheKey.join(':'),
         timestamp: Date.now()
       });
     }
-  });
+  }, [query.error, options.mode, options.projectId, options.shotId, cacheKey]);
   
   // Background task preloading
   React.useEffect(() => {
     if (preloadTaskData && query.data?.items && !options.includeTaskData) {
       // Background preload task data for hover/lightbox use
-      const itemsWithoutTasks = query.data.items.filter(item => item.taskId === null);
+      const itemsWithoutTasks = (query.data.items as GenerationWithTask[]).filter(item => item.taskId === null);
       
       if (itemsWithoutTasks.length > 0) {
         // Throttled background preloading
