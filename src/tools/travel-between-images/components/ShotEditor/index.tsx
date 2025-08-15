@@ -82,10 +82,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   
   // Use context images when available (thumbnails for most cases), fall back to full query for editing
   const contextImages = selectedShot?.images || [];
-  const needsFullImageData = contextImages.length === 5; // If we hit the thumbnail limit, we need full data
-  const { data: fullShotImages = [], isLoading: isLoadingFullImages } = useAllShotGenerations(
-    needsFullImageData ? selectedShotId : null // Only fetch full data when needed
-  );
+  
+  // Always load full data when in ShotEditor for complete editing functionality
+  // Context images (5 thumbnails) are shown immediately while full data loads
+  const { data: fullShotImages = [], isLoading: isLoadingFullImages } = useAllShotGenerations(selectedShotId);
   
   // Use full data if available, otherwise use context images
   // Keep context images visible while full data loads for better UX

@@ -68,9 +68,10 @@ export const ShotsPane: React.FC = () => {
       return [];
     }
     
-    const filtered = shots.map(shot => {
-      const originalImageCount = shot.images?.length || 0;
-      const filteredImages = (shot.images || [])
+            const filtered = shots.map(shot => {
+          // Note: shot.images now contains all images from ShotsContext (unlimited)
+          // Filter to show only positioned images in the intended sequence
+          const filteredImages = (shot.images || [])
         // Keep only images that have a valid position value
         .filter(img => {
           const hasPosition = (img as any).position !== null && (img as any).position !== undefined;

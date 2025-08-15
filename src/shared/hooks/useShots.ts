@@ -213,10 +213,12 @@ export const useDuplicateShot = () => {
   });
 };
 
-// List all shots for a specific project (without loading all generations)
-export const useListShots = (projectId?: string | null) => {
+// List all shots for a specific project (configurable image loading)
+export const useListShots = (projectId?: string | null, options: { maxImagesPerShot?: number } = {}) => {
+  const { maxImagesPerShot = 0 } = options; // Default to unlimited (0), can be limited for list views
+  
   return useQuery({
-    queryKey: ['shots', projectId],
+    queryKey: ['shots', projectId, maxImagesPerShot], // Include maxImagesPerShot in cache key
     queryFn: async () => {
       if (!projectId) {
         return [];
@@ -237,9 +239,9 @@ export const useListShots = (projectId?: string | null) => {
         return [];
       }
       
-      // Get only the first 5 images per shot for thumbnail display
+      // Get images per shot based on maxImagesPerShot parameter
       const shotPromises = shots.map(async (shot) => {
-        const { data: shotGenerations, error: sgError } = await supabase
+        let query = supabase
           .from('shot_generations')
           .select(`
             id,
@@ -253,8 +255,14 @@ export const useListShots = (projectId?: string | null) => {
           `)
           .eq('shot_id', shot.id)
           .order('position', { ascending: true, nullsFirst: false })
-          .order('created_at', { ascending: false })
-          .limit(5); // Actually limit to 5 thumbnails for performance
+          .order('created_at', { ascending: false });
+        
+        // Only apply limit if specified (allows unlimited when needed)
+        if (maxImagesPerShot > 0) {
+          query = query.limit(maxImagesPerShot);
+        }
+        
+        const { data: shotGenerations, error: sgError } = await query;
         
         if (sgError) {
           throw sgError;

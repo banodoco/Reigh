@@ -18,7 +18,7 @@ interface ShotsProviderProps {
 
 export const ShotsProvider: React.FC<ShotsProviderProps> = ({ children }) => {
   const { selectedProjectId } = useProject();
-  const { data: shots, isLoading, error, refetch } = useListShots(selectedProjectId);
+  const { data: shots, isLoading, error, refetch } = useListShots(selectedProjectId); // Default to unlimited images
 
   const value: ShotsContextType = {
     shots,

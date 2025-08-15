@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { SteerableMotionSettings, DEFAULT_STEERABLE_MOTION_SETTINGS } from '../components/ShotEditor/state/types';
 import { useCreateShot, useHandleExternalImageDrop, useUpdateShotName } from '@/shared/hooks/useShots';
 import { useShots } from '@/shared/contexts/ShotsContext';
+import { useListShots } from '@/shared/hooks/useShots';
 import { Shot } from '@/types/shots';
 import { Button } from '@/shared/components/ui/button';
 import { useProject } from "@/shared/contexts/ProjectContext";
@@ -26,11 +27,15 @@ import { timeEnd } from '@/shared/lib/logger';
 import { useShotNavigation } from '@/shared/hooks/useShotNavigation';
 // import { useLastAffectedShot } from '@/shared/hooks/useLastAffectedShot';
 import ShotEditor from '../components/ShotEditor';
+import { useAllShotGenerations } from '@/shared/hooks/useShotGenerations';
 
 // Custom hook to parallelize data fetching for better performance
 const useVideoTravelData = (selectedShotId?: string, projectId?: string) => {
-  // Get shots data from context (single source of truth)
+  // Get shots data from context (single source of truth) - full data for ShotEditor
   const { shots, isLoading: shotsLoading, error: shotsError, refetchShots } = useShots();
+  
+  // Get limited shots for main list view (5 images max for performance)
+  const { data: limitedShots, isLoading: limitedShotsLoading } = useListShots(projectId, { maxImagesPerShot: 5 });
   
   // Fetch public LoRAs data
   const publicLorasQuery = useListPublicResources('lora');
@@ -58,8 +63,9 @@ const useVideoTravelData = (selectedShotId?: string, projectId?: string) => {
 
   return {
     // Shots data
-    shots,
-    shotsLoading,
+    shots, // Full shots data for ShotEditor
+    limitedShots, // Limited shots for main list view
+    shotsLoading: shotsLoading || limitedShotsLoading,
     shotsError,
     refetchShots,
     
@@ -99,6 +105,7 @@ const VideoTravelToolPage: React.FC = () => {
   // Use parallelized data fetching for better performance
   const {
     shots,
+    limitedShots,
     shotsLoading: isLoading,
     shotsError: error,
     refetchShots,
@@ -458,10 +465,20 @@ const VideoTravelToolPage: React.FC = () => {
     }
   }, [shots, selectedShot, selectedProjectId, isLoading, setCurrentShotId]);
 
-  // Memoize video pair configs calculation
+  // Get full image data when editing a shot to avoid thumbnail limitation
+  const contextImages = selectedShot?.images || [];
+  const needsFullImageData = contextImages.length === 5 || shouldShowShotEditor; // Load full data when editing OR hit thumbnail limit
+  const { data: fullShotImages = [] } = useAllShotGenerations(
+    needsFullImageData ? selectedShot?.id : null
+  );
+  
+  // Use full images if available, otherwise fall back to context images
+  const shotImagesForCalculation = fullShotImages.length > 0 ? fullShotImages : contextImages;
+
+  // Memoize video pair configs calculation using full image data
   const computedVideoPairConfigs = useMemo(() => {
-    if (selectedShot?.images && selectedShot.images.length >= 2) {
-      const nonVideoImages = selectedShot.images.filter(img => !img.type?.includes('video'));
+    if (shotImagesForCalculation && shotImagesForCalculation.length >= 2) {
+      const nonVideoImages = shotImagesForCalculation.filter(img => !img.type?.includes('video'));
       if (nonVideoImages.length >= 2) {
         const pairs = [];
         for (let i = 0; i < nonVideoImages.length - 1; i++) {
@@ -478,7 +495,7 @@ const VideoTravelToolPage: React.FC = () => {
       }
     }
     return [];
-  }, [selectedShot?.images]);
+  }, [shotImagesForCalculation]);
 
   // Update videoPairConfigs when computed configs change
   useEffect(() => {
@@ -807,7 +824,7 @@ const VideoTravelToolPage: React.FC = () => {
       {!shouldShowShotEditor ? (
         <>
           <ShotListDisplay
-            shots={shots || []}
+            shots={limitedShots || []}
             onSelectShot={handleShotSelect}
             currentProjectId={selectedProjectId}
             onCreateNewShot={() => setIsCreateShotModalOpen(true)}
