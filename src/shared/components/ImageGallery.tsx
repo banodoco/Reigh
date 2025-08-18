@@ -836,6 +836,14 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   // Use the correct page number for both server and client pagination
   const effectivePage = isServerPagination ? (serverPage || 1) - 1 : page;
   
+  console.log(`[ImageLoadingDebug][Gallery] Page calculation:`, {
+    isServerPagination,
+    serverPage,
+    clientPage: page,
+    effectivePage,
+    paginatedImagesLength: paginatedImages.length
+  });
+  
   const { showImageIndices } = useProgressiveImageLoading({
     images: paginatedImages,
     page: effectivePage,
@@ -1143,6 +1151,16 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                   const shouldShow = showImageIndices.has(index);
                   // Use unified priority system
                   const isPriority = isImagePriority(index, isMobile);
+                  
+                  // Debug logging for first few images
+                  if (index < 5) {
+                    console.log(`[ImageLoadingDebug][Gallery] Image ${index}:`, {
+                      imageId: image.id,
+                      shouldShow,
+                      showImageIndicesArray: Array.from(showImageIndices),
+                      showImageIndicesSize: showImageIndices.size
+                    });
+                  }
                   
                   return (
                     <ImageGalleryItem
