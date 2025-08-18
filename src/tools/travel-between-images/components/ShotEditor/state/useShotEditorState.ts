@@ -17,6 +17,7 @@ const createInitialState = (): ShotEditorState => ({
   settingsError: null,
   isEditingName: false,
   editingName: '',
+  isTransitioningFromNameEdit: false,
   showStepsNotification: false,
   hasInitializedShot: null,
   hasInitializedUISettings: null,
@@ -70,6 +71,9 @@ const shotEditorReducer = (state: ShotEditorState, action: ShotEditorAction): Sh
     case 'SET_EDITING_NAME_VALUE':
       if (action.payload === state.editingName) return state;
       return { ...state, editingName: action.payload };
+    case 'SET_TRANSITIONING_FROM_NAME_EDIT':
+      if (action.payload === state.isTransitioningFromNameEdit) return state;
+      return { ...state, isTransitioningFromNameEdit: action.payload };
     case 'SET_SHOW_STEPS_NOTIFICATION':
       if (action.payload === state.showStepsNotification) return state;
       return { ...state, showStepsNotification: action.payload };
@@ -140,6 +144,10 @@ export const useShotEditorState = () => {
 
     setEditingNameValue: useCallback((value: string) => {
       dispatch({ type: 'SET_EDITING_NAME_VALUE', payload: value });
+    }, []),
+
+    setTransitioningFromNameEdit: useCallback((value: boolean) => {
+      dispatch({ type: 'SET_TRANSITIONING_FROM_NAME_EDIT', payload: value });
     }, []),
 
     setShowStepsNotification: useCallback((value: boolean) => {

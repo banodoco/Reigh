@@ -424,9 +424,27 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     actions.setEditingName(false);
   };
 
-  const handleNameCancel = () => {
+  const handleNameCancel = (e?: React.MouseEvent) => {
+    // Prevent event propagation to avoid clicking elements that appear after layout change
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    
     actions.setEditingNameValue(selectedShot?.name || '');
-    actions.setEditingName(false);
+    
+    // Set transition flag to temporarily disable navigation buttons
+    actions.setTransitioningFromNameEdit(true);
+    
+    // Add a small delay before hiding the editing mode to prevent click-through
+    // to elements that appear in the same position
+    setTimeout(() => {
+      actions.setEditingName(false);
+      // Clear transition flag after a slightly longer delay to ensure UI has settled
+      setTimeout(() => {
+        actions.setTransitioningFromNameEdit(false);
+      }, 200);
+    }, 100);
   };
 
   const handleNameKeyDown = (e: React.KeyboardEvent) => {
@@ -897,6 +915,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         selectedShot={selectedShot}
         isEditingName={state.isEditingName}
         editingName={state.editingName}
+        isTransitioningFromNameEdit={state.isTransitioningFromNameEdit}
         onBack={onBack}
         onUpdateShotName={onUpdateShotName}
         onPreviousShot={onPreviousShot}

@@ -8,6 +8,7 @@ interface HeaderProps {
   selectedShot: Shot;
   isEditingName: boolean;
   editingName: string;
+  isTransitioningFromNameEdit?: boolean;
   onBack: () => void;
   onUpdateShotName?: (newName: string) => void;
   onPreviousShot?: () => void;
@@ -16,7 +17,7 @@ interface HeaderProps {
   hasNext?: boolean;
   onNameClick: () => void;
   onNameSave: () => void;
-  onNameCancel: () => void;
+  onNameCancel: (e?: React.MouseEvent) => void;
   onNameKeyDown: (e: React.KeyboardEvent) => void;
   onEditingNameChange: (value: string) => void;
 }
@@ -25,6 +26,7 @@ export const Header: React.FC<HeaderProps> = ({
   selectedShot,
   isEditingName,
   editingName,
+  isTransitioningFromNameEdit = false,
   onBack,
   onUpdateShotName,
   onPreviousShot,
@@ -61,7 +63,12 @@ export const Header: React.FC<HeaderProps> = ({
               <Button size="sm" variant="outline" onClick={onNameSave}>
                 Save
               </Button>
-              <Button size="sm" variant="ghost" onClick={onNameCancel}>
+              <Button 
+                size="sm" 
+                variant="ghost" 
+                onClick={(e) => onNameCancel(e)}
+                onMouseDown={(e) => e.preventDefault()}
+              >
                 Cancel
               </Button>
             </div>
@@ -72,7 +79,7 @@ export const Header: React.FC<HeaderProps> = ({
                 variant="outline" 
                 size="sm" 
                 onClick={onPreviousShot}
-                disabled={!hasPrevious}
+                disabled={!hasPrevious || isTransitioningFromNameEdit}
                 className="flex-shrink-0"
                 title="Previous shot"
               >
@@ -91,7 +98,7 @@ export const Header: React.FC<HeaderProps> = ({
                 variant="outline" 
                 size="sm" 
                 onClick={onNextShot}
-                disabled={!hasNext}
+                disabled={!hasNext || isTransitioningFromNameEdit}
                 className="flex-shrink-0"
                 title="Next shot"
               >
@@ -120,7 +127,12 @@ export const Header: React.FC<HeaderProps> = ({
               <Button size="sm" variant="outline" onClick={onNameSave}>
                 Save
               </Button>
-              <Button size="sm" variant="ghost" onClick={onNameCancel}>
+              <Button 
+                size="sm" 
+                variant="ghost" 
+                onClick={(e) => onNameCancel(e)}
+                onMouseDown={(e) => e.preventDefault()}
+              >
                 Cancel
               </Button>
             </div>
@@ -131,7 +143,7 @@ export const Header: React.FC<HeaderProps> = ({
                 variant="outline" 
                 size="sm" 
                 onClick={onPreviousShot}
-                disabled={!hasPrevious}
+                disabled={!hasPrevious || isTransitioningFromNameEdit}
                 className="flex-shrink-0"
                 title="Previous shot"
               >
@@ -150,7 +162,7 @@ export const Header: React.FC<HeaderProps> = ({
                 variant="outline" 
                 size="sm" 
                 onClick={onNextShot}
-                disabled={!hasNext}
+                disabled={!hasNext || isTransitioningFromNameEdit}
                 className="flex-shrink-0"
                 title="Next shot"
               >

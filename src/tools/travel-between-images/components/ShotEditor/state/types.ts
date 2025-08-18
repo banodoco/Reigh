@@ -153,6 +153,7 @@ export interface ShotEditorState {
   // Shot name editing
   isEditingName: boolean;
   editingName: string;
+  isTransitioningFromNameEdit: boolean;
   
   // Settings state
   showStepsNotification: boolean;
@@ -175,6 +176,7 @@ export type ShotEditorAction =
   | { type: 'SET_SETTINGS_ERROR'; payload: string | null }
   | { type: 'SET_EDITING_NAME'; payload: boolean }
   | { type: 'SET_EDITING_NAME_VALUE'; payload: string }
+  | { type: 'SET_TRANSITIONING_FROM_NAME_EDIT'; payload: boolean }
   | { type: 'SET_SHOW_STEPS_NOTIFICATION'; payload: boolean }
   | { type: 'SET_HAS_INITIALIZED_SHOT'; payload: string | null }
   | { type: 'SET_HAS_INITIALIZED_UI_SETTINGS'; payload: string | null };
