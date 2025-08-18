@@ -41,6 +41,10 @@ interface HoverScrubVideoProps extends Omit<React.HTMLAttributes<HTMLDivElement>
   showSpeedControls?: boolean;
   showNativeControls?: boolean;
   speedControlsPosition?: 'top-left' | 'bottom-center';
+  /**
+   * Disable scrubbing behavior for lightbox/fullscreen usage (defaults to false).
+   */
+  disableScrubbing?: boolean;
 }
 
 /**
@@ -59,6 +63,7 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
   showSpeedControls = false,
   showNativeControls = false,
   speedControlsPosition = 'top-left',
+  disableScrubbing = false,
   ...rest
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -76,22 +81,26 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
   React.useEffect(() => {
     console.log('[MobileVideoAutoplay] Mobile detection result:', {
       isMobile,
+      disableScrubbing,
       userAgent: navigator.userAgent,
       src,
       poster,
       isEmulatedMobile: /Chrome/.test(navigator.userAgent) && isMobile, // Detect Chrome mobile emulation
+      isLightboxMode: disableScrubbing,
       timestamp: Date.now()
     });
-  }, [isMobile, src, poster]);
+  }, [isMobile, src, poster, disableScrubbing]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    // Skip mouse interactions on mobile devices
-    if (isMobile) {
-      console.log('[MobileVideoAutoplay] Mouse move detected on mobile (should be ignored)', {
-        src,
-        timestamp: Date.now(),
-        eventType: e.type
-      });
+    // Skip mouse interactions on mobile devices or when scrubbing is disabled
+    if (isMobile || disableScrubbing) {
+      if (isMobile) {
+        console.log('[MobileVideoAutoplay] Mouse move detected on mobile (should be ignored)', {
+          src,
+          timestamp: Date.now(),
+          eventType: e.type
+        });
+      }
       return;
     }
     if (!videoRef.current || !containerRef.current || duration === 0) return;
@@ -125,15 +134,17 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
         });
       }
     }, 150); // Start playing 150ms after mouse stops moving
-  }, [duration, isMobile]);
+  }, [duration, isMobile, disableScrubbing]);
 
   const handleMouseEnter = useCallback(() => {
-    // Skip hover interactions on mobile devices
-    if (isMobile) {
-      console.log('[MobileVideoAutoplay] Mouse enter detected on mobile (should be ignored)', {
-        src,
-        timestamp: Date.now()
-      });
+    // Skip hover interactions on mobile devices or when scrubbing is disabled
+    if (isMobile || disableScrubbing) {
+      if (isMobile) {
+        console.log('[MobileVideoAutoplay] Mouse enter detected on mobile (should be ignored)', {
+          src,
+          timestamp: Date.now()
+        });
+      }
       return;
     }
     
@@ -142,15 +153,17 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
       // Don't start playing immediately, wait for mouse movement or timeout
       videoRef.current.pause();
     }
-  }, [isMobile]);
+  }, [isMobile, disableScrubbing]);
 
   const handleMouseLeave = useCallback(() => {
-    // Skip hover interactions on mobile devices
-    if (isMobile) {
-      console.log('[MobileVideoAutoplay] Mouse leave detected on mobile (should be ignored)', {
-        src,
-        timestamp: Date.now()
-      });
+    // Skip hover interactions on mobile devices or when scrubbing is disabled
+    if (isMobile || disableScrubbing) {
+      if (isMobile) {
+        console.log('[MobileVideoAutoplay] Mouse leave detected on mobile (should be ignored)', {
+          src,
+          timestamp: Date.now()
+        });
+      }
       return;
     }
     
@@ -165,7 +178,7 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
       videoRef.current.pause();
       videoRef.current.currentTime = 0; // Reset to beginning
     }
-  }, [isMobile]);
+  }, [isMobile, disableScrubbing]);
 
   const handleSpeedChange = (speed: number) => {
     if (videoRef.current) {
@@ -197,18 +210,26 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
         videoRef.current.pause();
       }
       
-      // Set to first frame to show as poster (safer approach for both mobile and desktop)
-      if (videoRef.current.currentTime === 0) {
+      // Set to first frame to show as poster - but only for gallery thumbnails, not lightbox
+      if (!disableScrubbing && videoRef.current.currentTime === 0) {
         // Very small seek to ensure first frame is visible
         videoRef.current.currentTime = 0.001;
         console.log('[MobileVideoAutoplay] Set currentTime to show first frame', {
           isMobile,
+          disableScrubbing,
           newCurrentTime: videoRef.current.currentTime,
+          timestamp: Date.now()
+        });
+      } else if (disableScrubbing) {
+        console.log('[MobileVideoAutoplay] Skipping currentTime manipulation in lightbox mode', {
+          isMobile,
+          disableScrubbing,
+          currentTime: videoRef.current.currentTime,
           timestamp: Date.now()
         });
       }
     }
-  }, [isMobile]);
+  }, [isMobile, disableScrubbing]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -224,7 +245,10 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
 
     // Ensure the video starts paused
     video.pause();
-    video.currentTime = 0;
+    if (!disableScrubbing) {
+      // Only reset currentTime for gallery thumbnails, not lightbox
+      video.currentTime = 0;
+    }
     setDuration(0);
 
     // Add event listeners to track unexpected play events
@@ -292,11 +316,12 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
         mouseMoveTimeoutRef.current = null;
       }
     };
-  }, [src, isMobile]);
+  }, [src, isMobile, disableScrubbing]);
 
   // Additional mobile protection - use Intersection Observer to detect when video becomes visible
+  // Only for gallery thumbnails, not lightbox
   useEffect(() => {
-    if (!isMobile || !videoRef.current) return;
+    if (!isMobile || !videoRef.current || disableScrubbing) return;
 
     const video = videoRef.current;
     
@@ -304,16 +329,18 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
-            console.log('[MobileVideoAutoplay] Video became visible on mobile', {
+            console.log('[MobileVideoAutoplay] Video thumbnail became visible on mobile', {
               src: video.src,
               videoPaused: video.paused,
+              disableScrubbing,
               timestamp: Date.now()
             });
             
-            // Ensure video is paused when it comes into view on mobile
+            // Ensure video thumbnail is paused when it comes into view on mobile
             if (!video.paused) {
-              console.warn('[MobileVideoAutoplay] Video was playing when it became visible, pausing it', {
+              console.warn('[MobileVideoAutoplay] Video thumbnail was playing when it became visible, pausing it', {
                 src: video.src,
+                disableScrubbing,
                 timestamp: Date.now()
               });
               video.pause();
@@ -329,17 +356,18 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
     return () => {
       observer.disconnect();
     };
-  }, [isMobile, src]);
+  }, [isMobile, src, disableScrubbing]);
 
-  // Periodic mobile check to catch any unexpected play states
+  // Periodic mobile check to catch any unexpected play states - but only for gallery thumbnails
   useEffect(() => {
-    if (!isMobile) return;
+    if (!isMobile || disableScrubbing) return;
 
     const intervalId = setInterval(() => {
       if (videoRef.current && !videoRef.current.paused) {
-        console.warn('[MobileVideoAutoplay] Periodic check found video playing on mobile, pausing it', {
+        console.warn('[MobileVideoAutoplay] Periodic check found video playing on mobile thumbnail, pausing it', {
           src: videoRef.current.src,
           currentTime: videoRef.current.currentTime,
+          disableScrubbing,
           timestamp: Date.now()
         });
         videoRef.current.pause();
@@ -349,15 +377,15 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
     return () => {
       clearInterval(intervalId);
     };
-  }, [isMobile, src]);
+  }, [isMobile, src, disableScrubbing]);
 
   return (
     <div
       ref={containerRef}
       className={cn('relative group', className)}
-      onMouseEnter={isMobile ? undefined : handleMouseEnter}
-      onMouseLeave={isMobile ? undefined : handleMouseLeave}
-      onMouseMove={isMobile ? undefined : handleMouseMove}
+      onMouseEnter={isMobile || disableScrubbing ? undefined : handleMouseEnter}
+      onMouseLeave={isMobile || disableScrubbing ? undefined : handleMouseLeave}
+      onMouseMove={isMobile || disableScrubbing ? undefined : handleMouseMove}
       {...rest}
     >
       <video
@@ -467,8 +495,8 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
         Your browser does not support the video tag.
       </video>
 
-      {/* Scrubber Line - Desktop only */}
-      {!isMobile && scrubberPosition !== null && (
+      {/* Scrubber Line - Desktop only and when scrubbing is enabled */}
+      {!isMobile && !disableScrubbing && scrubberPosition !== null && (
         <div 
           className={cn(
             "absolute top-0 bottom-0 w-0.5 bg-white shadow-lg z-30 pointer-events-none transition-opacity duration-300",
@@ -489,7 +517,7 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
       )}
 
       {/* Speed controls overlay - Desktop only */}
-      {!isMobile && showSpeedControls && (
+      {!isMobile && !disableScrubbing && showSpeedControls && (
         <div 
           className={cn(
             'absolute flex items-center space-x-1 opacity-0 group-hover:opacity-100 group-touch:opacity-100 transition-opacity bg-black/60 rounded-md px-2 py-1 backdrop-blur-sm z-20',

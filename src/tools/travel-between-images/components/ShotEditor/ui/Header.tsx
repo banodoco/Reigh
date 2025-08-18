@@ -43,9 +43,11 @@ export const Header: React.FC<HeaderProps> = ({
     <div className="flex-shrink-0 space-y-3">
       <div className="flex flex-wrap justify-between items-center gap-y-2 px-2">
         <Button onPointerUp={onBack}>&larr; Back to Shot List</Button>
-        <div className="hidden sm:flex items-center space-x-2 min-w-0 flex-1 justify-center px-4">
-          <span className="hidden sm:inline text-2xl font-bold">Editing Shot:</span>
+        
+        {/* Desktop shot name with navigation buttons around it */}
+        <div className="hidden sm:flex items-center justify-end min-w-0 flex-1 px-4">
           {isEditingName ? (
+            // Hide navigation buttons when editing - only show name editing controls
             <div className="flex items-center space-x-2">
               <Input
                 value={editingName}
@@ -64,43 +66,47 @@ export const Header: React.FC<HeaderProps> = ({
               </Button>
             </div>
           ) : (
-            <span 
-              className={`text-2xl font-bold text-primary truncate ${onUpdateShotName ? 'cursor-pointer hover:underline' : ''}`}
-              onClick={onNameClick}
-              title={onUpdateShotName ? "Click to edit shot name" : undefined}
-            >
-              {selectedShot?.name || 'Untitled Shot'}
-            </span>
-          )}
-        </div>
-        <div className="flex flex-row items-center space-x-2">
-          {(hasPrevious || hasNext) && (
-            <>
+            // Show navigation buttons tightly around the shot name
+            <div className="flex items-center space-x-1">
               <Button 
                 variant="outline" 
                 size="sm" 
                 onClick={onPreviousShot}
                 disabled={!hasPrevious}
+                className="flex-shrink-0"
+                title="Previous shot"
               >
-                Previous
+                ←
               </Button>
+              
+              <span 
+                className={`text-2xl font-bold text-primary truncate px-3 ${onUpdateShotName ? 'cursor-pointer hover:underline' : ''}`}
+                onClick={onNameClick}
+                title={onUpdateShotName ? "Click to edit shot name" : undefined}
+              >
+                {selectedShot?.name || 'Untitled Shot'}
+              </span>
+              
               <Button 
                 variant="outline" 
                 size="sm" 
                 onClick={onNextShot}
                 disabled={!hasNext}
+                className="flex-shrink-0"
+                title="Next shot"
               >
-                Next
+                →
               </Button>
-            </>
+            </div>
           )}
         </div>
       </div>
       
-      {/* Mobile shot name display */}
+      {/* Mobile shot name display with navigation buttons */}
       {isMobile && (
         <div className="px-2 sm:hidden mt-1">
           {isEditingName ? (
+            // Hide navigation buttons when editing on mobile too
             <div className="flex items-center space-x-2">
               <Input
                 value={editingName}
@@ -119,13 +125,38 @@ export const Header: React.FC<HeaderProps> = ({
               </Button>
             </div>
           ) : (
-            <span 
-              className={`text-xl font-bold text-primary block truncate ${onUpdateShotName ? 'cursor-pointer hover:underline' : ''}`}
-              onClick={onNameClick}
-              title={onUpdateShotName ? "Click to edit shot name" : undefined}
-            >
-              {selectedShot?.name || 'Untitled Shot'}
-            </span>
+            // Show navigation buttons tightly around the shot name on mobile
+            <div className="flex items-center space-x-1">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={onPreviousShot}
+                disabled={!hasPrevious}
+                className="flex-shrink-0"
+                title="Previous shot"
+              >
+                ←
+              </Button>
+              
+              <span 
+                className={`text-xl font-bold text-primary truncate flex-1 text-center px-2 ${onUpdateShotName ? 'cursor-pointer hover:underline' : ''}`}
+                onClick={onNameClick}
+                title={onUpdateShotName ? "Click to edit shot name" : undefined}
+              >
+                {selectedShot?.name || 'Untitled Shot'}
+              </span>
+              
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={onNextShot}
+                disabled={!hasNext}
+                className="flex-shrink-0"
+                title="Next shot"
+              >
+                →
+              </Button>
+            </div>
           )}
         </div>
       )}

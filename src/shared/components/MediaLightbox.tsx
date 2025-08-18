@@ -417,6 +417,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           poster={media.thumbUrl}
                           className="object-contain"
                           style={{ maxWidth: '55vw', maxHeight: '90vh' }}
+                          disableScrubbing={true}
                         />
                       )
                     ) : (
@@ -704,6 +705,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           src={displayUrl}
                           poster={media.thumbUrl}
                           className="max-w-full max-h-full object-contain"
+                          disableScrubbing={true}
                         />
                       )
                     ) : (
@@ -871,6 +873,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       poster={media.thumbUrl}
                       className="h-auto max-h-[85vh] sm:max-h-[85vh] object-contain w-[95vw] sm:w-auto"
                       style={{ maxWidth: '95vw' }}
+                      disableScrubbing={true}
                     />
                   )
                 ) : (
