@@ -16,6 +16,7 @@ export async function fetchGenerations(
     shotId?: string;
     excludePositioned?: boolean;
     starredOnly?: boolean;
+    searchTerm?: string;
   }
 ): Promise<{
   items: GeneratedImageWithMetadata[];
@@ -52,6 +53,13 @@ export async function fetchGenerations(
   // Apply starred filter if provided
   if (filters?.starredOnly) {
     countQuery = countQuery.eq('starred', true);
+  }
+
+  // Apply search filter to count query
+  if (filters?.searchTerm?.trim()) {
+    // Search in the main prompt location first (most common)
+    const searchPattern = `%${filters.searchTerm.trim()}%`;
+    countQuery = countQuery.ilike('params->originalParams->orchestrator_details->>prompt', searchPattern);
   }
 
   // Apply shot filter if provided
@@ -117,6 +125,13 @@ export async function fetchGenerations(
   // Apply starred filter to data query
   if (filters?.starredOnly) {
     dataQuery = dataQuery.eq('starred', true);
+  }
+
+  // Apply search filter to data query
+  if (filters?.searchTerm?.trim()) {
+    // Search in the main prompt location first (most common)
+    const searchPattern = `%${filters.searchTerm.trim()}%`;
+    dataQuery = dataQuery.ilike('params->originalParams->orchestrator_details->>prompt', searchPattern);
   }
 
   // Apply shot filter to data query
@@ -301,6 +316,7 @@ export function useGenerations(
     shotId?: string;
     excludePositioned?: boolean;
     starredOnly?: boolean;
+    searchTerm?: string;
   }
 ) {
   const offset = (page - 1) * limit;

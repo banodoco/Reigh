@@ -700,8 +700,11 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
       currentFiltered = currentFiltered.filter(image => image.starred === true);
     }
 
-    // 4. Apply search filter (always apply, even in server pagination mode)
-    if (searchTerm.trim()) {
+    // 4. Search is now handled server-side for server pagination mode
+    // For server pagination, search filtering is done in the SQL query
+    // For client pagination, we still apply it here as a fallback
+    const isServerPagination = !!(onServerPageChange && serverPage);
+    if (!isServerPagination && searchTerm.trim()) {
       currentFiltered = currentFiltered.filter(image => {
         const prompt = image.prompt || 
                       image.metadata?.prompt || 
@@ -712,7 +715,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     }
         
     return currentFiltered;
-  }, [images, filterByToolType, currentToolType, mediaTypeFilter, searchTerm, showStarredOnly]);
+  }, [images, filterByToolType, currentToolType, mediaTypeFilter, searchTerm, showStarredOnly, onServerPageChange, serverPage]);
 
   // Determine if we should show the shot mismatch notifier
   const shouldShowShotNotifier = React.useMemo(() => {
@@ -1206,7 +1209,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                         console.log(`[GalleryDebug] 🖼️ Image ${index} render:`, {
                           imageId: image.id?.substring(0, 8),
                           shouldShow,
-                          tier: loadingStrategy.tier,
+                          batchGroup: loadingStrategy.batchGroup,
                           shouldLoadInInitialBatch: loadingStrategy.shouldLoadInInitialBatch,
                           showImageIndicesSize: showImageIndices.size,
                           showImageIndicesArray: Array.from(showImageIndices).slice(0, 10),

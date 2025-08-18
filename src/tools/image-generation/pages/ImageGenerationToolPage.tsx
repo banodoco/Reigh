@@ -146,7 +146,8 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     mediaType: mediaTypeFilter, // Use dynamic mediaType instead of hardcoded 'image'
     shotId: selectedShotFilter === 'all' ? undefined : selectedShotFilter,
     excludePositioned: selectedShotFilter !== 'all' ? excludePositioned : undefined,
-    starredOnly
+    starredOnly,
+    searchTerm: searchTerm.trim() || undefined // Only pass if not empty
   };
   
   // Debug logging removed for performance
@@ -180,6 +181,12 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     setIsFilterChange(true);
     setCurrentPage(1);
   }, []);
+
+  // Reset to page 1 when search term changes
+  useEffect(() => {
+    setIsFilterChange(true);
+    setCurrentPage(1);
+  }, [searchTerm]);
 
   // Update last known total when we get valid data
   useEffect(() => {
