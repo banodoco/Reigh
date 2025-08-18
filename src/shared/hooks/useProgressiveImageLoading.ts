@@ -1,3 +1,15 @@
+/**
+ * CRITICAL RACE CONDITION FIXES IMPLEMENTED:
+ * 
+ * 1. Session Management: Each loading session has a unique ID and AbortController
+ * 2. Proper Cancellation: All timeouts and operations are properly canceled when superseded
+ * 3. Reconciliation Tracking: Uses reconciliation IDs to prevent stale state updates
+ * 4. Safe State Updates: All setState calls check if the session is still active
+ * 5. Memory Leak Prevention: Comprehensive cleanup on unmount and session changes
+ * 
+ * This addresses the mobile stalling issues caused by competing progressive loading sessions.
+ */
+
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { isImageCached } from '@/shared/lib/imageCacheManager';
 import { getUnifiedBatchConfig, getImageLoadingStrategy } from '@/shared/lib/imageLoadingPriority';
@@ -18,6 +30,15 @@ interface UseProgressiveImageLoadingProps {
   useIntersectionObserver?: boolean; // Optional: use intersection observer for lazy loading
 }
 
+// Session management for proper cleanup and race condition prevention
+interface LoadingSession {
+  id: string;
+  abortController: AbortController;
+  timeouts: (NodeJS.Timeout | number)[];
+  isActive: boolean;
+  startTime: number;
+}
+
 export const useProgressiveImageLoading = ({ 
   images, 
   page, 
@@ -29,7 +50,8 @@ export const useProgressiveImageLoading = ({
   const [showImageIndices, setShowImageIndices] = useState<Set<number>>(new Set());
   const currentPageRef = useRef(page);
   const lastTriggerTimeRef = useRef<number>(0);
-  // REMOVED: Don't update ref here - it breaks page change detection
+  const activeSessionRef = useRef<LoadingSession | null>(null);
+  const reconciliationIdRef = useRef<number>(0);
   
   // Create a stable identifier for the image set to detect changes
   // This prevents the bug where server pagination with same-length pages wouldn't trigger
@@ -38,6 +60,23 @@ export const useProgressiveImageLoading = ({
     return images.slice(0, 3).map(img => img?.id).join(',');
   }, [images]);
   
+  // Helper function to safely cancel a loading session
+  const cancelActiveSession = (reason: string) => {
+    if (activeSessionRef.current?.isActive) {
+      console.log(`🧹 [PAGELOADINGDEBUG] [PROG:${activeSessionRef.current.id}] Canceling session: ${reason}`);
+      
+      // Abort any ongoing operations
+      activeSessionRef.current.abortController.abort();
+      
+      // Clear all timeouts
+      activeSessionRef.current.timeouts.forEach(timeout => clearTimeout(timeout));
+      
+      // Mark as inactive
+      activeSessionRef.current.isActive = false;
+      activeSessionRef.current = null;
+    }
+  };
+
   useEffect(() => {
     const now = Date.now();
     const timeSinceLastTrigger = now - lastTriggerTimeRef.current;
@@ -50,6 +89,7 @@ export const useProgressiveImageLoading = ({
         imagesLength: images.length,
         reason: !enabled ? 'disabled' : 'no images'
       });
+      cancelActiveSession('disabled or no images');
       return;
     }
     
@@ -61,17 +101,48 @@ export const useProgressiveImageLoading = ({
       return;
     }
 
+    // Cancel any previous session before starting new one
+    cancelActiveSession('new session starting');
+    
     lastTriggerTimeRef.current = now;
+    reconciliationIdRef.current += 1;
+    const currentReconciliationId = reconciliationIdRef.current;
 
-    // Generate unique session ID for this progressive loading session
+    // Create new loading session with proper cancellation support
     const sessionId = `prog-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    let isCurrentPage = true; // Track if this effect is still current
-    const timeouts: NodeJS.Timeout[] = [];
-
-    // Update current page ref for race condition checks
+    const abortController = new AbortController();
+    const timeouts: (NodeJS.Timeout | number)[] = [];
+    
+    const session: LoadingSession = {
+      id: sessionId,
+      abortController,
+      timeouts,
+      isActive: true,
+      startTime: now
+    };
+    
+    activeSessionRef.current = session;
     currentPageRef.current = page;
     
     console.log(`🎬 [PAGELOADINGDEBUG] [PROG:${sessionId}] Starting progressive load: ${images.length} images (${isPageChange ? 'page change' : 'image set change'})`);
+
+    // Helper to check if this session is still active
+    const isSessionActive = () => {
+      return activeSessionRef.current?.id === sessionId && 
+             activeSessionRef.current?.isActive && 
+             !abortController.signal.aborted &&
+             currentReconciliationId === reconciliationIdRef.current;
+    };
+
+    // Helper to safely update state if session is still active
+    const safeSetShowImageIndices = (updater: (prev: Set<number>) => Set<number>) => {
+      if (isSessionActive()) {
+        setShowImageIndices(updater);
+        return true;
+      }
+      console.log(`❌ [PAGELOADINGDEBUG] [PROG:${sessionId}] State update skipped - session inactive`);
+      return false;
+    };
 
     // Get unified batch configuration
     const batchConfig = getUnifiedBatchConfig(isMobile);
@@ -90,10 +161,13 @@ export const useProgressiveImageLoading = ({
       
     console.log(`📦 [PAGELOADINGDEBUG] [PROG:${sessionId}] Initial batch: ${actualInitialBatch} images (${cachedCount}/${actualInitialBatch} cached)`);
     
-    setShowImageIndices(initialIndices);
+    // Set initial batch immediately
+    if (!safeSetShowImageIndices(() => initialIndices)) {
+      return; // Session was canceled during setup
+    }
     
     // Notify that initial images are ready
-    if (onImagesReady) {
+    if (onImagesReady && isSessionActive()) {
       if (firstBatchCached) {
         // Immediate callback for cached images to prevent loading flicker
         console.log(`⚡ [PAGELOADINGDEBUG] [PROG:${sessionId}] Ready callback: IMMEDIATE (all cached)`);
@@ -102,20 +176,19 @@ export const useProgressiveImageLoading = ({
         // Small delay for non-cached images to avoid layout thrashing
         console.log(`⏱️ [PAGELOADINGDEBUG] [PROG:${sessionId}] Ready callback: DELAYED 16ms (${actualInitialBatch - cachedCount} uncached)`);
         const readyTimeout = setTimeout(() => {
-          // Simplified check - just verify we're still on the current session
-          if (isCurrentPage) {
+          if (isSessionActive()) {
             console.log(`✅ [PAGELOADINGDEBUG] [PROG:${sessionId}] Ready callback executed`);
             onImagesReady();
           } else {
-            console.log(`❌ [PAGELOADINGDEBUG] [PROG:${sessionId}] Ready callback cancelled (stale session)`);
+            console.log(`❌ [PAGELOADINGDEBUG] [PROG:${sessionId}] Ready callback cancelled (session inactive)`);
           }
         }, 16); // Next frame timing for smoother transitions
         timeouts.push(readyTimeout);
       }
     }
 
-    // Phase 2: Optimized staggered loading using single interval instead of multiple timeouts
-    if (images.length > actualInitialBatch) {
+    // Phase 2: Optimized staggered loading with cancellation support
+    if (images.length > actualInitialBatch && isSessionActive()) {
       const remainingImages = images.length - actualInitialBatch;
       console.log(`🔄 [PAGELOADINGDEBUG] [PROG:${sessionId}] Staggered load: ${remainingImages} remaining images (${batchConfig.staggerDelay}ms intervals)`);
       
@@ -140,10 +213,13 @@ export const useProgressiveImageLoading = ({
       let scheduleIndex = 0;
       const startTime = Date.now();
       
-      // Single interval to process the reveal schedule
+      // Single interval to process the reveal schedule with cancellation support
       const revealInterval = setInterval(() => {
-        if (!isCurrentPage || scheduleIndex >= revealSchedule.length) {
+        if (!isSessionActive() || scheduleIndex >= revealSchedule.length) {
           clearInterval(revealInterval);
+          if (scheduleIndex >= revealSchedule.length) {
+            console.log(`✅ [PAGELOADINGDEBUG] [PROG:${sessionId}] Staggered loading complete`);
+          }
           return;
         }
         
@@ -151,7 +227,7 @@ export const useProgressiveImageLoading = ({
         const currentItem = revealSchedule[scheduleIndex];
         
         if (currentTime >= currentItem.delay) {
-          setShowImageIndices(prev => {
+          const updated = safeSetShowImageIndices(prev => {
             if (!prev.has(currentItem.index)) {
               const newSet = new Set(prev);
               newSet.add(currentItem.index);
@@ -164,23 +240,28 @@ export const useProgressiveImageLoading = ({
             return prev;
           });
           
-          scheduleIndex++;
+          if (updated) {
+            scheduleIndex++;
+          } else {
+            // Session was canceled, stop the interval
+            clearInterval(revealInterval);
+          }
         }
       }, 16); // Check every frame (16ms)
       
-      timeouts.push(revealInterval as any); // Store for cleanup
-    } else {
+      timeouts.push(revealInterval);
+    } else if (isSessionActive()) {
       console.log(`✅ [PAGELOADINGDEBUG] [PROG:${sessionId}] Complete - all images in initial batch`);
     }
     
     // Cleanup function that runs when dependencies change or component unmounts
     return () => {
-      console.log(`🧹 [PAGELOADINGDEBUG] [PROG:${sessionId}] Cleanup - canceling ${timeouts.length} timers`);
-      isCurrentPage = false; // Mark this effect as stale
-      timeouts.forEach(timeout => clearTimeout(timeout));
-      // Don't clear showImageIndices here - let the new effect handle setting them
+      if (activeSessionRef.current?.id === sessionId) {
+        console.log(`🧹 [PAGELOADINGDEBUG] [PROG:${sessionId}] Cleanup - canceling ${timeouts.length} timers`);
+        cancelActiveSession('effect cleanup');
+      }
     };
-  }, [imageSetId, page, enabled, isMobile, useIntersectionObserver]);
+  }, [imageSetId, page, enabled, isMobile, useIntersectionObserver, onImagesReady]);
   
   // Debug: Track when images prop changes
   useEffect(() => {
@@ -191,6 +272,13 @@ export const useProgressiveImageLoading = ({
   useEffect(() => {
     console.log(`📄 [PAGELOADINGDEBUG] [PROG] Page prop changed: ${page}`);
   }, [page]);
+
+  // Cleanup on unmount - ensure all sessions are properly canceled
+  useEffect(() => {
+    return () => {
+      cancelActiveSession('component unmount');
+    };
+  }, []);
 
   return { showImageIndices };
 };

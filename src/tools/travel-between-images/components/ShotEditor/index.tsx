@@ -155,6 +155,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
   // Use the new modular state management
   const { state, actions } = useShotEditorState();
+  // Track previous and last-ready shot IDs to avoid flicker resets
+  const prevShotIdRef = useRef<string | null>(null);
+  const lastReadyShotIdRef = useRef<string | null>(null);
 
   // Use the LoRA sync hook
   const { loraManager, isShotLoraSettingsLoading, hasInitializedShot: loraInitialized } = useLoraSync({
@@ -187,7 +190,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     }
   };
 
-  // Detect if settings never finish loading (e.g., network hiccup on mobile)
+    // Enhanced settings loading timeout with mobile-specific recovery
   useEffect(() => {
     const anySettingsLoading = settingsLoading || isShotUISettingsLoading || isShotLoraSettingsLoading;
     
@@ -196,29 +199,104 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       actions.setSettingsError(null);
       return;
     }
-
+    
+    // Conservative timeouts to handle poor network conditions gracefully
+    // Only trigger recovery for genuinely stuck queries, not slow networks
+    const timeoutMs = isMobile ? 8000 : 6000;
+    
+    console.log(`[ShotEditor] Settings loading timeout started: ${timeoutMs}ms for shot ${selectedShot?.id}`, {
+      settingsLoading,
+      isShotUISettingsLoading,
+      isShotLoraSettingsLoading,
+      isMobile,
+      shotId: selectedShot?.id
+    });
+    
     // Give ALL settings queries a reasonable grace period before timing-out
     const fallbackTimer = setTimeout(() => {
-      console.warn('[ShotEditor] One or more settings failed to load within expected time. Falling back to defaults.', {
+      console.warn('[ShotEditor] SETTINGS TIMEOUT RECOVERY - One or more settings queries failed to complete within expected time. Forcing ready state to prevent infinite loading.', {
         settingsLoading,
         isShotUISettingsLoading,
-        isShotLoraSettingsLoading
+        isShotLoraSettingsLoading,
+        isMobile,
+        shotId: selectedShot?.id,
+        timeoutMs
       });
-      actions.setSettingsError('Failed to load some settings – using defaults.');
+      
+      // Force recovery - this prevents endless loading states
+      // Don't show error to users since fallback defaults work fine
+      actions.setSettingsError(null);
       actions.setModeReady(true);
-    }, 3000); // 3s timeout - faster fallback for better UX
+      
+      // Mobile-specific: Also dispatch a custom event to notify other components
+      if (isMobile) {
+        window.dispatchEvent(new CustomEvent('shotEditorRecovery', { 
+          detail: { shotId: selectedShot?.id, reason: 'settings_timeout' }
+        }));
+      }
+    }, timeoutMs);
 
     return () => clearTimeout(fallbackTimer);
-  }, [settingsLoading, isShotUISettingsLoading, isShotLoraSettingsLoading, actions]);
+  }, [settingsLoading, isShotUISettingsLoading, isShotLoraSettingsLoading, actions, isMobile, selectedShot?.id]);
 
-  // Reset mode readiness when shot changes
+  // Reset mode readiness when shot truly changes (guard against transient undefined states)
   useEffect(() => {
-    if (selectedShot?.id) {
-      actions.setModeReady(false);
-    }
-  }, [selectedShot?.id, actions]);
+    const newId = selectedShot?.id ?? null;
+    const prevId = prevShotIdRef.current;
+    
+    // Update ref for next comparison
+    prevShotIdRef.current = newId;
 
-  // Handle generation mode setup and readiness
+    // Reset conditions:
+    // 1. New shot ID exists and is different from previous
+    // 2. OR transitioning from undefined back to a valid shot (handles refetch recovery)
+    const shouldReset = (newId && newId !== prevId) || 
+                       (newId && prevId === null && newId !== lastReadyShotIdRef.current);
+
+    if (shouldReset) {
+      console.log('[ShotEditor] Shot changed - resetting mode readiness', { 
+        newShotId: newId, 
+        prevShotId: prevId,
+        lastReadyShotId: lastReadyShotIdRef.current,
+        isMobile,
+        reason: newId !== prevId ? 'different_shot' : 'refetch_recovery'
+      });
+      
+      // Clear the lastReady flag since we're starting fresh
+      lastReadyShotIdRef.current = null;
+      actions.setModeReady(false);
+
+      // Mobile emergency timeout - if we're still not ready after 5 seconds, force it
+      if (isMobile) {
+        const emergencyTimer = setTimeout(() => {
+          // Check the current shot ID at timeout time (not the one from effect closure)
+          const currentShotId = selectedShot?.id;
+          if (!state.isModeReady && currentShotId === newId) {
+            console.error('[ShotEditor] MOBILE EMERGENCY RECOVERY - Shot editor stuck after 5s, forcing ready state', {
+              shotId: currentShotId,
+              originalShotId: newId,
+              settingsLoading,
+              isShotUISettingsLoading, 
+              isShotLoraSettingsLoading
+            });
+            
+            // Force recovery no matter what
+            actions.setSettingsError('Emergency recovery - forced ready state');
+            actions.setModeReady(true);
+            
+            // Dispatch recovery event
+            window.dispatchEvent(new CustomEvent('shotEditorEmergencyRecovery', { 
+              detail: { shotId: currentShotId, reason: 'five_second_timeout' }
+            }));
+          }
+        }, 5000);
+        
+        return () => clearTimeout(emergencyTimer);
+      }
+    }
+  }, [selectedShot?.id, actions, isMobile]);
+
+  // Handle generation mode setup and readiness with mobile stall prevention
   useEffect(() => {
     // Wait for settings to load (main settings, UI settings, and LoRA settings)
     if (settingsLoading || isShotUISettingsLoading || isShotLoraSettingsLoading) {
@@ -227,24 +305,39 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
     // If we previously bailed out due to a settings load error, we're already ready
     if (state.settingsError) {
+      // Double-check that we're actually ready in case of settings error recovery
+      if (!state.isModeReady) {
+        console.log('[ShotEditor] Settings error recovery - forcing ready state');
+        actions.setModeReady(true);
+      }
       return;
     }
 
     // For mobile users, ensure batch mode
     if (isMobile && generationMode !== 'batch') {
+      console.log('[ShotEditor] Mobile mode correction - switching to batch mode');
       onGenerationModeChange('batch');
       // Don't set ready yet - the mode change will trigger this effect again
       return;
     }
 
-    // At this point, settings are loaded and mode is correct (or we're not on mobile)
+    // At this point, settings are loaded and mode is correct (or we're not on desktop)
     // Use a small timeout to prevent flicker but make it consistent
     const timer = setTimeout(() => {
+      const currentShotId = selectedShot?.id ?? null;
+      console.log('[ShotEditor] Setting mode ready after settings loaded', {
+        shotId: currentShotId,
+        isMobile,
+        generationMode
+      });
       actions.setModeReady(true);
+      // Record that this shot has successfully reached ready state
+      // Only update if we're still on the same shot
+      lastReadyShotIdRef.current = currentShotId;
     }, 50);
 
     return () => clearTimeout(timer);
-  }, [isMobile, generationMode, settingsLoading, isShotUISettingsLoading, isShotLoraSettingsLoading, onGenerationModeChange, state.settingsError, actions]);
+  }, [isMobile, generationMode, settingsLoading, isShotUISettingsLoading, isShotLoraSettingsLoading, onGenerationModeChange, state.settingsError, actions, selectedShot?.id, state.isModeReady]);
 
   // Accelerated mode and random seed from database settings
   // Default accelerated mode to true when it has never been explicitly set for this shot

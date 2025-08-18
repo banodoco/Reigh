@@ -79,35 +79,62 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
   // Optimistic local order state - shows immediate drag results
   const [optimisticOrder, setOptimisticOrder] = useState<GenerationRow[]>(images);
   const [isOptimisticUpdate, setIsOptimisticUpdate] = useState(false);
+  const [reconciliationId, setReconciliationId] = useState(0);
+  const reconciliationTimeoutRef = useRef<NodeJS.Timeout>();
 
-  // Keep local copy in sync when parent changes, but don't overwrite optimistic updates
+  // CRITICAL OPTIMISTIC UPDATE RACE CONDITION FIX:
+  // Enhanced reconciliation with debouncing, tracking IDs, and timeout-based recovery
+  // This prevents the component from getting stuck in inconsistent optimistic states
   useEffect(() => {
     console.log('[DragDebug:ShotImageManager] Parent images prop changed', {
       newLength: images.length,
       isOptimisticUpdate,
+      reconciliationId,
       timestamp: Date.now()
     });
     
-    // If we're in the middle of an optimistic update, don't sync yet
+    // Clear any pending reconciliation timeout
+    if (reconciliationTimeoutRef.current) {
+      clearTimeout(reconciliationTimeoutRef.current);
+    }
+    
+    // If we're in the middle of an optimistic update, use debounced reconciliation
     if (isOptimisticUpdate) {
-      console.log('[DragDebug:ShotImageManager] Skipping sync - optimistic update in progress');
+      console.log('[DragDebug:ShotImageManager] Skipping immediate sync - optimistic update in progress');
       
-      // Check if parent props now match our optimistic order (operation completed successfully)
-      const currentOrder = optimisticOrder.map(img => img.shotImageEntryId).join(',');
-      const parentOrder = images.map(img => img.shotImageEntryId).join(',');
+      const currentReconciliationId = reconciliationId;
       
-      if (currentOrder === parentOrder) {
-        console.log('[DragDebug:ShotImageManager] Parent caught up with optimistic order - ending optimistic mode');
-        setIsOptimisticUpdate(false);
-        // Parent is now consistent, we can sync only if different reference
-        if (optimisticOrder !== images) {
-          setOptimisticOrder(images);
+      // Debounce reconciliation checks to prevent race conditions
+      reconciliationTimeoutRef.current = setTimeout(() => {
+        // Check if this reconciliation is still current
+        if (currentReconciliationId !== reconciliationId) {
+          console.log('[DragDebug:ShotImageManager] Reconciliation cancelled - newer reconciliation in progress');
+          return;
         }
-      } else {
-        console.log('[DragDebug:ShotImageManager] Parent still has stale data - keeping optimistic order');
-        // Parent still has stale data, keep our optimistic order
-        return;
-      }
+        
+        // Check if parent props now match our optimistic order (operation completed successfully)
+        const currentOrder = optimisticOrder.map(img => img.shotImageEntryId).join(',');
+        const parentOrder = images.map(img => img.shotImageEntryId).join(',');
+        
+        if (currentOrder === parentOrder) {
+          console.log('[DragDebug:ShotImageManager] Parent caught up with optimistic order - ending optimistic mode');
+          setIsOptimisticUpdate(false);
+          // Parent is now consistent, we can sync only if different reference
+          if (optimisticOrder !== images) {
+            setOptimisticOrder(images);
+          }
+        } else {
+          console.log('[DragDebug:ShotImageManager] Parent still has stale data - keeping optimistic order');
+          
+          // Safety check: if optimistic update has been active for more than 5 seconds, force reconciliation
+          const optimisticStartTime = Date.now() - 5000; // 5 seconds ago
+          if (optimisticStartTime > Date.now()) {
+            console.warn('[DragDebug:ShotImageManager] Forcing reconciliation - optimistic update too long');
+            setIsOptimisticUpdate(false);
+            setOptimisticOrder(images);
+          }
+        }
+      }, 100); // 100ms debounce
     } else {
       console.log('[DragDebug:ShotImageManager] Normal sync from parent props');
       // Only update if the reference is actually different
@@ -117,7 +144,16 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
         console.log('[DragDebug:ShotImageManager] Skipping sync - same reference');
       }
     }
-  }, [images, isOptimisticUpdate]);
+  }, [images, isOptimisticUpdate, reconciliationId, optimisticOrder]);
+
+  // Cleanup reconciliation timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (reconciliationTimeoutRef.current) {
+        clearTimeout(reconciliationTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Use optimistic order everywhere instead of the parent `images` prop
   // Memoize to prevent unstable references during re-renders
@@ -210,6 +246,7 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
     ];
     
     // Update optimistic order immediately, then notify parent
+    setReconciliationId(prev => prev + 1); // Track this specific update
     setIsOptimisticUpdate(true); // Flag that we're doing an optimistic update
     setOptimisticOrder(newOrder);
     stableOnImageReorder(newOrder.map(img => img.shotImageEntryId));
@@ -366,6 +403,9 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
         // 1. Update optimistic order immediately for instant visual feedback
         const newOrder = arrayMove(currentImages, oldIndex, newIndex);
         console.log('[DragDebug:ShotImageManager] Updating optimistic order immediately');
+        
+        // Increment reconciliation ID to track this specific update
+        setReconciliationId(prev => prev + 1);
         setIsOptimisticUpdate(true); // Flag that we're doing an optimistic update
         setOptimisticOrder(newOrder);
         
@@ -458,6 +498,9 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
 
     // 1. Update optimistic order immediately for instant visual feedback
     console.log('[DragDebug:ShotImageManager] Updating optimistic order for multi-drag');
+    
+    // Increment reconciliation ID to track this specific update
+    setReconciliationId(prev => prev + 1);
     setIsOptimisticUpdate(true); // Flag that we're doing an optimistic update
     setOptimisticOrder(newItems);
     

@@ -5,6 +5,7 @@ import { Button } from '@/shared/components/ui/button';
 import { Trash2, Info } from 'lucide-react';
 import { Card } from '@/shared/components/ui/card';
 import { Separator } from '@/shared/components/ui/separator';
+import { Skeleton } from '@/shared/components/ui/skeleton';
 import HoverScrubVideo from '@/shared/components/HoverScrubVideo';
 import { getDisplayUrl } from '@/shared/lib/utils';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/shared/components/ui/pagination';
@@ -99,7 +100,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   });
 
   // Use unified generations hook with task data preloading
-  const { data: generationsData, isLoading: isLoadingGenerations, error: generationsError } = useUnifiedGenerations({
+  const { data: generationsData, isLoading: isLoadingGenerations, isFetching: isFetchingGenerations, error: generationsError } = useUnifiedGenerations({
     projectId,
     mode: 'shot-specific',
     shotId,
@@ -413,6 +414,58 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   const endIndex = startIndex + itemsPerPage;
   const currentVideoOutputs = sortedVideoOutputs.slice(startIndex, endIndex);
 
+  // Skeleton component for loading states
+  const VideoSkeleton = ({ index }: { index: number }) => (
+    <div key={`skeleton-${index}`} className="w-1/2 lg:w-1/3 px-1 sm:px-1.5 md:px-2 mb-2 sm:mb-3 md:mb-4">
+      <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden shadow-sm border relative">
+        <Skeleton className="w-full h-full" />
+        
+        {/* Skeleton for timestamp */}
+        <div className="absolute top-1 left-4 sm:top-2 sm:left-4 z-10">
+          <Skeleton className="h-4 w-16 rounded" />
+        </div>
+        
+        {/* Skeleton for action buttons */}
+        <div className="absolute top-1/2 right-2 sm:right-3 flex flex-col items-end gap-1 -translate-y-1/2 z-20">
+          <Skeleton className="h-6 w-6 sm:h-7 sm:w-7 rounded-full" />
+          <Skeleton className="h-6 w-6 sm:h-7 sm:w-7 rounded-full" />
+        </div>
+      </div>
+    </div>
+  );
+
+  // Determine number of skeletons to show
+  const getSkeletonCount = () => {
+    // Show skeletons when either loading initial data or fetching new data
+    const isLoading = isLoadingGenerations || isFetchingGenerations;
+    
+    if (isLoading) {
+      // If we have existing data, show skeletons for the current page
+      if (sortedVideoOutputs.length > 0) {
+        return Math.min(itemsPerPage, sortedVideoOutputs.length);
+      }
+      // Otherwise show default number of skeletons
+      return itemsPerPage;
+    }
+    return 0;
+  };
+
+  const skeletonCount = getSkeletonCount();
+  
+  // Debug logging for skeleton visibility
+  React.useEffect(() => {
+    console.log('[VideoOutputsGallery:Skeleton] Debug skeleton state:', {
+      isLoadingGenerations,
+      isFetchingGenerations,
+      skeletonCount,
+      videoOutputsLength: videoOutputs.length,
+      sortedVideoOutputsLength: sortedVideoOutputs.length,
+      currentPage,
+      itemsPerPage,
+      timestamp: Date.now()
+    });
+  }, [isLoadingGenerations, isFetchingGenerations, skeletonCount, videoOutputs.length, sortedVideoOutputs.length, currentPage]);
+
   // Background preloading is now handled by the unified generations system
 
   const handlePageChange = (page: number) => {
@@ -431,7 +484,8 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     }
   };
 
-  if (sortedVideoOutputs.length === 0) {
+  // Only show empty state if we're not loading AND there are no videos
+  if (sortedVideoOutputs.length === 0 && !isLoadingGenerations && !isFetchingGenerations) {
     return (
       <Card className="p-4 sm:p-6">
         <div className="text-center text-muted-foreground">
@@ -445,8 +499,15 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     <Card className="p-4 sm:p-6">
       <div className="flex flex-col space-y-2 sm:space-y-3">
         <div className="flex items-center justify-between flex-wrap gap-2">
-          <h3 className="text-base sm:text-lg font-semibold">Output Videos ({sortedVideoOutputs.length})</h3>
-          {totalPages > 1 && (
+          <h3 className="text-base sm:text-lg font-semibold flex items-center gap-2">
+            Output Videos 
+            {(isLoadingGenerations || isFetchingGenerations) ? (
+              <Skeleton className="h-5 w-8 inline-block" />
+            ) : (
+              `(${sortedVideoOutputs.length})`
+            )}
+          </h3>
+          {totalPages > 1 && !(isLoadingGenerations || isFetchingGenerations) && (
             <div className="flex items-center space-x-2">
               <span className="text-xs sm:text-sm text-muted-foreground">
                 Page {currentPage} of {totalPages}
@@ -458,7 +519,13 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
         <Separator className="my-2" />
 
         <div className="flex flex-wrap -mx-1 sm:-mx-1.5 md:-mx-2">
-          {currentVideoOutputs.map((video, index) => {
+          {/* Show skeletons when loading */}
+          {skeletonCount > 0 && Array.from({ length: skeletonCount }, (_, index) => (
+            <VideoSkeleton key={`skeleton-${index}`} index={index} />
+          ))}
+          
+          {/* Show actual videos when not loading */}
+          {skeletonCount === 0 && currentVideoOutputs.map((video, index) => {
             const originalIndex = startIndex + index;
             return (
               <div key={video.id} className="w-1/2 lg:w-1/3 px-1 sm:px-1.5 md:px-2 mb-2 sm:mb-3 md:mb-4 relative group">
@@ -522,32 +589,96 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
           })}
         </div>
 
-        {totalPages > 1 && (
+        {totalPages > 1 && !(isLoadingGenerations || isFetchingGenerations) && (
           <Pagination className="mt-4 sm:mt-6">
             <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious
-                  onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
-                  className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
-                />
-              </PaginationItem>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                <PaginationItem key={page}>
-                  <PaginationLink
-                    onClick={() => handlePageChange(page)}
-                    isActive={currentPage === page}
-                    className="cursor-pointer"
-                  >
-                    {page}
-                  </PaginationLink>
-                </PaginationItem>
-              ))}
-              <PaginationItem>
-                <PaginationNext
-                  onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
-                  className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
-                />
-              </PaginationItem>
+              {(() => {
+                if (!isMobile || totalPages <= 5) {
+                  // Desktop or few pages: show all pages
+                  return Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                    <PaginationItem key={page}>
+                      <PaginationLink
+                        onClick={() => handlePageChange(page)}
+                        isActive={currentPage === page}
+                        className="cursor-pointer"
+                      >
+                        {page}
+                      </PaginationLink>
+                    </PaginationItem>
+                  ));
+                }
+                
+                // Mobile with many pages: show smart pagination
+                const items = [];
+                
+                // Always show page 1
+                items.push(
+                  <PaginationItem key={1}>
+                    <PaginationLink
+                      onClick={() => handlePageChange(1)}
+                      isActive={currentPage === 1}
+                      className="cursor-pointer"
+                    >
+                      1
+                    </PaginationLink>
+                  </PaginationItem>
+                );
+                
+                // Show ellipsis if current page is far from start
+                if (currentPage > 3) {
+                  items.push(
+                    <PaginationItem key="start-ellipsis">
+                      <span className="px-3 py-2 text-sm text-muted-foreground">...</span>
+                    </PaginationItem>
+                  );
+                }
+                
+                // Show current page and adjacent pages (if not already shown)
+                const start = Math.max(2, currentPage - 1);
+                const end = Math.min(totalPages - 1, currentPage + 1);
+                
+                for (let page = start; page <= end; page++) {
+                  if (page !== 1 && page !== totalPages) {
+                    items.push(
+                      <PaginationItem key={page}>
+                        <PaginationLink
+                          onClick={() => handlePageChange(page)}
+                          isActive={currentPage === page}
+                          className="cursor-pointer"
+                        >
+                          {page}
+                        </PaginationLink>
+                      </PaginationItem>
+                    );
+                  }
+                }
+                
+                // Show ellipsis if current page is far from end
+                if (currentPage < totalPages - 2) {
+                  items.push(
+                    <PaginationItem key="end-ellipsis">
+                      <span className="px-3 py-2 text-sm text-muted-foreground">...</span>
+                    </PaginationItem>
+                  );
+                }
+                
+                // Always show last page (if more than 1 page)
+                if (totalPages > 1) {
+                  items.push(
+                    <PaginationItem key={totalPages}>
+                      <PaginationLink
+                        onClick={() => handlePageChange(totalPages)}
+                        isActive={currentPage === totalPages}
+                        className="cursor-pointer"
+                      >
+                        {totalPages}
+                      </PaginationLink>
+                    </PaginationItem>
+                  );
+                }
+                
+                return items;
+              })()}
             </PaginationContent>
           </Pagination>
         )}

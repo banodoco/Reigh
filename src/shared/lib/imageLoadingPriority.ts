@@ -20,12 +20,27 @@ export interface ImageLoadingStrategy {
 
 /**
  * Unified batch configuration - single source of truth
+ * Now uses mobile performance detection for better adaptation
  */
-export const getUnifiedBatchConfig = (isMobile: boolean) => ({
-  initialBatchSize: isMobile ? 4 : 6,
-  staggerDelay: isMobile ? 120 : 80,
-  maxStaggerDelay: isMobile ? 300 : 200
-});
+export const getUnifiedBatchConfig = (isMobile: boolean) => {
+  // For backward compatibility, provide a simple fallback
+  // New code should use getPerformanceConfig from mobilePerformanceUtils
+  if (isMobile) {
+    // Conservative mobile settings
+    return {
+      initialBatchSize: 4,
+      staggerDelay: 120,
+      maxStaggerDelay: 300
+    };
+  }
+  
+  // Desktop settings
+  return {
+    initialBatchSize: 6,
+    staggerDelay: 80,
+    maxStaggerDelay: 200
+  };
+};
 
 /**
  * Main function: determines loading strategy for an image

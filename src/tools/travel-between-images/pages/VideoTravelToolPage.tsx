@@ -61,11 +61,15 @@ const useVideoTravelData = (selectedShotId?: string, projectId?: string) => {
     enabled: !!projectId 
   });
 
+  // Stabilize loading by prioritizing the context shots loading state.
+  // The limitedShots is just an optimization for list view, so don't let it cause flicker.
+  const pageLoading = shotsLoading;
+
   return {
     // Shots data
     shots, // Full shots data for ShotEditor
     limitedShots, // Limited shots for main list view
-    shotsLoading: shotsLoading || limitedShotsLoading,
+    shotsLoading: pageLoading,
     shotsError,
     refetchShots,
     
@@ -237,7 +241,8 @@ const VideoTravelToolPage: React.FC = () => {
     // Check if we have a hash in the URL (direct navigation to a shot)
     const hashShotId = location.hash?.replace('#', '');
     
-    if (hashShotId && !isLoading && shots) {
+    // Only require shots to be present to validate hash; avoid tying this to loading flag
+    if (hashShotId && shots) {
       // Only show editor if the hash shot actually exists
       const hashShot = shots.find(s => s.id === hashShotId);
       return !!hashShot;
@@ -248,7 +253,7 @@ const VideoTravelToolPage: React.FC = () => {
     
     const result = !!shotExists;
     return result;
-  }, [selectedShot, viaShotClick, currentShotId, shots, location.hash, isLoading]);
+  }, [selectedShot, viaShotClick, currentShotId, shots, location.hash]);
   
   const shotToEdit = useMemo(() => {
     // Check if we have a hash in the URL
@@ -784,6 +789,32 @@ const VideoTravelToolPage: React.FC = () => {
   // const handleRemoveLora = (loraIdToRemove: string) => { ... };
   // const handleLoraStrengthChange = (loraId: string, newStrength: number) => { ... };
 
+  // Stabilized skeleton visibility to avoid rapid flicker when multiple queries resolve at different times.
+  const [showStableSkeleton, setShowStableSkeleton] = useState<boolean>(false);
+  const hideTimeoutRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (isLoading) {
+      // Immediately show the skeleton when entering loading
+      if (hideTimeoutRef.current) {
+        window.clearTimeout(hideTimeoutRef.current);
+        hideTimeoutRef.current = null;
+      }
+      setShowStableSkeleton(true);
+    } else {
+      // Delay hiding slightly to prevent rapid toggle flicker
+      hideTimeoutRef.current = window.setTimeout(() => {
+        setShowStableSkeleton(false);
+        hideTimeoutRef.current = null;
+      }, 120);
+    }
+    return () => {
+      if (hideTimeoutRef.current) {
+        window.clearTimeout(hideTimeoutRef.current);
+        hideTimeoutRef.current = null;
+      }
+    };
+  }, [isLoading]);
+
   if (!selectedProjectId) {
     if (showProjectError) {
       return <div className="p-4 text-center text-muted-foreground">Please select a project first.</div>;
@@ -805,8 +836,7 @@ const VideoTravelToolPage: React.FC = () => {
     return <div className="p-4">Error loading shots: {error.message}</div>;
   }
 
-  // Show consistent skeleton for both project loading and shots loading
-  if (isLoading) {
+  if (showStableSkeleton) {
     return (
       <div 
         className="grid gap-4"

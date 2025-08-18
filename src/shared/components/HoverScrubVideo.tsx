@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { getDisplayUrl } from '@/shared/lib/utils';
 import { Button } from '@/shared/components/ui/button';
+import { useIsMobile } from '@/shared/hooks/use-mobile';
 
 interface HoverScrubVideoProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'onTouchEnd'> {
   /**
@@ -69,8 +70,11 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
   const [scrubberPosition, setScrubberPosition] = useState<number | null>(null);
   const [scrubberVisible, setScrubberVisible] = useState(true);
   const speedOptions = [0.25, 0.5, 1, 1.5, 2];
+  const isMobile = useIsMobile();
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    // Skip mouse interactions on mobile devices
+    if (isMobile) return;
     if (!videoRef.current || !containerRef.current || duration === 0) return;
 
     const rect = containerRef.current.getBoundingClientRect();
@@ -102,17 +106,23 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
         });
       }
     }, 150); // Start playing 150ms after mouse stops moving
-  }, [duration]);
+  }, [duration, isMobile]);
 
   const handleMouseEnter = useCallback(() => {
+    // Skip hover interactions on mobile devices
+    if (isMobile) return;
+    
     isHoveringRef.current = true;
     if (videoRef.current) {
       // Don't start playing immediately, wait for mouse movement or timeout
       videoRef.current.pause();
     }
-  }, []);
+  }, [isMobile]);
 
   const handleMouseLeave = useCallback(() => {
+    // Skip hover interactions on mobile devices
+    if (isMobile) return;
+    
     isHoveringRef.current = false;
     setScrubberPosition(null); // Hide scrubber
     setScrubberVisible(true); // Reset visibility for next hover
@@ -124,7 +134,7 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
       videoRef.current.pause();
       videoRef.current.currentTime = 0; // Reset to beginning
     }
-  }, []);
+  }, [isMobile]);
 
   const handleSpeedChange = (speed: number) => {
     if (videoRef.current) {
@@ -136,17 +146,22 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
   const handleLoadedMetadata = useCallback(() => {
     if (videoRef.current) {
       setDuration(videoRef.current.duration);
-      // Ensure we can see the first frame by seeking to the start
-      if (videoRef.current.currentTime === 0) {
-        videoRef.current.currentTime = 0.1;
-        setTimeout(() => {
-          if (videoRef.current) {
-            videoRef.current.currentTime = 0;
-          }
-        }, 100);
+      
+      // On mobile, don't manipulate currentTime to avoid brief playback
+      // Mobile browsers often auto-play when currentTime is changed
+      if (!isMobile) {
+        // Desktop: Ensure we can see the first frame by seeking to the start
+        if (videoRef.current.currentTime === 0) {
+          videoRef.current.currentTime = 0.1;
+          setTimeout(() => {
+            if (videoRef.current) {
+              videoRef.current.currentTime = 0;
+            }
+          }, 100);
+        }
       }
     }
-  }, []);
+  }, [isMobile]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -172,16 +187,16 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
     <div
       ref={containerRef}
       className={cn('relative group', className)}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-      onMouseMove={handleMouseMove}
+      onMouseEnter={isMobile ? undefined : handleMouseEnter}
+      onMouseLeave={isMobile ? undefined : handleMouseLeave}
+      onMouseMove={isMobile ? undefined : handleMouseMove}
       {...rest}
     >
       <video
         ref={videoRef}
         src={getDisplayUrl(src)}
         poster={poster ? getDisplayUrl(poster) : undefined}
-        preload={preloadProp}
+        preload={isMobile ? 'none' : preloadProp}
         controls={showNativeControls}
         onLoadedMetadata={handleLoadedMetadata}
         loop={loop}
@@ -196,8 +211,8 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
         Your browser does not support the video tag.
       </video>
 
-      {/* Scrubber Line */}
-      {scrubberPosition !== null && (
+      {/* Scrubber Line - Desktop only */}
+      {!isMobile && scrubberPosition !== null && (
         <div 
           className={cn(
             "absolute top-0 bottom-0 w-0.5 bg-white shadow-lg z-30 pointer-events-none transition-opacity duration-300",
@@ -217,8 +232,8 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
         </div>
       )}
 
-      {/* Speed controls overlay */}
-      {showSpeedControls && (
+      {/* Speed controls overlay - Desktop only */}
+      {!isMobile && showSpeedControls && (
         <div 
           className={cn(
             'absolute flex items-center space-x-1 opacity-0 group-hover:opacity-100 group-touch:opacity-100 transition-opacity bg-black/60 rounded-md px-2 py-1 backdrop-blur-sm z-20',
