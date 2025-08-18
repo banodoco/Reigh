@@ -195,11 +195,24 @@ export const useProgressiveImageLoading = ({
       // Pre-calculate all reveal times for better performance
       const revealSchedule: Array<{ index: number; delay: number; tier: string }> = [];
       for (let i = actualInitialBatch; i < images.length; i++) {
+        const isCached = isImageCached(images[i]);
         const strategy = getImageLoadingStrategy(i, {
           isMobile,
           totalImages: images.length,
-          isPreloaded: isImageCached(images[i])
+          isPreloaded: isCached
         });
+        
+        // Debug logging to understand cache behavior
+        if (i < actualInitialBatch + 5) { // Log first few items beyond initial batch
+          console.log(`🔍 [PAGELOADINGDEBUG] [PROG:${sessionId}] Image ${i} strategy:`, {
+            imageId: images[i]?.id?.substring(0, 8),
+            isCached,
+            tier: strategy.tier,
+            progressiveDelay: strategy.progressiveDelay,
+            url: images[i]?.url?.substring(0, 50) + '...'
+          });
+        }
+        
         revealSchedule.push({ 
           index: i, 
           delay: strategy.progressiveDelay, 

@@ -35,6 +35,8 @@ interface SortableImageItemProps {
   onSkipConfirmationSave: () => void;
   duplicatingImageId?: string | null;
   duplicateSuccessImageId?: string | null;
+  /** When provided, image src will only be set once this is true */
+  shouldLoad?: boolean;
 }
 
 export const SortableImageItem: React.FC<SortableImageItemProps> = ({
@@ -52,6 +54,7 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
   onSkipConfirmationSave,
   duplicatingImageId,
   duplicateSuccessImageId,
+  shouldLoad = true,
 }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: image.shotImageEntryId,
@@ -142,7 +145,7 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
       onDoubleClick={isMobile ? undefined : onDoubleClick}
     >
       <img
-        src={getDisplayUrl(image.imageUrl)}
+        src={shouldLoad ? getDisplayUrl(image.imageUrl) : '/placeholder.svg'}
         alt={`Generated image ${(position ?? 0) + 1}`}
         className="w-full h-full object-cover transition-opacity duration-200"
         onTouchStart={isMobile ? handleTouchStart : undefined}

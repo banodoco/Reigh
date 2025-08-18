@@ -20,6 +20,8 @@ interface TimelineItemProps {
   dragDistances: { distanceToPrev?: number; distanceToNext?: number } | null;
   maxAllowedGap: number;
   originalFramePos: number;
+  /** When provided, image src will only be set once this is true */
+  shouldLoad?: boolean;
 }
 
 // TimelineItem component - simplified without dnd-kit
@@ -40,6 +42,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
   dragDistances,
   maxAllowedGap,
   originalFramePos,
+  shouldLoad = true,
 }) => {
   // Track touch position to detect scrolling vs tapping
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -135,7 +138,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
 
         <div className={`relative w-24 h-24 border-2 ${isDragging ? "border-primary/50" : "border-primary"} rounded-lg overflow-hidden`}>
           <img
-            src={getDisplayUrl(image.imageUrl)}
+            src={shouldLoad ? getDisplayUrl(image.imageUrl) : '/placeholder.svg'}
             alt={`Frame ${displayFrame}`}
             className="w-full h-full object-cover"
             draggable={false}

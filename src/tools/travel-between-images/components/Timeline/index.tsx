@@ -23,6 +23,7 @@ import {
   calculateMaxGap, 
   getPairInfo 
 } from "./utils/timeline-utils";
+import { ProgressiveLoadingManager } from "@/shared/components/ProgressiveLoadingManager";
 
 // Main Timeline component props
 export interface TimelineProps {
@@ -338,32 +339,40 @@ const Timeline: React.FC<TimelineProps> = ({
           })}
 
           {/* Timeline items */}
-          {images.map((image, idx) => {
-            const framePosition = currentPositions.get(image.shotImageEntryId) ?? idx * frameSpacing;
-            const isDragging = dragState.isDragging && dragState.activeId === image.shotImageEntryId;
+          <ProgressiveLoadingManager images={images} page={0} enabled={true} isMobile={isMobile}>
+            {(showImageIndices) => (
+              <>
+                {images.map((image, idx) => {
+                  const framePosition = currentPositions.get(image.shotImageEntryId) ?? idx * frameSpacing;
+                  const isDragging = dragState.isDragging && dragState.activeId === image.shotImageEntryId;
+                  const shouldLoad = showImageIndices.has(idx);
 
-            return (
-              <TimelineItem
-                key={image.shotImageEntryId}
-                image={image}
-                framePosition={framePosition}
-                isDragging={isDragging}
-                isSwapTarget={swapTargetId === image.shotImageEntryId}
-                dragOffset={isDragging ? dragOffset : null}
-                onMouseDown={(e) => handleMouseDown(e, image.shotImageEntryId, containerRef)}
-                onDoubleClick={isMobile ? undefined : () => setLightboxIndex(idx)}
-                onMobileTap={isMobile ? () => handleMobileTap(idx) : undefined}
-                zoomLevel={zoomLevel}
-                timelineWidth={containerWidth}
-                fullMinFrames={fullMin}
-                fullRange={fullRange}
-                currentDragFrame={isDragging ? currentDragFrame : null}
-                dragDistances={isDragging ? dragDistances : null}
-                maxAllowedGap={maxAllowedGap}
-                originalFramePos={framePositions.get(image.shotImageEntryId) ?? 0}
-              />
-            );
-          })}
+                  return (
+                    <TimelineItem
+                      key={image.shotImageEntryId}
+                      image={image}
+                      framePosition={framePosition}
+                      isDragging={isDragging}
+                      isSwapTarget={swapTargetId === image.shotImageEntryId}
+                      dragOffset={isDragging ? dragOffset : null}
+                      onMouseDown={(e) => handleMouseDown(e, image.shotImageEntryId, containerRef)}
+                      onDoubleClick={isMobile ? undefined : () => setLightboxIndex(idx)}
+                      onMobileTap={isMobile ? () => handleMobileTap(idx) : undefined}
+                      zoomLevel={zoomLevel}
+                      timelineWidth={containerWidth}
+                      fullMinFrames={fullMin}
+                      fullRange={fullRange}
+                      currentDragFrame={isDragging ? currentDragFrame : null}
+                      dragDistances={isDragging ? dragDistances : null}
+                      maxAllowedGap={maxAllowedGap}
+                      originalFramePos={framePositions.get(image.shotImageEntryId) ?? 0}
+                      shouldLoad={shouldLoad}
+                    />
+                  );
+                })}
+              </>
+            )}
+          </ProgressiveLoadingManager>
         </div>
       </div>
 

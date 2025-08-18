@@ -30,6 +30,8 @@ import { Slider } from './ui/slider';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { Button } from './ui/button';
 import { ArrowDown, Trash2, Check } from 'lucide-react';
+import { ProgressiveLoadingManager } from '@/shared/components/ProgressiveLoadingManager';
+import { getImageLoadingStrategy } from '@/shared/lib/imageLoadingPriority';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel, AlertDialogOverlay } from "@/shared/components/ui/alert-dialog";
 import { Checkbox } from "@/shared/components/ui/checkbox";
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
@@ -164,6 +166,9 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
     }
     return optimisticOrder;
   }, [optimisticOrder, images]);
+  // Progressive loading page context (single page view inside manager)
+  const progressivePage = 0;
+
 
   // Use ref pattern to create stable function reference that doesn't change
   const onImageReorderRef = useRef(onImageReorder);
@@ -610,64 +615,79 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
             setMobileSelectedIds([]);
           }
         }}>
-        
-        <div className={cn("grid gap-3", `grid-cols-${mobileColumns}`)}>
-          {currentImages.map((image, index) => {
-            const isSelected = mobileSelectedIds.includes(image.shotImageEntryId);
-            const isLastItem = index === currentImages.length - 1;
-            
-            return (
-              <React.Fragment key={image.shotImageEntryId}>
-                <div className="relative">
-                  <MobileImageItem
-                     image={image}
-                     isSelected={isSelected}
-                     index={index}
-                     onMobileTap={() => handleMobileTap(image.shotImageEntryId, index)}
-                     onDelete={() => handleIndividualDelete(image.shotImageEntryId)}
-                     onDuplicate={onImageDuplicate}
-                     hideDeleteButton={mobileSelectedIds.length > 0}
-                     duplicatingImageId={duplicatingImageId}
-                     duplicateSuccessImageId={duplicateSuccessImageId}
-                   />
-                   
-                  {/* Move button before first image */}
-                  {index === 0 && mobileSelectedIds.length > 0 && (
-                    <div className="absolute top-1/2 -left-1 -translate-y-1/2 -translate-x-1/2 z-10">
-                      <Button
-                        size="icon"
-                        variant="secondary"
-                        className="h-12 w-6 rounded-full p-0"
-                        onClick={() => handleMoveHere(0)}
-                        onPointerDown={e=>e.stopPropagation()}
-                        title="Move to beginning"
-                      >
-                        <ArrowDown className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  )}
+        <ProgressiveLoadingManager
+          images={currentImages}
+          page={progressivePage}
+          enabled={true}
+          isMobile={isMobile}
+        >
+          {(showImageIndices) => (
+            <div className={cn("grid gap-3", `grid-cols-${mobileColumns}`)}>
+              {currentImages.map((image, index) => {
+                const isSelected = mobileSelectedIds.includes(image.shotImageEntryId);
+                const isLastItem = index === currentImages.length - 1;
+                const loadingStrategy = getImageLoadingStrategy(index, {
+                  isMobile,
+                  totalImages: currentImages.length,
+                  isPreloaded: false,
+                });
+                const shouldLoad = showImageIndices.has(index);
+                
+                return (
+                  <React.Fragment key={image.shotImageEntryId}>
+                    <div className="relative">
+                      <MobileImageItem
+                         image={image}
+                         isSelected={isSelected}
+                         index={index}
+                         onMobileTap={() => handleMobileTap(image.shotImageEntryId, index)}
+                         onDelete={() => handleIndividualDelete(image.shotImageEntryId)}
+                         onDuplicate={onImageDuplicate}
+                         hideDeleteButton={mobileSelectedIds.length > 0}
+                         duplicatingImageId={duplicatingImageId}
+                         duplicateSuccessImageId={duplicateSuccessImageId}
+                         shouldLoad={shouldLoad}
+                       />
+                       
+                      {/* Move button before first image */}
+                      {index === 0 && mobileSelectedIds.length > 0 && (
+                        <div className="absolute top-1/2 -left-1 -translate-y-1/2 -translate-x-1/2 z-10">
+                          <Button
+                            size="icon"
+                            variant="secondary"
+                            className="h-12 w-6 rounded-full p-0"
+                            onClick={() => handleMoveHere(0)}
+                            onPointerDown={e=>e.stopPropagation()}
+                            title="Move to beginning"
+                          >
+                            <ArrowDown className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
 
-                  {/* Move here button after this item */}
-                  {mobileSelectedIds.length > 0 &&
-                   (!isSelected || isLastItem) &&
-                   <div className="absolute top-1/2 -right-1 -translate-y-1/2 translate-x-1/2 z-10">
-                     <Button
-                       size="icon"
-                       variant="secondary"
-                       className="h-12 w-6 rounded-full p-0"
-                       onClick={() => handleMoveHere(index + 1)}
-                       onPointerDown={e=>e.stopPropagation()}
-                       title={isLastItem ? "Move to end" : "Move here"}
-                     >
-                       <ArrowDown className="h-4 w-4" />
-                     </Button>
-                   </div>
-                  }
-                </div>
-              </React.Fragment>
-            );
-          })}
-        </div>
+                      {/* Move here button after this item */}
+                      {mobileSelectedIds.length > 0 &&
+                       (!isSelected || isLastItem) &&
+                       <div className="absolute top-1/2 -right-1 -translate-y-1/2 translate-x-1/2 z-10">
+                         <Button
+                           size="icon"
+                           variant="secondary"
+                           className="h-12 w-6 rounded-full p-0"
+                           onClick={() => handleMoveHere(index + 1)}
+                           onPointerDown={e=>e.stopPropagation()}
+                           title={isLastItem ? "Move to end" : "Move here"}
+                         >
+                           <ArrowDown className="h-4 w-4" />
+                         </Button>
+                       </div>
+                      }
+                    </div>
+                  </React.Fragment>
+                );
+              })}
+            </div>
+          )}
+        </ProgressiveLoadingManager>
 
         {/* Floating Action Bar for Multiple Selection (Mobile) */}
         {mobileSelectedIds.length >= 1 && (
@@ -759,40 +779,51 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
       onDragEnd={handleDragEnd}
     >
       <SortableContext items={currentImages.map((img) => img.shotImageEntryId)} strategy={rectSortingStrategy}>
-        <div 
-          className={cn("grid gap-3", gridColsClass)}
-          onDoubleClick={(e) => {
-            // Only deselect if double-clicking on the grid itself, not on an image
-            if (e.target === e.currentTarget) {
-              setSelectedIds([]);
-              setMobileSelectedIds([]);
-            }
-          }}
+        <ProgressiveLoadingManager
+          images={currentImages}
+          page={progressivePage}
+          enabled={true}
+          isMobile={isMobile}
         >
-          {currentImages.map((image, index) => (
-            <SortableImageItem
-              key={image.shotImageEntryId}
-              image={image}
-              isSelected={selectedIds.includes(image.shotImageEntryId) || mobileSelectedIds.includes(image.shotImageEntryId)}
-              isDragDisabled={isMobile}
-              onPointerDown={(e) => {
-                // Capture modifier key state ASAP to avoid losing it if the user releases before click fires
-                if (isMobile) return; // desktop-only multi-select enhancement
-                // Remove the redundant Ctrl+click handling here since it's handled in onClick
+          {(showImageIndices) => (
+            <div 
+              className={cn("grid gap-3", gridColsClass)}
+              onDoubleClick={(e) => {
+                // Only deselect if double-clicking on the grid itself, not on an image
+                if (e.target === e.currentTarget) {
+                  setSelectedIds([]);
+                  setMobileSelectedIds([]);
+                }
               }}
-              onClick={isMobile ? undefined : (e) => handleItemClick(image.shotImageEntryId, e)}
-              onDelete={() => handleIndividualDelete(image.shotImageEntryId)}
-              onDuplicate={onImageDuplicate}
-              position={(image as any).position ?? index}
-              onDoubleClick={isMobile ? () => {} : () => setLightboxIndex(index)}
-              onMobileTap={isMobile ? () => handleMobileTap(image.shotImageEntryId, index) : undefined}
-              skipConfirmation={imageDeletionSettings.skipConfirmation}
-              onSkipConfirmationSave={() => updateImageDeletionSettings({ skipConfirmation: true })}
-              duplicatingImageId={duplicatingImageId}
-              duplicateSuccessImageId={duplicateSuccessImageId}
-            />
-          ))}
-        </div>
+            >
+              {currentImages.map((image, index) => {
+                const shouldLoad = showImageIndices.has(index);
+                return (
+                  <SortableImageItem
+                    key={image.shotImageEntryId}
+                    image={image}
+                    isSelected={selectedIds.includes(image.shotImageEntryId) || mobileSelectedIds.includes(image.shotImageEntryId)}
+                    isDragDisabled={isMobile}
+                    onPointerDown={(e) => {
+                      if (isMobile) return;
+                    }}
+                    onClick={isMobile ? undefined : (e) => handleItemClick(image.shotImageEntryId, e)}
+                    onDelete={() => handleIndividualDelete(image.shotImageEntryId)}
+                    onDuplicate={onImageDuplicate}
+                    position={(image as any).position ?? index}
+                    onDoubleClick={isMobile ? () => {} : () => setLightboxIndex(index)}
+                    onMobileTap={isMobile ? () => handleMobileTap(image.shotImageEntryId, index) : undefined}
+                    skipConfirmation={imageDeletionSettings.skipConfirmation}
+                    onSkipConfirmationSave={() => updateImageDeletionSettings({ skipConfirmation: true })}
+                    duplicatingImageId={duplicatingImageId}
+                    duplicateSuccessImageId={duplicateSuccessImageId}
+                    shouldLoad={shouldLoad}
+                  />
+                );
+              })}
+            </div>
+          )}
+        </ProgressiveLoadingManager>
       </SortableContext>
       <DragOverlay>
         {activeId && activeImage ? (
@@ -897,6 +928,7 @@ interface MobileImageItemProps {
   hideDeleteButton?: boolean;
   duplicatingImageId?: string | null;
   duplicateSuccessImageId?: string | null;
+  shouldLoad?: boolean;
 }
 
 const MobileImageItem: React.FC<MobileImageItemProps> = ({
@@ -911,6 +943,7 @@ const MobileImageItem: React.FC<MobileImageItemProps> = ({
   hideDeleteButton,
   duplicatingImageId,
   duplicateSuccessImageId,
+  shouldLoad = true,
 }) => {
   const imageUrl = image.thumbUrl || image.imageUrl;
   const displayUrl = getDisplayUrl(imageUrl);
@@ -951,7 +984,7 @@ const MobileImageItem: React.FC<MobileImageItemProps> = ({
       data-mobile-item="true"
     >
       <img
-        src={displayUrl}
+        src={shouldLoad ? displayUrl : '/placeholder.svg'}
         alt={`Image ${image.id}`}
         className="max-w-full max-h-full object-contain rounded-sm"
         onTouchStart={handleTouchStart}

@@ -157,7 +157,19 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
     }
   };
 
-  if (!shots || shots.length === 0) {
+  // Show loading skeleton while data is being fetched
+  if (shots === undefined) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {Array.from({ length: 6 }).map((_, idx) => (
+          <div key={idx} className="h-40 rounded-lg bg-muted animate-pulse" />
+        ))}
+      </div>
+    );
+  }
+
+  // Show empty state only when we definitively have no shots
+  if (shots.length === 0) {
     return (
       <div className="py-8">
         <p className="mb-6">No shots available for this project. You can create one using the button below.</p>

@@ -61,15 +61,13 @@ const useVideoTravelData = (selectedShotId?: string, projectId?: string) => {
     enabled: !!projectId 
   });
 
-  // Stabilize loading by prioritizing the context shots loading state.
-  // The limitedShots is just an optimization for list view, so don't let it cause flicker.
-  const pageLoading = shotsLoading;
-
   return {
     // Shots data
     shots, // Full shots data for ShotEditor
     limitedShots, // Limited shots for main list view
-    shotsLoading: pageLoading,
+    // Expose raw loading flags; page can decide how to combine based on context
+    shotsLoading,
+    limitedShotsLoading, // Expose limited shots loading state for more granular control
     shotsError,
     refetchShots,
     
@@ -100,7 +98,7 @@ const VideoTravelToolPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const viaShotClick = location.state?.fromShotClick === true;
-  const { selectedProjectId } = useProject();
+  const { selectedProjectId, setSelectedProjectId } = useProject();
   const [selectedShot, setSelectedShot] = useState<Shot | null>(null);
   const { currentShotId, setCurrentShotId } = useCurrentShot();
   
@@ -110,7 +108,8 @@ const VideoTravelToolPage: React.FC = () => {
   const {
     shots,
     limitedShots,
-    shotsLoading: isLoading,
+    shotsLoading: shotsLoadingRaw,
+    limitedShotsLoading,
     shotsError: error,
     refetchShots,
     availableLoras,
@@ -125,6 +124,10 @@ const VideoTravelToolPage: React.FC = () => {
     projectSettingsUpdating,
     projectUISettings
   } = useVideoTravelData(selectedShot?.id, selectedProjectId);
+
+  // Determine page loading state: if deep-linking to a shot via hash, don't block on limited shots loading
+  const hasHashShotIdForLoading = !!location.hash?.replace('#', '');
+  const isLoading = hasHashShotIdForLoading ? (shotsLoadingRaw) : (shotsLoadingRaw || limitedShotsLoading);
   
   const createShotMutation = useCreateShot();
   const handleExternalImageDropMutation = useHandleExternalImageDrop();
@@ -219,6 +222,43 @@ const VideoTravelToolPage: React.FC = () => {
   // Add ref for main container to enable scroll-to-top functionality
   const mainContainerRef = useRef<HTMLDivElement>(null);
 
+  // Extract hash shot id once for reuse
+  const hashShotId = useMemo(() => {
+    const fromLocation = (location.hash?.replace('#', '') || '');
+    if (fromLocation) return fromLocation;
+    if (typeof window !== 'undefined' && window.location?.hash) {
+      return window.location.hash.replace('#', '');
+    }
+    return '';
+  }, [location.hash]);
+
+  // If deep-linked to a shot, set current shot id immediately to prevent list-clearing logic
+  useEffect(() => {
+    if (hashShotId && !currentShotId) {
+      setCurrentShotId(hashShotId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hashShotId]);
+
+  // Resolve selected project from shot when deep-linking
+  useEffect(() => {
+    if (!hashShotId || selectedProjectId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('shots')
+          .select('project_id')
+          .eq('id', hashShotId)
+          .single();
+        if (!cancelled && data?.project_id) {
+          setSelectedProjectId(data.project_id);
+        }
+      } catch {}
+    })();
+    return () => { cancelled = true; };
+  }, [hashShotId, selectedProjectId, setSelectedProjectId]);
+
   // Data fetching is now handled by the useVideoTravelData hook above
   
   // Add state for video generation settings - wait for settings to load before initializing
@@ -238,37 +278,25 @@ const VideoTravelToolPage: React.FC = () => {
   
   // Memoize expensive computations
   const shouldShowShotEditor = useMemo(() => {
-    // Check if we have a hash in the URL (direct navigation to a shot)
-    const hashShotId = location.hash?.replace('#', '');
-    
-    // Only require shots to be present to validate hash; avoid tying this to loading flag
-    if (hashShotId && shots) {
-      // Only show editor if the hash shot actually exists
-      const hashShot = shots.find(s => s.id === hashShotId);
-      return !!hashShot;
+    // If deep-linked to a specific shot, show the editor view immediately
+    if (hashShotId) {
+      return true;
     }
-    
-    // Only show editor if we actually have a shot to edit
+    // Otherwise, only show editor if we actually have a shot to edit
     const shotExists = selectedShot || (viaShotClick && currentShotId && shots?.find(s => s.id === currentShotId));
-    
-    const result = !!shotExists;
-    return result;
-  }, [selectedShot, viaShotClick, currentShotId, shots, location.hash]);
+    return !!shotExists;
+  }, [selectedShot, viaShotClick, currentShotId, shots, hashShotId]);
   
   const shotToEdit = useMemo(() => {
-    // Check if we have a hash in the URL
-    const hashShotId = location.hash?.replace('#', '');
-    
     if (hashShotId && shots) {
       const hashShot = shots.find(s => s.id === hashShotId);
       if (hashShot) {
         return hashShot;
       }
     }
-    
     const fallbackShot = selectedShot || (viaShotClick && currentShotId ? shots?.find(s => s.id === currentShotId) : null);
     return fallbackShot;
-  }, [selectedShot, viaShotClick, currentShotId, shots, location.hash]);
+  }, [selectedShot, viaShotClick, currentShotId, shots, hashShotId]);
   
   // Calculate navigation state with memoization
   const navigationState = useMemo(() => {
@@ -355,7 +383,7 @@ const VideoTravelToolPage: React.FC = () => {
   // Set up the page header with dynamic content based on state
   // Only show header when we're NOT viewing a specific shot
   useLayoutEffect(() => {
-    if (shouldShowShotEditor) {
+    if (shouldShowShotEditor || hashShotId) {
       // Clear header when viewing a specific shot
       clearHeader();
     } else {
@@ -372,7 +400,7 @@ const VideoTravelToolPage: React.FC = () => {
       setHeader(headerContent);
     }
     // Only clear header on component unmount, not on every effect re-run
-  }, [setHeader, isLoading, shots, setIsCreateShotModalOpen, shouldShowShotEditor]);
+  }, [setHeader, clearHeader, isLoading, shots, setIsCreateShotModalOpen, shouldShowShotEditor, hashShotId]);
 
   // Clean up header on component unmount
   useLayoutEffect(() => {
@@ -822,7 +850,26 @@ const VideoTravelToolPage: React.FC = () => {
     if (showProjectError) {
       return <div className="p-4 text-center text-muted-foreground">Please select a project first.</div>;
     }
-    // Skeleton while we wait for ProjectContext to hydrate
+    // If deep-linked to a shot, show an editor-style skeleton instead of the main list skeleton
+    if (hashShotId) {
+      return (
+        <PageFadeIn className="pt-2 sm:pt-5">
+          <div className="flex flex-col space-y-4 pb-16">
+            <div className="flex-shrink-0 flex flex-wrap justify-between items-center gap-y-2 px-2">
+              <Skeleton className="h-10 w-32" />
+              <Skeleton className="h-8 w-64" />
+              <div className="flex space-x-2">
+                <Skeleton className="h-8 w-20" />
+                <Skeleton className="h-8 w-16" />
+              </div>
+            </div>
+            <Skeleton className="h-64 w-full" />
+            <Skeleton className="h-96 w-full" />
+          </div>
+        </PageFadeIn>
+      );
+    }
+    // Otherwise show the main grid skeleton while the project hydrates
     return (
       <div 
         className="grid gap-4"
@@ -839,7 +886,8 @@ const VideoTravelToolPage: React.FC = () => {
     return <div className="p-4">Error loading shots: {error.message}</div>;
   }
 
-  if (showStableSkeleton) {
+  // Only show main page skeleton when not deep-linked to a shot
+  if (showStableSkeleton && !hashShotId && !shouldShowShotEditor) {
     return (
       <div 
         className="grid gap-4"
@@ -857,7 +905,7 @@ const VideoTravelToolPage: React.FC = () => {
       {!shouldShowShotEditor ? (
         <>
           <ShotListDisplay
-            shots={limitedShots || []}
+            shots={limitedShotsLoading ? undefined : (limitedShots || [])}
             onSelectShot={handleShotSelect}
             currentProjectId={selectedProjectId}
             onCreateNewShot={() => setIsCreateShotModalOpen(true)}
@@ -883,7 +931,7 @@ const VideoTravelToolPage: React.FC = () => {
         }>
           <PageFadeIn className="pt-2 sm:pt-5">
             <ShotEditor
-              selectedShotId={shotToEdit?.id || ''}
+              selectedShotId={shotToEdit?.id || hashShotId || ''}
               projectId={selectedProjectId}
               videoPairConfigs={videoPairConfigs}
               videoControlMode={isLoadingSettings ? 'batch' : videoControlMode}

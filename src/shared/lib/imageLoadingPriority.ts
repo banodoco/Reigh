@@ -34,9 +34,9 @@ export const getUnifiedBatchConfig = (isMobile: boolean) => {
     };
   }
   
-  // Desktop settings
+  // Desktop settings - temporarily increased for debugging
   return {
-    initialBatchSize: 6,
+    initialBatchSize: 20, // Increased from 6 to load more images immediately
     staggerDelay: 80,
     maxStaggerDelay: 200
   };
