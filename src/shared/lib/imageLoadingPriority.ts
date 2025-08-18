@@ -26,17 +26,17 @@ export const getUnifiedBatchConfig = (isMobile: boolean) => {
   // For backward compatibility, provide a simple fallback
   // New code should use getPerformanceConfig from mobilePerformanceUtils
   if (isMobile) {
-    // Conservative mobile settings
+    // Mobile settings - also load full page for consistent UX
     return {
-      initialBatchSize: 4,
+      initialBatchSize: 25, // Load full page on mobile too
       staggerDelay: 120,
       maxStaggerDelay: 300
     };
   }
   
-  // Desktop settings - temporarily increased for debugging
+  // Desktop settings - load full page immediately
   return {
-    initialBatchSize: 20, // Increased from 6 to load more images immediately
+    initialBatchSize: 25, // Load full page of images immediately
     staggerDelay: 80,
     maxStaggerDelay: 200
   };

@@ -148,6 +148,8 @@ export const useProgressiveImageLoading = ({
     const batchConfig = getUnifiedBatchConfig(isMobile);
     const actualInitialBatch = Math.min(batchConfig.initialBatchSize, images.length);
     
+    console.log(`📦 [PAGELOADINGDEBUG] [PROG:${sessionId}] Batch config: initialBatchSize=${batchConfig.initialBatchSize}, actualInitialBatch=${actualInitialBatch}, totalImages=${images.length}`);
+    
     // Phase 1: Show initial batch immediately
     const initialIndices = new Set<number>();
     for (let i = 0; i < actualInitialBatch; i++) {
