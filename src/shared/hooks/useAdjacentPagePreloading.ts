@@ -14,12 +14,34 @@ interface UseAdjacentPagePreloadingProps {
 
 // Centralized function to mark images as cached
 export const markImageAsCached = (image: any, isCached: boolean = true) => {
+  const prevState = (image as any).__memoryCached;
   (image as any).__memoryCached = isCached;
+  
+  // Only log when state changes
+  if (prevState !== isCached) {
+    console.log(`[ImageLoadingDebug][Cache] Image cache state changed:`, {
+      imageId: image.id,
+      from: prevState,
+      to: isCached,
+      timestamp: new Date().toISOString()
+    });
+  }
 };
 
 // Centralized function to check if image is cached
 export const isImageCached = (image: any): boolean => {
-  return (image as any).__memoryCached === true;
+  const isCached = (image as any).__memoryCached === true;
+  
+  // Occasionally log cache checks for debugging (every 10th check)
+  if (Math.random() < 0.1) {
+    console.log(`[ImageLoadingDebug][Cache] Cache check:`, {
+      imageId: image.id,
+      isCached,
+      cacheFlag: (image as any).__memoryCached
+    });
+  }
+  
+  return isCached;
 };
 
 // Device capability detection for smart preloading
@@ -325,9 +347,27 @@ export const smartPreloadImages = (
     images: HTMLImageElement[];
   }>
 ) => {
-  if (!cachedData?.items) return;
+  const preloadId = `smartpreload-${priority}-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
+  
+  console.log(`[ImageLoadingDebug][SmartPreload:${preloadId}] Starting smart preload:`, {
+    priority,
+    currentPrefetchId,
+    hasCachedData: !!cachedData?.items,
+    totalItems: cachedData?.items?.length || 0
+  });
+  
+  if (!cachedData?.items) {
+    console.log(`[ImageLoadingDebug][SmartPreload:${preloadId}] No cached data available`);
+    return;
+  }
   
   const config = performanceMonitor.currentConfig;
+  
+  console.log(`[ImageLoadingDebug][SmartPreload:${preloadId}] Performance config:`, {
+    preloadStrategy: config.preloadStrategy,
+    maxConcurrentPreloads: config.maxConcurrentPreloads,
+    thumbnailOnlyPreload: config.thumbnailOnlyPreload
+  });
   
   // Determine how many images to preload based on strategy
   const maxImages = (() => {
@@ -339,14 +379,46 @@ export const smartPreloadImages = (
     }
   })();
   
-  if (maxImages === 0) return;
+  console.log(`[ImageLoadingDebug][SmartPreload:${preloadId}] Strategy calculation:`, {
+    strategy: config.preloadStrategy,
+    availableItems: cachedData.items.length,
+    maxImages,
+    willProceed: maxImages > 0
+  });
+  
+  if (maxImages === 0) {
+    console.log(`[ImageLoadingDebug][SmartPreload:${preloadId}] No images to preload (maxImages = 0)`);
+    return;
+  }
   
   const imagesToPreload = cachedData.items.slice(0, maxImages);
   const priorityScore = priority === 'next' ? 100 : 50;
   
+  console.log(`[ImageLoadingDebug][SmartPreload:${preloadId}] Preload batch prepared:`, {
+    imagesToPreload: imagesToPreload.length,
+    priorityScore,
+    imageIds: imagesToPreload.slice(0, 3).map((img: any) => img.id) // Show first 3 IDs
+  });
+  
+  let queuedCount = 0;
+  let skippedCount = 0;
+  let alreadyCachedCount = 0;
+  
   imagesToPreload.forEach((img: any, idx: number) => {
     // Skip if this prefetch is no longer current
-    if (prefetchOperationsRef.current.currentPrefetchId !== currentPrefetchId) return;
+    if (prefetchOperationsRef.current.currentPrefetchId !== currentPrefetchId) {
+      console.log(`[ImageLoadingDebug][SmartPreload:${preloadId}] Skipping image ${idx} - prefetch ID changed`);
+      skippedCount++;
+      return;
+    }
+    
+    // Check if already cached
+    const isCached = isImageCached(img);
+    if (isCached) {
+      console.log(`[ImageLoadingDebug][SmartPreload:${preloadId}] Image ${idx} already cached:`, img.id);
+      alreadyCachedCount++;
+      return;
+    }
     
     const imageUrl = config.thumbnailOnlyPreload ? 
       getDisplayUrl(img.thumbUrl || img.url) : 
@@ -354,18 +426,38 @@ export const smartPreloadImages = (
     
     const itemPriority = priorityScore - idx; // Earlier images have higher priority
     
+    console.log(`[ImageLoadingDebug][SmartPreload:${preloadId}] Queueing image ${idx}:`, {
+      imageId: img.id,
+      itemPriority,
+      url: imageUrl.substring(0, 80) + '...',
+      thumbnailOnly: config.thumbnailOnlyPreload
+    });
+    
     globalPreloadQueue.add(
       imageUrl,
       itemPriority,
       () => {
         // Success callback
+        console.log(`[ImageLoadingDebug][SmartPreload:${preloadId}] Successfully preloaded image:`, img.id);
         markImageAsCached(img, true);
       },
       () => {
         // Error callback - just log, don't retry
-        console.warn(`[ImageLoadingDebug][SmartPreload] Failed to preload image:`, imageUrl);
+        console.warn(`[ImageLoadingDebug][SmartPreload:${preloadId}] Failed to preload image:`, {
+          imageId: img.id,
+          url: imageUrl
+        });
       }
     );
+    queuedCount++;
+  });
+  
+  console.log(`[ImageLoadingDebug][SmartPreload:${preloadId}] Preload batch summary:`, {
+    totalImages: imagesToPreload.length,
+    queuedCount,
+    alreadyCachedCount,
+    skippedCount,
+    queueSize: globalPreloadQueue.size()
   });
 };
 
