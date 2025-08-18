@@ -24,25 +24,29 @@ const SimpleVideoPlayer: React.FC<SimpleVideoPlayerProps> = ({
     const video = videoRef.current;
     if (!video) return;
 
+    const hasTriedAutoplayRef = { current: false } as { current: boolean };
+
     const handlePlay = () => setIsPlaying(true);
     const handlePause = () => setIsPlaying(false);
-    
-    // Auto-play when component mounts
-    const handleLoadedData = () => {
-      video.play().catch(error => {
-        console.log('Auto-play was prevented:', error);
-        // Auto-play was prevented, user will need to click play
+
+    // Prefer canplay to avoid stutter at start; only attempt once
+    const handleCanPlay = () => {
+      if (hasTriedAutoplayRef.current) return;
+      hasTriedAutoplayRef.current = true;
+      video.play().catch((error) => {
+        // Autoplay may be blocked; user can tap play
+        console.log('[LightboxStart] Autoplay prevented on canplay:', error);
       });
     };
 
     video.addEventListener('play', handlePlay);
     video.addEventListener('pause', handlePause);
-    video.addEventListener('loadeddata', handleLoadedData);
+    video.addEventListener('canplay', handleCanPlay);
 
     return () => {
       video.removeEventListener('play', handlePlay);
       video.removeEventListener('pause', handlePause);
-      video.removeEventListener('loadeddata', handleLoadedData);
+      video.removeEventListener('canplay', handleCanPlay);
     };
   }, []);
 
@@ -68,7 +72,6 @@ const SimpleVideoPlayer: React.FC<SimpleVideoPlayerProps> = ({
         loop
         muted
         playsInline
-        autoPlay
         preload="auto"
         className="object-contain w-full sm:w-auto max-w-full hide-video-controls"
         style={{ maxHeight: '85vh' }}
