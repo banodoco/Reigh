@@ -2,7 +2,13 @@
 
 ## Overview
 
-Reigh uses a sophisticated image loading system designed for optimal performance across mobile and desktop devices. The system combines **progressive loading** for smooth user experience with **adjacent page preloading** for instant navigation.
+Reigh uses a simplified image loading system that displays all images immediately for optimal user experience. The system combines **immediate loading** for instant visual feedback with **adjacent page preloading** for fast navigation between pages.
+
+**Key Characteristics:**
+- All images load and display immediately (no staggering)
+- Smart caching prevents duplicate loading and enables immediate display
+- Adjacent pages preload in background for instant navigation
+- Session management prevents race conditions during page changes
 
 ## Architecture
 
@@ -34,29 +40,33 @@ ImageGallery
 
 ## Key Features
 
-### 1. Progressive Loading
-- **Initial Batch**: First 4-6 images load immediately
-- **Staggered Loading**: Remaining images load with calculated delays
-- **Smart Delays**: Cached images bypass delays entirely
-- **Race Condition Protection**: Prevents overlapping sessions
+### 1. Immediate Loading
+- **All Images**: All images load and display immediately upon page change
+- **No Staggering**: Removed progressive delays for instant visual feedback
+- **Smart Caching**: Cached/preloaded images display instantly without network requests
+- **Race Condition Protection**: Prevents overlapping sessions with unique session IDs
+- **Instant Display**: All content appears as soon as it's available
 
 ### 2. Adjacent Page Preloading
 - **Background Preloading**: Loads next/prev page images while user views current page
+- **Progressive Preloading**: Adjacent pages also load top-to-bottom with 60ms delays
 - **Smart Cleanup**: Removes old cached pages to prevent memory bloat
-- **Performance Adaptation**: Adjusts strategy based on device capabilities
+- **Performance Adaptation**: Adjusts strategy based on device capabilities (1-3 concurrent requests)
+- **Coordinated Timing**: Slower than current page to avoid resource conflicts
 
-### 3. Unified Priority System
-- **Single Source of Truth**: All timing comes from `imageLoadingPriority.ts`
-- **Mobile Optimization**: Different delays and batch sizes for mobile devices
-- **Tier-Based Loading**: immediate → high → medium → low priority tiers
+### 3. Simplified Loading System
+- **Single Source of Truth**: Loading strategy comes from `imageLoadingPriority.ts`
+- **No Device Discrimination**: All devices get the same immediate loading experience
+- **Simplified Logic**: Removed complex progressive delay calculations
+- **Cache Integration**: All images benefit from intelligent caching
 
 ## Configuration
 
-### Mobile vs Desktop Settings
+### Loading Configuration
 ```typescript
-// Desktop: 6 initial images, 80ms stagger delay
-// Mobile: 4 initial images, 120ms stagger delay
-const batchConfig = getUnifiedBatchConfig(isMobile);
+// All devices: Immediate loading of all images
+// No progressive delays or batch sizes
+const allImages = images.map((_, index) => index);
 ```
 
 ### Loading Strategy
@@ -74,9 +84,10 @@ const strategy = getImageLoadingStrategy(index, {
 ### Console Logs
 The system provides comprehensive debug logs with unique tags:
 
-- **`[ProgressiveDebug]`**: Progressive loading lifecycle events
-- **`[GalleryDebug]`**: Gallery state changes and decisions  
-- **`[ItemDebug]`**: Individual image loading decisions
+- **`[PAGELOADINGDEBUG]`**: Progressive loading lifecycle events with session IDs
+- **`[GalleryDebug]`**: Gallery state changes and loading strategy decisions  
+- **`[ItemDebug]`**: Individual image loading decisions and timing
+- **`[PRELOAD]`**: Adjacent page preloading operations with unique IDs
 
 ### Browser Console Debugger
 ```javascript
@@ -89,85 +100,81 @@ window.imageLoadingDebugger.getCacheState()
 window.imageLoadingDebugger.diagnoseStuckPage()
 ```
 
-## Recent Improvements (January 2025)
+## System Behavior
 
-### Major Reliability & Performance Overhaul
+### Navigation Flow
+When a user navigates to a new page:
 
-#### 🔧 **Network Request Reliability**
-- **AbortController Support**: Added proper request cancellation for preloading queue
-- **Fetch-based Preloading**: Replaced Image() with fetch() + AbortController for better control
-- **Enhanced Video Support**: Videos now attempt frame preloading for availability checking
-- **Browser Cache Optimization**: Added `cache: 'force-cache'` for better cache utilization
+1. **Immediate Response**: First 3-4 images start loading instantly
+2. **Progressive Reveal**: Remaining images load with 25-40ms delays between each
+3. **Visual Effect**: Creates a smooth top-to-bottom cascading appearance
+4. **Background Preloading**: Adjacent pages start preloading after 400-800ms debounce
+5. **Cache Integration**: Any preloaded images bypass delays and appear immediately
 
-#### ⚡ **Performance Optimizations**  
-- **Single Timer System**: Replaced multiple individual timeouts with efficient single interval
-- **Batch Cache Operations**: Added `areImagesCached()` and `setMultipleImageCacheStatus()` 
-- **Memory Management**: Automatic cache cleanup when exceeding 500 cached images
-- **Optimized Timer Usage**: Pre-calculated reveal schedules reduce per-image timer overhead
+### Loading Coordination
+- **Current Page**: 25ms intervals (desktop), 40ms intervals (mobile)
+- **Adjacent Pages**: 60ms intervals to avoid resource conflicts
+- **Priority Queue**: Adjacent preloading uses 1-3 concurrent requests max
+- **Cache Handoff**: `setImageCacheStatus()` → `isImageCached()` → `progressiveDelay = 0`
 
-#### 🎯 **Server Pagination Timing Fix**
-- **Async Response Handling**: Fixed race condition where UI completed before server data arrived
-- **Proper Loading States**: Loading buttons now wait for actual data instead of arbitrary timeouts
-- **Real-time Feedback**: Loading states clear only when images are truly ready to display
+### Performance Characteristics
+- **Network Efficiency**: Single interval timer processes pre-calculated reveal schedule
+- **Memory Management**: Automatic cache cleanup when exceeding 500 cached images  
+- **Request Control**: Fetch-based preloading with AbortController for proper cancellation
+- **Error Recovery**: Comprehensive timeout handling and retry mechanisms
 
-#### 🔍 **Enhanced Debugging System**
-- **PAGELOADINGDEBUG Tags**: All navigation logs now use consistent `[PAGELOADINGDEBUG]` identifier
-- **Succinct Flow Tracking**: Complete navigation flow from button press to image display
-- **Issue Detection**: Automatic detection of server delays, stuck pages, and failed requests
-- **Timing Analysis**: Precise timing logs to identify bottlenecks
+## Understanding System Behavior
 
-#### 🧹 **Code Quality Improvements**
-- **Better Type Safety**: Replaced `any[]` with proper `ImageWithId[]` interface
-- **Removed Legacy Code**: Cleaned up deprecated functions and exports
-- **Simplified Logic**: Streamlined progressive loading state management
-- **Memory Leak Prevention**: Proper cleanup of timers, requests, and event listeners
+### Why Images "Cascade" Down the Page
+The progressive loading system creates a deliberate visual effect where images appear from top to bottom in sequence. This is **not** scroll-dependent loading - it's time-based progressive loading that:
 
-### Key Behavioral Changes
-- **Server Pagination**: Loading buttons stay active until server data actually arrives (fixes "click again" issue)
-- **Progressive Loading**: Uses single efficient interval instead of multiple timers
-- **Cache Management**: Automatic memory-aware cleanup prevents unlimited growth
-- **Error Recovery**: Better handling of slow servers and network issues
+- **Provides immediate feedback**: First few images load instantly
+- **Maintains smooth performance**: Prevents browser overload from simultaneous requests  
+- **Creates visual continuity**: Users see a predictable top-to-bottom reveal pattern
+- **Optimizes perceived performance**: Page feels responsive even during heavy loading
 
-## Common Issues & Solutions
+### Navigation Performance Scenarios
 
-### Problem: Multiple Progressive Loading Sessions
-**Symptoms**: Console shows overlapping `[ProgressiveDebug]` sessions
-**Cause**: Unstable `images` prop causing rapid effect re-triggers
-**Solution**: Effect now uses stable dependencies and debouncing
+**First Visit to a Page:**
+- Images 0-3: Load immediately (0ms delay)
+- Images 4+: Load progressively (25-40ms intervals)
+- Visual result: Smooth cascading appearance
 
-### Problem: Page Gets Stuck Loading
-**Symptoms**: Loading skeletons remain visible indefinitely or page appears empty until clicked again
-**Debugging**: Run `window.imageLoadingDebugger.diagnoseStuckPage()`
-**Common Causes**: 
-- Progressive loading effect not triggering due to identical image sets
-- `onImagesReady` callback not executing
-- Images failing to load
-**Solution**: Now fixed with improved image set detection and 2-second safety timeout
+**Adjacent Page Navigation:**
+- All images: Load immediately (preloaded and cached)
+- Visual result: Instant page display
 
-### Problem: Slow Page Navigation
-**Symptoms**: Delay when clicking next/prev page buttons
-**Cause**: Adjacent page preloading disabled or failing
-**Solution**: Check `enableAdjacentPagePreloading` prop and console logs
+**Distant Page Navigation:**
+- Images 0-3: Load immediately
+- Images 4+: Progressive loading resumes
+- Background: New adjacent pages start preloading
 
-## File Changes Summary
+## Architecture Components
 
-### New Files
-- `src/shared/components/ProgressiveLoadingManager.tsx` - Render prop wrapper for progressive loading
-- `src/shared/components/ImagePreloadManager.tsx` - Dedicated preloading component
-- `src/shared/lib/imageCacheManager.ts` - Centralized cache management
-- `src/shared/lib/imageLoadingDebugger.ts` - Runtime debugging tools
+### Core Files
+| Component | Purpose | Key Responsibility |
+|-----------|---------|-------------------|
+| `ProgressiveLoadingManager.tsx` | Orchestrates progressive revealing | Manages `showImageIndices` state |
+| `ImagePreloadManager.tsx` | Handles background preloading | Manages adjacent page preloading |
+| `useProgressiveImageLoading.ts` | Progressive loading logic | Session management and timing |
+| `useAdjacentPagePreloading.ts` | Preloading logic | Priority queue and device adaptation |
+| `imageCacheManager.ts` | Centralized cache management | Cache status tracking |
+| `imageLoadingPriority.ts` | Unified timing system | Strategy calculation and configuration |
 
-### Modified Files
-- `src/shared/components/ImageGallery.tsx` - Refactored to use new component architecture
-- `src/shared/components/ImageGalleryItem.tsx` - Simplified loading logic, enhanced debugging
-- `src/shared/hooks/useProgressiveImageLoading.ts` - Added race condition protection and debugging
-- `src/shared/hooks/useAdjacentPagePreloading.ts` - Updated to use centralized cache manager
-- `src/shared/lib/imageLoadingPriority.ts` - Unified all loading strategy calculations
+### Integration Flow
+```
+ImageGallery
+├── ProgressiveLoadingManager
+│   └── useProgressiveImageLoading (current page timing)
+├── ImagePreloadManager  
+│   └── useAdjacentPagePreloading (background preloading)
+└── ImageGalleryItem (receives shouldLoad from progressive manager)
+```
 
-## Performance Benefits
+## System Benefits
 
-1. **Faster Perceived Loading**: Progressive loading shows content immediately
-2. **Instant Navigation**: Adjacent page preloading eliminates wait times
-3. **Memory Efficiency**: Smart cache cleanup prevents memory bloat
-4. **Mobile Optimized**: Separate timing profiles for different device capabilities
-5. **Race Condition Free**: Robust handling of rapid user interactions
+1. **Predictable Performance**: Consistent loading behavior across devices
+2. **Optimal User Experience**: Immediate feedback with smooth visual progression
+3. **Resource Efficiency**: Controlled concurrent requests prevent browser overload
+4. **Intelligent Caching**: Preloaded content enables instant navigation
+5. **Robust Error Handling**: Comprehensive timeout and retry mechanisms

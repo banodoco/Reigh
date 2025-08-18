@@ -12,39 +12,107 @@ export interface LoadingConfig {
 }
 
 export interface ImageLoadingStrategy {
-  tier: 'immediate' | 'high' | 'medium' | 'low';
   shouldLoadInInitialBatch: boolean;
-  progressiveDelay: number; // Only delay used - for progressive loading system
+  progressiveDelay: number; // Unified delay calculation
   batchGroup: number;
 }
 
 /**
- * Unified batch configuration - single source of truth
- * Now uses mobile performance detection for better adaptation
+ * Device capability detection for adaptive loading
+ */
+const getDeviceCapabilities = () => {
+  const isMobile = window.innerWidth <= 768;
+  const hasLowMemory = 'deviceMemory' in navigator && (navigator as any).deviceMemory <= 4;
+  const hasLowEndCPU = 'hardwareConcurrency' in navigator && navigator.hardwareConcurrency <= 2;
+  const hasVeryLowEndCPU = 'hardwareConcurrency' in navigator && navigator.hardwareConcurrency === 1;
+  const hasSlowConnection = 'connection' in navigator && 
+    ((navigator as any).connection?.effectiveType === '2g' || 
+     (navigator as any).connection?.effectiveType === 'slow-2g');
+  
+  return {
+    isMobile,
+    hasLowMemory,
+    hasLowEndCPU,
+    hasVeryLowEndCPU,
+    hasSlowConnection,
+    isLowEnd: hasSlowConnection || (hasLowMemory && hasLowEndCPU),
+    isVeryLowEnd: hasVeryLowEndCPU || (hasSlowConnection && hasLowMemory)
+  };
+};
+
+// Performance tracking
+interface PerformanceMetrics {
+  avgLoadTime: number;
+  loadTimes: number[];
+  adjustedDelayMultiplier: number;
+}
+
+const performanceMetrics: PerformanceMetrics = {
+  avgLoadTime: 0,
+  loadTimes: [],
+  adjustedDelayMultiplier: 1.0
+};
+
+/**
+ * Track image load time and adjust delays based on performance
+ */
+export const trackImageLoadTime = (loadTimeMs: number): void => {
+  performanceMetrics.loadTimes.push(loadTimeMs);
+  
+  // Keep only last 20 measurements
+  if (performanceMetrics.loadTimes.length > 20) {
+    performanceMetrics.loadTimes.shift();
+  }
+  
+  // Calculate average
+  const sum = performanceMetrics.loadTimes.reduce((a, b) => a + b, 0);
+  performanceMetrics.avgLoadTime = sum / performanceMetrics.loadTimes.length;
+  
+  // Adjust delay multiplier based on average load time
+  if (performanceMetrics.avgLoadTime > 500) {
+    // Slow loading: increase delays
+    performanceMetrics.adjustedDelayMultiplier = Math.min(2.0, performanceMetrics.adjustedDelayMultiplier + 0.1);
+  } else if (performanceMetrics.avgLoadTime < 200) {
+    // Fast loading: decrease delays
+    performanceMetrics.adjustedDelayMultiplier = Math.max(0.5, performanceMetrics.adjustedDelayMultiplier - 0.1);
+  }
+};
+
+/**
+ * Adaptive batch configuration based on device capabilities
  */
 export const getUnifiedBatchConfig = (isMobile: boolean) => {
-  // For backward compatibility, provide a simple fallback
-  // New code should use getPerformanceConfig from mobilePerformanceUtils
-  if (isMobile) {
-    // Mobile settings - load full page with fast sequential delays
+  const capabilities = getDeviceCapabilities();
+  
+  // Very low-end mobile: minimal initial batch
+  if (capabilities.isVeryLowEnd && isMobile) {
     return {
-      initialBatchSize: 3, // First 3 load immediately
-      staggerDelay: 40, // Very fast delays for remaining images
-      maxStaggerDelay: 100
+      initialBatchSize: 2, // Only 2 images immediately
+      staggerDelay: 60, // Slower stagger for weak devices
+      maxStaggerDelay: 150
     };
   }
   
-  // Desktop settings - load full page with fast sequential delays
+  // Low-end or mobile: conservative settings
+  if (capabilities.isLowEnd || isMobile) {
+    return {
+      initialBatchSize: 3, // First 3 load immediately
+      staggerDelay: capabilities.hasSlowConnection ? 50 : 40, // Adaptive based on connection
+      maxStaggerDelay: 120
+    };
+  }
+  
+  // Desktop/high-end: aggressive settings
   return {
     initialBatchSize: 4, // First 4 load immediately
-    staggerDelay: 25, // Very fast delays for remaining images (25ms per image)
+    staggerDelay: 25, // Fast delays for good hardware
     maxStaggerDelay: 100
   };
 };
 
 /**
  * Main function: determines loading strategy for an image
- * This is the ONLY function components should use
+ * Simplified to use a single progressive delay calculation
  */
 export const getImageLoadingStrategy = (
   index: number, 
@@ -53,41 +121,34 @@ export const getImageLoadingStrategy = (
   const { isMobile, isPreloaded } = config;
   
   const batchConfig = getUnifiedBatchConfig(isMobile);
-  const { initialBatchSize, staggerDelay } = batchConfig;
+  const { initialBatchSize, staggerDelay, maxStaggerDelay } = batchConfig;
   
   // Determine which batch this image belongs to
   const batchGroup = Math.floor(index / initialBatchSize);
   
-  // Calculate strategy with unified logic
-  let tier: ImageLoadingStrategy['tier'];
+  // Simplified progressive delay calculation
   let progressiveDelay: number;
-  let shouldLoadInInitialBatch: boolean;
+  const shouldLoadInInitialBatch = index < initialBatchSize;
   
-  if (index === 0) {
-    // First image always loads immediately
-    tier = 'immediate';
+  if (isPreloaded) {
+    // Preloaded images always load immediately
     progressiveDelay = 0;
-    shouldLoadInInitialBatch = true;
-  } else if (index < 3) {
-    // Next 2 images get high priority  
-    tier = 'high';
-    progressiveDelay = isPreloaded ? 0 : 16; // Single frame delay
-    shouldLoadInInitialBatch = true;
-  } else if (index < initialBatchSize) {
-    // Rest of initial batch gets medium priority
-    tier = 'medium';
-    progressiveDelay = isPreloaded ? 0 : 32; // Two frame delay
-    shouldLoadInInitialBatch = true;
+  } else if (index === 0) {
+    // First image always loads immediately
+    progressiveDelay = 0;
+  } else if (shouldLoadInInitialBatch) {
+    // Initial batch with minimal delays for smooth appearance
+    progressiveDelay = index * 8; // 0ms, 8ms, 16ms, 24ms for first 4
   } else {
-    // Beyond initial batch gets medium priority with fast staggered delays for smooth visual progression
-    tier = 'medium';
-    const staggerMultiplier = index - initialBatchSize + 1;
-    progressiveDelay = isPreloaded ? 0 : staggerDelay * staggerMultiplier;
-    shouldLoadInInitialBatch = false;
+    // Progressive stagger for remaining images
+    const staggerIndex = index - initialBatchSize;
+    progressiveDelay = Math.min(
+      staggerDelay * (staggerIndex + 1),
+      maxStaggerDelay // Cap maximum delay
+    );
   }
   
   return {
-    tier,
     shouldLoadInInitialBatch,
     progressiveDelay,
     batchGroup

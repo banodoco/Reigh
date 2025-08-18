@@ -124,7 +124,7 @@ export const useProgressiveImageLoading = ({
     activeSessionRef.current = session;
     currentPageRef.current = page;
     
-    console.log(`🎬 [PAGELOADINGDEBUG] [PROG:${sessionId}] Starting progressive load: ${images.length} images (${isPageChange ? 'page change' : 'image set change'})`);
+    console.log(`🎬 [PAGELOADINGDEBUG] [PROG:${sessionId}] Starting immediate load: ${images.length} images (${isPageChange ? 'page change' : 'image set change'})`);
 
     // Helper to check if this session is still active
     const isSessionActive = () => {
@@ -144,39 +144,32 @@ export const useProgressiveImageLoading = ({
       return false;
     };
 
-    // Get unified batch configuration
-    const batchConfig = getUnifiedBatchConfig(isMobile);
-    const actualInitialBatch = Math.min(batchConfig.initialBatchSize, images.length);
-    
-    console.log(`📦 [PAGELOADINGDEBUG] [PROG:${sessionId}] Batch config: initialBatchSize=${batchConfig.initialBatchSize}, actualInitialBatch=${actualInitialBatch}, totalImages=${images.length}`);
-    
-    // Phase 1: Show initial batch immediately
-    const initialIndices = new Set<number>();
-    for (let i = 0; i < actualInitialBatch; i++) {
-      initialIndices.add(i);
+    // Show all images immediately
+    const allIndices = new Set<number>();
+    for (let i = 0; i < images.length; i++) {
+      allIndices.add(i);
     }
     
-    // Check if first batch of images are already cached
-    const firstBatchCached = images.slice(0, actualInitialBatch)
-      .every(img => isImageCached(img));
-    const cachedCount = images.slice(0, actualInitialBatch).filter(img => isImageCached(img)).length;
-      
-    console.log(`📦 [PAGELOADINGDEBUG] [PROG:${sessionId}] Initial batch: ${actualInitialBatch} images (${cachedCount}/${actualInitialBatch} cached)`);
-    
-    // Set initial batch immediately
-    if (!safeSetShowImageIndices(() => initialIndices)) {
+    // Set all immediately
+    if (!safeSetShowImageIndices(() => allIndices)) {
       return; // Session was canceled during setup
     }
     
-    // Notify that initial images are ready
+    // Check if all images are already cached
+    const allCached = images.every(img => isImageCached(img));
+    const cachedCount = images.filter(img => isImageCached(img)).length;
+      
+    console.log(`📦 [PAGELOADINGDEBUG] [PROG:${sessionId}] Immediate load: ${images.length} images (${cachedCount}/${images.length} cached)`);
+    
+    // Notify that images are ready
     if (onImagesReady && isSessionActive()) {
-      if (firstBatchCached) {
-        // Immediate callback for cached images to prevent loading flicker
+      if (allCached) {
+        // Immediate callback for cached images
         console.log(`⚡ [PAGELOADINGDEBUG] [PROG:${sessionId}] Ready callback: IMMEDIATE (all cached)`);
         onImagesReady();
       } else {
-        // Small delay for non-cached images to avoid layout thrashing
-        console.log(`⏱️ [PAGELOADINGDEBUG] [PROG:${sessionId}] Ready callback: DELAYED 16ms (${actualInitialBatch - cachedCount} uncached)`);
+        // Small delay for non-cached images
+        console.log(`⏱️ [PAGELOADINGDEBUG] [PROG:${sessionId}] Ready callback: DELAYED 16ms (${images.length - cachedCount} uncached)`);
         const readyTimeout = setTimeout(() => {
           if (isSessionActive()) {
             console.log(`✅ [PAGELOADINGDEBUG] [PROG:${sessionId}] Ready callback executed`);
@@ -184,88 +177,12 @@ export const useProgressiveImageLoading = ({
           } else {
             console.log(`❌ [PAGELOADINGDEBUG] [PROG:${sessionId}] Ready callback cancelled (session inactive)`);
           }
-        }, 16); // Next frame timing for smoother transitions
+        }, 16);
         timeouts.push(readyTimeout);
       }
     }
-
-    // Phase 2: Optimized staggered loading with cancellation support
-    if (images.length > actualInitialBatch && isSessionActive()) {
-      const remainingImages = images.length - actualInitialBatch;
-      console.log(`🔄 [PAGELOADINGDEBUG] [PROG:${sessionId}] Staggered load: ${remainingImages} remaining images (${batchConfig.staggerDelay}ms intervals)`);
-      
-      // Pre-calculate all reveal times for better performance
-      const revealSchedule: Array<{ index: number; delay: number; tier: string }> = [];
-      for (let i = actualInitialBatch; i < images.length; i++) {
-        const isCached = isImageCached(images[i]);
-        const strategy = getImageLoadingStrategy(i, {
-          isMobile,
-          totalImages: images.length,
-          isPreloaded: isCached
-        });
-        
-        // Debug logging to understand cache behavior
-        if (i < actualInitialBatch + 5) { // Log first few items beyond initial batch
-          console.log(`🔍 [PAGELOADINGDEBUG] [PROG:${sessionId}] Image ${i} strategy:`, {
-            imageId: images[i]?.id?.substring(0, 8),
-            isCached,
-            tier: strategy.tier,
-            progressiveDelay: strategy.progressiveDelay,
-            url: images[i]?.url?.substring(0, 50) + '...'
-          });
-        }
-        
-        revealSchedule.push({ 
-          index: i, 
-          delay: strategy.progressiveDelay, 
-          tier: strategy.tier 
-        });
-      }
-      
-      // Sort by delay for efficient processing
-      revealSchedule.sort((a, b) => a.delay - b.delay);
-      
-      let scheduleIndex = 0;
-      const startTime = Date.now();
-      
-      // Single interval to process the reveal schedule with cancellation support
-      const revealInterval = setInterval(() => {
-        if (!isSessionActive() || scheduleIndex >= revealSchedule.length) {
-          clearInterval(revealInterval);
-          if (scheduleIndex >= revealSchedule.length) {
-            console.log(`✅ [PAGELOADINGDEBUG] [PROG:${sessionId}] Staggered loading complete`);
-          }
-          return;
-        }
-        
-        const currentTime = Date.now() - startTime;
-        const currentItem = revealSchedule[scheduleIndex];
-        
-        if (currentTime >= currentItem.delay) {
-          const updated = safeSetShowImageIndices(prev => {
-            if (!prev.has(currentItem.index)) {
-              const newSet = new Set(prev);
-              newSet.add(currentItem.index);
-              // Log every reveal for debugging timing issues
-              console.log(`🖼️ [PAGELOADINGDEBUG] [PROG:${sessionId}] Revealed image ${currentItem.index} (${newSet.size}/${images.length} total) - tier: ${currentItem.tier}`);
-              return newSet;
-            }
-            return prev;
-          });
-          
-          if (updated) {
-            scheduleIndex++;
-          } else {
-            // Session was canceled, stop the interval
-            clearInterval(revealInterval);
-          }
-        }
-      }, 16); // Check every frame (16ms)
-      
-      timeouts.push(revealInterval);
-    } else if (isSessionActive()) {
-      console.log(`✅ [PAGELOADINGDEBUG] [PROG:${sessionId}] Complete - all images in initial batch`);
-    }
+    
+    console.log(`✅ [PAGELOADINGDEBUG] [PROG:${sessionId}] Complete - all images shown immediately`);
     
     // Cleanup function that runs when dependencies change or component unmounts
     return () => {
