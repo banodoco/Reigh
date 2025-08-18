@@ -26,7 +26,7 @@ import { timeEnd } from '@/shared/lib/logger';
 import { useIsMobile } from "@/shared/hooks/use-mobile";
 import { fetchGenerations } from "@/shared/hooks/useGenerations";
 import { getDisplayUrl } from '@/shared/lib/utils';
-import { preloadImagesWithCancel, initializePrefetchOperations, cleanupOldPaginationCache, triggerImageGarbageCollection } from '@/shared/hooks/useAdjacentPagePreloading';
+import { smartPreloadImages, initializePrefetchOperations, smartCleanupOldPages, triggerImageGarbageCollection } from '@/shared/hooks/useAdjacentPagePreloading';
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 import { ShotFilter } from '@/shared/components/ShotFilter';
 import { SkeletonGallery } from '@/shared/components/ui/skeleton-gallery';
@@ -658,7 +658,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     initializePrefetchOperations(prefetchOperationsRef, prefetchId);
 
     // Clean up old pagination cache to prevent memory leaks
-    cleanupOldPaginationCache(queryClient, currentPage, selectedProjectId, 10, 'generations');
+    smartCleanupOldPages(queryClient, currentPage, selectedProjectId, 'generations');
     
     // Trigger image garbage collection every 10 pages to free browser memory
     if (currentPage % 10 === 0) {
@@ -682,7 +682,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
         staleTime: 30 * 1000,
       }).then(() => {
         const cached = queryClient.getQueryData(['generations', selectedProjectId, nextPage, itemsPerPage, filters]) as GenerationsPaginatedResponse | undefined;
-        preloadImagesWithCancel(cached, 'next', prefetchId, prefetchOperationsRef);
+        smartPreloadImages(cached, 'next', prefetchId, prefetchOperationsRef);
       });
     }
 
@@ -694,7 +694,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
         staleTime: 30 * 1000,
       }).then(() => {
         const cachedPrev = queryClient.getQueryData(['generations', selectedProjectId, prevPage, itemsPerPage, filters]) as GenerationsPaginatedResponse | undefined;
-        preloadImagesWithCancel(cachedPrev, 'prev', prefetchId, prefetchOperationsRef);
+        smartPreloadImages(cachedPrev, 'prev', prefetchId, prefetchOperationsRef);
       });
     }
   }, [selectedProjectId, itemsPerPage, queryClient, loadGenerations, mediaTypeFilter, selectedShotFilter, excludePositioned, starredOnly]);

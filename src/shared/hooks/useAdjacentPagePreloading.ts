@@ -22,14 +22,176 @@ export const isImageCached = (image: any): boolean => {
   return (image as any).__memoryCached === true;
 };
 
-// Centralized function to clean up old pagination cache entries
-export const cleanupOldPaginationCache = (
+// Device capability detection for smart preloading
+interface PreloadConfig {
+  maxCachedPages: number;
+  preloadStrategy: 'aggressive' | 'moderate' | 'conservative' | 'disabled';
+  maxConcurrentPreloads: number;
+  thumbnailOnlyPreload: boolean;
+  debounceTime: number;
+}
+
+const getPreloadConfig = (): PreloadConfig => {
+  // Check if we're on mobile
+  const isMobile = window.innerWidth <= 768;
+  
+  // Check memory (if available)
+  const hasLowMemory = 'deviceMemory' in navigator && (navigator as any).deviceMemory <= 4;
+  
+  // Check CPU cores (if available) 
+  const hasLowEndCPU = 'hardwareConcurrency' in navigator && navigator.hardwareConcurrency <= 2;
+  
+  // Check connection (if available)
+  const hasSlowConnection = 'connection' in navigator && 
+    ((navigator as any).connection?.effectiveType === '2g' || 
+     (navigator as any).connection?.effectiveType === 'slow-2g');
+
+  // Determine strategy based on device capabilities
+  if (hasSlowConnection || (hasLowMemory && hasLowEndCPU)) {
+    return {
+      maxCachedPages: 3, // Current + 1 adjacent page each side
+      preloadStrategy: 'conservative',
+      maxConcurrentPreloads: 1,
+      thumbnailOnlyPreload: true,
+      debounceTime: 800
+    };
+  } else if (isMobile || hasLowMemory || hasLowEndCPU) {
+    return {
+      maxCachedPages: 5, // Current + 2 adjacent pages each side
+      preloadStrategy: 'moderate', 
+      maxConcurrentPreloads: 2,
+      thumbnailOnlyPreload: true,
+      debounceTime: 600
+    };
+  } else {
+    return {
+      maxCachedPages: 7, // Current + 3 adjacent pages each side
+      preloadStrategy: 'aggressive',
+      maxConcurrentPreloads: 3,
+      thumbnailOnlyPreload: false,
+      debounceTime: 400
+    };
+  }
+};
+
+// Performance monitoring for adaptive behavior
+const performanceMonitor = {
+  preloadTimes: [] as number[],
+  memoryUsage: [] as number[],
+  currentConfig: getPreloadConfig(),
+  
+  recordPreloadTime: (time: number) => {
+    performanceMonitor.preloadTimes.push(time);
+    if (performanceMonitor.preloadTimes.length > 10) {
+      performanceMonitor.preloadTimes.shift(); // Keep only last 10 measurements
+    }
+  },
+  
+  recordMemoryUsage: () => {
+    if ('memory' in performance) {
+      const memory = (performance as any).memory;
+      performanceMonitor.memoryUsage.push(memory.usedJSHeapSize);
+      if (performanceMonitor.memoryUsage.length > 5) {
+        performanceMonitor.memoryUsage.shift();
+      }
+    }
+  },
+  
+  adaptConfig: () => {
+    const avgPreloadTime = performanceMonitor.preloadTimes.length > 0 
+      ? performanceMonitor.preloadTimes.reduce((a, b) => a + b, 0) / performanceMonitor.preloadTimes.length 
+      : 0;
+    
+    const memoryIncrease = performanceMonitor.memoryUsage.length > 1
+      ? (performanceMonitor.memoryUsage[performanceMonitor.memoryUsage.length - 1] - performanceMonitor.memoryUsage[0]) / performanceMonitor.memoryUsage[0]
+      : 0;
+    
+    // If performance is degrading, become more conservative
+    if (avgPreloadTime > 2000 || memoryIncrease > 0.5) {
+      const current = performanceMonitor.currentConfig;
+      if (current.preloadStrategy !== 'conservative') {
+        performanceMonitor.currentConfig = {
+          ...current,
+          maxCachedPages: Math.max(3, current.maxCachedPages - 2),
+          maxConcurrentPreloads: Math.max(1, current.maxConcurrentPreloads - 1),
+          thumbnailOnlyPreload: true,
+          preloadStrategy: current.preloadStrategy === 'aggressive' ? 'moderate' : 'conservative'
+        };
+        console.log('[SmartPreload] Adapted to more conservative strategy due to performance');
+      }
+    }
+  }
+};
+
+// Priority-based preload queue to prevent browser overload
+class PreloadQueue {
+  private queue: Array<{
+    url: string;
+    priority: number;
+    onLoad: () => void;
+    onError: () => void;
+  }> = [];
+  private active = 0;
+  private maxConcurrent: number;
+
+  constructor(maxConcurrent: number = 3) {
+    this.maxConcurrent = maxConcurrent;
+  }
+
+  add(url: string, priority: number, onLoad: () => void, onError: () => void) {
+    this.queue.push({ url, priority, onLoad, onError });
+    this.queue.sort((a, b) => b.priority - a.priority); // Higher priority first
+    this.processQueue();
+  }
+
+  private processQueue() {
+    while (this.active < this.maxConcurrent && this.queue.length > 0) {
+      const item = this.queue.shift()!;
+      this.active++;
+      
+      const img = new Image();
+      const startTime = Date.now();
+      
+      img.onload = () => {
+        this.active--;
+        performanceMonitor.recordPreloadTime(Date.now() - startTime);
+        item.onLoad();
+        this.processQueue();
+      };
+      
+      img.onerror = () => {
+        this.active--;
+        item.onError();
+        this.processQueue();
+      };
+      
+      img.src = item.url;
+    }
+  }
+
+  clear() {
+    this.queue = [];
+    // Note: we can't cancel active downloads, but we can clear the queue
+  }
+
+  updateConcurrency(maxConcurrent: number) {
+    this.maxConcurrent = maxConcurrent;
+    this.processQueue();
+  }
+}
+
+const globalPreloadQueue = new PreloadQueue();
+
+// Smart cleanup that adapts to device capabilities  
+export const smartCleanupOldPages = (
   queryClient: any,
   currentPage: number,
   projectId: string,
-  maxCachedPages: number = 10,
   baseQueryKey: string = 'generations'
 ) => {
+  const config = performanceMonitor.currentConfig;
+  const keepRange = Math.floor(config.maxCachedPages / 2);
+  
   // Get all generation queries from cache
   const allQueries = queryClient.getQueryCache().getAll();
   
@@ -48,13 +210,12 @@ export const cleanupOldPaginationCache = (
     distance: Math.abs(query.queryKey[2] - currentPage)
   }));
 
-  // Keep queries within reasonable distance, remove distant ones
+  // Keep queries within range (current ± keepRange), remove distant ones
   const queriesToRemove = queriesWithDistance
-    .filter(item => item.distance > Math.floor(maxCachedPages / 2))
-    .sort((a, b) => b.distance - a.distance) // Remove most distant first
-    .slice(0, Math.max(0, generationQueries.length - maxCachedPages));
+    .filter(item => item.distance > keepRange)
+    .sort((a, b) => b.distance - a.distance); // Remove most distant first
 
-  // Clean up image cache for removed queries
+  // Clean up image cache flags for removed queries
   queriesToRemove.forEach(({ query }) => {
     const queryData = query.state?.data;
     if (queryData?.items) {
@@ -68,13 +229,18 @@ export const cleanupOldPaginationCache = (
 
   // Remove distant queries from cache
   queriesToRemove.forEach(({ query }) => {
-    console.log(`[CacheCleanup] Removing distant page cache:`, query.queryKey);
+    console.log(`[SmartCleanup] Removing distant page cache:`, query.queryKey);
     queryClient.removeQueries({ queryKey: query.queryKey });
   });
 
   if (queriesToRemove.length > 0) {
-    console.log(`[CacheCleanup] Cleaned up ${queriesToRemove.length} old pagination pages`);
+    console.log(`[SmartCleanup] Cleaned up ${queriesToRemove.length} old pagination pages (kept ${config.maxCachedPages} pages)`);
   }
+
+  // Record memory usage and adapt configuration
+  performanceMonitor.recordMemoryUsage();
+  performanceMonitor.adaptConfig();
+  globalPreloadQueue.updateConcurrency(performanceMonitor.currentConfig.maxConcurrentPreloads);
 };
 
 // Centralized function to trigger garbage collection for images (browser-level cleanup)
@@ -84,7 +250,7 @@ export const triggerImageGarbageCollection = () => {
     // Only available in Chrome with --js-flags="--expose-gc"
     try {
       (window as any).gc();
-      console.log('[CacheCleanup] Manual garbage collection triggered');
+      console.log('[SmartCleanup] Manual garbage collection triggered');
     } catch (e) {
       // Ignore if not available
     }
@@ -111,8 +277,8 @@ export const initializePrefetchOperations = (
   prefetchOperationsRef.current = { images: [], currentPrefetchId: prefetchId };
 };
 
-// Centralized function for preloading images with cancellation checks
-export const preloadImagesWithCancel = (
+// Smart preloading with device-aware limits
+export const smartPreloadImages = (
   cachedData: any,
   priority: 'next' | 'prev',
   currentPrefetchId: string,
@@ -123,45 +289,45 @@ export const preloadImagesWithCancel = (
 ) => {
   if (!cachedData?.items) return;
   
-  cachedData.items.forEach((img: any, idx: number) => {
+  const config = performanceMonitor.currentConfig;
+  
+  // Determine how many images to preload based on strategy
+  const maxImages = (() => {
+    switch (config.preloadStrategy) {
+      case 'conservative': return Math.min(5, cachedData.items.length);
+      case 'moderate': return Math.min(10, cachedData.items.length);
+      case 'aggressive': return cachedData.items.length;
+      default: return 0;
+    }
+  })();
+  
+  if (maxImages === 0) return;
+  
+  const imagesToPreload = cachedData.items.slice(0, maxImages);
+  const priorityScore = priority === 'next' ? 100 : 50;
+  
+  imagesToPreload.forEach((img: any, idx: number) => {
     // Skip if this prefetch is no longer current
     if (prefetchOperationsRef.current.currentPrefetchId !== currentPrefetchId) return;
     
-    // Priority-based delays: next page images load faster
-    const baseDelay = priority === 'next' ? 50 : 200;
-    const staggerDelay = idx * 30;
+    const imageUrl = config.thumbnailOnlyPreload ? 
+      getDisplayUrl(img.thumbUrl || img.url) : 
+      getDisplayUrl(img.url);
     
-    setTimeout(() => {
-      // Double-check this is still current before creating image
-      if (prefetchOperationsRef.current.currentPrefetchId !== currentPrefetchId) return;
-      
-      const preloadImg = new Image();
-      prefetchOperationsRef.current.images.push(preloadImg);
-      
-      preloadImg.onload = () => {
-        // Use centralized cache marking function
+    const itemPriority = priorityScore - idx; // Earlier images have higher priority
+    
+    globalPreloadQueue.add(
+      imageUrl,
+      itemPriority,
+      () => {
+        // Success callback
         markImageAsCached(img, true);
-        
-        const imgIndex = prefetchOperationsRef.current.images.indexOf(preloadImg);
-        if (imgIndex > -1) {
-          prefetchOperationsRef.current.images.splice(imgIndex, 1);
-        }
-      };
-      
-      preloadImg.onerror = () => {
-        const imgIndex = prefetchOperationsRef.current.images.indexOf(preloadImg);
-        if (imgIndex > -1) {
-          prefetchOperationsRef.current.images.splice(imgIndex, 1);
-        }
-      };
-      
-      preloadImg.src = getDisplayUrl(img.url);
-      
-      // Check if it was already cached (loads synchronously from memory)
-      if (preloadImg.complete && preloadImg.naturalWidth > 0) {
-        markImageAsCached(img, true);
+      },
+      () => {
+        // Error callback - just log, don't retry
+        console.warn(`[SmartPreload] Failed to preload image:`, imageUrl);
       }
-    }, baseDelay + staggerDelay);
+    );
   });
 };
 
@@ -170,6 +336,70 @@ interface PreloadOperation {
   timeouts: NodeJS.Timeout[];
   currentPageId: string;
 }
+
+// Client-side preloading with smart limits
+export const preloadClientSidePages = (
+  prevPageImages: any[],
+  nextPageImages: any[],
+  pageId: string,
+  operations: PreloadOperation
+) => {
+  const config = performanceMonitor.currentConfig;
+  
+  // Helper to preload images with smart prioritization and device-aware limits
+  const preloadImagesWithPriority = (
+    images: any[],
+    priority: 'next' | 'prev'
+  ) => {
+    const maxImages = (() => {
+      switch (config.preloadStrategy) {
+        case 'conservative': return Math.min(3, images.length);
+        case 'moderate': return Math.min(6, images.length);
+        case 'aggressive': return Math.min(10, images.length);
+        default: return 0;
+      }
+    })();
+    
+    if (maxImages === 0) return;
+    
+    const imagesToPreload = images.slice(0, maxImages);
+    const priorityScore = priority === 'next' ? 80 : 40;
+    
+    imagesToPreload.forEach((image, idx) => {
+      // Check if this preload is still valid
+      if (operations.currentPageId !== pageId) return;
+      
+      const imageUrl = config.thumbnailOnlyPreload ? 
+        getDisplayUrl(image.thumbUrl || image.url) : 
+        getDisplayUrl(image.url);
+      
+      const itemPriority = priorityScore - idx;
+      
+      globalPreloadQueue.add(
+        imageUrl,
+        itemPriority,
+        () => {
+          // Success callback
+          markImageAsCached(image, true);
+        },
+        () => {
+          // Error callback
+          console.warn(`[SmartPreload] Failed to preload client-side image:`, imageUrl);
+        }
+      );
+    });
+  };
+
+  // Preload next page first (higher priority)
+  if (nextPageImages.length > 0) {
+    preloadImagesWithPriority(nextPageImages, 'next');
+  }
+  
+  // Preload previous page second (lower priority)  
+  if (prevPageImages.length > 0) {
+    preloadImagesWithPriority(prevPageImages, 'prev');
+  }
+};
 
 export const useAdjacentPagePreloading = ({
   enabled = true,
@@ -202,6 +432,9 @@ export const useAdjacentPagePreloading = ({
     // Clear timeouts
     operations.timeouts.forEach(timeout => clearTimeout(timeout));
     
+    // Clear global preload queue
+    globalPreloadQueue.clear();
+    
     // Reset tracking
     preloadOperationsRef.current = {
       images: [],
@@ -210,117 +443,31 @@ export const useAdjacentPagePreloading = ({
     };
   }, []);
 
-  // Client-side adjacent page preloading
-  const preloadClientSidePages = useCallback((
-    prevPageImages: any[],
-    nextPageImages: any[],
-    pageId: string
-  ) => {
-    const operations = preloadOperationsRef.current;
-    
-    // Helper to preload images with prioritization and cancellation
-    const preloadImagesWithPriority = (
-      images: any[],
-      priority: 'next' | 'prev',
-      maxImages: number = 5
-    ) => {
-      const imagesToPreload = images.slice(0, maxImages);
-      const baseDelay = priority === 'next' ? 50 : 200;
-      
-      imagesToPreload.forEach((image, idx) => {
-        const timeout = setTimeout(() => {
-          // Check if this preload is still valid
-          if (operations.currentPageId !== pageId) return;
-          
-          const preloadImg = new Image();
-          operations.images.push(preloadImg);
-          
-          preloadImg.onload = () => {
-            // Use centralized cache marking function
-            markImageAsCached(image, true);
-            
-            const imgIndex = operations.images.indexOf(preloadImg);
-            if (imgIndex > -1) {
-              operations.images.splice(imgIndex, 1);
-            }
-          };
-          
-          // Set the source to start loading
-          preloadImg.src = getDisplayUrl(image.url);
-          
-          // Check if it was already cached (loads synchronously from memory)
-          if (preloadImg.complete && preloadImg.naturalWidth > 0) {
-            markImageAsCached(image, true);
-          }
-          
-          preloadImg.onerror = () => {
-            const imgIndex = operations.images.indexOf(preloadImg);
-            if (imgIndex > -1) {
-              operations.images.splice(imgIndex, 1);
-            }
-          };
-          
-          // Priority: preload full image for first 2 images of next page
-          if (priority === 'next' && idx < 2 && image.fullImageUrl) {
-            const fullImg = new Image();
-            operations.images.push(fullImg);
-            
-            fullImg.onload = () => {
-              // Mark full image as cached too (using a different flag)
-              (image as any).__fullImageCached = true;
-              
-              const fullImgIndex = operations.images.indexOf(fullImg);
-              if (fullImgIndex > -1) {
-                operations.images.splice(fullImgIndex, 1);
-              }
-            };
-            
-            fullImg.onerror = () => {
-              const fullImgIndex = operations.images.indexOf(fullImg);
-              if (fullImgIndex > -1) {
-                operations.images.splice(fullImgIndex, 1);
-              }
-            };
-            
-            fullImg.src = getDisplayUrl(image.fullImageUrl);
-            
-            // Check if full image was already cached
-            if (fullImg.complete && fullImg.naturalWidth > 0) {
-              (image as any).__fullImageCached = true;
-            }
-          }
-        }, baseDelay + (idx * 30));
-        
-        operations.timeouts.push(timeout);
-      });
-    };
-
-    // Preload next page first (higher priority)
-    if (nextPageImages.length > 0) {
-      preloadImagesWithPriority(nextPageImages, 'next');
-    }
-    
-    // Preload previous page second (lower priority)  
-    if (prevPageImages.length > 0) {
-      preloadImagesWithPriority(prevPageImages, 'prev');
-    }
-  }, []);
-
-  // Main preloading effect
+  // Main preloading effect with smart configuration
   useEffect(() => {
     if (!enabled) return;
     
     // Cancel any existing preloads immediately
     cancelAllPreloads();
     
+    // Update global queue concurrency based on current config
+    const config = performanceMonitor.currentConfig;
+    globalPreloadQueue.updateConcurrency(config.maxConcurrentPreloads);
+    
+    // Smart debounce based on strategy
+    const debounceTime = config.debounceTime;
+    
     // Debounce preloading to avoid excessive operations on rapid page changes
     const preloadTimer = setTimeout(() => {
       const totalPages = Math.max(1, Math.ceil(totalFilteredItems / itemsPerPage));
       const currentPageForPreload = isServerPagination ? (serverPage! - 1) : page;
       
-      // Calculate adjacent pages
-      const prevPage = currentPageForPreload > 0 ? currentPageForPreload - 1 : null;
-      const nextPage = currentPageForPreload < totalPages - 1 ? currentPageForPreload + 1 : null;
+      // Calculate adjacent pages based on strategy
+      const shouldPreloadPrev = config.preloadStrategy !== 'disabled' && currentPageForPreload > 0;
+      const shouldPreloadNext = config.preloadStrategy !== 'disabled' && currentPageForPreload < totalPages - 1;
+      
+      const prevPage = shouldPreloadPrev ? currentPageForPreload - 1 : null;
+      const nextPage = shouldPreloadNext ? currentPageForPreload + 1 : null;
       
       // Create unique page ID for this preload session
       const pageId = `${currentPageForPreload}-${Date.now()}`;
@@ -328,14 +475,14 @@ export const useAdjacentPagePreloading = ({
       
       if (isServerPagination) {
         // For server-side pagination, call the callback to prefetch data
-        if (onPrefetchAdjacentPages) {
+        if (onPrefetchAdjacentPages && (shouldPreloadPrev || shouldPreloadNext)) {
           const serverPrevPage = prevPage !== null ? prevPage + 1 : null; // Convert back to 1-based
           const serverNextPage = nextPage !== null ? nextPage + 1 : null;
           onPrefetchAdjacentPages(serverPrevPage, serverNextPage);
         }
       } else {
         // For client-side pagination, preload adjacent page images directly
-        if (allImages.length > 0) {
+        if (allImages.length > 0 && (shouldPreloadPrev || shouldPreloadNext)) {
           const startIndex = currentPageForPreload * itemsPerPage;
           
           // Get images for adjacent pages
@@ -346,10 +493,10 @@ export const useAdjacentPagePreloading = ({
             ? allImages.slice((currentPageForPreload + 1) * itemsPerPage, (currentPageForPreload + 2) * itemsPerPage)
             : [];
           
-          preloadClientSidePages(prevPageImages, nextPageImages, pageId);
+          preloadClientSidePages(prevPageImages, nextPageImages, pageId, preloadOperationsRef.current);
         }
       }
-    }, 500); // 500ms debounce
+    }, debounceTime);
     
     preloadOperationsRef.current.timeouts.push(preloadTimer);
     
@@ -366,7 +513,6 @@ export const useAdjacentPagePreloading = ({
     onPrefetchAdjacentPages,
     allImages,
     cancelAllPreloads,
-    preloadClientSidePages,
   ]);
 
   // Clean up all operations on unmount
@@ -379,4 +525,27 @@ export const useAdjacentPagePreloading = ({
   return {
     cancelAllPreloads,
   };
-}; 
+};
+
+// Diagnostic function for debugging and monitoring
+export const getPreloadDiagnostics = () => {
+  const config = performanceMonitor.currentConfig;
+  const avgPreloadTime = performanceMonitor.preloadTimes.length > 0 
+    ? performanceMonitor.preloadTimes.reduce((a, b) => a + b, 0) / performanceMonitor.preloadTimes.length 
+    : 0;
+  
+  return {
+    config,
+    performance: {
+      averagePreloadTime: avgPreloadTime,
+      preloadSamples: performanceMonitor.preloadTimes.length,
+      memorySamples: performanceMonitor.memoryUsage.length
+    },
+    device: {
+      isMobile: window.innerWidth <= 768,
+      memory: 'deviceMemory' in navigator ? (navigator as any).deviceMemory : 'unknown',
+      cores: 'hardwareConcurrency' in navigator ? navigator.hardwareConcurrency : 'unknown',
+      connection: 'connection' in navigator ? (navigator as any).connection?.effectiveType : 'unknown'
+    }
+  };
+};

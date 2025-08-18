@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useRenderLogger } from '@/shared/hooks/useRenderLogger';
 import { useSlidingPane } from '@/shared/hooks/useSlidingPane';
 import { cn, getDisplayUrl } from '@/shared/lib/utils';
-import { preloadImagesWithCancel, initializePrefetchOperations, cleanupOldPaginationCache, triggerImageGarbageCollection } from '@/shared/hooks/useAdjacentPagePreloading';
+import { smartPreloadImages, initializePrefetchOperations, smartCleanupOldPages, triggerImageGarbageCollection } from '@/shared/hooks/useAdjacentPagePreloading';
 import { useQueryClient } from '@tanstack/react-query';
 import { fetchGenerations } from '@/shared/hooks/useGenerations';
 import { Button } from '@/shared/components/ui/button';
@@ -100,7 +100,7 @@ export const GenerationsPane: React.FC = () => {
     // Clean up old pagination cache to prevent memory leaks
     // Use nextPage-1 as approximation of current page for cleanup
     const currentPage = nextPage ? nextPage - 1 : (prevPage ? prevPage + 1 : 1);
-    cleanupOldPaginationCache(queryClient, currentPage, selectedProjectId, 8, 'generations');
+    smartCleanupOldPages(queryClient, currentPage, selectedProjectId, 'generations');
     
     // Trigger image garbage collection periodically for pane to free browser memory
     if (currentPage % 8 === 0) {
@@ -124,7 +124,7 @@ export const GenerationsPane: React.FC = () => {
         staleTime: 30 * 1000,
       }).then(() => {
         const cached = queryClient.getQueryData(['generations', selectedProjectId, nextPage, GENERATIONS_PER_PAGE, filters]) as any;
-        preloadImagesWithCancel(cached, 'next', prefetchId, prefetchOperationsRef);
+        smartPreloadImages(cached, 'next', prefetchId, prefetchOperationsRef);
       });
     }
 
@@ -136,7 +136,7 @@ export const GenerationsPane: React.FC = () => {
         staleTime: 30 * 1000,
       }).then(() => {
         const cached = queryClient.getQueryData(['generations', selectedProjectId, prevPage, GENERATIONS_PER_PAGE, filters]) as any;
-        preloadImagesWithCancel(cached, 'prev', prefetchId, prefetchOperationsRef);
+        smartPreloadImages(cached, 'prev', prefetchId, prefetchOperationsRef);
       });
     }
   }, [selectedProjectId, queryClient, mediaTypeFilter, selectedShotFilter, excludePositioned, starredOnly]);

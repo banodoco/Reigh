@@ -6,7 +6,7 @@ import { useProject } from '@/shared/contexts/ProjectContext';
 import { useQueryClient } from '@tanstack/react-query';
 import { fetchGenerations } from '@/shared/hooks/useGenerations';
 import { getDisplayUrl } from '@/shared/lib/utils';
-import { preloadImagesWithCancel, initializePrefetchOperations, cleanupOldPaginationCache, triggerImageGarbageCollection } from '@/shared/hooks/useAdjacentPagePreloading';
+import { smartPreloadImages, initializePrefetchOperations, smartCleanupOldPages, triggerImageGarbageCollection } from '@/shared/hooks/useAdjacentPagePreloading';
 
 const GENERATIONS_PER_PAGE = 30; // 30 items per page for consistency
 
@@ -74,7 +74,7 @@ const GenerationsPage: React.FC = () => {
     initializePrefetchOperations(prefetchOperationsRef, prefetchId);
 
     // Clean up old pagination cache to prevent memory leaks
-    cleanupOldPaginationCache(queryClient, page, selectedProjectId, 10, 'generations');
+    smartCleanupOldPages(queryClient, page, selectedProjectId, 'generations');
     
     // Trigger image garbage collection every 10 pages to free browser memory
     if (page % 10 === 0) {
@@ -98,7 +98,7 @@ const GenerationsPage: React.FC = () => {
         staleTime: 30 * 1000,
       }).then(() => {
         const cached = queryClient.getQueryData(['generations', selectedProjectId, nextPage, GENERATIONS_PER_PAGE, filters]) as any;
-        preloadImagesWithCancel(cached, 'next', prefetchId, prefetchOperationsRef);
+        smartPreloadImages(cached, 'next', prefetchId, prefetchOperationsRef);
       });
     }
 
@@ -110,7 +110,7 @@ const GenerationsPage: React.FC = () => {
         staleTime: 30 * 1000,
       }).then(() => {
         const cached = queryClient.getQueryData(['generations', selectedProjectId, prevPage, GENERATIONS_PER_PAGE, filters]) as any;
-        preloadImagesWithCancel(cached, 'prev', prefetchId, prefetchOperationsRef);
+        smartPreloadImages(cached, 'prev', prefetchId, prefetchOperationsRef);
       });
     }
   }, [selectedProjectId, queryClient, mediaTypeFilter, selectedShotFilter, excludePositioned, starredOnly]);

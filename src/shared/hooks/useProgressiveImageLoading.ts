@@ -1,23 +1,28 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { isImageCached } from './useAdjacentPagePreloading';
+import { getBatchConfig, shouldIncludeInInitialBatch } from '@/shared/lib/imageLoadingPriority';
 
 interface UseProgressiveImageLoadingProps {
   images: any[];
   page: number;
   enabled?: boolean;
   onImagesReady?: () => void; // Callback when first batch is ready
+  isMobile: boolean; // Mobile context for adaptive behavior
+  useIntersectionObserver?: boolean; // Optional: use intersection observer for lazy loading
 }
 
 export const useProgressiveImageLoading = ({ 
   images, 
   page, 
   enabled = true,
-  onImagesReady
+  onImagesReady,
+  isMobile,
+  useIntersectionObserver = false // Disable by default for compatibility
 }: UseProgressiveImageLoadingProps) => {
   const [showImageIndices, setShowImageIndices] = useState<Set<number>>(new Set());
   const currentPageRef = useRef(page);
   currentPageRef.current = page;
-
+  
   useEffect(() => {
     if (!enabled || images.length === 0) return;
 
@@ -27,12 +32,32 @@ export const useProgressiveImageLoading = ({
     // Update current page ref for race condition checks
     currentPageRef.current = page;
 
-    // Reset and show first 10 images immediately (this ensures clean state for new page)
-    const initialIndices = new Set(Array.from({ length: Math.min(10, images.length) }, (_, i) => i));
+    // Get unified batch configuration
+    const batchConfig = getBatchConfig(isMobile);
+    const actualInitialBatch = Math.min(batchConfig.initialBatchSize, images.length);
+    
+    // Debug logging for pagination issues
+    if (page > 2) { // Only log for page 3+ where issues occur
+      console.log(`[ProgressiveLoading] Page ${page + 1}:`, {
+        imagesLength: images.length,
+        actualInitialBatch,
+        batchConfig,
+        enabled,
+        isCurrentPage
+      });
+    }
+
+    // Reset and show first batch immediately (visible-first approach)
+    // Only include images that should be in the initial batch according to unified system
+    const initialIndices = new Set(
+      Array.from({ length: images.length }, (_, i) => i)
+        .filter(i => shouldIncludeInInitialBatch(i, isMobile))
+        .slice(0, actualInitialBatch)
+    );
     setShowImageIndices(initialIndices);
     
     // Check if first batch of images are already cached
-    const firstBatchCached = images.slice(0, Math.min(10, images.length))
+    const firstBatchCached = images.slice(0, actualInitialBatch)
       .every(img => isImageCached(img));
     
     // Notify that initial images are ready
@@ -51,34 +76,29 @@ export const useProgressiveImageLoading = ({
       }
     }
 
-    // Progressive loading for remaining images (if more than 10)
-    if (images.length > 10) {
-      // Restore original optimized batching logic
-      const remainingImages = images.length - 10;
-      const batchSize = Math.min(10, remainingImages); // Dynamic batch size like original
-      const maxBatches = page > 10 ? 2 : Math.ceil(remainingImages / batchSize); // Smart limits
-      let batchCount = 0;
-      
-      for (let i = 10; i < images.length && batchCount < maxBatches; i += batchSize) {
-        const batchNumber = Math.floor((i - 10) / batchSize);
-        const delay = (batchNumber + 1) * 100; // Shorter delay like original
+    // Staggered loading for remaining images (one by one for smooth progression)
+    if (images.length > actualInitialBatch) {
+      // Load remaining images one by one with unified staggered timing
+      for (let i = actualInitialBatch; i < images.length; i++) {
+        const imageIndex = i;
+        const delay = batchConfig.staggerDelay * (i - actualInitialBatch + 1);
         
         const timeout = setTimeout(() => {
-          // Enhanced race condition check like original
+          // Enhanced race condition check - make sure we're still on the same page
           if (isCurrentPage && currentPageRef.current === page) {
             setShowImageIndices(prev => {
-              const newSet = new Set(prev);
-              // Add next batch (or remaining if less than batchSize)
-              for (let j = i; j < Math.min(i + batchSize, images.length); j++) {
-                newSet.add(j);
+              // Only add if we don't already have this index (avoid duplicates)
+              if (!prev.has(imageIndex)) {
+                const newSet = new Set(prev);
+                newSet.add(imageIndex);
+                return newSet;
               }
-              return newSet;
+              return prev;
             });
           }
         }, delay);
         
         timeouts.push(timeout);
-        batchCount++;
       }
     }
     
@@ -88,7 +108,7 @@ export const useProgressiveImageLoading = ({
       timeouts.forEach(timeout => clearTimeout(timeout));
       // Don't clear showImageIndices here - let the new effect handle setting them
     };
-  }, [images, page, enabled]);
+  }, [images, page, enabled, isMobile, useIntersectionObserver]);
 
   return { showImageIndices };
-}; 
+};

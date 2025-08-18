@@ -17,6 +17,7 @@ import {
 import { DraggableImage } from "@/shared/components/DraggableImage";
 import { getDisplayUrl } from "@/shared/lib/utils";
 import { isImageCached } from "@/shared/hooks/useAdjacentPagePreloading";
+import { getImageLoadingDelay } from '@/shared/lib/imageLoadingPriority';
 import { TimeStamp } from "@/shared/components/TimeStamp";
 import { useToast } from "@/shared/hooks/use-toast";
 import * as PopoverPrimitive from "@radix-ui/react-popover";
@@ -212,17 +213,21 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
     return displayUrl;
   }, [displayUrl, image.thumbUrl, image.url, imageRetryCount]);
 
-  // Always start loading images immediately for better prefetching
+  // Unified loading system that respects progressive loading control
   useEffect(() => {
     let isMounted = true; // Flag to prevent state updates after unmount
     
-    if (!actualSrc) {
+    // Only load if progressive loading system says we should AND we haven't loaded yet
+    if (!actualSrc && shouldLoad) {
       if (index < 3) {
-        console.log(`[ImageGalleryItem-${index}] Starting load sequence`, {
+        console.log(`[ImageGalleryItem-${index}] Starting unified load sequence`, {
           actualDisplayUrl,
-          imageId: image.id
+          imageId: image.id,
+          shouldLoad,
+          isPriority
         });
       }
+      
       // Don't load placeholder URLs - they indicate missing/invalid image data
       if (actualDisplayUrl === '/placeholder.svg' || !actualDisplayUrl) {
         console.warn(`[ImageGalleryItem] Skipping load for invalid URL: ${actualDisplayUrl}, image:`, image);
@@ -231,11 +236,17 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
       }
       
       // Only set loading if the image isn't already cached/loaded
-      if (!isImageCached(image)) {
+      const isPreloaded = isImageCached(image);
+      if (!isPreloaded) {
         setImageLoading(true);
       }
-      // Small delay to ensure priority images start loading first
-      const delay = isPriority ? 0 : 50;
+      
+      // Use unified delay calculation system
+      const delay = getImageLoadingDelay(index, {
+        isMobile, // Use the isMobile prop passed from parent
+        totalImages: 100, // Approximate - actual count not critical for delay calculation
+        isPreloaded
+      });
       
       const timeout = setTimeout(() => {
         if (isMounted && actualDisplayUrl !== '/placeholder.svg') {
@@ -252,7 +263,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [actualSrc, actualDisplayUrl, isPriority, image.id]); // Use image.id instead of entire object
+  }, [actualSrc, actualDisplayUrl, shouldLoad, isPriority, image.id, index]); // Added shouldLoad to dependencies
 
   // Only format metadata when actually needed (Info tooltip/popover is opened)
   // This prevents 150-200ms of string building work during initial render on mobile

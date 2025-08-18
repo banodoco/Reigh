@@ -35,6 +35,7 @@ import { TimeStamp } from "@/shared/components/TimeStamp";
 import { useToggleGenerationStar } from '@/shared/hooks/useGenerations';
 import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { ImageGalleryItem } from "./ImageGalleryItem";
+import { isImagePriority } from '@/shared/lib/imageLoadingPriority';
 
 // Define the structure for individual LoRA details within metadata
 export interface MetadataLora {
@@ -810,14 +811,13 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
 
 
 
-  // Progressive loading state - use custom hook  
+  // Progressive loading state - use unified system
   const { showImageIndices } = useProgressiveImageLoading({
     images: paginatedImages,
     page,
     enabled: true,
+    isMobile, // Pass mobile context for unified priority calculations
     onImagesReady: () => {
-      // Only reset gallery loading if it was actually set (for distant page jumps)
-      // Adjacent pages might not have set it in the first place
       setIsGalleryLoading(false);
     },
   });
@@ -1117,7 +1117,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
               <div className={`grid ${reducedSpacing ? 'gap-2 sm:gap-4' : 'gap-4'} ${reducedSpacing ? 'mb-4' : 'mb-12'} ${gridColumnClasses}`}>
                 {paginatedImages.map((image, index) => {
                   const shouldShow = showImageIndices.has(index);
-                  const isPriority = index < 10; // First 10 images are priority
+                  // Use unified priority system
+                  const isPriority = isImagePriority(index, isMobile);
                   
                   return (
                     <ImageGalleryItem
