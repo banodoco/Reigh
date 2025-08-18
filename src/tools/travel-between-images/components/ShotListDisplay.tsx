@@ -132,8 +132,11 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
         position: index + 1,
       }));
 
-      // Optimistically update the query cache immediately
+      // Optimistically update BOTH query caches immediately
+      // Update the full shots cache (used by useShots context)
       queryClient.setQueryData(['shots', currentProjectId], shotsWithNewPositions);
+      // Update the limited shots cache (used by useListShots in VideoTravelToolPage) 
+      queryClient.setQueryData(['shots', currentProjectId, 5], shotsWithNewPositions);
       
       // Generate position updates for database
       const shotOrders = reorderedShots.map((shot, index) => ({
@@ -146,8 +149,9 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
         { projectId: currentProjectId, shotOrders },
         {
           onError: (error) => {
-            // Revert optimistic update on error
+            // Revert optimistic updates on both caches on error
             queryClient.setQueryData(['shots', currentProjectId], shots);
+            queryClient.setQueryData(['shots', currentProjectId, 5], shots);
             toast.error(`Failed to reorder shots: ${error.message}`);
           },
           // Note: No onSuccess callback - we don't want to invalidate and refetch
