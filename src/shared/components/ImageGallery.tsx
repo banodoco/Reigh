@@ -732,7 +732,23 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   
   // Handle pagination with loading state
   const handlePageChange = React.useCallback((newPage: number, direction: 'prev' | 'next', fromBottom = false) => {
-    if (loadingButton) return; // Prevent multiple clicks while any button is loading
+    // Generate unique navigation ID for tracking
+    const navId = `nav-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    console.log(`[PageNav:${navId}] Navigation initiated:`, {
+      from: isServerPagination ? serverPage : page,
+      to: newPage,
+      direction,
+      fromBottom,
+      isServerPagination,
+      loadingButton,
+      timestamp: new Date().toISOString()
+    });
+    
+    if (loadingButton) {
+      console.log(`[PageNav:${navId}] Navigation blocked - loading button active:`, loadingButton);
+      return;
+    } // Prevent multiple clicks while any button is loading
     
     setLoadingButton(direction);
     
@@ -758,17 +774,21 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     
     if (isServerPagination && onServerPageChange) {
       // Server-side pagination: notify the parent, which will handle scrolling.
+      console.log(`[PageNav:${navId}] Server pagination - calling onServerPageChange`);
       onServerPageChange(newPage, fromBottom); 
       
       // We still manage the loading button state here.
       setTimeout(() => {
+        console.log(`[PageNav:${navId}] Server pagination complete - clearing loading button`);
         setLoadingButton(null);
       }, 500);
     } else {
       // Client-side pagination - show loading longer for bottom buttons
       const loadingDelay = fromBottom ? 300 : 100;
+      console.log(`[PageNav:${navId}] Client pagination - setting page to ${newPage}, delay: ${loadingDelay}ms`);
       setPage(newPage);
       setTimeout(() => {
+        console.log(`[PageNav:${navId}] Client pagination complete - clearing loading button`);
         setLoadingButton(null);
         // Scroll to top of gallery AFTER page loads (only for bottom buttons)
         if (fromBottom && galleryTopRef.current) {
@@ -776,6 +796,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
           const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
           const targetPosition = rect.top + scrollTop - (isMobile ? 80 : 20); // Account for mobile nav/header
           
+          console.log(`[PageNav:${navId}] Scrolling to top after bottom navigation`);
           window.scrollTo({
             top: Math.max(0, targetPosition), // Ensure we don't scroll above page top
             behavior: 'smooth'

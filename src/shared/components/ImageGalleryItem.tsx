@@ -215,18 +215,21 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
 
   // Unified loading system that respects progressive loading control
   useEffect(() => {
+    // Generate unique load ID for tracking this specific image load
+    const loadId = `load-${image.id}-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
     let isMounted = true; // Flag to prevent state updates after unmount
     
     // Only load if progressive loading system says we should AND we haven't loaded yet
     if (!actualSrc && shouldLoad) {
-      if (index < 3) {
-        console.log(`[ImageGalleryItem-${index}] Starting unified load sequence`, {
-          actualDisplayUrl,
-          imageId: image.id,
-          shouldLoad,
-          isPriority
-        });
-      }
+      console.log(`[ImageLoad:${loadId}] Starting image load:`, {
+        index,
+        imageId: image.id,
+        actualDisplayUrl,
+        shouldLoad,
+        isPriority,
+        isMobile,
+        timestamp: new Date().toISOString()
+      });
       
       // Don't load placeholder URLs - they indicate missing/invalid image data
       if (actualDisplayUrl === '/placeholder.svg' || !actualDisplayUrl) {
@@ -248,16 +251,26 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
         isPreloaded
       });
       
+      console.log(`[ImageLoad:${loadId}] Calculated delay: ${delay}ms (cached: ${isPreloaded})`);
+      
       const timeout = setTimeout(() => {
         if (isMounted && actualDisplayUrl !== '/placeholder.svg') {
+          console.log(`[ImageLoad:${loadId}] Setting actualSrc after ${delay}ms delay`);
           setActualSrc(actualDisplayUrl);
+        } else {
+          console.log(`[ImageLoad:${loadId}] Skipping setActualSrc - component unmounted or invalid URL`);
         }
       }, delay);
       
       return () => {
+        console.log(`[ImageLoad:${loadId}] Cleanup - clearing timeout`);
         clearTimeout(timeout);
         isMounted = false;
       };
+    } else if (!shouldLoad) {
+      console.log(`[ImageLoad:${loadId}] Skipping load - shouldLoad is false`);
+    } else if (actualSrc) {
+      console.log(`[ImageLoad:${loadId}] Skipping load - actualSrc already set:`, actualSrc);
     }
     
     return () => {
