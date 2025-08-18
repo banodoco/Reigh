@@ -504,8 +504,11 @@ const VideoTravelToolPage: React.FC = () => {
 
   // Update videoPairConfigs when computed configs change
   useEffect(() => {
-    setVideoPairConfigs(computedVideoPairConfigs);
-  }, [computedVideoPairConfigs]);
+    // Only update if the configs have actually changed to prevent infinite loops
+    if (!deepEqual(videoPairConfigs, computedVideoPairConfigs)) {
+      setVideoPairConfigs(computedVideoPairConfigs);
+    }
+  }, [computedVideoPairConfigs, videoPairConfigs]);
 
   // Clear any previously selected shot unless this navigation explicitly came from a shot click
   // OR if there's a hash in the URL (direct navigation to a specific shot)

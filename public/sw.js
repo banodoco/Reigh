@@ -55,7 +55,12 @@ self.addEventListener('fetch', event => {
       })
       .catch(() => {
         // Only fall back to cache if network fails
-        return caches.match(event.request);
+        return caches.match(event.request).then(response => {
+          return response || new Response('', {
+            status: 404,
+            statusText: 'Not Found'
+          });
+        });
       })
   );
 });
