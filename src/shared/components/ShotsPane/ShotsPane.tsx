@@ -9,7 +9,7 @@ import { cn } from '@/shared/lib/utils';
 import { useToolSettings } from '@/shared/hooks/useToolSettings';
 import { VideoTravelSettings } from '@/tools/travel-between-images/settings';
 import { Button } from '@/shared/components/ui/button';
-import { ArrowRightIcon, ArrowUpDown } from 'lucide-react';
+import { ArrowDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { usePanes } from '@/shared/contexts/PanesContext';
 import CreateShotModal from '@/shared/components/CreateShotModal';
@@ -221,30 +221,16 @@ export const ShotsPane: React.FC = () => {
         >
           <div className="p-2 border-b border-zinc-800 flex items-center justify-between flex-shrink-0">
             <h2 className="text-xl font-semibold text-zinc-200 ml-2">Shots</h2>
-            <div className="flex items-center gap-2">
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="text-zinc-400 hover:text-zinc-100 hover:bg-zinc-700/50 active:bg-zinc-600/60"
-                onClick={() => handleSortOrderChange(sortOrder === 'oldest' ? 'newest' : 'oldest')}
-                title={`Currently showing ${sortOrder} first. Click to show ${sortOrder === 'oldest' ? 'newest' : 'oldest'} first.`}
-              >
-                <ArrowUpDown className="h-4 w-4" />
-                {sortOrder === 'oldest' ? 'Oldest' : 'Newest'}
-              </Button>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="text-zinc-400 hover:text-zinc-100 hover:bg-zinc-700/50 active:bg-zinc-600/60"
-                onClick={() => {
-                  toggleLock(false);
-                  navigateToShotEditor({ closeMobilePanes: true });
-                }}
-              >
-                See All
-                <ArrowRightIcon className="h-4 w-4 ml-1" />
-              </Button>
-            </div>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="text-zinc-400 hover:text-zinc-100 hover:bg-zinc-700/50 active:bg-zinc-600/60"
+              onClick={() => handleSortOrderChange(sortOrder === 'oldest' ? 'newest' : 'oldest')}
+              title={`Currently showing ${sortOrder} first. Click to show ${sortOrder === 'oldest' ? 'newest' : 'oldest'} first.`}
+            >
+              <ArrowDown className="h-4 w-4" />
+              {sortOrder === 'oldest' ? 'Oldest' : 'Newest'}
+            </Button>
           </div>
           <div className="flex flex-col gap-4 px-3 py-4 flex-grow overflow-y-auto scrollbar-hide">
             <NewGroupDropZone onZoneClick={() => setIsCreateModalOpen(true)} />

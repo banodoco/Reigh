@@ -782,7 +782,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
                     <div className="flex items-center gap-2">
                       <Settings2 className="h-4 w-4" />
                       <span className="font-medium flex items-center gap-1">
-                        Image Generation Settings
+                        Image Generation
                         {!isFormExpanded && <Sparkles className="h-3 w-3 text-blue-400 animate-pulse" />}
                       </span>
                     </div>
@@ -840,7 +840,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
                   <div className="flex items-center gap-2">
                     <Settings2 className="h-4 w-4" />
                     <span className="font-medium flex items-center gap-1">
-                      {isMobile ? 'Image Settings' : 'Image Generation Settings'}
+                      {isMobile ? 'Image Generation' : 'Image Generation'}
                       <Sparkles className="h-3 w-3 text-blue-400 animate-pulse" />
                     </span>
                   </div>

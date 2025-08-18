@@ -35,7 +35,8 @@ export const useCreateShot = () => {
         .from('shots')
         .insert({ 
           name, 
-          project_id: projectId 
+          project_id: projectId,
+          position: null  // Explicitly set to NULL to trigger the database function
         })
         .select()
         .single();
@@ -46,7 +47,6 @@ export const useCreateShot = () => {
     },
     onSuccess: (newShot) => {
       queryClient.invalidateQueries({ queryKey: ['shots'] });
-      
     },
     onError: (error: Error) => {
       console.error('Error creating shot:', error);
@@ -223,8 +223,10 @@ export const useListShots = (projectId?: string | null, options: { maxImagesPerS
       if (!projectId) {
         return [];
       }
+      
+
         
-      // Just get shots simple query
+      // Just get shots simple query - order by position (which defaults to chronological)
       const { data: shots, error: shotsError } = await supabase
         .from('shots')
         .select('*')

@@ -965,12 +965,14 @@ const VideoTravelToolPage: React.FC = () => {
     return null;
   }
 
+  const shotsToDisplay = limitedShotsLoading ? undefined : (limitedShots || []);
+
   return (
     <div ref={mainContainerRef} className="w-full">
       {!shouldShowShotEditor ? (
         <>
           <ShotListDisplay
-            shots={limitedShotsLoading ? undefined : (limitedShots || [])}
+            shots={shotsToDisplay}
             onSelectShot={handleShotSelect}
             currentProjectId={selectedProjectId}
             onCreateNewShot={() => setIsCreateShotModalOpen(true)}
