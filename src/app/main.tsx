@@ -17,6 +17,12 @@ import App from './App.tsx';
 import '@/index.css';
 import { reactProfilerOnRender } from '@/shared/lib/logger';
 
+// Import cache validator for debugging (only in development)
+if (import.meta.env.DEV) {
+  import('../shared/lib/cacheValidationDebugger');
+  import('../shared/lib/simpleCacheValidator');
+}
+
 createRoot(document.getElementById('root')!).render(
   <Profiler id="Root" onRender={reactProfilerOnRender}>
     <App />

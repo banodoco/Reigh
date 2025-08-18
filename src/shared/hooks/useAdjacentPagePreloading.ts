@@ -206,11 +206,38 @@ export const smartCleanupOldPages = (
   projectId: string,
   baseQueryKey: string = 'generations'
 ) => {
+  // Auto-detect current page if passed page seems wrong by finding the most recently accessed query
+  let actualCurrentPage = currentPage;
+  
+  // Get all generation queries and find the most recently accessed one
+  const allQueries = queryClient.getQueryCache().getAll();
+  const generationQueries = allQueries.filter((query: any) => {
+    const queryKey = query.queryKey;
+    return queryKey?.[0] === baseQueryKey && 
+           queryKey?.[1] === projectId && 
+           typeof queryKey?.[2] === 'number'; // page number
+  });
+  
+  if (generationQueries.length > 0) {
+    // Find the query with the most recent dataUpdatedAt
+    const mostRecentQuery = generationQueries.reduce((latest, current) => 
+      (current.state.dataUpdatedAt || 0) > (latest.state.dataUpdatedAt || 0) ? current : latest
+    );
+    
+    const detectedPage = mostRecentQuery.queryKey[2];
+    
+    // If the detected page is very different from the passed page, use the detected one
+    if (Math.abs(detectedPage - currentPage) > 1) {
+      console.log(`[ImageLoadingDebug][CacheCleanup] Auto-correcting page: passed=${currentPage}, detected=${detectedPage} (using detected)`);
+      actualCurrentPage = detectedPage;
+    }
+  }
   // Generate unique cleanup ID for tracking
   const cleanupId = `cleanup-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   
   console.log(`[ImageLoadingDebug][CacheCleanup:${cleanupId}] Starting smart cleanup:`, {
-    currentPage,
+    passedPage: currentPage,
+    actualCurrentPage,
     projectId,
     baseQueryKey,
     timestamp: new Date().toISOString()
@@ -225,17 +252,6 @@ export const smartCleanupOldPages = (
     strategy: config.preloadStrategy
   });
   
-  // Get all generation queries from cache
-  const allQueries = queryClient.getQueryCache().getAll();
-  
-  // Find generation queries with page numbers
-  const generationQueries = allQueries.filter((query: any) => {
-    const queryKey = query.queryKey;
-    return queryKey?.[0] === baseQueryKey && 
-           queryKey?.[1] === projectId && 
-           typeof queryKey?.[2] === 'number'; // page number
-  });
-  
   console.log(`[ImageLoadingDebug][CacheCleanup:${cleanupId}] Found cached queries:`, {
     totalQueries: allQueries.length,
     generationQueries: generationQueries.length,
@@ -246,7 +262,7 @@ export const smartCleanupOldPages = (
   const queriesWithDistance = generationQueries.map((query: any) => ({
     query,
     page: query.queryKey[2],
-    distance: Math.abs(query.queryKey[2] - currentPage)
+    distance: Math.abs(query.queryKey[2] - actualCurrentPage)
   }));
 
   // Keep queries within range (current ± keepRange), remove distant ones
@@ -288,6 +304,23 @@ export const smartCleanupOldPages = (
     queriesKept: generationQueries.length - queriesToRemove.length,
     maxCachedPages: config.maxCachedPages
   });
+  
+  // Log user-friendly cache summary for easy validation
+  const remainingPages = [...new Set(queriesWithDistance
+    .filter(item => item.distance <= keepRange)
+    .map(item => item.page))]
+    .sort((a: number, b: number) => a - b);
+    
+  const removedPages = [...new Set(queriesToRemove.map(q => q.page))].sort((a: number, b: number) => a - b);
+    
+  // Always log cache validation info (even when other logs are suppressed)
+  const cacheLog = `🗂️ [CacheValidator] Current cache: pages [${remainingPages.join(', ')}] around page ${actualCurrentPage} (max: ${config.maxCachedPages})`;
+  console.warn(cacheLog); // Use warn so it shows even with log suppression
+  
+  if (removedPages.length > 0) {
+    const cleanupLog = `🧹 [CacheValidator] Cleaned up distant pages: [${removedPages.join(', ')}]`;
+    console.warn(cleanupLog); // Use warn so it shows even with log suppression
+  }
 
   // Record memory usage and adapt configuration
   performanceMonitor.recordMemoryUsage();
