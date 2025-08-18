@@ -91,27 +91,42 @@ window.imageLoadingDebugger.diagnoseStuckPage()
 
 ## Recent Improvements (January 2025)
 
-### Race Condition Fixes
-- **Effect Debouncing**: Prevents rapid re-triggers that cause overlapping sessions
-- **Stable Dependencies**: Uses `imageSetId` (first 3 image IDs) to reliably detect image set changes
-- **Session Tracking**: Each progressive loading session gets unique ID for debugging
+### Major Reliability & Performance Overhaul
 
-### Page Loading Fix
-- **Server Pagination**: Fixed `effectivePage` calculation where progressive loading was receiving wrong page numbers
-- **Correct Mapping**: Server-paginated data now always starts progressive loading from page 0
-- **Image Set Detection**: Fixed bug where server pages with same first image wouldn't trigger progressive loading
+#### 🔧 **Network Request Reliability**
+- **AbortController Support**: Added proper request cancellation for preloading queue
+- **Fetch-based Preloading**: Replaced Image() with fetch() + AbortController for better control
+- **Enhanced Video Support**: Videos now attempt frame preloading for availability checking
+- **Browser Cache Optimization**: Added `cache: 'force-cache'` for better cache utilization
 
-### Enhanced Debugging
-- **Comprehensive Logging**: Added detailed logs throughout the loading pipeline
-- **Browser Debugger**: Created `imageLoadingDebugger` for runtime diagnostics
-- **Issue Detection**: Automatic detection of stuck pages, failed images, and performance issues
+#### ⚡ **Performance Optimizations**  
+- **Single Timer System**: Replaced multiple individual timeouts with efficient single interval
+- **Batch Cache Operations**: Added `areImagesCached()` and `setMultipleImageCacheStatus()` 
+- **Memory Management**: Automatic cache cleanup when exceeding 500 cached images
+- **Optimized Timer Usage**: Pre-calculated reveal schedules reduce per-image timer overhead
 
-### Loading State Reliability
-- **Safety Timeout**: Added 1.5-second fallback to clear loading state if progressive loading fails
-- **Fixed Race Conditions**: Removed premature currentPageRef updates that broke page change detection
-- **Simplified Callbacks**: onImagesReady now uses session-based checks instead of page comparisons
-- **Clear Documentation**: Added comprehensive comments explaining page variable relationships
-- **Improved Dependencies**: Progressive loading hook now reliably detects all image set changes
+#### 🎯 **Server Pagination Timing Fix**
+- **Async Response Handling**: Fixed race condition where UI completed before server data arrived
+- **Proper Loading States**: Loading buttons now wait for actual data instead of arbitrary timeouts
+- **Real-time Feedback**: Loading states clear only when images are truly ready to display
+
+#### 🔍 **Enhanced Debugging System**
+- **PAGELOADINGDEBUG Tags**: All navigation logs now use consistent `[PAGELOADINGDEBUG]` identifier
+- **Succinct Flow Tracking**: Complete navigation flow from button press to image display
+- **Issue Detection**: Automatic detection of server delays, stuck pages, and failed requests
+- **Timing Analysis**: Precise timing logs to identify bottlenecks
+
+#### 🧹 **Code Quality Improvements**
+- **Better Type Safety**: Replaced `any[]` with proper `ImageWithId[]` interface
+- **Removed Legacy Code**: Cleaned up deprecated functions and exports
+- **Simplified Logic**: Streamlined progressive loading state management
+- **Memory Leak Prevention**: Proper cleanup of timers, requests, and event listeners
+
+### Key Behavioral Changes
+- **Server Pagination**: Loading buttons stay active until server data actually arrives (fixes "click again" issue)
+- **Progressive Loading**: Uses single efficient interval instead of multiple timers
+- **Cache Management**: Automatic memory-aware cleanup prevents unlimited growth
+- **Error Recovery**: Better handling of slow servers and network issues
 
 ## Common Issues & Solutions
 

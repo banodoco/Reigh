@@ -750,18 +750,10 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     // Generate unique navigation ID for tracking
     const navId = `nav-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
-    console.log(`[ImageLoadingDebug][PageNav:${navId}] Navigation initiated:`, {
-      from: isServerPagination ? serverPage : page,
-      to: newPage,
-      direction,
-      fromBottom,
-      isServerPagination,
-      loadingButton,
-      timestamp: new Date().toISOString()
-    });
+    console.log(`🔄 [PAGELOADINGDEBUG] [NAV:${navId}] ${direction.toUpperCase()} pressed: ${isServerPagination ? serverPage : page} → ${newPage} (${isServerPagination ? 'server' : 'client'} mode)`);
     
     if (loadingButton) {
-      console.log(`[ImageLoadingDebug][PageNav:${navId}] Navigation blocked - loading button active:`, loadingButton);
+      console.log(`❌ [PAGELOADINGDEBUG] [NAV:${navId}] BLOCKED - ${loadingButton} button still loading`);
       return;
     } // Prevent multiple clicks while any button is loading
     
@@ -772,23 +764,14 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     const isAdjacentPage = Math.abs(newPage - currentPageNum) === 1;
     const shouldShowGalleryLoading = !isAdjacentPage || !enableAdjacentPagePreloading;
     
-    console.log(`[GalleryDebug:${navId}] 🎚️ Loading state decision:`, {
-      currentPageNum,
-      newPage,
-      isAdjacentPage,
-      shouldShowGalleryLoading,
-      enableAdjacentPagePreloading,
-      isServerPagination
-    });
-    
     if (shouldShowGalleryLoading) {
-      console.log(`[GalleryDebug:${navId}] 🔄 SETTING isGalleryLoading=true (distant page or preloading disabled)`);
+      console.log(`⏳ [PAGELOADINGDEBUG] [NAV:${navId}] Loading state: ON (${isAdjacentPage ? 'preloading disabled' : 'distant page'})`);
       setIsGalleryLoading(true); // Show loading state for distant pages or when preloading disabled
     } else {
       // For adjacent pages, set a shorter fallback timeout since images should be preloaded
-      console.log(`[GalleryDebug:${navId}] ⏱️ Setting fallback loading timeout (50ms) for adjacent page`);
+      console.log(`⚡ [PAGELOADINGDEBUG] [NAV:${navId}] Loading state: DELAYED (adjacent page, likely preloaded)`);
       const fallbackTimeout = setTimeout(() => {
-        console.log(`[GalleryDebug:${navId}] ⏰ FALLBACK timeout fired - setting isGalleryLoading=true`);
+        console.log(`⏰ [PAGELOADINGDEBUG] [NAV:${navId}] Fallback loading activated (50ms elapsed)`);
         setIsGalleryLoading(true);
       }, 50); // Reduced from 200ms - shorter timeout for preloaded pages
       
@@ -807,7 +790,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     }
     
     safetyTimeoutRef.current = setTimeout(() => {
-      console.log(`[GalleryDebug:${navId}] ⚠️ SAFETY timeout fired - forcing isGalleryLoading=false after 1.5s`);
+      console.log(`🚨 [PAGELOADINGDEBUG] [NAV:${navId}] SAFETY TIMEOUT - ${isServerPagination ? 'server data never arrived' : 'progressive loading failed'} after 1.5s`);
       setIsGalleryLoading(false);
       setLoadingButton(null);
       safetyTimeoutRef.current = null;
@@ -815,22 +798,19 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     
     if (isServerPagination && onServerPageChange) {
       // Server-side pagination: notify the parent, which will handle scrolling.
-      console.log(`[ImageLoadingDebug][PageNav:${navId}] Server pagination - calling onServerPageChange`);
+      console.log(`📡 [PAGELOADINGDEBUG] [NAV:${navId}] Calling server pagination handler`);
       onServerPageChange(newPage, fromBottom); 
       
-      // We still manage the loading button state here.
-      setTimeout(() => {
-        console.log(`[ImageLoadingDebug][PageNav:${navId}] Server pagination complete - clearing loading button`);
-        setLoadingButton(null);
-        clearTimeout(safetyTimeoutRef.current!);
-      }, 500);
+      // Don't clear loading button immediately - wait for actual data to arrive
+      // The loading button will be cleared when onImagesReady is called
+      console.log(`⏳ [PAGELOADINGDEBUG] [NAV:${navId}] Server pagination initiated - waiting for data...`);
     } else {
       // Client-side pagination - show loading longer for bottom buttons
       const loadingDelay = fromBottom ? 300 : 100;
-      console.log(`[ImageLoadingDebug][PageNav:${navId}] Client pagination - setting page to ${newPage}, delay: ${loadingDelay}ms`);
+      console.log(`🖥️ [PAGELOADINGDEBUG] [NAV:${navId}] Client pagination - updating local page state`);
       setPage(newPage);
       setTimeout(() => {
-        console.log(`[ImageLoadingDebug][PageNav:${navId}] Client pagination complete - clearing loading button`);
+        console.log(`✅ [PAGELOADINGDEBUG] [NAV:${navId}] Client pagination completed`);
         setLoadingButton(null);
         clearTimeout(safetyTimeoutRef.current!);
         // Scroll to top of gallery AFTER page loads (only for bottom buttons)
@@ -839,7 +819,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
           const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
           const targetPosition = rect.top + scrollTop - (isMobile ? 80 : 20); // Account for mobile nav/header
           
-          console.log(`[ImageLoadingDebug][PageNav:${navId}] Scrolling to top after bottom navigation`);
+          console.log(`📜 [PAGELOADINGDEBUG] [NAV:${navId}] Auto-scrolling to top (bottom button used)`);
           window.scrollTo({
             top: Math.max(0, targetPosition), // Ensure we don't scroll above page top
             behavior: 'smooth'
@@ -1198,8 +1178,9 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
           enabled={true}
           isMobile={isMobile}
           onImagesReady={() => {
-            console.log(`[GalleryDebug] 🎯 onImagesReady called - clearing isGalleryLoading`);
+            console.log(`🎯 [PAGELOADINGDEBUG] [GALLERY] Images ready - clearing loading state & buttons`);
             setIsGalleryLoading(false);
+            setLoadingButton(null); // Clear loading button when images are actually ready
             // Clear the safety timeout since loading completed successfully
             if (safetyTimeoutRef.current) {
               clearTimeout(safetyTimeoutRef.current);

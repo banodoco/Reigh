@@ -4,7 +4,8 @@ import {
   isImageCached, 
   setImageCacheStatus, 
   clearCacheForImages,
-  keepOnlyInCache 
+  keepOnlyInCache,
+  performMemoryAwareCleanup
 } from '@/shared/lib/imageCacheManager';
 
 interface UseAdjacentPagePreloadingProps {
@@ -129,16 +130,19 @@ class PreloadQueue {
     priority: number;
     onLoad: () => void;
     onError: () => void;
+    abortController: AbortController;
   }> = [];
   private active = 0;
   private maxConcurrent: number;
+  private activeRequests = new Set<AbortController>();
 
   constructor(maxConcurrent: number = 3) {
     this.maxConcurrent = maxConcurrent;
   }
 
   add(url: string, priority: number, onLoad: () => void, onError: () => void) {
-    this.queue.push({ url, priority, onLoad, onError });
+    const abortController = new AbortController();
+    this.queue.push({ url, priority, onLoad, onError, abortController });
     this.queue.sort((a, b) => b.priority - a.priority); // Higher priority first
     this.processQueue();
   }
@@ -147,44 +151,94 @@ class PreloadQueue {
     while (this.active < this.maxConcurrent && this.queue.length > 0) {
       const item = this.queue.shift()!;
       this.active++;
+      this.activeRequests.add(item.abortController);
       
       // Check if this is a video file - handle differently
       const isVideo = item.url.match(/\.(mp4|webm|mov|avi)$/i);
       
       if (isVideo) {
-        // For videos, just mark as "preloaded" without actually loading
-        // since video preloading can be heavy and fail with Image()
-        setTimeout(() => {
-          this.active--;
-          performanceMonitor.recordPreloadTime(1); // Minimal time for videos
-          item.onLoad();
-          this.processQueue();
-        }, 1); // Immediate async completion
+        // For videos, preload first frame as image to check availability
+        const frameUrl = item.url.replace(/\.(mp4|webm|mov|avi)$/i, '_frame.jpg');
+        this.preloadImageWithFetch(frameUrl, item)
+          .then(() => {
+            performanceMonitor.recordPreloadTime(1); // Minimal time for videos
+            item.onLoad();
+          })
+          .catch(() => {
+            // Fallback: just mark as loaded without actual preloading
+            performanceMonitor.recordPreloadTime(1);
+            item.onLoad();
+          })
+          .finally(() => {
+            this.active--;
+            this.activeRequests.delete(item.abortController);
+            this.processQueue();
+          });
       } else {
-        const img = new Image();
-        const startTime = Date.now();
-        
-        img.onload = () => {
-          this.active--;
-          performanceMonitor.recordPreloadTime(Date.now() - startTime);
-          item.onLoad();
-          this.processQueue();
-        };
-        
-        img.onerror = () => {
-          this.active--;
-          item.onError();
-          this.processQueue();
-        };
-        
-        img.src = item.url;
+        this.preloadImageWithFetch(item.url, item)
+          .then(() => {
+            item.onLoad();
+          })
+          .catch(() => {
+            item.onError();
+          })
+          .finally(() => {
+            this.active--;
+            this.activeRequests.delete(item.abortController);
+            this.processQueue();
+          });
       }
     }
   }
 
+  private async preloadImageWithFetch(url: string, item: { abortController: AbortController }) {
+    const startTime = Date.now();
+    
+    try {
+      // Use fetch with abort controller for better cancellation support
+      const response = await fetch(url, { 
+        signal: item.abortController.signal,
+        mode: 'cors',
+        cache: 'force-cache' // Use browser cache if available
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      
+      // For images, also preload into Image() for immediate display
+      if (!url.includes('_frame.jpg')) {
+        const img = new Image();
+        await new Promise<void>((resolve, reject) => {
+          img.onload = () => resolve();
+          img.onerror = () => reject(new Error('Image load failed'));
+          img.src = url;
+          
+          // Abort if controller is aborted
+          item.abortController.signal.addEventListener('abort', () => {
+            img.onload = null;
+            img.onerror = null;
+            reject(new Error('Aborted'));
+          });
+        });
+      }
+      
+      performanceMonitor.recordPreloadTime(Date.now() - startTime);
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        // Silently ignore aborted requests
+        return;
+      }
+      throw error;
+    }
+  }
+
   clear() {
+    // Cancel all active requests
+    this.activeRequests.forEach(controller => controller.abort());
+    this.activeRequests.clear();
+    this.queue.forEach(item => item.abortController.abort());
     this.queue = [];
-    // Note: we can't cancel active downloads, but we can clear the queue
   }
 
   updateConcurrency(maxConcurrent: number) {
@@ -326,6 +380,9 @@ export const smartCleanupOldPages = (
   performanceMonitor.recordMemoryUsage();
   performanceMonitor.adaptConfig();
   globalPreloadQueue.updateConcurrency(performanceMonitor.currentConfig.maxConcurrentPreloads);
+  
+  // Perform memory-aware cache cleanup to prevent unlimited growth
+  performMemoryAwareCleanup(500); // Keep max 500 cached images
 };
 
 // Centralized function to trigger garbage collection for images (browser-level cleanup)
@@ -374,12 +431,7 @@ export const smartPreloadImages = (
 ) => {
   const preloadId = `smartpreload-${priority}-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
   
-  console.log(`[ImageLoadingDebug][SmartPreload:${preloadId}] Starting smart preload:`, {
-    priority,
-    currentPrefetchId,
-    hasCachedData: !!cachedData?.items,
-    totalItems: cachedData?.items?.length || 0
-  });
+  console.log(`🚀 [PAGELOADINGDEBUG] [PRELOAD:${preloadId}] ${priority} page: ${cachedData?.items?.length || 0} images`);
   
   if (!cachedData?.items) {
     console.log(`[ImageLoadingDebug][SmartPreload:${preloadId}] No cached data available`);
@@ -477,13 +529,7 @@ export const smartPreloadImages = (
     queuedCount++;
   });
   
-  console.log(`[ImageLoadingDebug][SmartPreload:${preloadId}] Preload batch summary:`, {
-    totalImages: imagesToPreload.length,
-    queuedCount,
-    alreadyCachedCount,
-    skippedCount,
-    queueSize: globalPreloadQueue.size()
-  });
+  console.log(`📊 [PAGELOADINGDEBUG] [PRELOAD:${preloadId}] Complete: ${queuedCount} queued, ${alreadyCachedCount} cached, ${skippedCount} skipped`);
 };
 
 interface PreloadOperation {

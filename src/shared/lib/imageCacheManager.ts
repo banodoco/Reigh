@@ -78,6 +78,58 @@ export const isImageCached = (image: any): boolean => {
 };
 
 /**
+ * Batch check if multiple images are cached - more efficient than individual calls
+ */
+export const areImagesCached = (images: any[]): boolean[] => {
+  return images.map(image => {
+    const imageId = image?.id;
+    if (!imageId) return false;
+    
+    const isCached = globalImageCache.get(imageId) === true;
+    
+    // Sync object cache if needed (backwards compatibility)
+    if (isCached && (image as any).__memoryCached !== true) {
+      (image as any).__memoryCached = true;
+    }
+    
+    return isCached;
+  });
+};
+
+/**
+ * Batch set cache status for multiple images - more efficient than individual calls
+ */
+export const setMultipleImageCacheStatus = (images: Array<{ image: any; isCached: boolean }>): void => {
+  let changedCount = 0;
+  
+  images.forEach(({ image, isCached }) => {
+    const imageId = image?.id;
+    if (!imageId) return;
+    
+    const prevState = globalImageCache.get(imageId);
+    
+    // Update global cache (primary storage)
+    globalImageCache.set(imageId, isCached);
+    
+    // Update object cache for backwards compatibility
+    (image as any).__memoryCached = isCached;
+    
+    if (prevState !== isCached) {
+      changedCount++;
+    }
+  });
+  
+  if (changedCount > 0) {
+    console.log(`[ImageCacheManager] Batch cache update:`, {
+      totalProcessed: images.length,
+      changedCount,
+      cacheSize: globalImageCache.size,
+      timestamp: new Date().toISOString()
+    });
+  }
+};
+
+/**
  * Remove images from cache (for cleanup)
  */
 export const removeCachedImages = (imageIds: string[]): number => {
@@ -133,6 +185,31 @@ export const clearAllCache = (): void => {
   globalImageCache.clear();
   
   console.log(`[ImageCacheManager] Cleared entire cache, removed ${prevSize} entries`);
+};
+
+/**
+ * Memory-aware cache cleanup - removes oldest entries when cache gets too large
+ */
+export const performMemoryAwareCleanup = (maxEntries: number = 1000): number => {
+  if (globalImageCache.size <= maxEntries) {
+    return 0; // No cleanup needed
+  }
+  
+  const entriesToRemove = globalImageCache.size - maxEntries;
+  const entries = Array.from(globalImageCache.keys());
+  
+  // Remove oldest entries (Map maintains insertion order)
+  let removedCount = 0;
+  for (let i = 0; i < entriesToRemove && i < entries.length; i++) {
+    globalImageCache.delete(entries[i]);
+    removedCount++;
+  }
+  
+  if (removedCount > 0) {
+    console.log(`[ImageCacheManager] Memory cleanup: removed ${removedCount} oldest entries, cache size now: ${globalImageCache.size}`);
+  }
+  
+  return removedCount;
 };
 
 /**

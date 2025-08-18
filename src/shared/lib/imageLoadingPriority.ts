@@ -90,28 +90,4 @@ export const shouldIncludeInInitialBatch = (
   return index < initialBatchSize;
 };
 
-/**
- * Legacy compatibility - now just calls the main function
- * @deprecated Use getImageLoadingStrategy instead
- */
-export const isImagePriority = (index: number, isMobile: boolean): boolean => {
-  return shouldIncludeInInitialBatch(index, isMobile);
-};
-
-/**
- * Legacy compatibility - now just calls the main function  
- * @deprecated Use getImageLoadingStrategy instead
- */
-export const getImageLoadingDelay = (
-  index: number,
-  config: LoadingConfig
-): number => {
-  const strategy = getImageLoadingStrategy(index, config);
-  return strategy.progressiveDelay;
-};
-
-/**
- * Legacy compatibility 
- * @deprecated Use getUnifiedBatchConfig instead
- */
-export const getBatchConfig = (isMobile: boolean) => getUnifiedBatchConfig(isMobile);
+// Legacy functions removed - use getImageLoadingStrategy and getUnifiedBatchConfig instead
