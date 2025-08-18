@@ -93,17 +93,25 @@ window.imageLoadingDebugger.diagnoseStuckPage()
 
 ### Race Condition Fixes
 - **Effect Debouncing**: Prevents rapid re-triggers that cause overlapping sessions
-- **Stable Dependencies**: Changed from `[images]` to `[images.length, images[0]?.id]` to prevent unnecessary effect runs
+- **Stable Dependencies**: Uses `imageSetId` (first 3 image IDs) to reliably detect image set changes
 - **Session Tracking**: Each progressive loading session gets unique ID for debugging
 
 ### Page Loading Fix
 - **Server Pagination**: Fixed `effectivePage` calculation where progressive loading was receiving wrong page numbers
 - **Correct Mapping**: Server-paginated data now always starts progressive loading from page 0
+- **Image Set Detection**: Fixed bug where server pages with same first image wouldn't trigger progressive loading
 
 ### Enhanced Debugging
 - **Comprehensive Logging**: Added detailed logs throughout the loading pipeline
 - **Browser Debugger**: Created `imageLoadingDebugger` for runtime diagnostics
 - **Issue Detection**: Automatic detection of stuck pages, failed images, and performance issues
+
+### Loading State Reliability
+- **Safety Timeout**: Added 1.5-second fallback to clear loading state if progressive loading fails
+- **Fixed Race Conditions**: Removed premature currentPageRef updates that broke page change detection
+- **Simplified Callbacks**: onImagesReady now uses session-based checks instead of page comparisons
+- **Clear Documentation**: Added comprehensive comments explaining page variable relationships
+- **Improved Dependencies**: Progressive loading hook now reliably detects all image set changes
 
 ## Common Issues & Solutions
 
@@ -113,12 +121,13 @@ window.imageLoadingDebugger.diagnoseStuckPage()
 **Solution**: Effect now uses stable dependencies and debouncing
 
 ### Problem: Page Gets Stuck Loading
-**Symptoms**: Loading skeletons remain visible indefinitely
+**Symptoms**: Loading skeletons remain visible indefinitely or page appears empty until clicked again
 **Debugging**: Run `window.imageLoadingDebugger.diagnoseStuckPage()`
 **Common Causes**: 
+- Progressive loading effect not triggering due to identical image sets
 - `onImagesReady` callback not executing
 - Images failing to load
-- Cache state inconsistencies
+**Solution**: Now fixed with improved image set detection and 2-second safety timeout
 
 ### Problem: Slow Page Navigation
 **Symptoms**: Delay when clicking next/prev page buttons

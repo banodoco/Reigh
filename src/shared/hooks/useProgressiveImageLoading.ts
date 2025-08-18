@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { isImageCached } from '@/shared/lib/imageCacheManager';
 import { getUnifiedBatchConfig, getImageLoadingStrategy } from '@/shared/lib/imageLoadingPriority';
 
@@ -22,7 +22,14 @@ export const useProgressiveImageLoading = ({
   const [showImageIndices, setShowImageIndices] = useState<Set<number>>(new Set());
   const currentPageRef = useRef(page);
   const lastTriggerTimeRef = useRef<number>(0);
-  currentPageRef.current = page;
+  // REMOVED: Don't update ref here - it breaks page change detection
+  
+  // Create a stable identifier for the image set to detect changes
+  // This prevents the bug where server pagination with same-length pages wouldn't trigger
+  // Using first 3 images provides enough uniqueness while being performant
+  const imageSetId = React.useMemo(() => {
+    return images.slice(0, 3).map(img => img?.id).join(',');
+  }, [images]);
   
   useEffect(() => {
     const now = Date.now();
@@ -62,8 +69,9 @@ export const useProgressiveImageLoading = ({
       enabled,
       isMobile,
       pageChanged: isPageChange,
+      imageSetId: imageSetId.substring(0, 50) + (imageSetId.length > 50 ? '...' : ''),
       firstImageId: images[0]?.id?.substring(0, 8),
-      trigger: isPageChange ? 'PAGE_CHANGE' : 'OTHER_DEPENDENCY',
+      trigger: isPageChange ? 'PAGE_CHANGE' : 'IMAGE_SET_CHANGE',
       timeSinceLastTrigger,
       timestamp: new Date().toISOString()
     });
@@ -116,11 +124,12 @@ export const useProgressiveImageLoading = ({
         // Small delay for non-cached images to avoid layout thrashing
         console.log(`[ProgressiveDebug:${sessionId}] ⏱️ DELAYED onImagesReady (16ms) - ${actualInitialBatch - images.slice(0, actualInitialBatch).filter(img => isImageCached(img)).length} uncached`);
         const readyTimeout = setTimeout(() => {
-          if (isCurrentPage && currentPageRef.current === page) {
-            console.log(`[ProgressiveDebug:${sessionId}] ✅ EXECUTED delayed onImagesReady callback`);
+          // Simplified check - just verify we're still on the current session
+          if (isCurrentPage) {
+            console.log(`[ProgressiveDebug:${sessionId}] ✅ EXECUTED delayed onImagesReady callback (page: ${page})`);
             onImagesReady();
           } else {
-            console.log(`[ProgressiveDebug:${sessionId}] ❌ CANCELLED delayed callback - page changed (${currentPageRef.current} !== ${page})`);
+            console.log(`[ProgressiveDebug:${sessionId}] ❌ CANCELLED delayed callback - session stale`);
           }
         }, 16); // Next frame timing for smoother transitions
         timeouts.push(readyTimeout);
@@ -149,8 +158,8 @@ export const useProgressiveImageLoading = ({
         });
         
         const timeout = setTimeout(() => {
-          // Enhanced race condition check - make sure we're still on the same page
-          if (isCurrentPage && currentPageRef.current === page) {
+          // Enhanced race condition check - just verify session is still current
+          if (isCurrentPage) {
             console.log(`[ProgressiveDebug:${sessionId}] 🖼️ REVEALING image ${imageIndex} (delay: ${strategy.progressiveDelay}ms, tier: ${strategy.tier})`);
             setShowImageIndices(prev => {
               // Only add if we don't already have this index (avoid duplicates)
@@ -164,7 +173,7 @@ export const useProgressiveImageLoading = ({
               return prev;
             });
           } else {
-            console.log(`[ProgressiveDebug:${sessionId}] ❌ CANCELLED image ${imageIndex} - page changed (${currentPageRef.current} !== ${page})`);
+            console.log(`[ProgressiveDebug:${sessionId}] ❌ CANCELLED image ${imageIndex} - session stale`);
           }
         }, strategy.progressiveDelay);
         
@@ -181,7 +190,7 @@ export const useProgressiveImageLoading = ({
       timeouts.forEach(timeout => clearTimeout(timeout));
       // Don't clear showImageIndices here - let the new effect handle setting them
     };
-  }, [images.length, images[0]?.id, page, enabled, isMobile, useIntersectionObserver]);
+  }, [imageSetId, page, enabled, isMobile, useIntersectionObserver]);
 
   return { showImageIndices };
 };

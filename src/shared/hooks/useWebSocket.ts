@@ -143,7 +143,16 @@ export function useWebSocket(projectId: string | null) {
               case 'TASK_COMPLETED':
                 // Avoid expensive getQueriesData - use targeted invalidation
                 scheduleInvalidation(['task-status-counts', projectId]);
-                scheduleInvalidation(['generations', projectId]);
+                
+                // Be more selective about generations invalidation to avoid interfering with page transitions
+                // Only invalidate if no generations queries are currently fetching
+                const generationsQueries = queryClient.getQueriesData({ queryKey: ['generations', projectId] });
+                const hasActiveFetch = generationsQueries.length === 0 || 
+                  queryClient.isFetching({ queryKey: ['generations', projectId] }) > 0;
+                
+                if (!hasActiveFetch) {
+                  scheduleInvalidation(['generations', projectId]);
+                }
                 
                 // Invalidate task queries with common patterns only
                 ['Queued', 'In Progress', undefined].forEach(status => {

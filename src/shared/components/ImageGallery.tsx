@@ -253,6 +253,17 @@ export const formatMetadataForDisplay = (metadata: DisplayableMetadata): string 
 
 
 
+/**
+ * ImageGallery Component
+ * 
+ * Page Variable Guide:
+ * - `page`: Client-side page number (0-based) for client pagination
+ * - `serverPage`: Server-side page number (1-based) for server pagination
+ * - `effectivePage`: Normalized page for progressive loading (always 0 for server pagination)
+ * 
+ * Server pagination mode: When onServerPageChange and serverPage are provided
+ * Client pagination mode: Default mode, handles pagination internally
+ */
 export const ImageGallery: React.FC<ImageGalleryProps> = ({ 
   images, 
   onDelete, 
@@ -731,6 +742,9 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   // Determine if we're in server-side pagination mode
   const isServerPagination = !!(onServerPageChange && serverPage);
   
+  // Safety timeout ref for clearing stuck loading states
+  const safetyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
   // Handle pagination with loading state
   const handlePageChange = React.useCallback((newPage: number, direction: 'prev' | 'next', fromBottom = false) => {
     // Generate unique navigation ID for tracking
@@ -785,6 +799,20 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
       }, 1000);
     }
     
+    // Add a safety timeout to clear loading state if progressive loading fails to trigger
+    // This prevents the UI from getting stuck in loading state
+    // Clear any existing safety timeout first
+    if (safetyTimeoutRef.current) {
+      clearTimeout(safetyTimeoutRef.current);
+    }
+    
+    safetyTimeoutRef.current = setTimeout(() => {
+      console.log(`[GalleryDebug:${navId}] ⚠️ SAFETY timeout fired - forcing isGalleryLoading=false after 1.5s`);
+      setIsGalleryLoading(false);
+      setLoadingButton(null);
+      safetyTimeoutRef.current = null;
+    }, 1500); // 1.5 second safety net (reduced from 2s for better UX)
+    
     if (isServerPagination && onServerPageChange) {
       // Server-side pagination: notify the parent, which will handle scrolling.
       console.log(`[ImageLoadingDebug][PageNav:${navId}] Server pagination - calling onServerPageChange`);
@@ -794,6 +822,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
       setTimeout(() => {
         console.log(`[ImageLoadingDebug][PageNav:${navId}] Server pagination complete - clearing loading button`);
         setLoadingButton(null);
+        clearTimeout(safetyTimeoutRef.current!);
       }, 500);
     } else {
       // Client-side pagination - show loading longer for bottom buttons
@@ -803,6 +832,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
       setTimeout(() => {
         console.log(`[ImageLoadingDebug][PageNav:${navId}] Client pagination complete - clearing loading button`);
         setLoadingButton(null);
+        clearTimeout(safetyTimeoutRef.current!);
         // Scroll to top of gallery AFTER page loads (only for bottom buttons)
         if (fromBottom && galleryTopRef.current) {
           const rect = galleryTopRef.current.getBoundingClientRect();
@@ -846,8 +876,9 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
 
 
   // Calculate effective page for progressive loading
-  // For server pagination: progressive loading should always start at page 0 since 
-  // each server page loads a fresh set of images that starts from index 0
+  // IMPORTANT: For server pagination, we always use 0 because each server response
+  // is a complete new set of images that progressive loading treats as "page 0"
+  // The actual server page number is tracked separately in serverPage
   // For client pagination: use the actual client page number
   const effectivePage = isServerPagination ? 0 : page;
   
@@ -903,6 +934,15 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   // Touch handling for mobile double-tap detection
   const lastTouchTimeRef = useRef<number>(0);
   const doubleTapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Clean up safety timeout on unmount
+  React.useEffect(() => {
+    return () => {
+      if (safetyTimeoutRef.current) {
+        clearTimeout(safetyTimeoutRef.current);
+      }
+    };
+  }, []);
 
   return (
     <TooltipProvider>
@@ -1160,6 +1200,11 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
           onImagesReady={() => {
             console.log(`[GalleryDebug] 🎯 onImagesReady called - clearing isGalleryLoading`);
             setIsGalleryLoading(false);
+            // Clear the safety timeout since loading completed successfully
+            if (safetyTimeoutRef.current) {
+              clearTimeout(safetyTimeoutRef.current);
+              safetyTimeoutRef.current = null;
+            }
           }}
         >
               {(showImageIndices) => (

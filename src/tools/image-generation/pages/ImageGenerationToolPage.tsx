@@ -496,8 +496,9 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     setIsPageChange(true);
     setIsPageChangeFromBottom(!!fromBottom);
     setCurrentPage(page);
-    // Clear existing images to show immediate loading feedback
-    setGeneratedImages([]);
+    // REMOVED: Don't clear images - this interferes with progressive loading
+    // The gallery's internal loading state handles the transition better
+    // setGeneratedImages([]);
   }, []);
 
   // Handle media type filter change

@@ -148,23 +148,37 @@ class PreloadQueue {
       const item = this.queue.shift()!;
       this.active++;
       
-      const img = new Image();
-      const startTime = Date.now();
+      // Check if this is a video file - handle differently
+      const isVideo = item.url.match(/\.(mp4|webm|mov|avi)$/i);
       
-      img.onload = () => {
-        this.active--;
-        performanceMonitor.recordPreloadTime(Date.now() - startTime);
-        item.onLoad();
-        this.processQueue();
-      };
-      
-      img.onerror = () => {
-        this.active--;
-        item.onError();
-        this.processQueue();
-      };
-      
-      img.src = item.url;
+      if (isVideo) {
+        // For videos, just mark as "preloaded" without actually loading
+        // since video preloading can be heavy and fail with Image()
+        setTimeout(() => {
+          this.active--;
+          performanceMonitor.recordPreloadTime(1); // Minimal time for videos
+          item.onLoad();
+          this.processQueue();
+        }, 1); // Immediate async completion
+      } else {
+        const img = new Image();
+        const startTime = Date.now();
+        
+        img.onload = () => {
+          this.active--;
+          performanceMonitor.recordPreloadTime(Date.now() - startTime);
+          item.onLoad();
+          this.processQueue();
+        };
+        
+        img.onerror = () => {
+          this.active--;
+          item.onError();
+          this.processQueue();
+        };
+        
+        img.src = item.url;
+      }
     }
   }
 
