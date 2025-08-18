@@ -459,9 +459,9 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
             posterSrc: poster ? getDisplayUrl(poster) : 'none',
             timestamp: Date.now()
           });
-          // Aggressively prevent autoplay on mobile
-          if (isMobile && videoRef.current && !videoRef.current.paused) {
-            console.warn('[MobileVideoAutoplay] Forcing pause on canPlay event (mobile)', {
+          // Prevent autoplay on mobile only for gallery thumbnails (scrubbing enabled)
+          if (!disableScrubbing && isMobile && videoRef.current && !videoRef.current.paused) {
+            console.warn('[MobileVideoAutoplay] Forcing pause on canPlay event (mobile thumbnail)', {
               src: getDisplayUrl(src),
               timestamp: Date.now()
             });
