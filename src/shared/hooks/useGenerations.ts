@@ -313,25 +313,10 @@ export function useGenerations(
     // Cache management to prevent memory leaks as pagination grows
     staleTime: 30 * 1000, // 30 seconds - shorter than polling for faster WebSocket response
     gcTime: 5 * 60 * 1000, // 5 minutes - cleanup old pages after this time
-    // Smart fallback polling for resilience (like task system)
-    refetchInterval: (query) => {
-      const dataAge = Date.now() - query.state.dataUpdatedAt;
-      const status = query.state.status;
-      
-      console.log('[GenerationsPolling] Using fallback polling for image gallery:', {
-        projectId,
-        page,
-        limit,
-        dataAge: Math.round(dataAge / 1000) + 's',
-        status,
-        visibilityState: document.visibilityState,
-        timestamp: Date.now()
-      });
-      
-      // Moderate polling for image galleries - balance between responsiveness and efficiency
-      return 45000; // 45 seconds - resurrection polling to catch missed WebSocket events
-    },
-    refetchIntervalInBackground: true, // CRITICAL: Continue polling when tab is hidden (like tasks)
+    // OPTIMIZED: Disable automatic polling to prevent UI flicker
+    // WebSocket invalidations will handle real-time updates when data actually changes
+    refetchInterval: false,
+    refetchIntervalInBackground: false,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
   });

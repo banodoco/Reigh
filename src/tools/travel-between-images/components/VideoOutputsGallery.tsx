@@ -488,8 +488,18 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   if (sortedVideoOutputs.length === 0 && !isLoadingGenerations && !isFetchingGenerations) {
     return (
       <Card className="p-4 sm:p-6">
-        <div className="text-center text-muted-foreground">
-          <p>No video outputs yet. Generate some videos to see them here.</p>
+        <div className="flex flex-col space-y-2 sm:space-y-3">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <h3 className="text-base sm:text-lg font-semibold flex items-center gap-2">
+              Output Videos &nbsp;(0)
+            </h3>
+          </div>
+
+          <Separator className="my-2" />
+
+          <div className="text-center text-muted-foreground py-8 mt-8">
+            <p>No video outputs yet. Generate some videos to see them here.</p>
+          </div>
         </div>
       </Card>
     );
@@ -500,7 +510,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
       <div className="flex flex-col space-y-2 sm:space-y-3">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <h3 className="text-base sm:text-lg font-semibold flex items-center gap-2">
-            Output Videos 
+            Output Videos &nbsp;
             {(isLoadingGenerations || isFetchingGenerations) ? (
               <Skeleton className="h-5 w-8 inline-block" />
             ) : (

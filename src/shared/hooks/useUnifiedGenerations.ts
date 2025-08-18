@@ -462,49 +462,10 @@ export function useUnifiedGenerations(options: UseUnifiedGenerationsOptions) {
     staleTime: 30 * 1000, // 30 seconds - shorter than task polling for faster WebSocket response
     gcTime,
     placeholderData: (previousData) => previousData,
-    // Smart fallback polling for resilience
-    refetchInterval: (query) => {
-      const data = query.state.data;
-      const dataAge = Date.now() - query.state.dataUpdatedAt;
-      const status = query.state.status;
-      
-      // For video galleries (shot-specific mode), use faster polling since videos are actively generated
-      if (options.mode === 'shot-specific') {
-        // Fast polling for recent video generations (may still be generating)
-        if (dataAge < 5 * 60 * 1000) { // Less than 5 minutes old
-          console.log('[VideoGenMissing] Using FAST fallback polling for recent video data:', {
-            mode: options.mode,
-            projectId: options.projectId,
-            shotId: options.shotId,
-            dataAge: Math.round(dataAge / 1000) + 's',
-            status,
-            timestamp: Date.now()
-          });
-          return 30000; // 30 seconds - videos generate frequently
-        } else {
-          console.log('[VideoGenMissing] Using SLOW fallback polling for older video data:', {
-            mode: options.mode,
-            projectId: options.projectId,
-            shotId: options.shotId,
-            dataAge: Math.round(dataAge / 1000) + 's',
-            status,
-            timestamp: Date.now()
-          });
-          return 60000; // 60 seconds - resurrection polling
-        }
-      } else {
-        // For image galleries (project-wide mode), use moderate polling
-        console.log('[VideoGenMissing] Using MODERATE fallback polling for image gallery:', {
-          mode: options.mode,
-          projectId: options.projectId,
-          dataAge: Math.round(dataAge / 1000) + 's',
-          status,
-          timestamp: Date.now()
-        });
-        return 45000; // 45 seconds - balance between responsiveness and efficiency
-      }
-    },
-    refetchIntervalInBackground: true, // CRITICAL: Continue polling when tab is hidden (like tasks)
+    // OPTIMIZED: Disable automatic polling to prevent UI flicker
+    // WebSocket invalidations will handle real-time updates when data actually changes
+    refetchInterval: false,
+    refetchIntervalInBackground: false,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
   });
