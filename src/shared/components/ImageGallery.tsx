@@ -1201,13 +1201,15 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                         isPreloaded: false // Will be checked inside the component
                       });
                       
-                      // Debug logging for first few images
-                      if (index < 3) {
+                      // Debug logging for first few images AND any that should show but don't
+                      if (index < 8 || (loadingStrategy.shouldLoadInInitialBatch && !shouldShow)) {
                         console.log(`[GalleryDebug] 🖼️ Image ${index} render:`, {
                           imageId: image.id?.substring(0, 8),
                           shouldShow,
                           tier: loadingStrategy.tier,
+                          shouldLoadInInitialBatch: loadingStrategy.shouldLoadInInitialBatch,
                           showImageIndicesSize: showImageIndices.size,
+                          showImageIndicesArray: Array.from(showImageIndices).slice(0, 10),
                           isGalleryLoading
                         });
                       }

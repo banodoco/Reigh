@@ -246,10 +246,8 @@ export const useProgressiveImageLoading = ({
             if (!prev.has(currentItem.index)) {
               const newSet = new Set(prev);
               newSet.add(currentItem.index);
-              // Only log every 5th image or the last one to reduce noise
-              if (currentItem.index % 5 === 0 || scheduleIndex === revealSchedule.length - 1) {
-                console.log(`🖼️ [PAGELOADINGDEBUG] [PROG:${sessionId}] Revealed image ${currentItem.index} (${newSet.size}/${images.length} total)`);
-              }
+              // Log every reveal for debugging timing issues
+              console.log(`🖼️ [PAGELOADINGDEBUG] [PROG:${sessionId}] Revealed image ${currentItem.index} (${newSet.size}/${images.length} total) - tier: ${currentItem.tier}`);
               return newSet;
             }
             return prev;

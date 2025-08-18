@@ -230,15 +230,17 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
     const loadId = `load-${image.id}-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
     const isPreloaded = isImageCached(image);
     
-    console.log(`[ItemDebug:${loadId}] Loading decision for image ${index}:`, {
-      imageId: image.id.substring(0, 8),
-      actualSrc: !!actualSrc,
-      shouldLoad,
-      isPriority,
-      isPreloaded,
-      actualDisplayUrl: actualDisplayUrl?.substring(0, 50) + '...',
-      decision: !actualSrc && shouldLoad ? 'LOAD' : actualSrc ? 'SKIP_ALREADY_SET' : !shouldLoad ? 'SKIP_NOT_READY' : 'UNKNOWN'
-    });
+    if (index < 8) {
+      console.log(`[ItemDebug:${loadId}] Loading decision for image ${index}:`, {
+        imageId: image.id.substring(0, 8),
+        actualSrc: !!actualSrc,
+        shouldLoad,
+        isPriority,
+        isPreloaded,
+        actualDisplayUrl: actualDisplayUrl?.substring(0, 50) + '...',
+        decision: !actualSrc && shouldLoad ? 'LOAD' : actualSrc ? 'SKIP_ALREADY_SET' : !shouldLoad ? 'SKIP_NOT_READY' : 'UNKNOWN'
+      });
+    }
     
     // Only load if progressive loading system says we should AND we haven't loaded yet
     if (!actualSrc && shouldLoad) {
@@ -260,7 +262,9 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
       
       // No additional delay - progressive loading system handles all timing
       // Images load immediately when shouldLoad becomes true
-      console.log(`[ItemDebug:${loadId}] 🚀 SETTING actualSrc immediately`);
+      if (index < 8) {
+        console.log(`[ItemDebug:${loadId}] 🚀 SETTING actualSrc immediately`);
+      }
       setActualSrc(actualDisplayUrl);
       
     } else if (!shouldLoad) {
