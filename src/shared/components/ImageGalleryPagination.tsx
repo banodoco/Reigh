@@ -7,6 +7,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/shared/components/ui/select";
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface ImageGalleryPaginationProps {
   totalPages: number;
@@ -74,6 +75,17 @@ export const ImageGalleryPagination: React.FC<ImageGalleryPaginationProps> = ({
   const isPrevDisabled = loadingButton !== null || (isServerPagination ? serverPage === 1 : currentPage === 0);
   const isNextDisabled = loadingButton !== null || (isServerPagination ? serverPage >= totalPages : currentPage >= totalPages - 1);
 
+  // Helper to render button content - now uses icons on all devices
+  const renderButtonContent = (direction: 'prev' | 'next', isLoading: boolean) => {
+    if (isLoading) {
+      return <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-current"></div>;
+    }
+    
+    return direction === 'prev' 
+      ? <ChevronLeft className="h-4 w-4" />
+      : <ChevronRight className="h-4 w-4" />;
+  };
+
   if (compact) {
     // Compact layout for top pagination - no range text, optional right content
     return (
@@ -84,12 +96,9 @@ export const ImageGalleryPagination: React.FC<ImageGalleryPaginationProps> = ({
             size="sm"
             onClick={handlePrevPage}
             disabled={isPrevDisabled}
+            className="px-2"
           >
-            {loadingButton === 'prev' ? (
-              <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-current"></div>
-            ) : (
-              'Prev'
-            )}
+            {renderButtonContent('prev', loadingButton === 'prev')}
           </Button>
           
           <div className="flex items-center gap-2">
@@ -122,12 +131,9 @@ export const ImageGalleryPagination: React.FC<ImageGalleryPaginationProps> = ({
             size="sm"
             onClick={handleNextPage}
             disabled={isNextDisabled}
+            className="px-2"
           >
-            {loadingButton === 'next' ? (
-              <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-current"></div>
-            ) : (
-              'Next'
-            )}
+            {renderButtonContent('next', loadingButton === 'next')}
           </Button>
         </div>
         
@@ -148,12 +154,9 @@ export const ImageGalleryPagination: React.FC<ImageGalleryPaginationProps> = ({
         size="sm"
         onClick={handlePrevPage}
         disabled={isPrevDisabled}
+        className="px-2"
       >
-        {loadingButton === 'prev' ? (
-          <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-current"></div>
-        ) : (
-          'Prev'
-        )}
+        {renderButtonContent('prev', loadingButton === 'prev')}
       </Button>
       
       <div className="flex items-center gap-2">
@@ -187,12 +190,9 @@ export const ImageGalleryPagination: React.FC<ImageGalleryPaginationProps> = ({
           size="sm"
           onClick={handleNextPage}
           disabled={isNextDisabled}
+          className="px-2"
         >
-          {loadingButton === 'next' ? (
-            <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-current"></div>
-          ) : (
-            'Next'
-          )}
+          {renderButtonContent('next', loadingButton === 'next')}
         </Button>
         <span className={`text-xs ${whiteText ? 'text-zinc-400' : 'text-muted-foreground'} whitespace-nowrap`}>
           {rangeStart}-{rangeEnd} of {totalFilteredItems}
