@@ -833,9 +833,12 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
 
 
   // Progressive loading state - use unified system
+  // Use the correct page number for both server and client pagination
+  const effectivePage = isServerPagination ? (serverPage || 1) - 1 : page;
+  
   const { showImageIndices } = useProgressiveImageLoading({
     images: paginatedImages,
-    page,
+    page: effectivePage,
     enabled: true,
     isMobile, // Pass mobile context for unified priority calculations
     onImagesReady: () => {
