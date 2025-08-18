@@ -228,12 +228,28 @@ const VideoTravelToolPage: React.FC = () => {
   // Add ref for main container to enable scroll-to-top functionality
   const mainContainerRef = useRef<HTMLDivElement>(null);
 
-  // Extract hash shot id once for reuse
+  // Extract and validate hash shot id once for reuse
   const hashShotId = useMemo(() => {
     const fromLocation = (location.hash?.replace('#', '') || '');
-    if (fromLocation) return fromLocation;
+    if (fromLocation) {
+      // Validate UUID format
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (uuidRegex.test(fromLocation)) {
+        return fromLocation;
+      } else {
+        console.warn('[VideoTravelToolPage] Invalid shot ID format in URL hash:', fromLocation);
+        return '';
+      }
+    }
     if (typeof window !== 'undefined' && window.location?.hash) {
-      return window.location.hash.replace('#', '');
+      const windowHash = window.location.hash.replace('#', '');
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (uuidRegex.test(windowHash)) {
+        return windowHash;
+      } else {
+        console.warn('[VideoTravelToolPage] Invalid shot ID format in window hash:', windowHash);
+        return '';
+      }
     }
     return '';
   }, [location.hash]);
@@ -257,13 +273,29 @@ const VideoTravelToolPage: React.FC = () => {
           .select('project_id')
           .eq('id', hashShotId)
           .single();
+        
+        if (error) {
+          console.error('[VideoTravelToolPage] Error fetching shot:', error);
+          // Shot doesn't exist or user doesn't have access - redirect to main view
+          if (!cancelled) {
+            console.log(`[VideoTravelToolPage] Shot ${hashShotId} not accessible, redirecting to main view`);
+            navigate('/tools/travel-between-images', { replace: true });
+          }
+          return;
+        }
+        
         if (!cancelled && data?.project_id) {
           setSelectedProjectId(data.project_id);
         }
-      } catch {}
+      } catch (err) {
+        console.error('[VideoTravelToolPage] Unexpected error fetching shot:', err);
+        if (!cancelled) {
+          navigate('/tools/travel-between-images', { replace: true });
+        }
+      }
     })();
     return () => { cancelled = true; };
-  }, [hashShotId, selectedProjectId, setSelectedProjectId]);
+  }, [hashShotId, selectedProjectId, setSelectedProjectId, navigate]);
 
   // Data fetching is now handled by the useVideoTravelData hook above
   
@@ -284,13 +316,11 @@ const VideoTravelToolPage: React.FC = () => {
   
   // Memoize expensive computations
   const shouldShowShotEditor = useMemo(() => {
-    // If deep-linked to a specific shot, show the editor view immediately
-    if (hashShotId) {
-      return true;
-    }
-    // Otherwise, only show editor if we actually have a shot to edit
+    // Only show editor if we actually have a valid shot to edit
     const shotExists = selectedShot || (viaShotClick && currentShotId && shots?.find(s => s.id === currentShotId));
-    return !!shotExists;
+    // Also check if we have a valid shot from hash
+    const hashShotExists = hashShotId && shots?.find(s => s.id === hashShotId);
+    return !!(shotExists || hashShotExists);
   }, [selectedShot, viaShotClick, currentShotId, shots, hashShotId]);
   
   const shotToEdit = useMemo(() => {
@@ -893,8 +923,28 @@ const VideoTravelToolPage: React.FC = () => {
     return <div className="p-4">Error loading shots: {error.message}</div>;
   }
 
-  // Only show main page skeleton when not deep-linked to a shot
-  if (showStableSkeleton && !hashShotId && !shouldShowShotEditor) {
+  // Show skeleton in different cases
+  if (showStableSkeleton) {
+    // If we have a hashShotId but shots are still loading, show editor skeleton
+    if (hashShotId) {
+      return (
+        <PageFadeIn className="pt-2 sm:pt-5">
+          <div className="flex flex-col space-y-4 pb-16">
+            <div className="flex-shrink-0 flex flex-wrap justify-between items-center gap-y-2 px-2">
+              <Skeleton className="h-10 w-32" />
+              <Skeleton className="h-8 w-64" />
+              <div className="flex space-x-2">
+                <Skeleton className="h-8 w-20" />
+                <Skeleton className="h-8 w-16" />
+              </div>
+            </div>
+            <Skeleton className="h-64 w-full" />
+            <Skeleton className="h-96 w-full" />
+          </div>
+        </PageFadeIn>
+      );
+    }
+    // Otherwise show main list skeleton
     return (
       <div 
         className="grid gap-4"
@@ -905,6 +955,14 @@ const VideoTravelToolPage: React.FC = () => {
         ))}
       </div>
     );
+  }
+
+  // If we have a hashShotId but shots have loaded and shot doesn't exist, redirect
+  if (hashShotId && shots && !shots.find(s => s.id === hashShotId)) {
+    // Shots have loaded but the hashShotId doesn't exist - redirect to main view
+    console.log(`[VideoTravelToolPage] Hash shot ${hashShotId} not found in loaded shots, redirecting`);
+    navigate('/tools/travel-between-images', { replace: true });
+    return null;
   }
 
   return (
@@ -937,9 +995,11 @@ const VideoTravelToolPage: React.FC = () => {
           </PageFadeIn>
         }>
           <PageFadeIn className="pt-2 sm:pt-5">
-            <ShotEditor
-              selectedShotId={shotToEdit?.id || hashShotId || ''}
-              projectId={selectedProjectId}
+            {/* Only render ShotEditor if we have a valid shot to edit */}
+            {shotToEdit ? (
+              <ShotEditor
+                selectedShotId={shotToEdit.id}
+                projectId={selectedProjectId}
               videoPairConfigs={videoPairConfigs}
               videoControlMode={isLoadingSettings ? 'batch' : videoControlMode}
               batchVideoPrompt={isLoadingSettings ? '' : batchVideoPrompt}
@@ -978,6 +1038,17 @@ const VideoTravelToolPage: React.FC = () => {
               settingsLoading={isLoadingSettings}
               // afterEachPromptText props removed - not in ShotEditorProps interface
             />
+            ) : (
+              // Show error message when shot is not found
+              <div className="flex items-center justify-center h-64">
+                <div className="text-center">
+                  <p className="text-muted-foreground mb-4">Shot not found</p>
+                  <Button onClick={handleBackToShotList} variant="outline">
+                    Back to Shots
+                  </Button>
+                </div>
+              </div>
+            )}
           </PageFadeIn>
         </Suspense>
       )}

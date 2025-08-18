@@ -155,9 +155,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
   // Use the new modular state management
   const { state, actions } = useShotEditorState();
-  // Track previous and last-ready shot IDs to avoid flicker resets
-  const prevShotIdRef = useRef<string | null>(null);
-  const lastReadyShotIdRef = useRef<string | null>(null);
 
   // Use the LoRA sync hook
   const { loraManager, isShotLoraSettingsLoading, hasInitializedShot: loraInitialized } = useLoraSync({
@@ -239,62 +236,12 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     return () => clearTimeout(fallbackTimer);
   }, [settingsLoading, isShotUISettingsLoading, isShotLoraSettingsLoading, actions, isMobile, selectedShot?.id]);
 
-  // Reset mode readiness when shot truly changes (guard against transient undefined states)
+  // Reset mode readiness when shot changes
   useEffect(() => {
-    const newId = selectedShot?.id ?? null;
-    const prevId = prevShotIdRef.current;
-    
-    // Update ref for next comparison
-    prevShotIdRef.current = newId;
-
-    // Reset conditions:
-    // 1. New shot ID exists and is different from previous
-    // 2. OR transitioning from undefined back to a valid shot (handles refetch recovery)
-    const shouldReset = (newId && newId !== prevId) || 
-                       (newId && prevId === null && newId !== lastReadyShotIdRef.current);
-
-    if (shouldReset) {
-      console.log('[ShotEditor] Shot changed - resetting mode readiness', { 
-        newShotId: newId, 
-        prevShotId: prevId,
-        lastReadyShotId: lastReadyShotIdRef.current,
-        isMobile,
-        reason: newId !== prevId ? 'different_shot' : 'refetch_recovery'
-      });
-      
-      // Clear the lastReady flag since we're starting fresh
-      lastReadyShotIdRef.current = null;
+    if (selectedShot?.id) {
       actions.setModeReady(false);
-
-      // Mobile emergency timeout - if we're still not ready after 5 seconds, force it
-      if (isMobile) {
-        const emergencyTimer = setTimeout(() => {
-          // Check the current shot ID at timeout time (not the one from effect closure)
-          const currentShotId = selectedShot?.id;
-          if (!state.isModeReady && currentShotId === newId) {
-            console.error('[ShotEditor] MOBILE EMERGENCY RECOVERY - Shot editor stuck after 5s, forcing ready state', {
-              shotId: currentShotId,
-              originalShotId: newId,
-              settingsLoading,
-              isShotUISettingsLoading, 
-              isShotLoraSettingsLoading
-            });
-            
-            // Force recovery no matter what
-            actions.setSettingsError('Emergency recovery - forced ready state');
-            actions.setModeReady(true);
-            
-            // Dispatch recovery event
-            window.dispatchEvent(new CustomEvent('shotEditorEmergencyRecovery', { 
-              detail: { shotId: currentShotId, reason: 'five_second_timeout' }
-            }));
-          }
-        }, 5000);
-        
-        return () => clearTimeout(emergencyTimer);
-      }
     }
-  }, [selectedShot?.id, actions, isMobile]);
+  }, [selectedShot?.id, actions]);
 
   // Handle generation mode setup and readiness with mobile stall prevention
   useEffect(() => {
@@ -331,9 +278,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         generationMode
       });
       actions.setModeReady(true);
-      // Record that this shot has successfully reached ready state
-      // Only update if we're still on the same shot
-      lastReadyShotIdRef.current = currentShotId;
     }, 50);
 
     return () => clearTimeout(timer);

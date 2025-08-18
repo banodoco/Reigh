@@ -471,8 +471,8 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                 />
               )}
               
-              {/* Hidden image for background loading when shouldLoad is false or image not loaded yet */}
-              {actualSrc && (!shouldLoad || !imageLoaded) && (
+              {/* Hidden image for background loading - only when image hasn't loaded yet */}
+              {actualSrc && !imageLoaded && (
                 <img
                   src={actualSrc}
                   alt={image.prompt || `Generated image ${index + 1}`}
