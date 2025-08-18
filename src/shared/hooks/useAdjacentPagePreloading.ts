@@ -481,6 +481,7 @@ export const smartPreloadImages = (
   let skippedCount = 0;
   let alreadyCachedCount = 0;
   
+  // Progressive top-to-bottom preloading with delays
   imagesToPreload.forEach((img: any, idx: number) => {
     // Skip if this prefetch is no longer current
     if (prefetchOperationsRef.current.currentPrefetchId !== currentPrefetchId) {
@@ -501,31 +502,43 @@ export const smartPreloadImages = (
       getDisplayUrl(img.thumbUrl || img.url) : 
       getDisplayUrl(img.url);
     
-    const itemPriority = priorityScore - idx; // Earlier images have higher priority
+    // Progressive delay: first 3 images immediate, then 60ms delays for adjacent page preloading
+    // Use slightly slower timing than current page (25ms) to avoid resource conflicts
+    const progressiveDelay = idx < 3 ? 0 : (idx - 2) * 60;
     
-    console.log(`[ImageLoadingDebug][SmartPreload:${preloadId}] Queueing image ${idx}:`, {
+    console.log(`[ImageLoadingDebug][SmartPreload:${preloadId}] Scheduling image ${idx} with ${progressiveDelay}ms delay:`, {
       imageId: img.id,
-      itemPriority,
       url: imageUrl.substring(0, 80) + '...',
       thumbnailOnly: config.thumbnailOnlyPreload
     });
     
-    globalPreloadQueue.add(
-      imageUrl,
-      itemPriority,
-      () => {
-        // Success callback
-        console.log(`[ImageLoadingDebug][SmartPreload:${preloadId}] Successfully preloaded image:`, img.id);
-        setImageCacheStatus(img, true);
-      },
-      () => {
-        // Error callback - just log, don't retry
-        console.warn(`[ImageLoadingDebug][SmartPreload:${preloadId}] Failed to preload image:`, {
-          imageId: img.id,
-          url: imageUrl
-        });
+    // Use setTimeout to create top-to-bottom loading effect
+    setTimeout(() => {
+      // Check if prefetch is still current before proceeding
+      if (prefetchOperationsRef.current.currentPrefetchId !== currentPrefetchId) {
+        return;
       }
-    );
+      
+      const itemPriority = priorityScore - idx; // Earlier images have higher priority
+      
+      globalPreloadQueue.add(
+        imageUrl,
+        itemPriority,
+        () => {
+          // Success callback
+          console.log(`[ImageLoadingDebug][SmartPreload:${preloadId}] Successfully preloaded image:`, img.id);
+          setImageCacheStatus(img, true);
+        },
+        () => {
+          // Error callback - just log, don't retry
+          console.warn(`[ImageLoadingDebug][SmartPreload:${preloadId}] Failed to preload image:`, {
+            imageId: img.id,
+            url: imageUrl
+          });
+        }
+      );
+    }, progressiveDelay);
+    
     queuedCount++;
   });
   
@@ -574,20 +587,29 @@ export const preloadClientSidePages = (
         getDisplayUrl(image.thumbUrl || image.url) : 
         getDisplayUrl(image.url);
       
-      const itemPriority = priorityScore - idx;
+      // Progressive delay for client-side preloading too: first 3 immediate, then 60ms delays
+      // Use slightly slower timing than current page (25ms) to avoid resource conflicts
+      const progressiveDelay = idx < 3 ? 0 : (idx - 2) * 60;
       
-      globalPreloadQueue.add(
-        imageUrl,
-        itemPriority,
-        () => {
-          // Success callback
-          setImageCacheStatus(image, true);
-        },
-        () => {
-          // Error callback
-          console.warn(`[ImageLoadingDebug][SmartPreload] Failed to preload client-side image:`, imageUrl);
-        }
-      );
+      setTimeout(() => {
+        // Double-check validity after delay
+        if (operations.currentPageId !== pageId) return;
+        
+        const itemPriority = priorityScore - idx;
+        
+        globalPreloadQueue.add(
+          imageUrl,
+          itemPriority,
+          () => {
+            // Success callback
+            setImageCacheStatus(image, true);
+          },
+          () => {
+            // Error callback
+            console.warn(`[ImageLoadingDebug][SmartPreload] Failed to preload client-side image:`, imageUrl);
+          }
+        );
+      }, progressiveDelay);
     });
   };
 
