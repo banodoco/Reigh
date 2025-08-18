@@ -26,19 +26,19 @@ export const getUnifiedBatchConfig = (isMobile: boolean) => {
   // For backward compatibility, provide a simple fallback
   // New code should use getPerformanceConfig from mobilePerformanceUtils
   if (isMobile) {
-    // Mobile settings - also load full page for consistent UX
+    // Mobile settings - load full page with fast sequential delays
     return {
-      initialBatchSize: 25, // Load full page on mobile too
-      staggerDelay: 120,
-      maxStaggerDelay: 300
+      initialBatchSize: 3, // First 3 load immediately
+      staggerDelay: 40, // Very fast delays for remaining images
+      maxStaggerDelay: 100
     };
   }
   
-  // Desktop settings - load full page immediately
+  // Desktop settings - load full page with fast sequential delays
   return {
-    initialBatchSize: 25, // Load full page of images immediately
-    staggerDelay: 80,
-    maxStaggerDelay: 200
+    initialBatchSize: 4, // First 4 load immediately
+    staggerDelay: 25, // Very fast delays for remaining images (25ms per image)
+    maxStaggerDelay: 100
   };
 };
 
@@ -79,8 +79,8 @@ export const getImageLoadingStrategy = (
     progressiveDelay = isPreloaded ? 0 : 32; // Two frame delay
     shouldLoadInInitialBatch = true;
   } else {
-    // Beyond initial batch gets low priority with staggered delays
-    tier = 'low';
+    // Beyond initial batch gets medium priority with fast staggered delays for smooth visual progression
+    tier = 'medium';
     const staggerMultiplier = index - initialBatchSize + 1;
     progressiveDelay = isPreloaded ? 0 : staggerDelay * staggerMultiplier;
     shouldLoadInInitialBatch = false;

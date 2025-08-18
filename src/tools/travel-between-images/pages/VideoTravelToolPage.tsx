@@ -35,29 +35,35 @@ const useVideoTravelData = (selectedShotId?: string, projectId?: string) => {
   const { shots, isLoading: shotsLoading, error: shotsError, refetchShots } = useShots();
   
   // Get limited shots for main list view (5 images max for performance)
-  const { data: limitedShots, isLoading: limitedShotsLoading } = useListShots(projectId, { maxImagesPerShot: 5 });
+  // Always call the hook but pass null when no projectId to prevent conditional hook usage
+  const { data: limitedShots, isLoading: limitedShotsLoading } = useListShots(projectId || null, { maxImagesPerShot: 5 });
   
-  // Fetch public LoRAs data
+  // Fetch public LoRAs data - always call this hook
   const publicLorasQuery = useListPublicResources('lora');
   
-  // Fetch tool settings only when we have a selected shot
+  // Always call these hooks but disable them when parameters are missing
+  // This ensures consistent hook order between renders
   const toolSettingsQuery = useToolSettings<VideoTravelSettings>(
     'travel-between-images',
-    { shotId: selectedShotId, enabled: !!selectedShotId }
+    { 
+      shotId: selectedShotId || null, 
+      enabled: !!selectedShotId 
+    }
   );
 
-  // Fetch project-level settings for defaults and saving
   const projectSettingsQuery = useToolSettings<VideoTravelSettings>(
     'travel-between-images',
-    { projectId: projectId, enabled: !!projectId }
+    { 
+      projectId: projectId || null, 
+      enabled: !!projectId 
+    }
   );
 
-  // Fetch project-level UI settings for defaults
   const projectUISettingsQuery = useToolSettings<{
     acceleratedMode?: boolean;
     randomSeed?: boolean;
   }>('travel-ui-state', { 
-    projectId: projectId, 
+    projectId: projectId || null, 
     enabled: !!projectId 
   });
 
@@ -501,8 +507,9 @@ const VideoTravelToolPage: React.FC = () => {
   // Get full image data when editing a shot to avoid thumbnail limitation
   const contextImages = selectedShot?.images || [];
   const needsFullImageData = contextImages.length === 5 || shouldShowShotEditor; // Load full data when editing OR hit thumbnail limit
+  // Always call the hook to prevent hook order issues - the hook internally handles enabling/disabling
   const { data: fullShotImages = [] } = useAllShotGenerations(
-    needsFullImageData ? selectedShot?.id : null
+    needsFullImageData ? (selectedShot?.id || null) : null
   );
   
   // Use full images if available, otherwise fall back to context images
