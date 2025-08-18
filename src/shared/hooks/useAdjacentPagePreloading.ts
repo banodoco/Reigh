@@ -1,5 +1,11 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { getDisplayUrl } from '@/shared/lib/utils';
+import { 
+  isImageCached, 
+  setImageCacheStatus, 
+  clearCacheForImages,
+  keepOnlyInCache 
+} from '@/shared/lib/imageCacheManager';
 
 interface UseAdjacentPagePreloadingProps {
   enabled?: boolean;
@@ -12,57 +18,8 @@ interface UseAdjacentPagePreloadingProps {
   allImages?: any[]; // For client-side pagination
 }
 
-// Global cache map to store cache status by image ID
-const globalImageCache = new Map<string, boolean>();
-
-// Centralized function to mark images as cached
-export const markImageAsCached = (image: any, isCached: boolean = true) => {
-  const imageId = image.id;
-  const prevState = globalImageCache.get(imageId);
-  
-  // Update both global cache and object cache for backwards compatibility
-  globalImageCache.set(imageId, isCached);
-  (image as any).__memoryCached = isCached;
-  
-  // Only log when state changes
-  if (prevState !== isCached) {
-    console.log(`[ImageLoadingDebug][Cache] Image cache state changed:`, {
-      imageId: image.id,
-      from: prevState,
-      to: isCached,
-      globalCacheSize: globalImageCache.size,
-      timestamp: new Date().toISOString()
-    });
-  }
-};
-
-// Centralized function to check if image is cached
-export const isImageCached = (image: any): boolean => {
-  const imageId = image.id;
-  
-  // Check global cache first, then fallback to object cache
-  const globalCached = globalImageCache.get(imageId) === true;
-  const objectCached = (image as any).__memoryCached === true;
-  const isCached = globalCached || objectCached;
-  
-  // If global cache has it but object doesn't, sync them
-  if (globalCached && !objectCached) {
-    (image as any).__memoryCached = true;
-  }
-  
-  // Occasionally log cache checks for debugging (every 20th check to reduce noise)
-  if (Math.random() < 0.05) {
-    console.log(`[ImageLoadingDebug][Cache] Cache check:`, {
-      imageId: image.id,
-      isCached,
-      globalCached,
-      objectCached,
-      globalCacheSize: globalImageCache.size
-    });
-  }
-  
-  return isCached;
-};
+// Legacy exports for backwards compatibility
+export const markImageAsCached = setImageCacheStatus;
 
 // Device capability detection for smart preloading
 interface PreloadConfig {
@@ -220,6 +177,10 @@ class PreloadQueue {
     this.maxConcurrent = maxConcurrent;
     this.processQueue();
   }
+
+  size(): number {
+    return this.queue.length;
+  }
 }
 
 const globalPreloadQueue = new PreloadQueue();
@@ -294,16 +255,10 @@ export const smartCleanupOldPages = (
       const imageCount = queryData.items.length;
       totalImagesCleared += imageCount;
       
-      console.log(`[ImageLoadingDebug][CacheCleanup:${cleanupId}] Clearing image cache flags for page ${page} (${imageCount} images)`);
-      
-      // Clear memory cache flags from images and global cache
-      queryData.items.forEach((image: any) => {
-        // Clear global cache
-        globalImageCache.delete(image.id);
-        // Clear object cache for backwards compatibility
-        delete (image as any).__memoryCached;
-        delete (image as any).__fullImageCached;
-      });
+              console.log(`[ImageLoadingDebug][CacheCleanup:${cleanupId}] Clearing image cache flags for page ${page} (${imageCount} images)`);
+        
+        // Clear cache using centralized manager
+        clearCacheForImages(queryData.items);
     }
   });
 
@@ -462,7 +417,7 @@ export const smartPreloadImages = (
       () => {
         // Success callback
         console.log(`[ImageLoadingDebug][SmartPreload:${preloadId}] Successfully preloaded image:`, img.id);
-        markImageAsCached(img, true);
+        setImageCacheStatus(img, true);
       },
       () => {
         // Error callback - just log, don't retry
@@ -533,7 +488,7 @@ export const preloadClientSidePages = (
         itemPriority,
         () => {
           // Success callback
-          markImageAsCached(image, true);
+          setImageCacheStatus(image, true);
         },
         () => {
           // Error callback
@@ -733,7 +688,7 @@ export const useAdjacentPagePreloading = ({
   return {
     cancelAllPreloads,
   };
-};
+}; 
 
 // Diagnostic function for debugging and monitoring
 export const getPreloadDiagnostics = () => {
@@ -756,4 +711,4 @@ export const getPreloadDiagnostics = () => {
       connection: 'connection' in navigator ? (navigator as any).connection?.effectiveType : 'unknown'
     }
   };
-};
+}; 

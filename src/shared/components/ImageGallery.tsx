@@ -28,14 +28,15 @@ import { DraggableImage } from "@/shared/components/DraggableImage";
 import { getDisplayUrl } from "@/shared/lib/utils";
 import { ShotFilter } from "@/shared/components/ShotFilter";
 import { useIsMobile } from "@/shared/hooks/use-mobile";
-import { useAdjacentPagePreloading } from "@/shared/hooks/useAdjacentPagePreloading";
-import { useProgressiveImageLoading } from "@/shared/hooks/useProgressiveImageLoading";
+import { ImagePreloadManager } from "./ImagePreloadManager";
+import { ProgressiveLoadingManager } from "./ProgressiveLoadingManager";
 import { ImageGalleryPagination } from "./ImageGalleryPagination";
 import { TimeStamp } from "@/shared/components/TimeStamp";
 import { useToggleGenerationStar } from '@/shared/hooks/useGenerations';
 import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { ImageGalleryItem } from "./ImageGalleryItem";
-import { isImagePriority } from '@/shared/lib/imageLoadingPriority';
+import { getImageLoadingStrategy, shouldIncludeInInitialBatch } from '@/shared/lib/imageLoadingPriority';
+import '@/shared/lib/imageLoadingDebugger'; // Make debugger available globally
 
 // Define the structure for individual LoRA details within metadata
 export interface MetadataLora {
@@ -757,11 +758,23 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     const isAdjacentPage = Math.abs(newPage - currentPageNum) === 1;
     const shouldShowGalleryLoading = !isAdjacentPage || !enableAdjacentPagePreloading;
     
+    console.log(`[GalleryDebug:${navId}] 🎚️ Loading state decision:`, {
+      currentPageNum,
+      newPage,
+      isAdjacentPage,
+      shouldShowGalleryLoading,
+      enableAdjacentPagePreloading,
+      isServerPagination
+    });
+    
     if (shouldShowGalleryLoading) {
+      console.log(`[GalleryDebug:${navId}] 🔄 SETTING isGalleryLoading=true (distant page or preloading disabled)`);
       setIsGalleryLoading(true); // Show loading state for distant pages or when preloading disabled
     } else {
       // For adjacent pages, set a shorter fallback timeout since images should be preloaded
+      console.log(`[GalleryDebug:${navId}] ⏱️ Setting fallback loading timeout (50ms) for adjacent page`);
       const fallbackTimeout = setTimeout(() => {
+        console.log(`[GalleryDebug:${navId}] ⏰ FALLBACK timeout fired - setting isGalleryLoading=true`);
         setIsGalleryLoading(true);
       }, 50); // Reduced from 200ms - shorter timeout for preloaded pages
       
@@ -832,40 +845,22 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
 
 
 
-  // Progressive loading state - use unified system
-  // Use the correct page number for both server and client pagination
-  const effectivePage = isServerPagination ? (serverPage || 1) - 1 : page;
+  // Calculate effective page for progressive loading
+  // For server pagination: progressive loading should always start at page 0 since 
+  // each server page loads a fresh set of images that starts from index 0
+  // For client pagination: use the actual client page number
+  const effectivePage = isServerPagination ? 0 : page;
   
-  console.log(`[ImageLoadingDebug][Gallery] Page calculation:`, {
+  console.log(`[GalleryDebug] 📊 Page state:`, {
     isServerPagination,
     serverPage,
     clientPage: page,
     effectivePage,
-    paginatedImagesLength: paginatedImages.length
-  });
-  
-  const { showImageIndices } = useProgressiveImageLoading({
-    images: paginatedImages,
-    page: effectivePage,
-    enabled: true,
-    isMobile, // Pass mobile context for unified priority calculations
-    onImagesReady: () => {
-      setIsGalleryLoading(false);
-    },
-  });
-    
-  // Progressive loading is now handled by the useProgressiveImageLoading hook
-
-  // Use the adjacent page preloading hook
-  useAdjacentPagePreloading({
-    enabled: enableAdjacentPagePreloading,
-    isServerPagination,
-    page,
-    serverPage,
-    totalFilteredItems,
-    itemsPerPage: ITEMS_PER_PAGE,
-    onPrefetchAdjacentPages,
-    allImages: filteredImages,
+    paginatedImagesLength: paginatedImages.length,
+    isGalleryLoading,
+    loadingButton,
+    enableAdjacentPagePreloading,
+    timestamp: new Date().toISOString()
   });
 
   const rangeStart = totalFilteredItems === 0 ? 0 : (isServerPagination ? offset : page * ITEMS_PER_PAGE) + 1;
@@ -1118,6 +1113,18 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
           </div>
         )}
 
+        {/* Adjacent Page Preloading Manager - handles preloading in background */}
+        <ImagePreloadManager
+          enabled={enableAdjacentPagePreloading}
+          isServerPagination={isServerPagination}
+          page={page}
+          serverPage={serverPage}
+          totalFilteredItems={totalFilteredItems}
+          itemsPerPage={ITEMS_PER_PAGE}
+          onPrefetchAdjacentPages={onPrefetchAdjacentPages}
+          allImages={filteredImages}
+        />
+
         {/* Gallery content wrapper with minimum height to prevent layout jump when there are images */}
         <div className={paginatedImages.length > 0 && !reducedSpacing ? "min-h-[400px] sm:min-h-[500px] lg:min-h-[600px]" : ""}>
           {images.length > 0 && filteredImages.length === 0 && (filterByToolType || mediaTypeFilter !== 'all' || searchTerm.trim()) && (
@@ -1145,59 +1152,78 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
           )}
 
           {paginatedImages.length > 0 && (
-            <div>
-              <div className={`grid ${reducedSpacing ? 'gap-2 sm:gap-4' : 'gap-4'} ${reducedSpacing ? 'mb-4' : 'mb-12'} ${gridColumnClasses}`}>
-                {paginatedImages.map((image, index) => {
-                  const shouldShow = showImageIndices.has(index);
-                  // Use unified priority system
-                  const isPriority = isImagePriority(index, isMobile);
-                  
-                  // Debug logging for first few images
-                  if (index < 5) {
-                    console.log(`[ImageLoadingDebug][Gallery] Image ${index}:`, {
-                      imageId: image.id,
-                      shouldShow,
-                      showImageIndicesArray: Array.from(showImageIndices),
-                      showImageIndicesSize: showImageIndices.size
-                    });
-                  }
-                  
-                  return (
-                    <ImageGalleryItem
-                      key={image.id || `image-${index}`}
-                      image={image}
-                      index={index}
-                      isDeleting={isDeleting === image.id}
-                      onDelete={onDelete}
-                      onApplySettings={onApplySettings}
-                      onOpenLightbox={handleOpenLightbox}
-                      onAddToLastShot={onAddToLastShot}
-                      onDownloadImage={handleDownloadImage}
-                      onToggleStar={onToggleStar}
-                      selectedShotIdLocal={selectedShotIdLocal}
-                      simplifiedShotOptions={simplifiedShotOptions}
-                      showTickForImageId={showTickForImageId}
-                      onShowTick={handleShowTick}
-                      addingToShotImageId={addingToShotImageId}
-                      setAddingToShotImageId={setAddingToShotImageId}
-                      downloadingImageId={downloadingImageId}
-                      isMobile={isMobile}
-                      mobileActiveImageId={mobileActiveImageId}
-                      mobilePopoverOpenImageId={mobilePopoverOpenImageId}
-                      onMobileTap={handleMobileTap}
-                      setMobilePopoverOpenImageId={setMobilePopoverOpenImageId}
-                      setSelectedShotIdLocal={setSelectedShotIdLocal}
-                      setLastAffectedShotId={setLastAffectedShotId}
-                      toggleStarMutation={toggleStarMutation}
-                      shouldLoad={shouldShow}
-                      isPriority={isPriority}
-                      isGalleryLoading={isGalleryLoading}
-                      onCreateShot={onCreateShot}
-                    />
-                  );
-                })}
-              </div>
-            </div>
+                    <ProgressiveLoadingManager
+          images={paginatedImages}
+          page={effectivePage}
+          enabled={true}
+          isMobile={isMobile}
+          onImagesReady={() => {
+            console.log(`[GalleryDebug] 🎯 onImagesReady called - clearing isGalleryLoading`);
+            setIsGalleryLoading(false);
+          }}
+        >
+              {(showImageIndices) => (
+                <div>
+                  <div className={`grid ${reducedSpacing ? 'gap-2 sm:gap-4' : 'gap-4'} ${reducedSpacing ? 'mb-4' : 'mb-12'} ${gridColumnClasses}`}>
+                    {paginatedImages.map((image, index) => {
+                      const shouldShow = showImageIndices.has(index);
+                      
+                      // Use unified loading strategy system
+                      const loadingStrategy = getImageLoadingStrategy(index, {
+                        isMobile,
+                        totalImages: paginatedImages.length,
+                        isPreloaded: false // Will be checked inside the component
+                      });
+                      
+                      // Debug logging for first few images
+                      if (index < 3) {
+                        console.log(`[GalleryDebug] 🖼️ Image ${index} render:`, {
+                          imageId: image.id?.substring(0, 8),
+                          shouldShow,
+                          tier: loadingStrategy.tier,
+                          showImageIndicesSize: showImageIndices.size,
+                          isGalleryLoading
+                        });
+                      }
+                      
+                      return (
+                        <ImageGalleryItem
+                          key={image.id || `image-${index}`}
+                          image={image}
+                          index={index}
+                          isDeleting={isDeleting === image.id}
+                          onDelete={onDelete}
+                          onApplySettings={onApplySettings}
+                          onOpenLightbox={handleOpenLightbox}
+                          onAddToLastShot={onAddToLastShot}
+                          onDownloadImage={handleDownloadImage}
+                          onToggleStar={onToggleStar}
+                          selectedShotIdLocal={selectedShotIdLocal}
+                          simplifiedShotOptions={simplifiedShotOptions}
+                          showTickForImageId={showTickForImageId}
+                          onShowTick={handleShowTick}
+                          addingToShotImageId={addingToShotImageId}
+                          setAddingToShotImageId={setAddingToShotImageId}
+                          downloadingImageId={downloadingImageId}
+                          isMobile={isMobile}
+                          mobileActiveImageId={mobileActiveImageId}
+                          mobilePopoverOpenImageId={mobilePopoverOpenImageId}
+                          onMobileTap={handleMobileTap}
+                          setMobilePopoverOpenImageId={setMobilePopoverOpenImageId}
+                          setSelectedShotIdLocal={setSelectedShotIdLocal}
+                          setLastAffectedShotId={setLastAffectedShotId}
+                          toggleStarMutation={toggleStarMutation}
+                          shouldLoad={shouldShow}
+                          isPriority={loadingStrategy.shouldLoadInInitialBatch}
+                          isGalleryLoading={isGalleryLoading}
+                          onCreateShot={onCreateShot}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </ProgressiveLoadingManager>
           )}
         </div>
         {/* Bottom Pagination Controls */}

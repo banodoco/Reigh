@@ -16,8 +16,8 @@ import {
 } from "@/shared/components/ui/select";
 import { DraggableImage } from "@/shared/components/DraggableImage";
 import { getDisplayUrl } from "@/shared/lib/utils";
-import { isImageCached } from "@/shared/hooks/useAdjacentPagePreloading";
-import { getImageLoadingDelay } from '@/shared/lib/imageLoadingPriority';
+import { isImageCached } from "@/shared/lib/imageCacheManager";
+import { getImageLoadingStrategy } from '@/shared/lib/imageLoadingPriority';
 import { TimeStamp } from "@/shared/components/TimeStamp";
 import { useToast } from "@/shared/hooks/use-toast";
 import * as PopoverPrimitive from "@radix-ui/react-popover";
@@ -103,6 +103,17 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   const isPreloadedAndCached = isImageCached(image);
   const [imageLoaded, setImageLoaded] = useState<boolean>(isPreloadedAndCached);
   const [imageLoading, setImageLoading] = useState<boolean>(false);
+  
+  // Track successful image load events
+  const handleImageLoad = useCallback(() => {
+    console.log(`[ItemDebug] ✅ Image ${index} LOADED successfully:`, {
+      imageId: image.id?.substring(0, 8),
+      wasCached: isPreloadedAndCached,
+      loadTime: Date.now()
+    });
+    setImageLoaded(true);
+    setImageLoading(false);
+  }, [index, image.id, isPreloadedAndCached]);
   const MAX_RETRIES = 2;
   
   // Handle shot creation
@@ -213,70 +224,51 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
     return displayUrl;
   }, [displayUrl, image.thumbUrl, image.url, imageRetryCount]);
 
-  // Unified loading system that respects progressive loading control
+  // Simplified loading system - only responds to progressive loading control
   useEffect(() => {
     // Generate unique load ID for tracking this specific image load
     const loadId = `load-${image.id}-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
-    let isMounted = true; // Flag to prevent state updates after unmount
+    const isPreloaded = isImageCached(image);
+    
+    console.log(`[ItemDebug:${loadId}] Loading decision for image ${index}:`, {
+      imageId: image.id.substring(0, 8),
+      actualSrc: !!actualSrc,
+      shouldLoad,
+      isPriority,
+      isPreloaded,
+      actualDisplayUrl: actualDisplayUrl?.substring(0, 50) + '...',
+      decision: !actualSrc && shouldLoad ? 'LOAD' : actualSrc ? 'SKIP_ALREADY_SET' : !shouldLoad ? 'SKIP_NOT_READY' : 'UNKNOWN'
+    });
     
     // Only load if progressive loading system says we should AND we haven't loaded yet
     if (!actualSrc && shouldLoad) {
-      console.log(`[ImageLoadingDebug][ImageLoad:${loadId}] Starting image load:`, {
-        index,
-        imageId: image.id,
-        actualDisplayUrl,
-        shouldLoad,
-        isPriority,
-        isMobile,
-        timestamp: new Date().toISOString()
-      });
       
       // Don't load placeholder URLs - they indicate missing/invalid image data
       if (actualDisplayUrl === '/placeholder.svg' || !actualDisplayUrl) {
-        console.warn(`[ImageGalleryItem] Skipping load for invalid URL: ${actualDisplayUrl}, image:`, image);
+        console.error(`[ItemDebug:${loadId}] ❌ INVALID URL - setting error state:`, actualDisplayUrl);
         setImageLoadError(true);
         return;
       }
       
       // Only set loading if the image isn't already cached/loaded
-      const isPreloaded = isImageCached(image);
       if (!isPreloaded) {
+        console.log(`[ItemDebug:${loadId}] 🔄 Setting loading state (uncached)`);
         setImageLoading(true);
+      } else {
+        console.log(`[ItemDebug:${loadId}] ⚡ Skipping loading state (cached)`);
       }
       
-      // Use unified delay calculation system
-      const delay = getImageLoadingDelay(index, {
-        isMobile, // Use the isMobile prop passed from parent
-        totalImages: 100, // Approximate - actual count not critical for delay calculation
-        isPreloaded
-      });
+      // No additional delay - progressive loading system handles all timing
+      // Images load immediately when shouldLoad becomes true
+      console.log(`[ItemDebug:${loadId}] 🚀 SETTING actualSrc immediately`);
+      setActualSrc(actualDisplayUrl);
       
-      console.log(`[ImageLoadingDebug][ImageLoad:${loadId}] Calculated delay: ${delay}ms (cached: ${isPreloaded})`);
-      
-      const timeout = setTimeout(() => {
-        if (isMounted && actualDisplayUrl !== '/placeholder.svg') {
-          console.log(`[ImageLoadingDebug][ImageLoad:${loadId}] Setting actualSrc after ${delay}ms delay`);
-          setActualSrc(actualDisplayUrl);
-        } else {
-          console.log(`[ImageLoadingDebug][ImageLoad:${loadId}] Skipping setActualSrc - component unmounted or invalid URL`);
-        }
-      }, delay);
-      
-      return () => {
-        console.log(`[ImageLoadingDebug][ImageLoad:${loadId}] Cleanup - clearing timeout`);
-        clearTimeout(timeout);
-        isMounted = false;
-      };
     } else if (!shouldLoad) {
-      console.log(`[ImageLoadingDebug][ImageLoad:${loadId}] Skipping load - shouldLoad is false`);
+      console.log(`[ItemDebug:${loadId}] ⏸️ WAITING for shouldLoad=true`);
     } else if (actualSrc) {
-      console.log(`[ImageLoadingDebug][ImageLoad:${loadId}] Skipping load - actualSrc already set:`, actualSrc);
+      console.log(`[ItemDebug:${loadId}] ✅ ALREADY LOADED`);
     }
-    
-    return () => {
-      isMounted = false;
-    };
-  }, [actualSrc, actualDisplayUrl, shouldLoad, isPriority, image.id, index]); // Added shouldLoad to dependencies
+  }, [actualSrc, actualDisplayUrl, shouldLoad, image.id, index]);
 
   // Only format metadata when actually needed (Info tooltip/popover is opened)
   // This prevents 150-200ms of string building work during initial render on mobile
@@ -415,17 +407,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                     style={{ cursor: 'pointer' }}
                     onError={handleImageError}
                     onLoadStart={() => setImageLoading(true)}
-                    onLoadedData={() => {
-                      if (index < 3) {
-                        console.log(`[ImageGalleryItem-${index}] Video loaded (visible element)`, {
-                          imageId: image.id,
-                          src: actualSrc,
-                          imageLoaded
-                        });
-                      }
-                      setImageLoading(false);
-                      setImageLoaded(true);
-                    }}
+                    onLoadedData={handleImageLoad}
                     onAbort={() => {
                       // Reset loading state if video load was aborted
                       setImageLoading(false);
@@ -439,16 +421,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                       src={actualSrc}
                       style={{ display: 'none' }}
                       onLoadStart={() => setImageLoading(true)}
-                      onLoadedData={() => {
-                        if (index < 3) {
-                          console.log(`[ImageGalleryItem-${index}] Video loaded (hidden element)`, {
-                            imageId: image.id,
-                            src: actualSrc
-                          });
-                        }
-                        setImageLoading(false);
-                        setImageLoaded(true);
-                      }}
+                      onLoadedData={handleImageLoad}
                       onError={handleImageError}
                       onAbort={() => setImageLoading(false)}
                     />
@@ -505,18 +478,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                   alt={image.prompt || `Generated image ${index + 1}`}
                   style={{ display: 'none' }}
                   onError={handleImageError}
-                  onLoad={() => {
-                    if (index < 3) {
-                      console.log(`[ImageGalleryItem-${index}] Image loaded successfully`, {
-                        imageId: image.id,
-                        src: actualSrc,
-                        imageLoaded,
-                        imageLoading
-                      });
-                    }
-                    setImageLoading(false);
-                    setImageLoaded(true);
-                  }}
+                  onLoad={handleImageLoad}
                   onLoadStart={() => setImageLoading(true)}
                   onAbort={() => {
                     setImageLoading(false);

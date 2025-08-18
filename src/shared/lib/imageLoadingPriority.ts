@@ -1,9 +1,8 @@
 /**
  * Unified Image Loading Priority System
  * 
- * This module provides a centralized way to calculate loading priorities
- * and delays for images across the entire application, ensuring consistency
- * between progressive loading and individual image loading logic.
+ * Single source of truth for all image loading behavior.
+ * Progressive loading is the primary mechanism - individual items no longer have separate delays.
  */
 
 export interface LoadingConfig {
@@ -12,94 +11,107 @@ export interface LoadingConfig {
   isPreloaded: boolean;
 }
 
-export interface ImagePriority {
+export interface ImageLoadingStrategy {
   tier: 'immediate' | 'high' | 'medium' | 'low';
-  delay: number;
-  shouldLoad: boolean;
-  batchGroup: number; // Which batch this image belongs to (0 = first batch)
+  shouldLoadInInitialBatch: boolean;
+  progressiveDelay: number; // Only delay used - for progressive loading system
+  batchGroup: number;
 }
 
 /**
- * Calculate the unified priority for an image based on its index and context
+ * Unified batch configuration - single source of truth
  */
-export const calculateImagePriority = (
-  index: number, 
-  config: LoadingConfig
-): ImagePriority => {
-  const { isMobile, totalImages, isPreloaded } = config;
-  
-  // Adaptive batch size based on mobile/desktop
-  const initialBatchSize = isMobile ? 4 : 6;
-  
-  // Determine which batch this image belongs to
-  const batchGroup = Math.floor(index / initialBatchSize);
-  
-  // Calculate tier and delay with unified logic
-  let tier: ImagePriority['tier'];
-  let delay: number;
-  
-  if (index === 0) {
-    // First image always loads immediately
-    tier = 'immediate';
-    delay = 0;
-  } else if (index < 3) {
-    // Next 2 images get high priority  
-    tier = 'high';
-    delay = isPreloaded ? 0 : (isMobile ? 15 : 10);
-  } else if (index < initialBatchSize) {
-    // Rest of initial batch gets medium priority
-    tier = 'medium';
-    delay = isPreloaded ? 0 : (isMobile ? 25 : 20);
-  } else {
-    // Beyond initial batch gets low priority with staggered delays
-    tier = 'low';
-    const staggerMultiplier = index - initialBatchSize + 1;
-    delay = isPreloaded ? 0 : (isMobile ? 80 : 60) + (staggerMultiplier * (isMobile ? 20 : 15));
-  }
-  
-  return {
-    tier,
-    delay,
-    shouldLoad: index < initialBatchSize, // Only initial batch loads immediately
-    batchGroup
-  };
-};
-
-/**
- * Get the batch configuration for progressive loading
- */
-export const getBatchConfig = (isMobile: boolean) => ({
+export const getUnifiedBatchConfig = (isMobile: boolean) => ({
   initialBatchSize: isMobile ? 4 : 6,
   staggerDelay: isMobile ? 120 : 80,
   maxStaggerDelay: isMobile ? 300 : 200
 });
 
 /**
- * Determine if an image should be considered "priority" for legacy compatibility
+ * Main function: determines loading strategy for an image
+ * This is the ONLY function components should use
  */
-export const isImagePriority = (index: number, isMobile: boolean): boolean => {
-  const { initialBatchSize } = getBatchConfig(isMobile);
-  return index < initialBatchSize;
-};
-
-/**
- * Get loading delay for an image with unified priority logic
- */
-export const getImageLoadingDelay = (
-  index: number,
+export const getImageLoadingStrategy = (
+  index: number, 
   config: LoadingConfig
-): number => {
-  const priority = calculateImagePriority(index, config);
-  return priority.delay;
+): ImageLoadingStrategy => {
+  const { isMobile, isPreloaded } = config;
+  
+  const batchConfig = getUnifiedBatchConfig(isMobile);
+  const { initialBatchSize, staggerDelay } = batchConfig;
+  
+  // Determine which batch this image belongs to
+  const batchGroup = Math.floor(index / initialBatchSize);
+  
+  // Calculate strategy with unified logic
+  let tier: ImageLoadingStrategy['tier'];
+  let progressiveDelay: number;
+  let shouldLoadInInitialBatch: boolean;
+  
+  if (index === 0) {
+    // First image always loads immediately
+    tier = 'immediate';
+    progressiveDelay = 0;
+    shouldLoadInInitialBatch = true;
+  } else if (index < 3) {
+    // Next 2 images get high priority  
+    tier = 'high';
+    progressiveDelay = isPreloaded ? 0 : 16; // Single frame delay
+    shouldLoadInInitialBatch = true;
+  } else if (index < initialBatchSize) {
+    // Rest of initial batch gets medium priority
+    tier = 'medium';
+    progressiveDelay = isPreloaded ? 0 : 32; // Two frame delay
+    shouldLoadInInitialBatch = true;
+  } else {
+    // Beyond initial batch gets low priority with staggered delays
+    tier = 'low';
+    const staggerMultiplier = index - initialBatchSize + 1;
+    progressiveDelay = isPreloaded ? 0 : staggerDelay * staggerMultiplier;
+    shouldLoadInInitialBatch = false;
+  }
+  
+  return {
+    tier,
+    shouldLoadInInitialBatch,
+    progressiveDelay,
+    batchGroup
+  };
 };
 
 /**
- * Check if an image should be included in the progressive loading initial batch
+ * Check if an image should be included in the initial batch
  */
 export const shouldIncludeInInitialBatch = (
   index: number,
   isMobile: boolean
 ): boolean => {
-  const { initialBatchSize } = getBatchConfig(isMobile);
+  const { initialBatchSize } = getUnifiedBatchConfig(isMobile);
   return index < initialBatchSize;
 };
+
+/**
+ * Legacy compatibility - now just calls the main function
+ * @deprecated Use getImageLoadingStrategy instead
+ */
+export const isImagePriority = (index: number, isMobile: boolean): boolean => {
+  return shouldIncludeInInitialBatch(index, isMobile);
+};
+
+/**
+ * Legacy compatibility - now just calls the main function  
+ * @deprecated Use getImageLoadingStrategy instead
+ */
+export const getImageLoadingDelay = (
+  index: number,
+  config: LoadingConfig
+): number => {
+  const strategy = getImageLoadingStrategy(index, config);
+  return strategy.progressiveDelay;
+};
+
+/**
+ * Legacy compatibility 
+ * @deprecated Use getUnifiedBatchConfig instead
+ */
+export const getBatchConfig = (isMobile: boolean) => getUnifiedBatchConfig(isMobile);

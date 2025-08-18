@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { isImageCached } from './useAdjacentPagePreloading';
-import { getBatchConfig, shouldIncludeInInitialBatch } from '@/shared/lib/imageLoadingPriority';
+import { isImageCached } from '@/shared/lib/imageCacheManager';
+import { getUnifiedBatchConfig, getImageLoadingStrategy } from '@/shared/lib/imageLoadingPriority';
 
 interface UseProgressiveImageLoadingProps {
   images: any[];
@@ -21,10 +21,31 @@ export const useProgressiveImageLoading = ({
 }: UseProgressiveImageLoadingProps) => {
   const [showImageIndices, setShowImageIndices] = useState<Set<number>>(new Set());
   const currentPageRef = useRef(page);
+  const lastTriggerTimeRef = useRef<number>(0);
   currentPageRef.current = page;
   
   useEffect(() => {
-    if (!enabled || images.length === 0) return;
+    const now = Date.now();
+    const timeSinceLastTrigger = now - lastTriggerTimeRef.current;
+    
+    if (!enabled || images.length === 0) {
+      console.log(`[ProgressiveDebug] Effect skipped:`, {
+        enabled,
+        imagesLength: images.length,
+        reason: !enabled ? 'disabled' : 'no images'
+      });
+      return;
+    }
+    
+    // Prevent rapid re-triggers (debounce for 50ms unless it's a page change)
+    const prevPage = currentPageRef.current;
+    const isPageChange = prevPage !== page;
+    if (!isPageChange && timeSinceLastTrigger < 50) {
+      console.log(`[ProgressiveDebug] 🚫 Effect DEBOUNCED (${timeSinceLastTrigger}ms since last trigger)`);
+      return;
+    }
+
+    lastTriggerTimeRef.current = now;
 
     // Generate unique session ID for this progressive loading session
     const sessionId = `prog-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -33,9 +54,22 @@ export const useProgressiveImageLoading = ({
 
     // Update current page ref for race condition checks
     currentPageRef.current = page;
+    
+    console.log(`[ProgressiveDebug:${sessionId}] 🔄 Effect triggered:`, {
+      page,
+      prevPage,
+      imagesLength: images.length,
+      enabled,
+      isMobile,
+      pageChanged: isPageChange,
+      firstImageId: images[0]?.id?.substring(0, 8),
+      trigger: isPageChange ? 'PAGE_CHANGE' : 'OTHER_DEPENDENCY',
+      timeSinceLastTrigger,
+      timestamp: new Date().toISOString()
+    });
 
     // Get unified batch configuration
-    const batchConfig = getBatchConfig(isMobile);
+    const batchConfig = getUnifiedBatchConfig(isMobile);
     const actualInitialBatch = Math.min(batchConfig.initialBatchSize, images.length);
     
     console.log(`[ImageLoadingDebug][ProgressiveLoading:${sessionId}] Starting progressive load session:`, {
@@ -48,13 +82,11 @@ export const useProgressiveImageLoading = ({
       timestamp: new Date().toISOString()
     });
 
-    // Reset and show first batch immediately (visible-first approach)
-    // Only include images that should be in the initial batch according to unified system
-    const initialIndices = new Set(
-      Array.from({ length: images.length }, (_, i) => i)
-        .filter(i => shouldIncludeInInitialBatch(i, isMobile))
-        .slice(0, actualInitialBatch)
-    );
+    // Phase 1: Show initial batch immediately
+    const initialIndices = new Set<number>();
+    for (let i = 0; i < actualInitialBatch; i++) {
+      initialIndices.add(i);
+    }
     
     console.log(`[ImageLoadingDebug][ProgressiveLoading:${sessionId}] Phase 1 - Initial batch reveal:`, {
       initialIndicesCount: initialIndices.size,
@@ -78,24 +110,26 @@ export const useProgressiveImageLoading = ({
     if (onImagesReady) {
       if (firstBatchCached) {
         // Immediate callback for cached images to prevent loading flicker
-        console.log(`[ImageLoadingDebug][ProgressiveLoading:${sessionId}] Immediate onImagesReady callback (cached)`);
+        console.log(`[ProgressiveDebug:${sessionId}] 🚀 IMMEDIATE onImagesReady (cached)`);
         onImagesReady();
       } else {
         // Small delay for non-cached images to avoid layout thrashing
-        console.log(`[ImageLoadingDebug][ProgressiveLoading:${sessionId}] Delayed onImagesReady callback (16ms)`);
+        console.log(`[ProgressiveDebug:${sessionId}] ⏱️ DELAYED onImagesReady (16ms) - ${actualInitialBatch - images.slice(0, actualInitialBatch).filter(img => isImageCached(img)).length} uncached`);
         const readyTimeout = setTimeout(() => {
           if (isCurrentPage && currentPageRef.current === page) {
-            console.log(`[ImageLoadingDebug][ProgressiveLoading:${sessionId}] Executing delayed onImagesReady callback`);
+            console.log(`[ProgressiveDebug:${sessionId}] ✅ EXECUTED delayed onImagesReady callback`);
             onImagesReady();
           } else {
-            console.log(`[ImageLoadingDebug][ProgressiveLoading:${sessionId}] Skipping delayed callback - page changed`);
+            console.log(`[ProgressiveDebug:${sessionId}] ❌ CANCELLED delayed callback - page changed (${currentPageRef.current} !== ${page})`);
           }
         }, 16); // Next frame timing for smoother transitions
         timeouts.push(readyTimeout);
       }
+    } else {
+      console.log(`[ProgressiveDebug:${sessionId}] ⚠️ No onImagesReady callback provided`);
     }
 
-    // Staggered loading for remaining images (one by one for smooth progression)
+    // Phase 2: Staggered loading for remaining images using unified delay system
     if (images.length > actualInitialBatch) {
       console.log(`[ImageLoadingDebug][ProgressiveLoading:${sessionId}] Phase 2 - Staggered loading:`, {
         remainingImages: images.length - actualInitialBatch,
@@ -103,28 +137,36 @@ export const useProgressiveImageLoading = ({
         totalImages: images.length
       });
       
-      // Load remaining images one by one with unified staggered timing
+      // Load remaining images using individual delay calculations
       for (let i = actualInitialBatch; i < images.length; i++) {
         const imageIndex = i;
-        const delay = batchConfig.staggerDelay * (i - actualInitialBatch + 1);
+        
+        // Use unified loading strategy for delay calculation
+        const strategy = getImageLoadingStrategy(imageIndex, {
+          isMobile,
+          totalImages: images.length, // Use actual count, not approximation
+          isPreloaded: isImageCached(images[imageIndex])
+        });
         
         const timeout = setTimeout(() => {
           // Enhanced race condition check - make sure we're still on the same page
           if (isCurrentPage && currentPageRef.current === page) {
-            console.log(`[ImageLoadingDebug][ProgressiveLoading:${sessionId}] Revealing image ${imageIndex} (delay: ${delay}ms)`);
+            console.log(`[ProgressiveDebug:${sessionId}] 🖼️ REVEALING image ${imageIndex} (delay: ${strategy.progressiveDelay}ms, tier: ${strategy.tier})`);
             setShowImageIndices(prev => {
               // Only add if we don't already have this index (avoid duplicates)
               if (!prev.has(imageIndex)) {
                 const newSet = new Set(prev);
                 newSet.add(imageIndex);
+                console.log(`[ProgressiveDebug:${sessionId}] 📈 Updated showImageIndices: size ${newSet.size}, latest: ${Array.from(newSet).slice(-3)}`);
                 return newSet;
               }
+              console.log(`[ProgressiveDebug:${sessionId}] ⚠️ Image ${imageIndex} already in set`);
               return prev;
             });
           } else {
-            console.log(`[ImageLoadingDebug][ProgressiveLoading:${sessionId}] Skipping image ${imageIndex} - page changed`);
+            console.log(`[ProgressiveDebug:${sessionId}] ❌ CANCELLED image ${imageIndex} - page changed (${currentPageRef.current} !== ${page})`);
           }
-        }, delay);
+        }, strategy.progressiveDelay);
         
         timeouts.push(timeout);
       }
@@ -134,12 +176,12 @@ export const useProgressiveImageLoading = ({
     
     // Cleanup function that runs when dependencies change or component unmounts
     return () => {
-      console.log(`[ImageLoadingDebug][ProgressiveLoading:${sessionId}] Cleanup - canceling ${timeouts.length} pending timeouts`);
+      console.log(`[ProgressiveDebug:${sessionId}] 🧹 CLEANUP - canceling ${timeouts.length} pending timeouts, stale: ${!isCurrentPage}`);
       isCurrentPage = false; // Mark this effect as stale
       timeouts.forEach(timeout => clearTimeout(timeout));
       // Don't clear showImageIndices here - let the new effect handle setting them
     };
-  }, [images, page, enabled, isMobile, useIntersectionObserver]);
+  }, [images.length, images[0]?.id, page, enabled, isMobile, useIntersectionObserver]);
 
   return { showImageIndices };
 };
