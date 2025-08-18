@@ -10,7 +10,7 @@ import { useToolSettings } from '@/shared/hooks/useToolSettings';
 import { VideoTravelSettings } from '@/tools/travel-between-images/settings';
 import { Button } from '@/shared/components/ui/button';
 import { ArrowDown } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { usePanes } from '@/shared/contexts/PanesContext';
 import CreateShotModal from '@/shared/components/CreateShotModal';
 import { useCreateShot, useHandleExternalImageDrop } from '@/shared/hooks/useShots';
@@ -25,6 +25,7 @@ export const ShotsPane: React.FC = () => {
   const { selectedProjectId } = useProject();
   const { shots, isLoading, error } = useShots();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const location = useLocation();
   // Pagination state
   const pageSize = 5;
   const [currentPage, setCurrentPage] = useState(1);
@@ -52,8 +53,8 @@ export const ShotsPane: React.FC = () => {
     enabled: !!selectedProjectId 
   });
 
-  // Get sort order from settings, default to 'oldest'
-  const sortOrder = shotsPaneSettings?.sortOrder || 'oldest';
+  // Get sort order from settings, default to 'newest'
+  const sortOrder = shotsPaneSettings?.sortOrder || 'newest';
 
   const handleSortOrderChange = (newSortOrder: 'oldest' | 'newest') => {
     if (!selectedProjectId) return;
@@ -117,6 +118,15 @@ export const ShotsPane: React.FC = () => {
   const { setCurrentShotId } = useCurrentShot();
   const isMobile = useIsMobile();
   const { navigateToShotEditor } = useShotNavigation();
+
+  // Check if we're currently on the travel-between-images page
+  const isOnTravelBetweenImagesPage = location.pathname === '/tools/travel-between-images';
+  
+  // Check if we're viewing a specific shot (has hash with shot ID)
+  const isViewingSpecificShot = !!location.hash?.replace('#', '');
+  
+  // Show the button if we're NOT on the travel page, OR if we're on the travel page but viewing a specific shot
+  const shouldShowTravelButton = !isOnTravelBetweenImagesPage || isViewingSpecificShot;
 
   const {
     isGenerationsPaneLocked,
@@ -193,13 +203,13 @@ export const ShotsPane: React.FC = () => {
         bottomOffset={useBottomOffset()}
         handlePaneEnter={handlePaneEnter}
         handlePaneLeave={handlePaneLeave}
-        thirdButton={{
+        thirdButton={shouldShowTravelButton ? {
           onClick: () => {
             setIsShotsPaneLocked(false); // Unlock and close the pane immediately
             navigateToShotEditor({ closeMobilePanes: true });
           },
           ariaLabel: "Open Travel Between Images tool"
-        }}
+        } : undefined}
       />
       <div
         className="pointer-events-none"

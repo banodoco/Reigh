@@ -785,27 +785,32 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
       }, 1000);
     }
     
-    // Add a safety timeout to clear loading state if progressive loading fails to trigger
+    // Separate safety timeouts for button and gallery loading states
     // This prevents the UI from getting stuck in loading state
     // Clear any existing safety timeout first
     if (safetyTimeoutRef.current) {
       clearTimeout(safetyTimeoutRef.current);
     }
     
+    // Gallery loading safety timeout (longer since it depends on progressive loading)
     safetyTimeoutRef.current = setTimeout(() => {
-      console.log(`🚨 [PAGELOADINGDEBUG] [NAV:${navId}] SAFETY TIMEOUT - ${isServerPagination ? 'server data never arrived' : 'progressive loading failed'} after 1.5s`);
+      console.log(`🚨 [PAGELOADINGDEBUG] [NAV:${navId}] GALLERY SAFETY TIMEOUT - progressive loading failed after 1.5s`);
       setIsGalleryLoading(false);
-      setLoadingButton(null);
       safetyTimeoutRef.current = null;
-    }, 1500); // 1.5 second safety net (reduced from 2s for better UX)
+    }, 1500);
     
     if (isServerPagination && onServerPageChange) {
       // Server-side pagination: notify the parent, which will handle scrolling.
       console.log(`📡 [PAGELOADINGDEBUG] [NAV:${navId}] Calling server pagination handler`);
       onServerPageChange(newPage, fromBottom); 
       
-      // Don't clear loading button immediately - wait for actual data to arrive
-      // The loading button will be cleared when onImagesReady is called
+      // For server pagination, clear button loading on a shorter timeout to prevent stuck states
+      // The progressive loading will handle the gallery loading state separately
+      const buttonTimeout = setTimeout(() => {
+        console.log(`🔘 [PAGELOADINGDEBUG] [NAV:${navId}] Server pagination button timeout - clearing button loading`);
+        setLoadingButton(null);
+      }, 800); // Shorter timeout for better UX
+      
       console.log(`⏳ [PAGELOADINGDEBUG] [NAV:${navId}] Server pagination initiated - waiting for data...`);
     } else {
       // Client-side pagination - show loading longer for bottom buttons
@@ -815,7 +820,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
       setTimeout(() => {
         console.log(`✅ [PAGELOADINGDEBUG] [NAV:${navId}] Client pagination completed`);
         setLoadingButton(null);
-        clearTimeout(safetyTimeoutRef.current!);
+        // Don't clear gallery safety timeout here - let progressive loading handle it
         // Scroll to top of gallery AFTER page loads (only for bottom buttons)
         if (fromBottom && galleryTopRef.current) {
           const rect = galleryTopRef.current.getBoundingClientRect();
@@ -932,75 +937,45 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
       <div className={`${reducedSpacing ? 'space-y-3' : 'space-y-6'} ${reducedSpacing ? 'pb-2' : 'pb-8'}`}>
         {/* Header section with pagination and filters */}
         <div ref={galleryTopRef} className={`${reducedSpacing ? 'mt-0' : 'mt-7'} space-y-3`}>
-            {/* Pagination row with starred filter */}
-            {totalPages > 1 && !hidePagination && (
-              <div className="flex justify-between items-center">
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const newPage = isServerPagination 
-                        ? Math.max(1, serverPage! - 1)
-                        : Math.max(0, page - 1);
-                      handlePageChange(newPage, 'prev');
-                    }}
-                    disabled={loadingButton !== null || (isServerPagination ? serverPage === 1 : page === 0)}
-                  >
-                    {loadingButton === 'prev' ? (
-                      <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-current"></div>
-                    ) : (
-                      'Prev'
-                    )}
-                  </Button>
-                  <span className={`text-sm ${whiteText ? 'text-white' : 'text-muted-foreground'} whitespace-nowrap`}>
-                    {rangeStart}-{rangeEnd} of {totalFilteredItems}
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const newPage = isServerPagination 
-                        ? serverPage! + 1
-                        : Math.min(totalPages - 1, page + 1);
-                      handlePageChange(newPage, 'next');
-                    }}
-                    disabled={loadingButton !== null || (isServerPagination ? serverPage >= totalPages : page >= totalPages - 1)}
-                  >
-                    {loadingButton === 'next' ? (
-                      <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-current"></div>
-                    ) : (
-                      'Next'
-                    )}
-                  </Button>
+            {/* Top Pagination */}
+            <ImageGalleryPagination
+              totalPages={totalPages}
+              currentPage={page}
+              isServerPagination={isServerPagination}
+              serverPage={serverPage}
+              rangeStart={rangeStart}
+              rangeEnd={rangeEnd}
+              totalFilteredItems={totalFilteredItems}
+              loadingButton={loadingButton}
+              whiteText={whiteText}
+              reducedSpacing={reducedSpacing}
+              hidePagination={hidePagination}
+              onPageChange={handlePageChange}
+              compact={true}
+              rightContent={!hideTopFilters ? (
+                <div className="flex items-center space-x-2">
+                    <Checkbox 
+                        id="starred-filter-gallery"
+                        checked={showStarredOnly}
+                        onCheckedChange={(checked) => {
+                            const newStarredOnly = Boolean(checked);
+                            setShowStarredOnly(newStarredOnly);
+                            onStarredFilterChange?.(newStarredOnly);
+                        }}
+                        className={whiteText ? "border-zinc-600 data-[state=checked]:bg-zinc-600" : ""}
+                    />
+                    <Label 
+                        htmlFor="starred-filter-gallery" 
+                        className={`text-xs cursor-pointer flex items-center space-x-1 ${whiteText ? 'text-zinc-400' : 'text-muted-foreground'}`}
+                    >
+                        <Star className="h-3 w-3" />
+                        <span>Starred</span>
+                    </Label>
                 </div>
-                
-                {/* Starred Filter on the right */}
-                {!hideTopFilters && (
-                  <div className="flex items-center space-x-2">
-                      <Checkbox 
-                          id="starred-filter-gallery"
-                          checked={showStarredOnly}
-                          onCheckedChange={(checked) => {
-                              const newStarredOnly = Boolean(checked);
-                              setShowStarredOnly(newStarredOnly);
-                              onStarredFilterChange?.(newStarredOnly);
-                          }}
-                          className={whiteText ? "border-zinc-600 data-[state=checked]:bg-zinc-600" : ""}
-                      />
-                      <Label 
-                          htmlFor="starred-filter-gallery" 
-                          className={`text-xs cursor-pointer flex items-center space-x-1 ${whiteText ? 'text-zinc-400' : 'text-muted-foreground'}`}
-                      >
-                          <Star className="h-3 w-3" />
-                          <span>Starred</span>
-                      </Label>
-                  </div>
-                )}
-              </div>
-            )}
+              ) : undefined}
+            />
             
-            {/* Single page count with starred filter */}
+            {/* Single page display with starred filter - only show when pagination is hidden */}
             {totalPages === 1 && !hidePagination && (
               <div className="flex justify-between items-center">
                 <span className={`text-sm ${whiteText ? 'text-white' : 'text-muted-foreground'}`}>
@@ -1181,10 +1156,16 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
           enabled={true}
           isMobile={isMobile}
           onImagesReady={() => {
-            console.log(`🎯 [PAGELOADINGDEBUG] [GALLERY] Images ready - clearing loading state & buttons`);
+            console.log(`🎯 [PAGELOADINGDEBUG] [GALLERY] Images ready - clearing gallery loading state`);
             setIsGalleryLoading(false);
-            setLoadingButton(null); // Clear loading button when images are actually ready
-            // Clear the safety timeout since loading completed successfully
+            
+            // Only clear button loading for server pagination - client pagination handles this separately
+            if (isServerPagination) {
+              console.log(`🔘 [PAGELOADINGDEBUG] [GALLERY] Server pagination - also clearing button loading`);
+              setLoadingButton(null);
+            }
+            
+            // Clear the gallery safety timeout since loading completed successfully
             if (safetyTimeoutRef.current) {
               clearTimeout(safetyTimeoutRef.current);
               safetyTimeoutRef.current = null;
