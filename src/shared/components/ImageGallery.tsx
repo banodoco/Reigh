@@ -952,6 +952,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
               hidePagination={hidePagination}
               onPageChange={handlePageChange}
               compact={true}
+              isBottom={false}
               rightContent={!hideTopFilters ? (
                 <div className="flex items-center space-x-2">
                     <Checkbox 
@@ -1252,6 +1253,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
           reducedSpacing={reducedSpacing}
           hidePagination={hidePagination}
           onPageChange={handlePageChange}
+          isBottom={true}
         />
       </div>
       

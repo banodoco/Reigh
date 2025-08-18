@@ -26,6 +26,8 @@ interface ImageGalleryPaginationProps {
   compact?: boolean;
   /** Additional content to show on the right side (e.g., filters) */
   rightContent?: React.ReactNode;
+  /** Whether this is positioned at the bottom (controls scroll behavior) */
+  isBottom?: boolean;
 }
 
 export const ImageGalleryPagination: React.FC<ImageGalleryPaginationProps> = ({
@@ -43,6 +45,7 @@ export const ImageGalleryPagination: React.FC<ImageGalleryPaginationProps> = ({
   onPageChange,
   compact = false,
   rightContent,
+  isBottom = false,
 }) => {
   // Don't render if conditions not met
   if (totalPages <= 1 || reducedSpacing || hidePagination) {
@@ -54,7 +57,7 @@ export const ImageGalleryPagination: React.FC<ImageGalleryPaginationProps> = ({
     const newPage = isServerPagination 
       ? Math.max(1, serverPage! - 1)
       : Math.max(0, currentPage - 1);
-    onPageChange(newPage, 'prev', true); // fromBottom = true for bottom buttons
+    onPageChange(newPage, 'prev', isBottom); // Only scroll if this is bottom pagination
   };
 
   const handleNextPage = (e: React.MouseEvent) => {
@@ -62,13 +65,13 @@ export const ImageGalleryPagination: React.FC<ImageGalleryPaginationProps> = ({
     const newPage = isServerPagination 
       ? serverPage! + 1
       : Math.min(totalPages - 1, currentPage + 1);
-    onPageChange(newPage, 'next', true); // fromBottom = true for bottom buttons
+    onPageChange(newPage, 'next', isBottom); // Only scroll if this is bottom pagination
   };
 
   const handlePageSelect = (pageStr: string) => {
     const newPage = isServerPagination ? parseInt(pageStr) : parseInt(pageStr) - 1;
     const direction = newPage > (isServerPagination ? serverPage! : currentPage) ? 'next' : 'prev';
-    onPageChange(newPage, direction, true);
+    onPageChange(newPage, direction, isBottom); // Only scroll if this is bottom pagination
   };
 
   const currentDisplayPage = isServerPagination ? serverPage! : currentPage + 1;
