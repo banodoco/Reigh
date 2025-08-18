@@ -237,6 +237,7 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
 
     console.log('[MobileVideoAutoplay] useEffect[src] called', {
       isMobile,
+      disableScrubbing,
       src,
       videoPaused: video.paused,
       videoCurrentTime: video.currentTime,
@@ -245,16 +246,18 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
 
     // Ensure the video starts paused
     video.pause();
+    // Important: never force-reset currentTime in lightbox (disableScrubbing=true)
     if (!disableScrubbing) {
-      // Only reset currentTime for gallery thumbnails, not lightbox
+      // Only reset currentTime for gallery thumbnails
       video.currentTime = 0;
     }
     setDuration(0);
 
     // Add event listeners to track unexpected play events
     const handlePlay = () => {
-      console.warn('[MobileVideoAutoplay] Video started playing unexpectedly', {
+      console.warn('[MobileVideoAutoplay] Video started playing', {
         isMobile,
+        disableScrubbing,
         src: video.src,
         currentTime: video.currentTime,
         isHovering: isHoveringRef.current,
@@ -262,9 +265,9 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
         stackTrace: new Error().stack
       });
       
-      // Immediately pause if on mobile and not expected to be playing
-      if (isMobile && !isHoveringRef.current) {
-        console.warn('[MobileVideoAutoplay] Force pausing unexpected autoplay on mobile', {
+      // Only enforce anti-autoplay on mobile thumbnails (scrubbing enabled)
+      if (!disableScrubbing && isMobile && !isHoveringRef.current) {
+        console.warn('[MobileVideoAutoplay] Force pausing unexpected autoplay on mobile thumbnail', {
           src: video.src,
           timestamp: Date.now()
         });
@@ -284,15 +287,16 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
     const handleSeeked = () => {
       console.log('[MobileVideoAutoplay] Video seeked', {
         isMobile,
+        disableScrubbing,
         src: video.src,
         currentTime: video.currentTime,
         paused: video.paused,
         timestamp: Date.now()
       });
       
-      // Ensure video stays paused after seeking on mobile
-      if (isMobile && !video.paused) {
-        console.warn('[MobileVideoAutoplay] Video started playing after seek on mobile, pausing', {
+      // Only enforce pause-after-seek on mobile thumbnails
+      if (!disableScrubbing && isMobile && !video.paused) {
+        console.warn('[MobileVideoAutoplay] Video started playing after seek on mobile thumbnail, pausing', {
           src: video.src,
           timestamp: Date.now()
         });
