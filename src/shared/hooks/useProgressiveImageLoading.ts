@@ -89,6 +89,11 @@ export const useProgressiveImageLoading = ({
         imagesLength: images.length,
         reason: !enabled ? 'disabled' : 'no images'
       });
+      // Call onImagesReady even for empty images to clear loading states
+      if (images.length === 0 && onImagesReady) {
+        console.log(`✅ [PAGELOADINGDEBUG] [PROG] Ready callback for empty page`);
+        onImagesReady();
+      }
       cancelActiveSession('disabled or no images');
       return;
     }

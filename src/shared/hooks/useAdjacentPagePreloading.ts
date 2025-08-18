@@ -382,7 +382,7 @@ export const smartCleanupOldPages = (
   globalPreloadQueue.updateConcurrency(performanceMonitor.currentConfig.maxConcurrentPreloads);
   
   // Perform memory-aware cache cleanup to prevent unlimited growth
-  performMemoryAwareCleanup(500); // Keep max 500 cached images
+  performMemoryAwareCleanup(300); // Keep max 300 cached images
 };
 
 // Centralized function to trigger garbage collection for images (browser-level cleanup)
