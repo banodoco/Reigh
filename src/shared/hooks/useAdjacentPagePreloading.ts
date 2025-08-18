@@ -117,7 +117,7 @@ const performanceMonitor = {
           thumbnailOnlyPreload: true,
           preloadStrategy: current.preloadStrategy === 'aggressive' ? 'moderate' : 'conservative'
         };
-        console.log('[SmartPreload] Adapted to more conservative strategy due to performance');
+        console.log('[ImageLoadingDebug][SmartPreload] Adapted to more conservative strategy due to performance');
       }
     }
   }
@@ -192,7 +192,7 @@ export const smartCleanupOldPages = (
   // Generate unique cleanup ID for tracking
   const cleanupId = `cleanup-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   
-  console.log(`[CacheCleanup:${cleanupId}] Starting smart cleanup:`, {
+  console.log(`[ImageLoadingDebug][CacheCleanup:${cleanupId}] Starting smart cleanup:`, {
     currentPage,
     projectId,
     baseQueryKey,
@@ -202,7 +202,7 @@ export const smartCleanupOldPages = (
   const config = performanceMonitor.currentConfig;
   const keepRange = Math.floor(config.maxCachedPages / 2);
   
-  console.log(`[CacheCleanup:${cleanupId}] Cleanup configuration:`, {
+  console.log(`[ImageLoadingDebug][CacheCleanup:${cleanupId}] Cleanup configuration:`, {
     maxCachedPages: config.maxCachedPages,
     keepRange,
     strategy: config.preloadStrategy
@@ -219,7 +219,7 @@ export const smartCleanupOldPages = (
            typeof queryKey?.[2] === 'number'; // page number
   });
   
-  console.log(`[CacheCleanup:${cleanupId}] Found cached queries:`, {
+  console.log(`[ImageLoadingDebug][CacheCleanup:${cleanupId}] Found cached queries:`, {
     totalQueries: allQueries.length,
     generationQueries: generationQueries.length,
     pages: generationQueries.map(q => q.queryKey[2]).sort((a, b) => a - b)
@@ -237,7 +237,7 @@ export const smartCleanupOldPages = (
     .filter(item => item.distance > keepRange)
     .sort((a, b) => b.distance - a.distance); // Remove most distant first
 
-  console.log(`[CacheCleanup:${cleanupId}] Cleanup analysis:`, {
+  console.log(`[ImageLoadingDebug][CacheCleanup:${cleanupId}] Cleanup analysis:`, {
     keepRange,
     pagesToKeep: queriesWithDistance.filter(item => item.distance <= keepRange).map(item => item.page),
     pagesToRemove: queriesToRemove.map(item => item.page),
@@ -252,7 +252,7 @@ export const smartCleanupOldPages = (
       const imageCount = queryData.items.length;
       totalImagesCleared += imageCount;
       
-      console.log(`[CacheCleanup:${cleanupId}] Clearing image cache flags for page ${page} (${imageCount} images)`);
+      console.log(`[ImageLoadingDebug][CacheCleanup:${cleanupId}] Clearing image cache flags for page ${page} (${imageCount} images)`);
       
       // Clear memory cache flags from images
       queryData.items.forEach((image: any) => {
@@ -264,11 +264,11 @@ export const smartCleanupOldPages = (
 
   // Remove distant queries from cache
   queriesToRemove.forEach(({ query, page }) => {
-    console.log(`[CacheCleanup:${cleanupId}] Removing query cache for page ${page}:`, query.queryKey);
+    console.log(`[ImageLoadingDebug][CacheCleanup:${cleanupId}] Removing query cache for page ${page}:`, query.queryKey);
     queryClient.removeQueries({ queryKey: query.queryKey });
   });
 
-  console.log(`[CacheCleanup:${cleanupId}] Cleanup complete:`, {
+  console.log(`[ImageLoadingDebug][CacheCleanup:${cleanupId}] Cleanup complete:`, {
     queriesRemoved: queriesToRemove.length,
     imagesCleared: totalImagesCleared,
     queriesKept: generationQueries.length - queriesToRemove.length,
@@ -288,7 +288,7 @@ export const triggerImageGarbageCollection = () => {
     // Only available in Chrome with --js-flags="--expose-gc"
     try {
       (window as any).gc();
-      console.log('[SmartCleanup] Manual garbage collection triggered');
+      console.log('[ImageLoadingDebug][SmartCleanup] Manual garbage collection triggered');
     } catch (e) {
       // Ignore if not available
     }
@@ -363,7 +363,7 @@ export const smartPreloadImages = (
       },
       () => {
         // Error callback - just log, don't retry
-        console.warn(`[SmartPreload] Failed to preload image:`, imageUrl);
+        console.warn(`[ImageLoadingDebug][SmartPreload] Failed to preload image:`, imageUrl);
       }
     );
   });
@@ -422,7 +422,7 @@ export const preloadClientSidePages = (
         },
         () => {
           // Error callback
-          console.warn(`[SmartPreload] Failed to preload client-side image:`, imageUrl);
+          console.warn(`[ImageLoadingDebug][SmartPreload] Failed to preload client-side image:`, imageUrl);
         }
       );
     });
@@ -491,7 +491,7 @@ export const useAdjacentPagePreloading = ({
     // Generate unique session ID for this preload session
     const preloadSessionId = `preload-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
-    console.log(`[AdjacentPreload:${preloadSessionId}] Starting preload session:`, {
+    console.log(`[ImageLoadingDebug][AdjacentPreload:${preloadSessionId}] Starting preload session:`, {
       page: isServerPagination ? serverPage : page,
       isServerPagination,
       totalFilteredItems,
@@ -506,7 +506,7 @@ export const useAdjacentPagePreloading = ({
     const config = performanceMonitor.currentConfig;
     globalPreloadQueue.updateConcurrency(config.maxConcurrentPreloads);
     
-    console.log(`[AdjacentPreload:${preloadSessionId}] Device configuration:`, {
+    console.log(`[ImageLoadingDebug][AdjacentPreload:${preloadSessionId}] Device configuration:`, {
       strategy: config.preloadStrategy,
       maxCachedPages: config.maxCachedPages,
       maxConcurrentPreloads: config.maxConcurrentPreloads,
@@ -518,9 +518,9 @@ export const useAdjacentPagePreloading = ({
     const debounceTime = config.debounceTime;
     
     // Debounce preloading to avoid excessive operations on rapid page changes
-    console.log(`[AdjacentPreload:${preloadSessionId}] Starting debounced preload timer (${debounceTime}ms)`);
+    console.log(`[ImageLoadingDebug][AdjacentPreload:${preloadSessionId}] Starting debounced preload timer (${debounceTime}ms)`);
     const preloadTimer = setTimeout(() => {
-      console.log(`[AdjacentPreload:${preloadSessionId}] Debounce timer fired - calculating adjacent pages`);
+      console.log(`[ImageLoadingDebug][AdjacentPreload:${preloadSessionId}] Debounce timer fired - calculating adjacent pages`);
       
       const totalPages = Math.max(1, Math.ceil(totalFilteredItems / itemsPerPage));
       const currentPageForPreload = isServerPagination ? (serverPage! - 1) : page;
@@ -532,7 +532,7 @@ export const useAdjacentPagePreloading = ({
       const prevPage = shouldPreloadPrev ? currentPageForPreload - 1 : null;
       const nextPage = shouldPreloadNext ? currentPageForPreload + 1 : null;
       
-      console.log(`[AdjacentPreload:${preloadSessionId}] Page calculation:`, {
+      console.log(`[ImageLoadingDebug][AdjacentPreload:${preloadSessionId}] Page calculation:`, {
         currentPageForPreload,
         totalPages,
         prevPage,
@@ -551,14 +551,14 @@ export const useAdjacentPagePreloading = ({
           const serverPrevPage = prevPage !== null ? prevPage + 1 : null; // Convert back to 1-based
           const serverNextPage = nextPage !== null ? nextPage + 1 : null;
           
-          console.log(`[AdjacentPreload:${preloadSessionId}] Server pagination - calling onPrefetchAdjacentPages:`, {
+          console.log(`[ImageLoadingDebug][AdjacentPreload:${preloadSessionId}] Server pagination - calling onPrefetchAdjacentPages:`, {
             serverPrevPage,
             serverNextPage
           });
           
           onPrefetchAdjacentPages(serverPrevPage, serverNextPage);
         } else {
-          console.log(`[AdjacentPreload:${preloadSessionId}] Server pagination - no adjacent pages to preload`);
+          console.log(`[ImageLoadingDebug][AdjacentPreload:${preloadSessionId}] Server pagination - no adjacent pages to preload`);
         }
       } else {
         // For client-side pagination, preload adjacent page images directly
@@ -573,7 +573,7 @@ export const useAdjacentPagePreloading = ({
             ? allImages.slice((currentPageForPreload + 1) * itemsPerPage, (currentPageForPreload + 2) * itemsPerPage)
             : [];
           
-          console.log(`[AdjacentPreload:${preloadSessionId}] Client pagination - preloading adjacent images:`, {
+          console.log(`[ImageLoadingDebug][AdjacentPreload:${preloadSessionId}] Client pagination - preloading adjacent images:`, {
             prevPageImagesCount: prevPageImages.length,
             nextPageImagesCount: nextPageImages.length,
             allImagesTotal: allImages.length,
@@ -582,7 +582,7 @@ export const useAdjacentPagePreloading = ({
           
           preloadClientSidePages(prevPageImages, nextPageImages, pageId, preloadOperationsRef.current);
         } else {
-          console.log(`[AdjacentPreload:${preloadSessionId}] Client pagination - no images to preload:`, {
+          console.log(`[ImageLoadingDebug][AdjacentPreload:${preloadSessionId}] Client pagination - no images to preload:`, {
             allImagesLength: allImages.length,
             shouldPreloadPrev,
             shouldPreloadNext
