@@ -147,11 +147,14 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const isMobile = useIsMobile();
   const { setIsGenerationsPaneLocked } = usePanes();
 
-  // Persistent state for GenerationsPane settings (shared with useGenerationsPageLogic)
-  const [shotSettings, setShotSettings] = usePersistentState<Record<string, GenerationsPaneSettings>>(
-    'generations-pane-shot-settings',
-    {}
-  );
+  // Use shots.settings to store GenerationsPane settings (shared with useGenerationsPageLogic)
+  const { 
+    settings: shotGenerationsPaneSettings, 
+    update: updateShotGenerationsPaneSettings 
+  } = useToolSettings<GenerationsPaneSettings>('generations-pane', { 
+    shotId: selectedShotId, 
+    enabled: !!selectedShotId 
+  });
 
   // Use the new modular state management
   const { state, actions } = useShotEditorState();
@@ -178,12 +181,15 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   });
 
   // Function to update GenerationsPane settings for current shot
-  const updateGenerationsPaneSettings = (settings: GenerationsPaneSettings) => {
-    if (selectedShot?.id) {
-    setShotSettings(prev => ({
-      ...prev,
-      [selectedShot.id]: settings
-    }));
+  const updateGenerationsPaneSettings = (settings: Partial<GenerationsPaneSettings>) => {
+    if (selectedShotId) {
+      const updatedSettings: GenerationsPaneSettings = {
+        selectedShotFilter: settings.selectedShotFilter || selectedShotId,
+        excludePositioned: settings.excludePositioned ?? true,
+        userHasCustomized: true // Mark as customized since this is being called programmatically
+      };
+      console.log('[ShotEditor] Updating GenerationsPane settings:', updatedSettings);
+      updateShotGenerationsPaneSettings('shot', updatedSettings);
     }
   };
 
@@ -975,6 +981,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             isUploadingImage={state.isUploadingImage}
             duplicatingImageId={state.duplicatingImageId}
             duplicateSuccessImageId={state.duplicateSuccessImageId}
+            projectAspectRatio={projects.find(p => p.id === projectId)?.aspectRatio}
           />
         </div>
 

@@ -62,6 +62,8 @@ interface ShotImagesEditorProps {
   duplicatingImageId?: string | null;
   /** ID of image that was successfully duplicated (for success state) */
   duplicateSuccessImageId?: string | null;
+  /** Project aspect ratio for proper placeholder dimensions */
+  projectAspectRatio?: string;
 }
 
 const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
@@ -92,6 +94,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   isUploadingImage,
   duplicatingImageId,
   duplicateSuccessImageId,
+  projectAspectRatio,
 }) => {
   /* ------------------------------------------------------------------ */
   /* Skeleton state                                                     */
@@ -189,6 +192,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
               }}
               duplicatingImageId={duplicatingImageId}
               duplicateSuccessImageId={duplicateSuccessImageId}
+              projectAspectRatio={projectAspectRatio}
             />
           )}
         </div>

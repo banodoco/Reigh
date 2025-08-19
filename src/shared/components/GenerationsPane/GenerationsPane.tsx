@@ -165,13 +165,17 @@ export const GenerationsPane: React.FC = () => {
 
   // Debug: Log GenerationsPane state when it opens/changes
   useEffect(() => {
-    console.log('[ShotFilterAutoSelectIssue] GenerationsPane state changed:', {
+    console.log('[GenerationsPane] State changed:', {
       isOpen,
       location: location.pathname,
       selectedShotFilter,
-      excludePositioned
+      excludePositioned,
+      lastAffectedShotId,
+      shotsDataLength: shotsData?.length,
+      totalGenerations: totalCount,
+      timestamp: Date.now()
     });
-  }, [isOpen, location.pathname, selectedShotFilter, excludePositioned]);
+  }, [isOpen, location.pathname, selectedShotFilter, excludePositioned, lastAffectedShotId, shotsData, totalCount]);
 
   // Listen for custom event to open the pane (used on mobile from other components)
   useEffect(() => {
@@ -380,7 +384,19 @@ export const GenerationsPane: React.FC = () => {
                     isDeleting={isDeleting}
                     allShots={shotsData || []}
                     lastShotId={lastAffectedShotId || undefined}
-                    onAddToLastShot={handleAddToShot}
+                    onAddToLastShot={(generationId, imageUrl, thumbUrl) => {
+                      console.log('[GenerationsPane] ImageGallery onAddToLastShot called', {
+                        generationId,
+                        imageUrl: imageUrl?.substring(0, 50) + '...',
+                        thumbUrl: thumbUrl?.substring(0, 50) + '...',
+                        lastAffectedShotId,
+                        selectedShotFilter,
+                        excludePositioned,
+                        shotsAvailable: shotsData?.map(s => ({ id: s.id, name: s.name })),
+                        timestamp: Date.now()
+                      });
+                      return handleAddToShot(generationId, imageUrl);
+                    }}
                     offset={(page - 1) * GENERATIONS_PER_PAGE}
                     totalCount={totalCount}
                     whiteText

@@ -22,6 +22,8 @@ export interface SegmentGenerationParams {
 export interface GenerationsPaneSettings {
   selectedShotFilter: string;
   excludePositioned: boolean;
+  // Flag to track if user has manually changed settings (never auto-reset after this)
+  userHasCustomized?: boolean;
 }
 
 // Interface for individual video pair configuration

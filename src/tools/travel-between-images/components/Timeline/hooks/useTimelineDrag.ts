@@ -6,6 +6,7 @@ import {
   pixelToFrame,
   clamp,
   shrinkOversizedGaps,
+  expandUndersizedGaps,
 } from "../utils/timeline-utils";
 import { log } from "@/shared/lib/logger";
 
@@ -138,8 +139,24 @@ export const useTimelineDrag = ({
       }
     }
 
-    // Apply gap enforcement to ensure valid layout
-    return shrinkOversizedGaps(newPositions, contextFrames);
+    // Apply gap enforcement based on modifier key used
+    if (dragState.isCommandPressed && !dragState.isOptionPressed) {
+      // Command key: compress gaps (push right)
+      return shrinkOversizedGaps(newPositions, contextFrames);
+    } else if (dragState.isOptionPressed && !dragState.isCommandPressed) {
+      // Option key: expand gaps (pull left)
+      const dragDirection = finalPosition - dragState.originalFramePos;
+      if (dragDirection < 0) {
+        // Only expand when pulling left
+        return expandUndersizedGaps(newPositions, contextFrames, 15, dragState.activeId);
+      } else {
+        // If dragging right with Option, use normal shrink
+        return shrinkOversizedGaps(newPositions, contextFrames);
+      }
+    } else {
+      // Both keys or neither: default behavior
+      return shrinkOversizedGaps(newPositions, contextFrames);
+    }
   }, [
     dragState.isDragging,
     dragState.activeId,
@@ -193,6 +210,7 @@ export const useTimelineDrag = ({
       framePos,
       cmd: e.metaKey,
       opt: e.altKey,
+      mode: e.metaKey && !e.altKey ? 'compress' : e.altKey && !e.metaKey ? 'expand' : 'normal',
     });
   }, [framePositions, dragState.isDragging]);
 
@@ -218,6 +236,7 @@ export const useTimelineDrag = ({
         diffFrames: finalPosition - dragState.originalFramePos,
         cmd: e.metaKey,
         opt: e.altKey,
+        mode: e.metaKey && !e.altKey ? 'compress' : e.altKey && !e.metaKey ? 'expand' : 'normal',
       });
     }
   }, [dragState.isDragging, dragState.activeId, dragState.originalFramePos, dragState.startX, calculateTargetFrame, calculateFinalPosition]);
@@ -235,6 +254,8 @@ export const useTimelineDrag = ({
       finalPos,
       cmd: dragState.isCommandPressed,
       opt: dragState.isOptionPressed,
+      mode: dragState.isCommandPressed && !dragState.isOptionPressed ? 'compress' : 
+            dragState.isOptionPressed && !dragState.isCommandPressed ? 'expand' : 'normal',
     });
 
     // Apply final positions
@@ -250,6 +271,54 @@ export const useTimelineDrag = ({
       .map(img => img.shotImageEntryId);
 
     onImageReorder(newOrder);
+
+    // Generate comprehensive drag summary
+    const mode = dragState.isCommandPressed && !dragState.isOptionPressed ? 'compress' : 
+                 dragState.isOptionPressed && !dragState.isCommandPressed ? 'expand' : 'normal';
+    
+    const originalOrder = [...images]
+      .sort((a, b) => {
+        const fa = framePositions.get(a.shotImageEntryId) ?? 0;
+        const fb = framePositions.get(b.shotImageEntryId) ?? 0;
+        return fa - fb;
+      })
+      .map(img => img.shotImageEntryId);
+
+    const positionChanges = [...finalPositions.entries()]
+      .filter(([id, newPos]) => {
+        const oldPos = framePositions.get(id) ?? 0;
+        return oldPos !== newPos;
+      })
+      .map(([id, newPos]) => {
+        const oldPos = framePositions.get(id) ?? 0;
+        const imageIndex = images.findIndex(img => img.shotImageEntryId === id);
+        return {
+          id: id.slice(-8), // last 8 chars for brevity
+          imageIdx: imageIndex,
+          oldPos,
+          newPos,
+          delta: newPos - oldPos
+        };
+      });
+
+    const orderChanged = JSON.stringify(originalOrder) !== JSON.stringify(newOrder);
+    const dragDirection = finalPos - dragState.originalFramePos;
+    const dragDistance = Math.abs(dragDirection);
+
+    log('DragSummary', 'Drag operation completed', {
+      draggedImage: {
+        id: dragState.activeId?.slice(-8),
+        index: images.findIndex(img => img.shotImageEntryId === dragState.activeId),
+        moved: `${dragState.originalFramePos} → ${finalPos} (${dragDirection > 0 ? '+' : ''}${dragDirection})`
+      },
+      mode,
+      modifiers: { cmd: dragState.isCommandPressed, opt: dragState.isOptionPressed },
+      dragDistance,
+      totalChanges: positionChanges.length,
+      orderChanged,
+      positionChanges: positionChanges.length > 0 ? positionChanges : 'none',
+      violations: positionChanges.some(change => Math.abs(change.delta) > calculateMaxGap(contextFrames)) ? 'POTENTIAL_GAP_VIOLATION' : 'none'
+    });
 
     // Prevent phantom drags
     const now = Date.now();

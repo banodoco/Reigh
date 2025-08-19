@@ -23,10 +23,7 @@ import { SortableImageItem } from '@/tools/travel-between-images/components/Sort
 import MediaLightbox from './MediaLightbox';
 import { cn, getDisplayUrl } from '@/shared/lib/utils';
 import { MultiImagePreview, SingleImagePreview } from './ImageDragPreview';
-import { Input } from './ui/input';
-import { Textarea } from './ui/textarea';
-import { Label } from './ui/label';
-import { Slider } from './ui/slider';
+
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { Button } from './ui/button';
 import { ArrowDown, Trash2, Check } from 'lucide-react';
@@ -49,6 +46,7 @@ export interface ShotImageManagerProps {
   onMagicEdit?: (imageUrl: string, prompt: string, numImages: number) => void;
   duplicatingImageId?: string | null;
   duplicateSuccessImageId?: string | null;
+  projectAspectRatio?: string; // Add project aspect ratio
 }
 
 const ShotImageManager: React.FC<ShotImageManagerProps> = ({
@@ -62,6 +60,7 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
   onMagicEdit,
   duplicatingImageId,
   duplicateSuccessImageId,
+  projectAspectRatio,
 }) => {
   // State for drag and drop
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -618,7 +617,7 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
         <ProgressiveLoadingManager
           images={currentImages}
           page={progressivePage}
-          enabled={true}
+          enabled={false}
           isMobile={isMobile}
         >
           {(showImageIndices) => (
@@ -631,7 +630,7 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
                   totalImages: currentImages.length,
                   isPreloaded: false,
                 });
-                const shouldLoad = showImageIndices.has(index);
+                const shouldLoad = true; // Force load immediately to mirror ShotsPane behavior
                 
                 return (
                   <React.Fragment key={image.shotImageEntryId}>
@@ -647,6 +646,7 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
                          duplicatingImageId={duplicatingImageId}
                          duplicateSuccessImageId={duplicateSuccessImageId}
                          shouldLoad={shouldLoad}
+                         projectAspectRatio={projectAspectRatio}
                        />
                        
                       {/* Move button before first image */}
@@ -782,7 +782,7 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
         <ProgressiveLoadingManager
           images={currentImages}
           page={progressivePage}
-          enabled={true}
+          enabled={false}
           isMobile={isMobile}
         >
           {(showImageIndices) => (
@@ -797,7 +797,7 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
               }}
             >
               {currentImages.map((image, index) => {
-                const shouldLoad = showImageIndices.has(index);
+                const shouldLoad = true; // Force load immediately to mirror ShotsPane behavior
                 return (
                   <SortableImageItem
                     key={image.shotImageEntryId}
@@ -929,6 +929,7 @@ interface MobileImageItemProps {
   duplicatingImageId?: string | null;
   duplicateSuccessImageId?: string | null;
   shouldLoad?: boolean;
+  projectAspectRatio?: string; // Add project aspect ratio
 }
 
 const MobileImageItem: React.FC<MobileImageItemProps> = ({
@@ -944,9 +945,79 @@ const MobileImageItem: React.FC<MobileImageItemProps> = ({
   duplicatingImageId,
   duplicateSuccessImageId,
   shouldLoad = true,
+  projectAspectRatio,
 }) => {
   const imageUrl = image.thumbUrl || image.imageUrl;
   const displayUrl = getDisplayUrl(imageUrl);
+
+  // Image loading state management
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageLoadError, setImageLoadError] = useState(false);
+
+  // Debug logging for this specific image
+  const debugId = `[MobileImageItem-${index}:${image.id?.substring(0, 8)}]`;
+
+  // Initial render logging
+  console.log(`${debugId} 🎬 Component render`, {
+    imageUrl: imageUrl?.substring(0, 50) + '...',
+    displayUrl: displayUrl?.substring(0, 50) + '...',
+    shouldLoad,
+    imageLoaded,
+    imageLoadError,
+    isPlaceholder: displayUrl === '/placeholder.svg',
+    hasDisplayUrl: !!displayUrl,
+    timestamp: Date.now()
+  });
+
+  // Calculate aspect ratio for placeholder
+  const getAspectRatioStyle = () => {
+    // Try to get dimensions from image metadata first
+    let width = (image as any).metadata?.width;
+    let height = (image as any).metadata?.height;
+    
+    // If not found, try to extract from resolution string
+    if (!width || !height) {
+      const resolution = (image as any).metadata?.originalParams?.orchestrator_details?.resolution;
+      if (resolution && typeof resolution === 'string' && resolution.includes('x')) {
+        const [w, h] = resolution.split('x').map(Number);
+        if (!isNaN(w) && !isNaN(h)) {
+          width = w;
+          height = h;
+        }
+      }
+    }
+    
+    // If we have image dimensions, use them
+    if (width && height) {
+      const aspectRatio = width / height;
+      return { aspectRatio: `${aspectRatio}` };
+    }
+    
+    // Fall back to project aspect ratio if available
+    if (projectAspectRatio) {
+      const [w, h] = projectAspectRatio.split(':').map(Number);
+      if (!isNaN(w) && !isNaN(h)) {
+        const aspectRatio = w / h;
+        return { aspectRatio: `${aspectRatio}` };
+      }
+    }
+    
+    // Default to square aspect ratio
+    return { aspectRatio: '1' };
+  };
+
+  // Track state changes over time
+  useEffect(() => {
+    console.log(`${debugId} 🔄 State changed`, {
+      shouldLoad,
+      imageLoaded,
+      imageLoadError,
+      displayUrl: displayUrl?.substring(0, 50) + '...',
+      isPlaceholder: displayUrl === '/placeholder.svg',
+      hasDisplayUrl: !!displayUrl,
+      timestamp: Date.now()
+    });
+  }, [shouldLoad, imageLoaded, imageLoadError, displayUrl, debugId]);
 
   // Track touch position to detect scrolling vs tapping
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -973,23 +1044,137 @@ const MobileImageItem: React.FC<MobileImageItemProps> = ({
     touchStartRef.current = null;
   };
 
+  const aspectRatioStyle = getAspectRatioStyle();
+
   return (
     <div
       className={cn(
-        'relative bg-muted/50 rounded border p-1 flex flex-col items-center justify-center aspect-square overflow-hidden shadow-sm cursor-pointer',
+        'relative bg-muted/50 rounded border p-1 flex flex-col items-center justify-center overflow-hidden shadow-sm cursor-pointer',
         { 'ring-4 ring-offset-2 ring-orange-500 border-orange-500 bg-orange-500/15': isSelected },
       )}
+      style={aspectRatioStyle}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       data-mobile-item="true"
     >
-      <img
-        src={shouldLoad ? displayUrl : '/placeholder.svg'}
-        alt={`Image ${image.id}`}
-        className="max-w-full max-h-full object-contain rounded-sm"
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-      />
+      {/* Show actual image when loaded and shouldLoad is true */}
+      {imageLoaded && shouldLoad && !imageLoadError ? (
+        (() => {
+          console.log(`${debugId} 🖼️ Showing actual image`, {
+            shouldLoad,
+            imageLoaded,
+            imageLoadError,
+            displayUrl: displayUrl?.substring(0, 50) + '...',
+            timestamp: Date.now()
+          });
+          return (
+            <img
+              src={displayUrl}
+              alt={`Image ${image.id}`}
+              className="w-full h-full object-cover rounded-sm"
+              onTouchStart={handleTouchStart}
+              onTouchEnd={handleTouchEnd}
+              draggable={false}
+            />
+          );
+        })()
+      ) : null}
+      
+      {/* Hidden image for loading detection */}
+      {shouldLoad && displayUrl && displayUrl !== '/placeholder.svg' ? (
+        <img
+          src={displayUrl}
+          alt=""
+          style={{ display: 'none' }}
+          onLoad={() => {
+            console.log(`${debugId} ✅ Image loaded successfully`, {
+              displayUrl: displayUrl?.substring(0, 50) + '...',
+              shouldLoad,
+              imageLoaded,
+              imageLoadError,
+              timestamp: Date.now()
+            });
+            setImageLoaded(true);
+            setImageLoadError(false);
+          }}
+          onError={() => {
+            console.error(`${debugId} ❌ Image failed to load`, {
+              displayUrl: displayUrl?.substring(0, 50) + '...',
+              shouldLoad,
+              imageLoaded,
+              imageLoadError,
+              timestamp: Date.now()
+            });
+            setImageLoadError(true);
+          }}
+        />
+      ) : (
+        (() => {
+          console.log(`${debugId} ⏭️ Skipping hidden image creation`, {
+            shouldLoad,
+            hasDisplayUrl: !!displayUrl,
+            isPlaceholder: displayUrl === '/placeholder.svg',
+            displayUrl: displayUrl?.substring(0, 50) + '...',
+            timestamp: Date.now()
+          });
+          return null;
+        })()
+      )}
+      
+      {/* Show loading spinner or placeholder */}
+      {shouldLoad && !imageLoaded && !imageLoadError ? (
+        (() => {
+          console.log(`${debugId} 🔄 Showing loading spinner`, {
+            shouldLoad,
+            imageLoaded,
+            imageLoadError,
+            timestamp: Date.now()
+          });
+          return (
+            <div className="w-full h-full flex items-center justify-center bg-muted animate-pulse">
+              <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-primary"></div>
+            </div>
+          );
+        })()
+      ) : null}
+      
+      {/* Show error state */}
+      {imageLoadError ? (
+        (() => {
+          console.log(`${debugId} ⚠️ Showing error state`, {
+            shouldLoad,
+            imageLoaded,
+            imageLoadError,
+            displayUrl: displayUrl?.substring(0, 50) + '...',
+            timestamp: Date.now()
+          });
+          return (
+            <div className="w-full h-full flex items-center justify-center bg-muted text-muted-foreground">
+              <div className="text-center">
+                <div className="text-lg mb-1">⚠️</div>
+                <div className="text-xs">Failed to load</div>
+              </div>
+            </div>
+          );
+        })()
+      ) : null}
+      
+      {/* Show placeholder when shouldLoad is false */}
+      {!shouldLoad ? (
+        (() => {
+          console.log(`${debugId} 📷 Showing placeholder (shouldLoad=false)`, {
+            shouldLoad,
+            imageLoaded,
+            imageLoadError,
+            timestamp: Date.now()
+          });
+          return (
+            <div className="w-full h-full bg-muted animate-pulse">
+            </div>
+          );
+        })()
+      ) : null}
+      
       {!hideDeleteButton && (
         <>
           <Button

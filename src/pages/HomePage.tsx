@@ -776,10 +776,13 @@ export default function HomePage() {
             <div className="space-y-6 pb-4 text-left">
               {/* New intro paragraphs */}
               <p className="text-sm leading-relaxed">
-                There are many tools that aim to be a 'one-stop-shop' for creating with AI- a kind of 'Amazon for art'. 
+                There are many tools that aim to be a 'one-stop-shop' for creating with AI - a kind of 'Amazon for art'. 
               </p>
               <p className="text-sm leading-relaxed">
-              Reigh isn't one of them. It's a tool <em>just</em> for travelling between images:
+              Reigh is not one of them.
+              </p>
+              <p className="text-sm leading-relaxed">
+              It's a tool <em>just</em> for travelling between images:
               </p>
               {/* Section 1 */}
               <div className="space-y-4">

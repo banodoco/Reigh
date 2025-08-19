@@ -4,9 +4,10 @@ import { useGenerations, useDeleteGeneration, useToggleGenerationStar } from '@/
 import { useListShots, useAddImageToShot, usePositionExistingGenerationInShot } from '@/shared/hooks/useShots';
 import { LastAffectedShotContext } from '@/shared/contexts/LastAffectedShotContext';
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
+import { useToolSettings } from '@/shared/hooks/useToolSettings';
 import { toast } from 'sonner';
 import { GeneratedImageWithMetadata } from '@/shared/components/ImageGallery';
-import usePersistentState from '@/shared/hooks/usePersistentState';
+import { GenerationsPaneSettings } from '@/tools/travel-between-images/components/ShotEditor/state/types';
 
 interface UseGenerationsPageLogicOptions {
   itemsPerPage?: number;
@@ -15,11 +16,7 @@ interface UseGenerationsPageLogicOptions {
   enableDataLoading?: boolean;
 }
 
-// Interface for per-shot GenerationsPane settings
-interface GenerationsPaneSettings {
-  selectedShotFilter: string;
-  excludePositioned: boolean;
-}
+
 
 export function useGenerationsPageLogic({
   itemsPerPage = 45,
@@ -36,121 +33,168 @@ export function useGenerationsPageLogic({
   
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [starredOnly, setStarredOnly] = useState<boolean>(false);
-  const [isPageChange, setIsPageChange] = useState(false);
   
   const { data: shotsData } = useListShots(selectedProjectId);
   const { currentShotId } = useCurrentShot();
 
-  // Use persistent state to store per-shot settings
-  const [shotSettings, setShotSettings] = usePersistentState<Record<string, GenerationsPaneSettings>>(
-    'generations-pane-shot-settings',
-    {}
-  );
+  // Use shots.settings to store GenerationsPane settings for the current shot
+  const { 
+    settings: shotSettings, 
+    update: updateShotSettings,
+    isLoading: isLoadingShotSettings 
+  } = useToolSettings<GenerationsPaneSettings>('generations-pane', { 
+    shotId: currentShotId || undefined, 
+    enabled: !!currentShotId 
+  });
 
-  // Function to get settings for a specific shot
-  const getShotSettings = (shotId: string): GenerationsPaneSettings => {
-    return shotSettings[shotId] || {
-      selectedShotFilter: shotId,
-      excludePositioned: true
+  // Helper function to check if a shot has any images
+  const shotHasImages = (shotId: string): boolean => {
+    if (!shotsData) return false;
+    const shot = shotsData.find(s => s.id === shotId);
+    return (shot?.images?.length || 0) > 0;
+  };
+
+  // Helper function to check if a shot has unpositioned images (when excludePositioned matters)
+  const shotHasUnpositionedImages = (shotId: string): boolean => {
+    if (!shotsData) return false;
+    const shot = shotsData.find(s => s.id === shotId);
+    if (!shot?.images) return false;
+    
+    // Check if any images have position === null/undefined (i.e., unpositioned)
+    const unpositionedImages = shot.images.filter(img => img.position === null || img.position === undefined);
+    console.log('[ShotFilterLogic] Shot unpositioned images check:', {
+      shotId,
+      totalImages: shot.images.length,
+      unpositionedCount: unpositionedImages.length,
+      unpositionedImageIds: unpositionedImages.map(img => img.id).slice(0, 3) // Show first 3 for debugging
+    });
+    
+    return unpositionedImages.length > 0;
+  };
+
+  // Function to determine the appropriate shot filter based on current shot and settings
+  const getDefaultShotFilter = (shotId: string): string => {
+    // When excludePositioned is true (default), check for unpositioned images
+    if (excludePositioned) {
+      if (!shotHasUnpositionedImages(shotId)) {
+        console.log('[ShotFilterLogic] Shot has no unpositioned images with excludePositioned=true, defaulting to "all":', shotId);
+        return 'all';
+      }
+      console.log('[ShotFilterLogic] Shot has unpositioned images, defaulting to shot filter:', shotId);
+      return shotId;
+    }
+    
+    // When excludePositioned is false, check for any images
+    if (!shotHasImages(shotId)) {
+      console.log('[ShotFilterLogic] Shot has no images, defaulting to "all":', shotId);
+      return 'all';
+    }
+    
+    console.log('[ShotFilterLogic] Shot has images with excludePositioned=false, defaulting to shot filter:', shotId);
+    return shotId;
+  };
+
+  // Function to get the appropriate settings for the current shot
+  const getCurrentShotSettings = (): GenerationsPaneSettings => {
+    if (!currentShotId) {
+      return {
+        selectedShotFilter: 'all',
+        excludePositioned: true,
+        userHasCustomized: false
+      };
+    }
+
+    // If user has previously customized settings for this shot, always use them
+    if (shotSettings?.userHasCustomized) {
+      console.log('[ShotFilterLogic] Using customized settings for shot:', currentShotId, shotSettings);
+      return shotSettings;
+    }
+
+    // Otherwise, determine default based on whether shot has images
+    const defaultFilter = getDefaultShotFilter(currentShotId);
+    return {
+      selectedShotFilter: defaultFilter,
+      excludePositioned: true,
+      userHasCustomized: false
     };
   };
 
-  // Function to get settings but always default to current shot filter when in shot context
-  const getShotSettingsWithShotDefault = (shotId: string, justSwitchedToShot: boolean): GenerationsPaneSettings => {
-    const saved = shotSettings[shotId];
-    if (!saved) {
-      // No saved settings - default to current shot
-      return {
-        selectedShotFilter: shotId,
-        excludePositioned: true
-      };
-    }
+  // Function to save settings when user makes changes
+  const saveUserCustomization = (newSettings: Partial<GenerationsPaneSettings>) => {
+    if (!currentShotId) return;
     
-    // When just switching to a shot, always default to current shot regardless of saved settings
-    if (justSwitchedToShot) {
-      console.log('[ShotFilterAutoSelectIssue] Just switched to shot, defaulting to current shot:', shotId);
-      return {
-        selectedShotFilter: shotId,
-        excludePositioned: true
-      };
-    }
+    const updatedSettings: GenerationsPaneSettings = {
+      ...getCurrentShotSettings(),
+      ...newSettings,
+      userHasCustomized: true // Mark as customized so it's never auto-reset
+    };
     
-    // When reopening pane for same shot, but saved filter is 'all', prefer the current shot
-    // This handles the case where 'all' was set from a different context
-    if (saved.selectedShotFilter === 'all') {
-      console.log('[ShotFilterAutoSelectIssue] Saved settings has "all" filter, defaulting to current shot:', shotId);
-      return {
-        ...saved,
-        selectedShotFilter: shotId
-      };
-    }
-    
-    // Use saved settings as-is (user explicitly chose a different shot filter)
-    return saved;
+    console.log('[ShotFilterLogic] Saving user customization for shot:', currentShotId, updatedSettings);
+    updateShotSettings('shot', updatedSettings);
   };
 
-  // Function to save settings for a specific shot
-  const saveShotSettings = (shotId: string, settings: GenerationsPaneSettings) => {
-    setShotSettings(prev => ({
-      ...prev,
-      [shotId]: settings
-    }));
-  };
-
-  // Track if we've just switched to viewing a specific shot (to override saved settings)
+  // Track when we switch shots to apply appropriate settings
   const [lastCurrentShotId, setLastCurrentShotId] = useState<string | null>(null);
 
-  // Set shot filter to current shot when it changes, but respect saved settings
+  // Apply shot filter settings when current shot changes or settings are loaded
   useEffect(() => {
-    console.log('[ShotFilterAutoSelectIssue] Effect triggered:', {
+    console.log('[ShotFilterLogic] Effect triggered:', {
       currentShotId,
       lastCurrentShotId,
       shotsDataLength: shotsData?.length,
-      hasMatchingShot: shotsData?.some(shot => shot.id === currentShotId)
+      isLoadingShotSettings,
+      shotSettings
     });
 
-    if (currentShotId && shotsData?.length && shotsData.some(shot => shot.id === currentShotId)) {
-      // Check if we just switched to a different shot
-      const justSwitchedToShot = lastCurrentShotId !== currentShotId;
-      
-      console.log('[ShotFilterAutoSelectIssue] In shot context:', {
-        currentShotId,
-        justSwitchedToShot,
-        lastCurrentShotId
-      });
+    // Wait for shots data to be available
+    if (!shotsData?.length) {
+      console.log('[ShotFilterLogic] Waiting for shots data');
+      return;
+    }
 
-      // Always use the shot-defaulting function which prioritizes current shot appropriately
-      const settingsToApply = getShotSettingsWithShotDefault(currentShotId, justSwitchedToShot);
-      console.log('[ShotFilterAutoSelectIssue] Applying settings for shot:', {
+    if (currentShotId && shotsData.some(shot => shot.id === currentShotId)) {
+      // We're viewing a specific shot
+      console.log('[ShotFilterLogic] In shot context:', currentShotId);
+      
+      // Don't update if we're still loading settings for this shot
+      if (isLoadingShotSettings) {
+        console.log('[ShotFilterLogic] Still loading shot settings');
+        return;
+      }
+      
+      const settingsToApply = getCurrentShotSettings();
+      console.log('[ShotFilterLogic] Applying settings for shot:', {
         currentShotId,
-        justSwitchedToShot,
         settingsToApply
       });
+      
       setSelectedShotFilter(settingsToApply.selectedShotFilter);
       setExcludePositioned(settingsToApply.excludePositioned);
-      
       setLastCurrentShotId(currentShotId);
+      
     } else if (!currentShotId) {
       // When no shot is selected, revert to 'all' shots
-      console.log('[ShotFilterAutoSelectIssue] No current shot, reverting to all shots');
+      console.log('[ShotFilterLogic] No current shot, reverting to all shots');
       setSelectedShotFilter('all');
       setExcludePositioned(true);
       setLastCurrentShotId(null);
     } else {
-      console.log('[ShotFilterAutoSelectIssue] Waiting for shots data or shot not found');
+      console.log('[ShotFilterLogic] Shot not found in shots data');
     }
-  }, [currentShotId, shotsData, lastCurrentShotId]);
+  }, [currentShotId, shotsData, isLoadingShotSettings, shotSettings]);
 
-  // Save settings whenever the user changes them (only when viewing a specific shot)
-  useEffect(() => {
-    if (currentShotId && shotsData?.some(shot => shot.id === currentShotId)) {
-      const currentSettings: GenerationsPaneSettings = {
-        selectedShotFilter,
-        excludePositioned
-      };
-      saveShotSettings(currentShotId, currentSettings);
-    }
-  }, [currentShotId, selectedShotFilter, excludePositioned, shotsData]);
+  // Create wrapper functions that save user customizations when called
+  const handleShotFilterChange = (newShotFilter: string) => {
+    setSelectedShotFilter(newShotFilter);
+    // Save this as a user customization
+    saveUserCustomization({ selectedShotFilter: newShotFilter });
+  };
+
+  const handleExcludePositionedChange = (newExcludePositioned: boolean) => {
+    setExcludePositioned(newExcludePositioned);
+    // Save this as a user customization
+    saveUserCustomization({ excludePositioned: newExcludePositioned });
+  };
 
   // Reset to page 1 when shot filter or position filter changes
   useEffect(() => {
@@ -207,26 +251,24 @@ export function useGenerationsPageLogic({
   useEffect(() => {
     // If there is no "last affected shot" but there are shots available,
     // default to the first shot in the list (which is the most recent).
+    console.log('[ADDTOSHOT] lastAffectedShotId initialization check:', {
+      lastAffectedShotId,
+      shotsDataLength: shotsData?.length,
+      firstShotId: shotsData?.[0]?.id,
+      firstShotName: shotsData?.[0]?.name,
+      currentShotId,
+      selectedShotFilter
+    });
+    
     if (!lastAffectedShotId && shotsData && shotsData.length > 0) {
+      console.log('[ADDTOSHOT] 🎯 Setting lastAffectedShotId to first shot:', shotsData[0].id);
       setLastAffectedShotId(shotsData[0].id);
     }
-  }, [lastAffectedShotId, shotsData, setLastAffectedShotId]);
-
-  const scrollPosRef = { current: 0 }; // Simple ref-like object for scroll position
+  }, [lastAffectedShotId, shotsData, setLastAffectedShotId, currentShotId, selectedShotFilter]);
 
   const handleServerPageChange = (newPage: number) => {
-    scrollPosRef.current = window.scrollY;
-    setIsPageChange(true);
     setPage(newPage);
   };
-
-  // Restore scroll position after data loads - but only for page changes, not filter changes
-  useEffect(() => {
-    if (generationsResponse && isPageChange) {
-      window.scrollTo({ top: scrollPosRef.current, behavior: 'auto' });
-      setIsPageChange(false);
-    }
-  }, [generationsResponse, isPageChange]);
 
   const handleDeleteGeneration = (id: string) => {
     deleteGenerationMutation.mutate(id);
@@ -237,49 +279,90 @@ export function useGenerationsPageLogic({
   };
 
   const handleAddToShot = (generationId: string, imageUrl?: string) => {
-    console.log('[ADDTOSHOT] handleAddToShot called', {
+    console.log('[ADDTOSHOT] ===== handleAddToShot called =====', {
       generationId,
       imageUrl: imageUrl?.substring(0, 50) + '...',
       lastAffectedShotId,
       selectedProjectId,
       excludePositioned,
+      selectedShotFilter,
+      shotsDataLength: shotsData?.length,
+      currentShotId,
       timestamp: Date.now()
     });
 
-    if (!lastAffectedShotId) {
-      console.log('[ADDTOSHOT] Error: No lastAffectedShotId available');
+    // 🎯 PRIORITY LOGIC: When viewing a specific shot, always use that shot
+    const targetShotId = currentShotId || lastAffectedShotId;
+    
+    if (!targetShotId) {
+      console.log('[ADDTOSHOT] ❌ ERROR: No target shot available', {
+        currentShotId,
+        lastAffectedShotId,
+        shotsData: shotsData?.map(shot => ({ id: shot.id, name: shot.name }))
+      });
       toast.error("No shot selected", {
         description: "Please select a shot in the gallery or create one first.",
       });
       return Promise.resolve(false);
     }
+
+    // Validate that the target shot exists in shotsData
+    const targetShot = shotsData?.find(shot => shot.id === targetShotId);
+    if (!targetShot) {
+      console.log('[ADDTOSHOT] ❌ ERROR: Target shot not found in shotsData', {
+        targetShotId,
+        currentShotId,
+        lastAffectedShotId,
+        shotsData: shotsData?.map(shot => ({ id: shot.id, name: shot.name }))
+      });
+      toast.error("Target shot not found", {
+        description: "The selected shot could not be found. Please refresh and try again.",
+      });
+      return Promise.resolve(false);
+    }
     
     // Check if we're trying to add to the same shot that's currently filtered with excludePositioned enabled
-    const shouldPositionExisting = selectedShotFilter === lastAffectedShotId && 
+    const shouldPositionExisting = selectedShotFilter === targetShotId && 
                                   excludePositioned;
     
-    console.log('[ADDTOSHOT] Determined action type', {
+    console.log('[ADDTOSHOT] 🎯 Determined action type', {
       shouldPositionExisting,
       selectedShotFilter,
+      targetShotId,
+      currentShotId,
       lastAffectedShotId,
-      excludePositioned
+      usingCurrentShot: !!currentShotId,
+      excludePositioned,
+      targetShot: { id: targetShot.id, name: targetShot.name }
     });
 
     return new Promise<boolean>((resolve) => {
       if (shouldPositionExisting) {
-        console.log('[ADDTOSHOT] Using positionExistingGenerationMutation');
+        console.log('[ADDTOSHOT] 📍 Using positionExistingGenerationMutation', {
+          shot_id: targetShotId,
+          generation_id: generationId,
+          project_id: selectedProjectId
+        });
+        
         // Use the position existing function for items in the filtered list
         positionExistingGenerationMutation.mutate({
-          shot_id: lastAffectedShotId,
+          shot_id: targetShotId,
           generation_id: generationId,
           project_id: selectedProjectId!,
         }, {
-          onSuccess: () => {          
-            console.log('[ADDTOSHOT] positionExistingGenerationMutation SUCCESS');
+          onSuccess: (data) => {          
+            console.log('[ADDTOSHOT] ✅ positionExistingGenerationMutation SUCCESS', data);
             resolve(true);
           },
           onError: (error) => {
-            console.log('[ADDTOSHOT] positionExistingGenerationMutation ERROR', error);
+            console.log('[ADDTOSHOT] ❌ positionExistingGenerationMutation ERROR', {
+              error,
+              message: error.message,
+              stack: error.stack,
+              shot_id: targetShotId,
+              generation_id: generationId,
+              project_id: selectedProjectId
+            });
             toast.error("Failed to position image in shot", {
               description: error.message,
             });
@@ -287,19 +370,34 @@ export function useGenerationsPageLogic({
           }
         });
       } else {
-        console.log('[ADDTOSHOT] Using addImageToShotMutation');
+        console.log('[ADDTOSHOT] ➕ Using addImageToShotMutation', {
+          shot_id: targetShotId,
+          generation_id: generationId,
+          imageUrl: imageUrl?.substring(0, 50) + '...',
+          project_id: selectedProjectId
+        });
+        
         // Use the regular add function
         addImageToShotMutation.mutate({
-          shot_id: lastAffectedShotId,
+          shot_id: targetShotId,
           generation_id: generationId,
+          imageUrl: imageUrl,
           project_id: selectedProjectId!,
         }, {
-          onSuccess: () => {          
-            console.log('[ADDTOSHOT] addImageToShotMutation SUCCESS');
+          onSuccess: (data) => {          
+            console.log('[ADDTOSHOT] ✅ addImageToShotMutation SUCCESS', data);
             resolve(true);
           },
           onError: (error) => {
-            console.log('[ADDTOSHOT] addImageToShotMutation ERROR', error);
+            console.log('[ADDTOSHOT] ❌ addImageToShotMutation ERROR', {
+              error,
+              message: error.message,
+              stack: error.stack,
+              shot_id: targetShotId,
+              generation_id: generationId,
+              imageUrl: imageUrl?.substring(0, 50) + '...',
+              project_id: selectedProjectId
+            });
             toast.error("Failed to add image to shot", {
               description: error.message,
             });
@@ -328,8 +426,8 @@ export function useGenerationsPageLogic({
     
     // State setters
     setPage,
-    setSelectedShotFilter,
-    setExcludePositioned,
+    setSelectedShotFilter: handleShotFilterChange,
+    setExcludePositioned: handleExcludePositionedChange,
     setSearchTerm,
     setStarredOnly,
     

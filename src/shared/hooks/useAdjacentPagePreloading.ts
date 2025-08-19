@@ -203,6 +203,11 @@ class PreloadQueue {
       });
       
       if (!response.ok) {
+        // Handle missing storage files gracefully - don't spam console with 400/404 errors
+        if (response.status === 400 || response.status === 404) {
+          console.warn(`[AdjacentPagePreloading][StorageMissingFile] Missing storage file (${response.status}): ${url.split('/').pop()}`);
+          return; // Fail silently for missing files
+        }
         throw new Error(`HTTP ${response.status}`);
       }
       
@@ -229,6 +234,19 @@ class PreloadQueue {
         // Silently ignore aborted requests
         return;
       }
+      
+      // Handle common storage errors gracefully
+      if (error instanceof Error) {
+        if (error.message.includes('400') || error.message.includes('404')) {
+          console.warn(`[AdjacentPagePreloading][StorageMissingFile] Storage file not accessible: ${url.split('/').pop()} - ${error.message}`);
+          return; // Don't throw for missing storage files
+        }
+        if (error.message.includes('Image load failed')) {
+          console.warn(`[AdjacentPagePreloading][StorageMissingFile] Image failed to load: ${url.split('/').pop()}`);
+          return; // Don't throw for failed image loads
+        }
+      }
+      
       throw error;
     }
   }

@@ -256,7 +256,7 @@ export const useListShots = (projectId?: string | null, options: { maxImagesPerS
             )
           `)
           .eq('shot_id', shot.id)
-          .order('position', { ascending: true, nullsFirst: false })
+          .order('position', { ascending: true })
           .order('created_at', { ascending: false });
         
         // Only apply limit if specified (allows unlimited when needed)

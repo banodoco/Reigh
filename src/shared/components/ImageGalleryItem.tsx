@@ -578,15 +578,33 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                           size="icon"
                           className={`h-7 w-7 p-0 rounded-full bg-black/50 hover:bg-black/70 text-white ${showTickForImageId === image.id ? 'bg-green-500 hover:bg-green-600 !text-white' : ''}`}
                           onClick={async () => {
+                              console.log('[GenerationsPane] Add to Shot button clicked', {
+                                imageId: image.id,
+                                selectedShotIdLocal,
+                                isAlreadyPositionedInSelectedShot,
+                                simplifiedShotOptions: simplifiedShotOptions.map(s => ({ id: s.id, name: s.name })),
+                                imageUrl: image.url?.substring(0, 50) + '...',
+                                timestamp: Date.now()
+                              });
+                              
                               // If already positioned in shot, do nothing
                               if (isAlreadyPositionedInSelectedShot) {
+                                  console.log('[GenerationsPane] Image already positioned in selected shot - skipping');
                                   return;
                               }
                               
                               if (!selectedShotIdLocal) {
+                                  console.log('[GenerationsPane] ❌ No shot selected for adding image');
                                   toast({ title: "Select a Shot", description: "Please select a shot first to add this image.", variant: "destructive" });
                                   return;
                               }
+                              
+                              console.log('[GenerationsPane] 🚀 Starting add to shot process', {
+                                imageId: image.id,
+                                targetShotId: selectedShotIdLocal,
+                                targetShotName: simplifiedShotOptions.find(s => s.id === selectedShotIdLocal)?.name
+                              });
+                              
                               setAddingToShotImageId(image.id!);
                               try {
                                   // Add limited retry logic for mobile network issues
@@ -606,13 +624,22 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                                           const imageUrlToUse = image.url || displayUrl;
                                           const thumbUrlToUse = image.thumbUrl || imageUrlToUse;
                                           
-                                          log('MobileAddToShot', `Attempt ${retryCount + 1}/${maxRetries} for image ${image.id} with URL: ${imageUrlToUse?.substring(0, 80)}...`);
+                                          console.log(`[GenerationsPane] Calling onAddToLastShot - Attempt ${retryCount + 1}/${maxRetries}`, {
+                                            imageId: image.id,
+                                            imageUrlToUse: imageUrlToUse?.substring(0, 80) + '...',
+                                            thumbUrlToUse: thumbUrlToUse?.substring(0, 80) + '...',
+                                            selectedShotIdLocal,
+                                            timestamp: Date.now()
+                                          });
                                           
                                           success = await onAddToLastShot(image.id!, imageUrlToUse, thumbUrlToUse);
                                           
                                           if (success) {
+                                              console.log(`[GenerationsPane] ✅ Success on attempt ${retryCount + 1} for image ${image.id}`);
                                               onShowTick(image.id!);
                                               log('MobileAddToShot', `Success on attempt ${retryCount + 1} for image ${image.id}`);
+                                          } else {
+                                              console.log(`[GenerationsPane] ❌ Failed on attempt ${retryCount + 1} for image ${image.id}`);
                                           }
                                       } catch (error) {
                                           retryCount++;

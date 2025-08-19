@@ -56,6 +56,9 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
   duplicateSuccessImageId,
   shouldLoad = true,
 }) => {
+  // Simple approach like ShotsPane - just use the image URL directly
+  const displayImageUrl = getDisplayUrl(image.thumbUrl || image.imageUrl);
+
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: image.shotImageEntryId,
     disabled: isDragDisabled,
@@ -144,8 +147,9 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
       onPointerDown={onPointerDown}
       onDoubleClick={isMobile ? undefined : onDoubleClick}
     >
+      {/* Simple image display like ShotsPane - no complex loading states */}
       <img
-        src={shouldLoad ? getDisplayUrl(image.imageUrl) : '/placeholder.svg'}
+        src={shouldLoad ? displayImageUrl : '/placeholder.svg'}
         alt={`Generated image ${(position ?? 0) + 1}`}
         className="w-full h-full object-cover transition-opacity duration-200"
         onTouchStart={isMobile ? handleTouchStart : undefined}

@@ -18,7 +18,7 @@ const THEME_DEFINITIONS = {
     primary: '345 40% 30%',      // Burgundy
     secondary: '210 35% 82%',    // Dusty Blue
     accent: '40 60% 80%',        // Vintage Gold
-    surface: '45 40% 95%',       // Cream
+    surface: '120 25% 92%',      // Pastel Green
     tertiary: '333 30% 93%',     // Soft Pink
     neutral: '150 30% 25%',      // Forest Green
     
@@ -42,7 +42,7 @@ const THEME_DEFINITIONS = {
       'mint-dark': '145 30% 70%',
       lavender: '280 35% 88%',
       'lavender-dark': '280 25% 75%',
-      cream: '45 40% 95%',
+      cream: '120 25% 92%',
       salmon: '15 60% 85%',
       sage: '120 20% 80%',
       'dusty-blue': '210 35% 82%',
@@ -146,10 +146,10 @@ function applyThemeSpecificStyling(root: HTMLElement, themeName: ThemeName) {
   
   if (themeName === 'wes-anderson') {
     // Override core Tailwind variables for Wes Anderson look
-    root.style.setProperty('--background', '45 40% 95%'); // Cream
+    root.style.setProperty('--background', '120 25% 92%'); // Pastel Green
     root.style.setProperty('--foreground', '345 40% 30%'); // Burgundy
     root.style.setProperty('--primary', '345 40% 30%'); // Burgundy
-    root.style.setProperty('--primary-foreground', '45 40% 95%'); // Cream
+    root.style.setProperty('--primary-foreground', '120 25% 92%'); // Pastel Green
     root.style.setProperty('--secondary', '210 35% 82%'); // Dusty Blue
     root.style.setProperty('--secondary-foreground', '345 40% 30%'); // Burgundy
     root.style.setProperty('--accent', '333 30% 93%'); // Soft Pink

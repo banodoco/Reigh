@@ -146,7 +146,7 @@ async function fetchShotSpecificGenerations({
   
   // Apply ordering
   dataQuery = dataQuery
-    .order('position', { ascending: true, nullsFirst: false })
+    .order('position', { ascending: true })
     .order('created_at', { ascending: false });
   
   // Execute queries

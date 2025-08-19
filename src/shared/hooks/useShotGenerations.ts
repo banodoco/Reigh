@@ -26,8 +26,7 @@ export const useShotGenerations = (
           generation:generations(*)
         `)
         .eq('shot_id', shotId!)
-        .order('position', { ascending: true, nullsFirst: false })
-        .order('created_at', { ascending: false }) // Secondary sort by created_at
+        .order('position', { ascending: true })
         .range(pageParam, pageParam + PAGE_SIZE - 1);
 
       if (error) throw error;
@@ -135,8 +134,7 @@ export const useAllShotGenerations = (
           )
         `)
         .eq('shot_id', shotId!)
-        .order('position', { ascending: true, nullsFirst: false })
-        .order('created_at', { ascending: false })
+        .order('position', { ascending: true })
         .range(0, INITIAL_LOAD - 1);
 
       if (initialError) throw initialError;
@@ -165,8 +163,7 @@ export const useAllShotGenerations = (
               )
             `)
             .eq('shot_id', shotId!)
-            .order('position', { ascending: true, nullsFirst: false })
-            .order('created_at', { ascending: false })
+            .order('position', { ascending: true })
             .range(offset, offset + BATCH_SIZE - 1);
 
           if (error) throw error;

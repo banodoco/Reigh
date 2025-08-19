@@ -338,27 +338,48 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   // Star functionality
   const toggleStarMutation = useToggleGenerationStar();
 
-  const [selectedShotIdLocal, setSelectedShotIdLocal] = useState<string>(() => 
-    currentShotId || lastShotId || (simplifiedShotOptions.length > 0 ? simplifiedShotOptions[0].id : "")
-  );
+  const [selectedShotIdLocal, setSelectedShotIdLocal] = useState<string>(() => {
+    const initial = currentShotId || lastShotId || (simplifiedShotOptions.length > 0 ? simplifiedShotOptions[0].id : "");
+    console.log('[GenerationsPane] ImageGallery initial selectedShotIdLocal:', {
+      initial,
+      currentShotId,
+      lastShotId,
+      simplifiedShotOptionsLength: simplifiedShotOptions.length,
+      firstShotId: simplifiedShotOptions[0]?.id
+    });
+    return initial;
+  });
   const [showTickForImageId, setShowTickForImageId] = useState<string | null>(null);
   const [addingToShotImageId, setAddingToShotImageId] = useState<string | null>(null);
 
   // Fix race condition: Update selectedShotIdLocal when shots data loads or context changes
   useEffect(() => {
-    // Only update if current selection is empty/invalid
+    // When viewing a specific shot (currentShotId exists), always prioritize that shot for the selector
+    if (currentShotId && simplifiedShotOptions.find(shot => shot.id === currentShotId)) {
+      if (selectedShotIdLocal !== currentShotId) {
+        console.log('[ShotSelectionDebug] Setting shot selector to current shot (GenerationsPane context):', {
+          oldSelection: selectedShotIdLocal,
+          newSelection: currentShotId,
+          context: 'viewing specific shot'
+        });
+        setSelectedShotIdLocal(currentShotId);
+      }
+      return;
+    }
+    
+    // Only update if current selection is empty/invalid and we're not viewing a specific shot
     const isCurrentSelectionValid = selectedShotIdLocal && simplifiedShotOptions.find(shot => shot.id === selectedShotIdLocal);
     
     if (!isCurrentSelectionValid) {
-      const newSelection = currentShotId || lastShotId || (simplifiedShotOptions.length > 0 ? simplifiedShotOptions[0].id : "");
+      const newSelection = lastShotId || (simplifiedShotOptions.length > 0 ? simplifiedShotOptions[0].id : "");
       if (newSelection && newSelection !== selectedShotIdLocal) {
         console.log('[ShotSelectionDebug] Fixing selectedShotIdLocal race condition:', {
           oldSelection: selectedShotIdLocal,
           newSelection,
-          currentShotId,
           lastShotId,
           availableShots: simplifiedShotOptions.length,
-          firstShotId: simplifiedShotOptions[0]?.id
+          firstShotId: simplifiedShotOptions[0]?.id,
+          context: 'no specific shot context'
         });
         setSelectedShotIdLocal(newSelection);
       }
@@ -366,8 +387,19 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   }, [currentShotId, lastShotId, simplifiedShotOptions, selectedShotIdLocal]);
 
   // Sync selection when lastShotId changes to ensure newly created shots become selected in the gallery dropdown
+  // BUT only if we're not viewing a specific shot (currentShotId should take priority)
   useEffect(() => {
     if (!lastShotId) return;
+    
+    // If we're viewing a specific shot, don't override with lastShotId
+    if (currentShotId && simplifiedShotOptions.find(shot => shot.id === currentShotId)) {
+      console.log('[ShotSelectionDebug] Not syncing to lastShotId because currentShotId takes priority:', {
+        currentShotId,
+        lastShotId,
+        selectedShotIdLocal
+      });
+      return;
+    }
 
     const existsInShots = simplifiedShotOptions.some(s => s.id === lastShotId);
     if (existsInShots && lastShotId !== selectedShotIdLocal) {
@@ -388,7 +420,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
         timestamp: Date.now()
       });
     }
-  }, [lastShotId, simplifiedShotOptions, selectedShotIdLocal, setLastAffectedShotId]);
+  }, [lastShotId, simplifiedShotOptions, selectedShotIdLocal, setLastAffectedShotId, currentShotId]);
 
   // State for the filter checkbox
   const [filterByToolType, setFilterByToolType] = useState<boolean>(initialFilterState);

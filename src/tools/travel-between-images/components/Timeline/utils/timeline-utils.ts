@@ -79,6 +79,47 @@ export const shrinkOversizedGaps = (
   return result;
 };
 
+// ---------------------------------------------------------------------------
+// Utility: expand undersized gaps by right-shifting subsequent frames so that
+// every gap ≥ minGap. Used for Option key "pull left" behavior.
+// Returns a **new** Map (does not mutate input).
+// ---------------------------------------------------------------------------
+export const expandUndersizedGaps = (
+  positions: Map<string, number>,
+  contextFrames: number,
+  minGap: number = 10,
+  excludeId?: string,
+): Map<string, number> => {
+  // Create sortable copy excluding optional id
+  const entries = [...positions.entries()].filter(([id]) => id !== excludeId);
+  // Always include frame 0 in the list
+  if (!entries.some(([_, pos]) => pos === 0)) {
+    // Find an id that currently sits at 0 (if any)
+    const zeroId = [...positions.entries()].find(([_, pos]) => pos === 0)?.[0];
+    if (zeroId) entries.push([zeroId, 0]);
+  }
+
+  entries.sort((a, b) => a[1] - b[1]);
+
+  const result = new Map<string, number>();
+  let prev = 0;
+
+  for (const [id, originalPos] of entries) {
+    // Ensure minimum gap while preserving relative ordering
+    const minRequiredPos = prev + minGap;
+    const finalPos = Math.max(originalPos, minRequiredPos);
+    result.set(id, finalPos);
+    prev = finalPos;
+  }
+
+  // Re-add the excluded id unchanged (caller may overwrite afterwards)
+  if (excludeId && positions.has(excludeId)) {
+    result.set(excludeId, positions.get(excludeId)!);
+  }
+
+  return result;
+};
+
 // Convert pixel position to frame number
 export const pixelToFrame = (pixelX: number, containerWidth: number, fullMin: number, fullRange: number): number => {
   const fraction = pixelX / containerWidth;
