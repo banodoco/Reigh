@@ -707,7 +707,7 @@ export function VideoSegmentEditor({ video, segments, onCreateSegment, onDeleteS
                   <div className="w-full h-full flex items-center justify-center">
                     <div className="text-center text-white">
                       <Video className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                      <p className="text-sm text-red-400 font-medium">Video file not available</p>
+                      <p className="text-sm text-red-400 font-light">Video file not available</p>
                       <p className="text-xs text-gray-400 mt-2 max-w-md">
                         The video file "{video.originalFilename}" could not be loaded. 
                         It may have been moved or deleted from storage.
@@ -870,7 +870,7 @@ export function VideoSegmentEditor({ video, segments, onCreateSegment, onDeleteS
                       <div className="bg-black/90 text-white text-xs rounded-lg p-2 whitespace-nowrap shadow-lg">
                         {/* Arrow pointing up */}
                         <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 border-l-4 border-r-4 border-b-4 border-transparent border-b-black/90"></div>
-                        <div className="font-medium">Segment {currentSegmentInfo.index + 1}</div>
+                        <div className="font-light">Segment {currentSegmentInfo.index + 1}</div>
                         <div className="text-xs opacity-80">
                           {formatDuration(currentSegmentInfo.segment.startTime)} - {formatDuration(currentSegmentInfo.segment.endTime)}
                         </div>
@@ -904,7 +904,7 @@ export function VideoSegmentEditor({ video, segments, onCreateSegment, onDeleteS
                           </TooltipTrigger>
                           <TooltipContent>
                             <div className="text-xs">
-                              <div className="font-medium">Segment {index + 1}</div>
+                              <div className="font-light">Segment {index + 1}</div>
                               <div>
                                 {formatDuration(segment.startTime)} - {formatDuration(segment.endTime)}
                               </div>
@@ -987,7 +987,7 @@ export function VideoSegmentEditor({ video, segments, onCreateSegment, onDeleteS
                     {/* Live preview when dragging */}
                     {segmentEndTime === null && currentTime > segmentStartTime && (
                       <div className="text-sm text-orange-600 bg-orange-50 p-2 rounded">
-                        <div className="font-medium">Live Preview</div>
+                        <div className="font-light">Live Preview</div>
                         <div className="text-xs">
                           Duration: {formatTime(currentTime - segmentStartTime)}
                         </div>
@@ -1046,7 +1046,7 @@ export function VideoSegmentEditor({ video, segments, onCreateSegment, onDeleteS
                 <div className="p-3 bg-green-50 rounded-lg border border-green-200">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span className="text-sm font-medium text-green-700">
+                    <span className="text-sm font-light text-green-700">
                       {segmentEndTime !== null ? 'Segment Frames' : `Start Frame (${formatTime(segmentStartTime)})`}
                     </span>
                   </div>
@@ -1054,7 +1054,7 @@ export function VideoSegmentEditor({ video, segments, onCreateSegment, onDeleteS
                   <div className="space-y-4">
                     {/* Start Frame */}
                     <div className="text-center">
-                      <div className="text-xs text-green-700 mb-1 font-medium">
+                      <div className="text-xs text-green-700 mb-1 font-light">
                         Start ({formatTime(segmentStartTime)})
                       </div>
                       {startFrameImage ? (
@@ -1105,7 +1105,7 @@ export function VideoSegmentEditor({ video, segments, onCreateSegment, onDeleteS
                     {segmentEndTime === null && (
                       <div className="p-3 bg-red-50 rounded-lg border border-red-200">
                         <div className="text-center">
-                          <div className="text-xs text-red-700 mb-2 font-medium">
+                          <div className="text-xs text-red-700 mb-2 font-light">
                             End at ({formatTime(currentTime)})
                           </div>
                           <div className="flex gap-1">
@@ -1141,7 +1141,7 @@ export function VideoSegmentEditor({ video, segments, onCreateSegment, onDeleteS
                     {/* End Frame */}
                     {segmentEndTime !== null && (
                       <div className="text-center">
-                        <div className="text-xs text-red-700 mb-1 font-medium">
+                        <div className="text-xs text-red-700 mb-1 font-light">
                           End ({formatTime(segmentEndTime)})
                         </div>
                         {endFrameImage ? (
@@ -1193,7 +1193,7 @@ export function VideoSegmentEditor({ video, segments, onCreateSegment, onDeleteS
                   {/* Duration Info */}
                   {segmentEndTime !== null && (
                     <div className="mt-3 text-center">
-                      <div className="text-sm text-green-700 font-medium">
+                      <div className="text-sm text-green-700 font-light">
                         Duration: {formatTime(segmentEndTime - segmentStartTime)}
                         <span className="ml-2 text-xs">
                           (~{Math.round((segmentEndTime - segmentStartTime) * 30)} frames @ 30fps)

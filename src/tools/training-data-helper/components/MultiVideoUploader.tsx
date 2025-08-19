@@ -324,7 +324,7 @@ export function MultiVideoUploader({ onUpload, isUploading, selectedBatchId }: M
         
         {videoFiles.length > 0 && (
           <div className="space-y-4">
-            <div className="text-sm font-medium">
+            <div className="text-sm font-light">
               Upload Queue ({videoFiles.length} video{videoFiles.length !== 1 ? 's' : ''})
             </div>
             
@@ -352,7 +352,7 @@ export function MultiVideoUploader({ onUpload, isUploading, selectedBatchId }: M
                       {/* Video Info */}
                       <div className="flex-1 space-y-2">
                         <div className="flex items-center gap-2">
-                          <span className="font-medium text-sm truncate" title={videoFile.file.name}>
+                          <span className="font-light text-sm truncate" title={videoFile.file.name}>
                             {cropFilename(videoFile.file.name)}
                           </span>
                           {processingScenes === videoFile.id && (
@@ -376,7 +376,7 @@ export function MultiVideoUploader({ onUpload, isUploading, selectedBatchId }: M
                         
                         {/* Split Mode Selection */}
                         <div className="space-y-2">
-                          <Label className="text-xs font-medium">How would you like to split this?</Label>
+                          <Label className="text-xs font-light">How would you like to split this?</Label>
                           <RadioGroup
                             value={videoFile.splitMode}
                             onValueChange={(value) => updateSplitMode(videoFile.id, value as SplitMode)}
@@ -394,7 +394,7 @@ export function MultiVideoUploader({ onUpload, isUploading, selectedBatchId }: M
                                   className="flex items-center gap-2 text-xs cursor-pointer"
                                 >
                                   {getSplitModeIcon(option.value as SplitMode)}
-                                  <span className="font-medium">{option.label}</span>
+                                  <span className="font-light">{option.label}</span>
                                   <span className="text-muted-foreground">- {option.description}</span>
                                 </Label>
                               </div>

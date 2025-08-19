@@ -72,7 +72,7 @@ const Loading = React.forwardRef<HTMLDivElement, LoadingProps>(
             </div>
           </div>
           {text && (
-            <p className="font-inter text-sm text-muted-foreground tracking-widest uppercase animate-fade-in">
+            <p className="font-cocogoose text-sm text-muted-foreground tracking-widest uppercase animate-fade-in">
               {text}
             </p>
           )}
@@ -117,7 +117,7 @@ const Loading = React.forwardRef<HTMLDivElement, LoadingProps>(
           </div>
           <div className="wes-divider w-full max-w-xs mx-auto"></div>
           {text && (
-            <p className="font-playfair text-xl text-primary font-bold text-shadow-vintage-glow animate-vintage-glow">
+            <p className="font-cocogoose text-xl text-primary font-normal text-shadow-vintage-glow animate-vintage-glow">
               {text}
             </p>
           )}

@@ -259,6 +259,34 @@ serve(async (req) => {
   }
 
   try {
+    // SAFETY CHECK: Prevent overwriting Complete tasks with Failed status
+    // First check the current status of the task
+    const { data: currentTask, error: currentTaskError } = await supabaseAdmin
+      .from("tasks")
+      .select("status")
+      .eq("id", task_id)
+      .single();
+
+    if (currentTaskError) {
+      console.error("Error checking current task status:", currentTaskError);
+      return new Response(`Failed to check current task status: ${currentTaskError.message}`, { status: 500 });
+    }
+
+    // Don't overwrite Complete tasks with Failed status
+    if (currentTask?.status === "Complete" && status === "Failed") {
+      console.log(`Refusing to mark completed task ${task_id} as Failed`);
+      return new Response(JSON.stringify({
+        success: false,
+        task_id: task_id,
+        current_status: currentTask.status,
+        requested_status: status,
+        message: "Cannot mark completed task as failed"
+      }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
     // Build update payload
     const updatePayload: any = {
       status: status,

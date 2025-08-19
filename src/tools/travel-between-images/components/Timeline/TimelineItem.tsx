@@ -113,7 +113,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
           <>
             {dragDistances.distanceToPrev !== undefined && (
               <div
-                className={`absolute left-0 top-1/2 -translate-y-1/2 -translate-x-full text-xs font-medium px-1 py-0.5 rounded mr-1 ${
+                className={`absolute left-0 top-1/2 -translate-y-1/2 -translate-x-full text-xs font-light px-1 py-0.5 rounded mr-1 ${
                   dragDistances.distanceToPrev > maxAllowedGap
                     ? 'bg-red-500/90 text-white'
                     : 'bg-primary/90 text-primary-foreground'
@@ -124,7 +124,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
             )}
             {dragDistances.distanceToNext !== undefined && (
               <div
-                className={`absolute right-0 top-1/2 -translate-y-1/2 translate-x-full text-xs font-medium px-1 py-0.5 rounded ml-1 ${
+                className={`absolute right-0 top-1/2 -translate-y-1/2 translate-x-full text-xs font-light px-1 py-0.5 rounded ml-1 ${
                   dragDistances.distanceToNext > maxAllowedGap
                     ? 'bg-red-500/90 text-white'
                     : 'bg-primary/90 text-primary-foreground'

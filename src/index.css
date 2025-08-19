@@ -1,6 +1,73 @@
+@import url('https://fonts.googleapis.com/css2?family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Playfair+Display:wght@300;400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Cocogoose Font Face Declarations - Using cleaner variants */
+
+/* Primary font - Clean Semilight Italic for main text */
+@font-face {
+  font-family: 'Cocogoose';
+  src: url('/fonts/Cocogoose-Pro-Semilight-Italic-trial.ttf') format('truetype');
+  font-weight: 300;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* Regular weight - Clean Regular instead of Letterpress */
+@font-face {
+  font-family: 'Cocogoose';
+  src: url('/fonts/Cocogoose-Pro-Regular-trial.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Light weight - Clean version */
+@font-face {
+  font-family: 'Cocogoose';
+  src: url('/fonts/Cocogoose-Pro-Light-trial.ttf') format('truetype');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Ultralight weight */
+@font-face {
+  font-family: 'Cocogoose';
+  src: url('/fonts/Cocogoose-Pro-Ultralight-trial.ttf') format('truetype');
+  font-weight: 200;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Bold weight */
+@font-face {
+  font-family: 'Cocogoose';
+  src: url('/fonts/Cocogoose-Pro-Bold-trial.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Semilight regular (non-italic) */
+@font-face {
+  font-family: 'Cocogoose';
+  src: url('/fonts/Cocogoose-Pro-Semilight-trial.ttf') format('truetype');
+  font-weight: 350;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Keep letterpress as a special decorative variant */
+@font-face {
+  font-family: 'CocogooseLetterpress';
+  src: url('/fonts/Cocogoose-Pro-Letterpress-Regular-trial.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
 
 .mb-8 {
     margin-top: 2rem;
@@ -8,92 +75,191 @@
 /* Reigh App Styles */
 @layer base {
   :root {
-    /* Wes Anderson-inspired pastel palette */
-    --wes-pink: 333 30% 93%;
-    --wes-pink-dark: 333 25% 82%;
-    --wes-yellow: 48 85% 88%;
-    --wes-yellow-dark: 48 65% 75%;
-    --wes-mint: 145 35% 85%;
-    --wes-mint-dark: 145 30% 70%;
-    --wes-lavender: 280 35% 88%;
-    --wes-lavender-dark: 280 25% 75%;
-    --wes-cream: 45 40% 95%;
-    --wes-salmon: 15 60% 85%;
-    --wes-sage: 120 20% 80%;
-    --wes-dusty-blue: 210 35% 82%;
-    --wes-burgundy: 345 40% 30%;
-    --wes-forest: 150 30% 25%;
-    --wes-coral: 10 70% 82%;
-    --wes-mustard: 45 80% 70%;
-    --wes-teal: 180 40% 75%;
-    --wes-vintage-gold: 40 60% 80%;
+    /* ========================================= */
+    /* CENTRALIZED THEME DEFINITIONS */
+    /* ========================================= */
     
-    --background: var(--wes-cream);
-    --foreground: var(--wes-burgundy);
+    /* La La Land Theme Colors */
+    --theme-lala-primary: 254 61% 48%;        /* #312680 - Royal Purple */
+    --theme-lala-primary-dark: 254 70% 35%;   /* Darker Royal Purple */
+    --theme-lala-primary-light: 254 55% 55%;  /* Lighter Royal Purple */
+    --theme-lala-secondary: 217 33% 63%;      /* #788FB4 - Light Blue */
+    --theme-lala-secondary-dark: 217 25% 45%; /* Darker Light Blue */
+    --theme-lala-secondary-light: 217 40% 75%; /* Lighter Light Blue */
+    --theme-lala-accent: 45 58% 67%;          /* #DABF77 - Golden Yellow */
+    --theme-lala-accent-dark: 45 50% 55%;     /* Darker Golden */
+    --theme-lala-accent-light: 45 65% 75%;    /* Lighter Golden */
+    --theme-lala-neutral: 242 78% 32%;        /* #151551 - Deep Navy */
+    --theme-lala-neutral-light: 242 70% 40%;  /* Lighter Navy */
+    --theme-lala-surface: 45 40% 95%;         /* Cream */
+    --theme-lala-surface-bright: 0 0% 98%;    /* White */
+    --theme-lala-tertiary: 247 49% 58%;       /* #453DA0 - Medium Purple */
+    
+    /* La La Land Icon Colors */
+    --theme-lala-icon-primary: 254 61% 48%;   /* Royal Purple for main icons */
+    --theme-lala-icon-secondary: 45 58% 67%;  /* Golden Yellow for accent icons */
+    --theme-lala-icon-muted: 217 40% 75%;     /* Light Blue for subtle icons */
+    --theme-lala-icon-interactive: 247 49% 58%; /* Medium Purple for interactive icons */
+    --theme-lala-icon-success: 217 33% 63%;   /* Light Blue for success states */
+    --theme-lala-icon-warning: 45 58% 67%;    /* Golden Yellow for warnings */
+    --theme-lala-icon-danger: 0 70% 60%;      /* Red for dangerous actions */
+    
+    /* Wes Anderson Theme Colors */
+    --theme-wes-primary: 345 40% 30%;         /* Burgundy */
+    --theme-wes-primary-dark: 345 50% 25%;    /* Darker Burgundy */
+    --theme-wes-primary-light: 345 35% 40%;   /* Lighter Burgundy */
+    --theme-wes-secondary: 210 35% 82%;       /* Dusty Blue */
+    --theme-wes-secondary-dark: 210 30% 70%;  /* Darker Dusty Blue */
+    --theme-wes-secondary-light: 210 40% 90%; /* Lighter Dusty Blue */
+    --theme-wes-accent: 40 60% 80%;           /* Vintage Gold */
+    --theme-wes-accent-dark: 40 70% 65%;      /* Darker Gold */
+    --theme-wes-accent-light: 40 50% 90%;     /* Lighter Gold */
+    --theme-wes-neutral: 150 30% 25%;         /* Forest Green */
+    --theme-wes-neutral-light: 150 20% 35%;   /* Lighter Forest */
+    --theme-wes-surface: 45 40% 95%;          /* Cream */
+    --theme-wes-surface-bright: 0 0% 100%;    /* Pure White */
+    --theme-wes-tertiary: 333 30% 93%;        /* Soft Pink */
+    
 
-    --card: 0 0% 100%;
-    --card-foreground: var(--wes-burgundy);
+    
+    /* Wes Anderson Icon Colors */
+    --theme-wes-icon-primary: 345 40% 30%;    /* Burgundy for main icons */
+    --theme-wes-icon-secondary: 40 60% 80%;   /* Vintage Gold for accent icons */
+    --theme-wes-icon-muted: 210 35% 82%;      /* Dusty Blue for subtle icons */
+    --theme-wes-icon-interactive: 333 30% 93%; /* Soft Pink for interactive icons */
+    --theme-wes-icon-success: 150 30% 25%;    /* Forest Green for success states */
+    --theme-wes-icon-warning: 40 60% 80%;     /* Vintage Gold for warnings */
+    --theme-wes-icon-danger: 0 70% 60%;       /* Red for dangerous actions */
+    
+    /* Cat Lounging Theme Colors - Refined & Sophisticated */
+    --theme-cat-primary: 180 35% 45%;         /* Muted Teal - sophisticated primary */
+    --theme-cat-primary-dark: 180 40% 35%;    /* Deeper Teal */
+    --theme-cat-primary-light: 180 30% 55%;   /* Lighter Teal */
+    --theme-cat-secondary: 91 25% 45%;        /* Refined Sage Green */
+    --theme-cat-secondary-dark: 91 30% 35%;   /* Deeper Sage */
+    --theme-cat-secondary-light: 91 20% 55%;  /* Softer Sage */
+    --theme-cat-accent: 35 45% 60%;           /* Warm Terracotta - much more muted */
+    --theme-cat-accent-dark: 35 50% 50%;      /* Deeper Terracotta */
+    --theme-cat-accent-light: 35 40% 70%;     /* Softer Terracotta */
+    --theme-cat-neutral: 25 30% 25%;          /* Warm Dark Brown - grounded neutral */
+    --theme-cat-neutral-light: 25 25% 35%;    /* Lighter Warm Brown */
+    --theme-cat-surface: 45 25% 88%;          /* Warm Cream - much softer */
+    --theme-cat-surface-bright: 45 15% 96%;   /* Very Soft Cream */
+    --theme-cat-tertiary: 40 30% 75%;         /* Soft Peach - very muted */
+    
+    /* Cat Lounging Icon Colors - Refined & Harmonious */
+    --theme-cat-icon-primary: 180 35% 45%;    /* Muted Teal for main icons */
+    --theme-cat-icon-secondary: 35 45% 60%;   /* Warm Terracotta for accent icons */
+    --theme-cat-icon-muted: 91 20% 55%;       /* Soft Sage for subtle icons */
+    --theme-cat-icon-interactive: 35 50% 50%; /* Deeper Terracotta for interactive icons */
+    --theme-cat-icon-success: 91 25% 45%;     /* Refined Sage for success states */
+    --theme-cat-icon-warning: 40 30% 75%;     /* Soft Peach for warnings */
+    --theme-cat-icon-danger: 35 55% 45%;      /* Deeper Terracotta for dangerous actions */
+    
+    /* ========================================= */
+    /* ACTIVE THEME SELECTION */
+    /* To switch themes, change 'lala' to 'wes' in the variable names below */
+    /* OR use the theme-switcher.ts utility for programmatic switching */
+    /* ========================================= */
+    
+    /* Current active theme: Cat Lounging */
+    /* To switch themes: change 'theme-cat-' to 'theme-lala-' or 'theme-wes-' */
+    --color-primary: var(--theme-cat-primary);
+    --color-primary-dark: var(--theme-cat-primary-dark);
+    --color-primary-light: var(--theme-cat-primary-light);
+    --color-secondary: var(--theme-cat-secondary);
+    --color-secondary-dark: var(--theme-cat-secondary-dark);
+    --color-secondary-light: var(--theme-cat-secondary-light);
+    --color-accent: var(--theme-cat-accent);
+    --color-accent-dark: var(--theme-cat-accent-dark);
+    --color-accent-light: var(--theme-cat-accent-light);
+    --color-neutral: var(--theme-cat-neutral);
+    --color-neutral-light: var(--theme-cat-neutral-light);
+    --color-surface: var(--theme-cat-surface);
+    --color-surface-bright: var(--theme-cat-surface-bright);
+    --color-tertiary: var(--theme-cat-tertiary);
+    
+    /* Active Icon Colors (mapped to current theme) */
+    --icon-primary: var(--theme-cat-icon-primary);
+    --icon-secondary: var(--theme-cat-icon-secondary);
+    --icon-muted: var(--theme-cat-icon-muted);
+    --icon-interactive: var(--theme-cat-icon-interactive);
+    --icon-success: var(--theme-cat-icon-success);
+    --icon-warning: var(--theme-cat-icon-warning);
+    --icon-danger: var(--theme-cat-icon-danger);
+    
+    /* ========================================= */
+    /* SEMANTIC COLOR VARIABLES */
+    /* These use the active theme colors above */
+    /* ========================================= */
+    
+    --background: var(--color-surface);
+    --foreground: var(--color-neutral);
 
-    --popover: 0 0% 100%;
-    --popover-foreground: var(--wes-burgundy);
+    --card: var(--color-surface-bright);
+    --card-foreground: var(--color-neutral);
 
-    --primary: var(--wes-burgundy);
-    --primary-foreground: var(--wes-cream);
+    --popover: var(--color-surface-bright);
+    --popover-foreground: var(--color-neutral);
 
-    --secondary: var(--wes-dusty-blue);
-    --secondary-foreground: var(--wes-burgundy);
+    --primary: var(--color-primary);
+    --primary-foreground: var(--color-surface-bright);
 
-    --muted: var(--wes-sage);
-    --muted-foreground: var(--wes-forest);
+    --secondary: var(--color-secondary);
+    --secondary-foreground: var(--color-neutral);
 
-    --accent: var(--wes-pink);
-    --accent-foreground: var(--wes-burgundy);
+    --muted: var(--color-secondary-light);
+    --muted-foreground: var(--color-secondary-dark);
+
+    --accent: var(--color-accent);
+    --accent-foreground: var(--color-neutral);
 
     --destructive: 0 70% 60%;
-    --destructive-foreground: var(--wes-cream);
+    --destructive-foreground: var(--color-surface-bright);
 
-    --border: var(--wes-sage);
-    --input: var(--wes-mint);
-    --ring: var(--wes-burgundy);
+    --border: var(--color-secondary-light);
+    --input: var(--color-surface-bright);
+    --ring: var(--color-primary);
 
     --radius: 0.75rem;
 
-    --sidebar-background: var(--wes-lavender);
-    --sidebar-foreground: var(--wes-burgundy);
-    --sidebar-primary: var(--wes-burgundy);
-    --sidebar-primary-foreground: var(--wes-cream);
-    --sidebar-accent: var(--wes-pink);
-    --sidebar-accent-foreground: var(--wes-burgundy);
-    --sidebar-border: var(--wes-lavender-dark);
-    --sidebar-ring: var(--wes-burgundy);
+    --sidebar-background: var(--color-tertiary);
+    --sidebar-foreground: var(--color-surface-bright);
+    --sidebar-primary: var(--color-accent);
+    --sidebar-primary-foreground: var(--color-neutral);
+    --sidebar-accent: var(--color-accent);
+    --sidebar-accent-foreground: var(--color-neutral);
+    --sidebar-border: var(--color-primary-dark);
+    --sidebar-ring: var(--color-accent);
   }
 
   .dark {
-    --background: var(--wes-burgundy);
-    --foreground: var(--wes-cream);
-    --card: 345 35% 20%;
-    --card-foreground: var(--wes-cream);
-    --popover: 345 35% 20%;
-    --popover-foreground: var(--wes-cream);
-    --primary: var(--wes-cream);
-    --primary-foreground: var(--wes-burgundy);
-    --secondary: 345 20% 15%;
-    --secondary-foreground: var(--wes-cream);
-    --muted: 345 15% 25%;
-    --muted-foreground: var(--wes-dusty-blue);
-    --accent: var(--wes-pink-dark);
-    --accent-foreground: var(--wes-burgundy);
-    --border: 345 20% 35%;
-    --input: 345 20% 35%;
-    --ring: var(--wes-pink);
-    --sidebar-background: 345 30% 18%;
-    --sidebar-foreground: var(--wes-cream);
-    --sidebar-primary: var(--wes-cream);
-    --sidebar-primary-foreground: var(--wes-burgundy);
-    --sidebar-accent: var(--wes-pink-dark);
-    --sidebar-accent-foreground: var(--wes-burgundy);
-    --sidebar-border: 345 25% 25%;
-    --sidebar-ring: var(--wes-pink);
+    /* Dark mode uses inverted theme colors */
+    --background: var(--color-neutral);
+    --foreground: var(--color-surface);
+    --card: var(--color-neutral-light);
+    --card-foreground: var(--color-surface);
+    --popover: var(--color-neutral-light);
+    --popover-foreground: var(--color-surface);
+    --primary: var(--color-accent);
+    --primary-foreground: var(--color-neutral);
+    --secondary: var(--color-primary-dark);
+    --secondary-foreground: var(--color-surface);
+    --muted: var(--color-secondary-dark);
+    --muted-foreground: var(--color-secondary-light);
+    --accent: var(--color-tertiary);
+    --accent-foreground: var(--color-surface-bright);
+    --border: var(--color-primary-light);
+    --input: var(--color-neutral-light);
+    --ring: var(--color-accent);
+    --sidebar-background: var(--color-neutral-light);
+    --sidebar-foreground: var(--color-surface);
+    --sidebar-primary: var(--color-accent);
+    --sidebar-primary-foreground: var(--color-neutral);
+    --sidebar-accent: var(--color-tertiary);
+    --sidebar-accent-foreground: var(--color-surface-bright);
+    --sidebar-border: var(--color-primary-dark);
+    --sidebar-ring: var(--color-accent);
   }
 }
 
@@ -103,11 +269,81 @@
   }
 
   body {
-    @apply bg-background text-foreground font-['Inter',sans-serif] antialiased;
+    @apply bg-background text-foreground font-cocogoose font-light antialiased;
+    font-family: 'Cocogoose', 'CocogooseNumbers', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: 
+      /* Theme-adaptive dreamy gradient */
+      linear-gradient(135deg, 
+        hsl(var(--color-surface)) 0%,
+        hsl(var(--color-secondary-light) / 0.3) 25%,
+        hsl(var(--color-tertiary) / 0.2) 50%,
+        hsl(var(--color-accent) / 0.2) 75%,
+        hsl(var(--color-surface)) 100%
+      ),
+      /* Subtle star field effect */
+      radial-gradient(circle at 15% 25%, hsl(var(--color-secondary) / 0.1) 0%, transparent 30%),
+      radial-gradient(circle at 85% 15%, hsl(var(--color-tertiary) / 0.1) 0%, transparent 25%),
+      radial-gradient(circle at 75% 85%, hsl(var(--color-accent) / 0.1) 0%, transparent 35%),
+      /* Subtle texture */
+      radial-gradient(circle at 1px 1px, rgba(255,255,255,0.08) 1px, transparent 0);
+    background-size: 100% 100%, 80% 80%, 70% 70%, 90% 90%, 15px 15px;
+    background-attachment: fixed, fixed, fixed, fixed, scroll;
+    letter-spacing: 0.015em;
+    position: relative;
+  }
+
+  /* Theme-adaptive starlight overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: 
+      linear-gradient(45deg, transparent 98%, hsl(var(--color-accent) / 0.05) 100%),
+      linear-gradient(-45deg, transparent 98%, hsl(var(--color-secondary) / 0.03) 100%);
+    background-size: 4px 4px;
+    pointer-events: none;
+    z-index: 1000;
+    opacity: 0.6;
+    animation: dreamyShimmer 3s ease-in-out infinite;
+  }
+
+  /* Theme-adaptive spotlight effect */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: 
+      radial-gradient(ellipse at 30% 20%, hsl(var(--color-accent) / 0.03) 0%, transparent 40%),
+      radial-gradient(ellipse at 70% 80%, hsl(var(--color-tertiary) / 0.02) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: 999;
+    opacity: 0.8;
+    animation: gentleSpotlight 6s ease-in-out infinite alternate;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--theme-font-family, 'Cocogoose', 'Inter', sans-serif);
+    font-weight: var(--theme-heading-weight, 350);
+    letter-spacing: 0.02em;
+    position: relative;
+  }
+  
+  body {
+    font-family: var(--theme-font-family, 'Cocogoose', 'Inter', sans-serif) !important;
+    font-weight: var(--theme-body-weight, 350) !important;
+  }
+  
+  /* ========================================= */
+  /* WES ANDERSON THEME SPECIFIC STYLING */
+  /* ========================================= */
+  
+  /* Wes Anderson Theme Body Styling */
+  body.wes-anderson-theme {
+    @apply font-['Inter',sans-serif] antialiased;
     background-image: 
-      radial-gradient(circle at 20% 20%, hsl(var(--wes-pink)) 0%, transparent 50%),
-      radial-gradient(circle at 80% 80%, hsl(var(--wes-yellow)) 0%, transparent 50%),
-      radial-gradient(circle at 40% 60%, hsl(var(--wes-mint)) 0%, transparent 50%),
+      radial-gradient(circle at 20% 20%, hsl(333 30% 93%) 0%, transparent 50%),
+      radial-gradient(circle at 80% 80%, hsl(48 85% 88%) 0%, transparent 50%),
+      radial-gradient(circle at 40% 60%, hsl(145 35% 85%) 0%, transparent 50%),
       /* Vintage film grain */
       radial-gradient(circle at 1px 1px, rgba(255,255,255,0.15) 1px, transparent 0);
     background-size: 100% 100%, 100% 100%, 100% 100%, 20px 20px;
@@ -116,8 +352,8 @@
     position: relative;
   }
 
-  /* Vintage film overlay */
-  body::before {
+  /* Vintage film overlay for Wes Anderson theme */
+  body.wes-anderson-theme::before {
     content: '';
     position: fixed;
     inset: 0;
@@ -131,8 +367,8 @@
     animation: filmGrain 0.5s infinite;
   }
 
-  /* Vintage scratches effect */
-  body::after {
+  /* Vintage scratches effect for Wes Anderson theme */
+  body.wes-anderson-theme::after {
     content: '';
     position: fixed;
     inset: 0;
@@ -145,11 +381,290 @@
     opacity: 0.6;
     animation: vintageScratches 8s infinite linear;
   }
+  
+  /* Typography for Wes Anderson theme - handled by theme variables now */
+  body.wes-anderson-theme {
+    /* Additional Wes Anderson specific typography styles can go here if needed */
+  }
 
-  h1, h2, h3, h4, h5, h6 {
-    @apply font-['Crimson_Text',serif] font-semibold;
-    letter-spacing: 0.02em;
-    position: relative;
+  /* Force numbers to use system fonts since Cocogoose trial doesn't include them */
+  .font-cocogoose {
+    font-family: 'Cocogoose', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  }
+
+  /* Override for any element containing numbers - force system font for digits */
+  [class*="font-cocogoose"] {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Specific CSS to force numbers to use fallback fonts */
+  .font-cocogoose::before,
+  .font-cocogoose::after,
+  .font-cocogoose {
+    unicode-bidi: isolate;
+  }
+
+  /* Emergency fallback: Use Inter for any text containing numbers */
+  .force-numbers {
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  }
+
+  /* Theme-adaptive shadows */
+  .shadow-theme {
+    box-shadow: 
+      0 10px 25px -5px hsl(var(--primary) / 0.15),
+      0 4px 6px -2px hsl(var(--primary) / 0.08),
+      inset 0 1px 0 hsl(var(--accent) / 0.3),
+      0 0 0 1px hsl(var(--color-accent) / 0.1);
+  }
+
+  .shadow-theme-hover {
+    box-shadow: 
+      0 20px 40px -10px hsl(var(--primary) / 0.2),
+      0 8px 12px -4px hsl(var(--primary) / 0.15),
+      inset 0 1px 0 hsl(var(--accent) / 0.4),
+      0 0 0 2px hsl(var(--color-accent) / 0.2),
+      0 0 30px hsl(var(--color-tertiary) / 0.1);
+  }
+
+  /* Legacy aliases for backward compatibility */
+  .shadow-lala { @apply shadow-theme; }
+  .shadow-lala-hover { @apply shadow-theme-hover; }
+
+  /* ========================================= */
+  /* THEME-ADAPTIVE ICON COLORS */
+  /* ========================================= */
+  
+  /* Primary icon colors - for main navigation, important actions */
+  .icon-primary {
+    color: hsl(var(--icon-primary));
+  }
+  
+  .icon-primary svg {
+    fill: hsl(var(--icon-primary));
+    stroke: hsl(var(--icon-primary));
+  }
+  
+  /* Secondary icon colors - for accent elements, highlights */
+  .icon-secondary {
+    color: hsl(var(--icon-secondary));
+  }
+  
+  .icon-secondary svg {
+    fill: hsl(var(--icon-secondary));
+    stroke: hsl(var(--icon-secondary));
+  }
+  
+  /* Muted icon colors - for subtle, background icons */
+  .icon-muted {
+    color: hsl(var(--icon-muted));
+  }
+  
+  .icon-muted svg {
+    fill: hsl(var(--icon-muted));
+    stroke: hsl(var(--icon-muted));
+  }
+  
+  /* Interactive icon colors - for buttons, clickable elements */
+  .icon-interactive {
+    color: hsl(var(--icon-interactive));
+    transition: color 0.2s ease, transform 0.2s ease;
+  }
+  
+  .icon-interactive:hover {
+    color: hsl(var(--icon-interactive) / 0.8);
+    transform: scale(1.1);
+  }
+  
+  .icon-interactive svg {
+    fill: hsl(var(--icon-interactive));
+    stroke: hsl(var(--icon-interactive));
+    transition: fill 0.2s ease, stroke 0.2s ease;
+  }
+  
+  .icon-interactive:hover svg {
+    fill: hsl(var(--icon-interactive) / 0.8);
+    stroke: hsl(var(--icon-interactive) / 0.8);
+  }
+  
+  /* Success state icons - for completed actions, positive feedback */
+  .icon-success {
+    color: hsl(var(--icon-success));
+  }
+  
+  .icon-success svg {
+    fill: hsl(var(--icon-success));
+    stroke: hsl(var(--icon-success));
+  }
+  
+  /* Warning state icons - for cautionary messages */
+  .icon-warning {
+    color: hsl(var(--icon-warning));
+  }
+  
+  .icon-warning svg {
+    fill: hsl(var(--icon-warning));
+    stroke: hsl(var(--icon-warning));
+  }
+  
+  /* Danger state icons - for destructive actions, errors */
+  .icon-danger {
+    color: hsl(var(--icon-danger));
+  }
+  
+  .icon-danger svg {
+    fill: hsl(var(--icon-danger));
+    stroke: hsl(var(--icon-danger));
+  }
+  
+  /* Utility classes for icon sizing with theme colors */
+  .icon-sm { width: 1rem; height: 1rem; }
+  .icon-md { width: 1.5rem; height: 1.5rem; }
+  .icon-lg { width: 2rem; height: 2rem; }
+  .icon-xl { width: 2.5rem; height: 2.5rem; }
+
+  /* ========================================= */
+  /* SELECTIVE ICON COLOR OVERRIDES */
+  /* ========================================= */
+  
+  /* Only override icons that explicitly use theme classes */
+  .icon-theme-primary {
+    color: hsl(var(--icon-primary)) !important;
+  }
+  
+  .icon-theme-secondary {
+    color: hsl(var(--icon-secondary)) !important;
+  }
+  
+  /* Keep default white/inherit behavior for most icons */
+  .text-white {
+    color: white !important;
+  }
+  
+  /* Preserve existing icon colors by default */
+  svg {
+    color: inherit;
+  }
+
+  /* ========================================= */
+  /* THEME-ADAPTIVE GRADIENTS */
+  /* ========================================= */
+  
+  /* Primary gradient for collapsed form buttons */
+  .gradient-primary-collapsed {
+    background: linear-gradient(to right, 
+      hsl(var(--color-primary) / 0.6), 
+      hsl(var(--color-tertiary) / 0.6), 
+      hsl(var(--color-accent) / 0.6)
+    );
+    border: 1px solid hsl(var(--color-primary) / 0.8);
+  }
+  
+  .gradient-primary-collapsed:hover {
+    background: linear-gradient(to right, 
+      hsl(var(--color-primary) / 0.7), 
+      hsl(var(--color-tertiary) / 0.7), 
+      hsl(var(--color-accent) / 0.7)
+    );
+  }
+  
+  /* Subtle gradient for expanded form buttons */
+  .gradient-primary-expanded {
+    background: linear-gradient(to right, 
+      hsl(var(--color-secondary) / 0.2), 
+      hsl(var(--color-tertiary) / 0.2), 
+      hsl(var(--color-accent) / 0.2)
+    );
+    border: 1px solid hsl(var(--color-primary) / 0.4);
+  }
+  
+  .gradient-primary-expanded:hover {
+    background: linear-gradient(to right, 
+      hsl(var(--color-secondary) / 0.3), 
+      hsl(var(--color-tertiary) / 0.3), 
+      hsl(var(--color-accent) / 0.3)
+    );
+  }
+  
+  /* Theme-adaptive sparkle color */
+  .sparkle-accent {
+    color: hsl(var(--color-accent)) !important;
+  }
+
+  /* ========================================= */
+  /* DYNAMIC THEME-ADAPTIVE UTILITY CLASSES */
+  /* ========================================= */
+  
+  /* Background colors */
+  .bg-theme-primary { background-color: hsl(var(--color-primary)); }
+  .bg-theme-secondary { background-color: hsl(var(--color-secondary)); }
+  .bg-theme-accent { background-color: hsl(var(--color-accent)); }
+  .bg-theme-surface { background-color: hsl(var(--color-surface)); }
+  .bg-theme-tertiary { background-color: hsl(var(--color-tertiary)); }
+  .bg-theme-neutral { background-color: hsl(var(--color-neutral)); }
+  
+  /* Background colors with opacity */
+  .bg-theme-primary\/10 { background-color: hsl(var(--color-primary) / 0.1); }
+  .bg-theme-primary\/20 { background-color: hsl(var(--color-primary) / 0.2); }
+  .bg-theme-secondary\/10 { background-color: hsl(var(--color-secondary) / 0.1); }
+  .bg-theme-secondary\/20 { background-color: hsl(var(--color-secondary) / 0.2); }
+  .bg-theme-accent\/10 { background-color: hsl(var(--color-accent) / 0.1); }
+  .bg-theme-accent\/20 { background-color: hsl(var(--color-accent) / 0.2); }
+  .bg-theme-tertiary\/10 { background-color: hsl(var(--color-tertiary) / 0.1); }
+  .bg-theme-tertiary\/20 { background-color: hsl(var(--color-tertiary) / 0.2); }
+  
+  /* Text colors */
+  .text-theme-primary { color: hsl(var(--color-primary)); }
+  .text-theme-secondary { color: hsl(var(--color-secondary)); }
+  .text-theme-accent { color: hsl(var(--color-accent)); }
+  .text-theme-surface { color: hsl(var(--color-surface)); }
+  .text-theme-tertiary { color: hsl(var(--color-tertiary)); }
+  .text-theme-neutral { color: hsl(var(--color-neutral)); }
+  
+  /* Border colors */
+  .border-theme-primary { border-color: hsl(var(--color-primary)); }
+  .border-theme-secondary { border-color: hsl(var(--color-secondary)); }
+  .border-theme-accent { border-color: hsl(var(--color-accent)); }
+  .border-theme-tertiary { border-color: hsl(var(--color-tertiary)); }
+  
+  /* Gradient utilities */
+  .from-theme-primary { --tw-gradient-from: hsl(var(--color-primary)) var(--tw-gradient-from-position); }
+  .from-theme-secondary { --tw-gradient-from: hsl(var(--color-secondary)) var(--tw-gradient-from-position); }
+  .from-theme-accent { --tw-gradient-from: hsl(var(--color-accent)) var(--tw-gradient-from-position); }
+  .from-theme-surface { --tw-gradient-from: hsl(var(--color-surface)) var(--tw-gradient-from-position); }
+  .from-theme-tertiary { --tw-gradient-from: hsl(var(--color-tertiary)) var(--tw-gradient-from-position); }
+  
+  .to-theme-primary { --tw-gradient-to: hsl(var(--color-primary)) var(--tw-gradient-to-position); }
+  .to-theme-secondary { --tw-gradient-to: hsl(var(--color-secondary)) var(--tw-gradient-to-position); }
+  .to-theme-accent { --tw-gradient-to: hsl(var(--color-accent)) var(--tw-gradient-to-position); }
+  .to-theme-surface { --tw-gradient-to: hsl(var(--color-surface)) var(--tw-gradient-to-position); }
+  .to-theme-tertiary { --tw-gradient-to: hsl(var(--color-tertiary)) var(--tw-gradient-to-position); }
+
+  /* ========================================= */
+  /* THEME-ADAPTIVE TYPOGRAPHY UTILITIES */
+  /* ========================================= */
+  
+  /* Font family utilities */
+  .font-theme { font-family: var(--theme-font-family, 'Inter', sans-serif); }
+  
+  /* Font weight utilities - adapt to current theme */
+  .font-theme-light { font-weight: var(--theme-light-weight, 300); }
+  .font-theme-body { font-weight: var(--theme-body-weight, 400); }
+  .font-theme-medium { font-weight: var(--theme-medium-weight, 500); }
+  .font-theme-heading { font-weight: var(--theme-heading-weight, 600); }
+  .font-theme-bold { font-weight: var(--theme-bold-weight, 700); }
+  
+  /* Override existing font-light classes to be theme-adaptive */
+  .font-light {
+    font-weight: var(--theme-light-weight, 300) !important;
+  }
+  
+  .font-medium {
+    font-weight: var(--theme-medium-weight, 400) !important;
+  }
+  
+  .font-semibold {
+    font-weight: var(--theme-heading-weight, 350) !important;
   }
 
   /* Wes Anderson signature elements */
@@ -178,15 +693,15 @@
     border: 4px solid hsl(var(--primary) / 0.2);
     border-radius: inherit;
     border-image: linear-gradient(45deg, 
-      hsl(var(--wes-vintage-gold)), 
-      hsl(var(--wes-coral)), 
-      hsl(var(--wes-mint)), 
-      hsl(var(--wes-vintage-gold))
+      hsl(var(--lala-golden-yellow)), 
+      hsl(var(--lala-royal-purple)), 
+      hsl(var(--lala-light-blue)), 
+      hsl(var(--lala-golden-yellow))
     ) 1;
     box-shadow: 
       inset 0 0 0 2px hsl(var(--background)),
       inset 0 0 0 8px hsl(var(--accent) / 0.08),
-      inset 0 0 0 12px hsl(var(--wes-yellow) / 0.05),
+      inset 0 0 0 12px hsl(var(--lala-golden-yellow) / 0.05),
       0 2px 20px hsl(var(--primary) / 0.15);
   }
 
@@ -194,8 +709,8 @@
     content: '';
     @apply absolute inset-2 pointer-events-none;
     background: 
-      radial-gradient(circle at 10px 10px, hsl(var(--wes-vintage-gold) / 0.1) 1px, transparent 1px),
-      radial-gradient(circle at 25px 25px, hsl(var(--wes-coral) / 0.1) 1px, transparent 1px);
+      radial-gradient(circle at 10px 10px, hsl(var(--lala-golden-yellow) / 0.1) 1px, transparent 1px),
+      radial-gradient(circle at 25px 25px, hsl(var(--lala-royal-purple) / 0.1) 1px, transparent 1px);
     background-size: 20px 20px, 50px 50px;
     border-radius: inherit;
   }
@@ -210,25 +725,25 @@
       0 10px 25px -5px hsl(var(--primary) / 0.1),
       0 4px 6px -2px hsl(var(--primary) / 0.05),
       inset 0 1px 0 hsl(var(--accent) / 0.2),
-      inset 0 0 0 1px hsl(var(--wes-vintage-gold) / 0.1);
+      inset 0 0 0 1px hsl(var(--lala-golden-yellow) / 0.1);
   }
 
   .wes-card::before {
     content: '';
     @apply absolute inset-0 rounded-xl pointer-events-none;
     background: 
-      linear-gradient(135deg, transparent 25%, hsl(var(--wes-pink) / 0.03) 25%, hsl(var(--wes-pink) / 0.03) 50%, transparent 50%),
-      linear-gradient(45deg, transparent 25%, hsl(var(--wes-yellow) / 0.02) 25%, hsl(var(--wes-yellow) / 0.02) 50%);
+      linear-gradient(135deg, transparent 25%, hsl(var(--lala-medium-purple) / 0.03) 25%, hsl(var(--lala-medium-purple) / 0.03) 50%, transparent 50%),
+      linear-gradient(45deg, transparent 25%, hsl(var(--lala-golden-yellow) / 0.02) 25%, hsl(var(--lala-golden-yellow) / 0.02) 50%);
     background-size: 30px 30px, 40px 40px;
   }
 
   .wes-vintage-card {
     @apply wes-card;
     background: 
-      linear-gradient(135deg, hsl(var(--wes-cream)) 0%, hsl(var(--wes-pink) / 0.3) 100%),
-      radial-gradient(circle at top right, hsl(var(--wes-yellow) / 0.2), transparent 50%),
-      radial-gradient(circle at bottom left, hsl(var(--wes-mint) / 0.2), transparent 50%);
-    border: 3px solid hsl(var(--wes-vintage-gold) / 0.4);
+      linear-gradient(135deg, hsl(var(--lala-cream)) 0%, hsl(var(--lala-medium-purple) / 0.3) 100%),
+      radial-gradient(circle at top right, hsl(var(--lala-golden-yellow) / 0.2), transparent 50%),
+      radial-gradient(circle at bottom left, hsl(var(--lala-light-blue) / 0.2), transparent 50%);
+    border: 3px solid hsl(var(--lala-golden-yellow) / 0.4);
     position: relative;
   }
 
@@ -255,7 +770,7 @@
     box-shadow: 
       0 4px 14px 0 hsl(var(--primary) / 0.15),
       inset 0 1px 0 hsl(var(--primary-foreground) / 0.2),
-      inset 0 0 0 1px hsl(var(--wes-vintage-gold) / 0.3);
+      inset 0 0 0 1px hsl(var(--lala-golden-yellow) / 0.3);
   }
 
   .wes-button::before {
@@ -314,7 +829,7 @@
       linear-gradient(-45deg, hsl(var(--accent)) 25%, transparent 25%),
       linear-gradient(45deg, transparent 75%, hsl(var(--accent)) 75%),
       linear-gradient(-45deg, transparent 75%, hsl(var(--accent)) 75%),
-      radial-gradient(circle at 50% 50%, hsl(var(--wes-vintage-gold) / 0.1) 2px, transparent 2px);
+      radial-gradient(circle at 50% 50%, hsl(var(--lala-golden-yellow) / 0.1) 2px, transparent 2px);
     background-size: 20px 20px, 20px 20px, 20px 20px, 20px 20px, 30px 30px;
     background-position: 0 0, 0 10px, 10px -10px, -10px 0px, 15px 15px;
     opacity: 0.03;
@@ -322,18 +837,18 @@
 
   .wes-chevron-pattern {
     background-image: 
-      linear-gradient(45deg, transparent 40%, hsl(var(--wes-coral) / 0.1) 40%, hsl(var(--wes-coral) / 0.1) 60%, transparent 60%),
-      linear-gradient(-45deg, transparent 40%, hsl(var(--wes-mint) / 0.1) 40%, hsl(var(--wes-mint) / 0.1) 60%, transparent 60%);
+      linear-gradient(45deg, transparent 40%, hsl(var(--lala-royal-purple) / 0.1) 40%, hsl(var(--lala-royal-purple) / 0.1) 60%, transparent 60%),
+      linear-gradient(-45deg, transparent 40%, hsl(var(--lala-light-blue) / 0.1) 40%, hsl(var(--lala-light-blue) / 0.1) 60%, transparent 60%);
     background-size: 16px 16px;
     background-position: 0 0, 8px 8px;
   }
 
   .wes-diamond-pattern {
     background-image: 
-      linear-gradient(45deg, hsl(var(--wes-yellow) / 0.08) 25%, transparent 25%), 
-      linear-gradient(-45deg, hsl(var(--wes-yellow) / 0.08) 25%, transparent 25%), 
-      linear-gradient(45deg, transparent 75%, hsl(var(--wes-yellow) / 0.08) 75%), 
-      linear-gradient(-45deg, transparent 75%, hsl(var(--wes-yellow) / 0.08) 75%);
+      linear-gradient(45deg, hsl(var(--lala-golden-yellow) / 0.08) 25%, transparent 25%), 
+      linear-gradient(-45deg, hsl(var(--lala-golden-yellow) / 0.08) 25%, transparent 25%), 
+      linear-gradient(45deg, transparent 75%, hsl(var(--lala-golden-yellow) / 0.08) 75%), 
+      linear-gradient(-45deg, transparent 75%, hsl(var(--lala-golden-yellow) / 0.08) 75%);
     background-size: 24px 24px;
     background-position: 0 0, 0 12px, 12px -12px, -12px 0px;
   }
@@ -345,12 +860,12 @@
         45deg,
         transparent,
         transparent 8px,
-        hsl(var(--wes-vintage-gold) / 0.06) 8px,
-        hsl(var(--wes-vintage-gold) / 0.06) 16px,
+        hsl(var(--lala-golden-yellow) / 0.06) 8px,
+        hsl(var(--lala-golden-yellow) / 0.06) 16px,
         transparent 16px,
         transparent 24px,
-        hsl(var(--wes-coral) / 0.04) 24px,
-        hsl(var(--wes-coral) / 0.04) 32px
+        hsl(var(--lala-royal-purple) / 0.04) 24px,
+        hsl(var(--lala-royal-purple) / 0.04) 32px
       );
   }
 
@@ -438,11 +953,11 @@
   /* Vintage badge */
   .wes-badge {
     position: relative;
-    background: linear-gradient(45deg, hsl(var(--wes-vintage-gold)), hsl(var(--wes-mustard)));
+    background: linear-gradient(45deg, hsl(var(--lala-golden-yellow)), hsl(var(--lala-gold-dark)));
     border: 3px solid hsl(var(--primary));
     border-radius: 50%;
     box-shadow: 
-      0 0 0 4px hsl(var(--wes-vintage-gold) / 0.3),
+      0 0 0 4px hsl(var(--lala-golden-yellow) / 0.3),
       0 0 0 8px hsl(var(--background)),
       0 0 0 12px hsl(var(--primary) / 0.2),
       0 8px 16px hsl(var(--primary) / 0.3);
@@ -454,8 +969,8 @@
     inset: 6px;
     border-radius: 50%;
     background: 
-      radial-gradient(circle at 30% 30%, hsl(var(--wes-cream) / 0.5), transparent 50%),
-      conic-gradient(from 0deg, hsl(var(--wes-vintage-gold)), hsl(var(--wes-coral)), hsl(var(--wes-mint)), hsl(var(--wes-vintage-gold)));
+      radial-gradient(circle at 30% 30%, hsl(var(--lala-cream) / 0.5), transparent 50%),
+      conic-gradient(from 0deg, hsl(var(--lala-golden-yellow)), hsl(var(--lala-royal-purple)), hsl(var(--lala-light-blue)), hsl(var(--lala-golden-yellow)));
     opacity: 0.7;
   }
 
@@ -470,7 +985,7 @@
     position: absolute;
     width: 20px;
     height: 20px;
-    border: 3px solid hsl(var(--wes-vintage-gold));
+    border: 3px solid hsl(var(--lala-golden-yellow));
   }
 
   .wes-corners::before {
@@ -529,13 +1044,13 @@
     @apply wes-symmetry bg-white/80 backdrop-blur-md border-b-2 border-primary/10 relative;
     @apply shadow-sm;
     background: 
-      linear-gradient(90deg, hsl(var(--wes-cream)) 0%, hsl(var(--wes-pink) / 0.3) 50%, hsl(var(--wes-cream)) 100%),
+      linear-gradient(90deg, hsl(var(--lala-cream)) 0%, hsl(var(--lala-medium-purple) / 0.3) 50%, hsl(var(--lala-cream)) 100%),
       repeating-linear-gradient(
         90deg,
         transparent,
         transparent 100px,
-        hsl(var(--wes-vintage-gold) / 0.05) 100px,
-        hsl(var(--wes-vintage-gold) / 0.05) 102px
+        hsl(var(--lala-golden-yellow) / 0.05) 100px,
+        hsl(var(--lala-golden-yellow) / 0.05) 102px
       );
   }
 
@@ -547,16 +1062,16 @@
     right: 0;
     height: 3px;
     background: linear-gradient(90deg, 
-      hsl(var(--wes-vintage-gold)), 
-      hsl(var(--wes-coral)), 
-      hsl(var(--wes-mint)), 
-      hsl(var(--wes-yellow)), 
-      hsl(var(--wes-vintage-gold))
+      hsl(var(--lala-golden-yellow)), 
+      hsl(var(--lala-royal-purple)), 
+      hsl(var(--lala-light-blue)), 
+      hsl(var(--lala-golden-yellow)), 
+      hsl(var(--lala-golden-yellow))
     );
   }
 
   .wes-nav-item {
-    @apply relative px-6 py-3 font-medium text-sm tracking-wider uppercase;
+    @apply relative px-6 py-3 font-light text-sm tracking-wider uppercase;
     @apply transition-all duration-300 ease-out;
     @apply hover:text-primary hover:bg-accent/30;
     position: relative;
@@ -569,7 +1084,7 @@
     left: 50%;
     width: 0;
     height: 0;
-    background: radial-gradient(circle, hsl(var(--wes-vintage-gold) / 0.2), transparent);
+    background: radial-gradient(circle, hsl(var(--lala-golden-yellow) / 0.2), transparent);
     transform: translate(-50%, -50%);
     transition: all 0.4s ease;
     border-radius: 50%;
@@ -614,7 +1129,7 @@
     height: 200%;
     background: 
       radial-gradient(circle at center, 
-        hsl(var(--wes-vintage-gold) / 0.1) 0%, 
+        hsl(var(--lala-golden-yellow) / 0.1) 0%, 
         transparent 50%
       );
     transform: scale(0);
@@ -643,13 +1158,13 @@
     @apply transition-all duration-200 ease-out;
     box-shadow: 
       inset 0 1px 3px hsl(var(--primary) / 0.1),
-      0 0 0 1px hsl(var(--wes-vintage-gold) / 0.2);
+      0 0 0 1px hsl(var(--lala-golden-yellow) / 0.2);
   }
 
   .wes-input:focus {
     box-shadow: 
       inset 0 1px 3px hsl(var(--primary) / 0.1),
-      0 0 0 1px hsl(var(--wes-vintage-gold) / 0.4),
+      0 0 0 1px hsl(var(--lala-golden-yellow) / 0.4),
       0 0 10px hsl(var(--primary) / 0.2);
   }
 
@@ -677,8 +1192,8 @@
     left: 50%;
     transform: translateX(-50%);
     font-size: 20px;
-    color: hsl(var(--wes-vintage-gold));
-    text-shadow: 0 0 10px hsl(var(--wes-vintage-gold) / 0.5);
+    color: hsl(var(--lala-golden-yellow));
+    text-shadow: 0 0 10px hsl(var(--lala-golden-yellow) / 0.5);
   }
 
   .wes-divider {
@@ -697,9 +1212,9 @@
     background: linear-gradient(
       to right,
       transparent,
-      hsl(var(--wes-vintage-gold) / 0.3) 20%,
-      hsl(var(--wes-coral) / 0.3) 50%,
-      hsl(var(--wes-mint) / 0.3) 80%,
+      hsl(var(--lala-golden-yellow) / 0.3) 20%,
+      hsl(var(--lala-royal-purple) / 0.3) 50%,
+      hsl(var(--lala-light-blue) / 0.3) 80%,
       transparent
     );
   }
@@ -712,7 +1227,7 @@
     transform: translate(-50%, -50%);
     background: hsl(var(--background));
     padding: 0 1rem;
-    color: hsl(var(--wes-vintage-gold));
+    color: hsl(var(--lala-golden-yellow));
     font-size: 12px;
   }
 
@@ -746,7 +1261,7 @@
   .wes-stamp {
     position: relative;
     border: 3px dashed hsl(var(--primary) / 0.4);
-    background: hsl(var(--wes-cream));
+    background: hsl(var(--lala-cream));
     /* Keep stamps upright by default */
     transform: rotate(0deg);
   }
@@ -801,10 +1316,10 @@
   .sparkle-underline::before {
     background-image: linear-gradient(
       90deg,
-      hsl(var(--wes-coral)),
-      hsl(var(--wes-mustard)),
-      hsl(var(--wes-teal)),
-      hsl(var(--wes-coral)) /* Loop back */
+      hsl(var(--lala-royal-purple)),
+      hsl(var(--lala-gold-dark)),
+      hsl(var(--lala-blue-dark)),
+      hsl(var(--lala-royal-purple)) /* Loop back */
     );
     background-size: 200% 100%;
     opacity: 0; /* Hidden by default */
@@ -826,7 +1341,7 @@
    
   /* Multicolour border for tooltips on hover */
   .tooltip-content:hover {
-    border-image: linear-gradient(to right, hsl(var(--wes-pink)), hsl(var(--wes-coral)), hsl(var(--wes-vintage-gold))) 1;
+    border-image: linear-gradient(to right, hsl(var(--lala-medium-purple)), hsl(var(--lala-royal-purple)), hsl(var(--lala-golden-yellow))) 1;
     border-image-slice: 1;
     border-width: 2px;
   }
@@ -838,18 +1353,24 @@
   }
 }
 
-@keyframes filmGrain {
-  0% { opacity: 0.3; }
-  50% { opacity: 0.5; }
-  100% { opacity: 0.3; }
+@keyframes dreamyShimmer {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.8; }
 }
 
-@keyframes vintageScratches {
-  0% { transform: translateX(0) translateY(0); }
-  25% { transform: translateX(1px) translateY(-1px); }
-  50% { transform: translateX(-1px) translateY(1px); }
-  75% { transform: translateX(1px) translateY(1px); }
-  100% { transform: translateX(0) translateY(0); }
+@keyframes gentleSpotlight {
+  0% { 
+    transform: translateX(0) translateY(0) scale(1); 
+    opacity: 0.6;
+  }
+  50% { 
+    transform: translateX(10px) translateY(-5px) scale(1.1); 
+    opacity: 0.9;
+  }
+  100% { 
+    transform: translateX(0) translateY(0) scale(1); 
+    opacity: 0.6;
+  }
 }
 
 @keyframes typewriter {
@@ -867,17 +1388,19 @@
   to { transform: rotate(360deg); }
 }
 
-@keyframes vintageGlow {
+@keyframes dreamyGlow {
   0%, 100% { 
     text-shadow: 
-      0 0 5px hsl(var(--wes-vintage-gold) / 0.5),
-      0 0 10px hsl(var(--wes-vintage-gold) / 0.3);
+      0 0 8px hsl(var(--color-accent) / 0.6),
+      0 0 15px hsl(var(--color-accent) / 0.4),
+      0 0 25px hsl(var(--color-tertiary) / 0.2);
   }
   50% { 
     text-shadow: 
-      0 0 10px hsl(var(--wes-vintage-gold) / 0.8),
-      0 0 20px hsl(var(--wes-vintage-gold) / 0.5),
-      0 0 30px hsl(var(--wes-vintage-gold) / 0.3);
+      0 0 15px hsl(var(--color-accent) / 0.9),
+      0 0 25px hsl(var(--color-accent) / 0.6),
+      0 0 35px hsl(var(--color-tertiary) / 0.4),
+      0 0 45px hsl(var(--color-secondary) / 0.3);
   }
 }
 
@@ -1535,10 +2058,11 @@
   100% { stroke: rgba(253, 226, 228, 0.6); }
 }
 @keyframes soul-grow-animation {
-  0% { color: hsl(var(--wes-mint)); }
-  33% { color: hsl(var(--wes-lavender)); }
-  66% { color: hsl(var(--wes-coral)); }
-  100% { color: hsl(var(--wes-mint)); }
+  0% { color: hsl(var(--lala-light-blue)); }
+  25% { color: hsl(var(--lala-medium-purple)); }
+  50% { color: hsl(var(--lala-golden-yellow)); }
+  75% { color: hsl(var(--lala-royal-purple)); }
+  100% { color: hsl(var(--lala-light-blue)); }
 }
 .animated-soul-grow {
   animation: soul-grow-animation 8s ease-in-out infinite;
@@ -1608,6 +2132,23 @@
 .palette-wrapper:hover::before {
   opacity: 1;
 }
+
+/* ========================================= */
+/* WES ANDERSON THEME ANIMATIONS */
+/* ========================================= */
+
+@keyframes filmGrain {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.6; }
+}
+
+@keyframes vintageScratches {
+  0% { transform: translate(0, 0); }
+  25% { transform: translate(-1px, 1px); }
+  50% { transform: translate(1px, -1px); }
+  75% { transform: translate(-1px, -1px); }
+  100% { transform: translate(0, 0); }
+}
 .palette-wrapper > * {
   position: relative;
   z-index: 1;
@@ -1624,7 +2165,7 @@
   stroke: currentColor;
 }
 .dehovering {
-  border-color: hsl(var(--wes-vintage-gold) / 0.2) !important;
+  border-color: hsl(var(--lala-golden-yellow) / 0.2) !important;
   animation: none !important;
   transition: border-color 10s ease;
 }

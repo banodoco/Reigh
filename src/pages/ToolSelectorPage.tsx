@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { toolsUIManifest, type ToolUIDefinition } from '../tools';
 import { PageFadeIn, FadeInSection } from '@/shared/components/transitions';
 import { useContentResponsive, useContentResponsiveDirection, useContentResponsiveColumns } from '@/shared/hooks/useContentResponsive';
-import React from 'react';
+import React, { memo } from 'react';
 import { time, timeEnd } from '@/shared/lib/logger';
 
 // Define process tools (main workflow)
@@ -94,7 +94,7 @@ const assistantTools = [
   },
 ];
 
-const ToolCard = ({ item, isSquare = false, index, isVisible }: { item: any, isSquare?: boolean, index?: number, isVisible: boolean }) => {
+const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any, isSquare?: boolean, index?: number, isVisible: boolean }) => {
   const [isWiggling, setIsWiggling] = useState(false);
   const navigate = useNavigate();
   
@@ -113,11 +113,11 @@ const ToolCard = ({ item, isSquare = false, index, isVisible }: { item: any, isS
 
   if (!shouldShow) return null;
 
-  // Dynamic sizing based on content area
+  // Dynamic sizing based on content area - increased text sizes
   const iconSize = isLg ? 'w-10 h-10' : isSm ? 'w-8 h-8' : 'w-6 h-6';
   const iconContainerSize = isLg ? 'w-20 h-20' : isSm ? 'w-16 h-16' : 'w-12 h-12';
-  const titleSize = isLg ? 'text-2xl' : isSm ? 'text-xl' : 'text-lg';
-  const descriptionSize = isSm ? 'text-sm' : 'text-xs';
+  const titleSize = isLg ? 'text-3xl' : isSm ? 'text-2xl' : 'text-xl';
+  const descriptionSize = isSm ? 'text-base' : 'text-sm';
 
   const content = (
     <div className={`wes-tool-card relative overflow-hidden ${isSquare ? 'min-h-48' : 'h-32 sm:h-32'} ${isComingSoon ? 'opacity-40' : ''} h-full`}>
@@ -136,7 +136,7 @@ const ToolCard = ({ item, isSquare = false, index, isVisible }: { item: any, isS
           {/* Large subtle number in background - responsive visibility */}
           {index !== undefined && isLg && (
             <div className="absolute right-4 lg:right-6 top-1/2 -translate-y-1/2 -translate-y-5">
-              <span className="font-playfair text-[8rem] lg:text-[10.5rem] font-bold text-wes-vintage-gold/50 select-none block w-20 lg:w-24 text-center">
+              <span className="font-theme text-[8rem] lg:text-[10.5rem] font-theme-light text-wes-vintage-gold/30 select-none block w-20 lg:w-24 text-center">
                 {index + 1}
               </span>
             </div>
@@ -151,10 +151,10 @@ const ToolCard = ({ item, isSquare = false, index, isVisible }: { item: any, isS
           
           {/* Text content */}
           <div className="flex-1 relative z-10 min-w-0">
-            <h3 className={`font-playfair ${titleSize} font-bold text-primary mb-1 ${!isComingSoon ? 'group-hover:text-primary/80' : ''} transition-colors duration-300 leading-tight`}>
+            <h3 className={`font-theme ${titleSize} font-theme-heading text-primary mb-1 ${!isComingSoon ? 'group-hover:text-primary/80' : ''} transition-colors duration-300 leading-tight`}>
               {item.name}
             </h3>
-            <p className={`font-inter ${descriptionSize} text-muted-foreground leading-relaxed pr-2`}>
+            <p className={`font-theme ${descriptionSize} font-theme-body text-muted-foreground leading-relaxed pr-2`}>
               {item.description}
             </p>
           </div>
@@ -165,7 +165,7 @@ const ToolCard = ({ item, isSquare = false, index, isVisible }: { item: any, isS
           {/* Tool Header without icon */}
           <div className={`wes-symmetry ${isSm ? 'mb-3' : 'mb-2'} relative`}>
             <div className="">
-              <h3 className={`font-playfair ${titleSize} font-bold text-primary mb-2 ${!isComingSoon ? 'group-hover:text-primary/80' : ''} transition-colors duration-300 text-shadow-vintage text-center leading-tight whitespace-pre-line`}>
+              <h3 className={`font-theme ${titleSize} font-theme-heading text-primary mb-2 ${!isComingSoon ? 'group-hover:text-primary/80' : ''} transition-colors duration-300 text-shadow-vintage text-center leading-tight whitespace-pre-line`}>
                 {item.name}
               </h3>
               <div className={`${isSm ? 'w-16' : 'w-12'} h-1 bg-gradient-to-r from-${item.accent} to-wes-vintage-gold rounded-full mx-auto ${!isComingSoon ? `${isSm ? 'group-hover:w-24' : 'group-hover:w-16'}` : ''} transition-all duration-700`}></div>
@@ -175,7 +175,7 @@ const ToolCard = ({ item, isSquare = false, index, isVisible }: { item: any, isS
           {/* Description - hidden on mobile to save space */}
           {isSm && (
             <div className="flex-1">
-              <p className={`font-inter text-muted-foreground leading-relaxed text-center ${descriptionSize}`}>
+              <p className={`font-theme font-theme-body text-muted-foreground leading-relaxed text-center ${descriptionSize}`}>
                 {item.description}
               </p>
             </div>
@@ -237,7 +237,9 @@ const ToolCard = ({ item, isSquare = false, index, isVisible }: { item: any, isS
       </div>
     </div>
   );
-};
+});
+
+ToolCard.displayName = 'ToolCard';
 
 const ToolSelectorPage: React.FC = () => {
   const currentEnv = (import.meta.env.VITE_APP_ENV?.toLowerCase() || AppEnv.WEB) as AppEnvValue;
@@ -293,7 +295,7 @@ const ToolSelectorPage: React.FC = () => {
             <div className="w-full c-lg:w-2/3">
               <div className={`flex flex-col ${itemGap} ${topMargin}`}>
                 {processTools.map((tool, index) => (
-                  <FadeInSection key={tool.id} delayMs={index * 50}>
+                  <FadeInSection key={tool.id}>
                     <ToolCard
                       item={tool}
                       index={index}
@@ -308,7 +310,7 @@ const ToolSelectorPage: React.FC = () => {
             <div className="w-full c-lg:w-1/3">
               <div className={`grid ${itemGap} ${topMargin} grid-cols-2`}>
                 {assistantTools.map((tool, index) => (
-                  <FadeInSection key={tool.id} delayMs={index * 50}>
+                  <FadeInSection key={tool.id}>
                     <ToolCard
                       item={tool}
                       isSquare

@@ -34,7 +34,7 @@ const DescriptionModal: React.FC<{
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle className="text-lg font-semibold">{title}</DialogTitle>
+          <DialogTitle className="text-lg font-light">{title}</DialogTitle>
           <DialogDescription>Full description</DialogDescription>
         </DialogHeader>
         <ScrollArea className="flex-1 pr-4 overflow-y-auto">
@@ -326,12 +326,12 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & { onClose: () => void
                                       {lora.Name !== "N/A" ? lora.Name : lora["Model ID"]}
                                   </CardTitle>
                                   {isSelectedOnGenerator && (
-                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-600 text-white">
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-light bg-green-600 text-white">
                                       Added
                                     </span>
                                   )}
                                   {isMyLora && (
-                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-light bg-blue-100 text-blue-800">
                                       {isLocalLora ? 'Local' : 'Mine'}
                                     </span>
                                   )}
@@ -383,7 +383,7 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & { onClose: () => void
                           <div className="w-full lg:w-48 lg:ml-auto space-y-1 mt-2" onClick={(e) => e.stopPropagation()}>
                             <div className="flex justify-between items-center">
                               <Label htmlFor={`lora-strength-${lora['Model ID']}`} className="text-xs">Strength</Label>
-                              <span className="text-xs font-medium">{strength?.toFixed(2)}</span>
+                              <span className="text-xs font-light">{strength?.toFixed(2)}</span>
                             </div>
                             <Slider
                               id={`lora-strength-${lora['Model ID']}`}
@@ -521,7 +521,7 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & { onClose: () => void
                         onCheckedChange={(checked) => setShowAddedLorasOnly(!!checked)}
                         className="data-[state=checked]:bg-wes-mint data-[state=checked]:border-wes-mint-dark border-primary/40 pointer-events-none"
                       />
-                      <Label htmlFor="show-added-loras-only-sticky" className="text-sm font-medium cursor-pointer select-none font-inter tracking-wide pointer-events-none">
+                      <Label htmlFor="show-added-loras-only-sticky" className="text-sm font-light cursor-pointer select-none font-cocogoose tracking-wide pointer-events-none">
                         <span className="hidden sm:inline">Show added LoRAs</span>
                         <span className="sm:hidden">Added</span>
                       </Label>
@@ -542,7 +542,7 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & { onClose: () => void
                         onCheckedChange={(checked) => setShowMyLorasOnly(!!checked)}
                         className="data-[state=checked]:bg-wes-dusty-blue data-[state=checked]:border-primary border-primary/40 pointer-events-none"
                       />
-                      <Label htmlFor="show-my-loras-only-sticky" className="text-sm font-medium cursor-pointer select-none font-inter tracking-wide pointer-events-none">
+                      <Label htmlFor="show-my-loras-only-sticky" className="text-sm font-light cursor-pointer select-none font-cocogoose tracking-wide pointer-events-none">
                         <span className="hidden sm:inline">Show my LoRAs</span>
                         <span className="sm:hidden">My LoRAs</span>
                       </Label>
@@ -555,7 +555,7 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & { onClose: () => void
                     {myLorasCount > 0 && (
                       <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gradient-to-r from-wes-dusty-blue/20 to-wes-lavender/20 border border-wes-dusty-blue/30">
                         <div className="w-1.5 h-1.5 rounded-full bg-wes-dusty-blue animate-pulse" />
-                        <span className="text-xs font-medium text-primary font-inter">
+                        <span className="text-xs font-light text-primary font-cocogoose">
                           {myLorasCount} saved
                         </span>
                       </div>
@@ -563,7 +563,7 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & { onClose: () => void
                     {selectedLoraIds.length > 0 && (
                       <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gradient-to-r from-wes-mint/20 to-wes-sage/20 border border-wes-mint/30">
                         <div className="w-1.5 h-1.5 rounded-full bg-wes-mint animate-pulse" />
-                        <span className="text-xs font-medium text-wes-forest font-inter">
+                        <span className="text-xs font-light text-wes-forest font-cocogoose">
                           {selectedLoraIds.length} active
                         </span>
                       </div>
@@ -574,7 +574,7 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & { onClose: () => void
                       variant="wes-outline" 
                       size="sm"
                       onClick={onClose}
-                      className="flex items-center gap-1.5 font-inter tracking-wide"
+                      className="flex items-center gap-1.5 font-cocogoose tracking-wide"
                     >
                       <X className="h-4 w-4" />
                       <span className="hidden sm:inline">Close</span>
@@ -586,7 +586,7 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & { onClose: () => void
                 <div className="text-center">
                   <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-wes-cream/80 to-wes-pink/20 border border-wes-vintage-gold/30 shadow-inner-vintage">
                     <div className="w-1.5 h-1.5 rounded-full bg-wes-vintage-gold animate-pulse" />
-                    <span className="text-sm font-medium text-primary font-inter tracking-wide">
+                    <span className="text-sm font-light text-primary font-cocogoose tracking-wide">
                       {showMyLorasOnly && showAddedLorasOnly ? (
                         <span className="text-wes-burgundy">Showing {processedLoras.length} of your added LoRAs</span>
                       ) : showMyLorasOnly ? (
@@ -1004,7 +1004,7 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
                         {/* Display uploaded files */}
                         {sampleFiles.length > 0 && (
                             <div className="space-y-2 mt-3">
-                                <Label className="text-sm font-medium">Uploaded Files ({sampleFiles.length})</Label>
+                                <Label className="text-sm font-light">Uploaded Files ({sampleFiles.length})</Label>
                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                                     {sampleFiles.map((file, index) => (
                                         <div key={index} className="relative group">

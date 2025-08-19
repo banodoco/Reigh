@@ -537,7 +537,15 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                           ) : 'Shot...'}
                       </SelectValue>
                   </SelectTrigger>
-                  <SelectContent className="z-[9999]" style={{ zIndex: 10000 }}>
+                  <SelectContent 
+                      className="z-[9999] w-[var(--radix-select-trigger-width)] bg-zinc-900 border-zinc-700 text-white max-h-60 overflow-y-auto" 
+                      style={{ zIndex: 10000 }}
+                      position="popper"
+                      side="top"
+                      sideOffset={4}
+                      align="start"
+                      collisionPadding={8}
+                  >
                       {onCreateShot && (
                         <div className="p-1">
                           <Button

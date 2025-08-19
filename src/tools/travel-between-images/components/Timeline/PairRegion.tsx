@@ -57,7 +57,7 @@ const PairRegion: React.FC<PairRegionProps> = ({
             transition: isDragging ? 'none' : 'left 0.2s ease-out, width 0.2s ease-out',
           }}
         >
-          <div className={`absolute bottom-2 left-1/2 transform -translate-x-1/2 text-xs font-medium ${colorScheme.text} bg-white/80 px-2 py-0.5 rounded`}>
+          <div className={`absolute bottom-2 left-1/2 transform -translate-x-1/2 text-xs font-light ${colorScheme.text} bg-white/80 px-2 py-0.5 rounded`}>
             Context ({visibleContextFrames}f)
           </div>
         </div>
@@ -65,7 +65,7 @@ const PairRegion: React.FC<PairRegionProps> = ({
 
       {/* Pair label */}
       <div
-        className={`absolute top-1/2 text-sm font-semibold ${colorScheme.text} bg-white/90 px-3 py-1 rounded-full border ${colorScheme.border} pointer-events-none z-10 shadow-sm`}
+        className={`absolute top-1/2 text-sm font-light ${colorScheme.text} bg-white/90 px-3 py-1 rounded-full border ${colorScheme.border} pointer-events-none z-10 shadow-sm`}
         style={{
           left: `${(startPercent + endPercent) / 2}%`,
           transform: 'translate(-50%, -50%)',

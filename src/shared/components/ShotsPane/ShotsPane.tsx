@@ -230,7 +230,7 @@ export const ShotsPane: React.FC = () => {
           )}
         >
           <div className="p-2 border-b border-zinc-800 flex items-center justify-between flex-shrink-0">
-            <h2 className="text-xl font-semibold text-zinc-200 ml-2">Shots</h2>
+            <h2 className="text-xl font-light text-zinc-200 ml-2">Shots</h2>
             <Button 
               variant="ghost" 
               size="sm" 

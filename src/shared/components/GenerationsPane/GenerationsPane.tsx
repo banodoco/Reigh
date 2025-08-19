@@ -236,6 +236,7 @@ export const GenerationsPane: React.FC = () => {
       )}
       <div
         {...paneProps}
+        data-testid="generations-pane"
         style={{
           height: `${generationsPaneHeight}px`,
           left: isShotsPaneLocked ? `${shotsPaneWidth}px` : 0,
@@ -248,7 +249,7 @@ export const GenerationsPane: React.FC = () => {
       >
         <div className="p-2 border-b border-zinc-800">
             <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold text-zinc-200 ml-2">Generations</h2>
+                <h2 className="text-xl font-light text-zinc-200 ml-2">Generations</h2>
                 <div className="flex items-center space-x-4 mr-2">
                     {/* Star Filter */}
                     <div 

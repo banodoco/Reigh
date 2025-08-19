@@ -88,7 +88,7 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({
   return (
     <div className={`flex flex-col h-full ${className}`}>
       <div className="flex-shrink-0 p-4 border-b">
-        <h3 className="text-lg font-semibold">Generation Task Details</h3>
+        <h3 className="text-lg font-light">Generation Task Details</h3>
       </div>
       
       <ScrollArea className="flex-1 p-4">
@@ -112,7 +112,7 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
-                <h3 className="text-lg font-semibold text-foreground">Detailed Task Parameters</h3>
+                <h3 className="text-lg font-light text-foreground">Detailed Task Parameters</h3>
               </div>
               <Button
                 variant="ghost"
@@ -192,7 +192,7 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({
                 checked={replaceImages}
                 onCheckedChange={(checked) => onReplaceImagesChange(checked as boolean)}
               />
-              <Label htmlFor="replaceImages" className="text-sm font-medium">
+              <Label htmlFor="replaceImages" className="text-sm font-light">
                 Replace these images
               </Label>
             </div>

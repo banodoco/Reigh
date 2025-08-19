@@ -277,7 +277,7 @@ export default function HomePage() {
            }`}
         >
           <HandHeart className="w-6 h-6 sm:w-4 sm:h-4 animate-gifting-motion" />
-          <span className="font-inter text-sm font-medium hidden sm:inline">Open Creative Partner Programme</span>
+          <span className="font-cocogoose text-sm font-light hidden sm:inline">Open Creative Partner Programme</span>
         </button>
       </div> */}
         
@@ -304,7 +304,7 @@ export default function HomePage() {
            }`}
         >
           <Brain className="w-6 h-6 sm:w-4 sm:h-4 text-wes-vintage-gold animate-brain-pulse" />
-          <span className="font-inter text-sm font-medium text-primary group-hover:text-primary/80 hidden sm:inline">Philosophy</span>
+          <span className="font-cocogoose text-sm font-light text-primary group-hover:text-primary/80 hidden sm:inline">Philosophy</span>
         </button>
       </div> */}
 
@@ -321,7 +321,7 @@ export default function HomePage() {
             
             {/* Main title */}
             <FadeInSection delayMs={50}>
-              <h1 className="font-playfair text-6xl md:text-8xl font-bold text-primary mb-8 text-shadow-vintage">
+              <h1 className="font-theme text-6xl md:text-8xl font-theme-heading text-primary mb-8 text-shadow-vintage">
                 Reigh
               </h1>
             </FadeInSection>
@@ -333,7 +333,7 @@ export default function HomePage() {
             
             {/* Subtitle */}
             <FadeInSection delayMs={200}>
-              <p className="font-inter text-xl md:text-2xl text-muted-foreground leading-relaxed tracking-wide mb-8">
+              <p className="font-theme text-xl md:text-2xl font-theme-body text-muted-foreground leading-relaxed tracking-wide mb-8">
                 An{' '}
                 <TooltipProvider>
                   <Tooltip open={openTipOpen} onOpenChange={(o)=>{ if(!openTipDisabled) setOpenTipOpen(o); }}>
@@ -438,9 +438,9 @@ export default function HomePage() {
                 >
                   <div className="flex items-center gap-1 text-primary">
                     <div className="w-16 h-16 sm:w-20 sm:h-20 bg-muted/20 border rounded" />
-                    <span className="text-xs sm:text-sm font-medium">+</span>
+                    <span className="text-xs sm:text-sm font-light">+</span>
                     <div className="w-16 h-16 sm:w-20 sm:h-20 bg-muted/20 border rounded" />
-                    <span className="text-xs sm:text-sm font-medium">=</span>
+                    <span className="text-xs sm:text-sm font-light">=</span>
                     <div className="w-16 h-16 sm:w-20 sm:h-20 bg-muted/20 border rounded" />
                   </div>
                   <div className="flex-shrink-0">
@@ -458,7 +458,7 @@ export default function HomePage() {
                 <div className="group">
                   <button
                     onClick={handleDiscordSignIn}
-                    className="flex items-center space-x-2 px-6 py-4 bg-gradient-to-r from-wes-vintage-gold to-wes-coral rounded-full border-2 border-wes-vintage-gold/40 hover:border-wes-vintage-gold/60 transition-all duration-300 shadow-wes-vintage hover:shadow-wes-hover text-white text-lg font-medium mx-auto relative overflow-hidden"
+                    className="flex items-center space-x-2 px-6 py-4 bg-gradient-to-r from-wes-vintage-gold to-wes-coral rounded-full border-2 border-wes-vintage-gold/40 hover:border-wes-vintage-gold/60 transition-all duration-300 shadow-wes-vintage hover:shadow-wes-hover text-white text-lg font-light mx-auto relative overflow-hidden"
                   >
                     {/* Pulsing effect on hover */}
                     <div className="absolute -bottom-1/2 -left-1/2 w-1/2 h-[200%] group-hover:animate-pulse-sweep bg-gradient-to-r from-transparent via-wes-vintage-gold/40 to-transparent pointer-events-none -rotate-45" />
@@ -485,7 +485,7 @@ export default function HomePage() {
                 <div className="group">
                   <button
                     onPointerUp={() => navigate('/tools')}
-                    className="flex items-center space-x-2 px-6 py-4 bg-gradient-to-r from-wes-vintage-gold to-wes-coral rounded-full border-2 border-wes-vintage-gold/40 hover:border-wes-vintage-gold/60 transition-all duration-300 shadow-wes-vintage hover:shadow-wes-hover text-white text-lg font-medium mx-auto relative overflow-hidden"
+                    className="flex items-center space-x-2 px-6 py-4 bg-gradient-to-r from-wes-vintage-gold to-wes-coral rounded-full border-2 border-wes-vintage-gold/40 hover:border-wes-vintage-gold/60 transition-all duration-300 shadow-wes-vintage hover:shadow-wes-hover text-white text-lg font-light mx-auto relative overflow-hidden"
                   >
                     {/* Pulsing effect on hover */}
                     <div className="absolute -bottom-1/2 -left-1/2 w-1/2 h-[200%] group-hover:animate-pulse-sweep bg-gradient-to-r from-transparent via-wes-vintage-gold/40 to-transparent pointer-events-none -rotate-45" />
@@ -527,7 +527,7 @@ export default function HomePage() {
                 //     setTimeout(() => setIsExamplesButtonAnimating(false), 350);
                 //     setTimeout(() => setIsExamplesPaneOpening(false), 300);
                 //   }}
-                //   className={`group text-sm font-medium text-muted-foreground hover:text-primary underline underline-offset-2 transition-colors duration-200 ${
+                //   className={`group text-sm font-light text-muted-foreground hover:text-primary underline underline-offset-2 transition-colors duration-200 ${
                 //     isExamplesButtonAnimating ? 'animate-pulse' : ''
                 //   } ${
                 //     showExamples || isExamplesButtonAnimating
@@ -643,7 +643,7 @@ export default function HomePage() {
             </button>
             
             <div className="mb-6 pr-12 sm:pr-0">
-              <h2 className="font-playfair text-2xl sm:text-3xl font-bold text-primary mb-4">Anyone can run Reigh for free</h2>
+              <h2 className="font-theme text-2xl sm:text-3xl font-theme-heading text-primary mb-4">Anyone can run Reigh for free</h2>
               <div className="w-16 h-1 bg-gradient-to-r from-wes-coral to-wes-pink rounded-full mb-6 animate-pulse-breathe"></div>
             </div>
             
@@ -671,7 +671,7 @@ export default function HomePage() {
               </p>
               
               <div className="space-y-4">
-                <h3 className="font-semibold text-primary text-lg">But...why make it free?</h3>
+                <h3 className="font-theme-light text-primary text-lg">But...why make it free?</h3>
                 
                 <p className="text-sm leading-relaxed">
                   Today, venture-backed startups invest tens of millions in 'Creative Partner Programs'.
@@ -688,7 +688,7 @@ export default function HomePage() {
               </div>
               
               <div className="space-y-4">
-                <h3 className="font-semibold text-primary text-lg">A better way for <u>all</u> artists</h3>
+                <h3 className="font-theme-light text-primary text-lg">A better way for <u>all</u> artists</h3>
                 
                 <p className="text-sm leading-relaxed">
                   While this status quo is good for artists who are given free credits, we believe that there's a better way.
@@ -711,7 +711,7 @@ export default function HomePage() {
                 </p>
                 
                 <blockquote className="bg-wes-coral/10 border-l-4 border-wes-coral p-3 rounded-r-lg">
-                  <p className="text-sm italic text-primary font-medium">
+                  <p className="text-sm italic text-primary font-theme-light">
                     "...when artists get together they talk about where you can buy cheap turpentine."
                   </p>
                 </blockquote>
@@ -769,7 +769,7 @@ export default function HomePage() {
 
             {/* Examples content moved from the Bottom Pane */}
             <div className="mb-8 space-y-3">
-              <h2 className="font-playfair text-2xl sm:text-3xl font-bold text-primary">Reigh is a tool for travelling between images</h2>
+              <h2 className="font-theme text-2xl sm:text-3xl font-theme-heading text-primary">Reigh is a tool for travelling between images</h2>
               <div className="w-16 h-1 bg-gradient-to-r from-wes-vintage-gold to-wes-coral rounded-full animate-pulse-breathe"></div>
             </div>
 
@@ -829,7 +829,7 @@ export default function HomePage() {
                   {motionExamples.map(example => (
                     <div key={example.id} className="relative">
                       {/* Label attached across the bottom */}
-                      <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-muted/60 backdrop-blur-sm px-4 py-0.5 text-xs font-medium text-muted-foreground rounded-full border border-muted whitespace-nowrap text-center">
+                      <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-muted/60 backdrop-blur-sm px-4 py-0.5 text-xs font-light text-muted-foreground rounded-full border border-muted whitespace-nowrap text-center">
                         {example.label}
                       </div>
                       {/* Thumbnail */}
@@ -902,7 +902,7 @@ export default function HomePage() {
             </button>
 
             <div className="mb-8 text-center space-y-3">
-              <h2 className="font-playfair text-2xl sm:text-3xl font-bold text-primary">Reigh is a tool for travelling between images</h2>
+              <h2 className="font-theme text-2xl sm:text-3xl font-theme-heading text-primary">Reigh is a tool for travelling between images</h2>
               <div className="w-16 h-1 bg-gradient-to-r from-wes-vintage-gold to-wes-coral rounded-full mx-auto animate-pulse-breathe"></div>
             </div>
 
@@ -926,7 +926,7 @@ export default function HomePage() {
 
               {/* Section 2 */}
               <div className="space-y-4">
-                <h3 className="font-semibold text-primary text-lg text-center">You can travel between batches of images of any size – with seamless transitions</h3>
+                <h3 className="font-theme-light text-primary text-lg text-center">You can travel between batches of images of any size – with seamless transitions</h3>
                 <div className="flex flex-wrap justify-center items-center gap-3">
                   {/* Four square inputs */}
                   {multiSquareIndices.map(i => (
@@ -944,12 +944,12 @@ export default function HomePage() {
 
               {/* Section 3 */}
               <div className="space-y-4">
-                <h3 className="font-semibold text-primary text-lg text-center">You can use LoRAs to achieve all kinds of weird and interesting motion</h3>
+                <h3 className="font-theme-light text-primary text-lg text-center">You can use LoRAs to achieve all kinds of weird and interesting motion</h3>
                 <div className="flex flex-wrap justify-center items-center gap-4">
             {motionExamples.map(example => (
               <div key={example.id} className="relative w-40 sm:w-56">
                 {/* Label attached across the bottom */}
-                <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-muted/60 backdrop-blur-sm px-4 py-0.5 text-xs font-medium text-muted-foreground rounded-full border border-muted whitespace-nowrap text-center">
+                <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-muted/60 backdrop-blur-sm px-4 py-0.5 text-xs font-theme-light text-muted-foreground rounded-full border border-muted whitespace-nowrap text-center">
                   {example.label}
                 </div>
                 {/* Thumbnail */}
@@ -963,7 +963,7 @@ export default function HomePage() {
 
         {/* Closing line + Join Us Button */}
         <div className="text-center space-y-8 mb-6">
-          <p className="text-base md:text-lg font-medium text-primary m-0 max-w-2xl mx-auto">We believe that there's endless potential in this approach waiting to be unlocked&nbsp;&mdash; and that a tool and community focusing exclusively on it can unleash its promise.</p>
+          <p className="text-base md:text-lg font-theme-light text-primary m-0 max-w-2xl mx-auto">We believe that there's endless potential in this approach waiting to be unlocked&nbsp;&mdash; and that a tool and community focusing exclusively on it can unleash its promise.</p>
           
           {/* Divider */}
           <div className="w-12 h-px bg-muted/30 mx-auto"></div>

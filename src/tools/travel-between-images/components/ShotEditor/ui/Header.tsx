@@ -56,7 +56,7 @@ export const Header: React.FC<HeaderProps> = ({
                 onChange={(e) => onEditingNameChange(e.target.value)}
                 onKeyDown={onNameKeyDown}
                 onBlur={onNameSave}
-                className="text-2xl font-bold text-primary h-auto py-1 px-2 min-w-[200px]"
+                className="text-2xl font-normal text-primary h-auto py-1 px-2 min-w-[200px]"
                 autoFocus
                 maxLength={30}
               />
@@ -87,7 +87,7 @@ export const Header: React.FC<HeaderProps> = ({
               </Button>
               
               <span 
-                className={`text-2xl font-bold text-primary truncate px-3 ${onUpdateShotName ? 'cursor-pointer hover:underline' : ''}`}
+                className={`text-2xl font-normal text-primary truncate px-3 ${onUpdateShotName ? 'cursor-pointer hover:underline' : ''}`}
                 onClick={onNameClick}
                 title={onUpdateShotName ? "Click to edit shot name" : undefined}
               >
@@ -120,7 +120,7 @@ export const Header: React.FC<HeaderProps> = ({
                 onChange={(e) => onEditingNameChange(e.target.value)}
                 onKeyDown={onNameKeyDown}
                 onBlur={onNameSave}
-                className="text-xl font-bold text-primary h-auto py-1 px-2 flex-1"
+                className="text-xl font-normal text-primary h-auto py-1 px-2 flex-1"
                 autoFocus
                 maxLength={30}
               />
@@ -151,7 +151,7 @@ export const Header: React.FC<HeaderProps> = ({
               </Button>
               
               <span 
-                className={`text-xl font-bold text-primary truncate flex-1 text-center px-2 ${onUpdateShotName ? 'cursor-pointer hover:underline' : ''}`}
+                className={`text-xl font-normal text-primary truncate flex-1 text-center px-2 ${onUpdateShotName ? 'cursor-pointer hover:underline' : ''}`}
                 onClick={onNameClick}
                 title={onUpdateShotName ? "Click to edit shot name" : undefined}
               >

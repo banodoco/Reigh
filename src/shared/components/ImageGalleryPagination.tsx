@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/shared/components/ui/button';
 import { 
   Select,
@@ -8,6 +8,8 @@ import {
   SelectValue,
 } from "@/shared/components/ui/select";
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { usePanes } from '@/shared/contexts/PanesContext';
+import { useIsMobile } from '@/shared/hooks/use-mobile';
 
 interface ImageGalleryPaginationProps {
   totalPages: number;
@@ -47,31 +49,72 @@ export const ImageGalleryPagination: React.FC<ImageGalleryPaginationProps> = ({
   rightContent,
   isBottom = false,
 }) => {
+  const [showStickyPagination, setShowStickyPagination] = useState(false);
+  const topPaginationRef = useRef<HTMLDivElement>(null);
+  const isMobile = useIsMobile();
+  
+  // Get pane states to adjust sticky pagination position
+  const { 
+    isShotsPaneLocked, 
+    isTasksPaneLocked,
+    shotsPaneWidth,
+    tasksPaneWidth
+  } = usePanes();
+
   // Don't render if conditions not met
   if (totalPages <= 1 || reducedSpacing || hidePagination) {
     return null;
   }
 
-  const handlePrevPage = (e: React.MouseEvent) => {
+  // Scroll detection for sticky pagination
+  useEffect(() => {
+    if (!isBottom) return;
+
+    const handleScroll = () => {
+      // Find the top pagination element
+      const topPagination = document.querySelector('[data-pagination-top]');
+      if (topPagination) {
+        const rect = topPagination.getBoundingClientRect();
+        // Show sticky pagination when top pagination is partially hidden (more responsive)
+        // Using a threshold so it appears before completely scrolling past
+        const threshold = 100; // Show when top pagination is 100px above viewport
+        setShowStickyPagination(rect.bottom < threshold);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    // Use a small timeout to ensure DOM is ready
+    const timeout = setTimeout(handleScroll, 100);
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      clearTimeout(timeout);
+    };
+  }, [isBottom]);
+
+  const handlePrevPage = (e: React.MouseEvent, preventScroll = false) => {
     e.preventDefault(); // Prevent any default scroll behavior
     const newPage = isServerPagination 
       ? Math.max(1, serverPage! - 1)
       : Math.max(0, currentPage - 1);
-    onPageChange(newPage, 'prev', isBottom); // Only scroll if this is bottom pagination
+    // Don't scroll to top when using sticky pagination
+    onPageChange(newPage, 'prev', isBottom && !preventScroll);
   };
 
-  const handleNextPage = (e: React.MouseEvent) => {
+  const handleNextPage = (e: React.MouseEvent, preventScroll = false) => {
     e.preventDefault(); // Prevent any default scroll behavior
     const newPage = isServerPagination 
       ? serverPage! + 1
       : Math.min(totalPages - 1, currentPage + 1);
-    onPageChange(newPage, 'next', isBottom); // Only scroll if this is bottom pagination
+    // Don't scroll to top when using sticky pagination
+    onPageChange(newPage, 'next', isBottom && !preventScroll);
   };
 
-  const handlePageSelect = (pageStr: string) => {
+  const handlePageSelect = (pageStr: string, preventScroll = false) => {
     const newPage = isServerPagination ? parseInt(pageStr) : parseInt(pageStr) - 1;
     const direction = newPage > (isServerPagination ? serverPage! : currentPage) ? 'next' : 'prev';
-    onPageChange(newPage, direction, isBottom); // Only scroll if this is bottom pagination
+    // Don't scroll to top when using sticky pagination
+    onPageChange(newPage, direction, isBottom && !preventScroll);
   };
 
   const currentDisplayPage = isServerPagination ? serverPage! : currentPage + 1;
@@ -150,6 +193,82 @@ export const ImageGalleryPagination: React.FC<ImageGalleryPaginationProps> = ({
   }
 
   // Full layout for bottom pagination
+  if (isBottom) {
+    return (
+      <>
+        {/* Sticky navigation buttons - only show when scrolled and >1 page */}
+        <div 
+          className={`fixed z-40 transition-all duration-300 ease-in-out ${
+            showStickyPagination && totalPages > 1
+              ? 'translate-y-0 opacity-100 scale-100'
+              : 'translate-y-8 opacity-0 scale-95 pointer-events-none'
+          }`}
+          style={{
+            // Calculate horizontal constraints based on locked panes
+            left: `${isShotsPaneLocked ? shotsPaneWidth : 0}px`,
+            right: `${isTasksPaneLocked ? tasksPaneWidth : 0}px`,
+            bottom: '25px', // 25px from bottom to match top spacing
+            // Center within the available space
+            display: 'flex',
+            justifyContent: 'center',
+            paddingLeft: '16px',
+            paddingRight: '16px',
+          }}
+        >
+          <div className="bg-white/95 backdrop-blur-md rounded-full px-4 py-2 shadow-lg border border-gray-200/50">
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={(e) => handlePrevPage(e, true)}
+                disabled={isPrevDisabled}
+                className="px-3 py-2 rounded-full"
+              >
+                {renderButtonContent('prev', loadingButton === 'prev')}
+              </Button>
+              
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">
+                  Page
+                </span>
+                <Select 
+                  value={currentDisplayPage.toString()} 
+                  onValueChange={(value) => handlePageSelect(value, true)}
+                  disabled={loadingButton !== null}
+                >
+                  <SelectTrigger className="h-8 w-16 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: totalPages }, (_, i) => (
+                      <SelectItem key={i + 1} value={(i + 1).toString()} className="text-sm">
+                        {i + 1}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <span className="text-sm text-muted-foreground">
+                  of {totalPages}
+                </span>
+              </div>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={(e) => handleNextPage(e, true)}
+                disabled={isNextDisabled}
+                className="px-3 py-2 rounded-full"
+              >
+                {renderButtonContent('next', loadingButton === 'next')}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // Regular layout for non-bottom pagination (top pagination, etc.)
   return (
     <div className={`flex justify-center items-center gap-3 mt-4 ${whiteText ? 'text-white' : 'text-gray-600'}`}>
       <Button

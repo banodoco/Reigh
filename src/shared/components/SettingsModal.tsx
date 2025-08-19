@@ -300,7 +300,7 @@ python worker.py --db-type supabase \\
           {/* Mobile header with sign out */}
           {isMobile && (
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold">How would you like to generate?</h3>
+              <h3 className="font-light">How would you like to generate?</h3>
               <Button
                 variant="ghost"
                 size="sm"
@@ -317,7 +317,7 @@ python worker.py --db-type supabase \\
             {/* Left column: options */}
             <div className="space-y-4">
               {!isMobile && (
-                <h3 className="font-semibold">How would you like to generate?</h3>
+                <h3 className="font-light">How would you like to generate?</h3>
               )}
               
               {isLoadingGenerationMethods ? (
@@ -337,7 +337,7 @@ python worker.py --db-type supabase \\
                     />
                     <label
                       htmlFor="in-cloud"
-                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                      className="text-sm font-light leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                     >
                       In the cloud
                     </label>
@@ -351,7 +351,7 @@ python worker.py --db-type supabase \\
                     />
                     <label
                       htmlFor="on-computer"
-                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                      className="text-sm font-light leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                     >
                       On my computer
                     </label>
@@ -387,7 +387,7 @@ python worker.py --db-type supabase \\
             <div className="space-y-4">
               <div className="flex items-center gap-2 mb-2">
                 <Coins className="w-6 h-6 text-blue-600" />
-                <h3 className="text-xl font-bold text-gray-800">Credit Management</h3>
+                <h3 className="text-xl font-normal text-gray-800">Credit Management</h3>
               </div>
               <CreditsManagement initialTab={creditsTab} />
             </div>
@@ -398,7 +398,7 @@ python worker.py --db-type supabase \\
             <div className="space-y-4">
               <div className="flex items-center gap-2 mb-2">
                 <Monitor className="w-6 h-6 text-green-600" />
-                <h3 className="text-xl font-bold text-gray-800">Local Generation</h3>
+                <h3 className="text-xl font-normal text-gray-800">Local Generation</h3>
               </div>
               
               {!hasValidToken ? (
@@ -406,7 +406,7 @@ python worker.py --db-type supabase \\
                   <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                     <div className="flex items-center gap-2 mb-2">
                       <Key className="h-5 w-5 text-blue-600" />
-                      <h4 className="font-semibold text-blue-900">To process locally, you need an API Key</h4>
+                      <h4 className="font-light text-blue-900">To process locally, you need an API Key</h4>
                     </div>
                     <p className="text-sm text-blue-700 mb-4">
                       You'll need an API key to authenticate your local worker with our servers.
@@ -430,7 +430,7 @@ python worker.py --db-type supabase \\
                     <div className="grid grid-cols-2 gap-6 items-start">
                       {/* Left: Computer Type Selection */}
                       <div className="space-y-3">
-                        <p className="text-sm font-medium">What kind of computer do you have?</p>
+                        <p className="text-sm font-light">What kind of computer do you have?</p>
                         <div className="flex gap-4 flex-wrap">
                           <div className="flex items-center space-x-2">
                             <input
@@ -442,7 +442,7 @@ python worker.py --db-type supabase \\
                               onChange={(e) => setComputerType(e.target.value)}
                               className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-2"
                             />
-                            <label htmlFor="linux" className="text-sm font-medium">
+                            <label htmlFor="linux" className="text-sm font-light">
                               Linux
                             </label>
                           </div>
@@ -456,7 +456,7 @@ python worker.py --db-type supabase \\
                               onChange={(e) => setComputerType(e.target.value)}
                               className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-2"
                             />
-                            <label htmlFor="windows" className="text-sm font-medium">
+                            <label htmlFor="windows" className="text-sm font-light">
                               Windows
                             </label>
                           </div>
@@ -470,7 +470,7 @@ python worker.py --db-type supabase \\
                               onChange={(e) => setComputerType(e.target.value)}
                               className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-2"
                             />
-                            <label htmlFor="mac" className="text-sm font-medium">
+                            <label htmlFor="mac" className="text-sm font-light">
                               Mac
                             </label>
                           </div>
@@ -518,7 +518,7 @@ python worker.py --db-type supabase \\
                             <p className="text-sm text-amber-800 leading-relaxed">
                               You can't process tasks locally on a Mac yet.{" "}
                               <button
-                                className="text-blue-600 hover:text-blue-700 underline font-medium transition-colors duration-200 hover:bg-blue-50 px-1 py-0.5 rounded"
+                                className="text-blue-600 hover:text-blue-700 underline font-light transition-colors duration-200 hover:bg-blue-50 px-1 py-0.5 rounded"
                                 onClick={() => {
                                   updateGenerationMethods({ onComputer: false, inCloud: true });
                                 }}
@@ -670,7 +670,7 @@ python worker.py --db-type supabase \\
                                 </TooltipTrigger>
                                 <TooltipContent className="max-w-sm">
                                   <div className="py-3 space-y-3">
-                                    <p className="font-medium">Troubleshooting steps:</p>
+                                    <p className="font-light">Troubleshooting steps:</p>
                                     <ol className="text-sm space-y-2 list-decimal list-inside">
                                       <li>Try running each line of the commands one-at-a-time</li>
                                       <li>Feed the command-line log into ChatGPT or your LLM of choice</li>
@@ -760,7 +760,7 @@ python worker.py --db-type supabase \\
                                 </TooltipTrigger>
                                 <TooltipContent className="max-w-sm">
                                   <div className="py-3 space-y-3">
-                                    <p className="font-medium">Troubleshooting steps:</p>
+                                    <p className="font-light">Troubleshooting steps:</p>
                                     <ol className="text-sm space-y-2 list-decimal list-inside">
                                       <li>Try running each line of the commands one-at-a-time</li>
                                       <li>Feed the command-line log into ChatGPT or your LLM of choice</li>

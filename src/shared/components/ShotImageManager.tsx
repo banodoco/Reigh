@@ -693,7 +693,7 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
         {mobileSelectedIds.length >= 1 && (
           <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center gap-3">
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              <span className="text-sm font-light text-gray-700 dark:text-gray-300">
                 {mobileSelectedIds.length} selected
               </span>
               <div className="flex gap-2">
@@ -859,7 +859,7 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
       {selectedIds.length >= 1 && (
         <div className="fixed bottom-[54px] left-1/2 transform -translate-x-1/2 z-50">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center gap-3">
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            <span className="text-sm font-light text-gray-700 dark:text-gray-300">
               {selectedIds.length} selected
             </span>
             <div className="flex gap-2">

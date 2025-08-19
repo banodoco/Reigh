@@ -63,7 +63,7 @@ export const ShotFilter: React.FC<ShotFilterProps> = ({
     <div className={containerClassName}>
       <div className={isMobile ? "flex items-center space-x-3" : "contents"}>
         {labelText && (
-          <Label className={`${labelSizeClass} font-medium ${whiteText ? 'text-white' : 'text-foreground'}`}>
+          <Label className={`${labelSizeClass} font-light ${whiteText ? 'text-white' : 'text-foreground'}`}>
             {labelText}
           </Label>
         )}

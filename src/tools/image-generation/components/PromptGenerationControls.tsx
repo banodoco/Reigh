@@ -111,7 +111,7 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
 
   return (
     <div className="space-y-4 p-4 border-b mb-4">
-      <h3 className="text-lg font-semibold flex items-center">
+      <h3 className="text-lg font-light flex items-center">
         <Wand2 className="mr-2 h-5 w-5" /> Generate Prompts
       </h3>
         <div>
@@ -152,7 +152,7 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
         <div className="flex flex-col items-center">
           <div className="w-full">
             <div className="text-center mb-3">
-              <span className="font-medium text-sm">
+              <span className="font-light text-sm">
                 Level of creativity
               </span>
               <span className="block text-xs text-muted-foreground">
@@ -176,7 +176,7 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
               </div>
             </div>
             <div className="text-center">
-              <span className="font-medium text-sm">
+              <span className="font-light text-sm">
                 {selectedTemperatureOption?.label || 'Balanced'}
               </span>
             </div>

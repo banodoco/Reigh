@@ -153,7 +153,7 @@ export function VideoUploadList({ videos, selectedVideo, onVideoSelect, segments
 
               {/* Video info */}
               <div className="space-y-2">
-                <h3 className="font-medium text-sm truncate" title={video.originalFilename}>
+                <h3 className="font-light text-sm truncate" title={video.originalFilename}>
                   {cropFilename(video.originalFilename)}
                 </h3>
                 

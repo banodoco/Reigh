@@ -23,23 +23,23 @@ export default function NotFoundPage() {
 
           {/* Error Message */}
           <div className="mb-8">
-            <h1 className="font-crimson text-6xl font-semibold text-primary mb-4 tracking-wide">
+            <h1 className="font-inter text-6xl font-light text-primary mb-4 tracking-wide">
               404
             </h1>
-            <h2 className="font-crimson text-3xl font-semibold text-primary mb-4">
+            <h2 className="font-crimson text-3xl font-light text-primary mb-4">
               Page Not Found
             </h2>
             <div className="w-24 h-1 bg-wes-pink rounded-full mx-auto mb-6"></div>
             
-            <p className="font-inter text-lg text-muted-foreground leading-relaxed mb-4">
+            <p className="font-cocogoose text-lg text-muted-foreground leading-relaxed mb-4">
               It seems you've wandered into uncharted territory. 
               The page you're looking for has taken a different creative journey.
             </p>
             
             {error?.statusText || error?.message ? (
               <div className="bg-wes-yellow/20 border border-wes-yellow/30 rounded-lg p-4 mb-6">
-                <p className="font-inter text-sm text-muted-foreground">
-                  <span className="font-medium">Technical details:</span> {error.statusText || error.message}
+                <p className="font-cocogoose text-sm text-muted-foreground">
+                  <span className="font-light">Technical details:</span> {error.statusText || error.message}
                 </p>
               </div>
             ) : null}
@@ -52,12 +52,12 @@ export default function NotFoundPage() {
               className="group flex items-center space-x-3 wes-button px-8 py-4 text-primary-foreground rounded-xl transition-all duration-300 hover:scale-105"
             >
               <Home className="h-5 w-5 group-hover:rotate-12 transition-transform duration-300" />
-              <span className="font-inter font-medium tracking-wide">Return Home</span>
+              <span className="font-cocogoose font-light tracking-wide">Return Home</span>
             </Link>
             
             <div className="flex items-center space-x-2 text-muted-foreground">
               <div className="w-2 h-2 bg-wes-dusty-blue rounded-full animate-pulse"></div>
-              <span className="font-inter text-sm tracking-widest uppercase">or</span>
+              <span className="font-cocogoose text-sm tracking-widest uppercase">or</span>
               <div className="w-2 h-2 bg-wes-mint rounded-full animate-pulse" style={{ animationDelay: '1s' }}></div>
             </div>
             
@@ -66,7 +66,7 @@ export default function NotFoundPage() {
               className="group flex items-center space-x-3 px-6 py-3 border-2 border-primary/20 rounded-xl bg-white/80 hover:bg-accent/30 transition-all duration-300 hover:scale-105"
             >
               <Sparkles className="h-4 w-4 text-primary group-hover:animate-spin" />
-              <span className="font-inter font-medium text-primary tracking-wide">Go Back</span>
+              <span className="font-cocogoose font-light text-primary tracking-wide">Go Back</span>
             </button>
           </div>
 

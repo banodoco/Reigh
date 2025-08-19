@@ -11,6 +11,8 @@ import { cn } from '@/shared/lib/utils';
 import { ProjectSettingsModal } from '@/shared/components/ProjectSettingsModal';
 import { toast } from "sonner";
 import { useProjectContextDebug } from '@/shared/hooks/useProjectContextDebug';
+import { useScrollDirection } from '@/shared/hooks/useScrollDirection';
+import { useIsMobile } from '@/shared/hooks/use-mobile';
 
 interface GlobalHeaderProps {
   contentOffsetRight?: number;
@@ -21,12 +23,43 @@ interface GlobalHeaderProps {
 export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight = 0, contentOffsetLeft = 0, onOpenSettings }) => {
   const { projects, selectedProjectId, setSelectedProjectId, isLoadingProjects } = useProject();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
 
   // [MobileStallFix] Enable debug monitoring
   useProjectContextDebug();
 
+  // Scroll direction tracking for mobile header hide/show
+  const { scrollDirection, isAtTop } = useScrollDirection({
+    threshold: 15,
+    enabled: isMobile
+  });
+
+  // Header visibility state for mobile
+  const [isHeaderVisible, setIsHeaderVisible] = useState(true);
+
   // Track authentication state to conditionally change the logo destination
   const [session, setSession] = useState<Session | null>(null);
+
+  // Control header visibility based on scroll direction (mobile only)
+  useEffect(() => {
+    if (!isMobile) {
+      setIsHeaderVisible(true);
+      return;
+    }
+
+    // Always show header at top of page
+    if (isAtTop) {
+      setIsHeaderVisible(true);
+      return;
+    }
+
+    // Show/hide based on scroll direction
+    if (scrollDirection === 'up') {
+      setIsHeaderVisible(true);
+    } else if (scrollDirection === 'down') {
+      setIsHeaderVisible(false);
+    }
+  }, [isMobile, scrollDirection, isAtTop]);
 
   useEffect(() => {
     // Get current session on mount
@@ -73,7 +106,13 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
 
   return (
     <>
-      <header className="wes-header sticky top-0 z-50 w-full relative overflow-hidden lg:p-0" style={{ padding: 0, margin: 0 }}>
+      <header 
+        className={cn(
+          "wes-header sticky top-0 z-50 w-full relative overflow-hidden lg:p-0 transition-transform duration-300 ease-out",
+          isMobile && !isHeaderVisible && "-translate-y-full"
+        )} 
+        style={{ padding: 0, margin: 0 }}
+      >
         {/* Enhanced background patterns */}
         <div className="wes-deco-pattern absolute inset-0 opacity-20"></div>
         <div className="absolute inset-0 wes-diamond-pattern opacity-10"></div>
@@ -118,7 +157,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
               </div>
               
               <div className="wes-symmetry relative">
-                <span className="hidden sm:inline font-playfair text-3xl font-bold tracking-wide text-primary text-shadow-vintage group-hover:animate-vintage-glow transition-all duration-300">
+                <span className="hidden sm:inline font-theme text-3xl font-theme-bold tracking-wide text-primary text-shadow-vintage group-hover:animate-vintage-glow transition-all duration-300">
                   Reigh
                 </span>
                 <div className="absolute -top-1 -right-2">
@@ -137,7 +176,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
               ) : projects.length === 0 && !isLoadingProjects ? (
                 <div className="w-[280px] text-center">
                   <div className="wes-vintage-card p-3">
-                    <p className="font-inter text-sm text-muted-foreground">No projects found</p>
+                    <p className="font-cocogoose text-sm text-muted-foreground">No projects found</p>
                   </div>
                 </div>
               ) : (
@@ -147,7 +186,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                     onValueChange={handleProjectChange}
                     disabled={isLoadingProjects || projects.length === 0}
                   >
-                    <SelectTrigger className="w-[280px] wes-select border-2 border-wes-vintage-gold/30 bg-white/95 font-inter text-sm shadow-wes-vintage hover:shadow-wes-hover transition-all duration-300 h-12 [&>svg]:opacity-30">
+                    <SelectTrigger className="w-[280px] wes-select border-2 border-wes-vintage-gold/30 bg-white/95 font-cocogoose text-sm shadow-wes-vintage hover:shadow-wes-hover transition-all duration-300 h-12 [&>svg]:opacity-30">
                       <SelectValue placeholder="Select a project" className="font-crimson text-primary" />
                     </SelectTrigger>
                     <SelectContent className="wes-vintage-card border-2 border-wes-vintage-gold/30 shadow-wes-deep">
@@ -155,13 +194,13 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                         <SelectItem 
                           key={project.id} 
                           value={project.id}
-                          className="font-inter hover:bg-wes-vintage-gold/20 transition-colors duration-300 p-3 pl-3 pr-8 [&>span:first-child]:left-auto [&>span:first-child]:right-2"
+                          className="font-cocogoose hover:bg-wes-vintage-gold/20 transition-colors duration-300 p-3 pl-3 pr-8 [&>span:first-child]:left-auto [&>span:first-child]:right-2"
                         >
                           <div className="flex items-center space-x-2">
                             <div className="w-4 h-4 bg-gradient-to-br from-wes-mint to-wes-sage rounded-full flex items-center justify-center flex-shrink-0">
                               <Star className="h-2 w-2 text-white flex-shrink-0" />
                             </div>
-                            <span className="font-crimson font-medium text-primary truncate">
+                            <span className="font-crimson font-light text-primary truncate">
                               {project.name.length > 30 ? `${project.name.substring(0, 30)}...` : project.name}
                             </span>
                           </div>
@@ -176,13 +215,13 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                       )}
                       <SelectItem 
                         value="create-new"
-                        className="font-inter hover:bg-wes-vintage-gold/20 transition-colors duration-300 p-3 pl-3 pr-8 [&>span:first-child]:left-auto [&>span:first-child]:right-2 mt-1"
+                        className="font-cocogoose hover:bg-wes-vintage-gold/20 transition-colors duration-300 p-3 pl-3 pr-8 [&>span:first-child]:left-auto [&>span:first-child]:right-2 mt-1"
                       >
                         <div className="flex items-center space-x-2">
                           <div className="w-4 h-4 bg-gradient-to-br from-wes-vintage-gold to-amber-400 rounded-full flex items-center justify-center flex-shrink-0">
                             <PlusCircle className="h-2 w-2 text-white flex-shrink-0" />
                           </div>
-                          <span className="font-crimson font-medium text-primary">
+                          <span className="font-crimson font-light text-primary">
                             Create New Project
                           </span>
                         </div>
@@ -267,7 +306,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                   </div>
                   
                   <div className="relative">
-                    <span className="font-playfair text-xl font-bold tracking-wide text-primary text-shadow-vintage group-hover:animate-vintage-glow transition-all duration-300">
+                    <span className="font-theme text-xl font-theme-bold tracking-wide text-primary text-shadow-vintage group-hover:animate-vintage-glow transition-all duration-300">
                       Reigh
                     </span>
                     <div className="absolute -top-1 -right-1">
@@ -323,7 +362,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
               ) : projects.length === 0 && !isLoadingProjects ? (
                 <div className="text-center">
                   <div className="wes-vintage-card p-2">
-                    <p className="font-inter text-xs text-muted-foreground">No projects</p>
+                    <p className="font-cocogoose text-xs text-muted-foreground">No projects</p>
                   </div>
                 </div>
               ) : (
@@ -332,7 +371,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                   onValueChange={handleProjectChange}
                   disabled={isLoadingProjects || projects.length === 0}
                 >
-                  <SelectTrigger className="w-full wes-select border-2 border-wes-vintage-gold/30 bg-white/95 font-inter text-xs shadow-wes-vintage hover:shadow-wes-hover transition-all duration-300 h-10 [&>svg]:opacity-30">
+                  <SelectTrigger className="w-full wes-select border-2 border-wes-vintage-gold/30 bg-white/95 font-cocogoose text-xs shadow-wes-vintage hover:shadow-wes-hover transition-all duration-300 h-10 [&>svg]:opacity-30">
                     <SelectValue placeholder="Select project" className="font-crimson text-primary" />
                   </SelectTrigger>
                   <SelectContent className="wes-vintage-card border-2 border-wes-vintage-gold/30 shadow-wes-deep">
@@ -340,13 +379,13 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                       <SelectItem 
                         key={project.id} 
                         value={project.id}
-                        className="font-inter hover:bg-wes-vintage-gold/20 transition-colors duration-300 p-3 pl-3 pr-8 [&>span:first-child]:left-auto [&>span:first-child]:right-2"
+                        className="font-cocogoose hover:bg-wes-vintage-gold/20 transition-colors duration-300 p-3 pl-3 pr-8 [&>span:first-child]:left-auto [&>span:first-child]:right-2"
                       >
                         <div className="flex items-center space-x-2">
                           <div className="w-4 h-4 bg-gradient-to-br from-wes-mint to-wes-sage rounded-full flex items-center justify-center flex-shrink-0">
                             <Star className="h-2 w-2 text-white flex-shrink-0" />
                           </div>
-                          <span className="font-crimson font-medium text-primary text-sm truncate">
+                          <span className="font-crimson font-light text-primary text-sm truncate">
                             {project.name.length > 30 ? `${project.name.substring(0, 30)}...` : project.name}
                           </span>
                         </div>
@@ -361,13 +400,13 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                     )}
                     <SelectItem 
                       value="create-new"
-                      className="font-inter hover:bg-wes-vintage-gold/20 transition-colors duration-300 p-3 pl-3 pr-8 [&>span:first-child]:left-auto [&>span:first-child]:right-2 mt-1"
+                      className="font-cocogoose hover:bg-wes-vintage-gold/20 transition-colors duration-300 p-3 pl-3 pr-8 [&>span:first-child]:left-auto [&>span:first-child]:right-2 mt-1"
                     >
                       <div className="flex items-center space-x-2">
                         <div className="w-4 h-4 bg-gradient-to-br from-wes-vintage-gold to-amber-400 rounded-full flex items-center justify-center flex-shrink-0">
                           <PlusCircle className="h-2 w-2 text-white flex-shrink-0" />
                         </div>
-                        <span className="font-crimson font-medium text-primary text-sm">
+                        <span className="font-crimson font-light text-primary text-sm">
                           Create New Project
                         </span>
                       </div>

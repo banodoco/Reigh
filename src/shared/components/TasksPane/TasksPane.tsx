@@ -41,7 +41,7 @@ const StatusIndicator: React.FC<StatusIndicatorProps> = ({ count, type, onClick,
   return (
     <div 
       className={cn(
-        "ml-2 px-2 py-1 border-2 rounded text-xs font-medium cursor-pointer transition-all",
+        "ml-2 px-2 py-1 border-2 rounded text-xs font-light cursor-pointer transition-all",
         borderStyle,
         borderColor,
         count === 0 ? "opacity-50" : "opacity-100",
@@ -290,7 +290,7 @@ export const TasksPane: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
         thirdButton={{
           onClick: openPane,
           ariaLabel: `Open Tasks pane (${cancellableTaskCount} active tasks)`,
-          content: <span className="text-xs font-medium">{cancellableTaskCount}</span>
+          content: <span className="text-xs font-light">{cancellableTaskCount}</span>
         }}
       />
       <div
@@ -313,7 +313,7 @@ export const TasksPane: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
           )}
         >
           <div className="p-2 border-b border-zinc-800 flex items-center justify-between flex-shrink-0">
-              <h2 className="text-xl font-semibold text-zinc-200 ml-2">Tasks</h2>
+              <h2 className="text-xl font-light text-zinc-200 ml-2">Tasks</h2>
               <Button
                 variant="destructive"
                 size="sm"

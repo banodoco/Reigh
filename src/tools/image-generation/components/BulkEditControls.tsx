@@ -75,7 +75,7 @@ export const BulkEditControls: React.FC<BulkEditControlsProps> = ({
 
   return (
     <div className="space-y-4 p-4 border-b mb-4">
-      <h3 className="text-lg font-semibold flex items-center">
+      <h3 className="text-lg font-light flex items-center">
         <Edit className="mr-2 h-5 w-5" /> Manage Prompts {numberOfPromptsToEdit > 0 ? `(${numberOfPromptsToEdit})` : ''}
       </h3>
       <div>

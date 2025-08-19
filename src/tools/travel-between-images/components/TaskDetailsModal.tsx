@@ -148,7 +148,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
         aria-describedby="task-details-description"
       >
         <DialogHeader className="flex-shrink-0">
-          <DialogTitle className="text-xl font-semibold">Generation Task Details</DialogTitle>
+          <DialogTitle className="text-xl font-light">Generation Task Details</DialogTitle>
           <p id="task-details-description" className="sr-only">
             View details about the task that generated this video, including input images, settings, and parameters.
           </p>
@@ -186,7 +186,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
-                    <h3 className="text-lg font-semibold text-foreground">Detailed Task Parameters</h3>
+                    <h3 className="text-lg font-light text-foreground">Detailed Task Parameters</h3>
                   </div>
                   <Button
                     variant="ghost"
@@ -256,7 +256,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
                       checked={replaceImages}
                       onCheckedChange={(checked) => setReplaceImages(checked as boolean)}
                     />
-                    <Label htmlFor="replaceImages" className={`text-sm font-medium ${isMobile ? 'whitespace-pre-line leading-tight' : ''}`}>
+                    <Label htmlFor="replaceImages" className={`text-sm font-light ${isMobile ? 'whitespace-pre-line leading-tight' : ''}`}>
                       {isMobile ? 'Replace\nthese\nimages' : 'Replace these images'}
                     </Label>
                   </div>

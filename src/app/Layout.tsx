@@ -145,10 +145,10 @@ const Layout: React.FC = () => {
   const containerSpacing = isLg ? 'py-8' : 'py-4';
 
   return (
-    <div className="flex flex-col min-h-screen wes-texture">
+    <div className="flex flex-col min-h-screen">
       <ScrollToTop />
-      {/* Subtle background gradient */}
-      <div className="fixed inset-0 bg-gradient-to-br from-wes-cream via-white to-wes-mint/10 opacity-60 pointer-events-none"></div>
+      {/* Theme-adaptive background gradient */}
+      <div className="fixed inset-0 bg-gradient-to-br from-[hsl(var(--color-surface))] via-[hsl(var(--color-surface-bright))] to-[hsl(var(--color-tertiary)_/_0.1)] opacity-60 pointer-events-none"></div>
       
       <GlobalHeader 
         contentOffsetRight={isTasksPaneLocked ? tasksPaneWidth + 16 : 16} 

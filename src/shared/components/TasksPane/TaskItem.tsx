@@ -407,7 +407,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
   return (
     <div className={containerClass}>
       <div className="flex justify-between items-center mb-1 gap-2">
-        <span className="text-sm font-semibold text-zinc-200 flex-1 whitespace-nowrap overflow-hidden text-ellipsis cursor-default min-w-0">
+        <span className="text-sm font-light text-zinc-200 flex-1 whitespace-nowrap overflow-hidden text-ellipsis cursor-default min-w-0">
           {abbreviatedTaskType}
         </span>
         <span

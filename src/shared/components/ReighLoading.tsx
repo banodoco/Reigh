@@ -12,7 +12,7 @@ export const ReighLoading: React.FC<ReighLoadingProps> = ({ text }) => {
       <div className="text-center relative z-10">
         <div className="w-32 h-1.5 bg-gradient-to-r from-wes-pink to-wes-vintage-gold rounded-full mx-auto shadow-inner-vintage animate-pulse-glow"></div>
         {text && (
-          <p className="font-inter text-sm text-muted-foreground mt-6 opacity-70">
+          <p className="font-cocogoose text-sm text-muted-foreground mt-6 opacity-70">
             {text}
           </p>
         )}

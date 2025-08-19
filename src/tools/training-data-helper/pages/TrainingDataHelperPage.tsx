@@ -75,7 +75,7 @@ export default function TrainingDataHelperPage() {
       <div className="space-y-6">
         {/* Header */}
         <div className="text-center space-y-2">
-          <h1 className="text-3xl font-bold">Training Data Helper</h1>
+          <h1 className="text-3xl font-light">Training Data Helper</h1>
           <p className="text-muted-foreground">
             Upload videos and extract training segments for AI model development
           </p>

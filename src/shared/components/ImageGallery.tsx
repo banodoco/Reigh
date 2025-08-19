@@ -938,43 +938,45 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
         {/* Header section with pagination and filters */}
         <div ref={galleryTopRef} className={`${reducedSpacing ? 'mt-0' : 'mt-7'} space-y-3`}>
             {/* Top Pagination */}
-            <ImageGalleryPagination
-              totalPages={totalPages}
-              currentPage={page}
-              isServerPagination={isServerPagination}
-              serverPage={serverPage}
-              rangeStart={rangeStart}
-              rangeEnd={rangeEnd}
-              totalFilteredItems={totalFilteredItems}
-              loadingButton={loadingButton}
-              whiteText={whiteText}
-              reducedSpacing={reducedSpacing}
-              hidePagination={hidePagination}
-              onPageChange={handlePageChange}
-              compact={true}
-              isBottom={false}
-              rightContent={!hideTopFilters ? (
-                <div className="flex items-center space-x-2">
-                    <Checkbox 
-                        id="starred-filter-gallery"
-                        checked={showStarredOnly}
-                        onCheckedChange={(checked) => {
-                            const newStarredOnly = Boolean(checked);
-                            setShowStarredOnly(newStarredOnly);
-                            onStarredFilterChange?.(newStarredOnly);
-                        }}
-                        className={whiteText ? "border-zinc-600 data-[state=checked]:bg-zinc-600" : ""}
-                    />
-                    <Label 
-                        htmlFor="starred-filter-gallery" 
-                        className={`text-xs cursor-pointer flex items-center space-x-1 ${whiteText ? 'text-zinc-400' : 'text-muted-foreground'}`}
-                    >
-                        <Star className="h-3 w-3" />
-                        <span>Starred</span>
-                    </Label>
-                </div>
-              ) : undefined}
-            />
+            <div data-pagination-top>
+              <ImageGalleryPagination
+                totalPages={totalPages}
+                currentPage={page}
+                isServerPagination={isServerPagination}
+                serverPage={serverPage}
+                rangeStart={rangeStart}
+                rangeEnd={rangeEnd}
+                totalFilteredItems={totalFilteredItems}
+                loadingButton={loadingButton}
+                whiteText={whiteText}
+                reducedSpacing={reducedSpacing}
+                hidePagination={hidePagination}
+                onPageChange={handlePageChange}
+                compact={true}
+                isBottom={false}
+                rightContent={!hideTopFilters ? (
+                  <div className="flex items-center space-x-2">
+                      <Checkbox 
+                          id="starred-filter-gallery"
+                          checked={showStarredOnly}
+                          onCheckedChange={(checked) => {
+                              const newStarredOnly = Boolean(checked);
+                              setShowStarredOnly(newStarredOnly);
+                              onStarredFilterChange?.(newStarredOnly);
+                          }}
+                          className={whiteText ? "border-zinc-600 data-[state=checked]:bg-zinc-600" : ""}
+                      />
+                      <Label 
+                          htmlFor="starred-filter-gallery" 
+                          className={`text-xs cursor-pointer flex items-center space-x-1 ${whiteText ? 'text-zinc-400' : 'text-muted-foreground'}`}
+                      >
+                          <Star className="h-3 w-3" />
+                          <span>Starred</span>
+                      </Label>
+                  </div>
+                ) : undefined}
+              />
+            </div>
             
             {/* Single page display with starred filter - only show when pagination is hidden */}
             {totalPages === 1 && !hidePagination && (
@@ -1133,7 +1135,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                 : "text-muted-foreground border bg-card shadow-sm"
             }`}>
               <Filter className={`mx-auto h-10 w-10 mb-3 opacity-60 ${whiteText ? "text-zinc-500" : ""}`} />
-              <p className={`font-semibold ${whiteText ? "text-zinc-300" : ""}`}>No items match the current filters.</p>
+              <p className={`font-light ${whiteText ? "text-zinc-300" : ""}`}>No items match the current filters.</p>
               <p className={`text-sm ${whiteText ? "text-zinc-400" : ""}`}>Adjust the filters or clear the search to see all items.</p>
             </div>
           )}
@@ -1145,7 +1147,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                  : "text-muted-foreground border bg-card shadow-sm"
              }`}>
                <Sparkles className={`mx-auto h-10 w-10 mb-3 opacity-60 ${whiteText ? "text-zinc-500" : ""}`} />
-               <p className={`font-semibold ${whiteText ? "text-zinc-300" : ""}`}>No images generated yet.</p>
+               <p className={`font-light ${whiteText ? "text-zinc-300" : ""}`}>No images generated yet.</p>
                <p className={`text-sm ${whiteText ? "text-zinc-400" : ""}`}>Use the controls above to generate some images.</p>
              </div>
           )}

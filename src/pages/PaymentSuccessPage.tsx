@@ -158,7 +158,7 @@ const PaymentSuccessPage: React.FC = () => {
             {sessionDetails?.amount && (
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Amount:</span>
-                <span className="font-semibold">${sessionDetails.amount}</span>
+                <span className="font-light">${sessionDetails.amount}</span>
               </div>
             )}
           </div>

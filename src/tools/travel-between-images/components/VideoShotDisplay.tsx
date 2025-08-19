@@ -292,7 +292,7 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
                     setIsEditingName(false);
                   }
                 }}
-                className="text-xl font-medium h-9"
+                className="text-xl font-light h-9"
                 autoFocus
                 maxLength={30}
               />
@@ -305,7 +305,7 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
             </div>
           ) : (
             <h3 
-              className="text-xl font-medium hover:text-primary flex-grow mr-2"
+              className="text-xl font-light hover:text-primary flex-grow mr-2"
             >
               {shot.name}
             </h3>

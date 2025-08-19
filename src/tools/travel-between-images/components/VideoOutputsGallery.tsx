@@ -490,7 +490,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
       <Card className="p-4 sm:p-6">
         <div className="flex flex-col space-y-2 sm:space-y-3">
           <div className="flex items-center justify-between flex-wrap gap-2">
-            <h3 className="text-base sm:text-lg font-semibold flex items-center gap-2">
+            <h3 className="text-base sm:text-lg font-light flex items-center gap-2">
               Output Videos &nbsp;(0)
             </h3>
           </div>
@@ -509,7 +509,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     <Card className="p-4 sm:p-6">
       <div className="flex flex-col space-y-2 sm:space-y-3">
         <div className="flex items-center justify-between flex-wrap gap-2">
-          <h3 className="text-base sm:text-lg font-semibold flex items-center gap-2">
+          <h3 className="text-base sm:text-lg font-light flex items-center gap-2">
             Output Videos &nbsp;
             {(isLoadingGenerations || isFetchingGenerations) ? (
               <Skeleton className="h-5 w-8 inline-block" />
@@ -822,7 +822,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
                 ) : hoverTask ? (
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <h4 className="font-semibold text-sm">Generation Details</h4>
+                      <h4 className="font-light text-sm">Generation Details</h4>
                       <Badge variant="secondary" className="text-xs">Preview</Badge>
                     </div>
                     

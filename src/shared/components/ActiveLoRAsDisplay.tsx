@@ -39,7 +39,7 @@ const ActiveLoRAsDisplayComponent: React.FC<ActiveLoRAsDisplayProps> = ({
   return (
     <div className={`space-y-4 pt-2 ${className}`}>
       <div className="flex items-center justify-between">
-        <h3 className="text-md font-semibold">Active LoRAs:</h3>
+        <h3 className="text-md font-light">Active LoRAs:</h3>
         {renderHeaderActions && renderHeaderActions()}
       </div>
       
@@ -83,7 +83,7 @@ const ActiveLoRAsDisplayComponent: React.FC<ActiveLoRAsDisplayProps> = ({
                     <div className="flex-grow min-w-0">
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <Label htmlFor={`lora-strength-${lora.id}`} className="text-sm font-medium truncate pr-2 cursor-help block">
+                          <Label htmlFor={`lora-strength-${lora.id}`} className="text-sm font-light truncate pr-2 cursor-help block">
                             {lora.name}
                           </Label>
                         </TooltipTrigger>

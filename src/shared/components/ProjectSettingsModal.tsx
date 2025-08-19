@@ -194,7 +194,7 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({ isOp
                 >
                   <div className="flex items-center gap-2">
                     <AlertTriangle className="h-4 w-4 text-red-500" />
-                    <span className="text-red-600 font-semibold">Delete Project</span>
+                    <span className="text-red-600 font-light">Delete Project</span>
                   </div>
                   <ChevronDown className={`h-4 w-4 text-red-500 transition-transform ${isDangerZoneOpen ? 'rotate-180' : ''}`} />
                 </Button>
@@ -203,7 +203,7 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({ isOp
                 <div className="bg-red-50 border border-red-200 rounded-lg p-4 space-y-4">
                   <div className="space-y-3">
                     <div>
-                      <Label htmlFor="delete-confirm-input" className="text-sm font-medium text-red-900">
+                      <Label htmlFor="delete-confirm-input" className="text-sm font-light text-red-900">
                         Type "confirm" to make it clear you wish to delete the project and all associated data.
                       </Label>
                       <Input

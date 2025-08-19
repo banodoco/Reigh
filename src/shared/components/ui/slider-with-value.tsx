@@ -27,7 +27,7 @@ const SliderWithValue = ({
   return (
     <div className="space-y-2">
       <div className="flex justify-between items-center">
-        <label className="text-sm font-medium">{label}</label>
+        <label className="text-sm font-light">{label}</label>
       </div>
       <div className="flex gap-4">
         <div className="border rounded w-16 h-10 flex items-center justify-center bg-white">

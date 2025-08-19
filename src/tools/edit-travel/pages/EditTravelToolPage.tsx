@@ -269,7 +269,7 @@ const EditTravelToolPage: React.FC = () => {
   return (
     <PageFadeIn className="container mx-auto p-4 relative">
       <header className="flex justify-between items-center mb-6 sticky top-0 bg-background/90 backdrop-blur-md py-4 z-10">
-        <h1 className="text-3xl font-bold">Edit Travel Tool</h1>
+        <h1 className="text-3xl font-light">Edit Travel Tool</h1>
         <Button variant="ghost" size="icon" onClick={() => setIsSettingsModalOpen(true)} className="h-10 w-10" title="Settings">
           <Settings className="h-5 w-5" />
         </Button>
@@ -314,7 +314,7 @@ const EditTravelToolPage: React.FC = () => {
       {(isOverallGenerating) && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[10000]">
             <div className="bg-background p-8 rounded-lg shadow-2xl w-full max-w-md text-center">
-              <h2 className="text-2xl font-semibold mb-4">
+              <h2 className="text-2xl font-light mb-4">
                 {isClientSideReconstructing ? "Reconstructing Video..." : "Generating..."}
               </h2>
               <p className="mb-4">

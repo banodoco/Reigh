@@ -213,7 +213,7 @@ const ShotGroup: React.FC<ShotGroupProps> = ({ shot }) => {
           className="absolute inset-0 bg-sky-500 bg-opacity-30 flex items-center justify-center rounded-lg pointer-events-none z-10"
           style={{ backdropFilter: 'blur(2px)' }}
         >
-          <p className="text-white text-sm font-semibold p-2 bg-black/50 rounded">Add to shot</p>
+          <p className="text-white text-sm font-light p-2 bg-black/50 rounded">Add to shot</p>
         </div>
       )}
       {isEditing ? (
@@ -234,7 +234,7 @@ const ShotGroup: React.FC<ShotGroupProps> = ({ shot }) => {
             e.stopPropagation();
           }}
           onDoubleClick={handleNameDoubleClick}
-          className="text-white text-sm font-semibold truncate cursor-pointer hover:bg-zinc-700/70 p-1 rounded transition-colors"
+          className="text-white text-sm font-light truncate cursor-pointer hover:bg-zinc-700/70 p-1 rounded transition-colors"
           title={currentName}
         >
           {currentName}

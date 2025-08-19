@@ -16,11 +16,35 @@ import { Profiler } from 'react';
 import App from './App.tsx';
 import '@/index.css';
 import { reactProfilerOnRender } from '@/shared/lib/logger';
+import { initializeTheme } from '@/shared/lib/theme-switcher';
 
 // Import cache validator for debugging (only in development)
 if (import.meta.env.DEV) {
   import('../shared/lib/cacheValidationDebugger');
   import('../shared/lib/simpleCacheValidator');
+}
+
+// Initialize theme system
+initializeTheme();
+
+// Add global theme switching helpers for debugging
+if (import.meta.env.DEV) {
+  (window as any).switchTheme = (themeName: 'lala-land' | 'wes-anderson' | 'cat-lounging') => {
+    const { switchTheme } = require('@/shared/lib/theme-switcher');
+    switchTheme(themeName);
+    console.log(`Switched to ${themeName} theme`);
+  };
+  
+  (window as any).getAvailableThemes = () => {
+    const { getAvailableThemes } = require('@/shared/lib/theme-switcher');
+    return getAvailableThemes();
+  };
+  
+  console.log('Theme helpers available:');
+  console.log('- switchTheme("wes-anderson")');
+  console.log('- switchTheme("lala-land")');
+  console.log('- switchTheme("cat-lounging")');
+  console.log('- getAvailableThemes()');
 }
 
 createRoot(document.getElementById('root')!).render(

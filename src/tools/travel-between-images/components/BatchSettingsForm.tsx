@@ -91,7 +91,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="relative">
-                  <Label htmlFor="batchVideoPrompt" className="text-sm font-medium block mb-1.5">Prompt:</Label>
+                  <Label htmlFor="batchVideoPrompt" className="text-sm font-light block mb-1.5">Prompt:</Label>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">
@@ -112,7 +112,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                   />
                 </div>
                 <div className="relative">
-                  <Label htmlFor="negative_prompt" className="text-sm font-medium block mb-1.5">Negative Prompt:</Label>
+                  <Label htmlFor="negative_prompt" className="text-sm font-light block mb-1.5">Negative Prompt:</Label>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">
@@ -139,7 +139,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
             <div className={`grid grid-cols-1 gap-4 ${!isTimelineMode && imageCount > 2 ? 'md:grid-cols-2' : ''}`}>
                 {!isTimelineMode && (
                   <div className="relative">
-                    <Label htmlFor="batchVideoFrames" className="text-sm font-medium block mb-1">
+                    <Label htmlFor="batchVideoFrames" className="text-sm font-light block mb-1">
                       {imageCount === 1 ? 'Frames to generate' : 'Frames per pair'}: {batchVideoFrames}
                     </Label>
                     <Tooltip>
@@ -164,7 +164,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                 )}
                 {!isTimelineMode && imageCount > 2 && (
                   <div className="relative">
-                    <Label htmlFor="batchVideoContext" className="text-sm font-medium block mb-1">Number of Context Frames: {batchVideoContext}</Label>
+                    <Label htmlFor="batchVideoContext" className="text-sm font-light block mb-1">Number of Context Frames: {batchVideoContext}</Label>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">
@@ -235,7 +235,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
             {/* Steps slider in its own row */}
             <div className="grid grid-cols-1 gap-4 items-end">
               <div className="relative">
-                <Label htmlFor="batchVideoSteps" className="text-sm font-medium block mb-1">Generation Steps: {batchVideoSteps}</Label>
+                <Label htmlFor="batchVideoSteps" className="text-sm font-light block mb-1">Generation Steps: {batchVideoSteps}</Label>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">
@@ -265,7 +265,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
               </div>
             </div>
             <div>
-              <Label className="text-sm font-medium block mb-2">Dimension Source</Label>
+              <Label className="text-sm font-light block mb-2">Dimension Source</Label>
               <RadioGroup
                 value={dimensionSource || 'project'}
                 onValueChange={(value) => {

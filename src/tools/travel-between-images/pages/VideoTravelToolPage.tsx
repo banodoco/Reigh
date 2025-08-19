@@ -426,7 +426,7 @@ const VideoTravelToolPage: React.FC = () => {
       // Show header when in shot list view
       const headerContent = (
         <div className="flex items-center justify-between">
-          <ToolPageHeader title="Travel Between Images" />
+          <ToolPageHeader title="Shots:" />
           {/* Only show header button when there are shots */}
           {(!isLoading && shots && shots.length > 0) && (
             <Button onClick={() => setIsCreateShotModalOpen(true)}>New Shot</Button>

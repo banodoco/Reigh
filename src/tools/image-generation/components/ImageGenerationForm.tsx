@@ -248,7 +248,7 @@ export const PromptInputRow: React.FC<PromptInputRowProps> = React.memo(({
       className="p-3 rounded-md shadow-sm bg-slate-50/30 dark:bg-slate-800/30"
     >
       <div className="flex justify-between items-center">
-        <Label htmlFor={`fullPrompt-${promptEntry.id}`} className="text-sm font-medium">
+        <Label htmlFor={`fullPrompt-${promptEntry.id}`} className="text-sm font-light">
           Prompt #{index + 1}
         </Label>
         <div className="flex items-center space-x-1">
@@ -886,7 +886,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
                   <button
                     type="button"
                     onClick={() => navigateToShot(selectedShot)}
-                    className="text-xs font-medium text-gray-500 hover:text-gray-700 hover:underline transition-colors duration-200 px-2 py-1 rounded-md hover:bg-gray-50"
+                    className="text-xs font-light text-gray-500 hover:text-gray-700 hover:underline transition-colors duration-200 px-2 py-1 rounded-md hover:bg-gray-50"
                   >
                     Jump to animate '{selectedShot.name}' →
                   </button>
@@ -898,7 +898,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
             {/* Prompts Section */}
             <div className="space-y-4">
                 <div className="flex justify-between items-center mb-2">
-                  <Label className="text-lg font-semibold">Prompts</Label>
+                  <Label className="text-lg font-light">Prompts</Label>
                   <div className="flex items-center space-x-2">
                     {/* Manage Prompts button (hidden when >3 prompts) */}
                     {prompts.length <= 3 && (
@@ -945,7 +945,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
                     ))
                   ) : (
                     <div className="p-3 border rounded-md text-center bg-slate-50/50 hover:border-primary/50 cursor-pointer" onClick={() => setIsPromptModalOpen(true)}>
-                        <p className="text-sm text-muted-foreground"><span className="font-semibold text-primary">{prompts.length} prompts</span> currently active.</p>
+                        <p className="text-sm text-muted-foreground"><span className="font-light text-primary">{prompts.length} prompts</span> currently active.</p>
                         <p className="text-xs text-primary">(Click to Edit)</p>
                     </div>
                   )}

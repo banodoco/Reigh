@@ -135,7 +135,7 @@ const EditTravelForm: React.FC<EditTravelFormProps> = ({
                 />
                 <Label 
                     htmlFor="reconstruct-video" 
-                    className={`text-sm font-medium ${isOverallGenerating || !inputFile || !inputFile.type.startsWith('video/') || isClientSideReconstructing ? 'text-muted-foreground' : ''}`}
+                    className={`text-sm font-light ${isOverallGenerating || !inputFile || !inputFile.type.startsWith('video/') || isClientSideReconstructing ? 'text-muted-foreground' : ''}`}
                 >
                   Reconstruct as video (Beta)
                 </Label>
@@ -157,7 +157,7 @@ const EditTravelForm: React.FC<EditTravelFormProps> = ({
             </div>
 
             <div className="pt-4">
-              <Label className="text-sm font-medium">Generation Mode</Label>
+              <Label className="text-sm font-light">Generation Mode</Label>
               <RadioGroup 
                 defaultValue="kontext" 
                 value={generationMode} 
@@ -177,7 +177,7 @@ const EditTravelForm: React.FC<EditTravelFormProps> = ({
               {generationMode === 'flux' && (
                 <>
                   <div className="pt-3">
-                    <Label htmlFor="flux-soft-edge-strength" className={`text-sm font-medium ${isOverallGenerating ? 'text-muted-foreground' : ''}`}>
+                    <Label htmlFor="flux-soft-edge-strength" className={`text-sm font-light ${isOverallGenerating ? 'text-muted-foreground' : ''}`}>
                       Soft Edge Strength: {Math.round(fluxSoftEdgeStrength * 100)}%
                     </Label>
                     <Slider
@@ -192,7 +192,7 @@ const EditTravelForm: React.FC<EditTravelFormProps> = ({
                     />
                   </div>
                   <div className="pt-3">
-                    <Label htmlFor="flux-depth-strength" className={`text-sm font-medium ${isOverallGenerating ? 'text-muted-foreground' : ''}`}>
+                    <Label htmlFor="flux-depth-strength" className={`text-sm font-light ${isOverallGenerating ? 'text-muted-foreground' : ''}`}>
                       Depth Strength: {Math.round(fluxDepthStrength * 100)}%
                     </Label>
                     <Slider

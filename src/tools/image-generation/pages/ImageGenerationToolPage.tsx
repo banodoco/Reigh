@@ -600,43 +600,64 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     }
   }, [isFormExpanded, markFormStateInteracted]);
 
-  // Effect for sticky header
+  // Effect for sticky header (RAF + precomputed threshold to avoid layout thrash)
   useEffect(() => {
-    const collapsibleDiv = collapsibleContainerRef.current;
-    let throttleTimer: NodeJS.Timeout | null = null;
+    const containerEl = collapsibleContainerRef.current;
+    if (!containerEl) return;
 
-    const handleScroll = () => {
-      if (throttleTimer) return; // Throttle to prevent excessive calls
-      
-      throttleTimer = setTimeout(() => {
-        throttleTimer = null;
-        
-        if (collapsibleDiv) {
-          const rect = collapsibleDiv.getBoundingClientRect();
-          // Sticky when the top of the container is scrolled past the header
-          const headerHeight = isMobile ? 150 : 96; // Match actual header heights
-          // Account for header height when determining if we've scrolled past
-          const shouldBeSticky = rect.top < headerHeight;
-          
-          // Only update state if it actually changed
-          if (shouldBeSticky !== isSticky) {
-            setIsSticky(shouldBeSticky);
-          }
-        }
-      }, 16); // ~60fps throttling
+    const stickyThresholdY = { current: 0 } as { current: number };
+    const isStickyRef = { current: isSticky } as { current: boolean };
+    let rafId = 0 as number | 0;
+
+    const computeThreshold = () => {
+      const rect = containerEl.getBoundingClientRect();
+      const docTop = window.pageYOffset || document.documentElement.scrollTop || 0;
+      const containerDocTop = rect.top + docTop;
+      const headerHeight = isMobile ? 150 : 96; // match actual header heights
+      const extra = isMobile ? 0 : 50; // extra scroll on desktop
+      stickyThresholdY.current = containerDocTop + headerHeight + extra;
     };
 
-    // Also check on mount
-    handleScroll();
-
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-      if (throttleTimer) {
-        clearTimeout(throttleTimer);
+    const checkSticky = () => {
+      rafId = 0 as number | 0;
+      const shouldBeSticky = (window.pageYOffset || document.documentElement.scrollTop || 0) > stickyThresholdY.current;
+      if (shouldBeSticky !== isStickyRef.current) {
+        isStickyRef.current = shouldBeSticky;
+        setIsSticky(shouldBeSticky);
       }
     };
-  }, [isFormExpanded, isMobile, isSticky]);
+
+    const onScroll = () => {
+      if (rafId) return;
+      rafId = requestAnimationFrame(checkSticky) as unknown as number;
+    };
+
+    const onResize = () => {
+      computeThreshold();
+      // Re-evaluate stickiness immediately after layout changes
+      if (rafId) cancelAnimationFrame(rafId as unknown as number);
+      rafId = requestAnimationFrame(checkSticky) as unknown as number;
+    };
+
+    // Initial measure
+    computeThreshold();
+    // Initial state check
+    checkSticky();
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onResize);
+
+    // If the container layout might change due to content expansion/collapse, recompute threshold
+    const ro = new ResizeObserver(() => onResize());
+    ro.observe(containerEl);
+
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onResize);
+      if (rafId) cancelAnimationFrame(rafId as unknown as number);
+      ro.disconnect();
+    };
+  }, [isFormExpanded, isMobile]);
 
   // [NavPerf] Stop timers when page has mounted
   useEffect(() => {
@@ -730,8 +751,8 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   }, [generationsResponse, isPageChange, isPageChangeFromBottom]);
 
   return (
-    <PageFadeIn>
-      <ToolPageHeader title="Image Generation" />
+    <PageFadeIn className="pt-10">
+
         {/* <Button variant="ghost" onClick={() => setShowSettingsModal(true)}>
           <Settings className="h-5 w-5" />
           <span className="sr-only">Settings</span>
@@ -770,30 +791,28 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
               open={isFormExpanded} 
               onOpenChange={setIsFormExpanded}
             >
-              {/* This trigger is only visible when the form is expanded OR when it's collapsed but not sticky */}
-              {!(!isFormExpanded && isSticky) && (
-                <CollapsibleTrigger asChild>
+              {/* Keep the trigger always visible - let it scroll naturally */}
+              <CollapsibleTrigger asChild>
                   <Button
                     variant="ghost"
-                    className={`${isFormExpanded ? 'w-full justify-between p-4 mb-4 hover:bg-accent/50' : 'w-full justify-between p-4 mb-4 bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-pink-500/20 border border-blue-400/40 hover:from-blue-500/30 hover:to-pink-500/30'} transition-colors duration-300`}
+                    className={`${isFormExpanded ? 'w-full justify-between p-4 mb-4 hover:bg-accent/50' : 'w-full justify-between p-4 mb-4 gradient-primary-collapsed'} transition-colors duration-300`}
                     onClick={handleToggleFormExpanded}
                     type="button"
                   >
                     <div className="flex items-center gap-2">
-                      <Settings2 className="h-4 w-4" />
-                      <span className="font-medium flex items-center gap-1">
+                      <Settings2 className={`h-4 w-4 ${!isFormExpanded ? 'text-white' : ''}`} />
+                      <span className={`font-light flex items-center gap-1 ${!isFormExpanded ? 'text-white' : ''}`}>
                         Image Generation
-                        {!isFormExpanded && <Sparkles className="h-3 w-3 text-blue-400 animate-pulse" />}
+                        {!isFormExpanded && <Sparkles className="h-3 w-3 text-white animate-pulse" />}
                       </span>
                     </div>
                     {isFormExpanded ? (
                       <ChevronDown className="h-4 w-4" />
                     ) : (
-                      <ChevronRight className="h-4 w-4" />
+                      <ChevronRight className="h-4 w-4 text-white" />
                     )}
                   </Button>
                 </CollapsibleTrigger>
-              )}
               <CollapsibleContent>
                 <div ref={formContainerRef} className="p-6 border rounded-lg shadow-sm bg-card w-full max-w-full">
                   <ImageGenerationForm
@@ -810,11 +829,11 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
             </Collapsible>
           </div>
 
-          {/* Sticky form toggle button (only when collapsed and scrolled past) */}
+          {/* Sticky form toggle button (appears when scrolled past original) */}
           {(hasValidFalApiKey && isFormExpanded === false && (isSticky || isScrollingToForm)) && (() => {
             // Calculate positioning based on header and panes
-            const headerHeight = isMobile ? 150 : 96; // Mobile header adjusted to 150px, desktop is 96px (h-24)
-            const topPosition = headerHeight + 12; // Add 12px gap below header
+            const headerHeight = isMobile ? 20 : 96; // Mobile header VERY close to top, desktop is 96px (h-24)
+            const topPosition = isMobile ? headerHeight + 4 : 25; // 25px from top on desktop, minimal gap on mobile
             
             // Calculate horizontal constraints based on locked panes
             const leftOffset = isShotsPaneLocked ? shotsPaneWidth : 0;
@@ -829,28 +848,30 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
                   right: `${rightOffset}px`,
                   paddingLeft: '16px',
                   paddingRight: '16px',
+                  willChange: 'transform, opacity',
+                  transform: 'translateZ(0)'
                 }}
               >
                 <Button
                   variant="ghost"
-                  className={`justify-between ${isMobile ? 'p-3 text-sm' : 'p-4'} w-full max-w-2xl bg-gradient-to-r from-blue-500/60 via-purple-500/60 to-pink-500/60 border border-blue-400/80 hover:from-blue-500/70 hover:to-pink-500/70 backdrop-blur-md shadow-xl transition-all duration-300 rounded-lg`}
+                  className={`justify-between ${isMobile ? 'p-3 text-sm' : 'p-4'} w-full max-w-2xl gradient-primary-collapsed backdrop-blur-md shadow-xl transition-all duration-300 rounded-lg`}
                   onClick={handleToggleFormExpanded}
                   type="button"
                 >
                   <div className="flex items-center gap-2">
-                    <Settings2 className="h-4 w-4" />
-                    <span className="font-medium flex items-center gap-1">
+                    <Settings2 className="h-4 w-4 text-white" />
+                    <span className="font-light flex items-center gap-1 text-white">
                       {isMobile ? 'Image Generation' : 'Image Generation'}
-                      <Sparkles className="h-3 w-3 text-blue-400 animate-pulse" />
+                      <Sparkles className="h-3 w-3 text-white animate-pulse" />
                     </span>
                   </div>
-                  <ChevronDown className="h-4 w-4" />
+                  <ChevronDown className="h-4 w-4 text-white" />
                 </Button>
               </div>
             );
           })()}
 
-          <div ref={galleryRef} className="mt-2">
+          <div ref={galleryRef} className="mt-2 pb-5">
             {/* Show SkeletonGallery on initial load or when filter changes take too long */}
             {isLoadingGenerations && imagesToShow.length === 0 ? (
               <SkeletonGallery

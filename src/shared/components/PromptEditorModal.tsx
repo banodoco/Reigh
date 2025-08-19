@@ -376,7 +376,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
               >
                 <div className="flex items-center gap-2">
                   <Wand2Icon className="h-4 w-4" />
-                  <span className="font-medium flex items-center gap-1">
+                  <span className="font-light flex items-center gap-1">
                     AI Prompt Tools
                     {!isAIPromptSectionExpanded && <Sparkles className="h-3 w-3 text-pink-400 animate-pulse" />}
                   </span>

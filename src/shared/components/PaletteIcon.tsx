@@ -143,12 +143,12 @@ export const PaletteIcon: React.FC<PaletteIconProps> = ({ className = "" }) => {
             >
               
               {/* Quote */}
-              <blockquote className="text-xs sm:text-sm leading-relaxed text-primary italic font-medium">
-                <span className="underline decoration-wes-pink decoration-2 underline-offset-2 font-semibold">Practice any art</span>—music, singing, dancing, acting, drawing, painting, sculpting, poetry, fiction, essays, reportage—<span className="not-italic font-medium text-wes-forest">no matter how well or badly</span>, not to get money and fame, but to <span className="font-bold text-wes-coral">experience becoming</span>, to find out <span className="font-bold text-wes-vintage-gold">what's inside you</span>, to <span className="animated-soul-grow">make your soul grow</span>.
+              <blockquote className="text-xs sm:text-sm leading-relaxed text-primary italic font-light">
+                <span className="underline decoration-wes-pink decoration-2 underline-offset-2 font-light">Practice any art</span>—music, singing, dancing, acting, drawing, painting, sculpting, poetry, fiction, essays, reportage—<span className="not-italic font-light text-wes-forest">no matter how well or badly</span>, not to get money and fame, but to <span className="font-bold text-wes-coral">experience becoming</span>, to find out <span className="font-bold text-wes-vintage-gold">what's inside you</span>, to <span className="animated-soul-grow">make your soul grow</span>.
               </blockquote>
               
               {/* Attribution */}
-              <p className="text-xs text-muted-foreground font-medium opacity-70">— Kurt Vonnegut —</p>
+              <p className="text-xs text-muted-foreground font-light opacity-70">— Kurt Vonnegut —</p>
             </div>
           </div>
         )}

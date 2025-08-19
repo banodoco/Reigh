@@ -138,7 +138,7 @@ const ShotsPage: React.FC = () => {
     <div className="container mx-auto p-4">
       {!selectedShot ? (
         <>
-          <h1 className="text-3xl font-bold mb-6">All Shots</h1>
+          <h1 className="text-3xl font-light mb-6">All Shots</h1>
           <ShotListDisplay
             shots={shots}
             onSelectShot={handleSelectShot}
@@ -148,7 +148,7 @@ const ShotsPage: React.FC = () => {
       ) : (
         <>
           <Button onPointerUp={handleBackToList} className="mb-4">Back to All Shots</Button>
-          <h2 className="text-2xl font-bold mb-4">Images in: {selectedShot.name}</h2>
+          <h2 className="text-2xl font-normal mb-4">Images in: {selectedShot.name}</h2>
           <ShotImageManager
             images={managedImages}
             onImageDelete={handleDeleteImage}

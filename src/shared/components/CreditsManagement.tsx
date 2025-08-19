@@ -262,7 +262,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
         <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">Remaining Credit</h3>
+              <h3 className="text-lg font-light text-gray-900">Remaining Credit</h3>
               <div className="text-2xl font-bold text-gray-900">
                 {isLoadingBalance ? (
                   <div className="animate-pulse">
@@ -322,7 +322,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
             <div className="p-6 space-y-6">
               <div className="space-y-4">
                 <div className="text-center">
-                  <label className="text-lg font-semibold text-gray-900">
+                  <label className="text-lg font-light text-gray-900">
                     How much would you like to add?
                   </label>
                 </div>
@@ -412,7 +412,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                           </Badge>
                         </TableCell>
                         <TableCell
-                          className={`font-semibold ${
+                          className={`font-light ${
                             tx.amount > 0 ? 'text-green-600' : 'text-red-600'
                           }`}
                         >
@@ -436,13 +436,13 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
             <div className="p-4 bg-gray-50 rounded-lg border space-y-3 sm:space-y-0">
               <div className="flex items-center gap-2 sm:hidden">
                 <Filter className="w-4 h-4 text-gray-500" />
-                <span className="text-sm font-medium text-gray-700">Filter by:</span>
+                <span className="text-sm font-light text-gray-700">Filter by:</span>
               </div>
               
               <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
                 <div className="hidden sm:flex items-center gap-2">
                   <Filter className="w-4 h-4 text-gray-500" />
-                  <span className="text-sm font-medium text-gray-700">Filter by:</span>
+                  <span className="text-sm font-light text-gray-700">Filter by:</span>
                 </div>
 
               {/* Cost Filter */}
@@ -460,7 +460,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                 <PopoverContent className="w-48" align="start">
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <h4 className="font-medium text-sm">Filter by Cost</h4>
+                      <h4 className="font-light text-sm">Filter by Cost</h4>
                       {taskLogFilters.costFilter !== 'all' && (
                         <Button 
                           variant="ghost" 
@@ -482,7 +482,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                           onChange={() => updateFilter('costFilter', 'all')}
                           className="w-4 h-4"
                         />
-                        <label htmlFor="cost-all" className="text-sm cursor-pointer font-medium">
+                        <label htmlFor="cost-all" className="text-sm cursor-pointer font-light">
                           All Costs
                         </label>
                       </div>
@@ -533,7 +533,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                   <PopoverContent className="w-48" align="start">
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <h4 className="font-medium text-sm">Filter by Status</h4>
+                        <h4 className="font-light text-sm">Filter by Status</h4>
                         {taskLogFilters.status.length > 0 && (
                           <Button 
                             variant="ghost" 
@@ -551,7 +551,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                           checked={taskLogFilters.status.length === 0}
                           onCheckedChange={() => updateFilter('status', [])}
                         />
-                        <label htmlFor="status-all" className="text-sm cursor-pointer font-medium">
+                        <label htmlFor="status-all" className="text-sm cursor-pointer font-light">
                           All Statuses ({taskLogData.availableFilters.statuses.length})
                         </label>
                       </div>
@@ -588,7 +588,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                   <PopoverContent className="w-56" align="start">
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <h4 className="font-medium text-sm">Filter by Task Type</h4>
+                        <h4 className="font-light text-sm">Filter by Task Type</h4>
                         {taskLogFilters.taskTypes.length > 0 && (
                           <Button 
                             variant="ghost" 
@@ -606,7 +606,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                           checked={taskLogFilters.taskTypes.length === 0}
                           onCheckedChange={() => updateFilter('taskTypes', [])}
                         />
-                        <label htmlFor="taskType-all" className="text-sm cursor-pointer font-medium">
+                        <label htmlFor="taskType-all" className="text-sm cursor-pointer font-light">
                           All Types ({taskLogData.availableFilters.taskTypes.length})
                         </label>
                       </div>
@@ -643,7 +643,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                   <PopoverContent className="w-64" align="start">
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <h4 className="font-medium text-sm">Filter by Project</h4>
+                        <h4 className="font-light text-sm">Filter by Project</h4>
                         {taskLogFilters.projectIds.length > 0 && (
                           <Button 
                             variant="ghost" 
@@ -661,7 +661,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                           checked={taskLogFilters.projectIds.length === 0}
                           onCheckedChange={() => updateFilter('projectIds', [])}
                         />
-                        <label htmlFor="project-all" className="text-sm cursor-pointer font-medium">
+                        <label htmlFor="project-all" className="text-sm cursor-pointer font-light">
                           All Projects ({taskLogData.availableFilters.projects.length})
                         </label>
                       </div>
@@ -798,7 +798,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                             {task.duration ? `${task.duration}s` : '-'}
                           </TableCell>
                           <TableCell 
-                            className={`font-semibold text-sm ${
+                            className={`font-light text-sm ${
                               task.cost ? 'text-red-600' : 'text-gray-400'
                             }`}
                           >

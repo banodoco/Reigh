@@ -21,9 +21,14 @@ export default {
 		},
 		extend: {
 			fontFamily: {
+				'cocogoose': ['"Cocogoose"', '"CocogooseNumbers"', '"Inter"', 'system-ui', '-apple-system', '"BlinkMacSystemFont"', '"Segoe UI"', '"Roboto"', 'sans-serif'],
+				'cocogoose-numbers': ['"Inter"', 'system-ui', '-apple-system', '"BlinkMacSystemFont"', '"Segoe UI"', '"Roboto"', 'sans-serif'],
 				'crimson': ['Crimson Text', 'serif'],
 				'inter': ['Inter', 'sans-serif'],
 				'playfair': ['Playfair Display', 'serif'],
+			},
+			fontWeight: {
+				'ultralight': '200',
 			},
 			colors: {
 				border: 'hsl(var(--border))',

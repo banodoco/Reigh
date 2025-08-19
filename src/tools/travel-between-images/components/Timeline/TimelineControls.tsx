@@ -29,7 +29,7 @@ const TimelineControls: React.FC<TimelineControlsProps> = ({
       <div className="flex items-center gap-4 flex-1">
         <div className="w-1/2">
           <div className="flex items-center gap-2 mb-1">
-            <Label htmlFor="contextFrames" className="text-sm font-medium">
+            <Label htmlFor="contextFrames" className="text-sm font-light">
               Context Frames: {contextFrames}
             </Label>
           </div>
@@ -48,11 +48,11 @@ const TimelineControls: React.FC<TimelineControlsProps> = ({
             <Info className="h-5 w-5 text-muted-foreground cursor-help hover:text-foreground transition-colors" />
           </TooltipTrigger>
                       <TooltipContent>
-              <p className="mb-1 font-semibold">Timeline Drag Shortcuts</p>
+              <p className="mb-1 font-light">Timeline Drag Shortcuts</p>
               <ul className="list-disc list-inside text-sm space-y-1">
-                <li><kbd className="font-mono">⌘</kbd> – <span className="font-medium">push/pull frames to the right</span></li>
-                <li><kbd className="font-mono">⌥</kbd> – <span className="font-medium">push/pull frames to the left</span></li>
-                <li><kbd className="font-mono">⌘ + ⌥</kbd> – shift the <span className="font-medium">entire timeline</span></li>
+                <li><kbd className="font-mono">⌘</kbd> – <span className="font-light">push/pull frames to the right</span></li>
+                <li><kbd className="font-mono">⌥</kbd> – <span className="font-light">push/pull frames to the left</span></li>
+                <li><kbd className="font-mono">⌘ + ⌥</kbd> – shift the <span className="font-light">entire timeline</span></li>
               </ul>
               <p className="text-xs text-muted-foreground mt-2">Push when dragging away, pull when dragging towards</p>
             </TooltipContent>

@@ -51,7 +51,7 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
   const config = {
     hover: {
       textSize: 'text-xs',
-      fontWeight: 'font-medium',
+      fontWeight: 'font-light',
       iconSize: 'h-2.5 w-2.5',
       labelCase: 'uppercase tracking-wide',
       gridCols: 'grid-cols-2',
@@ -64,7 +64,7 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
     },
     modal: {
       textSize: 'text-sm',
-      fontWeight: 'font-medium',
+      fontWeight: 'font-light',
       iconSize: 'h-3 w-3',
       labelCase: 'uppercase tracking-wide',
       gridCols: 'grid-cols-2',
@@ -77,7 +77,7 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
     },
     panel: {
       textSize: 'text-sm',
-      fontWeight: 'font-medium',
+      fontWeight: 'font-light',
       iconSize: 'h-3 w-3',
       labelCase: 'uppercase tracking-wide',
       gridCols: 'grid-cols-2',

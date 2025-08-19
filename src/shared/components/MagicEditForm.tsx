@@ -208,7 +208,7 @@ export const MagicEditForm: React.FC<MagicEditFormProps> = ({
             checked={magicEditInSceneBoost}
             onCheckedChange={(checked) => setMagicEditInSceneBoost(checked === true)}
           />
-          <Label htmlFor="magic-edit-in-scene" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+          <Label htmlFor="magic-edit-in-scene" className="text-sm font-light leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
             In-Scene Boost
           </Label>
         </div>

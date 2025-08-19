@@ -24,7 +24,7 @@ export const LoraManager: React.FC<LoraManagerProps> = ({
 
   return (
     <div className={`space-y-4 ${className}`}>
-      <h3 className="font-semibold text-sm">{title}</h3>
+      <h3 className="font-light text-sm">{title}</h3>
       
       <Button 
         type="button" 

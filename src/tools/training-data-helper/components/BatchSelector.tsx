@@ -478,7 +478,7 @@ File Size: ${segmentBlob.size} bytes`;
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <h4 className="font-medium text-sm">{selectedBatch.name}</h4>
+                      <h4 className="font-light text-sm">{selectedBatch.name}</h4>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -586,7 +586,7 @@ File Size: ${segmentBlob.size} bytes`;
                 Are you sure you want to delete "{batchToDelete?.name}"? This action cannot be undone.
               </p>
               {batchToDelete && videos.filter(v => v.batchId === batchToDelete.id).length > 0 && (
-                <p className="text-sm text-red-600 font-medium">
+                <p className="text-sm text-red-600 font-light">
                   This batch contains {videos.filter(v => v.batchId === batchToDelete.id).length} videos. 
                   Please delete all videos first before deleting the batch.
                 </p>

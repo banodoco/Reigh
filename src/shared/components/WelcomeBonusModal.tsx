@@ -67,7 +67,7 @@ const IntroductionStep: React.FC<{ onNext: () => void }> = ({ onNext }) => (
     </DialogHeader>
     
     <div className="text-center space-y-4">
-      <p className="text-lg font-medium">
+      <p className="text-lg font-light">
         Reigh is a tool to help <em>you</em> make art with AI
       </p>
       
@@ -107,7 +107,7 @@ const CommunityStep: React.FC<{ onNext: () => void }> = ({ onNext }) => (
     </DialogHeader>
     
     <div className="text-center space-y-4">
-      <p className="text-lg font-medium">
+      <p className="text-lg font-light">
         Creating art that feels like you made it is hard
       </p>
       
@@ -179,7 +179,7 @@ const PWAInstallStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
       </DialogHeader>
       
       <div className="text-center space-y-4">
-        <p className="text-lg font-medium">
+        <p className="text-lg font-light">
           Get the best experience by installing Reigh as an app!
         </p>
         
@@ -203,7 +203,7 @@ const PWAInstallStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
           <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 text-sm">
             {isIOS && (
               <>
-                <p className="font-medium mb-2">📱 On iOS Safari:</p>
+                <p className="font-light mb-2">📱 On iOS Safari:</p>
                 <p className="text-muted-foreground">
                   1. Tap the <strong>Share</strong> button (□↗) at the bottom<br/>
                   2. Scroll down and select <strong>"Add to Home Screen"</strong><br/>
@@ -213,7 +213,7 @@ const PWAInstallStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
             )}
             {isAndroid && (
               <>
-                <p className="font-medium mb-2">🤖 On Android:</p>
+                <p className="font-light mb-2">🤖 On Android:</p>
                 <p className="text-muted-foreground">
                   1. Look for <strong>"Install"</strong> button in address bar<br/>
                   2. Or tap browser menu (⋮) → <strong>"Add to Home Screen"</strong><br/>
@@ -223,7 +223,7 @@ const PWAInstallStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
             )}
             {!isIOS && !isAndroid && showInstructions && (
               <>
-                <p className="font-medium mb-2">💻 On Desktop:</p>
+                <p className="font-light mb-2">💻 On Desktop:</p>
                 <p className="text-muted-foreground">
                   1. Press <strong>Ctrl+D</strong> (or <strong>Cmd+D</strong> on Mac) to bookmark<br/>
                   2. Or look for install icon in your browser's address bar<br/>
@@ -327,7 +327,7 @@ const GenerationMethodStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
                  className="pointer-events-none"
                />
                <div className="flex-1">
-                 <label htmlFor="in-cloud" className="text-sm font-medium leading-none cursor-pointer">
+                 <label htmlFor="in-cloud" className="text-sm font-light leading-none cursor-pointer">
                    In the cloud ☁️
                  </label>
                  <p className="text-xs text-muted-foreground mt-1">
@@ -342,7 +342,7 @@ const GenerationMethodStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
              onClick={() => updateGenerationMethods({ onComputer: !onComputerChecked })}
            >
              <div className="absolute top-2 right-2">
-               <span className="bg-green-500 text-white text-xs font-medium px-2 py-1 rounded-full">
+               <span className="bg-green-500 text-white text-xs font-light px-2 py-1 rounded-full">
                  Free
                </span>
              </div>
@@ -353,7 +353,7 @@ const GenerationMethodStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
                  className="pointer-events-none"
                />
                <div className="flex-1">
-                 <label htmlFor="on-computer" className="text-sm font-medium leading-none cursor-pointer">
+                 <label htmlFor="on-computer" className="text-sm font-light leading-none cursor-pointer">
                    On my computer 💻
                  </label>
                  <p className="text-xs text-muted-foreground mt-1">
@@ -407,7 +407,7 @@ const CreditsStep: React.FC<{ onNext: () => void }> = ({ onNext }) => (
     <div className="text-center space-y-4">
       <div className="flex items-center justify-center space-x-2 text-lg">
         <Sparkles className="w-5 h-5 text-yellow-500" />
-        <span className="font-semibold">We've added $5 to your account to help test our cloud service!</span>
+        <span className="font-light">We've added $5 to your account to help test our cloud service!</span>
         <Sparkles className="w-5 h-5 text-yellow-500" />
       </div>
       
@@ -456,7 +456,7 @@ const SetupCompleteStep: React.FC<{ onClose: () => void }> = ({ onClose }) => {
       </DialogHeader>
       
       <div className="text-center space-y-4">
-        <p className="text-lg font-medium">
+        <p className="text-lg font-light">
           Ready to start creating amazing art with Reigh
         </p>
         

@@ -85,11 +85,11 @@ export default function ArtPage() {
       <div className="container mx-auto px-4 py-16 relative z-10">
         {/* Header */}
         <FadeInSection className="text-center mb-16">
-          <h1 className="font-playfair text-5xl md:text-7xl font-bold text-primary mb-8 text-shadow-vintage">
+                      <h1 className="font-cocogoose text-5xl md:text-7xl font-light text-primary mb-8 text-shadow-vintage">
             Community Art Gallery
           </h1>
           <div className="w-32 h-1.5 bg-gradient-to-r from-wes-coral to-wes-vintage-gold rounded-full mx-auto mb-8 shadow-inner-vintage"></div>
-          <p className="font-inter text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
+          <p className="font-cocogoose text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
             A curated collection of visual journeys created by our community of artists and dreamers
           </p>
         </FadeInSection>
@@ -109,19 +109,19 @@ export default function ArtPage() {
                     <div className={`w-16 h-16 bg-${piece.color}/30 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform duration-300`}>
                       <Video className={`w-8 h-8 text-${piece.color}`} />
                     </div>
-                    <p className="text-sm text-muted-foreground font-inter">Click to play</p>
+                    <p className="text-sm text-muted-foreground font-cocogoose">Click to play</p>
                   </div>
                 </div>
 
                 {/* Content */}
                 <div className="p-6">
-                  <h3 className="font-playfair text-xl font-semibold text-primary mb-2 group-hover:text-primary/80 transition-colors">
+                  <h3 className="font-cocogoose text-xl font-light text-primary mb-2 group-hover:text-primary/80 transition-colors">
                     {piece.title}
                   </h3>
-                  <p className="text-sm text-muted-foreground font-inter mb-3">
-                    by <span className="font-medium text-primary">{piece.artist}</span>
+                  <p className="text-sm text-muted-foreground font-cocogoose mb-3">
+                    by <span className="font-light text-primary">{piece.artist}</span>
                   </p>
-                  <p className="text-sm text-muted-foreground font-inter leading-relaxed mb-4">
+                  <p className="text-sm text-muted-foreground font-cocogoose leading-relaxed mb-4">
                     {piece.description}
                   </p>
                   
@@ -154,15 +154,15 @@ export default function ArtPage() {
         {/* Call to Action */}
         <FadeInSection className="text-center mt-16" delayMs={800}>
           <div className="wes-ornate-frame p-8 max-w-2xl mx-auto">
-            <h2 className="font-playfair text-2xl font-semibold text-primary mb-4">
+            <h2 className="font-cocogoose text-2xl font-light text-primary mb-4">
               Share Your Journey
             </h2>
-            <p className="font-inter text-muted-foreground mb-6 leading-relaxed">
+            <p className="font-cocogoose text-muted-foreground mb-6 leading-relaxed">
               Create your own visual journey and join our community of artists exploring the spaces between images.
             </p>
             <a
               href="#signup"
-              className="inline-flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-wes-coral to-wes-pink text-white rounded-full border-2 border-wes-coral/30 hover:border-wes-coral/50 transition-all duration-300 hover:shadow-wes-ornate font-inter font-medium"
+              className="inline-flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-wes-coral to-wes-pink text-white rounded-full border-2 border-wes-coral/30 hover:border-wes-coral/50 transition-all duration-300 hover:shadow-wes-ornate font-cocogoose font-light"
             >
               <span>Start Creating</span>
             </a>

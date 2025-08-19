@@ -223,7 +223,7 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
                 currentDialogSkipChoiceRef.current = booleanValue;
               }}
             />
-            <Label htmlFor="skip-confirm" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+            <Label htmlFor="skip-confirm" className="text-sm font-light leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
               Delete without confirmation in the future
             </Label>
           </div>

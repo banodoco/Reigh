@@ -1022,7 +1022,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                         {/* Model Selection (Mobile) */}
                         <div className="block lg:hidden mt-6">
                             <div className="space-y-4 p-4 border rounded-lg bg-card mb-4">
-                                <h3 className="font-semibold text-sm">Which model would you like to use:</h3>
+                                <h3 className="font-light text-sm">Which model would you like to use:</h3>
                                 <div className="space-y-2">
                                     <label className="flex items-center space-x-2 cursor-pointer">
                                         <input
@@ -1053,7 +1053,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                         {/* LoRA Settings (Mobile) */}
                         <div className="block lg:hidden mt-6">
                             <div className="space-y-4 p-4 border rounded-lg bg-card">
-                                <h3 className="font-semibold text-sm">LoRA Models</h3>
+                                <h3 className="font-light text-sm">LoRA Models</h3>
                                 
                                 <Button type="button" variant="outline" className="w-full" onClick={() => loraManager.setIsLoraModalOpen(true)}>
                                     Add or Manage LoRAs
@@ -1103,7 +1103,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                     <div className="hidden lg:block lg:w-80 order-1 lg:order-2">
                         {/* Model Selection */}
                         <div className="space-y-4 p-4 border rounded-lg bg-card mb-4">
-                            <h3 className="font-semibold text-sm">Which model would you like to use:</h3>
+                            <h3 className="font-light text-sm">Which model would you like to use:</h3>
                             <div className="space-y-2">
                                 <label className="flex items-center space-x-2 cursor-pointer">
                                     <input
@@ -1144,7 +1144,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                         
                         {/* LoRA Settings */}
                         <div className="space-y-4 p-4 border rounded-lg bg-card">
-                            <h3 className="font-semibold text-sm">LoRA Models</h3>
+                            <h3 className="font-light text-sm">LoRA Models</h3>
                             
                             <Button type="button" variant="outline" className="w-full" onClick={() => loraManager.setIsLoraModalOpen(true)}>
                                 Add or Manage LoRAs

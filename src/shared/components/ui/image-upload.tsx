@@ -66,7 +66,7 @@ const ImageUpload = ({
 
   return (
     <div className="space-y-2">
-      {label && <div className="text-center font-medium">{label}</div>}
+      {label && <div className="text-center font-light">{label}</div>}
       <div
         className={cn(
           "border-2 border-dashed rounded-md flex flex-col items-center justify-center p-4 transition-colors",
