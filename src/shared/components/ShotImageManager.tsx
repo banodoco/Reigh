@@ -32,6 +32,7 @@ import { getImageLoadingStrategy } from '@/shared/lib/imageLoadingPriority';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel, AlertDialogOverlay } from "@/shared/components/ui/alert-dialog";
 import { Checkbox } from "@/shared/components/ui/checkbox";
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
+import { usePanes } from '@/shared/contexts/PanesContext';
 
 // Removed legacy sessionStorage key constant now that setting is persisted in DB
 
@@ -82,6 +83,14 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
   const [isOptimisticUpdate, setIsOptimisticUpdate] = useState(false);
   const [reconciliationId, setReconciliationId] = useState(0);
   const reconciliationTimeoutRef = useRef<NodeJS.Timeout>();
+
+  // Get pane states to adjust floating bar position
+  const { 
+    isShotsPaneLocked, 
+    isTasksPaneLocked,
+    shotsPaneWidth,
+    tasksPaneWidth
+  } = usePanes();
 
   // CRITICAL OPTIMISTIC UPDATE RACE CONDITION FIX:
   // Enhanced reconciliation with debouncing, tracking IDs, and timeout-based recovery
@@ -690,36 +699,50 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
         </ProgressiveLoadingManager>
 
         {/* Floating Action Bar for Multiple Selection (Mobile) */}
-        {mobileSelectedIds.length >= 1 && (
-          <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center gap-3">
-              <span className="text-sm font-light text-gray-700 dark:text-gray-300">
-                {mobileSelectedIds.length} selected
-              </span>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setMobileSelectedIds([])}
-                  className="text-sm"
-                >
-                  {mobileSelectedIds.length === 1 ? 'Deselect' : 'Deselect All'}
-                </Button>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => {
-                    setPendingDeleteIds([...mobileSelectedIds]); // Preserve selected IDs
-                    setConfirmOpen(true);
-                  }}
-                  className="text-sm"
-                >
-                  {mobileSelectedIds.length === 1 ? 'Delete' : 'Delete All'}
-                </Button>
+        {mobileSelectedIds.length >= 1 && (() => {
+          // Calculate horizontal constraints based on locked panes (same pattern as ImageGenerationToolPage)
+          const leftOffset = isShotsPaneLocked ? shotsPaneWidth : 0;
+          const rightOffset = isTasksPaneLocked ? tasksPaneWidth : 0;
+          
+          return (
+            <div 
+              className="fixed bottom-6 z-50 flex justify-center"
+              style={{
+                left: `${leftOffset}px`,
+                right: `${rightOffset}px`,
+                paddingLeft: '16px',
+                paddingRight: '16px',
+              }}
+            >
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center gap-3">
+                <span className="text-sm font-light text-gray-700 dark:text-gray-300">
+                  {mobileSelectedIds.length} selected
+                </span>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setMobileSelectedIds([])}
+                    className="text-sm"
+                  >
+                    {mobileSelectedIds.length === 1 ? 'Deselect' : 'Deselect All'}
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => {
+                      setPendingDeleteIds([...mobileSelectedIds]); // Preserve selected IDs
+                      setConfirmOpen(true);
+                    }}
+                    className="text-sm"
+                  >
+                    {mobileSelectedIds.length === 1 ? 'Delete' : 'Delete All'}
+                  </Button>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* Delete Confirmation Dialog (Mobile) */}
         <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
