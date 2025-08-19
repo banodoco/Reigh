@@ -879,36 +879,50 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
       )}
 
       {/* Floating Action Bar for Multiple Selection (Desktop) */}
-      {selectedIds.length >= 1 && (
-        <div className="fixed bottom-[54px] left-1/2 transform -translate-x-1/2 z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center gap-3">
-            <span className="text-sm font-light text-gray-700 dark:text-gray-300">
-              {selectedIds.length} selected
-            </span>
-            <div className="flex gap-2">
-                             <Button
-                 variant="outline"
-                 size="sm"
-                 onClick={() => setSelectedIds([])}
-                 className="text-sm"
-               >
-                 {selectedIds.length === 1 ? 'Deselect' : 'Deselect All'}
-               </Button>
-               <Button
-                 variant="destructive"
-                 size="sm"
-                 onClick={() => {
-                   setPendingDeleteIds([...selectedIds]); // Preserve selected IDs
-                   setConfirmOpen(true);
-                 }}
-                 className="text-sm"
-               >
-                 {selectedIds.length === 1 ? 'Delete' : 'Delete All'}
-               </Button>
+      {selectedIds.length >= 1 && (() => {
+        // Calculate horizontal constraints based on locked panes (same pattern as ImageGenerationToolPage)
+        const leftOffset = isShotsPaneLocked ? shotsPaneWidth : 0;
+        const rightOffset = isTasksPaneLocked ? tasksPaneWidth : 0;
+        
+        return (
+          <div 
+            className="fixed bottom-[54px] z-50 flex justify-center"
+            style={{
+              left: `${leftOffset}px`,
+              right: `${rightOffset}px`,
+              paddingLeft: '16px',
+              paddingRight: '16px',
+            }}
+          >
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center gap-3">
+              <span className="text-sm font-light text-gray-700 dark:text-gray-300">
+                {selectedIds.length} selected
+              </span>
+              <div className="flex gap-2">
+                               <Button
+                   variant="outline"
+                   size="sm"
+                   onClick={() => setSelectedIds([])}
+                   className="text-sm"
+                 >
+                   {selectedIds.length === 1 ? 'Deselect' : 'Deselect All'}
+                 </Button>
+                 <Button
+                   variant="destructive"
+                   size="sm"
+                   onClick={() => {
+                     setPendingDeleteIds([...selectedIds]); // Preserve selected IDs
+                     setConfirmOpen(true);
+                   }}
+                   className="text-sm"
+                 >
+                   {selectedIds.length === 1 ? 'Delete' : 'Delete All'}
+                 </Button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Shared Delete Confirmation Dialog for both Mobile and Desktop */}
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
