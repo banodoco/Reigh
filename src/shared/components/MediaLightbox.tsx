@@ -58,6 +58,7 @@ interface MediaLightboxProps {
     taskId: string | null;
     onApplyTaskSettings?: (settings: any) => void;
     onApplySettingsFromTask?: (taskId: string, replaceImages: boolean, inputImages: string[]) => void;
+    onClose?: () => void;
   };
   // Mobile video task details toggle
   onShowTaskDetails?: () => void;
@@ -556,15 +557,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           <TooltipContent>Download {isVideo ? 'video' : 'image'}</TooltipContent>
                         </Tooltip>
                       )}
-
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={onClose}
-                        className="bg-black/50 hover:bg-black/70 text-white"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
                     </div>
 
                     {/* Bottom Workflow Controls */}
@@ -676,6 +668,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       onReplaceImagesChange={setReplaceImages}
                       onApplySettings={taskDetailsData.onApplyTaskSettings}
                       onApplySettingsFromTask={taskDetailsData.onApplySettingsFromTask}
+                      onClose={taskDetailsData.onClose || onClose}
                       className="h-full"
                     />
                   )}
@@ -774,15 +767,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       >
                         <Star className={`h-4 w-4 ${localStarred ? 'fill-current' : ''}`} />
                       </Button>
-
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={onClose}
-                        className="bg-black/50 hover:bg-black/70 text-white"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
                     </div>
 
                     {/* Mobile navigation */}
@@ -826,6 +810,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       onReplaceImagesChange={setReplaceImages}
                       onApplySettings={taskDetailsData.onApplyTaskSettings}
                       onApplySettingsFromTask={taskDetailsData.onApplySettingsFromTask}
+                      onClose={taskDetailsData.onClose || onClose}
                       className="h-full"
                     />
                   )}

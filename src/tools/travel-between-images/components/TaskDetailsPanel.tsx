@@ -22,6 +22,7 @@ interface TaskDetailsPanelProps {
   onApplySettingsFromTask?: (taskId: string, replaceImages: boolean, inputImages: string[]) => void;
   taskId: string | null;
   className?: string;
+  onClose?: () => void;
 }
 
 const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({ 
@@ -34,7 +35,8 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({
   onApplySettings, 
   onApplySettingsFromTask, 
   taskId,
-  className = ""
+  className = "",
+  onClose
 }) => {
   const isMobile = useIsMobile();
   const [showDetailedParams, setShowDetailedParams] = useState(true);
@@ -88,7 +90,19 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({
   return (
     <div className={`flex flex-col h-full ${className}`}>
       <div className="flex-shrink-0 p-4 border-b">
-        <h3 className="text-lg font-light">Generation Task Details</h3>
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-light">Generation Task Details</h3>
+          {onClose && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onClose}
+              className="h-8 w-8 p-0 hover:bg-muted"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
       </div>
       
       <ScrollArea className="flex-1 p-4">

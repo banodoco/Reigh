@@ -725,7 +725,8 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
               inputImages,
               taskId: lightboxTaskMapping?.taskId || null,
               onApplyTaskSettings: onApplySettings,
-              onApplySettingsFromTask
+              onApplySettingsFromTask,
+              onClose: () => setLightboxIndex(null)
             }}
             onShowTaskDetails={isMobile ? handleShowTaskDetails : undefined}
           />

@@ -642,80 +642,81 @@ export default function HomePage() {
               <X className="w-5 h-5 sm:w-4 sm:h-4 text-gray-600" />
             </button>
             
-            <div className="mb-6 pr-12 sm:pr-0">
-              <h2 className="font-theme text-2xl sm:text-3xl font-theme-heading text-primary mb-4">Anyone can run Reigh for free</h2>
-              <div className="w-16 h-1 bg-gradient-to-r from-wes-coral to-wes-pink rounded-full mb-6 animate-pulse-breathe"></div>
+            <div className="mb-8 pr-12 sm:pr-0 space-y-3 -mt-4">
+              <h2 className="font-theme text-2xl sm:text-3xl font-theme-heading text-primary">Reigh is an open source tool built on top of open models</h2>
+              <div className="w-16 h-1 bg-gradient-to-r from-wes-coral to-wes-pink rounded-full animate-pulse-breathe"></div>
             </div>
             
             <div className="space-y-6 text-muted-foreground">
-            <p className="text-sm leading-relaxed">
-              Reigh is an open source tool built on top of open models.
-            </p>
-
               <p className="text-sm leading-relaxed">
-                As a result, when you sign up to Reigh, you'll notice something strange:&nbsp; if you have a decent computer, you can run it for free!
+                This means four important things that set us apart from venture-backed AI art platforms:
               </p>
-              
 
-              
-              <div className="rounded-lg overflow-hidden border border-gray-200 shadow-sm">
-                <img 
-                  src="https://wczysqzxlwdndgxitrvc.supabase.co/storage/v1/object/public/image_uploads//easy.png"
-                  alt="Screenshot showing how easy it is to run Reigh locally"
-                  className="w-full h-auto rounded-lg"
-                />
-              </div>
-              
-              <p className="text-sm leading-relaxed">
-                This isn't just possible, but we make it very easy&nbsp;&mdash;&nbsp;you can use the app in any browser while the tasks process at home.
-              </p>
-              
-              <div className="space-y-4">
-                <h3 className="font-theme-light text-primary text-lg">But...why make it free?</h3>
-                
-                <p className="text-sm leading-relaxed">
-                  Today, venture-backed startups invest tens of millions in 'Creative Partner Programs'.
-                </p>
-                
-                <p className="text-sm leading-relaxed">
-                  The reason they do this is simple: it's valuable to have people make art with your tool - every piece you make is marketing for them.
-                </p>
-                
-                <p className="text-sm leading-relaxed">
-                  But it's not free - the cost is ultimately paid by the people you attract for them. On aggregate, they pay a higher price to cover the cost of your credits.
-                </p>
-    
-              </div>
-              
-              <div className="space-y-4">
-                <h3 className="font-theme-light text-primary text-lg">A better way for <u>all</u> artists</h3>
-                
-                <p className="text-sm leading-relaxed">
-                  While this status quo is good for artists who are given free credits, we believe that there's a better way.
-                </p>
-                
-                <p className="text-sm leading-relaxed">
-                  We call this an <strong className="text-primary">Open Creative Partner Programme</strong>.
-                </p>
-                
-                <p className="text-sm leading-relaxed">
-                  In short, we open source our tool, capabilities, models and then make it as easy as possible for people to run them for free.
-                </p>
-                
-                <p className="text-sm leading-relaxed">
-                  We hope that artists will then use the free tool to create and that this in turns attracts others&nbsp;&mdash;&nbsp;many of whom won't have powerful computers or will want to pay for convenience.
-                </p>
-
-                <p className="text-sm leading-relaxed">
-                  We believe that this is a better approach that will make creation affordable to more people. If you agree and choose to create with Reigh, you'll be honouring the age-old truth in the sentiment expressed by Picasso:
-                </p>
-                
-                <blockquote className="bg-wes-coral/10 border-l-4 border-wes-coral p-3 rounded-r-lg">
-                  <p className="text-sm italic text-primary font-theme-light">
-                    "...when artists get together they talk about where you can buy cheap turpentine."
+              <div className="space-y-6">
+                <div className="space-y-3">
+                  <h3 className="font-theme-light text-primary text-lg">1) Anyone can run Reigh for free on your computer</h3>
+                  
+                  <p className="text-sm leading-relaxed">
+                    When you sign up to Reigh, you'll notice something strange: if you have a decent computer, you can run it for free! We make this very easy—you can use the app in any browser while the tasks process at home.
                   </p>
-                </blockquote>
-                
+                  
+                  <p className="text-sm leading-relaxed">
+                    This isn't just possible, but we make it very easy. Unlike other platforms that lock you into their expensive cloud services, we open source everything so you have real choice in how you create.
+                  </p>
+                  
+                  <p className="text-sm leading-relaxed">
+                    Today, venture-backed startups invest tens of millions in 'Creative Partner Programs'. The reason they do this is simple: it's valuable to have people make art with your tool—every piece you make is marketing for them. But it's not free—the cost is ultimately paid by the people you attract for them. On aggregate, they pay a higher price to cover the cost of your credits.
+                  </p>
+                  
+                  <div className="rounded-lg overflow-hidden border border-gray-200 shadow-sm">
+                    <img 
+                      src="https://wczysqzxlwdndgxitrvc.supabase.co/storage/v1/object/public/image_uploads//easy.png"
+                      alt="Screenshot showing how easy it is to run Reigh locally"
+                      className="w-full h-auto rounded-lg"
+                    />
+                  </div>
+                  
+                  <p className="text-sm leading-relaxed">
+                    We call our approach an <strong className="text-primary">Open Creative Partner Programme</strong>. In short, we open source our tool, capabilities, and models, then make it as easy as possible for people to run them for free. We hope that artists will use the free tool to create, and this in turn attracts others—many of whom won't have powerful computers or will want to pay for convenience.
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  <h3 className="font-theme-light text-primary text-lg">2) It's very cheap to run on the cloud</h3>
+                  
+                  <p className="text-sm leading-relaxed">
+                    Because we use open models and run on consumer-grade hardware, our cloud costs are a fraction of what big platforms charge. This means we can offer extremely affordable cloud processing for those who prefer convenience.
+                  </p>
+                  
+                  <p className="text-sm leading-relaxed">
+                    We believe this approach creates a sustainable ecosystem where artists get affordable tools, the community gets supported, and innovation flourishes. If you agree and choose to create with Reigh, you'll be honouring the age-old truth in the sentiment expressed by Picasso:
+                  </p>
+                  
+                  <blockquote className="bg-wes-coral/10 border-l-4 border-wes-coral p-3 rounded-r-lg">
+                    <p className="text-sm italic text-primary font-theme-light">
+                      "...when artists get together they talk about where you can buy cheap turpentine."
+                    </p>
+                  </blockquote>
+                </div>
+
+                <div className="space-y-3">
+                  <h3 className="font-theme-light text-primary text-lg">3) We want to support people in the ecosystem</h3>
+                  
+                  <p className="text-sm leading-relaxed">
+                    We share 33% of our profits with people from the community who contribute to tutorials, documentation, community building, and artistic exploration that helps others discover what's possible with the tool.
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  <h3 className="font-theme-light text-primary text-lg">4) We want to support the ecosystem as a whole</h3>
+                  
+                  <p className="text-sm leading-relaxed">
+                    We share another 33% of our profits with projects that benefit the broader open source AI art community—funding model development, dataset creation, and tools that make AI art more accessible to everyone.
+                  </p>
+                </div>
+              </div>
+              
+              <div className="space-y-4">
                 <p className="text-sm leading-relaxed">
                   Accessible, cheap/free capabilities delivered through great tools = a flourishing ecosystem for all artists.
                 </p>
@@ -768,7 +769,7 @@ export default function HomePage() {
             </button>
 
             {/* Examples content moved from the Bottom Pane */}
-            <div className="mb-8 space-y-3">
+            <div className="mb-8 space-y-3 -mt-4">
               <h2 className="font-theme text-2xl sm:text-3xl font-theme-heading text-primary">Reigh is a tool for travelling between images</h2>
               <div className="w-16 h-1 bg-gradient-to-r from-wes-vintage-gold to-wes-coral rounded-full animate-pulse-breathe"></div>
             </div>

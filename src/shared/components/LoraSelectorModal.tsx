@@ -521,7 +521,7 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & { onClose: () => void
                         onCheckedChange={(checked) => setShowAddedLorasOnly(!!checked)}
                         className="data-[state=checked]:bg-wes-mint data-[state=checked]:border-wes-mint-dark border-primary/40 pointer-events-none"
                       />
-                      <Label htmlFor="show-added-loras-only-sticky" className="text-sm font-light cursor-pointer select-none font-cocogoose tracking-wide pointer-events-none">
+                      <Label htmlFor="show-added-loras-only-sticky" className="text-sm font-medium cursor-pointer select-none tracking-normal pointer-events-none">
                         <span className="hidden sm:inline">Show added LoRAs</span>
                         <span className="sm:hidden">Added</span>
                       </Label>
@@ -542,7 +542,7 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & { onClose: () => void
                         onCheckedChange={(checked) => setShowMyLorasOnly(!!checked)}
                         className="data-[state=checked]:bg-wes-dusty-blue data-[state=checked]:border-primary border-primary/40 pointer-events-none"
                       />
-                      <Label htmlFor="show-my-loras-only-sticky" className="text-sm font-light cursor-pointer select-none font-cocogoose tracking-wide pointer-events-none">
+                      <Label htmlFor="show-my-loras-only-sticky" className="text-sm font-medium cursor-pointer select-none tracking-normal pointer-events-none">
                         <span className="hidden sm:inline">Show my LoRAs</span>
                         <span className="sm:hidden">My LoRAs</span>
                       </Label>
@@ -555,7 +555,7 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & { onClose: () => void
                     {myLorasCount > 0 && (
                       <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gradient-to-r from-wes-dusty-blue/20 to-wes-lavender/20 border border-wes-dusty-blue/30">
                         <div className="w-1.5 h-1.5 rounded-full bg-wes-dusty-blue animate-pulse" />
-                        <span className="text-xs font-light text-primary font-cocogoose">
+                        <span className="text-sm font-medium text-primary">
                           {myLorasCount} saved
                         </span>
                       </div>
@@ -563,7 +563,7 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & { onClose: () => void
                     {selectedLoraIds.length > 0 && (
                       <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gradient-to-r from-wes-mint/20 to-wes-sage/20 border border-wes-mint/30">
                         <div className="w-1.5 h-1.5 rounded-full bg-wes-mint animate-pulse" />
-                        <span className="text-xs font-light text-wes-forest font-cocogoose">
+                        <span className="text-sm font-medium text-wes-forest">
                           {selectedLoraIds.length} active
                         </span>
                       </div>
@@ -574,7 +574,7 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & { onClose: () => void
                       variant="wes-outline" 
                       size="sm"
                       onClick={onClose}
-                      className="flex items-center gap-1.5 font-cocogoose tracking-wide"
+                      className="flex items-center gap-1.5 text-sm font-normal"
                     >
                       <X className="h-4 w-4" />
                       <span className="hidden sm:inline">Close</span>
@@ -586,7 +586,7 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & { onClose: () => void
                 <div className="text-center">
                   <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-wes-cream/80 to-wes-pink/20 border border-wes-vintage-gold/30 shadow-inner-vintage">
                     <div className="w-1.5 h-1.5 rounded-full bg-wes-vintage-gold animate-pulse" />
-                    <span className="text-sm font-light text-primary font-cocogoose tracking-wide">
+                    <span className="text-sm font-medium text-primary">
                       {showMyLorasOnly && showAddedLorasOnly ? (
                         <span className="text-wes-burgundy">Showing {processedLoras.length} of your added LoRAs</span>
                       ) : showMyLorasOnly ? (
