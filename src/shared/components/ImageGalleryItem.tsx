@@ -549,9 +549,9 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                       {onCreateShot && (
                         <div className="p-1">
                           <Button
-                            variant="outline"
+                            variant="secondary"
                             size="sm"
-                            className="w-full h-8 text-xs justify-center"
+                            className="w-full h-8 text-xs justify-center bg-zinc-700 hover:bg-zinc-600 text-white border-zinc-600"
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();

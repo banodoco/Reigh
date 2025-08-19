@@ -613,8 +613,8 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
       const rect = containerEl.getBoundingClientRect();
       const docTop = window.pageYOffset || document.documentElement.scrollTop || 0;
       const containerDocTop = rect.top + docTop;
-      const headerHeight = isMobile ? 150 : 96; // match actual header heights
-      const extra = isMobile ? 0 : 50; // extra scroll on desktop
+             const headerHeight = isMobile ? 150 : 96; // match actual header heights
+       const extra = isMobile ? 0 : -10; // appears 30px earlier than before (negative value)
       stickyThresholdY.current = containerDocTop + headerHeight + extra;
     };
 
