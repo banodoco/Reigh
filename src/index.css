@@ -1316,10 +1316,10 @@
   .sparkle-underline::before {
     background-image: linear-gradient(
       90deg,
-      hsl(var(--lala-royal-purple)),
-      hsl(var(--lala-gold-dark)),
-      hsl(var(--lala-blue-dark)),
-      hsl(var(--lala-royal-purple)) /* Loop back */
+      hsl(var(--wes-pink)),
+      hsl(var(--wes-vintage-gold)),
+      hsl(var(--wes-coral)),
+      hsl(var(--wes-pink)) /* Loop back */
     );
     background-size: 200% 100%;
     opacity: 0; /* Hidden by default */
@@ -1332,16 +1332,38 @@
 
   /* Enhance persistence for sparkle-underline when tooltip open */
   .sparkle-underline[data-state="open"]::before {
-    opacity: 1;
+    opacity: 1 !important;
     animation: sparkleColorWave 3s linear infinite;
   }
   .sparkle-underline[data-state="open"]::after {
-    opacity: 0;
+    opacity: 0 !important;
+  }
+
+  /* Keep colorful underline when tooltip is open (React state-based) */
+  .sparkle-underline.tooltip-open::before {
+    opacity: 1 !important;
+    animation: sparkleColorWave 3s linear infinite;
+  }
+  
+  .sparkle-underline.tooltip-open::after {
+    opacity: 0 !important;
+  }
+
+  /* Additional fallback for tooltip hover states */
+  .sparkle-underline:has(+ [data-state="open"])::before,
+  .sparkle-underline[data-state="open"]:hover::before {
+    opacity: 1 !important;
+    animation: sparkleColorWave 3s linear infinite;
+  }
+  
+  .sparkle-underline:has(+ [data-state="open"])::after,
+  .sparkle-underline[data-state="open"]:hover::after {
+    opacity: 0 !important;
   }
    
   /* Multicolour border for tooltips on hover */
   .tooltip-content:hover {
-    border-image: linear-gradient(to right, hsl(var(--lala-medium-purple)), hsl(var(--lala-royal-purple)), hsl(var(--lala-golden-yellow))) 1;
+    border-image: linear-gradient(to right, hsl(var(--wes-pink)), hsl(var(--wes-vintage-gold)), hsl(var(--wes-coral))) 1;
     border-image-slice: 1;
     border-width: 2px;
   }

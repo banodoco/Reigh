@@ -26,7 +26,6 @@ import { usePersistentToolState } from "@/shared/hooks/usePersistentToolState";
 import { ImageGenerationSettings } from "../settings";
 import { useListPublicResources } from '@/shared/hooks/useResources';
 import { useListShots, useCreateShot } from "@/shared/hooks/useShots";
-import { useCurrentShot } from "@/shared/contexts/CurrentShotContext";
 import CreateShotModal from "@/shared/components/CreateShotModal";
 import { useQueryClient } from '@tanstack/react-query';
 import { useShotNavigation } from "@/shared/hooks/useShotNavigation";
@@ -360,7 +359,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   const [isCreateShotModalOpen, setIsCreateShotModalOpen] = useState(false);
 
   const { selectedProjectId } = useProject();
-  const { currentShotId } = useCurrentShot();
+  // Removed unused currentShotId that was causing unnecessary re-renders
   const { data: shots } = useListShots(selectedProjectId);
   const createShotMutation = useCreateShot();
   const queryClient = useQueryClient();
@@ -368,8 +367,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
 
   // Debug project context
   useEffect(() => {
-    console.log('[ImageGenerationForm] Project context - selectedProjectId:', selectedProjectId, 'currentShotId:', currentShotId);
-  }, [selectedProjectId, currentShotId]);
+    console.log('[ImageGenerationForm] Project context - selectedProjectId:', selectedProjectId);
+  }, [selectedProjectId]);
 
   // Debug persistence hook inputs
   useEffect(() => {

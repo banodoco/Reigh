@@ -341,7 +341,7 @@ export default function HomePage() {
                 <span
                   onClick={handleOpenToolActivate}
                   onMouseLeave={() => { if(openTipDisabled) setOpenTipDisabled(false);} }
-                  className={`sparkle-underline cursor-pointer transition-colors duration-200 ${openTipDisabled ? 'pointer-events-none' : ''} ${
+                  className={`sparkle-underline cursor-pointer transition-colors duration-200 ${openTipOpen ? 'tooltip-open' : ''} ${openTipDisabled ? 'pointer-events-none' : ''} ${
                     showCreativePartner ? 'pointer-events-none opacity-60' : showPhilosophy || showExamples ? 'opacity-40 pointer-events-none brightness-50 transition-all duration-100' : 'opacity-100 pointer-events-auto transition-all duration-300'
                   }`}
                 >
@@ -419,7 +419,7 @@ export default function HomePage() {
                     onMouseLeave={() => {
                       if (emergingTipDisabled) setEmergingTipDisabled(false);
                     }}
-                    className={`sparkle-underline cursor-pointer transition-colors duration-200 ${emergingTipDisabled ? 'pointer-events-none' : ''} ${
+                    className={`sparkle-underline cursor-pointer transition-colors duration-200 ${emergingTipOpen ? 'tooltip-open' : ''} ${emergingTipDisabled ? 'pointer-events-none' : ''} ${
                       showExamples
                         ? 'pointer-events-none opacity-60'
                         : showCreativePartner || showPhilosophy
@@ -795,7 +795,7 @@ export default function HomePage() {
                   ))}
                 </div>
                 {/* Spacer between inputs and output */}
-                <div className="h-2" />
+                <div className="h-1" />
                 {/* Output row */}
                 <div className="bg-muted/20 border rounded-lg w-full aspect-video flex items-center justify-center text-xs text-muted-foreground">
                   16:9 Output
@@ -823,10 +823,38 @@ export default function HomePage() {
                 </div>
               </div>
 
-              {/* Section 3 */}
+              {/* Section 3 - Structural Control */}
               <div className="space-y-4">
                 <p className="text-sm leading-relaxed">
-                  Using combinations of images with LoRAs and other control mechanisms can allow for a high-degree of intentionality - and for artists to discover a style of creation and outcome that's truly unique:
+                  Using images in combination with structural control can allow for deep control and intentionality:
+                </p>
+                <div className="flex items-center gap-3 w-full">
+                  {/* 2 images stacked */}
+                  <div className="flex flex-col gap-1 flex-1">
+                    <div className="bg-muted/20 border rounded-lg w-full aspect-video flex items-center justify-center text-xs text-muted-foreground">
+                      Image 1
+                    </div>
+                    <div className="bg-muted/20 border rounded-lg w-full aspect-video flex items-center justify-center text-xs text-muted-foreground">
+                      Image 2
+                    </div>
+                  </div>
+                  <span className="text-sm text-muted-foreground flex-shrink-0">+</span>
+                  {/* Structural guide video placeholder */}
+                  <div className="bg-muted/20 border rounded-lg flex-1 aspect-video flex items-center justify-center text-xs text-muted-foreground">
+                    Guide Video
+                  </div>
+                  <span className="text-sm text-muted-foreground flex-shrink-0">=</span>
+                  {/* Output */}
+                  <div className="bg-muted/20 border rounded-lg flex-1 aspect-video flex items-center justify-center text-xs text-muted-foreground">
+                    Output
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 4 - LoRAs */}
+              <div className="space-y-4">
+                <p className="text-sm leading-relaxed">
+                  Combining those with LoRAs can allow for artists to discover a style that's truly unique:
                 </p>
                 <div className="grid grid-cols-2 gap-4">
                   {motionExamples.map(example => (

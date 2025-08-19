@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, ReactNode, useMemo, useEffect } from 'react';
+import React, { createContext, useState, useContext, ReactNode, useMemo, useEffect, useCallback } from 'react';
 
 interface CurrentShotContextType {
   currentShotId: string | null;
@@ -10,15 +10,22 @@ const CurrentShotContext = createContext<CurrentShotContextType | undefined>(und
 export const CurrentShotProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [currentShotId, setCurrentShotId] = useState<string | null>(null);
 
-  // Debug: Log when currentShotId changes
+  // Debug: Log when currentShotId changes (only in development)
   useEffect(() => {
-    console.log('[ShotFilterAutoSelectIssue] currentShotId changed:', currentShotId);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[ShotFilterAutoSelectIssue] currentShotId changed:', currentShotId);
+    }
   }, [currentShotId]);
+
+  // Memoize setCurrentShotId to prevent recreating the function
+  const memoizedSetCurrentShotId = useCallback((shotId: string | null) => {
+    setCurrentShotId(shotId);
+  }, []);
 
   const value = useMemo(() => ({
     currentShotId,
-    setCurrentShotId,
-  }), [currentShotId]);
+    setCurrentShotId: memoizedSetCurrentShotId,
+  }), [currentShotId, memoizedSetCurrentShotId]);
 
   return (
     <CurrentShotContext.Provider value={value}>

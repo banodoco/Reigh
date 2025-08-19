@@ -101,6 +101,14 @@ const useVideoTravelData = (selectedShotId?: string, projectId?: string) => {
 // ShotEditor is imported eagerly to avoid dynamic import issues on certain mobile browsers.
 
 const VideoTravelToolPage: React.FC = () => {
+  // [VideoTravelDebug] Comparison logs to understand difference
+  const VIDEO_DEBUG_TAG = '[VideoTravelDebug]';
+  const videoRenderCount = useRef(0);
+  const videoMountTime = useRef(Date.now());
+  videoRenderCount.current += 1;
+  
+  console.log(`${VIDEO_DEBUG_TAG} === RENDER START #${videoRenderCount.current} === ${Date.now() - videoMountTime.current}ms since mount`);
+  
   const navigate = useNavigate();
   const location = useLocation();
   const viaShotClick = location.state?.fromShotClick === true;
@@ -131,9 +139,25 @@ const VideoTravelToolPage: React.FC = () => {
     projectUISettings
   } = useVideoTravelData(selectedShot?.id, selectedProjectId);
 
+  // [VideoTravelDebug] Log the data loading states
+  console.log(`${VIDEO_DEBUG_TAG} Data loading states:`, {
+    shotsCount: shots?.length,
+    shotsLoadingRaw,
+    limitedShotsLoading,
+    selectedProjectId,
+    fromContext: 'useVideoTravelData->useShots(context)'
+  });
+
   // Determine page loading state: if deep-linking to a shot via hash, don't block on limited shots loading
   const hasHashShotIdForLoading = !!location.hash?.replace('#', '');
   const isLoading = hasHashShotIdForLoading ? (shotsLoadingRaw) : (shotsLoadingRaw || limitedShotsLoading);
+  
+  console.log(`${VIDEO_DEBUG_TAG} Final loading decision:`, {
+    isLoading,
+    hasHashShotIdForLoading,
+    shotsLoadingRaw,
+    limitedShotsLoading
+  });
   
   const createShotMutation = useCreateShot();
   const handleExternalImageDropMutation = useHandleExternalImageDrop();

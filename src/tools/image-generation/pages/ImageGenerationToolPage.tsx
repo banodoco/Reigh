@@ -6,7 +6,8 @@ import SettingsModal from "@/shared/components/SettingsModal";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/shared/components/ui/button";
-import { useListShots, useAddImageToShot, usePositionExistingGenerationInShot, useCreateShot } from "@/shared/hooks/useShots";
+import { useAddImageToShot, usePositionExistingGenerationInShot, useCreateShot } from "@/shared/hooks/useShots";
+import { useShots } from '@/shared/contexts/ShotsContext';
 import { useLastAffectedShot } from "@/shared/hooks/useLastAffectedShot";
 import { useProject } from "@/shared/contexts/ProjectContext";
 import { uploadImageToStorage } from '@/shared/lib/imageUploader';
@@ -27,13 +28,13 @@ import { useIsMobile } from "@/shared/hooks/use-mobile";
 import { fetchGenerations } from "@/shared/hooks/useGenerations";
 import { getDisplayUrl } from '@/shared/lib/utils';
 import { smartPreloadImages, initializePrefetchOperations, smartCleanupOldPages, triggerImageGarbageCollection } from '@/shared/hooks/useAdjacentPagePreloading';
-import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 import { ShotFilter } from '@/shared/components/ShotFilter';
 import { SkeletonGallery } from '@/shared/components/ui/skeleton-gallery';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/shared/components/ui/collapsible';
 import { ChevronDown, ChevronRight, Sparkles, Settings2 } from 'lucide-react';
 import { usePersistentToolState } from '@/shared/hooks/usePersistentToolState';
 import { usePanes } from '@/shared/contexts/PanesContext';
+import { useStableObject } from '@/shared/hooks/useStableObject';
 
 // Remove unnecessary environment detection - tool should work in all environments
 
@@ -47,12 +48,44 @@ export type Json =
 
 
 
+// Create a proper memo comparison - since this component has no props, it should never re-render due to props
 const ImageGenerationToolPage: React.FC = React.memo(() => {
+  
+  // [ImageGenPageLoadDebug] Strategic debug logging to track timing and cache state
+  const DEBUG_TAG = '[ImageGenPageLoadDebug]';
+  const renderCount = useRef(0);
+  const mountTime = useRef(Date.now());
+  renderCount.current += 1;
+  
+  console.log(`${DEBUG_TAG} === RENDER START #${renderCount.current} === ${Date.now() - mountTime.current}ms since mount`);
+  
+  // [Strategic Debug] Track component lifecycle
+  useEffect(() => {
+    console.log(`${DEBUG_TAG} 🟢 COMPONENT MOUNTED at ${Date.now()}`);
+    return () => {
+      console.log(`${DEBUG_TAG} 🔴 COMPONENT UNMOUNTING at ${Date.now()}`);
+    };
+  }, []);
+  
+  // [Strategic Debug] Track after every render to see sequence
+  useEffect(() => {
+    console.log(`${DEBUG_TAG} 📋 POST-RENDER EFFECT #${renderCount.current}:`, {
+      timestamp: Date.now(),
+      allHookStates: {
+        shots: { count: shots?.length, loading: isLoadingShots },
+        generations: { loading: isLoadingGenerations, hasData: !!generationsResponse },
+        form: { ready: formStateReady, expanded: isFormExpanded },
+        project: { id: selectedProjectId }
+      }
+    });
+  });
+  
   const [generatedImages, setGeneratedImages] = useState<GeneratedImageWithMetadata[]>([]);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [isUpscalingImageId, setIsUpscalingImageId] = useState<string | null>(null);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [loadGenerations, setLoadGenerations] = useState(false);
+  // Enable generations loading immediately to leverage React Query cache on revisits
+  // Removing delayed load gate prevents transient loading state on revisit
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedShotFilter, setSelectedShotFilter] = useState<string>('all');
   const [excludePositioned, setExcludePositioned] = useState(true); // Default checked
@@ -64,7 +97,16 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   const [mediaTypeFilter, setMediaTypeFilter] = useState<'all' | 'image' | 'video'>('all'); // Add media type filter state
   const [starredOnly, setStarredOnly] = useState<boolean>(false);
   const [formAssociatedShotId, setFormAssociatedShotId] = useState<string | null>(null); // Track the associated shot from the form
-  const [isFormExpanded, setIsFormExpanded] = useState<boolean | undefined>(undefined); // No default - wait for persistence
+  // Optimistic initial state: read last known form state from sessionStorage for instant UI on revisit
+  const [isFormExpanded, setIsFormExpanded] = useState<boolean | undefined>(() => {
+    try {
+      const key = 'ig:formExpanded';
+      const raw = typeof window !== 'undefined' ? window.sessionStorage.getItem(key) : null;
+      if (raw === 'true') return true;
+      if (raw === 'false') return false;
+    } catch {}
+    return true; // Default to expanded instead of undefined to avoid skeleton
+  });
   const [isSticky, setIsSticky] = useState(false);
   const [isScrollingToForm, setIsScrollingToForm] = useState(false);
   const isMobile = useIsMobile();
@@ -78,13 +120,32 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   } = usePanes();
   
   // Early prefetch of public LoRAs to reduce loading time
-  useListPublicResources('lora');
+  const publicLorasResult = useListPublicResources('lora');
+  
+  console.log(`${DEBUG_TAG} Render #${renderCount.current} - useListPublicResources states:`, {
+    isLoading: publicLorasResult.isLoading,
+    hasData: !!publicLorasResult.data,
+    dataLength: publicLorasResult.data?.length,
+    error: !!publicLorasResult.error
+  });
   
   // Use the new task queue notifier hook
   const { selectedProjectId } = useProject();
-  const { enqueueTasks, isEnqueuing, justQueued } = useTaskQueueNotifier({ 
+  
+  console.log(`${DEBUG_TAG} Render #${renderCount.current} - selectedProjectId:`, selectedProjectId);
+  
+  // Use stable object for task queue notifier options
+  const taskQueueOptions = useStableObject(() => ({
     projectId: selectedProjectId,
     suppressPerTaskToast: true 
+  }), [selectedProjectId]);
+  
+  const { enqueueTasks, isEnqueuing, justQueued } = useTaskQueueNotifier(taskQueueOptions);
+  
+  console.log(`${DEBUG_TAG} Render #${renderCount.current} - taskQueueNotifier states:`, {
+    isEnqueuing,
+    justQueued,
+    taskQueueOptions
   });
 
   // Always use hooks - no environment-based disabling
@@ -94,20 +155,38 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   const formContainerRef = useRef<HTMLDivElement>(null);
   const collapsibleContainerRef = useRef<HTMLDivElement>(null);
   const [searchParams] = useSearchParams();
-  const { currentShotId } = useCurrentShot();
+  // Removed unused currentShotId that was causing unnecessary re-renders
 
   // Removed projectTasks tracking - was causing performance issues with 1000+ tasks
   // TaskQueueNotifier now handles task tracking internally
-  const { data: shots, isLoading: isLoadingShots, error: shotsError } = useListShots(selectedProjectId);
+  // Use shots from context instead of direct hook call - this prevents loading state on revisit
+  const { shots, isLoading: isLoadingShots, error: shotsError } = useShots();
+  
+  console.log(`${DEBUG_TAG} Render #${renderCount.current} - useShots context states:`, {
+    shotsCount: shots?.length,
+    isLoadingShots,
+    hasError: !!shotsError,
+    selectedProjectId,
+    note: 'Using context instead of direct hook call'
+  });
 
-  // Persistent state for form collapse
-  const { ready: formStateReady, markAsInteracted: markFormStateInteracted } = usePersistentToolState(
-    'image-generation-ui',
-    { projectId: selectedProjectId },
-    {
-      isFormExpanded: [isFormExpanded, setIsFormExpanded],
-    }
-  );
+  // Use stable object to prevent recreation on every render
+  const persistentStateContext = useStableObject(() => ({ 
+    projectId: selectedProjectId 
+  }), [selectedProjectId]);
+  
+  // Skip persistent state hook for form expansion to avoid loading delay
+  // We handle persistence manually with sessionStorage for instant UI
+  const formStateReady = true; // Always ready since we handle it manually
+  const markFormStateInteracted = useCallback(() => {
+    // No-op since we handle persistence manually
+  }, []);
+  
+  console.log(`${DEBUG_TAG} Render #${renderCount.current} - Manual form state (bypassed usePersistentToolState):`, {
+    formStateReady,
+    isFormExpanded,
+    note: 'Using sessionStorage directly for instant UI'
+  });
 
 
 
@@ -118,7 +197,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     // Only run this logic once when the component mounts and state is ready
     if (formStateReady && formCollapsedParam === 'true') {
       setIsFormExpanded(false);
-      markFormStateInteracted(); // Save this preference
+      try { window.sessionStorage.setItem('ig:formExpanded', 'false'); } catch {}
       
       // Clear the URL parameter after applying it
       const newSearchParams = new URLSearchParams(searchParams);
@@ -127,10 +206,6 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
         ? `${window.location.pathname}?${newSearchParams.toString()}`
         : window.location.pathname;
       window.history.replaceState({}, '', newUrl);
-    }
-    // Set default only if no saved state exists and no URL param
-    else if (formStateReady && isFormExpanded === undefined && !formCollapsedParam) {
-      setIsFormExpanded(true);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formStateReady]); // Only depend on formStateReady to run once when ready
@@ -141,14 +216,16 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   const createShotMutation = useCreateShot();
   const { lastAffectedShotId, setLastAffectedShotId } = useLastAffectedShot();
   const itemsPerPage = isMobile ? 24 : 20;
-  const generationsFilters = {
+  
+  // Use stable object for filters to prevent recreating on every render
+  const generationsFilters = useStableObject(() => ({
     toolType: 'image-generation', // Always true
     mediaType: mediaTypeFilter, // Use dynamic mediaType instead of hardcoded 'image'
     shotId: selectedShotFilter === 'all' ? undefined : selectedShotFilter,
     excludePositioned: selectedShotFilter !== 'all' ? excludePositioned : undefined,
     starredOnly,
     searchTerm: searchTerm.trim() || undefined // Only pass if not empty
-  };
+  }), [mediaTypeFilter, selectedShotFilter, excludePositioned, starredOnly, searchTerm]);
   
   // Debug logging removed for performance
   
@@ -156,13 +233,43 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     selectedProjectId, 
     currentPage, 
     itemsPerPage, 
-    loadGenerations,
+    true,
     generationsFilters
   );
+  
+  console.log(`${DEBUG_TAG} Render #${renderCount.current} - useGenerations states:`, {
+    isLoadingGenerations,
+    hasData: !!generationsResponse,
+    dataItemsCount: generationsResponse?.items?.length,
+    total: generationsResponse?.total,
+    currentPage,
+    itemsPerPage,
+    generationsFilters,
+    selectedProjectId
+  });
+  
   const deleteGenerationMutation = useDeleteGeneration();
   const updateGenerationLocationMutation = useUpdateGenerationLocation();
 
   const queryClient = useQueryClient();
+  
+  // [Strategic Debug] Check React Query cache state for this exact query
+  const generationsQueryKey = ['generations', selectedProjectId, currentPage, itemsPerPage, generationsFilters];
+  const cachedGenerationsData = queryClient.getQueryData(generationsQueryKey);
+  const generationsQueryState = queryClient.getQueryState(generationsQueryKey);
+  
+  console.log(`${DEBUG_TAG} React Query Cache Inspection:`, {
+    queryKey: generationsQueryKey,
+    hasCachedData: !!cachedGenerationsData,
+    cachedDataItemsCount: (cachedGenerationsData as any)?.items?.length,
+    queryState: {
+      status: generationsQueryState?.status,
+      fetchStatus: generationsQueryState?.fetchStatus,
+      dataUpdatedAt: generationsQueryState?.dataUpdatedAt,
+      isLoading: generationsQueryState?.status === 'pending',
+      isStale: generationsQueryState ? Date.now() - (generationsQueryState.dataUpdatedAt || 0) > 5 * 60 * 1000 : 'no-state'
+    }
+  });
 
   // Reset to page 1 when shot filter or position filter changes
   useEffect(() => {
@@ -209,12 +316,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     // Clearing only happens explicitly elsewhere if needed
   }, [generationsResponse, isFilterChange]);
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setLoadGenerations(true);
-    }, 300); // Delay fetching to allow for page transition
-    return () => clearTimeout(timer);
-  }, []);
+  // Removed delayed enable; query is always enabled to leverage cache on revisit
 
   // Track the associated shot ID from the form
   useEffect(() => {
@@ -554,7 +656,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   const handleToggleFormExpanded = useCallback(() => {
     const wasExpanded = isFormExpanded === true;
     setIsFormExpanded(prev => prev !== true); // Explicitly toggle to boolean
-    markFormStateInteracted();
+    try { window.sessionStorage.setItem('ig:formExpanded', (!wasExpanded).toString()); } catch {}
 
     // If we're expanding (was collapsed), initiate scroll behavior
     if (!wasExpanded) {
@@ -672,7 +774,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
 
   // Prefetch adjacent pages callback for ImageGallery with cancellation
   const handlePrefetchAdjacentPages = useCallback((prevPage: number | null, nextPage: number | null) => {
-    if (!selectedProjectId || !loadGenerations) return;
+    if (!selectedProjectId) return;
 
     // Cancel previous image preloads immediately
     const prevOps = prefetchOperationsRef.current;
@@ -694,12 +796,8 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
       triggerImageGarbageCollection();
     }
 
-    const filters = { 
-      mediaType: mediaTypeFilter,
-      shotId: selectedShotFilter === 'all' ? undefined : selectedShotFilter,
-      excludePositioned: selectedShotFilter !== 'all' ? excludePositioned : undefined,
-      starredOnly
-    };
+    // Use the same memoized filters object for consistency
+    const filters = generationsFilters;
 
     // Using centralized preload function from shared hooks
 
@@ -726,7 +824,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
         smartPreloadImages(cachedPrev, 'prev', prefetchId, prefetchOperationsRef);
       });
     }
-  }, [selectedProjectId, itemsPerPage, queryClient, loadGenerations, mediaTypeFilter, selectedShotFilter, excludePositioned, starredOnly]);
+  }, [selectedProjectId, itemsPerPage, queryClient, generationsFilters, currentPage]);
 
   useEffect(() => {
     if (generationsResponse && isPageChange) {
@@ -750,6 +848,24 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     }
   }, [generationsResponse, isPageChange, isPageChangeFromBottom]);
 
+  // [Strategic Debug] Final render decision summary
+  console.log(`${DEBUG_TAG} === RENDER END #${renderCount.current} ===`, {
+    finalDecision: {
+      showFormSkeleton: hasValidFalApiKey && isFormExpanded === undefined,
+      showGallerySkeleton: isLoadingGenerations && imagesToShow.length === 0,
+      renderMainContent: hasValidFalApiKey && isFormExpanded !== undefined
+    },
+    keyStates: {
+      hasValidFalApiKey,
+      isFormExpanded,
+      formStateReady,
+      isLoadingGenerations,
+      imagesToShowLength: imagesToShow.length,
+      hasGenerationsResponse: !!generationsResponse
+    },
+    timingSinceMount: `${Date.now() - mountTime.current}ms`
+  });
+
   return (
     <PageFadeIn className="pt-10">
 
@@ -772,7 +888,16 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
       )}
 
       {/* Show loading state while persistent state is loading */}
-      {hasValidFalApiKey && isFormExpanded === undefined && (
+      {(() => {
+        const showFormSkeleton = hasValidFalApiKey && isFormExpanded === undefined;
+        console.log(`${DEBUG_TAG} Render #${renderCount.current} - Form skeleton decision:`, {
+          showFormSkeleton,
+          hasValidFalApiKey,
+          isFormExpanded,
+          formStateReady
+        });
+        return showFormSkeleton;
+      })() && (
         <div className="p-6 border rounded-lg shadow-sm bg-card w-full max-w-full animate-pulse">
           <div className="h-4 bg-muted rounded w-48 mb-4"></div>
           <div className="space-y-3">
@@ -873,7 +998,18 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
 
           <div ref={galleryRef} className="mt-2 pb-5">
             {/* Show SkeletonGallery on initial load or when filter changes take too long */}
-            {isLoadingGenerations && imagesToShow.length === 0 ? (
+            {(() => {
+              const showSkeleton = isLoadingGenerations && imagesToShow.length === 0;
+              console.log(`${DEBUG_TAG} Render #${renderCount.current} - Skeleton decision:`, {
+                showSkeleton,
+                isLoadingGenerations,
+                imagesToShowLength: imagesToShow.length,
+                hasGenerationsResponse: !!generationsResponse,
+                formStateReady,
+                isFormExpanded
+              });
+              return showSkeleton;
+            })() ? (
               <SkeletonGallery
                 count={20}
                 columns={{ base: 2, sm: 3, md: 4, lg: 5, xl: 5, '2xl': 5 }}
@@ -929,7 +1065,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
       />
     </PageFadeIn>
   );
-});
+}, () => true); // Always return true since component has no props
 
 export default ImageGenerationToolPage;
 

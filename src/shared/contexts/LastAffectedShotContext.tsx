@@ -10,9 +10,14 @@ export const LastAffectedShotContext = createContext<LastAffectedShotContextType
 export const LastAffectedShotProvider = ({ children }: { children: ReactNode }) => {
   const [lastAffectedShotId, setLastAffectedShotId] = useState<string | null>(null);
 
+  // Memoize the setter to prevent function recreation
+  const memoizedSetLastAffectedShotId = useCallback((shotId: string | null) => {
+    setLastAffectedShotId(shotId);
+  }, []);
+
   const value = useMemo(
-    () => ({ lastAffectedShotId, setLastAffectedShotId }),
-    [lastAffectedShotId]
+    () => ({ lastAffectedShotId, setLastAffectedShotId: memoizedSetLastAffectedShotId }),
+    [lastAffectedShotId, memoizedSetLastAffectedShotId]
   );
 
   return (

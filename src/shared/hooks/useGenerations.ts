@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { GeneratedImageWithMetadata } from '@/shared/components/ImageGallery';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -320,15 +320,20 @@ export function useGenerations(
   }
 ) {
   const offset = (page - 1) * limit;
-  
+  const queryClient = useQueryClient();
+  const queryKey = ['generations', projectId, page, limit, filters];
+
   return useQuery<GenerationsPaginatedResponse, Error>({
-    queryKey: ['generations', projectId, page, limit, filters],
+    queryKey: queryKey,
     queryFn: () => fetchGenerations(projectId, limit, offset, filters),
     enabled: !!projectId && enabled,
-    placeholderData: (previousData) => previousData,
+    // Use `placeholderData` with `keepPreviousData` to prevent UI flashes on pagination/filter changes
+    placeholderData: keepPreviousData,
+    // Synchronously grab initial data from the cache on mount to prevent skeletons on revisit
+    initialData: () => queryClient.getQueryData(queryKey),
     // Cache management to prevent memory leaks as pagination grows
-    staleTime: 30 * 1000, // 30 seconds - shorter than polling for faster WebSocket response
-    gcTime: 5 * 60 * 1000, // 5 minutes - cleanup old pages after this time
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes, slightly longer gcTime
     // OPTIMIZED: Disable automatic polling to prevent UI flicker
     // WebSocket invalidations will handle real-time updates when data actually changes
     refetchInterval: false,

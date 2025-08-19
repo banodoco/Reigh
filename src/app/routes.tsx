@@ -81,6 +81,8 @@ const router = createBrowserRouter([
       {
         path: '/tools/image-generation',
         element: <ImageGenerationToolPage />,
+        // Add a stable key to prevent remounting on route revisits
+        loader: () => null,
       },
       {
         path: '/tools/travel-between-images',
