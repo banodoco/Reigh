@@ -3,6 +3,7 @@ import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { Shot } from "@/types/shots";
 import { useIsMobile } from "@/shared/hooks/use-mobile";
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface HeaderProps {
   selectedShot: Shot;
@@ -85,7 +86,7 @@ export const Header: React.FC<HeaderProps> = ({
                 className="flex-shrink-0"
                 title="Previous shot"
               >
-                ←
+                <ChevronLeft className="h-4 w-4" />
               </Button>
               
               <span 
@@ -104,7 +105,7 @@ export const Header: React.FC<HeaderProps> = ({
                 className="flex-shrink-0"
                 title="Next shot"
               >
-                →
+                <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
           )}
@@ -149,7 +150,7 @@ export const Header: React.FC<HeaderProps> = ({
                 className="flex-shrink-0"
                 title="Previous shot"
               >
-                ←
+                <ChevronLeft className="h-4 w-4" />
               </Button>
               
               <span 
@@ -168,7 +169,7 @@ export const Header: React.FC<HeaderProps> = ({
                 className="flex-shrink-0"
                 title="Next shot"
               >
-                →
+                <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
           )}
