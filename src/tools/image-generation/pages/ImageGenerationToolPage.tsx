@@ -699,6 +699,9 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
           });
         });
       }, 300); // Increased delay to let form fully expand
+    } else {
+      // If we're collapsing (was expanded), immediately reset scroll state
+      setIsScrollingToForm(false);
     }
   }, [isFormExpanded, markFormStateInteracted]);
 
@@ -867,7 +870,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   });
 
   return (
-    <PageFadeIn className="pt-10">
+    <PageFadeIn className="pt-8">
 
         {/* <Button variant="ghost" onClick={() => setShowSettingsModal(true)}>
           <Settings className="h-5 w-5" />
@@ -920,7 +923,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
               <CollapsibleTrigger asChild>
                   <Button
                     variant="ghost"
-                    className={`${isFormExpanded ? 'w-full justify-between p-4 mb-4 hover:bg-accent/50' : 'w-full justify-between p-4 mb-4 gradient-primary-collapsed'} transition-colors duration-300`}
+                    className={`${isFormExpanded ? 'w-full justify-between px-6 py-6 hover:bg-accent/30 bg-accent/10 border border-b-0 rounded-t-lg shadow-sm' : 'w-full justify-between p-4 gradient-primary-collapsed rounded-lg'} transition-colors duration-300`}
                     onClick={handleToggleFormExpanded}
                     type="button"
                   >
@@ -928,7 +931,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
                       <Settings2 className={`h-4 w-4 ${!isFormExpanded ? 'text-white' : ''}`} />
                       <span className={`font-light flex items-center gap-1 ${!isFormExpanded ? 'text-white' : ''}`}>
                         Image Generation
-                        {!isFormExpanded && <Sparkles className="h-3 w-3 text-white animate-pulse" />}
+                        <Sparkles className={`h-3 w-3 animate-pulse ${!isFormExpanded ? 'text-white' : ''}`} />
                       </span>
                     </div>
                     {isFormExpanded ? (
@@ -996,7 +999,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
             );
           })()}
 
-          <div ref={galleryRef} className="mt-2 pb-5">
+          <div ref={galleryRef} className="pt-0 pb-5">
             {/* Show SkeletonGallery on initial load or when filter changes take too long */}
             {(() => {
               const showSkeleton = isLoadingGenerations && imagesToShow.length === 0;

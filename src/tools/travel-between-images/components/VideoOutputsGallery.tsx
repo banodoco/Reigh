@@ -497,7 +497,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
 
           <Separator className="my-2" />
 
-          <div className="text-center text-muted-foreground py-8 mt-8">
+          <div className="text-center text-muted-foreground pb-8 pt-12">
             <p>No video outputs yet. Generate some videos to see them here.</p>
           </div>
         </div>
