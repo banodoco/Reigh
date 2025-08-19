@@ -425,8 +425,10 @@ const VideoTravelToolPage: React.FC = () => {
     } else {
       // Show header when in shot list view
       const headerContent = (
-        <div className="flex items-center justify-between">
-          <ToolPageHeader title="Shots:" />
+        <div className="flex items-center justify-between mb-6 sm:mb-8 mt-2 sm:mt-7">
+          <h1 className="text-3xl font-light tracking-tight text-foreground sm:text-4xl">
+            Shots:
+          </h1>
           {/* Only show header button when there are shots */}
           {(!isLoading && shots && shots.length > 0) && (
             <Button onClick={() => setIsCreateShotModalOpen(true)}>New Shot</Button>
@@ -1045,7 +1047,7 @@ const VideoTravelToolPage: React.FC = () => {
               <div className="flex items-center justify-center h-64">
                 <div className="text-center">
                   <p className="text-muted-foreground mb-4">Shot not found</p>
-                  <Button onClick={handleBackToShotList} variant="outline">
+                  <Button onClick={handleBackToShotList} variant="outline" size="sm">
                     Back to Shots
                   </Button>
                 </div>

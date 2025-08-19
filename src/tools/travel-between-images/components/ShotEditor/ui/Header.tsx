@@ -44,7 +44,9 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <div className="flex-shrink-0 space-y-3">
       <div className="flex flex-wrap justify-between items-center gap-y-2 px-2">
-        <Button onPointerUp={onBack}>&larr; Back to Shot List</Button>
+        <Button onPointerUp={onBack} variant="outline" size="sm" className="flex items-center gap-1">
+          <span>←</span> Back to Shot List
+        </Button>
         
         {/* Desktop shot name with navigation buttons around it */}
         <div className="hidden sm:flex items-center justify-end min-w-0 flex-1 px-4">

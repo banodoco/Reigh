@@ -140,7 +140,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   const positionExistingGenerationMutation = usePositionExistingGenerationInShot();
   const createShotMutation = useCreateShot();
   const { lastAffectedShotId, setLastAffectedShotId } = useLastAffectedShot();
-  const itemsPerPage = isMobile ? 24 : 25;
+  const itemsPerPage = isMobile ? 24 : 20;
   const generationsFilters = {
     toolType: 'image-generation', // Always true
     mediaType: mediaTypeFilter, // Use dynamic mediaType instead of hardcoded 'image'
@@ -614,7 +614,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
       const docTop = window.pageYOffset || document.documentElement.scrollTop || 0;
       const containerDocTop = rect.top + docTop;
              const headerHeight = isMobile ? 150 : 96; // match actual header heights
-       const extra = isMobile ? 0 : -10; // appears 30px earlier than before (negative value)
+       const extra = isMobile ? 0 : -40; // appears much earlier on desktop (negative value)
       stickyThresholdY.current = containerDocTop + headerHeight + extra;
     };
 
