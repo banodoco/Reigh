@@ -31,7 +31,7 @@ import { smartPreloadImages, initializePrefetchOperations, smartCleanupOldPages,
 import { ShotFilter } from '@/shared/components/ShotFilter';
 import { SkeletonGallery } from '@/shared/components/ui/skeleton-gallery';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/shared/components/ui/collapsible';
-import { ChevronDown, ChevronRight, Sparkles, Settings2 } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, Sparkles, Settings2 } from 'lucide-react';
 import { usePersistentToolState } from '@/shared/hooks/usePersistentToolState';
 import { usePanes } from '@/shared/contexts/PanesContext';
 import { useStableObject } from '@/shared/hooks/useStableObject';
@@ -937,7 +937,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
                     {isFormExpanded ? (
                       <ChevronDown className="h-4 w-4" />
                     ) : (
-                      <ChevronRight className="h-4 w-4 text-white" />
+                      <ChevronLeft className="h-4 w-4 text-white" />
                     )}
                   </Button>
                 </CollapsibleTrigger>
