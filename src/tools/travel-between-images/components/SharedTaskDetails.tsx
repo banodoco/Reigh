@@ -165,8 +165,16 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
                   )}
                 </div>
               );
+            } else {
+              return (
+                <div className="space-y-1">
+                  <p className={`${config.textSize} ${config.fontWeight} text-muted-foreground ${config.labelCase}`}>Prompt</p>
+                  <p className={`${config.textSize} ${config.fontWeight} break-words whitespace-pre-wrap leading-relaxed`}>
+                    None
+                  </p>
+                </div>
+              );
             }
-            return null;
           })()}
           
           {/* Negative Prompt */}
@@ -193,8 +201,16 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
                   )}
                 </div>
               );
+            } else {
+              return (
+                <div className="space-y-1">
+                  <p className={`${config.textSize} ${config.fontWeight} text-muted-foreground ${config.labelCase}`}>Negative Prompt</p>
+                  <p className={`${config.textSize} ${config.fontWeight} break-words whitespace-pre-wrap leading-relaxed`}>
+                    None
+                  </p>
+                </div>
+              );
             }
-            return null;
           })()}
         </div>
         
