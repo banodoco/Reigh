@@ -338,11 +338,10 @@ export function useGenerations(
     // This ensures ImageGallery recovers when generations are created by separate processes
     refetchInterval: (query) => {
       const data = query.state.data;
-      const isStale = query.state.isStale;
       const dataUpdatedAt = query.state.dataUpdatedAt;
-      const isFetching = query.state.isFetching;
-      const isError = query.state.isError;
       const error = query.state.error;
+      const fetchStatus = query.state.fetchStatus;
+      const status = query.state.status;
       const now = Date.now();
       
       if (!data) {
@@ -351,9 +350,8 @@ export function useGenerations(
           projectId,
           page,
           filters,
-          isStale,
-          isFetching,
-          isError,
+          fetchStatus,
+          status,
           errorMessage: error?.message,
           timestamp: now
         });
@@ -378,9 +376,8 @@ export function useGenerations(
         totalCount,
         hasRecentGenerations,
         dataAge: Math.round(dataAge / 1000) + 's',
-        isStale,
-        isFetching,
-        isError,
+        fetchStatus,
+        status,
         errorMessage: error?.message,
         visibilityState: document.visibilityState,
         timestamp: now
@@ -399,7 +396,7 @@ export function useGenerations(
             return ageMs < 5 * 60 * 1000;
           }).length || 0,
           pollIntervalMs: pollInterval,
-          isStale,
+          fetchStatus,
           dataAge: Math.round(dataAge / 1000) + 's',
           dataUpdatedAt: new Date(dataUpdatedAt).toISOString(),
           timestamp: now
@@ -416,7 +413,7 @@ export function useGenerations(
           totalCount,
           dataAge: Math.round(dataAge / 1000) + 's',
           pollIntervalMs: pollInterval,
-          isStale,
+          fetchStatus,
           dataUpdatedAt: new Date(dataUpdatedAt).toISOString(),
           timestamp: now
         });

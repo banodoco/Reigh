@@ -264,12 +264,13 @@ export const useLoraManager = (
     try {
       // Reset the manual interaction flag when explicitly loading
       setUserHasManuallyInteracted(false);
-      // Get saved LoRA IDs for comparison
+      // Get saved LoRA IDs for comparison - use ref for current state
       const savedLoraIds = new Set(savedLoras.map(lora => lora.id));
-      const currentLoraIds = new Set(selectedLoras.map(lora => lora.id));
+      const currentLoras = selectedLorasRef.current;
+      const currentLoraIds = new Set(currentLoras.map(lora => lora.id));
 
       // Remove LoRAs that are not in the saved list
-      const lorasToRemove = selectedLoras.filter(lora => !savedLoraIds.has(lora.id));
+      const lorasToRemove = currentLoras.filter(lora => !savedLoraIds.has(lora.id));
       lorasToRemove.forEach(lora => handleRemoveLora(lora.id, false)); // false = not manual action
 
       // Add LoRAs that are not currently selected
@@ -301,7 +302,6 @@ export const useLoraManager = (
   }, [
     enableProjectPersistence, 
     projectLoraSettings?.loras, 
-    selectedLoras, 
     handleRemoveLora, 
     availableLoras, 
     handleAddLora, 

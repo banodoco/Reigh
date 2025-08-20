@@ -505,9 +505,8 @@ export function useUnifiedGenerations(options: UseUnifiedGenerationsOptions) {
         itemCount,
         hasRecentGenerations,
         dataAge: Math.round(dataAge / 1000) + 's',
-        isStale,
-        isFetching,
-        isError,
+        fetchStatus,
+        status,
         errorMessage: error?.message,
         visibilityState: document.visibilityState,
         timestamp: now
@@ -527,7 +526,7 @@ export function useUnifiedGenerations(options: UseUnifiedGenerationsOptions) {
             return ageMs < 5 * 60 * 1000;
           }).length || 0,
           pollIntervalMs: pollInterval,
-          isStale,
+          fetchStatus,
           dataAge: Math.round(dataAge / 1000) + 's',
           dataUpdatedAt: new Date(dataUpdatedAt).toISOString(),
           timestamp: now
@@ -544,7 +543,7 @@ export function useUnifiedGenerations(options: UseUnifiedGenerationsOptions) {
           itemCount,
           dataAge: Math.round(dataAge / 1000) + 's',
           pollIntervalMs: pollInterval,
-          isStale,
+          fetchStatus,
           dataUpdatedAt: new Date(dataUpdatedAt).toISOString(),
           timestamp: now
         });

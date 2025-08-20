@@ -398,6 +398,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     enableTriggerWords: true,
     onPromptUpdate: setAfterEachPromptText,
     currentPrompt: afterEachPromptText,
+    disableAutoLoad: true, // Disable auto-load since we handle our own default logic
   });
 
   // Get the effective shot ID for storage (use 'none' for null)
