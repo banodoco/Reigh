@@ -3,6 +3,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { GeneratedImageWithMetadata } from '@/shared/components/ImageGallery';
 import { GenerationRow } from '@/types/shots';
 import { supabase } from '@/integrations/supabase/client';
+import { useResurrectionPollingConfig, RecentActivityDetectors } from './useResurrectionPolling';
+import { useQueryDebugLogging, QueryDebugConfigs } from './useQueryDebugLogging';
 
 // Extended interface that includes task data
 export interface GenerationWithTask extends GeneratedImageWithMetadata {
@@ -457,6 +459,24 @@ export function useUnifiedGenerations(options: UseUnifiedGenerationsOptions) {
       });
     }
   }
+
+  // 🎯 MODULAR POLLING: Configure resurrection polling with UnifiedGenerations-specific settings
+  const { refetchInterval } = useResurrectionPollingConfig(
+    'UnifiedGenerations', // Debug tag matches original logs
+    { 
+      mode: options.mode,
+      projectId: options.projectId,
+      shotId: options.shotId,
+      page: options.page
+    }, // Context for logging
+    {
+      hasRecentActivity: RecentActivityDetectors.unifiedGenerations,
+      fastInterval: 15000,        // 15s when recent generations exist
+      resurrectionInterval: 45000, // 45s for stale data recovery  
+      initialInterval: 30000,     // 30s when no data
+      staleThreshold: 60000       // 1 minute = stale
+    }
+  );
   
   const query = useQuery({
     queryKey: cacheKey,
@@ -475,162 +495,24 @@ export function useUnifiedGenerations(options: UseUnifiedGenerationsOptions) {
     staleTime: 10 * 1000, // 10 seconds - match task polling for consistency
     gcTime,
     placeholderData: (previousData) => previousData,
-    // RESURRECTION POLLING: Adapted from TasksPane pattern to catch missed WebSocket events
-    // This ensures galleries recover when generations are created by separate processes
-    refetchInterval: (query) => {
-      const data = query.state.data;
-      const dataUpdatedAt = query.state.dataUpdatedAt;
-      const error = query.state.error;
-      const fetchStatus = query.state.fetchStatus;
-      const status = query.state.status;
-      const now = Date.now();
-      
-      if (!data) {
-        // If no data yet, poll slowly to get initial data
-        console.log('🟡 [GalleryPollingDebug:UnifiedGenerations] No data yet, using slow polling (30s):', {
-          mode: options.mode,
-          projectId: options.projectId,
-          shotId: options.shotId,
-          page: options.page,
-          fetchStatus,
-          status,
-          errorMessage: error?.message,
-          timestamp: now,
-          refetchIntervalTriggered: true
-        });
-        return 30000; // 30 seconds
-      }
-      
-      const dataAge = now - dataUpdatedAt;
-      const itemCount = (data.items as any[])?.length || 0;
-      
-      // Check if we have recent activity (new generations in last 5 minutes)
-      const hasRecentGenerations = data.items?.some((item: any) => {
-        const createdAt = new Date(item.createdAt || item.created_at).getTime();
-        const ageMs = now - createdAt;
-        return ageMs < 5 * 60 * 1000; // Created in last 5 minutes
-      }) ?? false;
-      
-      console.log('🔍 [GalleryPollingDebug:UnifiedGenerations] Polling interval calculation:', {
-        mode: options.mode,
-        projectId: options.projectId,
-        shotId: options.shotId,
-        page: options.page,
-        itemCount,
-        hasRecentGenerations,
-        dataAge: Math.round(dataAge / 1000) + 's',
-        fetchStatus,
-        status,
-        errorMessage: error?.message,
-        visibilityState: document.visibilityState,
-        timestamp: now,
-        refetchIntervalTriggered: true
-      });
-      
-      if (hasRecentGenerations) {
-        // Fast polling when we have recent activity (might be more coming)
-        const pollInterval = 15000; // 15 seconds for active generation period
-        console.log('🚀 [GalleryPollingDebug:UnifiedGenerations] Recent generations detected, using FAST polling:', {
-          mode: options.mode,
-          projectId: options.projectId,
-          shotId: options.shotId,
-          itemCount,
-          recentGenerations: data.items?.filter((item: any) => {
-            const createdAt = new Date(item.createdAt || item.created_at).getTime();
-            const ageMs = now - createdAt;
-            return ageMs < 5 * 60 * 1000;
-          }).length || 0,
-          pollIntervalMs: pollInterval,
-          fetchStatus,
-          dataAge: Math.round(dataAge / 1000) + 's',
-          dataUpdatedAt: new Date(dataUpdatedAt).toISOString(),
-          timestamp: now,
-          refetchIntervalTriggered: true
-        });
-        return pollInterval;
-      } else if (dataAge > 60000) {
-        // RESURRECTION POLLING: If data is stale (>1 minute old), poll occasionally
-        // This catches generations created while WebSocket was disconnected
-        const pollInterval = 45000; // 45 seconds for resurrection polling
-        console.log('⚰️ [GalleryPollingDebug:UnifiedGenerations] Data is stale, using RESURRECTION polling:', {
-          mode: options.mode,
-          projectId: options.projectId,
-          shotId: options.shotId,
-          itemCount,
-          dataAge: Math.round(dataAge / 1000) + 's',
-          pollIntervalMs: pollInterval,
-          fetchStatus,
-          dataUpdatedAt: new Date(dataUpdatedAt).toISOString(),
-          timestamp: now,
-          refetchIntervalTriggered: true
-        });
-        return pollInterval;
-      } else {
-        // Data is fresh and no recent activity - rely on WebSocket
-        console.log('✅ [GalleryPollingDebug:UnifiedGenerations] Data is fresh, WebSocket should handle updates:', {
-          mode: options.mode,
-          projectId: options.projectId,
-          shotId: options.shotId,
-          itemCount,
-          dataAge: Math.round(dataAge / 1000) + 's',
-          timestamp: now,
-          refetchIntervalTriggered: true
-        });
-        return false; // No polling, rely on WebSocket
-      }
-    },
+    // 🎯 MODULAR POLLING: Use configured resurrection polling
+    refetchInterval,
     refetchIntervalInBackground: true, // CRITICAL: Continue polling when tab is not visible
     refetchOnWindowFocus: false, // Prevent double-fetches
     refetchOnReconnect: false, // Prevent double-fetches
   });
-  
-  // [GalleryPollingDebug] Enhanced logging for unified generations
-  React.useEffect(() => {
-    console.log('[GalleryPollingDebug:useUnifiedGenerations] Query result updated:', {
-      instanceId: hookInstanceIdRef.current,
-      mode: options.mode,
-      projectId: options.projectId,
-      shotId: options.shotId,
-      page: options.page,
-      isLoading: query.isLoading,
-      isFetching: query.isFetching,
-      isError: query.isError,
-      hasData: !!query.data,
-      itemsCount: query.data?.items?.length,
-      total: query.data?.total,
-      hasMore: query.data?.hasMore,
-      errorMessage: query.error?.message,
-      status: query.status,
-      fetchStatus: query.fetchStatus,
-      timestamp: Date.now()
-    });
-  }, [query.data, query.isLoading, query.isFetching, query.isError, query.error, query.status, query.fetchStatus, options.mode, options.projectId, options.shotId, options.page]);
 
-  // [GalleryPollingDebug] Special tracking for data changes (new results) 
-  const dataItemsCount = (query.data?.items as any[])?.length || 0;
-  const dataSignature = React.useMemo(() => {
-    if (!(query.data?.items as any[])) return 'no-data';
-    return (query.data.items as any[]).map((item: any) => `${item.id}:${item.createdAt}`).join('|');
-  }, [query.data?.items]);
-  
-  React.useEffect(() => {
-    if (query.data && dataItemsCount > 0) {
-      console.log('🎯 [GalleryPollingDebug:useUnifiedGenerations] NEW DATA RECEIVED:', {
-        instanceId: hookInstanceIdRef.current,
-        mode: options.mode,
-        projectId: options.projectId,
-        shotId: options.shotId,
-        page: options.page,
-        itemsCount: dataItemsCount,
-        total: query.data.total,
-        firstItemId: (query.data.items as any[])[0]?.id,
-        firstItemCreatedAt: (query.data.items as any[])[0]?.createdAt,
-        dataSignature: dataSignature.substring(0, 100) + '...',
-        wasTriggeredByPolling: query.isFetching && !query.isLoading,
-        timestamp: Date.now()
-      });
-    }
-  }, [dataSignature, options.mode, options.projectId, options.shotId, options.page, dataItemsCount, query.data, query.isFetching, query.isLoading]);
+  // 🎯 MODULAR LOGGING: Standardized debug logging with data signature tracking
+  useQueryDebugLogging(query, QueryDebugConfigs.unifiedGenerations({
+    instanceId: hookInstanceIdRef.current,
+    mode: options.mode,
+    projectId: options.projectId,
+    shotId: options.shotId,
+    page: options.page,
+    limit: options.limit,
+    filters: options.filters,
+    enabled: options.enabled
+  }));
   
   // Log query results (original logging preserved)
   React.useEffect(() => {

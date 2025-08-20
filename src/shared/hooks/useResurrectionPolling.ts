@@ -1,0 +1,290 @@
+import React from 'react';
+
+/**
+ * Common resurrection polling logic that can be reused across different data types.
+ * Based on the successful TasksPane pattern.
+ */
+
+export interface ResurrectionPollingConfig {
+  /** Tag for debug logging (e.g., 'Tasks', 'ImageGallery', 'VideoGallery') */
+  debugTag: string;
+  /** Fast polling interval for recent activity (ms) */
+  fastInterval?: number;
+  /** Resurrection polling interval for stale data (ms) */
+  resurrectionInterval?: number;
+  /** Initial polling interval when no data (ms) */
+  initialInterval?: number;
+  /** Age threshold to consider data stale (ms) */
+  staleThreshold?: number;
+  /** Function to detect if there's recent activity in the data */
+  hasRecentActivity?: (data: any) => boolean;
+  /** Additional context for logging */
+  context?: Record<string, any>;
+}
+
+const DEFAULT_CONFIG: Required<Omit<ResurrectionPollingConfig, 'debugTag' | 'hasRecentActivity' | 'context'>> = {
+  fastInterval: 15000,        // 15s for active periods
+  resurrectionInterval: 45000, // 45s for stale data  
+  initialInterval: 30000,     // 30s when no data
+  staleThreshold: 60000,      // 1 minute = stale
+};
+
+/**
+ * Generates a refetchInterval function for React Query that implements resurrection polling.
+ * This is the core logic that was duplicated across TasksPane, ImageGallery, and VideoOutputsGallery.
+ * 
+ * IMPORTANT: This preserves all the specific logging contexts and behaviors from the original hooks.
+ */
+export function createResurrectionPollingFunction(config: ResurrectionPollingConfig) {
+  const {
+    debugTag,
+    fastInterval = DEFAULT_CONFIG.fastInterval,
+    resurrectionInterval = DEFAULT_CONFIG.resurrectionInterval,
+    initialInterval = DEFAULT_CONFIG.initialInterval,
+    staleThreshold = DEFAULT_CONFIG.staleThreshold,
+    hasRecentActivity,
+    context = {}
+  } = config;
+
+  return (query: any) => {
+    const data = query.state.data;
+    const dataUpdatedAt = query.state.dataUpdatedAt;
+    const error = query.state.error;
+    const fetchStatus = query.state.fetchStatus;
+    const status = query.state.status;
+    const now = Date.now();
+    
+    // Build base context but allow override for specific fields
+    const baseLogContext = {
+      fetchStatus,
+      status,
+      errorMessage: error?.message,
+      timestamp: now,
+      refetchIntervalTriggered: true,
+      ...context // Context can override any of the above
+    };
+
+    if (!data) {
+      // If no data yet, poll slowly to get initial data
+      console.log(`🟡 [GalleryPollingDebug:${debugTag}] No data yet, using slow polling (${initialInterval/1000}s):`, baseLogContext);
+      return initialInterval;
+    }
+    
+    const dataAge = now - dataUpdatedAt;
+    
+    // Extract data metrics for logging (different for each hook type)
+    const dataMetrics = extractDataMetrics(data, debugTag);
+    
+    // Check for recent activity if function provided
+    const recentActivity = hasRecentActivity ? hasRecentActivity(data) : false;
+    
+    // Log the polling decision process with data-specific metrics
+    console.log(`🔍 [GalleryPollingDebug:${debugTag}] Polling interval calculation:`, {
+      ...baseLogContext,
+      ...dataMetrics,
+      hasRecentActivity: recentActivity,
+      dataAge: Math.round(dataAge / 1000) + 's',
+      visibilityState: document.visibilityState
+    });
+    
+    if (recentActivity) {
+      // Fast polling when we have recent activity (might be more coming)
+      const fastLogContext = {
+        ...baseLogContext,
+        ...dataMetrics,
+        pollIntervalMs: fastInterval,
+        dataAge: Math.round(dataAge / 1000) + 's',
+        dataUpdatedAt: new Date(dataUpdatedAt).toISOString()
+      };
+      
+      // Add recent activity details if available
+      if (hasRecentActivity && debugTag.includes('Generation')) {
+        const recentItems = getRecentItems(data, debugTag);
+        if (recentItems !== null) {
+          (fastLogContext as any).recentGenerations = recentItems;
+        }
+      } else if (hasRecentActivity && debugTag === 'Tasks') {
+        const activeTaskDetails = getActiveTaskDetails(data);
+        if (activeTaskDetails) {
+          Object.assign(fastLogContext, activeTaskDetails);
+        }
+      }
+      
+      console.log(`🚀 [GalleryPollingDebug:${debugTag}] Recent activity detected, using FAST polling:`, fastLogContext);
+      return fastInterval;
+    } else if (dataAge > staleThreshold) {
+      // RESURRECTION POLLING: If data is stale, poll occasionally
+      // This catches new items created while WebSocket was disconnected
+      const resurrectionLogContext = {
+        ...baseLogContext,
+        ...dataMetrics,
+        dataAge: Math.round(dataAge / 1000) + 's',
+        pollIntervalMs: resurrectionInterval,
+        dataUpdatedAt: new Date(dataUpdatedAt).toISOString()
+      };
+      
+      // Add recent task details for Tasks hook
+      if (debugTag === 'Tasks') {
+        const recentTaskDetails = getRecentTaskDetails(data);
+        if (recentTaskDetails) {
+          Object.assign(resurrectionLogContext, recentTaskDetails);
+        }
+      }
+      
+      console.log(`⚰️ [GalleryPollingDebug:${debugTag}] Data is stale, using RESURRECTION polling:`, resurrectionLogContext);
+      return resurrectionInterval;
+    } else {
+      // Data is fresh and no recent activity - rely on WebSocket
+      console.log(`✅ [GalleryPollingDebug:${debugTag}] Data is fresh, WebSocket should handle updates:`, {
+        ...baseLogContext,
+        ...dataMetrics,
+        dataAge: Math.round(dataAge / 1000) + 's'
+      });
+      return false; // No polling, rely on WebSocket
+    }
+  };
+}
+
+/**
+ * Extract data metrics specific to each hook type for consistent logging
+ */
+function extractDataMetrics(data: any, debugTag: string): Record<string, any> {
+  if (debugTag === 'Tasks') {
+    return {
+      taskCount: data.tasks?.length || 0,
+      totalTasks: data.tasks?.length || 0,
+      activeTaskCount: data.tasks?.filter((t: any) => t.status === 'Queued' || t.status === 'In Progress').length || 0
+    };
+  } else if (debugTag === 'ImageGallery') {
+    return {
+      itemCount: data.items?.length || 0,
+      totalCount: data.total || 0
+    };
+  } else if (debugTag === 'UnifiedGenerations') {
+    return {
+      itemCount: (data.items as any[])?.length || 0
+    };
+  }
+  return {};
+}
+
+/**
+ * Get recent items count for generation hooks
+ */
+function getRecentItems(data: any, debugTag: string): number | null {
+  const now = Date.now();
+  if (debugTag === 'ImageGallery' && data.items) {
+    return data.items.filter((item: any) => {
+      const createdAt = new Date(item.createdAt || (item as any).created_at).getTime();
+      const ageMs = now - createdAt;
+      return ageMs < 5 * 60 * 1000;
+    }).length;
+  } else if (debugTag === 'UnifiedGenerations' && data.items) {
+    return data.items.filter((item: any) => {
+      const createdAt = new Date(item.createdAt || item.created_at).getTime();
+      const ageMs = now - createdAt;
+      return ageMs < 5 * 60 * 1000;
+    }).length;
+  }
+  return null;
+}
+
+/**
+ * Get active task details for Tasks hook  
+ */
+function getActiveTaskDetails(data: any): Record<string, any> | null {
+  if (!data.tasks) return null;
+  
+  const activeTasks = data.tasks.filter((t: any) => t.status === 'Queued' || t.status === 'In Progress');
+  return {
+    activeTasksDetails: activeTasks.map((t: any) => ({
+      id: t.id,
+      status: t.status,
+      taskType: t.taskType,
+      createdAt: t.createdAt
+    }))
+  };
+}
+
+/**
+ * Get recent task details for Tasks hook resurrection polling
+ */
+function getRecentTaskDetails(data: any): Record<string, any> | null {
+  if (!data.tasks) return null;
+  
+  return {
+    recentTasksDetails: data.tasks.slice(0, 3).map((t: any) => ({
+      id: t.id,
+      status: t.status,
+      taskType: t.taskType,
+      createdAt: t.createdAt
+    }))
+  };
+}
+
+/**
+ * Hook to create consistent polling configuration with debug logging.
+ * Reduces boilerplate in components that need resurrection polling.
+ */
+export function useResurrectionPollingConfig(
+  debugTag: string,
+  context: Record<string, any> = {},
+  customConfig: Partial<ResurrectionPollingConfig> = {}
+): {
+  refetchInterval: (query: any) => number | false;
+  debugConfig: ResurrectionPollingConfig;
+} {
+  const config = React.useMemo(() => ({
+    debugTag,
+    context,
+    ...customConfig
+  }), [debugTag, context, customConfig]);
+
+  const refetchInterval = React.useMemo(
+    () => createResurrectionPollingFunction(config),
+    [config]
+  );
+
+  return { refetchInterval, debugConfig: config };
+}
+
+/**
+ * Common recent activity detectors that can be reused.
+ * These match the exact logic from the original hook implementations.
+ */
+export const RecentActivityDetectors = {
+  /**
+   * For task data - checks if there are active tasks (Queued/In Progress)
+   * Matches the logic from usePaginatedTasks
+   */
+  tasks: (data: any) => {
+    return data?.tasks?.some((task: any) => 
+      task.status === 'Queued' || task.status === 'In Progress'
+    ) ?? false;
+  },
+
+  /**
+   * For generation data - checks if any items were created in last 5 minutes
+   * Matches the exact logic from useGenerations
+   */
+  generations: (data: any) => {
+    const now = Date.now();
+    return data?.items?.some((item: any) => {
+      const createdAt = new Date(item.createdAt || (item as any).created_at).getTime();
+      const ageMs = now - createdAt;
+      return ageMs < 5 * 60 * 1000; // Created in last 5 minutes
+    }) ?? false;
+  },
+
+  /**
+   * For unified generation data - matches the exact logic from useUnifiedGenerations
+   */
+  unifiedGenerations: (data: any) => {
+    const now = Date.now();
+    return data?.items?.some((item: any) => {
+      const createdAt = new Date(item.createdAt || item.created_at).getTime();
+      const ageMs = now - createdAt;
+      return ageMs < 5 * 60 * 1000; // Created in last 5 minutes
+    }) ?? false;
+  }
+};
