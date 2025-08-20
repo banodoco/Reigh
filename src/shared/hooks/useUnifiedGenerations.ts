@@ -459,15 +459,112 @@ export function useUnifiedGenerations(options: UseUnifiedGenerationsOptions) {
       return fetchUnifiedGenerations(options);
     },
     enabled: enabled && !!options.projectId,
-    staleTime: 30 * 1000, // 30 seconds - shorter than task polling for faster WebSocket response
+    staleTime: 10 * 1000, // 10 seconds - match task polling for consistency
     gcTime,
     placeholderData: (previousData) => previousData,
-    // OPTIMIZED: Disable automatic polling to prevent UI flicker
-    // WebSocket invalidations will handle real-time updates when data actually changes
-    refetchInterval: false,
-    refetchIntervalInBackground: false,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
+    // RESURRECTION POLLING: Adapted from TasksPane pattern to catch missed WebSocket events
+    // This ensures galleries recover when generations are created by separate processes
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      const dataUpdatedAt = query.state.dataUpdatedAt;
+      const error = query.state.error;
+      const fetchStatus = query.state.fetchStatus;
+      const status = query.state.status;
+      const now = Date.now();
+      
+      if (!data) {
+        // If no data yet, poll slowly to get initial data
+        console.log('[GenerationPollingDebug] No data yet, using slow polling (30s):', {
+          mode: options.mode,
+          projectId: options.projectId,
+          shotId: options.shotId,
+          page: options.page,
+          fetchStatus,
+          status,
+          errorMessage: error?.message,
+          timestamp: now
+        });
+        return 30000; // 30 seconds
+      }
+      
+      const dataAge = now - dataUpdatedAt;
+      const itemCount = (data.items as any[])?.length || 0;
+      
+      // Check if we have recent activity (new generations in last 5 minutes)
+      const hasRecentGenerations = data.items?.some((item: any) => {
+        const createdAt = new Date(item.createdAt || item.created_at).getTime();
+        const ageMs = now - createdAt;
+        return ageMs < 5 * 60 * 1000; // Created in last 5 minutes
+      }) ?? false;
+      
+      console.log('[GenerationPollingDebug] Polling interval calculation:', {
+        mode: options.mode,
+        projectId: options.projectId,
+        shotId: options.shotId,
+        page: options.page,
+        itemCount,
+        hasRecentGenerations,
+        dataAge: Math.round(dataAge / 1000) + 's',
+        isStale,
+        isFetching,
+        isError,
+        errorMessage: error?.message,
+        visibilityState: document.visibilityState,
+        timestamp: now
+      });
+      
+      if (hasRecentGenerations) {
+        // Fast polling when we have recent activity (might be more coming)
+        const pollInterval = 15000; // 15 seconds for active generation period
+        console.log('[GenerationPollingDebug] Recent generations detected, using FAST polling:', {
+          mode: options.mode,
+          projectId: options.projectId,
+          shotId: options.shotId,
+          itemCount,
+          recentGenerations: data.items?.filter((item: any) => {
+            const createdAt = new Date(item.createdAt || item.created_at).getTime();
+            const ageMs = now - createdAt;
+            return ageMs < 5 * 60 * 1000;
+          }).length || 0,
+          pollIntervalMs: pollInterval,
+          isStale,
+          dataAge: Math.round(dataAge / 1000) + 's',
+          dataUpdatedAt: new Date(dataUpdatedAt).toISOString(),
+          timestamp: now
+        });
+        return pollInterval;
+      } else if (dataAge > 60000) {
+        // RESURRECTION POLLING: If data is stale (>1 minute old), poll occasionally
+        // This catches generations created while WebSocket was disconnected
+        const pollInterval = 45000; // 45 seconds for resurrection polling
+        console.log('[GenerationPollingDebug] Data is stale, using RESURRECTION polling:', {
+          mode: options.mode,
+          projectId: options.projectId,
+          shotId: options.shotId,
+          itemCount,
+          dataAge: Math.round(dataAge / 1000) + 's',
+          pollIntervalMs: pollInterval,
+          isStale,
+          dataUpdatedAt: new Date(dataUpdatedAt).toISOString(),
+          timestamp: now
+        });
+        return pollInterval;
+      } else {
+        // Data is fresh and no recent activity - rely on WebSocket
+        console.log('[GenerationPollingDebug] Data is fresh, WebSocket should handle updates:', {
+          mode: options.mode,
+          projectId: options.projectId,
+          shotId: options.shotId,
+          itemCount,
+          dataAge: Math.round(dataAge / 1000) + 's',
+          timestamp: now
+        });
+        return false; // No polling, rely on WebSocket
+      }
+    },
+    refetchIntervalInBackground: true, // CRITICAL: Continue polling when tab is not visible
+    refetchOnWindowFocus: false, // Prevent double-fetches
+    refetchOnReconnect: false, // Prevent double-fetches
   });
   
   // Log query results

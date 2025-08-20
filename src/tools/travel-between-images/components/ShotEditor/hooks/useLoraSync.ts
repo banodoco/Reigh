@@ -113,15 +113,9 @@ export const useLoraSync = ({
         lorasToLoad.forEach(savedLora => {
           const availableLora = availableLoras.find(lora => lora['Model ID'] === savedLora.id);
           if (availableLora) {
-            console.log(`[LoRA] Adding LoRA: ${savedLora.id}`);
-            // The handleAddLora function already has duplicate checking built-in,
-            // so we don't need to check here. This prevents race condition issues.
-            loraManager.handleAddLora(availableLora);
-            
-            // Set strength after adding
-            setTimeout(() => {
-              loraManager.handleLoraStrengthChange(savedLora.id, savedLora.strength);
-            }, 100); // Longer delay for strength setting
+            console.log(`[LoRA] Adding LoRA: ${savedLora.id} with strength ${savedLora.strength}`);
+            // Add LoRA with correct strength immediately - no separate strength change needed
+            loraManager.handleAddLora(availableLora, false, savedLora.strength);
           } else {
             console.warn(`[LoRA] LoRA ${savedLora.id} not found in available LoRAs`);
           }

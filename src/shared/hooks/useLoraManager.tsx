@@ -37,7 +37,7 @@ export interface UseLoraManagerReturn {
   setIsLoraModalOpen: (open: boolean) => void;
   
   // Core handlers
-  handleAddLora: (lora: any) => void;
+  handleAddLora: (lora: any, isManualAction?: boolean, initialStrength?: number) => void;
   handleRemoveLora: (loraId: string) => void;
   handleLoraStrengthChange: (loraId: string, strength: number) => void;
   
@@ -148,8 +148,8 @@ export const useLoraManager = (
   }, []);
 
   // Core handlers with universal user tracking
-  const handleAddLora = useCallback((loraToAdd: any, isManualAction = true) => {
-    console.log(`[LoRA] handleAddLora called for ${loraToAdd["Model ID"]} (manual: ${isManualAction})`);
+  const handleAddLora = useCallback((loraToAdd: any, isManualAction = true, initialStrength?: number) => {
+    console.log(`[LoRA] handleAddLora called for ${loraToAdd["Model ID"]} (manual: ${isManualAction}, strength: ${initialStrength || 1.0})`);
     // Use the ref to ensure we are checking against the most up-to-date selection.
     if (selectedLorasRef.current.find(sl => sl.id === loraToAdd["Model ID"])) {
       console.log(`[LoRA] LoRA ${loraToAdd["Model ID"]} already exists, skipping`);
@@ -162,13 +162,13 @@ export const useLoraManager = (
         id: loraToAdd["Model ID"],
         name: loraName,
         path: loraToAdd["Model Files"][0].url || loraToAdd["Model Files"][0].path,
-        strength: 1.0,
+        strength: initialStrength || 1.0, // Use provided strength or default to 1.0
         previewImageUrl: loraToAdd.Images && loraToAdd.Images.length > 0 
           ? loraToAdd.Images[0].url 
           : undefined,
         trigger_word: loraToAdd.trigger_word,
       };
-      console.log(`[LoRA] Adding LoRA ${newLora.id} to selectedLoras`);
+      console.log(`[LoRA] Adding LoRA ${newLora.id} to selectedLoras with strength ${newLora.strength}`);
       setSelectedLoras(prev => [...prev, newLora]);
       if (isManualAction) {
         markAsUserSet();
@@ -275,26 +275,23 @@ export const useLoraManager = (
       // Add LoRAs that are not currently selected
       const lorasToAdd = savedLoras.filter(savedLora => !currentLoraIds.has(savedLora.id));
 
-      // Add missing LoRAs
+      // Add missing LoRAs with correct strength immediately
       for (const savedLora of lorasToAdd) {
         const availableLora = availableLoras.find(lora => lora['Model ID'] === savedLora.id);
         if (availableLora) {
-          handleAddLora(availableLora, false); // false = not manual action
+          handleAddLora(availableLora, false, savedLora.strength); // Add with correct strength
         } else {
           console.warn(`LoRA ${savedLora.id} not found in available LoRAs`);
         }
       }
 
-      // Update strengths for all saved LoRAs (including ones already selected)
-      // Use a longer timeout to ensure all add operations are processed
-      setTimeout(() => {
-        savedLoras.forEach(savedLora => {
-          const availableLora = availableLoras.find(lora => lora['Model ID'] === savedLora.id);
-          if (availableLora) {
-            handleLoraStrengthChange(savedLora.id, savedLora.strength);
-          }
-        });
-      }, 50);
+      // Update strengths for LoRAs that were already selected (no timeout needed for new ones)
+      savedLoras.forEach(savedLora => {
+        if (currentLoraIds.has(savedLora.id)) {
+          // Only update strength for LoRAs that were already present
+          handleLoraStrengthChange(savedLora.id, savedLora.strength);
+        }
+      });
 
       // Mark as user set after loading
       markAsUserSet();
