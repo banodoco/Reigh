@@ -245,6 +245,8 @@ tool-name/
   - `analyze_task_availability_service_role(p_include_active boolean)`
 - Rationale: Align service role scheduling with cloud capacity by excluding local runs from active task pressure.
 
+- Follow-up migration `20250820000000_fix_count_active_filter.sql` further refines dry-run counting by restricting the "active" portion to tasks that are both cloud-claimed (non-null `worker_id`) and belong to eligible users (credits > 0, inCloud enabled, and <5 in-progress). This prevents over-counting when users already at/over the concurrency cap have many active tasks.
+
 
 ### 🔄 Shared Elements (`/src/shared/`)
 
