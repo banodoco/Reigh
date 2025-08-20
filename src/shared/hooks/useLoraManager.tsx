@@ -94,6 +94,8 @@ export const useLoraManager = (
         }
       });
       if (uniqueMap.size !== selectedLoras.length) {
+        console.log(`[LoRADedup] Found duplicates! ${selectedLoras.length} LoRAs -> ${uniqueMap.size} unique. Removing duplicates.`);
+        console.log(`[LoRADedup] LoRA IDs:`, selectedLoras.map(l => l.id));
         // Only update state if duplicates were actually found to avoid extra renders.
         setSelectedLoras(Array.from(uniqueMap.values()));
       }
@@ -147,8 +149,10 @@ export const useLoraManager = (
 
   // Core handlers with universal user tracking
   const handleAddLora = useCallback((loraToAdd: any, isManualAction = true) => {
+    console.log(`[LoRA] handleAddLora called for ${loraToAdd["Model ID"]} (manual: ${isManualAction})`);
     // Use the ref to ensure we are checking against the most up-to-date selection.
     if (selectedLorasRef.current.find(sl => sl.id === loraToAdd["Model ID"])) {
+      console.log(`[LoRA] LoRA ${loraToAdd["Model ID"]} already exists, skipping`);
       return;
     }
 
@@ -164,6 +168,7 @@ export const useLoraManager = (
           : undefined,
         trigger_word: loraToAdd.trigger_word,
       };
+      console.log(`[LoRA] Adding LoRA ${newLora.id} to selectedLoras`);
       setSelectedLoras(prev => [...prev, newLora]);
       if (isManualAction) {
         markAsUserSet();

@@ -95,29 +95,30 @@ export const useLoraSync = ({
     });
 
     const loadLorasIntoManager = (lorasToLoad: { id: string; strength: number }[], source: string) => {
-      console.log(`[LoRA] Loading ${source} LoRAs (${lorasToLoad.length})`);
+      console.log(`[LoRA] Loading ${source} LoRAs (${lorasToLoad.length}) - current selected: ${loraManager.selectedLoras.length}`);
       
       // Force clear all LoRAs first using setSelectedLoras for immediate effect
       if (loraManager.setSelectedLoras) {
+        console.log(`[LoRA] Clearing existing LoRAs before loading ${source}`);
         loraManager.setSelectedLoras([]);
       }
 
       // Small delay to allow state update before adding new LoRAs
       setTimeout(() => {
+        console.log(`[LoRA] Actually adding ${lorasToLoad.length} LoRAs from ${source} - current count: ${loraManager.selectedLoras.length}`);
         // Add each LoRA with proper error checking
         lorasToLoad.forEach(savedLora => {
           const availableLora = availableLoras.find(lora => lora['Model ID'] === savedLora.id);
           if (availableLora) {
-            // Check if it's already added before attempting to add
-            const isAlreadyAdded = loraManager.selectedLoras.some(lora => lora.id === savedLora.id);
-            if (!isAlreadyAdded) {
-              loraManager.handleAddLora(availableLora);
-              
-              // Set strength after adding
-              setTimeout(() => {
-                loraManager.handleLoraStrengthChange(savedLora.id, savedLora.strength);
-              }, 100); // Longer delay for strength setting
-            }
+            console.log(`[LoRA] Adding LoRA: ${savedLora.id}`);
+            // The handleAddLora function already has duplicate checking built-in,
+            // so we don't need to check here. This prevents race condition issues.
+            loraManager.handleAddLora(availableLora);
+            
+            // Set strength after adding
+            setTimeout(() => {
+              loraManager.handleLoraStrengthChange(savedLora.id, savedLora.strength);
+            }, 100); // Longer delay for strength setting
           } else {
             console.warn(`[LoRA] LoRA ${savedLora.id} not found in available LoRAs`);
           }
