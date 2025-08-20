@@ -255,6 +255,8 @@ For the complete catalog, see [`shared_hooks_contexts.md`](structure_detail/shar
 | Component | Purpose |
 |-----------|---------|
 | **ui/** | shadcn-ui primitives (button, dialog, etc.) |
+| **LightboxScrubVideo** | Video player with auto-play and mouse scrubbing for lightbox usage |
+| **MediaLightbox** | Modal lightbox for viewing media with task details and video scrubbing |
 | **ToolSettingsGate** | Loading wrapper for settings hydration |
 | **PaneHeader** | Consistent pane headers |
 | **transitions/** | Fade animations (PageFadeIn, FadeInSection) |

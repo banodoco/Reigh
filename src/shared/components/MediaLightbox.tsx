@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { getDisplayUrl, cn } from '@/shared/lib/utils';
 import HoverScrubVideo from '@/shared/components/HoverScrubVideo';
 import SimpleVideoPlayer from '@/tools/travel-between-images/components/SimpleVideoPlayer';
+import LightboxScrubVideo from '@/shared/components/LightboxScrubVideo';
 import TaskDetailsPanel from '@/tools/travel-between-images/components/TaskDetailsPanel';
 import { useToggleGenerationStar } from '@/shared/hooks/useGenerations';
 import MagicEditLauncher from '@/shared/components/MagicEditLauncher';
@@ -30,7 +31,7 @@ interface MediaLightboxProps {
   showImageEditTools?: boolean;
   showDownload?: boolean;
   showMagicEdit?: boolean;
-  videoPlayerComponent?: 'hover-scrub' | 'simple-player';
+  videoPlayerComponent?: 'hover-scrub' | 'simple-player' | 'lightbox-scrub';
   // Navigation availability
   hasNext?: boolean;
   hasPrevious?: boolean;
@@ -74,7 +75,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   showImageEditTools = true,
   showDownload = true,
   showMagicEdit = false,
-  videoPlayerComponent = 'hover-scrub',
+  videoPlayerComponent = 'lightbox-scrub',
   // Navigation availability
   hasNext = true,
   hasPrevious = true,
@@ -412,6 +413,13 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                             className="w-full h-full object-contain"
                           />
                         </div>
+                      ) : videoPlayerComponent === 'lightbox-scrub' ? (
+                        <LightboxScrubVideo
+                          src={displayUrl}
+                          poster={media.thumbUrl}
+                          className="object-contain"
+                          style={{ maxWidth: '55vw', maxHeight: '90vh' }}
+                        />
                       ) : (
                         <HoverScrubVideo
                           src={displayUrl}
@@ -666,8 +674,14 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       taskId={taskDetailsData.taskId}
                       replaceImages={replaceImages}
                       onReplaceImagesChange={setReplaceImages}
-                      onApplySettings={taskDetailsData.onApplyTaskSettings}
-                      onApplySettingsFromTask={taskDetailsData.onApplySettingsFromTask}
+                      onApplySettings={taskDetailsData.onApplyTaskSettings ? (settings) => {
+                        taskDetailsData.onApplyTaskSettings?.(settings);
+                        onClose(); // Close lightbox after applying settings
+                      } : undefined}
+                      onApplySettingsFromTask={taskDetailsData.onApplySettingsFromTask ? (taskId, replaceImages, inputImages) => {
+                        taskDetailsData.onApplySettingsFromTask?.(taskId, replaceImages, inputImages);
+                        onClose(); // Close lightbox after applying settings
+                      } : undefined}
                       onClose={taskDetailsData.onClose || onClose}
                       className="h-full"
                     />
@@ -693,6 +707,12 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                             className="max-w-full max-h-full object-contain"
                           />
                         </div>
+                      ) : videoPlayerComponent === 'lightbox-scrub' ? (
+                        <LightboxScrubVideo
+                          src={displayUrl}
+                          poster={media.thumbUrl}
+                          className="max-w-full max-h-full object-contain"
+                        />
                       ) : (
                         <HoverScrubVideo
                           src={displayUrl}
@@ -808,8 +828,14 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       taskId={taskDetailsData.taskId}
                       replaceImages={replaceImages}
                       onReplaceImagesChange={setReplaceImages}
-                      onApplySettings={taskDetailsData.onApplyTaskSettings}
-                      onApplySettingsFromTask={taskDetailsData.onApplySettingsFromTask}
+                      onApplySettings={taskDetailsData.onApplyTaskSettings ? (settings) => {
+                        taskDetailsData.onApplyTaskSettings?.(settings);
+                        onClose(); // Close lightbox after applying settings
+                      } : undefined}
+                      onApplySettingsFromTask={taskDetailsData.onApplySettingsFromTask ? (taskId, replaceImages, inputImages) => {
+                        taskDetailsData.onApplySettingsFromTask?.(taskId, replaceImages, inputImages);
+                        onClose(); // Close lightbox after applying settings
+                      } : undefined}
                       onClose={taskDetailsData.onClose || onClose}
                       className="h-full"
                     />
@@ -852,6 +878,13 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         className="h-auto max-h-[85vh] sm:max-h-[85vh] object-contain"
                       />
                     </div>
+                  ) : videoPlayerComponent === 'lightbox-scrub' ? (
+                    <LightboxScrubVideo
+                      src={displayUrl}
+                      poster={media.thumbUrl}
+                      className="h-auto max-h-[85vh] sm:max-h-[85vh] object-contain w-[95vw] sm:w-auto"
+                      style={{ maxWidth: '95vw' }}
+                    />
                   ) : (
                     <HoverScrubVideo
                       src={displayUrl}
