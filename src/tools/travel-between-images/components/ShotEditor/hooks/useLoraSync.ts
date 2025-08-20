@@ -69,9 +69,12 @@ export const useLoraSync = ({
 
   // Load shot-specific LoRAs when shot changes (only depend on data, not loraManager)
   useEffect(() => {
+    const effectId = `${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
+    console.log(`[LoRA:${effectId}] Effect triggered for shot: ${selectedShot?.id}`);
+    
     // Only run if we have everything we need and haven't initialized this shot yet
     if (!selectedShot?.id || isShotLoraSettingsLoading || hasInitializedShot === selectedShot.id || isLoadingLorasRef.current) {
-      console.log('[LoRA] Skipping initialization for shot:', selectedShot?.id, {
+      console.log(`[LoRA:${effectId}] Skipping initialization for shot:`, selectedShot?.id, {
         noShotId: !selectedShot?.id,
         settingsLoading: isShotLoraSettingsLoading,
         alreadyInitialized: hasInitializedShot === selectedShot?.id,
@@ -88,7 +91,7 @@ export const useLoraSync = ({
     }
     
     isLoadingLorasRef.current = true;
-    console.log('[LoRA] Initializing LoRAs for shot:', selectedShot.id, {
+    console.log(`[LoRA:${effectId}] Initializing LoRAs for shot:`, selectedShot.id, {
       shotLoraSettings: shotLoraSettings,
       projectLoraSettings: projectLoraSettings,
       availableLorasCount: availableLoras.length

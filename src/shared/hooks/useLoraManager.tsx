@@ -359,11 +359,17 @@ export const useLoraManager = (
   // BUT only if the user hasn't manually interacted (to prevent re-adding after manual removal)
   // Also skip entirely if disableAutoLoad flag is true
   useEffect(() => {
+    console.log(`[LoRAAutoLoad] Effect triggered - disableAutoLoad: ${disableAutoLoad}, enableProjectPersistence: ${enableProjectPersistence}, hasSavedLoras: ${hasSavedLoras}, selectedLorasLength: ${selectedLoras.length}, userHasManuallyInteracted: ${userHasManuallyInteracted}`);
+    
     if (disableAutoLoad) {
+      console.log(`[LoRAAutoLoad] Skipping - auto-load disabled`);
       return;
     }
     if (enableProjectPersistence && hasSavedLoras && selectedLoras.length === 0 && !userHasManuallyInteracted) {
+      console.log(`[LoRAAutoLoad] Loading project LoRAs automatically`);
       handleLoadProjectLoras();
+    } else {
+      console.log(`[LoRAAutoLoad] Skipping - conditions not met`);
     }
   }, [enableProjectPersistence, hasSavedLoras, selectedLoras.length, handleLoadProjectLoras, userHasManuallyInteracted, disableAutoLoad]);
 
