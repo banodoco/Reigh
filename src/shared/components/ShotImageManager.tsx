@@ -74,6 +74,9 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
   
   // State to preserve selected IDs for delete confirmation
   const [pendingDeleteIds, setPendingDeleteIds] = useState<string[]>([]);
+  
+  // State for range selection (Command+click)
+  const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
   const isMobile = useIsMobile();
   const outerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
@@ -201,6 +204,7 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
       // Clear selection first for immediate UI feedback (both mobile and desktop)
       setMobileSelectedIds([]);
       setSelectedIds([]);
+    setLastSelectedIndex(null);
       setConfirmOpen(false);
       setPendingDeleteIds([]); // Clear pending delete IDs
       
@@ -376,6 +380,7 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
       // Starting a regular drag on an un-selected item -> clear previous selection
       console.log('[DragDebug:ShotImageManager] Clearing selection during drag start');
       setSelectedIds([]);
+    setLastSelectedIndex(null);
     }
   }, [selectedIds, mobileSelectedIds]);
 
@@ -427,6 +432,7 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
         stableOnImageReorder(newOrder.map((img) => img.shotImageEntryId));
       }
       setSelectedIds([]);
+    setLastSelectedIndex(null);
       return;
     }
 
@@ -506,6 +512,7 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
     if (currentOrder === newOrder) {
       console.log('[DragDebug:ShotImageManager] Multi-drag resulted in no change - skipping update');
       setSelectedIds([]);
+    setLastSelectedIndex(null);
       return;
     }
 
@@ -521,7 +528,23 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
     console.log('[DragDebug:ShotImageManager] Calling onImageReorder for multi-drag');
     stableOnImageReorder(newItems.map((img) => img.shotImageEntryId));
     setSelectedIds([]);
+    setLastSelectedIndex(null);
   }, [selectedIds, currentImages, stableOnImageReorder]);
+
+  // Helper function to get range of images between two indices
+  const getImageRange = useCallback((startIndex: number, endIndex: number): string[] => {
+    const minIndex = Math.min(startIndex, endIndex);
+    const maxIndex = Math.max(startIndex, endIndex);
+    const rangeIds: string[] = [];
+    
+    for (let i = minIndex; i <= maxIndex; i++) {
+      if (currentImages[i]) {
+        rangeIds.push(currentImages[i].shotImageEntryId);
+      }
+    }
+    
+    return rangeIds;
+  }, [currentImages]);
 
   const handleItemClick = useCallback((id: string, event: React.MouseEvent) => {
     event.preventDefault(); // Prevent any default behavior like navigation
@@ -538,19 +561,75 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
       return;
     }
     
+    // Find the current image index
+    const currentIndex = currentImages.findIndex(img => img.shotImageEntryId === id);
+    
     // Desktop behavior
     if (event.metaKey || event.ctrlKey) {
-      // Ctrl/Cmd+click: Toggle selection (add/remove from current selection)
-      setSelectedIds((prev) =>
-        prev.includes(id) ? prev.filter((selectedId) => selectedId !== id) : [...prev, id],
-      );
+      // Command+click behavior
+      const isCurrentlySelected = selectedIds.includes(id);
+      
+      if (lastSelectedIndex !== null && lastSelectedIndex !== currentIndex && selectedIds.length > 0) {
+        // Range operation: select or deselect range between lastSelectedIndex and currentIndex
+        const rangeIds = getImageRange(lastSelectedIndex, currentIndex);
+        
+        if (isCurrentlySelected) {
+          // Deselect range: remove all images in the range from selection
+          setSelectedIds((prev) => {
+            const newSelection = prev.filter(selectedId => !rangeIds.includes(selectedId));
+            // Clear lastSelectedIndex if we deselected everything
+            if (newSelection.length === 0) {
+              setLastSelectedIndex(null);
+            }
+            return newSelection;
+          });
+        } else {
+          // Select range: add all images in the range to selection
+          setSelectedIds((prev) => {
+            const newSelection = Array.from(new Set([...prev, ...rangeIds]));
+            return newSelection;
+          });
+          // Update last selected to current
+          setLastSelectedIndex(currentIndex);
+        }
+      } else {
+        // Regular Ctrl/Cmd+click: Toggle individual selection
+        setSelectedIds((prev) => {
+          if (isCurrentlySelected) {
+            // Deselecting: remove from selection
+            const newSelection = prev.filter((selectedId) => selectedId !== id);
+            // Clear lastSelectedIndex if this was the only selected item
+            if (newSelection.length === 0) {
+              setLastSelectedIndex(null);
+            }
+            return newSelection;
+          } else {
+            // Selecting: add to selection
+            setLastSelectedIndex(currentIndex);
+            return [...prev, id];
+          }
+        });
+      }
     } else {
-      // Single click: Toggle selection (add/remove from current selection)
-      setSelectedIds((prev) =>
-        prev.includes(id) ? prev.filter((selectedId) => selectedId !== id) : [...prev, id],
-      );
+      // Single click: Toggle individual selection (don't clear others)
+      setSelectedIds((prev) => {
+        const isSelected = prev.includes(id);
+        if (isSelected) {
+          // Deselecting: remove only this item
+          const newSelection = prev.filter((selectedId) => selectedId !== id);
+          // Clear lastSelectedIndex if this was the only selected item
+          if (newSelection.length === 0) {
+            setLastSelectedIndex(null);
+          }
+          return newSelection;
+        } else {
+          // Selecting: add to existing selection
+          setLastSelectedIndex(currentIndex);
+          return [...prev, id];
+        }
+      });
     }
-  }, [isMobile, generationMode, mobileSelectedIds]);
+  }, [isMobile, generationMode, mobileSelectedIds, currentImages, lastSelectedIndex, selectedIds.length, getImageRange]);
 
   const handleMobileDoubleClick = (index: number) => {
     if (isMobile && generationMode === 'batch') {
@@ -815,6 +894,7 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
                 // Only deselect if double-clicking on the grid itself, not on an image
                 if (e.target === e.currentTarget) {
                   setSelectedIds([]);
+    setLastSelectedIndex(null);
                   setMobileSelectedIds([]);
                 }
               }}

@@ -76,6 +76,7 @@ export default {
 				},
 				// Expanded Wes Anderson palette
 				wes: {
+					// Legacy names (for backward compatibility)
 					pink: 'hsl(var(--wes-pink))',
 					'pink-dark': 'hsl(var(--wes-pink-dark))',
 					yellow: 'hsl(var(--wes-yellow))',
@@ -88,12 +89,30 @@ export default {
 					salmon: 'hsl(var(--wes-salmon))',
 					sage: 'hsl(var(--wes-sage))',
 					'dusty-blue': 'hsl(var(--wes-dusty-blue))',
-					burgundy: 'hsl(var(--wes-burgundy))',
+					burgundy: 'hsl(var(--wes-burgundy))', // NOTE: Actually dark orange now
 					forest: 'hsl(var(--wes-forest))',
 					coral: 'hsl(var(--wes-coral))',
 					mustard: 'hsl(var(--wes-mustard))',
 					teal: 'hsl(var(--wes-teal))',
 					'vintage-gold': 'hsl(var(--wes-vintage-gold))',
+					
+					// Descriptive aliases (same CSS variables, clearer names)
+					'soft-pink': 'hsl(var(--wes-soft-pink))',
+					'soft-pink-dark': 'hsl(var(--wes-soft-pink-dark))',
+					'pale-yellow': 'hsl(var(--wes-pale-yellow))',
+					'pale-yellow-dark': 'hsl(var(--wes-pale-yellow-dark))',
+					'mint-green': 'hsl(var(--wes-mint-green))',
+					'mint-green-dark': 'hsl(var(--wes-mint-green-dark))',
+					'dusty-lavender': 'hsl(var(--wes-dusty-lavender))',
+					'dusty-lavender-dark': 'hsl(var(--wes-dusty-lavender-dark))',
+					'pastel-cream': 'hsl(var(--wes-pastel-cream))',
+					'coral-salmon': 'hsl(var(--wes-coral-salmon))',
+					'sage-green': 'hsl(var(--wes-sage-green))',
+					'dark-orange': 'hsl(var(--wes-dark-orange))',
+					'forest-green': 'hsl(var(--wes-forest-green))',
+					'warm-coral': 'hsl(var(--wes-warm-coral))',
+					'vintage-mustard': 'hsl(var(--wes-vintage-mustard))',
+					'muted-teal': 'hsl(var(--wes-muted-teal))',
 				}
 			},
 			borderRadius: {

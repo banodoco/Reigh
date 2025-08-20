@@ -105,9 +105,9 @@
     --theme-lala-icon-danger: 0 70% 60%;      /* Red for dangerous actions */
     
     /* Wes Anderson Theme Colors */
-    --theme-wes-primary: 345 40% 30%;         /* Burgundy */
-    --theme-wes-primary-dark: 345 50% 25%;    /* Darker Burgundy */
-    --theme-wes-primary-light: 345 35% 40%;   /* Lighter Burgundy */
+    --theme-wes-primary: 25 70% 35%;          /* Dark Warm Orange */
+    --theme-wes-primary-dark: 25 75% 25%;     /* Darker Orange */
+    --theme-wes-primary-light: 25 65% 45%;    /* Lighter Orange */
     --theme-wes-secondary: 210 35% 82%;       /* Dusty Blue */
     --theme-wes-secondary-dark: 210 30% 70%;  /* Darker Dusty Blue */
     --theme-wes-secondary-light: 210 40% 90%; /* Lighter Dusty Blue */
@@ -123,7 +123,7 @@
 
     
     /* Wes Anderson Icon Colors */
-    --theme-wes-icon-primary: 345 40% 30%;    /* Burgundy for main icons */
+    --theme-wes-icon-primary: 25 70% 35%;     /* Dark Warm Orange for main icons */
     --theme-wes-icon-secondary: 40 60% 80%;   /* Vintage Gold for accent icons */
     --theme-wes-icon-muted: 210 35% 82%;      /* Dusty Blue for subtle icons */
     --theme-wes-icon-interactive: 333 30% 93%; /* Soft Pink for interactive icons */

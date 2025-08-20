@@ -4,7 +4,7 @@
  * This utility provides functions to switch between different color themes.
  * Currently supports:
  * - 'lala-land': La La Land inspired theme (purple, gold, blue)
- * - 'wes-anderson': Wes Anderson inspired theme (burgundy, soft pink, dusty blue)
+ * - 'wes-anderson': Wes Anderson inspired theme (dark warm orange, soft pink, dusty blue)
  */
 
 export type ThemeName = 'lala-land' | 'wes-anderson' | 'cat-lounging';
@@ -15,7 +15,7 @@ export type ThemeName = 'lala-land' | 'wes-anderson' | 'cat-lounging';
 const THEME_DEFINITIONS = {
   'wes-anderson': {
     // Core theme colors
-    primary: '345 40% 30%',      // Burgundy
+    primary: '25 70% 35%',       // Dark Warm Orange
     secondary: '210 35% 82%',    // Dusty Blue
     accent: '40 60% 80%',        // Vintage Gold
     surface: '120 25% 92%',      // Pastel Green
@@ -32,8 +32,9 @@ const THEME_DEFINITIONS = {
       boldWeight: '800'         // Make bold extra heavy (if available, fallback to 700)
     },
     
-    // Extended palette for legacy support
+    // Extended palette for legacy support and descriptive access
     palette: {
+      // Legacy names (keep for backward compatibility)
       pink: '333 30% 93%',
       'pink-dark': '333 25% 82%',
       yellow: '48 85% 88%',
@@ -46,12 +47,30 @@ const THEME_DEFINITIONS = {
       salmon: '15 60% 85%',
       sage: '120 20% 80%',
       'dusty-blue': '210 35% 82%',
-      burgundy: '345 40% 30%',
+      burgundy: '25 70% 35%',     // NOTE: Now actually dark warm orange
       forest: '150 30% 25%',
       coral: '10 70% 82%',
       mustard: '45 80% 70%',
       teal: '180 40% 75%',
-      'vintage-gold': '40 60% 80%'
+      'vintage-gold': '40 60% 80%',
+      
+      // Descriptive aliases for clarity (same colors, better names)
+      'soft-pink': '333 30% 93%',           // = pink - for accents and highlights
+      'soft-pink-dark': '333 25% 82%',      // = pink-dark - for hover states
+      'pale-yellow': '48 85% 88%',          // = yellow - for backgrounds
+      'pale-yellow-dark': '48 65% 75%',     // = yellow-dark - for borders
+      'mint-green': '145 35% 85%',          // = mint - for inputs and success
+      'mint-green-dark': '145 30% 70%',     // = mint-dark - for borders
+      'dusty-lavender': '280 35% 88%',      // = lavender - for subtle accents
+      'dusty-lavender-dark': '280 25% 75%', // = lavender-dark - for text
+      'pastel-cream': '120 25% 92%',        // = cream - for backgrounds
+      'coral-salmon': '15 60% 85%',         // = salmon - for warmth
+      'sage-green': '120 20% 80%',          // = sage - for muted borders
+      'dark-orange': '25 70% 35%',          // = burgundy - primary color (misleading name!)
+      'forest-green': '150 30% 25%',        // = forest - for neutral text
+      'warm-coral': '10 70% 82%',           // = coral - for highlights
+      'vintage-mustard': '45 80% 70%',      // = mustard - for warnings
+      'muted-teal': '180 40% 75%'           // = teal - for secondary elements
     }
   },
   'lala-land': {
@@ -147,18 +166,18 @@ function applyThemeSpecificStyling(root: HTMLElement, themeName: ThemeName) {
   if (themeName === 'wes-anderson') {
     // Override core Tailwind variables for Wes Anderson look
     root.style.setProperty('--background', '120 25% 92%'); // Pastel Green
-    root.style.setProperty('--foreground', '345 40% 30%'); // Burgundy
-    root.style.setProperty('--primary', '345 40% 30%'); // Burgundy
+    root.style.setProperty('--foreground', '25 70% 35%'); // Dark Warm Orange
+    root.style.setProperty('--primary', '25 70% 35%'); // Dark Warm Orange
     root.style.setProperty('--primary-foreground', '120 25% 92%'); // Pastel Green
     root.style.setProperty('--secondary', '210 35% 82%'); // Dusty Blue
-    root.style.setProperty('--secondary-foreground', '345 40% 30%'); // Burgundy
+    root.style.setProperty('--secondary-foreground', '25 70% 35%'); // Dark Warm Orange
     root.style.setProperty('--accent', '333 30% 93%'); // Soft Pink
-    root.style.setProperty('--accent-foreground', '345 40% 30%'); // Burgundy
+    root.style.setProperty('--accent-foreground', '25 70% 35%'); // Dark Warm Orange
     root.style.setProperty('--muted', '120 20% 80%'); // Sage
     root.style.setProperty('--muted-foreground', '150 30% 25%'); // Forest
     root.style.setProperty('--border', '120 20% 80%'); // Sage
     root.style.setProperty('--input', '145 35% 85%'); // Mint
-    root.style.setProperty('--ring', '345 40% 30%'); // Burgundy
+    root.style.setProperty('--ring', '25 70% 35%'); // Dark Warm Orange
     
     // Add body class and dynamic CSS variables
     document.body.classList.add('wes-anderson-theme');
@@ -287,7 +306,7 @@ export function initializeTheme() {
 export function getAvailableThemes() {
   return [
     { name: 'lala-land' as const, displayName: 'La La Land', description: 'Dreamy purples and golden tones' },
-    { name: 'wes-anderson' as const, displayName: 'Wes Anderson', description: 'Burgundy, soft pink, and dusty pastels' },
+    { name: 'wes-anderson' as const, displayName: 'Wes Anderson', description: 'Dark warm orange, soft pink, and dusty pastels' },
     { name: 'cat-lounging' as const, displayName: 'Cat Lounging', description: 'Warm oranges, turquoise, and sage greens' }
   ];
 }

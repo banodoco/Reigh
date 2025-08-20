@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useRef, useEffect } from 'react';
 import { toast } from 'sonner';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -50,23 +51,50 @@ interface UpdateToolSettingsParams {
  * Fetch and merge tool settings from all scopes using direct Supabase calls
  * This replaces the Express API approach for better mobile reliability
  */
-// Helper function to add timeout to auth calls
-async function getUserWithTimeout(timeoutMs = 5000) {
-  return Promise.race([
-    supabase.auth.getUser(),
-    new Promise<{ data: { user: null }, error: Error }>((_, reject) =>
-      setTimeout(() => reject(new Error('Auth timeout - please check your connection')), timeoutMs)
-    )
-  ]);
+// Helper function to add timeout to auth calls - aligned with Supabase global timeout
+async function getUserWithTimeout(timeoutMs = 7000) {
+  const controller = new AbortController();
+  
+  const timeoutId = setTimeout(() => {
+    controller.abort();
+  }, timeoutMs);
+  
+  try {
+    const result = await Promise.race([
+      supabase.auth.getUser(),
+      new Promise<{ data: { user: null }, error: Error }>((_, reject) =>
+        setTimeout(() => reject(new Error('Auth timeout - please check your connection')), timeoutMs)
+      )
+    ]);
+    
+    clearTimeout(timeoutId);
+    return result;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error?.name === 'AbortError') {
+      throw new Error('Auth request was cancelled - please try again');
+    }
+    throw error;
+  }
 }
 
-async function fetchToolSettingsSupabase(toolId: string, ctx: ToolSettingsContext): Promise<unknown> {
+async function fetchToolSettingsSupabase(toolId: string, ctx: ToolSettingsContext, signal?: AbortSignal): Promise<unknown> {
   try {
+    // Check if request was cancelled before starting
+    if (signal?.aborted) {
+      throw new Error('Request was cancelled');
+    }
+    
     // Mobile optimization: Cache user info to avoid repeated auth calls
-    // Add timeout to prevent hanging on mobile connections
-    const { data: { user }, error: authError } = await getUserWithTimeout(5000);
+    // Add timeout to prevent hanging on mobile connections (aligned with Supabase global timeout)
+    const { data: { user }, error: authError } = await getUserWithTimeout(7000);
     if (authError || !user) {
       throw new Error('Authentication required');
+    }
+    
+    // Check again after auth call
+    if (signal?.aborted) {
+      throw new Error('Request was cancelled');
     }
 
     // Mobile optimization: Use more efficient queries with targeted JSON extraction
@@ -122,11 +150,15 @@ async function fetchToolSettingsSupabase(toolId: string, ctx: ToolSettingsContex
 
   } catch (error) {
     console.error('[fetchToolSettingsSupabase] Error:', error);
-    // Mobile-friendly error handling - provide more context
+    // Handle different types of errors appropriately
+    if (error?.name === 'AbortError' || error?.message?.includes('Request was cancelled')) {
+      console.warn('[fetchToolSettingsSupabase] Request was cancelled - component likely unmounted');
+      throw new Error('Request was cancelled');
+    }
     if (error?.message?.includes('Failed to fetch')) {
       throw new Error('Network connection issue. Please check your internet connection.');
     }
-    if (error?.message?.includes('Auth timeout')) {
+    if (error?.message?.includes('Auth timeout') || error?.message?.includes('Auth request was cancelled')) {
       console.warn('[fetchToolSettingsSupabase] Auth timeout - continuing with defaults');
       throw new Error('Authentication timeout - using default settings');
     }
@@ -137,10 +169,14 @@ async function fetchToolSettingsSupabase(toolId: string, ctx: ToolSettingsContex
 /**
  * Update tool settings using direct Supabase calls
  */
-async function updateToolSettingsSupabase(params: UpdateToolSettingsParams): Promise<void> {
+async function updateToolSettingsSupabase(params: UpdateToolSettingsParams, signal?: AbortSignal): Promise<void> {
   const { scope, id, toolId, patch } = params;
 
   try {
+    // Check if request was cancelled before starting
+    if (signal?.aborted) {
+      throw new Error('Request was cancelled');
+    }
     let tableName: string;
     switch (scope) {
       case 'user':
@@ -166,6 +202,11 @@ async function updateToolSettingsSupabase(params: UpdateToolSettingsParams): Pro
     if (fetchError) {
       throw new Error(`Failed to fetch current ${scope} settings: ${fetchError.message}`);
     }
+    
+    // Check if request was cancelled after fetch
+    if (signal?.aborted) {
+      throw new Error('Request was cancelled');
+    }
 
     const currentSettings = (currentEntity?.settings as any) ?? {};
     const currentToolSettings = currentSettings[toolId] ?? {};
@@ -188,6 +229,11 @@ async function updateToolSettingsSupabase(params: UpdateToolSettingsParams): Pro
 
   } catch (error) {
     console.error('[updateToolSettingsSupabase] Error:', error);
+    // Handle abort errors specifically
+    if (error?.name === 'AbortError' || error?.message?.includes('Request was cancelled')) {
+      console.warn('[updateToolSettingsSupabase] Request was cancelled - component likely unmounted');
+      throw new Error('Request was cancelled');
+    }
     throw error;
   }
 }
@@ -210,24 +256,38 @@ export function useToolSettings<T>(
 ) {
   const { selectedProjectId } = useProject();
   const queryClient = useQueryClient();
+  
+  // Ref to track active update controllers for cleanup
+  const updateControllersRef = useRef<Set<AbortController>>(new Set());
 
   // Determine parameter shapes
   const projectId: string | undefined = context?.projectId ?? selectedProjectId;
   const shotId: string | undefined = context?.shotId;
   const fetchEnabled: boolean = context?.enabled ?? true;
 
+  // Cleanup abort controllers on unmount
+  useEffect(() => {
+    return () => {
+      updateControllersRef.current.forEach(controller => {
+        controller.abort();
+      });
+      updateControllersRef.current.clear();
+    };
+  }, []);
+
   // Fetch merged settings using Supabase with mobile optimizations
   const { data: settings, isLoading, error } = useQuery({
     queryKey: ['toolSettings', toolId, projectId, shotId],
-    queryFn: () => fetchToolSettingsSupabase(toolId, { projectId, shotId }),
+    queryFn: ({ signal }) => fetchToolSettingsSupabase(toolId, { projectId, shotId }, signal),
     enabled: !!toolId && fetchEnabled,
     staleTime: 10 * 60 * 1000, // 10 minutes
     gcTime: 15 * 60 * 1000, // 15 minutes
     refetchOnWindowFocus: false,
     // Mobile-specific optimizations
     retry: (failureCount, error) => {
-      // Don't retry auth errors
-      if (error?.message?.includes('Authentication required')) {
+      // Don't retry auth errors or cancelled requests
+      if (error?.message?.includes('Authentication required') || 
+          error?.message?.includes('Request was cancelled')) {
         return false;
       }
       // Retry up to 3 times for network errors on mobile
@@ -248,12 +308,16 @@ export function useToolSettings<T>(
 
   // Update settings mutation
   const updateMutation = useMutation({
-    mutationFn: async ({ scope, settings: newSettings }: { scope: SettingsScope; settings: Partial<T> }) => {
+    mutationFn: async ({ scope, settings: newSettings, signal }: { 
+      scope: SettingsScope; 
+      settings: Partial<T>; 
+      signal?: AbortSignal;
+    }) => {
       let idForScope: string | undefined;
       
       if (scope === 'user') {
-        // Get userId from auth for user scope with timeout protection
-        const { data: { user } } = await getUserWithTimeout(5000);
+        // Get userId from auth for user scope with timeout protection (aligned with global timeout)
+        const { data: { user } } = await getUserWithTimeout(7000);
         idForScope = user?.id;
       } else if (scope === 'project') {
         idForScope = projectId;
@@ -270,7 +334,7 @@ export function useToolSettings<T>(
           id: idForScope,
           toolId,
           patch: newSettings,
-      });
+      }, signal);
     },
     onSuccess: () => {
       // Invalidate the query to refetch updated settings
@@ -280,12 +344,32 @@ export function useToolSettings<T>(
     },
     onError: (error: Error) => {
       console.error('[useToolSettings] Update error:', error);
-      toast.error(`Failed to save ${toolId} settings: ${error.message}`);
+      // Don't show toast for cancelled requests
+      if (!error?.message?.includes('Request was cancelled')) {
+        toast.error(`Failed to save ${toolId} settings: ${error.message}`);
+      }
     },
   });
 
   const update = (scope: SettingsScope, settings: Partial<T>) => {
-    return updateMutation.mutate({ scope, settings });
+    // Create an AbortController for this update and track it
+    const controller = new AbortController();
+    updateControllersRef.current.add(controller);
+    
+    // Clean up controller when mutation completes
+    const cleanup = () => {
+      updateControllersRef.current.delete(controller);
+    };
+    
+    // Set up cleanup handlers
+    controller.signal.addEventListener('abort', cleanup);
+    
+    return updateMutation.mutate(
+      { scope, settings, signal: controller.signal },
+      {
+        onSettled: cleanup, // Clean up on both success and error
+      }
+    );
   };
 
   return {
