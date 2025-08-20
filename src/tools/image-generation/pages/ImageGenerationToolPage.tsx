@@ -236,6 +236,22 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     true,
     generationsFilters
   );
+
+  // [GalleryPollingDebug] Log when component uses the hook
+  React.useEffect(() => {
+    console.log('📊 [GalleryPollingDebug:ImageGenerationToolPage] useGenerations result:', {
+      selectedProjectId,
+      currentPage,
+      itemsPerPage,
+      isLoadingGenerations,
+      hasData: !!generationsResponse,
+      itemsCount: generationsResponse?.items?.length,
+      total: generationsResponse?.total,
+      generationsFilters,
+      renderCount: renderCount.current,
+      timestamp: Date.now()
+    });
+  }, [generationsResponse, isLoadingGenerations, selectedProjectId, currentPage]);
   
   console.log(`${DEBUG_TAG} Render #${renderCount.current} - useGenerations states:`, {
     isLoadingGenerations,

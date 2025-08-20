@@ -413,6 +413,19 @@ export function useUnifiedGenerations(options: UseUnifiedGenerationsOptions) {
   const prevCacheKeyRef = React.useRef<string>("");
   const lastSuccessSigRef = React.useRef<string>("");
   const lastStateSigRef = React.useRef<string>("");
+
+  // [GalleryPollingDebug] Add comprehensive logging for useUnifiedGenerations
+  console.log('[GalleryPollingDebug:useUnifiedGenerations] Hook called with:', {
+    instanceId: hookInstanceIdRef.current,
+    mode: options.mode,
+    projectId: options.projectId,
+    shotId: options.shotId,
+    page: options.page,
+    limit: options.limit,
+    filters: options.filters,
+    enabled: options.enabled,
+    timestamp: Date.now()
+  });
   
   const {
     enabled = true,
@@ -474,7 +487,7 @@ export function useUnifiedGenerations(options: UseUnifiedGenerationsOptions) {
       
       if (!data) {
         // If no data yet, poll slowly to get initial data
-        console.log('[GenerationPollingDebug] No data yet, using slow polling (30s):', {
+        console.log('🟡 [GalleryPollingDebug:UnifiedGenerations] No data yet, using slow polling (30s):', {
           mode: options.mode,
           projectId: options.projectId,
           shotId: options.shotId,
@@ -482,7 +495,8 @@ export function useUnifiedGenerations(options: UseUnifiedGenerationsOptions) {
           fetchStatus,
           status,
           errorMessage: error?.message,
-          timestamp: now
+          timestamp: now,
+          refetchIntervalTriggered: true
         });
         return 30000; // 30 seconds
       }
@@ -497,7 +511,7 @@ export function useUnifiedGenerations(options: UseUnifiedGenerationsOptions) {
         return ageMs < 5 * 60 * 1000; // Created in last 5 minutes
       }) ?? false;
       
-      console.log('[GenerationPollingDebug] Polling interval calculation:', {
+      console.log('🔍 [GalleryPollingDebug:UnifiedGenerations] Polling interval calculation:', {
         mode: options.mode,
         projectId: options.projectId,
         shotId: options.shotId,
@@ -509,13 +523,14 @@ export function useUnifiedGenerations(options: UseUnifiedGenerationsOptions) {
         status,
         errorMessage: error?.message,
         visibilityState: document.visibilityState,
-        timestamp: now
+        timestamp: now,
+        refetchIntervalTriggered: true
       });
       
       if (hasRecentGenerations) {
         // Fast polling when we have recent activity (might be more coming)
         const pollInterval = 15000; // 15 seconds for active generation period
-        console.log('[GenerationPollingDebug] Recent generations detected, using FAST polling:', {
+        console.log('🚀 [GalleryPollingDebug:UnifiedGenerations] Recent generations detected, using FAST polling:', {
           mode: options.mode,
           projectId: options.projectId,
           shotId: options.shotId,
@@ -529,14 +544,15 @@ export function useUnifiedGenerations(options: UseUnifiedGenerationsOptions) {
           fetchStatus,
           dataAge: Math.round(dataAge / 1000) + 's',
           dataUpdatedAt: new Date(dataUpdatedAt).toISOString(),
-          timestamp: now
+          timestamp: now,
+          refetchIntervalTriggered: true
         });
         return pollInterval;
       } else if (dataAge > 60000) {
         // RESURRECTION POLLING: If data is stale (>1 minute old), poll occasionally
         // This catches generations created while WebSocket was disconnected
         const pollInterval = 45000; // 45 seconds for resurrection polling
-        console.log('[GenerationPollingDebug] Data is stale, using RESURRECTION polling:', {
+        console.log('⚰️ [GalleryPollingDebug:UnifiedGenerations] Data is stale, using RESURRECTION polling:', {
           mode: options.mode,
           projectId: options.projectId,
           shotId: options.shotId,
@@ -545,18 +561,20 @@ export function useUnifiedGenerations(options: UseUnifiedGenerationsOptions) {
           pollIntervalMs: pollInterval,
           fetchStatus,
           dataUpdatedAt: new Date(dataUpdatedAt).toISOString(),
-          timestamp: now
+          timestamp: now,
+          refetchIntervalTriggered: true
         });
         return pollInterval;
       } else {
         // Data is fresh and no recent activity - rely on WebSocket
-        console.log('[GenerationPollingDebug] Data is fresh, WebSocket should handle updates:', {
+        console.log('✅ [GalleryPollingDebug:UnifiedGenerations] Data is fresh, WebSocket should handle updates:', {
           mode: options.mode,
           projectId: options.projectId,
           shotId: options.shotId,
           itemCount,
           dataAge: Math.round(dataAge / 1000) + 's',
-          timestamp: now
+          timestamp: now,
+          refetchIntervalTriggered: true
         });
         return false; // No polling, rely on WebSocket
       }
@@ -566,7 +584,55 @@ export function useUnifiedGenerations(options: UseUnifiedGenerationsOptions) {
     refetchOnReconnect: false, // Prevent double-fetches
   });
   
-  // Log query results
+  // [GalleryPollingDebug] Enhanced logging for unified generations
+  React.useEffect(() => {
+    console.log('[GalleryPollingDebug:useUnifiedGenerations] Query result updated:', {
+      instanceId: hookInstanceIdRef.current,
+      mode: options.mode,
+      projectId: options.projectId,
+      shotId: options.shotId,
+      page: options.page,
+      isLoading: query.isLoading,
+      isFetching: query.isFetching,
+      isError: query.isError,
+      hasData: !!query.data,
+      itemsCount: query.data?.items?.length,
+      total: query.data?.total,
+      hasMore: query.data?.hasMore,
+      errorMessage: query.error?.message,
+      status: query.status,
+      fetchStatus: query.fetchStatus,
+      timestamp: Date.now()
+    });
+  }, [query.data, query.isLoading, query.isFetching, query.isError, query.error, query.status, query.fetchStatus, options.mode, options.projectId, options.shotId, options.page]);
+
+  // [GalleryPollingDebug] Special tracking for data changes (new results) 
+  const dataItemsCount = (query.data?.items as any[])?.length || 0;
+  const dataSignature = React.useMemo(() => {
+    if (!(query.data?.items as any[])) return 'no-data';
+    return (query.data.items as any[]).map((item: any) => `${item.id}:${item.createdAt}`).join('|');
+  }, [query.data?.items]);
+  
+  React.useEffect(() => {
+    if (query.data && dataItemsCount > 0) {
+      console.log('🎯 [GalleryPollingDebug:useUnifiedGenerations] NEW DATA RECEIVED:', {
+        instanceId: hookInstanceIdRef.current,
+        mode: options.mode,
+        projectId: options.projectId,
+        shotId: options.shotId,
+        page: options.page,
+        itemsCount: dataItemsCount,
+        total: query.data.total,
+        firstItemId: (query.data.items as any[])[0]?.id,
+        firstItemCreatedAt: (query.data.items as any[])[0]?.createdAt,
+        dataSignature: dataSignature.substring(0, 100) + '...',
+        wasTriggeredByPolling: query.isFetching && !query.isLoading,
+        timestamp: Date.now()
+      });
+    }
+  }, [dataSignature, options.mode, options.projectId, options.shotId, options.page, dataItemsCount, query.data, query.isFetching, query.isLoading]);
+  
+  // Log query results (original logging preserved)
   React.useEffect(() => {
     if (query.data) {
       const cacheKeyStr = cacheKey.join(':');

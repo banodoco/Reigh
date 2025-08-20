@@ -1,3 +1,4 @@
+import React from 'react';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { GeneratedImageWithMetadata } from '@/shared/components/ImageGallery';
 import { supabase } from '@/integrations/supabase/client';
@@ -323,7 +324,19 @@ export function useGenerations(
   const queryClient = useQueryClient();
   const queryKey = ['generations', projectId, page, limit, filters];
 
-  return useQuery<GenerationsPaginatedResponse, Error>({
+  // [GalleryPollingDebug] Add comprehensive logging for useGenerations
+  console.log('[GalleryPollingDebug:useGenerations] Hook called with:', {
+    projectId,
+    page,
+    limit,
+    enabled,
+    filters,
+    offset,
+    queryKey: queryKey.join(':'),
+    timestamp: Date.now()
+  });
+
+  const result = useQuery<GenerationsPaginatedResponse, Error>({
     queryKey: queryKey,
     queryFn: () => fetchGenerations(projectId, limit, offset, filters),
     enabled: !!projectId && enabled,
@@ -346,14 +359,15 @@ export function useGenerations(
       
       if (!data) {
         // If no data yet, poll slowly to get initial data
-        console.log('[GenerationPollingDebug:ImageGallery] No data yet, using slow polling (30s):', {
+        console.log('🟡 [GalleryPollingDebug:ImageGallery] No data yet, using slow polling (30s):', {
           projectId,
           page,
           filters,
           fetchStatus,
           status,
           errorMessage: error?.message,
-          timestamp: now
+          timestamp: now,
+          refetchIntervalTriggered: true
         });
         return 30000; // 30 seconds
       }
@@ -369,7 +383,7 @@ export function useGenerations(
         return ageMs < 5 * 60 * 1000; // Created in last 5 minutes
       }) ?? false;
       
-      console.log('[GenerationPollingDebug:ImageGallery] Polling interval calculation:', {
+      console.log('🔍 [GalleryPollingDebug:ImageGallery] Polling interval calculation:', {
         projectId,
         page,
         itemCount,
@@ -380,13 +394,14 @@ export function useGenerations(
         status,
         errorMessage: error?.message,
         visibilityState: document.visibilityState,
-        timestamp: now
+        timestamp: now,
+        refetchIntervalTriggered: true
       });
       
       if (hasRecentGenerations) {
         // Fast polling when we have recent activity (might be more coming)
         const pollInterval = 15000; // 15 seconds for active generation period
-        console.log('[GenerationPollingDebug:ImageGallery] Recent generations detected, using FAST polling:', {
+        console.log('🚀 [GalleryPollingDebug:ImageGallery] Recent generations detected, using FAST polling:', {
           projectId,
           page,
           itemCount,
@@ -399,14 +414,15 @@ export function useGenerations(
           fetchStatus,
           dataAge: Math.round(dataAge / 1000) + 's',
           dataUpdatedAt: new Date(dataUpdatedAt).toISOString(),
-          timestamp: now
+          timestamp: now,
+          refetchIntervalTriggered: true
         });
         return pollInterval;
       } else if (dataAge > 60000) {
         // RESURRECTION POLLING: If data is stale (>1 minute old), poll occasionally
         // This catches generations created while WebSocket was disconnected
         const pollInterval = 45000; // 45 seconds for resurrection polling
-        console.log('[GenerationPollingDebug:ImageGallery] Data is stale, using RESURRECTION polling:', {
+        console.log('⚰️ [GalleryPollingDebug:ImageGallery] Data is stale, using RESURRECTION polling:', {
           projectId,
           page,
           itemCount,
@@ -415,18 +431,20 @@ export function useGenerations(
           pollIntervalMs: pollInterval,
           fetchStatus,
           dataUpdatedAt: new Date(dataUpdatedAt).toISOString(),
-          timestamp: now
+          timestamp: now,
+          refetchIntervalTriggered: true
         });
         return pollInterval;
       } else {
         // Data is fresh and no recent activity - rely on WebSocket
-        console.log('[GenerationPollingDebug:ImageGallery] Data is fresh, WebSocket should handle updates:', {
+        console.log('✅ [GalleryPollingDebug:ImageGallery] Data is fresh, WebSocket should handle updates:', {
           projectId,
           page,
           itemCount,
           totalCount,
           dataAge: Math.round(dataAge / 1000) + 's',
-          timestamp: now
+          timestamp: now,
+          refetchIntervalTriggered: true
         });
         return false; // No polling, rely on WebSocket
       }
@@ -435,6 +453,49 @@ export function useGenerations(
     refetchOnWindowFocus: false, // Prevent double-fetches
     refetchOnReconnect: false, // Prevent double-fetches
   });
+
+  // [GalleryPollingDebug] Log the result
+  React.useEffect(() => {
+    console.log('[GalleryPollingDebug:useGenerations] Query result updated:', {
+      projectId,
+      page,
+      isLoading: result.isLoading,
+      isFetching: result.isFetching,
+      isError: result.isError,
+      hasData: !!result.data,
+      itemsCount: result.data?.items?.length,
+      total: result.data?.total,
+      errorMessage: result.error?.message,
+      status: result.status,
+      fetchStatus: result.fetchStatus,
+      timestamp: Date.now()
+    });
+  }, [result.data, result.isLoading, result.isFetching, result.isError, result.error, result.status, result.fetchStatus]);
+
+  // [GalleryPollingDebug] Special tracking for data changes (new results)
+  const dataItemsCount = result.data?.items?.length || 0;
+  const dataSignature = React.useMemo(() => {
+    if (!result.data?.items) return 'no-data';
+    return result.data.items.map((item: any) => `${item.id}:${item.createdAt}`).join('|');
+  }, [result.data?.items]);
+  
+  React.useEffect(() => {
+    if (result.data && dataItemsCount > 0) {
+      console.log('🎯 [GalleryPollingDebug:useGenerations] NEW DATA RECEIVED:', {
+        projectId,
+        page,
+        itemsCount: dataItemsCount,
+        total: result.data.total,
+        firstItemId: result.data.items[0]?.id,
+        firstItemCreatedAt: result.data.items[0]?.createdAt,
+        dataSignature: dataSignature.substring(0, 100) + '...',
+        wasTriggeredByPolling: result.isFetching && !result.isLoading,
+        timestamp: Date.now()
+      });
+    }
+  }, [dataSignature, projectId, page, dataItemsCount, result.data, result.isFetching, result.isLoading]);
+
+  return result;
 }
 
 export function useDeleteGeneration() {

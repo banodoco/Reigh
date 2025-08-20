@@ -112,6 +112,25 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     enabled: !!(projectId && shotId),
   });
 
+  // [GalleryPollingDebug] Log when component uses the hook
+  React.useEffect(() => {
+    console.log('📊 [GalleryPollingDebug:VideoOutputsGallery] useUnifiedGenerations result:', {
+      projectId,
+      shotId,
+      currentPage,
+      itemsPerPage,
+      isLoadingGenerations,
+      isFetchingGenerations,
+      hasData: !!generationsData,
+      itemsCount: (generationsData as any)?.items?.length,
+      total: (generationsData as any)?.total,
+      filters,
+      enabled: !!(projectId && shotId),
+      errorMessage: generationsError?.message,
+      timestamp: Date.now()
+    });
+  }, [generationsData, isLoadingGenerations, isFetchingGenerations, generationsError, projectId, shotId, currentPage]);
+
   // Get video outputs from unified data
   const videoOutputs = useMemo(() => {
     if (!(generationsData as any)?.items) return [];
