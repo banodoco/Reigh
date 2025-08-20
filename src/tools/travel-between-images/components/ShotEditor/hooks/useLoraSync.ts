@@ -42,15 +42,17 @@ export const useLoraSync = ({
     enabled: !!projectId 
   });
 
-  // LoRA management using the modularized hook with manual Save/Load buttons enabled
+  // LoRA management using the modularized hook with new generalized approach
   const loraManager = useLoraManager(availableLoras, {
     projectId,
+    shotId: selectedShot?.id,
+    persistenceScope: 'shot', // Use shot-level persistence for ShotEditor
     enableProjectPersistence: true, // Enable for Save/Load buttons
     persistenceKey: 'project-loras', // Standardized key shared across all tools
     enableTriggerWords: true,
     onPromptUpdate: onBatchVideoPromptChange,
     currentPrompt: batchVideoPrompt,
-    disableAutoLoad: true, // Prevent internal auto-loading; ShotEditor handles it
+    disableAutoLoad: true, // Keep disabled since we handle initialization manually
   });
 
   // Initialize shot LoRAs from database settings

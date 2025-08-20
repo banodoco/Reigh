@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import { useToolSettings } from './useToolSettings';
 import { ActiveLora } from '@/shared/components/ActiveLoRAsDisplay';
@@ -10,6 +10,9 @@ export type { LoraModel } from '@/shared/components/LoraSelectorModal';
 
 export interface UseLoraManagerOptions {
   projectId?: string;
+  shotId?: string;
+  /** Persistence scope: 'project', 'shot', or 'none' for no persistence */
+  persistenceScope?: 'project' | 'shot' | 'none';
   /** Enable save/load functionality to project settings */
   enableProjectPersistence?: boolean;
   /** Storage key for project persistence (defaults to 'loras') */
@@ -38,6 +41,11 @@ export interface UseLoraManagerReturn {
   handleRemoveLora: (loraId: string) => void;
   handleLoraStrengthChange: (loraId: string, strength: number) => void;
   
+  // Universal user preference tracking
+  hasEverSetLoras: boolean;
+  shouldApplyDefaults: boolean;
+  markAsUserSet: () => void;
+  
   // Trigger word functionality
   handleAddTriggerWord?: (triggerWord: string) => void;
   
@@ -59,6 +67,8 @@ export const useLoraManager = (
 ): UseLoraManagerReturn => {
   const {
     projectId,
+    shotId,
+    persistenceScope = 'none',
     enableProjectPersistence = false,
     persistenceKey = 'loras',
     enableTriggerWords = false,
@@ -69,6 +79,10 @@ export const useLoraManager = (
 
   // Core state
   const [selectedLoras, setSelectedLoras] = useState<ActiveLora[]>([]);
+  
+  // Universal user preference tracking
+  const [hasEverSetLoras, setHasEverSetLoras] = useState(false);
+  
   // Deduplicate selectedLoras whenever it changes to prevent duplicate entries, especially
   // when state is restored from persistence or set externally without using our handlers.
   useEffect(() => {
@@ -105,19 +119,33 @@ export const useLoraManager = (
     latestPromptRef.current = currentPrompt;
   }, [currentPrompt]);
 
-  // Project LoRA settings for save/load functionality
+  // Universal persistence settings based on scope
   const {
-    settings: projectLoraSettings,
-    update: updateProjectLoraSettings,
+    settings: persistenceSettings,
+    update: updatePersistenceSettings,
     isUpdating: isSavingLoras
-  } = useToolSettings<{ loras?: { id: string; strength: number }[] }>(
-    `${persistenceKey}`,
+  } = useToolSettings<{ 
+    loras?: { id: string; strength: number }[];
+    hasEverSetLoras?: boolean;
+  }>(
+    persistenceKey,
     { 
-      projectId: enableProjectPersistence ? projectId : undefined 
+      projectId: persistenceScope === 'project' ? projectId : (enableProjectPersistence ? projectId : undefined),
+      shotId: persistenceScope === 'shot' ? shotId : undefined,
+      enabled: persistenceScope !== 'none' || enableProjectPersistence
     }
   );
 
-  // Core handlers
+  // Legacy project LoRA settings for backward compatibility
+  const projectLoraSettings = enableProjectPersistence ? persistenceSettings : undefined;
+
+  // Universal mark as user set function
+  const markAsUserSet = useCallback(() => {
+    setHasEverSetLoras(true);
+    setUserHasManuallyInteracted(true);
+  }, []);
+
+  // Core handlers with universal user tracking
   const handleAddLora = useCallback((loraToAdd: any, isManualAction = true) => {
     // Use the ref to ensure we are checking against the most up-to-date selection.
     if (selectedLorasRef.current.find(sl => sl.id === loraToAdd["Model ID"])) {
@@ -138,12 +166,12 @@ export const useLoraManager = (
       };
       setSelectedLoras(prev => [...prev, newLora]);
       if (isManualAction) {
-        setUserHasManuallyInteracted(true);
+        markAsUserSet();
       }
     } else {
       toast.error("Selected LoRA has no model file specified.");
     }
-  }, []);
+  }, [markAsUserSet]);
 
   const handleRemoveLora = useCallback((loraIdToRemove: string, isManualAction = true) => {
     const loraToRemove = selectedLoras.find(lora => lora.id === loraIdToRemove);
@@ -153,9 +181,9 @@ export const useLoraManager = (
     
     setSelectedLoras(prev => prev.filter(lora => lora.id !== loraIdToRemove));
     if (isManualAction) {
-      setUserHasManuallyInteracted(true);
+      markAsUserSet();
     }
-  }, [selectedLoras]);
+  }, [selectedLoras, markAsUserSet]);
 
   const handleLoraStrengthChange = useCallback((loraId: string, newStrength: number) => {
     setSelectedLoras(prev => 
@@ -163,7 +191,8 @@ export const useLoraManager = (
         lora.id === loraId ? { ...lora, strength: newStrength } : lora
       )
     );
-  }, []);
+    markAsUserSet();
+  }, [markAsUserSet]);
 
   // Trigger word functionality
   const handleAddTriggerWord = useCallback((triggerWord: string) => {
@@ -179,7 +208,7 @@ export const useLoraManager = (
     latestPromptRef.current = newPrompt;
   }, [enableTriggerWords, onPromptUpdate]);
 
-  // Project persistence functionality
+  // Universal persistence functionality
   const handleSaveProjectLoras = useCallback(async () => {
     if (!enableProjectPersistence || !projectId) {
       return;
@@ -194,10 +223,17 @@ export const useLoraManager = (
         strength: lora.strength
       }));
 
-      await updateProjectLoraSettings('project', { loras: lorasToSave });
+      const settingsToSave = { 
+        loras: lorasToSave,
+        hasEverSetLoras: true
+      };
+
+      // Use universal persistence settings
+      await (updatePersistenceSettings || updateProjectLoraSettings)('project', settingsToSave);
 
       // Update local cache of saved LoRAs for immediate tooltip update
       setLastSavedLoras(lorasToSave);
+      markAsUserSet();
 
       // Only clear flash and show success after save completes
       setSaveFlash(false);
@@ -207,7 +243,10 @@ export const useLoraManager = (
       console.error('Error saving LoRAs:', error);
       setSaveFlash(false); // Clear flash on error too
     }
-  }, [enableProjectPersistence, projectId, updateProjectLoraSettings]);
+  }, [enableProjectPersistence, projectId, updatePersistenceSettings, markAsUserSet]);
+
+  // For backward compatibility
+  const updateProjectLoraSettings = updatePersistenceSettings;
 
   const handleLoadProjectLoras = useCallback(async () => {
     if (!enableProjectPersistence) return;
@@ -251,6 +290,9 @@ export const useLoraManager = (
           }
         });
       }, 50);
+
+      // Mark as user set after loading
+      markAsUserSet();
     } catch (error) {
       console.error('Error loading LoRAs:', error);
     }
@@ -261,8 +303,23 @@ export const useLoraManager = (
     handleRemoveLora, 
     availableLoras, 
     handleAddLora, 
-    handleLoraStrengthChange
+    handleLoraStrengthChange,
+    markAsUserSet
   ]);
+
+  // Initialize user preference state from persistence
+  useEffect(() => {
+    if (persistenceScope !== 'none' && persistenceSettings) {
+      // Restore hasEverSetLoras from persistence if it exists
+      if (persistenceSettings.hasEverSetLoras !== undefined) {
+        setHasEverSetLoras(persistenceSettings.hasEverSetLoras);
+      }
+      // Also check if we have existing loras as a fallback indicator
+      else if (persistenceSettings.loras && persistenceSettings.loras.length > 0) {
+        setHasEverSetLoras(true);
+      }
+    }
+  }, [persistenceScope, persistenceSettings]);
 
   // Initialize lastSavedLoras when projectLoraSettings first loads
   useEffect(() => {
@@ -270,6 +327,23 @@ export const useLoraManager = (
       setLastSavedLoras(projectLoraSettings.loras);
     }
   }, [projectLoraSettings?.loras, lastSavedLoras]);
+
+  // Universal shouldApplyDefaults logic
+  const shouldApplyDefaults = useMemo(() => {
+    // Don't apply defaults if user has ever set LoRAs
+    if (hasEverSetLoras) return false;
+    
+    // Don't apply if there are already LoRAs selected
+    if (selectedLoras.length > 0) return false;
+    
+    // Don't apply if persistence shows user has made choices (fallback check)
+    if (persistenceScope !== 'none' && persistenceSettings?.loras && persistenceSettings.loras.length >= 0) {
+      // If loras array exists (even if empty), user has made a choice
+      return false;
+    }
+    
+    return true;
+  }, [hasEverSetLoras, selectedLoras.length, persistenceScope, persistenceSettings]);
 
   // Check if there are saved LoRAs to show the Load button  
   const hasSavedLoras = enableProjectPersistence 
@@ -291,7 +365,7 @@ export const useLoraManager = (
   // No longer needed - using proper JSX with Tooltip components
 
   // Render header actions for ActiveLoRAsDisplay
-  const renderHeaderActions = useCallback(() => {
+  const renderHeaderActions = useCallback((customLoadHandler?: () => Promise<void>) => {
     if (!enableProjectPersistence) return null;
 
     // Format saved LoRAs for tooltip (multi-line) - use lastSavedLoras for immediate updates
@@ -344,7 +418,7 @@ export const useLoraManager = (
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={handleLoadProjectLoras}
+                onClick={customLoadHandler || handleLoadProjectLoras}
                 disabled={!hasSavedLoras}
                 className={`w-full text-xs h-7 ${
                   hasSavedLoras 
@@ -390,6 +464,11 @@ export const useLoraManager = (
     handleAddLora,
     handleRemoveLora,
     handleLoraStrengthChange,
+    
+    // Universal user preference tracking
+    hasEverSetLoras,
+    shouldApplyDefaults,
+    markAsUserSet,
     
     // Conditional functionality
     ...(enableTriggerWords && { handleAddTriggerWord }),

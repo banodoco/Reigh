@@ -389,9 +389,10 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   const { data: publicLorasData } = useListPublicResources('lora');
   const availableLoras: LoraModel[] = publicLorasData?.map(resource => resource.metadata) || [];
 
-  // LoRA management using the modularized hook
+  // LoRA management using the modularized hook with new generalized approach
   const loraManager = useLoraManager(availableLoras, {
     projectId: selectedProjectId,
+    persistenceScope: 'project', // Use new persistence scope
     enableProjectPersistence: true,
     persistenceKey: 'project-loras', // Standardized key shared across all tools
     enableTriggerWords: true,
@@ -537,14 +538,14 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     getAssociatedShotId: () => associatedShotId
   }));
 
-  // Optimize default LoRA loading - only run when all conditions are met
+  // Apply default LoRAs using the new generalized approach
   useEffect(() => { 
     if (
       generationMode === 'wan-local' && 
       ready &&
       !defaultsApplied.current && 
       availableLoras.length > 0 && 
-      loraManager.selectedLoras.length === 0
+      loraManager.shouldApplyDefaults // Use the generalized check
     ) { 
       const newSelectedLoras: ActiveLora[] = [];
       for (const defaultConfig of defaultLorasConfig) {
@@ -562,23 +563,31 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       }
       if (newSelectedLoras.length > 0) {
         loraManager.setSelectedLoras(newSelectedLoras);
+        loraManager.markAsUserSet(); // Use the generalized mark function
+        markAsInteracted();
         defaultsApplied.current = true;
       }
     } 
-  }, [generationMode, availableLoras, ready, loraManager.selectedLoras.length]);
+  }, [generationMode, availableLoras, ready, loraManager.shouldApplyDefaults, markAsInteracted]);
 
   // Wrap loraManager handlers to maintain markAsInteracted behavior
   const handleAddLora = (loraToAdd: LoraModel) => { 
     markAsInteracted();
-    loraManager.handleAddLora(loraToAdd);
+    loraManager.handleAddLora(loraToAdd); // markAsUserSet is now handled internally
   };
   const handleRemoveLora = (loraIdToRemove: string) => {
     markAsInteracted();
-    loraManager.handleRemoveLora(loraIdToRemove);
+    loraManager.handleRemoveLora(loraIdToRemove); // markAsUserSet is now handled internally
   };
   const handleLoraStrengthChange = (loraId: string, newStrength: number) => {
     markAsInteracted();
-    loraManager.handleLoraStrengthChange(loraId, newStrength);
+    loraManager.handleLoraStrengthChange(loraId, newStrength); // markAsUserSet is now handled internally
+  };
+
+  // Wrap the load project LoRAs function to mark as interacted
+  const handleLoadProjectLoras = async () => {
+    await loraManager.handleLoadProjectLoras?.(); // markAsUserSet is now handled internally
+    markAsInteracted();
   };
 
   const handleAddPrompt = (source: 'form' | 'modal' = 'form') => {
@@ -1043,7 +1052,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
               availableLoras={availableLoras}
               className=""
               onAddTriggerWord={loraManager.handleAddTriggerWord}
-              renderHeaderActions={loraManager.renderHeaderActions}
+              renderHeaderActions={() => loraManager.renderHeaderActions?.(handleLoadProjectLoras)}
             />
             </div>
           </div>
