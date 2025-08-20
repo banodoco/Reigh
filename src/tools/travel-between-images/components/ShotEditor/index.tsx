@@ -136,13 +136,33 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     }
   }, [shotUISettings?.timelineFramePositions]);
   
+  // Debounced ref for timeline position updates to prevent cascading
+  const timelineUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
   const setTimelineFramePositions = useCallback((newMap: Map<string, number>) => {
     try {
-      updateShotUISettings('shot', { timelineFramePositions: [...newMap.entries()] });
+      // Clear any existing debounce timer
+      if (timelineUpdateTimeoutRef.current) {
+        clearTimeout(timelineUpdateTimeoutRef.current);
+      }
+      
+      // Debounce timeline position updates to prevent cascading during task cancellation
+      timelineUpdateTimeoutRef.current = setTimeout(() => {
+        updateShotUISettings('shot', { timelineFramePositions: [...newMap.entries()] });
+      }, 1000); // 1 second debounce to reduce noise during rapid changes
     } catch (error) {
       console.warn('[ShotEditor] Failed to save timeline positions:', error);
     }
   }, [updateShotUISettings]);
+  
+  // Cleanup timeline update timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (timelineUpdateTimeoutRef.current) {
+        clearTimeout(timelineUpdateTimeoutRef.current);
+      }
+    };
+  }, []);
   
   const isMobile = useIsMobile();
   const { setIsGenerationsPaneLocked } = usePanes();

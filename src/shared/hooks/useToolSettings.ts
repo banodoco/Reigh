@@ -149,12 +149,16 @@ async function fetchToolSettingsSupabase(toolId: string, ctx: ToolSettingsContex
     );
 
   } catch (error) {
-    console.error('[fetchToolSettingsSupabase] Error:', error);
-    // Handle different types of errors appropriately
-    if (error?.name === 'AbortError' || error?.message?.includes('Request was cancelled')) {
-      console.warn('[fetchToolSettingsSupabase] Request was cancelled - component likely unmounted');
+    // Handle abort errors silently to reduce noise during task cancellation
+    if (error?.name === 'AbortError' || 
+        error?.message?.includes('Request was cancelled') ||
+        error?.message?.includes('signal is aborted')) {
+      // Don't log these as errors - they're expected during component unmounting
       throw new Error('Request was cancelled');
     }
+    
+    console.error('[fetchToolSettingsSupabase] Error:', error);
+    
     if (error?.message?.includes('Failed to fetch')) {
       throw new Error('Network connection issue. Please check your internet connection.');
     }
@@ -228,12 +232,15 @@ async function updateToolSettingsSupabase(params: UpdateToolSettingsParams, sign
     }
 
   } catch (error) {
-    console.error('[updateToolSettingsSupabase] Error:', error);
-    // Handle abort errors specifically
-    if (error?.name === 'AbortError' || error?.message?.includes('Request was cancelled')) {
-      console.warn('[updateToolSettingsSupabase] Request was cancelled - component likely unmounted');
+    // Handle abort errors silently to reduce noise during task cancellation
+    if (error?.name === 'AbortError' || 
+        error?.message?.includes('Request was cancelled') ||
+        error?.message?.includes('signal is aborted')) {
+      // Don't log these as errors - they're expected during component unmounting
       throw new Error('Request was cancelled');
     }
+    
+    console.error('[updateToolSettingsSupabase] Error:', error);
     throw error;
   }
 }
@@ -265,9 +272,15 @@ export function useToolSettings<T>(
   const shotId: string | undefined = context?.shotId;
   const fetchEnabled: boolean = context?.enabled ?? true;
 
-  // Cleanup abort controllers on unmount
+  // Cleanup abort controllers and debounce timer on unmount
   useEffect(() => {
     return () => {
+      // Cancel any pending debounced updates
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+      
+      // Abort all active update controllers
       updateControllersRef.current.forEach(controller => {
         controller.abort();
       });
@@ -283,22 +296,24 @@ export function useToolSettings<T>(
     staleTime: 10 * 60 * 1000, // 10 minutes
     gcTime: 15 * 60 * 1000, // 15 minutes
     refetchOnWindowFocus: false,
-    // Mobile-specific optimizations
-    retry: (failureCount, error) => {
-      // Don't retry auth errors or cancelled requests
-      if (error?.message?.includes('Authentication required') || 
-          error?.message?.includes('Request was cancelled')) {
-        return false;
-      }
-      // Retry up to 3 times for network errors on mobile
-      return failureCount < 3;
-    },
-    retryDelay: (attemptIndex) => {
-      // Faster retry schedule for settings: 500ms, 1s, 2s
-      return Math.min(500 * Math.pow(2, attemptIndex), 2000);
-    },
-    // Shorter timeout for critical settings data
-    networkMode: 'online',
+      // Mobile-specific optimizations
+  retry: (failureCount, error) => {
+    // Don't retry auth errors, cancelled requests, or abort errors
+    if (error?.message?.includes('Authentication required') || 
+        error?.message?.includes('Request was cancelled') ||
+        error?.name === 'AbortError' ||
+        error?.message?.includes('signal is aborted')) {
+      return false;
+    }
+    // Retry up to 3 times for network errors on mobile
+    return failureCount < 3;
+  },
+  retryDelay: (attemptIndex) => {
+    // Faster retry schedule for settings: 500ms, 1s, 2s
+    return Math.min(500 * Math.pow(2, attemptIndex), 2000);
+  },
+  // Shorter timeout for critical settings data
+  networkMode: 'online',
   });
 
   // Log errors for debugging
@@ -343,33 +358,48 @@ export function useToolSettings<T>(
       });
     },
     onError: (error: Error) => {
-      console.error('[useToolSettings] Update error:', error);
-      // Don't show toast for cancelled requests
-      if (!error?.message?.includes('Request was cancelled')) {
-        toast.error(`Failed to save ${toolId} settings: ${error.message}`);
+      // Don't log or show errors for cancelled requests during task cancellation
+      if (error?.name === 'AbortError' || 
+          error?.message?.includes('Request was cancelled') ||
+          error?.message?.includes('signal is aborted')) {
+        return; // Silent handling for expected cancellations
       }
+      
+      console.error('[useToolSettings] Update error:', error);
+      toast.error(`Failed to save ${toolId} settings: ${error.message}`);
     },
   });
 
+  // Debounce ref to prevent rapid updates
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   const update = (scope: SettingsScope, settings: Partial<T>) => {
-    // Create an AbortController for this update and track it
-    const controller = new AbortController();
-    updateControllersRef.current.add(controller);
-    
-    // Clean up controller when mutation completes
-    const cleanup = () => {
-      updateControllersRef.current.delete(controller);
-    };
-    
-    // Set up cleanup handlers
-    controller.signal.addEventListener('abort', cleanup);
-    
-    return updateMutation.mutate(
-      { scope, settings, signal: controller.signal },
-      {
-        onSettled: cleanup, // Clean up on both success and error
-      }
-    );
+    // Clear any existing debounce timer
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+
+    // Debounce updates to prevent cascading requests
+    debounceTimeoutRef.current = setTimeout(() => {
+      // Create an AbortController for this update and track it
+      const controller = new AbortController();
+      updateControllersRef.current.add(controller);
+      
+      // Clean up controller when mutation completes
+      const cleanup = () => {
+        updateControllersRef.current.delete(controller);
+      };
+      
+      // Set up cleanup handlers
+      controller.signal.addEventListener('abort', cleanup);
+      
+      updateMutation.mutate(
+        { scope, settings, signal: controller.signal },
+        {
+          onSettled: cleanup, // Clean up on both success and error
+        }
+      );
+    }, 300); // 300ms debounce
   };
 
   return {

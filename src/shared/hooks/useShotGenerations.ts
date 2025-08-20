@@ -18,7 +18,12 @@ export const useShotGenerations = (
     queryKey: ['shot-generations', shotId],
     enabled: !!shotId,
     initialPageParam: 0,
-    queryFn: async ({ pageParam }: { pageParam: number }) => {
+    queryFn: async ({ pageParam, signal }: { pageParam: number; signal?: AbortSignal }) => {
+      // Check if request was cancelled before starting
+      if (signal?.aborted) {
+        throw new Error('Request was cancelled');
+      }
+
       const { data, error } = await supabase
         .from('shot_generations')
         .select(`
@@ -27,9 +32,17 @@ export const useShotGenerations = (
         `)
         .eq('shot_id', shotId!)
         .order('position', { ascending: true })
-        .range(pageParam, pageParam + PAGE_SIZE - 1);
+        .range(pageParam, pageParam + PAGE_SIZE - 1)
+        .abortSignal(signal);
 
-      if (error) throw error;
+      if (error) {
+        // Handle 400 errors gracefully
+        if ((error as any).code === 'PGRST116' || error.message?.includes('Invalid')) {
+          console.warn('[useShotGenerations] Invalid shot ID or query parameters:', { shotId, error });
+          return { items: [], nextCursor: null };
+        }
+        throw error;
+      }
 
       // Transform to match GenerationRow interface
       const items: GenerationRow[] = (data || [])
@@ -51,6 +64,17 @@ export const useShotGenerations = (
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     staleTime: 60 * 1000, // 1 minute
     gcTime: 5 * 60 * 1000, // 5 minutes
+    retry: (failureCount, error) => {
+      // Don't retry cancelled requests or 400 errors
+      if (error?.message?.includes('Request was cancelled') || 
+          (error as any)?.code === 'PGRST116' || 
+          error?.message?.includes('Invalid')) {
+        return false;
+      }
+      // Retry up to 2 times for other errors
+      return failureCount < 2;
+    },
+    retryDelay: (attemptIndex) => Math.min(1000 * Math.pow(2, attemptIndex), 3000),
   });
 };
 
@@ -111,7 +135,11 @@ export const useAllShotGenerations = (
   return useQuery({
     queryKey: ['all-shot-generations', shotId],
     enabled: !!shotId,
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
+      // Check if request was cancelled before starting
+      if (signal?.aborted) {
+        throw new Error('Request was cancelled');
+      }
       console.log('[VideoLoadSpeedIssue][ADDTOSHOT] useAllShotGenerations queryFn executing', { shotId, timestamp: Date.now() });
       let allGenerations: any[] = [];
       let offset = 0;
@@ -135,9 +163,22 @@ export const useAllShotGenerations = (
         `)
         .eq('shot_id', shotId!)
         .order('position', { ascending: true })
-        .range(0, INITIAL_LOAD - 1);
+        .range(0, INITIAL_LOAD - 1)
+        .abortSignal(signal);
 
-      if (initialError) throw initialError;
+      if (initialError) {
+        // Better error handling for 400 errors
+        if (initialError.code === 'PGRST116' || initialError.message?.includes('Invalid')) {
+          console.warn('[useAllShotGenerations] Invalid shot ID or query parameters:', { shotId, error: initialError });
+          return [];
+        }
+        throw initialError;
+      }
+
+      // Check again after first query
+      if (signal?.aborted) {
+        throw new Error('Request was cancelled');
+      }
 
       if (initialData) {
         allGenerations = initialData;
@@ -148,6 +189,11 @@ export const useAllShotGenerations = (
       if (initialData && initialData.length === INITIAL_LOAD) {
         // Fetch remaining data in smaller batches
         while (true) {
+          // Check for cancellation before each batch
+          if (signal?.aborted) {
+            throw new Error('Request was cancelled');
+          }
+
           const { data, error } = await supabase
             .from('shot_generations')
             .select(`
@@ -164,9 +210,17 @@ export const useAllShotGenerations = (
             `)
             .eq('shot_id', shotId!)
             .order('position', { ascending: true })
-            .range(offset, offset + BATCH_SIZE - 1);
+            .range(offset, offset + BATCH_SIZE - 1)
+            .abortSignal(signal);
 
-          if (error) throw error;
+          if (error) {
+            // Handle 400 errors gracefully during batch loading
+            if ((error as any).code === 'PGRST116' || error.message?.includes('Invalid')) {
+              console.warn('[useAllShotGenerations] Error during batch loading, stopping:', { shotId, offset, error });
+              break;
+            }
+            throw error;
+          }
 
           if (!data || data.length === 0) break;
 
@@ -204,6 +258,17 @@ export const useAllShotGenerations = (
     },
     staleTime: 2 * 60 * 1000, // 2 minutes
     gcTime: 5 * 60 * 1000, // 5 minutes
+    retry: (failureCount, error) => {
+      // Don't retry cancelled requests or 400 errors
+      if (error?.message?.includes('Request was cancelled') || 
+          (error as any)?.code === 'PGRST116' || 
+          error?.message?.includes('Invalid')) {
+        return false;
+      }
+      // Retry up to 2 times for other errors
+      return failureCount < 2;
+    },
+    retryDelay: (attemptIndex) => Math.min(1000 * Math.pow(2, attemptIndex), 3000),
     meta: {
       onInvalidate: () => {
         console.log('[VideoLoadSpeedIssue] useAllShotGenerations query invalidated for shotId:', shotId);

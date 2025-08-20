@@ -76,14 +76,14 @@ export const useFramePositions = ({
     });
   }, [images, frameSpacing, pendingPositions, onPendingPositionApplied]);
 
-  // Save positions to localStorage
+  // Save positions to localStorage with increased debounce to reduce cascading updates
   useEffect(() => {
     const timer = setTimeout(() => {
       localStorage.setItem(`timelineFramePositions_${shotId}`, JSON.stringify(Array.from(framePositions.entries())));
       if (onFramePositionsChange) {
         onFramePositionsChange(framePositions);
       }
-    }, 100);
+    }, 500); // Increased from 100ms to 500ms to reduce rapid updates during task cancellation
     return () => clearTimeout(timer);
   }, [framePositions, shotId, onFramePositionsChange]);
 
