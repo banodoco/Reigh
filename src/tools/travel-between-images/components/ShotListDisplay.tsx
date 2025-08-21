@@ -164,7 +164,7 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
   // Show loading skeleton while data is being fetched
   if (shots === undefined) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         {Array.from({ length: 6 }).map((_, idx) => (
           <div key={idx} className="h-40 rounded-lg bg-muted animate-pulse" />
         ))}
@@ -194,7 +194,7 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
         items={shots.map((shot) => shot.id)} 
         strategy={rectSortingStrategy}
       >
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {shots.map((shot, index) => {
             const shouldLoadImages = loadedShotIndices.has(index);
             

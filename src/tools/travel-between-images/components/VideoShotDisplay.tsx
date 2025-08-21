@@ -275,7 +275,7 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
     <>
       <div 
         key={shot.id} 
-        className="mb-6 p-4 border rounded-lg hover:shadow-sm transition-shadow duration-200 relative cursor-pointer"
+        className="h-48 p-4 border rounded-lg hover:shadow-sm transition-shadow duration-200 relative cursor-pointer flex flex-col"
         onClick={onSelectShot}
       >
         <div className="flex justify-between items-start mb-3">
@@ -345,7 +345,7 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
           </div>
         </div>
         
-        <div className="flex space-x-2 overflow-hidden pb-2">
+        <div className="flex space-x-2 overflow-hidden flex-1 items-start">
           {imagesToShow.length > 0 ? (
             imagesToShow.map((image, index) => (
               <ShotImage
