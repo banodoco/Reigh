@@ -276,8 +276,8 @@ export const useListShots = (projectId?: string | null, options: { maxImagesPerS
             ...sg.generation,
             shotImageEntryId: sg.id,
             position: sg.position,
-            imageUrl: sg.generation.location,
-            thumbUrl: sg.generation.location,
+            imageUrl: (sg.generation as any).location,
+            thumbUrl: (sg.generation as any).location,
           }));
         
         return {
@@ -447,24 +447,27 @@ export const useAddImageToShot = () => {
       return shotGeneration;
     },
     onSuccess: (_, variables) => {
-      console.log('[ADDTOSHOT] useAddImageToShot onSuccess called', variables);
-      // After successfully adding the image, invalidate related queries so UI refreshes.
-      // 1. Re-fetch shots list for the project (affects thumbnail counts, etc.)
+      // Batch invalidate queries for better performance
       const { project_id, shot_id } = variables;
-
+      
+      // Use a single batched invalidation call
+      const invalidationPromises = [];
+      
       if (project_id) {
-        console.log('[ADDTOSHOT] Invalidating shots and generations queries for project', project_id);
-        queryClient.invalidateQueries({ queryKey: ['shots', project_id] });
-        // Also invalidate project-level generations cache (used by GenerationsPane)
-        queryClient.invalidateQueries({ queryKey: ['generations', project_id] });
+        invalidationPromises.push(
+          queryClient.invalidateQueries({ queryKey: ['shots', project_id] }),
+          queryClient.invalidateQueries({ queryKey: ['generations', project_id] })
+        );
       }
-
-      // 2. Critically, re-fetch the per-shot generations list used by ShotEditor so that
-      //    newly-added images appear without a manual refresh.
+      
       if (shot_id) {
-        console.log('[ADDTOSHOT] Invalidating all-shot-generations query for shot', shot_id);
-        queryClient.invalidateQueries({ queryKey: ['all-shot-generations', shot_id] });
+        invalidationPromises.push(
+          queryClient.invalidateQueries({ queryKey: ['all-shot-generations', shot_id] })
+        );
       }
+      
+      // Execute all invalidations in parallel
+      Promise.all(invalidationPromises);
     },
     onError: (error: Error) => {
       console.error('Error adding image to shot:', error);
@@ -509,23 +512,26 @@ export const usePositionExistingGenerationInShot = () => {
       return shotGeneration;
     },
     onSuccess: (_, variables) => {
-      console.log('[ADDTOSHOT] usePositionExistingGenerationInShot onSuccess called', variables);
-      // Use the project_id from variables directly
+      // Batch invalidate queries for better performance
       const { project_id, shot_id } = variables;
       
+      const invalidationPromises = [];
+      
       if (project_id) {
-        console.log('[ADDTOSHOT] Invalidating shots and generations queries for project', project_id);
-        queryClient.invalidateQueries({ queryKey: ['shots', project_id] });
-        // Also invalidate generations cache so GenerationsPane updates immediately
-        queryClient.invalidateQueries({ queryKey: ['generations', project_id] });
-      }      
-
-      // CRITICAL: Invalidate the per-shot generations list used by ShotEditor so that
-      //    newly-positioned images appear without a manual refresh.
+        invalidationPromises.push(
+          queryClient.invalidateQueries({ queryKey: ['shots', project_id] }),
+          queryClient.invalidateQueries({ queryKey: ['generations', project_id] })
+        );
+      }
+      
       if (shot_id) {
-        console.log('[ADDTOSHOT] Invalidating all-shot-generations query for shot', shot_id);
-        queryClient.invalidateQueries({ queryKey: ['all-shot-generations', shot_id] });
-      }      
+        invalidationPromises.push(
+          queryClient.invalidateQueries({ queryKey: ['all-shot-generations', shot_id] })
+        );
+      }
+      
+      // Execute all invalidations in parallel
+      Promise.all(invalidationPromises);
     },
     onError: (error: Error) => {
       console.error('Error positioning existing generation in shot:', error);
@@ -885,6 +891,78 @@ export const useUpdateShotImageOrder = () => {
 };
 
 // Hook to handle dropping an external image file to create a new shot or add to an existing one
+// Type for the RPC response
+interface CreateShotWithImageResponse {
+  shot_id: string;
+  shot_name: string;
+  shot_generation_id: string;
+  success: boolean;
+}
+
+// Create shot with image atomically using database function
+export const useCreateShotWithImage = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ 
+      projectId, 
+      shotName, 
+      generationId 
+    }: { 
+      projectId: string; 
+      shotName: string; 
+      generationId: string; 
+    }) => {
+      console.log('[CreateShotWithImage] Starting atomic operation:', {
+        projectId,
+        shotName,
+        generationId
+      });
+      
+      const { data, error } = await supabase
+        .rpc('create_shot_with_image', {
+          p_project_id: projectId,
+          p_shot_name: shotName,
+          p_generation_id: generationId
+        })
+        .single();
+      
+      if (error) {
+        console.error('[CreateShotWithImage] RPC Error:', error);
+        throw error;
+      }
+      
+      const typedData = data as CreateShotWithImageResponse;
+      
+      if (!typedData?.success) {
+        throw new Error('Failed to create shot with image');
+      }
+      
+      console.log('[CreateShotWithImage] Success:', typedData);
+      return {
+        shotId: typedData.shot_id,
+        shotName: typedData.shot_name,
+        shotGenerationId: typedData.shot_generation_id
+      };
+    },
+    onSuccess: (data, variables) => {
+      console.log('[CreateShotWithImage] Invalidating queries for project:', variables.projectId);
+      
+      // Invalidate and refetch relevant queries
+      queryClient.invalidateQueries({ queryKey: ['shots', variables.projectId] });
+      queryClient.invalidateQueries({ queryKey: ['generations', variables.projectId] });
+      
+      if (data.shotId) {
+        queryClient.invalidateQueries({ queryKey: ['all-shot-generations', data.shotId] });
+      }
+    },
+    onError: (error: Error) => {
+      console.error('[CreateShotWithImage] Error:', error);
+      toast.error(`Failed to create shot with image: ${error.message}`);
+    },
+  });
+};
+
 export const useHandleExternalImageDrop = () => {
   const createShotMutation = useCreateShot();
   const addImageToShotMutation = useAddImageToShot();

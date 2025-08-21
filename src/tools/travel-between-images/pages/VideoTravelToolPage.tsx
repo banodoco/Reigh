@@ -28,6 +28,7 @@ import { useShotNavigation } from '@/shared/hooks/useShotNavigation';
 // import { useLastAffectedShot } from '@/shared/hooks/useLastAffectedShot';
 import ShotEditor from '../components/ShotEditor';
 import { useAllShotGenerations } from '@/shared/hooks/useShotGenerations';
+import { useProjectVideoCountsCache } from '@/shared/hooks/useProjectVideoCountsCache';
 
 // Custom hook to parallelize data fetching for better performance
 const useVideoTravelData = (selectedShotId?: string, projectId?: string) => {
@@ -115,6 +116,30 @@ const VideoTravelToolPage: React.FC = () => {
   const { selectedProjectId, setSelectedProjectId } = useProject();
   const [selectedShot, setSelectedShot] = useState<Shot | null>(null);
   const { currentShotId, setCurrentShotId } = useCurrentShot();
+  
+  // Preload all shot video counts for the project
+  const { getShotVideoCount, logCacheState, isLoading: isLoadingProjectCounts, error: projectCountsError, invalidateOnVideoChanges } = useProjectVideoCountsCache(selectedProjectId);
+  
+  // Debug project video counts cache
+  React.useEffect(() => {
+    console.log('[ProjectVideoCountsDebug] Cache state in VideoTravelToolPage:', {
+      selectedProjectId,
+      isLoadingProjectCounts,
+      projectCountsError: projectCountsError?.message,
+      getShotVideoCountExists: !!getShotVideoCount,
+      timestamp: Date.now()
+    });
+    
+    if (selectedProjectId && getShotVideoCount) {
+      // Test the cache with current shot
+      const testCount = getShotVideoCount(selectedShot?.id || null);
+      console.log('[ProjectVideoCountsDebug] Test cache lookup:', {
+        selectedShotId: selectedShot?.id,
+        testCount,
+        timestamp: Date.now()
+      });
+    }
+  }, [selectedProjectId, isLoadingProjectCounts, projectCountsError, getShotVideoCount, selectedShot?.id]);
   
   // Task queue notifier is now handled inside ShotEditor component
   
@@ -1064,6 +1089,8 @@ const VideoTravelToolPage: React.FC = () => {
               hasNext={hasNext}
               onUpdateShotName={handleUpdateShotName}
               settingsLoading={isLoadingSettings}
+              getShotVideoCount={getShotVideoCount}
+              invalidateVideoCountsCache={invalidateOnVideoChanges}
               // afterEachPromptText props removed - not in ShotEditorProps interface
             />
             ) : (

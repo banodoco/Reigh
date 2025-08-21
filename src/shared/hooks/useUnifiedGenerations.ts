@@ -494,7 +494,9 @@ export function useUnifiedGenerations(options: UseUnifiedGenerationsOptions) {
     enabled: enabled && !!options.projectId,
     staleTime: 10 * 1000, // 10 seconds - match task polling for consistency
     gcTime,
-    placeholderData: (previousData) => previousData,
+    // Do NOT carry over previous data across key changes (e.g., shot switches)
+    // This prevents cross-shot contamination in consumers like VideoOutputsGallery
+    // placeholderData: (previousData) => previousData,
     // 🎯 MODULAR POLLING: Use configured resurrection polling
     refetchInterval,
     refetchIntervalInBackground: true, // CRITICAL: Continue polling when tab is not visible

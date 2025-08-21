@@ -236,6 +236,13 @@ tool-name/
 - **Visual Design**: Collapsed state shows gradient button with animated sparkles, similar to AI Prompt section in PromptEditorModal
 - **Sticky UI**: When collapsed, form toggle button sticks to top of screen while scrolling; clicking expands form and scrolls to it
 
+**Video Gallery Skeleton Optimization ✨ NEW:**
+- **Problem**: VideoOutputsGallery showed jarring skeleton transitions - fixed skeleton count causing abrupt disappearance, and stale data from previous shots contaminating skeleton counts during navigation
+- **Solution**: Intelligent skeleton system using multiple data sources with priority hierarchy and aggressive cache reset on shot changes
+- **Features**: Project-wide video count preloading (`useProjectVideoCountsCache`), per-shot fallback caching (`useVideoCountCache`), instant empty state display for zero videos
+- **Architecture**: Three-tier priority system (fresh current data > project cache > fallbacks), automatic cache invalidation on mismatches, shot change detection with state reset
+- **Components**: Enhanced `VideoOutputsGallery`, `ShotEditor` integration, disabled `placeholderData` in `useUnifiedGenerations` to prevent cross-shot contamination
+
 ---
 
 **Service-Role Active Task Filtering (Latest):**
@@ -273,6 +280,8 @@ For the complete catalog, see [`shared_hooks_contexts.md`](structure_detail/shar
 | **useTasks** | Task queue | Real-time task status & updates |
 | **useTaskQueueNotifier** | Centralized task creation | Unified task enqueueing with realtime feedback |
 | **useWebSocket** | Real-time updates | Supabase broadcast subscriptions |
+| **useVideoCountCache** | Per-shot video caching | Instant skeleton display for video galleries |
+| **useProjectVideoCountsCache** | Project-wide video counts | Preloads all shot video counts for smooth UX |
 
 #### 🧮 Services & Utilities
 

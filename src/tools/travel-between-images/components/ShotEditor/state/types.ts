@@ -131,6 +131,12 @@ export interface ShotEditorProps {
 
   // Indicates if parent is still loading settings. Manage Shot Images should wait until this is false.
   settingsLoading?: boolean;
+  
+  // Project-wide video count lookup function for instant skeleton display
+  getShotVideoCount?: (shotId: string | null) => number | null;
+  
+  // Function to invalidate video counts cache when videos are added/deleted
+  invalidateVideoCountsCache?: () => void;
 }
 
 // Internal state interface for the shot editor

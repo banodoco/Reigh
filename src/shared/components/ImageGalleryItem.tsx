@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { Trash2, Info, Settings, CheckCircle, AlertTriangle, Download, PlusCircle, Check, Sparkles, Star } from "lucide-react";
+import { Trash2, Info, Settings, CheckCircle, AlertTriangle, Download, PlusCircle, Check, Sparkles, Star, Eye } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
 import { 
   Tooltip, 
@@ -25,6 +25,10 @@ import { GeneratedImageWithMetadata, DisplayableMetadata, formatMetadataForDispl
 import { log } from '@/shared/lib/logger';
 import { cn } from "@/shared/lib/utils";
 import CreateShotModal from "@/shared/components/CreateShotModal";
+import { useAddImageToShot, useCreateShotWithImage } from "@/shared/hooks/useShots";
+import { useProject } from "@/shared/contexts/ProjectContext";
+import { useShotNavigation } from "@/shared/hooks/useShotNavigation";
+import { useLastAffectedShot } from "@/shared/hooks/useLastAffectedShot";
 
 interface ImageGalleryItemProps {
   image: GeneratedImageWithMetadata;
@@ -90,6 +94,11 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   onCreateShot,
 }) => {
   const { toast } = useToast();
+  const { selectedProjectId } = useProject();
+  const addImageToShotMutation = useAddImageToShot();
+  const createShotWithImageMutation = useCreateShotWithImage();
+  const { navigateToShot } = useShotNavigation();
+  const { lastAffectedShotId, setLastAffectedShotId: updateLastAffectedShotId } = useLastAffectedShot();
   // Memoize displayUrl to prevent unnecessary recalculations
   const displayUrl = useMemo(() => getDisplayUrl(image.thumbUrl || image.url), [image.thumbUrl, image.url]);
   // Track loading state for this specific image
@@ -99,6 +108,12 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   // State for CreateShotModal
   const [isCreateShotModalOpen, setIsCreateShotModalOpen] = useState<boolean>(false);
   const [isCreatingShot, setIsCreatingShot] = useState<boolean>(false);
+  // State for quick create success
+  const [quickCreateSuccess, setQuickCreateSuccess] = useState<{
+    isSuccessful: boolean;
+    shotId: string | null;
+    shotName: string | null;
+  }>({ isSuccessful: false, shotId: null, shotName: null });
   // Check if this image was already cached by the preloader using centralized function
   const isPreloadedAndCached = isImageCached(image);
   const [imageLoaded, setImageLoaded] = useState<boolean>(isPreloadedAndCached);
@@ -137,6 +152,64 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
       });
     } finally {
       setIsCreatingShot(false);
+    }
+  };
+
+  // Handle quick create and add using atomic database function
+  const handleQuickCreateAndAdd = async () => {
+    if (!selectedProjectId) return;
+    
+    // Generate automatic shot name
+    const shotCount = simplifiedShotOptions.length;
+    const newShotName = `Shot ${shotCount + 1}`;
+    
+    setAddingToShotImageId(image.id);
+    try {
+      console.log('[QuickCreate] Starting atomic shot creation with image:', {
+        projectId: selectedProjectId,
+        shotName: newShotName,
+        generationId: image.id
+      });
+      
+      // Use the atomic database function to create shot and add image in one operation
+      const result = await createShotWithImageMutation.mutateAsync({
+        projectId: selectedProjectId,
+        shotName: newShotName,
+        generationId: image.id
+      });
+      
+      console.log('[QuickCreate] Atomic operation successful:', result);
+      
+      // Set the newly created shot as the last affected shot
+      updateLastAffectedShotId(result.shotId);
+      
+      toast({ 
+        title: "Shot Created & Image Added", 
+        description: `Created "${result.shotName}" and added image successfully.` 
+      });
+      
+      // Set success state immediately and let the mutation's onSuccess handle the data refresh
+      // The mutation should have triggered query invalidation, so the shot will be available soon
+      setQuickCreateSuccess({
+        isSuccessful: true,
+        shotId: result.shotId,
+        shotName: result.shotName
+      });
+      
+      // Clear success state after 5 seconds
+      setTimeout(() => {
+        setQuickCreateSuccess({ isSuccessful: false, shotId: null, shotName: null });
+      }, 5000);
+      
+    } catch (error) {
+      console.error('[QuickCreate] Error in atomic operation:', error);
+      toast({ 
+        title: "Error", 
+        description: "Failed to create shot and add image. Please try again.",
+        variant: "destructive" 
+      });
+    } finally {
+      setAddingToShotImageId(null);
     }
   };
   
@@ -547,20 +620,67 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                       collisionPadding={8}
                   >
                       {onCreateShot && (
-                        <div className="p-1">
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            className="w-full h-8 text-xs justify-center bg-zinc-700 hover:bg-zinc-600 text-white border-zinc-600"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              setIsCreateShotModalOpen(true);
-                            }}
-                          >
-                            <PlusCircle className="h-3 w-3 mr-1" />
-                            Add Shot
-                          </Button>
+                        <div className="p-1 space-y-1">
+                          {quickCreateSuccess.isSuccessful ? (
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              className="w-full h-8 text-xs justify-center bg-green-700 hover:bg-green-600 text-white border-green-600"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                                                  if (quickCreateSuccess.shotId) {
+                                    // Try to find the shot in the list first
+                                    const shot = simplifiedShotOptions.find(s => s.id === quickCreateSuccess.shotId);
+                                    if (shot) {
+                                      // Shot found in list, use it
+                                      navigateToShot({ 
+                                        id: shot.id, 
+                                        name: shot.name,
+                                        images: [],
+                                        position: 0
+                                      });
+                                    } else {
+                                      // Shot not in list yet, but we have the ID and name, so navigate anyway
+                                      console.log('[QuickCreate] Shot not in list yet, navigating with stored data');
+                                      navigateToShot({ 
+                                        id: quickCreateSuccess.shotId, 
+                                        name: quickCreateSuccess.shotName || `Shot`,
+                                        images: [],
+                                        position: 0
+                                      });
+                                    }
+                                  }
+                              }}
+                            >
+                              <Check className="h-3 w-3 mr-1" />
+                              Visit {quickCreateSuccess.shotName}
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              className="w-full h-8 text-xs justify-center bg-green-700 hover:bg-green-600 text-white border-green-600"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleQuickCreateAndAdd();
+                              }}
+                              disabled={addingToShotImageId === image.id}
+                            >
+                              {addingToShotImageId === image.id ? (
+                                <>
+                                  <div className="h-3 w-3 animate-spin rounded-full border-b-2 border-white mr-1"></div>
+                                  Creating...
+                                </>
+                              ) : (
+                                <>
+                                  <PlusCircle className="h-3 w-3 mr-1" />
+                                  Add Shot
+                                </>
+                              )}
+                            </Button>
+                          )}
                         </div>
                       )}
                       {simplifiedShotOptions.map(shot => (

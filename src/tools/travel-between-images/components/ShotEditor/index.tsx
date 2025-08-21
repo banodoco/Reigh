@@ -71,6 +71,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   hasNext,
   onUpdateShotName,
   settingsLoading,
+  getShotVideoCount,
+  invalidateVideoCountsCache,
 }) => {
   // Call all hooks first (Rules of Hooks)
   const { selectedProjectId, projects } = useProject();
@@ -965,6 +967,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           onApplySettings={applySettingsDirect}
           onApplySettingsFromTask={applySettingsFromTask}
           shotKey={selectedShotId}
+          getShotVideoCount={getShotVideoCount}
+          invalidateVideoCountsCache={invalidateVideoCountsCache}
         />
       </div>
 

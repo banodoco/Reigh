@@ -20,6 +20,7 @@ import { SharedTaskDetails } from './SharedTaskDetails';
 import { useQueryClient } from '@tanstack/react-query';
 import { useUnifiedGenerations, useTaskFromUnifiedCache } from '@/shared/hooks/useUnifiedGenerations';
 import { useGenerationTaskPreloader, useEnhancedGenerations } from '@/shared/contexts/GenerationTaskContext';
+import { useVideoCountCache } from '@/shared/hooks/useVideoCountCache';
 
 
 
@@ -58,6 +59,16 @@ interface VideoOutputsGalleryProps {
    * Key to identify which shot/context these videos belong to - used to reset state when shot changes
    */
   shotKey?: string;
+  
+  /**
+   * Project-wide video count lookup function for instant skeleton display
+   */
+  getShotVideoCount?: (shotId: string | null) => number | null;
+  
+  /**
+   * Function to invalidate video counts cache when videos are added/deleted
+   */
+  invalidateVideoCountsCache?: () => void;
 }
 
 const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
@@ -69,6 +80,8 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   onApplySettingsFromTask,
   onImageSaved,
   shotKey,
+  getShotVideoCount,
+  invalidateVideoCountsCache,
 }) => {
   
 
@@ -83,6 +96,38 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   const taskDetailsButtonRef = useRef<HTMLButtonElement>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isMobile = useIsMobile();
+  
+  // Video count cache for instant skeleton display
+  const { getCachedCount, setCachedCount } = useVideoCountCache();
+  
+  // Stable video count to prevent data loss
+  const lastGoodCountRef = useRef<number | null>(null);
+  const prevShotIdRef = useRef<string | null>(null);
+  
+  // Reset state when shot changes to prevent stale data
+  useEffect(() => {
+    if (shotId !== prevShotIdRef.current) {
+      console.log('[SkeletonOptimization] Shot changed - resetting ALL state:', {
+        prevShotId: prevShotIdRef.current,
+        newShotId: shotId,
+        resettingLastGoodCount: lastGoodCountRef.current,
+        timestamp: Date.now()
+      });
+      
+      // Reset pagination to page 1
+      setCurrentPage(1);
+      
+      // CRITICAL: Reset lastGoodCountRef to prevent cross-shot contamination
+      lastGoodCountRef.current = null;
+      
+      // Clear any cached count for the previous shot to prevent contamination
+      if (prevShotIdRef.current) {
+        setCachedCount(prevShotIdRef.current, null);
+      }
+      
+      prevShotIdRef.current = shotId;
+    }
+  }, [shotId, setCachedCount]);
 
   // Stable filters object to prevent infinite re-renders
   const filters = useMemo(() => ({
@@ -129,7 +174,58 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
       errorMessage: generationsError?.message,
       timestamp: Date.now()
     });
-  }, [generationsData, isLoadingGenerations, isFetchingGenerations, generationsError, projectId, shotId, currentPage]);
+    
+    // [SkeletonOptimization] Track when generationsData becomes available
+    console.log('[SkeletonOptimization] useUnifiedGenerations data change:', {
+      generationsDataExists: !!generationsData,
+      generationsDataTotal: (generationsData as any)?.total,
+      generationsDataItems: (generationsData as any)?.items?.length,
+      isLoadingGenerations,
+      isFetchingGenerations,
+      previousDataExists: !!generationsData,
+      timestamp: Date.now()
+    });
+    
+    // Cache video count when data becomes available and protect against data loss
+    const newTotal = (generationsData as any)?.total;
+    const projectVideoCount = getShotVideoCount?.(shotId) ?? null;
+    
+    if (shotId && typeof newTotal === 'number' && newTotal >= 0) {
+      // Check for cache mismatch and invalidate if needed
+      if (projectVideoCount !== null && projectVideoCount !== newTotal && invalidateVideoCountsCache) {
+        console.log('[SkeletonOptimization] Cache mismatch detected - invalidating project cache:', {
+          shotId,
+          projectVideoCount,
+          actualTotal: newTotal,
+          timestamp: Date.now()
+        });
+        invalidateVideoCountsCache();
+      }
+      
+      // Only update cache and last good count if we have a valid positive count
+      // or if this is the first time we're seeing data (prevent data loss)
+      if (newTotal > 0 || lastGoodCountRef.current === null) {
+        setCachedCount(shotId, newTotal);
+        lastGoodCountRef.current = newTotal;
+        console.log('[SkeletonOptimization] Updated stable count:', {
+          shotId,
+          newTotal,
+          lastGoodCount: lastGoodCountRef.current,
+          timestamp: Date.now()
+        });
+      } else if (newTotal === 0 && lastGoodCountRef.current && lastGoodCountRef.current > 0) {
+        // Data disappeared - this might be a race condition or cache invalidation
+        console.warn('[SkeletonOptimization] Data loss detected - preserving last good count:', {
+          shotId,
+          newTotal,
+          lastGoodCount: lastGoodCountRef.current,
+          preservingCount: true,
+          timestamp: Date.now()
+        });
+        // Don't update the cache with 0 if we had a good count before
+      }
+    }
+  }, [generationsData, isLoadingGenerations, isFetchingGenerations, generationsError, projectId, shotId, currentPage, setCachedCount, getShotVideoCount, invalidateVideoCountsCache]);
 
   // Get video outputs from unified data
   const videoOutputs = useMemo(() => {
@@ -307,6 +403,9 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
       setHoverPosition(null);
       setIsInitialHover(false);
       
+      // Reset stable count for new shot
+      lastGoodCountRef.current = null;
+      
       // Clear any pending timeouts
       if (hoverTimeoutRef.current) {
         clearTimeout(hoverTimeoutRef.current);
@@ -453,37 +552,150 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     </div>
   );
 
-  // Determine number of skeletons to show
+  // Determine number of skeletons to show based on actual video count
   const getSkeletonCount = () => {
     // Show skeletons when either loading initial data or fetching new data
     const isLoading = isLoadingGenerations || isFetchingGenerations;
     
+      // Get cached count for instant display
+    const cachedCount = getCachedCount(shotId);
+    // Get project-wide preloaded count (highest priority for instant display)
+    const projectVideoCount = getShotVideoCount?.(shotId) ?? null;
+    
+    console.log('[SkeletonOptimization] Getting skeleton count:', {
+      isLoadingGenerations,
+      isFetchingGenerations,
+      isLoading,
+      currentPage,
+      itemsPerPage,
+      shotId,
+      projectVideoCount,
+      cachedCount,
+      generationsDataExists: !!generationsData,
+      generationsDataTotal: (generationsData as any)?.total,
+      generationsDataItems: (generationsData as any)?.items?.length,
+      sortedVideoOutputsLength: sortedVideoOutputs.length,
+      timestamp: Date.now()
+    });
+    
     if (isLoading) {
-      // If we have existing data, show skeletons for the current page
-      if (sortedVideoOutputs.length > 0) {
-        return Math.min(itemsPerPage, sortedVideoOutputs.length);
+      // Priority 1: Use current data if available AND it's from current shot (most accurate)
+      const totalVideos = (generationsData as any)?.total;
+      const isDataFresh = !isFetchingGenerations; // Data is fresh if not currently fetching
+      
+      // Priority 2: Use project-wide preloaded count (instant display) 
+      // Priority 3: Use cached count for fallback
+      // Priority 4: Use last good count to prevent data loss
+      const lastGoodCount = lastGoodCountRef.current;
+      // ONLY use project cache during loading - never use cached/lastGood during transitions
+      const countToUse = (totalVideos !== null && totalVideos !== undefined && isDataFresh) ? totalVideos :
+                        (projectVideoCount !== null && projectVideoCount >= 0) ? projectVideoCount : 0;
+      
+      console.log('[SkeletonOptimization] Loading state - count sources (SAFE MODE):', {
+        totalVideos,
+        isDataFresh,
+        projectVideoCount,
+        countToUse,
+        usingFreshData: (totalVideos !== null && totalVideos !== undefined && isDataFresh),
+        usingProject: !(totalVideos !== null && totalVideos !== undefined && isDataFresh) && projectVideoCount !== null,
+        usingFallback: !(totalVideos !== null && totalVideos !== undefined && isDataFresh) && projectVideoCount === null,
+        generationsData: generationsData ? 'exists' : 'null',
+        shotId,
+        timestamp: Date.now()
+      });
+      
+      // If we have count information (current or cached), calculate accurate skeleton count
+      if (countToUse > 0) {
+        // Calculate how many videos should be on the current page
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        
+        // Handle case where currentPage is beyond available data
+        if (startIndex >= countToUse) {
+          console.log('[SkeletonOptimization] Current page beyond available data, returning 0 skeletons:', {
+            startIndex,
+            countToUse,
+            currentPage,
+            itemsPerPage,
+            source: totalVideos > 0 ? 'current' : 'cached'
+          });
+          return 0;
+        }
+        
+        const videosOnCurrentPage = Math.min(countToUse - startIndex, itemsPerPage);
+        const result = Math.max(0, videosOnCurrentPage);
+        const source = (totalVideos !== null && totalVideos !== undefined && isDataFresh) ? 'fresh-current' : 'project';
+        console.log('[SkeletonOptimization] Calculated skeleton count from count:', {
+          countToUse,
+          startIndex,
+          videosOnCurrentPage,
+          result,
+          currentPage,
+          itemsPerPage,
+          source
+        });
+        return result;
       }
-      // Otherwise show default number of skeletons
-      return itemsPerPage;
+      
+      // Do NOT use existing data from previous shot to derive skeletons; avoid cross-shot contamination
+      
+      // For initial load with no data and no cache, show 0 skeletons
+      // Most conservative approach - no jarring transitions
+      console.log('[SkeletonOptimization] SAFE FALLBACK: No fresh data or project cache, returning 0 skeletons to prevent stale data');
+      return 0;
     }
+    
+    console.log('[SkeletonOptimization] Not loading, returning 0 skeletons');
     return 0;
   };
 
   const skeletonCount = getSkeletonCount();
   
+  // [SkeletonOptimization] Log the final skeleton count being used
+  console.log('[SkeletonOptimization] Final skeleton count result:', {
+    skeletonCount,
+    isLoadingGenerations,
+    isFetchingGenerations,
+    videoOutputsLength: videoOutputs.length,
+    sortedVideoOutputsLength: sortedVideoOutputs.length,
+    willShowSkeletons: skeletonCount > 0,
+    willShowActualVideos: skeletonCount === 0 && videoOutputs.length > 0,
+    timestamp: Date.now()
+  });
+  
   // Debug logging for skeleton visibility
   React.useEffect(() => {
+    const totalVideos = (generationsData as any)?.total || 0;
     console.log('[VideoOutputsGallery:Skeleton] Debug skeleton state:', {
       isLoadingGenerations,
       isFetchingGenerations,
       skeletonCount,
+      totalVideos,
       videoOutputsLength: videoOutputs.length,
       sortedVideoOutputsLength: sortedVideoOutputs.length,
       currentPage,
       itemsPerPage,
+      calculatedVideosOnPage: totalVideos > 0 ? Math.min(totalVideos - ((currentPage - 1) * itemsPerPage), itemsPerPage) : 'unknown',
       timestamp: Date.now()
     });
-  }, [isLoadingGenerations, isFetchingGenerations, skeletonCount, videoOutputs.length, sortedVideoOutputs.length, currentPage]);
+  }, [isLoadingGenerations, isFetchingGenerations, skeletonCount, videoOutputs.length, sortedVideoOutputs.length, currentPage, generationsData]);
+
+  // Debug: Compare different count sources for potential mismatches
+  React.useEffect(() => {
+    const projectVideoCount = getShotVideoCount?.(shotId) ?? null;
+    const currentDataTotal = (generationsData as any)?.total ?? null;
+    if (shotId && (projectVideoCount !== null || currentDataTotal !== null)) {
+      console.log('[CountMismatchDebug] Comparing video count sources:', {
+        shotId,
+        projectVideoCount,
+        currentDataTotal,
+        cachedCount: getCachedCount(shotId),
+        videoOutputsLength: videoOutputs.length,
+        sortedVideoOutputsLength: sortedVideoOutputs.length,
+        mismatch: projectVideoCount !== null && currentDataTotal !== null && projectVideoCount !== currentDataTotal,
+        timestamp: Date.now()
+      });
+    }
+  }, [shotId, getShotVideoCount, generationsData, getCachedCount, videoOutputs.length, sortedVideoOutputs.length]);
 
   // Background preloading is now handled by the unified generations system
 
@@ -503,8 +715,31 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     }
   };
 
-  // Only show empty state if we're not loading AND there are no videos
-  if (sortedVideoOutputs.length === 0 && !isLoadingGenerations && !isFetchingGenerations) {
+  // Show empty state if:
+  // 1. We know for certain there are 0 videos (from project cache) OR
+  // 2. We know from current data that there are 0 videos (fast path) OR  
+  // 3. We're not loading AND there are no videos
+  const projectVideoCount = getShotVideoCount?.(shotId) ?? null;
+  const currentDataTotal = (generationsData as any)?.total ?? null;
+  const shouldShowEmptyState = (projectVideoCount === 0) || 
+                               (currentDataTotal === 0) ||
+                               (sortedVideoOutputs.length === 0 && !isLoadingGenerations && !isFetchingGenerations);
+
+  // When loading and we have no skeletons to show and no videos loaded, show the 0-videos message
+  // This avoids a temporary blank state while we await confirmation of zero
+  const showZeroMessageWhileLoading = (isLoadingGenerations || isFetchingGenerations) && skeletonCount === 0 && sortedVideoOutputs.length === 0;
+  
+  if (shouldShowEmptyState || showZeroMessageWhileLoading) {
+    console.log('[SkeletonOptimization] Showing instant empty state:', {
+      projectVideoCount,
+      currentDataTotal,
+      sortedVideoOutputsLength: sortedVideoOutputs.length,
+      isLoadingGenerations,
+      isFetchingGenerations,
+      reason: projectVideoCount === 0 ? 'project-cache-zero' : 
+              currentDataTotal === 0 ? 'current-data-zero' : (showZeroMessageWhileLoading ? 'loading-zero' : 'no-videos-loaded'),
+      timestamp: Date.now()
+    });
     return (
       <Card className="p-4 sm:p-6">
         <div className="flex flex-col space-y-2 sm:space-y-3">
