@@ -140,7 +140,8 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
         }
       }}
     >
-      {children && <DialogTrigger asChild>{children}</DialogTrigger>}
+      {/* Avoid rendering an active trigger when controlled via `open` to prevent unintended close events */}
+      {!open && children && <DialogTrigger asChild>{children}</DialogTrigger>}
       <DialogContent 
         className={`sm:max-w-[700px] flex flex-col ${
           isMobile ? 'mx-2 max-h-[calc(100vh-4rem)] top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] fixed' : ''
@@ -235,19 +236,6 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
         <DialogFooter className="flex-shrink-0 pt-4 border-t">
           <div className="flex justify-between w-full items-center">
             <div className="flex items-center space-x-4">
-              {/* Show Video button for mobile video context */}
-              {isMobile && isVideoContext && onShowVideo && (
-                <Button 
-                  variant="secondary" 
-                  onClick={() => {
-                    setIsOpen(false);
-                    onShowVideo();
-                  }}
-                  className="text-sm whitespace-pre-line leading-tight py-3 px-4 min-h-[3rem]"
-                >
-                  {'Show\nVideo'}
-                </Button>
-              )}
               {inputImages.length > 0 && (
                 <div className="flex items-center space-x-4">
                   <div className="flex items-center space-x-2">
@@ -272,13 +260,28 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
                 </div>
               )}
             </div>
-            <Button
-              variant="outline"
-              onClick={() => setIsOpen(false)}
-              className={`text-sm ${isMobile ? 'whitespace-pre-line leading-tight py-3 px-4 min-h-[2.5rem]' : ''}`}
-            >
-              Close
-            </Button>
+            <div className="flex items-center space-x-3">
+              {/* Show Video button for mobile video context - now positioned directly to the left of close button */}
+              {isMobile && isVideoContext && onShowVideo && (
+                <Button 
+                  variant="secondary" 
+                  onClick={() => {
+                    // Don't close modal immediately - let the onShowVideo handler manage the timing
+                    onShowVideo();
+                  }}
+                  className="text-sm whitespace-pre-line leading-tight py-3 px-4 min-h-[3rem]"
+                >
+                  {'Show\nVideo'}
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                onClick={() => setIsOpen(false)}
+                className={`text-sm ${isMobile ? 'whitespace-pre-line leading-tight py-3 px-4 min-h-[2.5rem]' : ''}`}
+              >
+                Close
+              </Button>
+            </div>
           </div>
         </DialogFooter>
       </DialogContent>

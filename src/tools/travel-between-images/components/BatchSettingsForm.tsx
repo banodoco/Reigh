@@ -86,7 +86,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
 
     return (
         <div className="space-y-4">
-          <div className="p-4 border rounded-lg bg-card shadow-md space-y-4">
+          <div className="p-4 border rounded-lg bg-card shadow-md space-y-4 mb-4">
 
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

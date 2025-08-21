@@ -111,7 +111,7 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
   // Show loading skeleton while data is being fetched
   if (shotsLoading || shots === undefined) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-x-8 md:gap-y-8 pb-6 md:pb-8">
         {Array.from({ length: 6 }).map((_, idx) => (
           <div key={idx} className="h-40 rounded-lg bg-muted animate-pulse" />
         ))}
@@ -153,7 +153,7 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
         items={shots.map((shot) => shot.id)} 
         strategy={rectSortingStrategy}
       >
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-x-8 md:gap-y-8 pb-6 md:pb-8">
           {shots.map((shot, index) => {
             return (
               <SortableShotItem

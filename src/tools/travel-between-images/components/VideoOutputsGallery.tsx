@@ -35,17 +35,6 @@ const VideoSkeleton = React.memo(({ index }: { index: number }) => (
         <div className="w-6 h-6 border-2 border-muted-foreground/30 border-t-muted-foreground/60 rounded-full animate-spin" 
              style={{ animationDuration: '1s' }} />
       </div>
-      
-      {/* Skeleton for timestamp */}
-      <div className="absolute top-1 left-4 sm:top-2 sm:left-4 z-10">
-        <Skeleton className="h-4 w-16 rounded" />
-      </div>
-      
-      {/* Skeleton for action buttons */}
-      <div className="absolute top-1/2 right-2 sm:right-3 flex flex-col items-end gap-1 -translate-y-1/2 z-20">
-        <Skeleton className="h-6 w-6 sm:h-7 sm:w-7 rounded-full" />
-        <Skeleton className="h-6 w-6 sm:h-7 sm:w-7 rounded-full" />
-      </div>
     </div>
   </div>
 ));
@@ -114,10 +103,27 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   const [currentPage, setCurrentPage] = useState(1);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [selectedVideoForDetails, setSelectedVideoForDetails] = useState<GenerationRow | null>(null);
+  // Track ids we optimistically hide after delete click for instant UI feedback
+  const [optimisticallyDeletedIds, setOptimisticallyDeletedIds] = useState<string[]>([]);
   const [hoveredVideo, setHoveredVideo] = useState<GenerationRow | null>(null);
   const [hoverPosition, setHoverPosition] = useState<{ x: number; y: number; positioning?: 'above' | 'below' } | null>(null);
   const [isInitialHover, setIsInitialHover] = useState(false);
   const [showTaskDetailsModal, setShowTaskDetailsModal] = useState(false);
+  
+  // Debug state changes
+  useEffect(() => {
+    console.log('[MobileButtonDebug] [StateChange] selectedVideoForDetails changed:', {
+      videoId: selectedVideoForDetails?.id,
+      timestamp: Date.now()
+    });
+  }, [selectedVideoForDetails]);
+  
+  useEffect(() => {
+    console.log('[MobileButtonDebug] [StateChange] showTaskDetailsModal changed:', {
+      showTaskDetailsModal,
+      timestamp: Date.now()
+    });
+  }, [showTaskDetailsModal]);
   
   // SIMPLIFIED FIX: Use a simple delay-based approach instead of complex video loading tracking
   const [showVideosAfterDelay, setShowVideosAfterDelay] = useState(false);
@@ -129,6 +135,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   const taskDetailsButtonRef = useRef<HTMLButtonElement>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isMobile = useIsMobile();
+  const queryClient = useQueryClient();
   
   // Video count cache for instant skeleton display
   const { getCachedCount, setCachedCount } = useVideoCountCache();
@@ -286,6 +293,13 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   // Enhanced generations with automatic task data preloading via context
   const enhancedVideoOutputs = useEnhancedGenerations(videoOutputs);
   
+  // Hide any videos that were optimistically deleted (until refetch confirms removal)
+  const visibleVideoOutputs = React.useMemo(() => {
+    if (!optimisticallyDeletedIds.length) return videoOutputs;
+    const hide = new Set(optimisticallyDeletedIds);
+    return videoOutputs.filter(v => !hide.has(v.id));
+  }, [videoOutputs, optimisticallyDeletedIds]);
+  
   // Background preload task data for current page
   useGenerationTaskPreloader(videoOutputs, !!projectId && !!shotId);
   
@@ -297,6 +311,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
       currentPage,
       itemsPerPage,
       videoOutputsCount: videoOutputs.length,
+      visibleVideoOutputsCount: visibleVideoOutputs.length,
       enhancedVideoOutputsCount: enhancedVideoOutputs.length,
       isLoadingGenerations,
       generationsError: generationsError?.message,
@@ -313,7 +328,14 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
         shotImageEntryId: (video as any).shotImageEntryId
       }))
     });
-  }, [videoOutputs, enhancedVideoOutputs, currentPage, isLoadingGenerations, generationsError, generationsData]);
+  }, [videoOutputs, visibleVideoOutputs.length, enhancedVideoOutputs, currentPage, isLoadingGenerations, generationsError, generationsData]);
+
+  // After refetches, drop any ids from the optimistic list that are no longer present in results
+  useEffect(() => {
+    if (!optimisticallyDeletedIds.length) return;
+    const currentIds = new Set(videoOutputs.map(v => v.id));
+    setOptimisticallyDeletedIds((ids) => ids.filter(id => currentIds.has(id)));
+  }, [videoOutputs, optimisticallyDeletedIds.length]);
 
   // Hooks for task details (now using unified cache)
   const lightboxVideoId = lightboxIndex !== null && videoOutputs[lightboxIndex] ? videoOutputs[lightboxIndex].id : null;
@@ -383,18 +405,19 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   }, [contentKey, isLoadingGenerations, showVideosAfterDelay]);
 
   useEffect(() => {
-    if (selectedVideoForDetails && taskDetailsButtonRef.current) {
+    // Only use the hidden trigger click on desktop to avoid Radix toggle conflicts on mobile
+    if (!isMobile && selectedVideoForDetails && taskDetailsButtonRef.current) {
       taskDetailsButtonRef.current.click();
     }
-  }, [selectedVideoForDetails]);
+  }, [selectedVideoForDetails, isMobile]);
 
   // Sort video outputs by creation date
   const sortedVideoOutputs = useMemo(() => {
-    return [...videoOutputs]
+    return [...visibleVideoOutputs]
       .map(v => ({ v, time: new Date(v.createdAt || (v as { created_at?: string | null }).created_at || 0).getTime() }))
       .sort((a, b) => b.time - a.time)
       .map(({ v }) => v);
-  }, [videoOutputs]);
+  }, [visibleVideoOutputs]);
 
   // Get current video for lightbox
   const currentVideo = lightboxIndex !== null ? sortedVideoOutputs[lightboxIndex] : null;
@@ -846,6 +869,10 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
                       setLightboxIndex(originalIndex);
                     }}
                     onTouchEnd={isMobile ? (e) => {
+                      // Don't interfere with touches inside action buttons
+                      const path = (e as any).nativeEvent?.composedPath?.() as HTMLElement[] | undefined;
+                      const isInsideButton = path ? path.some((el) => (el as HTMLElement)?.tagName === 'BUTTON' || (el as HTMLElement)?.closest?.('button')) : !!(e.target as HTMLElement).closest('button');
+                      if (isInsideButton) return;
                       e.preventDefault();
                       handleMobileTap(originalIndex);
                     } : undefined}
@@ -853,30 +880,87 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
                   />
                   
                   {/* Action buttons – positioned directly on the video container */}
-                  <div className="absolute top-1/2 right-2 sm:right-3 flex flex-col items-end gap-1 opacity-0 group-hover:opacity-100 group-touch:opacity-100 transition-opacity -translate-y-1/2 z-20">
+                  <div className="absolute top-1/2 right-2 sm:right-3 flex flex-col items-end gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity -translate-y-1/2 z-20 pointer-events-auto">
                     <Button
                       variant="secondary"
                       size="icon"
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        console.log('[MobileButtonDebug] [InfoButton] Button clicked START:', {
+                          isMobile,
+                          videoId: video.id,
+                          currentSelectedVideo: selectedVideoForDetails?.id,
+                          currentShowModal: showTaskDetailsModal,
+                          timestamp: Date.now()
+                        });
+                        
                         if (isMobile) {
                           // On mobile, open the modal
+                          console.log('[MobileButtonDebug] [InfoButton] Setting modal state...');
                           setSelectedVideoForDetails(video);
+                          setShowTaskDetailsModal(true);
+                          console.log('[MobileButtonDebug] [InfoButton] Modal state set - selectedVideo:', video.id);
+                          
+                          // Add a check to see if state was actually updated
+                          setTimeout(() => {
+                            console.log('[MobileButtonDebug] [InfoButton] State check after 100ms:', {
+                              selectedVideoForDetails: selectedVideoForDetails?.id,
+                              showTaskDetailsModal,
+                              expectedVideoId: video.id
+                            });
+                          }, 100);
                         } else {
                           // On desktop, open the lightbox
+                          console.log('[MobileButtonDebug] [InfoButton] Desktop - opening lightbox');
                           setLightboxIndex(originalIndex);
                         }
                       }}
                       onMouseEnter={(e) => handleHoverStart(video, e)}
                       onMouseLeave={handleHoverEnd}
                       className="h-6 w-6 sm:h-7 sm:w-7 p-0 rounded-full bg-black/50 hover:bg-black/70 text-white"
-                      title="View details"
                     >
                       <Info className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                     </Button>
                     <Button
                       variant="destructive"
                       size="icon"
-                      onClick={() => onDelete(video.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        console.log('[MobileButtonDebug] [DeleteButton] Button clicked:', {
+                          videoId: video.id,
+                          deletingVideoId,
+                          isDisabled: deletingVideoId === video.id,
+                          timestamp: Date.now()
+                        });
+                        // Optimistically hide the video
+                        setOptimisticallyDeletedIds((ids) => ids.includes(video.id) ? ids : [...ids, video.id]);
+                        onDelete(video.id);
+                        console.log('[MobileButtonDebug] [DeleteButton] onDelete called');
+                        // Proactively refetch unified generations for this shot/page
+                        try {
+                          const { getUnifiedGenerationsCacheKey } = require('@/shared/hooks/useUnifiedGenerations');
+                          const key = getUnifiedGenerationsCacheKey({
+                            projectId,
+                            mode: 'shot-specific',
+                            shotId,
+                            page: currentPage,
+                            limit: itemsPerPage,
+                            filters,
+                            includeTaskData: false,
+                            preloadTaskData: true,
+                            enabled: !!(projectId && shotId),
+                          } as any);
+                          queryClient.invalidateQueries({ queryKey: key });
+                        } catch (err) {
+                          console.warn('[VideoOutputsGallery] Failed to invalidate unified generations cache', err);
+                          // Fallback: invalidate all unified generations queries
+                          queryClient.invalidateQueries({ queryKey: ['unified-generations'] });
+                        }
+                        // Invalidate project video count cache if provided
+                        if (invalidateVideoCountsCache) {
+                          invalidateVideoCountsCache();
+                        }
+                      }}
                       disabled={deletingVideoId === video.id}
                       className="h-6 w-6 sm:h-7 sm:w-7 p-0 rounded-full"
                       title="Delete video"
@@ -1030,14 +1114,32 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
           />
         )}
 
-        {selectedVideoForDetails && showTaskDetailsModal && (
+        {(() => {
+          console.log('[MobileButtonDebug] [TaskDetailsModal] Render check:', {
+            selectedVideoForDetails: !!selectedVideoForDetails,
+            selectedVideoId: selectedVideoForDetails?.id,
+            showTaskDetailsModal,
+            shouldRender: !!(selectedVideoForDetails && showTaskDetailsModal),
+            timestamp: Date.now()
+          });
+          return selectedVideoForDetails && showTaskDetailsModal;
+        })() && (
           <TaskDetailsModal
-            generationId={selectedVideoForDetails.id}
+            generationId={(() => {
+              console.log('[MobileButtonDebug] [TaskDetailsModal] Rendering with generationId:', selectedVideoForDetails.id);
+              return selectedVideoForDetails.id;
+            })()}
             open={showTaskDetailsModal}
             onOpenChange={(open) => {
-              console.log('[TaskToggle] VideoOutputsGallery: TaskDetailsModal onOpenChange', { open, selectedVideo: selectedVideoForDetails?.id });
+              console.log('[MobileButtonDebug] [TaskDetailsModal] onOpenChange called:', { 
+                open, 
+                selectedVideo: selectedVideoForDetails?.id,
+                currentShowModal: showTaskDetailsModal,
+                timestamp: Date.now()
+              });
               if (!open) {
                 // When closing, reset both states
+                console.log('[MobileButtonDebug] [TaskDetailsModal] Resetting modal state due to onOpenChange(false)');
                 setShowTaskDetailsModal(false);
                 setSelectedVideoForDetails(null);
               }

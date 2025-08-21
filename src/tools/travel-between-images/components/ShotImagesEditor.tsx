@@ -119,9 +119,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   if (!isModeReady) {
     return (
       <Card className="flex flex-col">
-        <CardContent className="p-6">
-          {skeleton}
-        </CardContent>
+        {skeleton}
       </Card>
     );
   }

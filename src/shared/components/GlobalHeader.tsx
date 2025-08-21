@@ -11,7 +11,7 @@ import { cn } from '@/shared/lib/utils';
 import { ProjectSettingsModal } from '@/shared/components/ProjectSettingsModal';
 import { toast } from "sonner";
 import { useProjectContextDebug } from '@/shared/hooks/useProjectContextDebug';
-import { useScrollDirection } from '@/shared/hooks/useScrollDirection';
+
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 
 interface GlobalHeaderProps {
@@ -28,38 +28,8 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
   // [MobileStallFix] Enable debug monitoring
   useProjectContextDebug();
 
-  // Scroll direction tracking for mobile header hide/show
-  const { scrollDirection, isAtTop } = useScrollDirection({
-    threshold: 15,
-    enabled: isMobile
-  });
-
-  // Header visibility state for mobile
-  const [isHeaderVisible, setIsHeaderVisible] = useState(true);
-
   // Track authentication state to conditionally change the logo destination
   const [session, setSession] = useState<Session | null>(null);
-
-  // Control header visibility based on scroll direction (mobile only)
-  useEffect(() => {
-    if (!isMobile) {
-      setIsHeaderVisible(true);
-      return;
-    }
-
-    // Always show header at top of page
-    if (isAtTop) {
-      setIsHeaderVisible(true);
-      return;
-    }
-
-    // Show/hide based on scroll direction
-    if (scrollDirection === 'up') {
-      setIsHeaderVisible(true);
-    } else if (scrollDirection === 'down') {
-      setIsHeaderVisible(false);
-    }
-  }, [isMobile, scrollDirection, isAtTop]);
 
   useEffect(() => {
     // Get current session on mount
@@ -108,10 +78,9 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
     <>
       <header 
         className={cn(
-          "wes-header sticky top-0 z-50 w-full relative overflow-hidden lg:p-0 transition-transform duration-300 ease-out",
-          isMobile && !isHeaderVisible && "-translate-y-full"
+          "wes-header z-50 w-full relative overflow-hidden lg:p-0",
+          isMobile ? "" : "sticky top-0"
         )} 
-        style={{ padding: 0, margin: 0 }}
       >
         {/* Enhanced background patterns */}
         <div className="wes-deco-pattern absolute inset-0 opacity-20"></div>
@@ -276,7 +245,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
 
         {/* Mobile Layout (below lg) */}
         <div 
-          className="lg:hidden w-full"
+          className="lg:hidden w-full pt-1"
           style={{
             paddingRight: contentOffsetRight ? `${contentOffsetRight}px` : undefined,
             paddingLeft: contentOffsetLeft ? `${contentOffsetLeft}px` : undefined,

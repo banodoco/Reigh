@@ -259,7 +259,7 @@ const ToolSelectorPage: React.FC = () => {
   // Dynamic spacing based on content area - fixed padding to prevent right shift
   const containerPadding = isSm ? 'px-4' : 'px-2';
   const containerSpacing = isLg ? 'pt-3 pb-4' : isSm ? 'pt-4 pb-2' : 'pt-3 pb-[0.333rem]';
-  const sectionGap = isLg ? 'gap-10' : isSm ? 'gap-8' : 'gap-6';
+  const sectionGap = isLg ? 'gap-6' : isSm ? 'gap-4' : 'gap-3';
   const itemGap = isLg ? 'gap-5' : isSm ? 'gap-6' : 'gap-5';
   const topMargin = isLg ? 'mt-2' : isSm ? 'mt-4' : 'mt-2';
   const bottomMargin = ''; // layoutDirection === 'column' ? 'mb-8' : '';

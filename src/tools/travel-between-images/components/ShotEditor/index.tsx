@@ -1042,7 +1042,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       }, [selectedShot, isMobile, updateGenerationsPaneSettings, setIsGenerationsPaneLocked]);
   
     return (
-    <div className="flex flex-col space-y-2 sm:space-y-4 pb-16">
+    <div className="flex flex-col space-y-4 pb-16">
       {/* Header */}
       <Header
         selectedShot={selectedShot}
@@ -1162,7 +1162,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                         />
                         
                         {/* Model Selection (Mobile) */}
-                        <div className="block lg:hidden mt-6">
+                        <div className="block lg:hidden mt-4">
                             <div className="space-y-4 p-4 border rounded-lg bg-card mb-4">
                                 <h3 className="font-light text-sm">Which model would you like to use:</h3>
                                 <div className="space-y-2">
@@ -1193,7 +1193,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                         </div>
                         
                         {/* LoRA Settings (Mobile) */}
-                        <div className="block lg:hidden mt-6">
+                        <div className="block lg:hidden">
                             <div className="space-y-4 p-4 border rounded-lg bg-card">
                                 <h3 className="font-light text-sm">LoRA Models</h3>
                                 
@@ -1213,7 +1213,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                             </div>
                         </div>
                         
-                        <div className="mt-6 pt-6 border-t">
+                        <div className="mt-4 pt-6 border-t">
                             <Button 
                                 size="lg" 
                                 className="w-full" 
