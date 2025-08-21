@@ -429,6 +429,16 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   // State for shot filter
   const [shotFilter, setShotFilter] = useState<string>(initialShotFilter);
   const [excludePositioned, setExcludePositioned] = useState<boolean>(initialExcludePositioned);
+
+  // Sync external shot filter changes with internal state (e.g., from "Jump to shot" button)
+  useEffect(() => {
+    setShotFilter(initialShotFilter);
+  }, [initialShotFilter]);
+
+  // Sync external exclude positioned changes with internal state
+  useEffect(() => {
+    setExcludePositioned(initialExcludePositioned);
+  }, [initialExcludePositioned]);
   // State for starred filter
   const [showStarredOnly, setShowStarredOnly] = useState<boolean>(initialStarredFilter);
   // Mobile-only: track which image should show action controls (e.g., Info button)

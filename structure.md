@@ -228,6 +228,7 @@ tool-name/
 - **Solution**: Always call hooks in same order, use activation constraints to gate behavior instead of conditional execution
 - **Key Fixes**: Stable `useSensor` calls, stable `onImageReorder` reference with useRef pattern, dependency array stabilization
 - **Components**: Enhanced `ShotImageManager`, `ShotEditor`, and `useGenerationActions` for consistent hook execution
+- **Latest Fix (Jan 2025)**: Fixed `ImageGalleryPagination` hook violation by moving early return **before** hook calls to comply with Rules of Hooks
 
 **Image Generation Form UX:**
 - **Collapsible Form**: Image generation form can now be collapsed/expanded to save screen space
