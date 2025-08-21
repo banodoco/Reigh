@@ -12,7 +12,13 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
  * 
  * POST /functions/v1/complete-task
  * Headers: Authorization: Bearer <JWT or PAT>
- * Body: { task_id, file_data: "base64...", filename: "image.png" }
+ * Body: { 
+ *   task_id, 
+ *   file_data: "base64...", 
+ *   filename: "image.png",
+ *   first_frame_data?: "base64...",      // Optional thumbnail data
+ *   first_frame_filename?: "thumb.png"   // Optional thumbnail filename
+ * }
  * 
  * Returns:
  * - 200 OK with success data
@@ -33,11 +39,23 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
       status: 400
     });
   }
-  const { task_id, file_data, filename } = body;
+  const { task_id, file_data, filename, first_frame_data, first_frame_filename } = body;
   console.log(`[COMPLETE-TASK-DEBUG] Received request with task_id type: ${typeof task_id}, value: ${JSON.stringify(task_id)}`);
   console.log(`[COMPLETE-TASK-DEBUG] Body keys: ${Object.keys(body)}`);
   if (!task_id || !file_data || !filename) {
     return new Response("task_id, file_data (base64), and filename required", {
+      status: 400
+    });
+  }
+  
+  // Validate thumbnail parameters if provided
+  if (first_frame_data && !first_frame_filename) {
+    return new Response("first_frame_filename required when first_frame_data is provided", {
+      status: 400
+    });
+  }
+  if (first_frame_filename && !first_frame_data) {
+    return new Response("first_frame_data required when first_frame_filename is provided", {
       status: 400
     });
   }
@@ -189,6 +207,42 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
     const { data: urlData } = supabaseAdmin.storage.from('image_uploads').getPublicUrl(objectPath);
     const publicUrl = urlData.publicUrl;
     
+    // 8.1) Upload thumbnail if provided
+    let thumbnailUrl = null;
+    if (first_frame_data && first_frame_filename) {
+      console.log(`[COMPLETE-TASK-DEBUG] Uploading thumbnail for task ${taskIdString}`);
+      try {
+        // Decode the base64 thumbnail data
+        const thumbnailBuffer = Uint8Array.from(atob(first_frame_data), (c) => c.charCodeAt(0));
+        
+        // Create thumbnail path
+        const thumbnailPath = `${userId}/thumbnails/${first_frame_filename}`;
+        
+        // Upload thumbnail to storage
+        const { data: thumbnailUploadData, error: thumbnailUploadError } = await supabaseAdmin.storage
+          .from('image_uploads')
+          .upload(thumbnailPath, thumbnailBuffer, {
+            contentType: getContentType(first_frame_filename),
+            upsert: true
+          });
+        
+        if (thumbnailUploadError) {
+          console.error("Thumbnail upload error:", thumbnailUploadError);
+          // Don't fail the main upload, just log the error
+        } else {
+          // Get the public URL for the thumbnail
+          const { data: thumbnailUrlData } = supabaseAdmin.storage
+            .from('image_uploads')
+            .getPublicUrl(thumbnailPath);
+          thumbnailUrl = thumbnailUrlData.publicUrl;
+          console.log(`[COMPLETE-TASK-DEBUG] Thumbnail uploaded successfully: ${thumbnailUrl}`);
+        }
+      } catch (thumbnailError) {
+        console.error("Error processing thumbnail:", thumbnailError);
+        // Don't fail the main upload, just log the error
+      }
+    }
+    
     // 8.5) Validate shot existence and clean up parameters if necessary
     console.log(`[COMPLETE-TASK-DEBUG] Validating shot references for task ${taskIdString}`);
     try {
@@ -235,9 +289,26 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
           }
         }
         
+        // Add thumbnail URL to task parameters if available
+        if (thumbnailUrl) {
+          console.log(`[COMPLETE-TASK-DEBUG] Adding thumbnail_url to task parameters: ${thumbnailUrl}`);
+          needsParamsUpdate = true;
+          
+          if (currentTask.task_type === 'travel_stitch') {
+            // For travel_stitch tasks, add to full_orchestrator_payload.thumbnail_url
+            if (!updatedParams.full_orchestrator_payload) {
+              updatedParams.full_orchestrator_payload = {};
+            }
+            updatedParams.full_orchestrator_payload.thumbnail_url = thumbnailUrl;
+          } else if (currentTask.task_type === 'single_image') {
+            // For single_image tasks, add to thumbnail_url
+            updatedParams.thumbnail_url = thumbnailUrl;
+          }
+        }
+        
         // Update task parameters if needed (before marking as complete)
         if (needsParamsUpdate) {
-          console.log(`[COMPLETE-TASK-DEBUG] Updating task parameters to remove invalid shot reference`);
+          console.log(`[COMPLETE-TASK-DEBUG] Updating task parameters${thumbnailUrl ? ' with thumbnail_url' : ' to remove invalid shot reference'}`);
           const { error: paramsUpdateError } = await supabaseAdmin
             .from("tasks")
             .update({ params: updatedParams })
@@ -246,12 +317,63 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
           if (paramsUpdateError) {
             console.error(`[COMPLETE-TASK-DEBUG] Failed to update task parameters:`, paramsUpdateError);
             // Continue anyway - better to complete the task than fail entirely
+          } else if (thumbnailUrl) {
+            console.log(`[COMPLETE-TASK-DEBUG] Successfully added thumbnail_url to task parameters`);
           }
         }
       }
     } catch (shotValidationError) {
       console.error(`[COMPLETE-TASK-DEBUG] Error during shot validation:`, shotValidationError);
       // Continue anyway - don't fail task completion due to validation errors
+    }
+    
+    // 8.6) Handle thumbnail URL if we couldn't update through the main parameter update flow
+    if (thumbnailUrl) {
+      try {
+        // Try a separate update to ensure thumbnail gets added even if shot validation failed
+        console.log(`[COMPLETE-TASK-DEBUG] Ensuring thumbnail_url is added to task parameters`);
+        const { data: currentTask, error: taskFetchError } = await supabaseAdmin
+          .from("tasks")
+          .select("params, task_type")
+          .eq("id", taskIdString)
+          .single();
+        
+        if (!taskFetchError && currentTask) {
+          let updatedParams = { ...(currentTask.params || {}) };
+          let shouldUpdate = false;
+          
+          if (currentTask.task_type === 'travel_stitch') {
+            if (!updatedParams.full_orchestrator_payload) {
+              updatedParams.full_orchestrator_payload = {};
+            }
+            if (!updatedParams.full_orchestrator_payload.thumbnail_url) {
+              updatedParams.full_orchestrator_payload.thumbnail_url = thumbnailUrl;
+              shouldUpdate = true;
+            }
+          } else if (currentTask.task_type === 'single_image') {
+            if (!updatedParams.thumbnail_url) {
+              updatedParams.thumbnail_url = thumbnailUrl;
+              shouldUpdate = true;
+            }
+          }
+          
+          if (shouldUpdate) {
+            const { error: thumbnailUpdateError } = await supabaseAdmin
+              .from("tasks")
+              .update({ params: updatedParams })
+              .eq("id", taskIdString);
+            
+            if (thumbnailUpdateError) {
+              console.error(`[COMPLETE-TASK-DEBUG] Failed to update thumbnail in parameters:`, thumbnailUpdateError);
+            } else {
+              console.log(`[COMPLETE-TASK-DEBUG] Successfully ensured thumbnail_url is in task parameters`);
+            }
+          }
+        }
+      } catch (thumbnailParamError) {
+        console.error(`[COMPLETE-TASK-DEBUG] Error adding thumbnail to parameters:`, thumbnailParamError);
+        // Continue anyway - don't fail task completion
+      }
     }
     
     // 9) Update the database with the public URL
@@ -337,6 +459,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
     const responseData = {
       success: true,
       public_url: publicUrl,
+      thumbnail_url: thumbnailUrl,
       message: "Task completed and file uploaded successfully"
     };
     console.log(`[COMPLETE-TASK-DEBUG] Returning success response: ${JSON.stringify(responseData)}`);

@@ -77,6 +77,13 @@ const FileInput: React.FC<FileInputProps> = ({
         toast.info("Multiple files selected, but only the first one will be used as 'multiple' is not enabled.");
         setInternalFiles([validFiles[0]]);
         onFileChange([validFiles[0]]);
+      } else if (multiple) {
+        // For multiple mode, append new files to existing ones
+        setInternalFiles(prevFiles => {
+          const newFiles = [...prevFiles, ...validFiles];
+          onFileChange(newFiles);
+          return newFiles;
+        });
       } else {
         setInternalFiles(validFiles);
         onFileChange(validFiles);
@@ -101,6 +108,14 @@ const FileInput: React.FC<FileInputProps> = ({
       fileInputRef.current.value = "";
     }
   }, [onFileChange, onFileRemove]);
+
+  const handleRemoveFile = useCallback((indexToRemove: number) => {
+    setInternalFiles(prevFiles => {
+      const newFiles = prevFiles.filter((_, index) => index !== indexToRemove);
+      onFileChange(newFiles);
+      return newFiles;
+    });
+  }, [onFileChange]);
 
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     handleFilesSelect(event.target.files);
@@ -139,11 +154,11 @@ const FileInput: React.FC<FileInputProps> = ({
       <div
         className={`border-2 border-dashed rounded-md p-6 text-center
                     ${isDraggingOver ? 'border-primary bg-primary/10' : 'border-muted-foreground/30'}
-                    ${(disabled || (internalFiles.length > 0 && !multiple)) ? 'cursor-not-allowed bg-muted/50' : 'cursor-pointer hover:border-muted-foreground/50'}`}
+                    ${disabled ? 'cursor-not-allowed bg-muted/50' : 'cursor-pointer hover:border-muted-foreground/50'}`}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        onClick={() => !disabled && !(internalFiles.length > 0 && !multiple) && fileInputRef.current?.click()}
+        onClick={() => !disabled && fileInputRef.current?.click()}
       >
         <Input
           id="file-input-element"
@@ -152,7 +167,7 @@ const FileInput: React.FC<FileInputProps> = ({
           accept={acceptedMimeTypes}
           onChange={handleInputChange}
           className="hidden"
-          disabled={disabled || (internalFiles.length > 0 && !multiple && !onFileRemove)}
+          disabled={disabled}
           multiple={multiple}
         />
         {displayFiles.length === 0 && (
@@ -165,55 +180,66 @@ const FileInput: React.FC<FileInputProps> = ({
           </div>
         )}
         {displayFiles.length > 0 && (
-          <div className="relative group space-y-2">
-            {displayFiles.length > 1 && (
-                <div className="text-sm text-muted-foreground p-2 border rounded-md bg-background">
-                    {displayFiles.length} files selected. First file: {cropFilename(displayFiles[0].name)}
-                </div>
-            )}
-            {displayFiles.length === 1 && displayPreviewUrls[0] && (
-                displayFiles[0].type.startsWith('image/') ? (
-                <img
-                    src={displayPreviewUrls[0]}
-                    alt={displayFiles[0].name || 'Preview'}
-                    className="rounded-md max-h-48 w-auto mx-auto object-contain"
-                />
-                ) : displayFiles[0].type.startsWith('video/') ? (
-                <video
-                    src={displayPreviewUrls[0]}
-                    controls
-                    className="rounded-md max-h-48 w-auto mx-auto"
-                >
-                    Your browser does not support the video tag.
-                </video>
-                ) : (
-                    <div className="mt-2 border rounded-md p-2 h-32 flex items-center justify-center bg-muted max-w-xs mx-auto">
-                        <FileText className="h-8 w-8 text-muted-foreground mr-2" />
-                        <p className="text-xs text-muted-foreground truncate" title={displayFiles[0].name}>
-                          {cropFilename(displayFiles[0].name)}
-                        </p> 
+          <div className="space-y-2">
+            <div className="text-sm text-muted-foreground p-2 border rounded-md bg-background text-center">
+                {displayFiles.length} file{displayFiles.length === 1 ? '' : 's'} selected
+                {multiple && !disabled && (
+                  <span className="block text-xs mt-1 text-primary">
+                    <ImagePlus className="inline h-3 w-3 mr-1" />
+                    Click or drag to add more
+                  </span>
+                )}
+            </div>
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-48 overflow-y-auto">
+                {displayFiles.map((file, index) => (
+                    <div key={index} className="relative group">
+                        {file.type.startsWith('image/') && displayPreviewUrls[index] ? (
+                            <img
+                                src={displayPreviewUrls[index]}
+                                alt={file.name || `Preview ${index + 1}`}
+                                className="w-full h-16 object-cover rounded border"
+                            />
+                        ) : file.type.startsWith('video/') && displayPreviewUrls[index] ? (
+                            <div className="w-full h-16 bg-gray-200 rounded border flex items-center justify-center">
+                                <VideoIcon className="h-6 w-6 text-gray-500" />
+                            </div>
+                        ) : (
+                            <div className="w-full h-16 bg-gray-200 rounded border flex items-center justify-center">
+                                <FileText className="h-6 w-6 text-gray-500" />
+                            </div>
+                        )}
+                        {!disabled && (
+                            <Button
+                                variant="destructive"
+                                size="icon"
+                                className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity h-5 w-5"
+                                onClick={(e) => {
+                                    e.stopPropagation(); 
+                                    handleRemoveFile(index);
+                                }}
+                                aria-label={`Remove ${file.name}`}
+                            >
+                                <X className="h-3 w-3" />
+                            </Button>
+                        )}
+                        <p className="text-xs text-muted-foreground mt-1 truncate text-center" title={file.name}>
+                          {cropFilename(file.name)}
+                        </p>
                     </div>
-                )
-            )}
-            
+                ))}
+            </div>
             {!disabled && (
                 <Button
-                variant="destructive"
-                size="icon"
-                className="absolute top-1 right-1 opacity-70 group-hover:opacity-100 transition-opacity h-7 w-7"
-                onClick={(e) => {
-                    e.stopPropagation(); 
-                    handleRemoveAllFiles();
-                }}
-                aria-label="Remove all files"
+                    variant="outline"
+                    size="sm"
+                    onClick={(e) => {
+                        e.stopPropagation(); 
+                        handleRemoveAllFiles();
+                    }}
+                    className="w-full"
                 >
-                <X className="h-4 w-4" />
+                    Remove All Files
                 </Button>
-            )}
-             {displayFiles.length === 1 && displayFiles[0].name && (
-              <p className="text-xs text-muted-foreground mt-1 truncate" title={displayFiles[0].name}>
-                {cropFilename(displayFiles[0].name)}
-              </p>
             )}
           </div>
         )}

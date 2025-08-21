@@ -187,7 +187,7 @@ export async function fetchGenerations(
     const baseItem = {
       id: item.id,
       url: item.location,
-      thumbUrl: item.location, // Use main location as thumbnail fallback
+      thumbUrl: item.thumbnail_url || item.location, // Use thumbnail_url if available, fallback to main location
       prompt: item.params?.originalParams?.orchestrator_details?.prompt || 
               item.params?.prompt || 
               item.metadata?.prompt || 

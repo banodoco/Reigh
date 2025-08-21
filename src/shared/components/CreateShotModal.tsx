@@ -37,9 +37,16 @@ const CreateShotModal: React.FC<CreateShotModalProps> = ({
     if (!finalShotName) {
       finalShotName = defaultShotName || 'Untitled Shot';
     }
-    await onSubmit(finalShotName, files);
-    setShotName('');
-    setFiles([]);
+    try {
+      await onSubmit(finalShotName, files);
+      // Only clear the form and close if submission was successful
+      setShotName('');
+      setFiles([]);
+      onClose();
+    } catch (error) {
+      // Let the parent component handle the error display
+      console.error('Shot creation failed:', error);
+    }
   };
 
   const handleClose = () => {

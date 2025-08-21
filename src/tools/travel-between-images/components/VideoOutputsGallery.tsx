@@ -78,9 +78,14 @@ const VideoItem = React.memo<VideoItemProps>(({
   const [shouldLoad, setShouldLoad] = useState(isFirstVideo); // First video loads immediately
   const [videoMetadataLoaded, setVideoMetadataLoaded] = useState(false);
   const [videoPosterLoaded, setVideoPosterLoaded] = useState(false);
+  const [thumbnailLoaded, setThumbnailLoaded] = useState(false);
+  const [thumbnailError, setThumbnailError] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const posterFallbackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasTriggeredLoadRef = useRef(false); // Prevent multiple load() calls
+  
+  // Check if we have a thumbnail URL that's different from the main video URL
+  const hasThumbnail = video.thumbUrl && video.thumbUrl !== video.location && video.thumbUrl !== video.imageUrl;
   
   // Helper function to safely trigger load only once
   const triggerLoadOnce = useCallback((reason: string) => {
@@ -257,27 +262,59 @@ const VideoItem = React.memo<VideoItemProps>(({
   // Log state changes (throttled to reduce spam)
   const lastLoggedStateRef = useRef<string>('');
   useEffect(() => {
-    const currentState = `${shouldLoad}-${videoPosterLoaded}-${videoMetadataLoaded}`;
+    const currentState = `${shouldLoad}-${videoPosterLoaded}-${videoMetadataLoaded}-${thumbnailLoaded}-${hasThumbnail}`;
     if (currentState !== lastLoggedStateRef.current) {
       console.log(`[VideoLoadProcess] 📊 Video ${index + 1} state:`, {
         shouldLoad,
         videoPosterLoaded,
         videoMetadataLoaded,
+        thumbnailLoaded,
+        hasThumbnail,
+        thumbnailUrl: video.thumbUrl,
         videoId: video.id
       });
       lastLoggedStateRef.current = currentState;
     }
-  }, [shouldLoad, videoPosterLoaded, videoMetadataLoaded, index, video.id]);
+  }, [shouldLoad, videoPosterLoaded, videoMetadataLoaded, thumbnailLoaded, hasThumbnail, index, video.id, video.thumbUrl]);
   
   return (
     <div className="w-1/2 lg:w-1/3 px-1 sm:px-1.5 md:px-2 mb-2 sm:mb-3 md:mb-4 relative group">
       <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden shadow-sm border relative">
-        {/* Loading placeholder - shows until video poster is ready */}
-        {!videoPosterLoaded && (
-          <div className="absolute inset-0 bg-gray-200 flex items-center justify-center">
+        {/* Thumbnail - shows immediately if available, before video loads */}
+        {hasThumbnail && !thumbnailError && (
+          <img
+            src={video.thumbUrl}
+            alt="Video thumbnail"
+            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
+              videoPosterLoaded ? 'opacity-0' : 'opacity-100'
+            }`}
+            onLoad={() => {
+              setThumbnailLoaded(true);
+              console.log(`[ThumbnailLoad] Video ${index + 1} thumbnail loaded:`, {
+                videoId: video.id,
+                thumbnailUrl: video.thumbUrl,
+                timestamp: Date.now()
+              });
+            }}
+            onError={() => {
+              setThumbnailError(true);
+              console.warn(`[ThumbnailLoad] Video ${index + 1} thumbnail failed to load:`, {
+                videoId: video.id,
+                thumbnailUrl: video.thumbUrl,
+                timestamp: Date.now()
+              });
+            }}
+          />
+        )}
+        
+        {/* Loading placeholder - shows until thumbnail or video poster is ready */}
+        {!thumbnailLoaded && !videoPosterLoaded && (
+          <div className="absolute inset-0 bg-gray-200 flex items-center justify-center z-10">
             <div className="flex flex-col items-center space-y-2">
               <div className="w-6 h-6 border-2 border-gray-400 border-t-gray-600 rounded-full animate-spin"></div>
-              <div className="text-gray-500 text-xs">Loading video...</div>
+              <div className="text-gray-500 text-xs">
+                {hasThumbnail ? 'Loading thumbnail...' : 'Loading video...'}
+              </div>
             </div>
           </div>
         )}
@@ -289,7 +326,9 @@ const VideoItem = React.memo<VideoItemProps>(({
             <HoverScrubVideo
               src={video.location || video.imageUrl}
               preload={shouldPreload as 'auto' | 'metadata' | 'none'}
-              className="w-full h-full"
+              className={`w-full h-full transition-opacity duration-300 ${
+                videoPosterLoaded ? 'opacity-100' : 'opacity-0'
+              }`}
               videoClassName="object-cover cursor-pointer"
               data-video-id={video.id}
               // Interaction events
@@ -604,6 +643,14 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   const videoOutputs = useMemo(() => {
     if (!(generationsData as any)?.items) return [];
     
+    // Debug log the raw data structure to see thumbnails
+    console.log('[ThumbnailDebug] Raw generationsData.items:', {
+      itemCount: (generationsData as any).items.length,
+      firstItem: (generationsData as any).items[0],
+      itemsWithThumbs: (generationsData as any).items.filter((item: any) => item.thumbUrl && item.thumbUrl !== item.url).length,
+      timestamp: Date.now()
+    });
+    
     // Transform to GenerationRow format for compatibility
     return ((generationsData as any).items as any[]).map((item: any) => ({
       id: item.id,
@@ -647,7 +694,10 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
         type: video.type,
         createdAt: (video as any).created_at,
         hasTaskId: !!(video as any).taskId,
-        shotImageEntryId: (video as any).shotImageEntryId
+        shotImageEntryId: (video as any).shotImageEntryId,
+        thumbUrl: video.thumbUrl,
+        location: video.location,
+        hasThumbnail: video.thumbUrl && video.thumbUrl !== video.location && video.thumbUrl !== video.imageUrl
       }))
     });
   }, [videoOutputs, enhancedVideoOutputs, currentPage, isLoadingGenerations, generationsError, generationsData]);

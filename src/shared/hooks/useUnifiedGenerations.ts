@@ -133,6 +133,7 @@ async function fetchShotSpecificGenerations({
       generation:generations(
         id,
         location,
+        thumbnail_url,
         type,
         created_at,
         params,
@@ -202,7 +203,7 @@ async function fetchShotSpecificGenerations({
       const baseItem: GenerationWithTask = {
         id: gen.id,
         url: gen.location,
-        thumbUrl: gen.location, // Use main location as thumbnail fallback
+        thumbUrl: gen.thumbnail_url || gen.location, // Use thumbnail_url if available, fallback to main location
         isVideo: gen.type?.includes('video'),
         createdAt: gen.created_at,
         starred: gen.starred || false,

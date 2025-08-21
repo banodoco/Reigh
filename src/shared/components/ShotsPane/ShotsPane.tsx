@@ -130,7 +130,7 @@ export const ShotsPane: React.FC = () => {
   const navigate = useNavigate();
   const { setCurrentShotId } = useCurrentShot();
   const isMobile = useIsMobile();
-  const { navigateToShotEditor } = useShotNavigation();
+  const { navigateToShotEditor, navigateToShot } = useShotNavigation();
 
   // Check if we're currently on the travel-between-images page
   const isOnTravelBetweenImagesPage = location.pathname === '/tools/travel-between-images';
@@ -162,7 +162,7 @@ export const ShotsPane: React.FC = () => {
       return;
     }
 
-    let createdShotId: string | null = null;
+    let createdShot: any = null;
 
     if (files.length > 0) {
       const result = await handleExternalImageDropMutation.mutateAsync({
@@ -171,37 +171,34 @@ export const ShotsPane: React.FC = () => {
         currentProjectQueryKey: selectedProjectId,
         currentShotCount: shots?.length ?? 0
       });
-      createdShotId = result?.shotId || null;
+      const createdShotId = result?.shotId || null;
+      // For file uploads, we need to find the shot after the mutation completes
+      if (createdShotId) {
+        // The shot should be available in the cache after the mutation
+        const updatedShots = shots?.concat() || [];
+        createdShot = updatedShots.find(shot => shot.id === createdShotId) || { id: createdShotId, name: shotName };
+      }
     } else {
       const newShotResult = await createShotMutation.mutateAsync({ name: shotName, projectId: selectedProjectId });
-      createdShotId = newShotResult?.shot?.id || null;
+      createdShot = newShotResult?.shot || null;
     }
 
-    setIsCreateModalOpen(false);
-
     // Apply project defaults to the newly created shot if available
-    if (createdShotId && (projectSettings || projectUISettings)) {
+    if (createdShot?.id && (projectSettings || projectUISettings)) {
       const defaultsToApply = {
         ...(projectSettings || {}),
         // Include UI settings in a special key that will be handled separately
         _uiSettings: projectUISettings || {}
       };
       // Store the new shot ID to apply defaults when settings load
-      sessionStorage.setItem(`apply-project-defaults-${createdShotId}`, JSON.stringify(defaultsToApply));
-      console.log('[ShotsPane] Marked shot for project defaults application:', createdShotId);
+      sessionStorage.setItem(`apply-project-defaults-${createdShot.id}`, JSON.stringify(defaultsToApply));
+      console.log('[ShotsPane] Marked shot for project defaults application:', createdShot.id);
     }
 
-    // If a shot was successfully created, we purposely *do not* auto-navigate or
-    // switch the current shot here. This keeps the user in their current
-    // context (e.g. continuing to work on another shot or different tool)
-    // and simply lets the list refresh to show the new shot.
-    //
-    // NOTE: Users can still click the new shot manually or use the "See All"
-    // button to jump to the full Travel Between Images editor when they
-    // actually want to open it.
-    //
-    // setCurrentShotId(createdShotId);
-    // navigate('/tools/travel-between-images', { state: { fromShotClick: true } });
+    // Navigate to the newly created shot
+    if (createdShot) {
+      navigateToShot(createdShot, { closeMobilePanes: true });
+    }
   };
 
   return (

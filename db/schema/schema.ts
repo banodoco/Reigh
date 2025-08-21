@@ -52,6 +52,7 @@ export const generations = pgTable('generations', {
   params: jsonb('params'), // Generation parameters and metadata
   location: text('location'), // URL/path to the generated content
   type: text('type'), // 'image', 'video', etc.
+  thumbnailUrl: text('thumbnail_url'), // URL to thumbnail image extracted from task parameters
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }),
   projectId: uuid('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),

@@ -796,8 +796,7 @@ const VideoTravelToolPage: React.FC = () => {
         sessionStorage.setItem(`apply-project-defaults-${newShot.id}`, JSON.stringify(defaultsToApply));
       }
       
-      // Close the modal
-      setIsCreateShotModalOpen(false);
+      // Modal will auto-close on successful submission
     } catch (error) {
       console.error("[VideoTravelToolPage] Error creating shot:", error);
     }
