@@ -275,7 +275,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
             .single();
           
           if (shotError || !shotData) {
-            console.log(`[COMPLETE-TASK-DEBUG] Shot ${shotId} does not exist, removing from task parameters`);
+            console.log(`[COMPLETE-TASK-DEBUG] Shot ${shotId} does not exist (error: ${shotError?.message || 'not found'}), removing from task parameters`);
             needsParamsUpdate = true;
             
             // Remove shot_id from parameters
@@ -435,19 +435,36 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
         if (isFinalTask && params?.orchestrator_task_id_ref) {
           console.log(`[COMPLETE-TASK-DEBUG] Task ${taskIdString} is a final ${task_type} task. Marking orchestrator ${params.orchestrator_task_id_ref} as complete.`);
           // Update the orchestrator task to Complete status with the same output location
-          const orchestratorIdString = String(params.orchestrator_task_id_ref);
-          console.log(`[COMPLETE-TASK-DEBUG] Orchestrator ID string: ${orchestratorIdString}, type: ${typeof orchestratorIdString}`);
-          const { error: orchError } = await supabaseAdmin.from("tasks").update({
-            status: "Complete",
-            output_location: publicUrl,
-            generation_processed_at: new Date().toISOString()
-          }).eq("id", orchestratorIdString).eq("status", "In Progress"); // Only update if still in progress
-          if (orchError) {
-            console.error(`[COMPLETE-TASK-DEBUG] Failed to update orchestrator ${params.orchestrator_task_id_ref}:`, orchError);
-            console.error(`[COMPLETE-TASK-DEBUG] Orchestrator error details:`, JSON.stringify(orchError, null, 2));
-          // Don't fail the whole request, just log the error
+          // Ensure orchestrator_task_id_ref is properly extracted as a string from JSONB
+          let orchestratorIdString;
+          if (typeof params.orchestrator_task_id_ref === 'string') {
+            orchestratorIdString = params.orchestrator_task_id_ref;
+          } else if (typeof params.orchestrator_task_id_ref === 'object' && params.orchestrator_task_id_ref !== null) {
+            // If it's wrapped in an object, try to extract the actual UUID
+            orchestratorIdString = String(params.orchestrator_task_id_ref.id || params.orchestrator_task_id_ref.uuid || params.orchestrator_task_id_ref);
           } else {
-            console.log(`[COMPLETE-TASK-DEBUG] Successfully marked orchestrator ${params.orchestrator_task_id_ref} as complete.`);
+            orchestratorIdString = String(params.orchestrator_task_id_ref);
+          }
+          console.log(`[COMPLETE-TASK-DEBUG] Orchestrator ID string: ${orchestratorIdString}, type: ${typeof orchestratorIdString}, original type: ${typeof params.orchestrator_task_id_ref}`);
+          
+          // Validate UUID format before using in query
+          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+          if (!uuidRegex.test(orchestratorIdString)) {
+            console.error(`[COMPLETE-TASK-DEBUG] Invalid UUID format for orchestrator: ${orchestratorIdString}`);
+            // Don't attempt the update with invalid UUID
+          } else {
+            const { error: orchError } = await supabaseAdmin.from("tasks").update({
+              status: "Complete",
+              output_location: publicUrl,
+              generation_processed_at: new Date().toISOString()
+            }).eq("id", orchestratorIdString).eq("status", "In Progress"); // Only update if still in progress
+            if (orchError) {
+              console.error(`[COMPLETE-TASK-DEBUG] Failed to update orchestrator ${params.orchestrator_task_id_ref}:`, orchError);
+              console.error(`[COMPLETE-TASK-DEBUG] Orchestrator error details:`, JSON.stringify(orchError, null, 2));
+            // Don't fail the whole request, just log the error
+            } else {
+              console.log(`[COMPLETE-TASK-DEBUG] Successfully marked orchestrator ${params.orchestrator_task_id_ref} as complete.`);
+            }
           }
         }
       }
