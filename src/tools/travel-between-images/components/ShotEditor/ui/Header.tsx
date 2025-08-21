@@ -90,7 +90,7 @@ export const Header: React.FC<HeaderProps> = ({
               </Button>
               
               <span 
-                className={`text-2xl font-normal text-primary truncate px-3 w-[300px] ${onUpdateShotName ? 'cursor-pointer hover:underline' : ''}`}
+                className={`text-2xl font-normal text-primary truncate px-3 w-[200px] text-center ${onUpdateShotName ? 'cursor-pointer hover:underline' : ''}`}
                 onClick={onNameClick}
                 title={onUpdateShotName ? "Click to edit shot name" : selectedShot?.name || 'Untitled Shot'}
               >
