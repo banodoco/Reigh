@@ -89,16 +89,51 @@ const VideoItem = React.memo<VideoItemProps>(({
   
   // Helper function to safely trigger load only once
   const triggerLoadOnce = useCallback((reason: string) => {
+    console.log(`🎬 [VideoLifecycle] Video ${index + 1} - TRIGGER_LOAD_ATTEMPT:`, {
+      videoId: video.id,
+      phase: 'TRIGGER_LOAD_ATTEMPT',
+      reason,
+      hasTriggeredLoad: hasTriggeredLoadRef.current,
+      hasVideoRef: !!videoRef.current,
+      shouldPreload,
+      willTriggerLoad: !hasTriggeredLoadRef.current && videoRef.current && shouldPreload === 'none',
+      timestamp: Date.now()
+    });
+    
     if (!hasTriggeredLoadRef.current && videoRef.current && shouldPreload === 'none') {
       hasTriggeredLoadRef.current = true;
       videoRef.current.load();
+      
+      console.log(`🎬 [VideoLifecycle] Video ${index + 1} - VIDEO_LOAD_TRIGGERED:`, {
+        videoId: video.id,
+        phase: 'VIDEO_LOAD_TRIGGERED',
+        reason,
+        videoSrc: videoRef.current.src,
+        timestamp: Date.now()
+      });
     }
-  }, [index, shouldPreload]);
+  }, [index, shouldPreload, video.id]);
   
-  // Log initial mount (debug only)
+  // Log component mount/unmount (debug only)
   useEffect(() => {
     if (process.env.NODE_ENV === 'development') {
-      console.log(`[VideoLoad] Video ${index + 1} ${isFirstVideo ? 'priority' : 'delayed'}`);
+      console.log(`🎬 [VideoLifecycle] Video ${index + 1} - COMPONENT_MOUNTED:`, {
+        videoId: video.id,
+        phase: 'COMPONENT_MOUNTED',
+        isFirstVideo,
+        priority: isFirstVideo ? 'priority' : 'delayed',
+        timestamp: Date.now()
+      });
+      
+      // Return cleanup function to track unmounts
+      return () => {
+        console.log(`🎬 [VideoLifecycle] Video ${index + 1} - COMPONENT_UNMOUNTED:`, {
+          videoId: video.id,
+          phase: 'COMPONENT_UNMOUNTED',
+          reason: 'Component destroyed/re-rendered',
+          timestamp: Date.now()
+        });
+      };
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   
@@ -128,13 +163,27 @@ const VideoItem = React.memo<VideoItemProps>(({
       const container = document.querySelector(`[data-video-id="${video.id}"]`);
       const videoElement = container?.querySelector('video') as HTMLVideoElement | null;
       
+      console.log(`🎬 [VideoLifecycle] Video ${index + 1} - VIDEO_ELEMENT_SEARCH:`, {
+        videoId: video.id,
+        phase: 'VIDEO_ELEMENT_SEARCH',
+        containerFound: !!container,
+        videoElementFound: !!videoElement,
+        containerSelector: `[data-video-id="${video.id}"]`,
+        videoSrc: videoElement?.src || 'NO_SRC',
+        shouldPreload: shouldPreload,
+        videoReadyState: videoElement?.readyState || 'NO_ELEMENT',
+        isFirstVideo: isFirstVideo,
+        timestamp: Date.now()
+      });
+      
       if (videoElement) {
         videoRef.current = videoElement;
         
         // Add our loading optimization event listeners
         const handleLoadStart = () => {
-          console.log(`[VideoLoadProcess] 📡 Video ${index + 1} load started:`, {
+          console.log(`🎬 [VideoLifecycle] Video ${index + 1} - VIDEO_LOAD_STARTED:`, {
             videoId: video.id,
+            phase: 'VIDEO_LOAD_STARTED',
             src: videoElement.src,
             preload: shouldPreload,
             timestamp: Date.now()
@@ -142,8 +191,9 @@ const VideoItem = React.memo<VideoItemProps>(({
         };
         
         const handleLoadedMetadata = () => {
-          console.log(`[VideoLoadProcess] ✅ Video ${index + 1} metadata loaded:`, {
+          console.log(`🎬 [VideoLifecycle] Video ${index + 1} - VIDEO_METADATA_LOADED:`, {
             videoId: video.id,
+            phase: 'VIDEO_METADATA_LOADED',
             duration: videoElement?.duration,
             dimensions: `${videoElement?.videoWidth}x${videoElement?.videoHeight}`,
             timestamp: Date.now()
@@ -156,8 +206,10 @@ const VideoItem = React.memo<VideoItemProps>(({
           }
           posterFallbackTimeoutRef.current = setTimeout(() => {
             if (!videoPosterLoaded) {
-              console.log(`[VideoLoadProcess] ⏰ Video ${index + 1} poster fallback triggered (onLoadedData didn't fire):`, {
+              console.log(`🎬 [VideoLifecycle] Video ${index + 1} - VIDEO_POSTER_FALLBACK:`, {
                 videoId: video.id,
+                phase: 'VIDEO_POSTER_FALLBACK',
+                reason: 'onLoadedData did not fire within 2 seconds',
                 readyState: videoElement?.readyState,
                 networkState: videoElement?.networkState,
                 timestamp: Date.now()
@@ -168,10 +220,12 @@ const VideoItem = React.memo<VideoItemProps>(({
         };
         
         const handleLoadedData = () => {
-          console.log(`[VideoLoadProcess] 🖼️ Video ${index + 1} first frame loaded (poster ready):`, {
+          console.log(`🎬 [VideoLifecycle] Video ${index + 1} - VIDEO_POSTER_LOADED:`, {
             videoId: video.id,
+            phase: 'VIDEO_POSTER_LOADED',
             currentTime: videoElement?.currentTime,
             readyState: videoElement?.readyState,
+            nextPhase: 'Will transition to VIDEO_READY',
             timestamp: Date.now()
           });
           setVideoPosterLoaded(true);
@@ -183,11 +237,13 @@ const VideoItem = React.memo<VideoItemProps>(({
         };
         
         const handleSuspend = () => {
-          console.warn(`[VideoLoadProcess] ⏸️ Video ${index + 1} loading suspended:`, {
+          console.warn(`🎬 [VideoLifecycle] Video ${index + 1} - VIDEO_LOADING_SUSPENDED:`, {
             videoId: video.id,
+            phase: 'VIDEO_LOADING_SUSPENDED',
             readyState: videoElement?.readyState,
             networkState: videoElement?.networkState,
             preload: shouldPreload,
+            recovery: 'Will retry in 500ms if readyState=0',
             timestamp: Date.now()
           });
           
@@ -199,15 +255,18 @@ const VideoItem = React.memo<VideoItemProps>(({
         };
         
         const handleCanPlay = () => {
-          console.log(`[VideoLoadProcess] 🎬 Video ${index + 1} can play:`, {
+          console.log(`🎬 [VideoLifecycle] Video ${index + 1} - VIDEO_CAN_PLAY:`, {
             videoId: video.id,
+            phase: 'VIDEO_CAN_PLAY',
             readyState: videoElement?.readyState,
             timestamp: Date.now()
           });
           
           if (!videoPosterLoaded && shouldPreload === 'none') {
-            console.log(`[VideoLoadProcess] 🎯 Video ${index + 1} canPlay fallback for preload=none:`, {
+            console.log(`🎬 [VideoLifecycle] Video ${index + 1} - VIDEO_CANPLAY_FALLBACK:`, {
               videoId: video.id,
+              phase: 'VIDEO_CANPLAY_FALLBACK',
+              reason: 'preload=none fallback trigger',
               triggeredBy: 'onCanPlay',
               timestamp: Date.now()
             });
@@ -228,10 +287,48 @@ const VideoItem = React.memo<VideoItemProps>(({
         videoElement.addEventListener('canplay', handleCanPlay);
         
         // Trigger manual loading for preload="none" videos
+        console.log(`🎬 [VideoLifecycle] Video ${index + 1} - PRELOAD_CHECK:`, {
+          videoId: video.id,
+          phase: 'PRELOAD_CHECK',
+          shouldPreload: shouldPreload,
+          willTriggerManualLoad: shouldPreload === 'none',
+          videoReadyState: videoElement.readyState,
+          timestamp: Date.now()
+        });
+        
+        // Check if video is already loaded (readyState >= 2 means metadata is loaded)
+        if (videoElement.readyState >= 2) {
+          console.log(`🎬 [VideoLifecycle] Video ${index + 1} - VIDEO_ALREADY_LOADED:`, {
+            videoId: video.id,
+            phase: 'VIDEO_ALREADY_LOADED',
+            readyState: videoElement.readyState,
+            readyStateText: videoElement.readyState === 4 ? 'HAVE_ENOUGH_DATA' : 
+                           videoElement.readyState === 3 ? 'HAVE_FUTURE_DATA' : 
+                           videoElement.readyState === 2 ? 'HAVE_CURRENT_DATA' : 'UNKNOWN',
+            willSetStates: true,
+            timestamp: Date.now()
+          });
+          
+          // Video is already loaded, update our state immediately
+          setVideoMetadataLoaded(true);
+          if (videoElement.readyState >= 3) {
+            setVideoPosterLoaded(true);
+          }
+        }
+        
         if (shouldPreload === 'none') {
           setTimeout(() => {
             triggerLoadOnce('(HoverScrubVideo integration)');
           }, 50);
+        } else {
+          console.log(`🎬 [VideoLifecycle] Video ${index + 1} - AUTO_PRELOAD_EXPECTED:`, {
+            videoId: video.id,
+            phase: 'AUTO_PRELOAD_EXPECTED',
+            shouldPreload: shouldPreload,
+            message: 'Video should start loading automatically with this preload setting',
+            videoReadyState: videoElement.readyState,
+            timestamp: Date.now()
+          });
         }
         
         // Store cleanup function
@@ -242,6 +339,15 @@ const VideoItem = React.memo<VideoItemProps>(({
           videoElement.removeEventListener('suspend', handleSuspend);
           videoElement.removeEventListener('canplay', handleCanPlay);
         };
+      } else {
+        console.warn(`🎬 [VideoLifecycle] Video ${index + 1} - VIDEO_ELEMENT_NOT_FOUND:`, {
+          videoId: video.id,
+          phase: 'VIDEO_ELEMENT_NOT_FOUND',
+          issue: 'HoverScrubVideo did not create video element',
+          containerFound: !!container,
+          retryIn: 'Will retry in next render cycle',
+          timestamp: Date.now()
+        });
       }
     }, 100); // Small delay to ensure HoverScrubVideo has rendered
     
@@ -259,23 +365,64 @@ const VideoItem = React.memo<VideoItemProps>(({
     };
   }, []);
   
+  // 🎬 UNIFIED VIDEO LOADING TRACKER - Use `[VideoLifecycle]` to follow complete loading journey
+  // Phases: INITIALIZED → WAITING_TO_LOAD → THUMBNAIL_LOADED → VIDEO_LOADING_WITH_THUMBNAIL → VIDEO_READY
+  // Or: INITIALIZED → WAITING_TO_LOAD → VIDEO_LOADING → VIDEO_READY (no thumbnail)
   // Log state changes (throttled to reduce spam)
   const lastLoggedStateRef = useRef<string>('');
   useEffect(() => {
     const currentState = `${shouldLoad}-${videoPosterLoaded}-${videoMetadataLoaded}-${thumbnailLoaded}-${hasThumbnail}`;
     if (currentState !== lastLoggedStateRef.current) {
-      console.log(`[VideoLoadProcess] 📊 Video ${index + 1} state:`, {
+      // Determine loading phase for clearer tracking
+      let phase = 'INITIAL';
+      let readyToShow = false;
+      
+      if (hasThumbnail && thumbnailLoaded && !videoPosterLoaded) {
+        phase = 'THUMBNAIL_READY';
+        readyToShow = true;
+      } else if (!hasThumbnail && !shouldLoad) {
+        phase = 'WAITING_TO_LOAD';
+      } else if (shouldLoad && !videoPosterLoaded && !hasThumbnail) {
+        phase = 'VIDEO_LOADING';
+      } else if (shouldLoad && !videoPosterLoaded && hasThumbnail && thumbnailLoaded) {
+        phase = 'VIDEO_LOADING_WITH_THUMBNAIL';
+      } else if (videoPosterLoaded) {
+        phase = 'VIDEO_READY';
+        readyToShow = true;
+      }
+      
+      console.log(`🎬 [VideoLifecycle] Video ${index + 1} - ${phase}:`, {
+        // Core identification
+        videoId: video.id,
+        position: index + 1,
+        phase,
+        readyToShow,
+        
+        // Loading states
         shouldLoad,
         videoPosterLoaded,
         videoMetadataLoaded,
-        thumbnailLoaded,
+        
+        // Thumbnail states
         hasThumbnail,
+        thumbnailLoaded,
+        thumbnailError,
         thumbnailUrl: video.thumbUrl,
-        videoId: video.id
+        
+        // URLs for debugging
+        videoUrl: video.location,
+        
+        // Timing
+        timestamp: Date.now(),
+        
+        // Summary for quick scanning
+        summary: hasThumbnail 
+          ? `Thumbnail: ${thumbnailLoaded ? '✅' : '⏳'} | Video: ${videoPosterLoaded ? '✅' : '⏳'}`
+          : `Video: ${videoPosterLoaded ? '✅' : shouldLoad ? '⏳' : '⏸️'}`
       });
       lastLoggedStateRef.current = currentState;
     }
-  }, [shouldLoad, videoPosterLoaded, videoMetadataLoaded, thumbnailLoaded, hasThumbnail, index, video.id, video.thumbUrl]);
+  }, [shouldLoad, videoPosterLoaded, videoMetadataLoaded, thumbnailLoaded, hasThumbnail, thumbnailError, index, video.id, video.thumbUrl, video.location]);
   
   return (
     <div className="w-1/2 lg:w-1/3 px-1 sm:px-1.5 md:px-2 mb-2 sm:mb-3 md:mb-4 relative group">
@@ -290,17 +437,21 @@ const VideoItem = React.memo<VideoItemProps>(({
             }`}
             onLoad={() => {
               setThumbnailLoaded(true);
-              console.log(`[ThumbnailLoad] Video ${index + 1} thumbnail loaded:`, {
+              console.log(`🎬 [VideoLifecycle] Video ${index + 1} - THUMBNAIL_LOADED:`, {
                 videoId: video.id,
                 thumbnailUrl: video.thumbUrl,
+                phase: 'THUMBNAIL_LOADED',
+                nextPhase: 'Will transition to video when ready',
                 timestamp: Date.now()
               });
             }}
             onError={() => {
               setThumbnailError(true);
-              console.warn(`[ThumbnailLoad] Video ${index + 1} thumbnail failed to load:`, {
+              console.warn(`🎬 [VideoLifecycle] Video ${index + 1} - THUMBNAIL_FAILED:`, {
                 videoId: video.id,
                 thumbnailUrl: video.thumbUrl,
+                phase: 'THUMBNAIL_FAILED',
+                fallback: 'Will show video loading directly',
                 timestamp: Date.now()
               });
             }}
@@ -980,7 +1131,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   const hasLoggedStrategyRef = useRef(false);
   React.useEffect(() => {
     if (currentVideoOutputs.length > 0 && !hasLoggedStrategyRef.current) {
-      console.log('[VideoLoadProcess] 🎯 Page loading strategy:', {
+      console.log('🎬 [VideoLifecycle] PAGE_LOADING_STRATEGY:', {
         currentPage,
         totalVideosOnPage: currentVideoOutputs.length,
         loadingPlan: currentVideoOutputs.map((video, index) => ({
@@ -1249,6 +1400,8 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
             const originalIndex = startIndex + index;
             const isFirstVideo = index === 0; // Prioritize first video
             const shouldPreload = isFirstVideo ? "metadata" : "none"; // Only preload first video
+            
+            // Video initialization tracked at component level (COMPONENT_MOUNTED)
             
             return (
               <VideoItem
