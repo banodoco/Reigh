@@ -16,6 +16,7 @@ import { SkeletonGallery } from '@/shared/components/ui/skeleton-gallery';
 import { ShotFilter } from '@/shared/components/ShotFilter';
 import { useGenerationsPageLogic } from '@/shared/hooks/useGenerationsPageLogic';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
+import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 
 import { 
   Select,
@@ -39,6 +40,7 @@ export const GenerationsPane: React.FC = () => {
   const isOnImageGenerationPage = location.pathname === '/tools/image-generation';
   
   const isMobile = useIsMobile();
+  const { currentShotId } = useCurrentShot();
 
   // Media type filter state
   const [mediaTypeFilter, setMediaTypeFilter] = useState<'all' | 'image' | 'video'>('image');
@@ -425,6 +427,7 @@ export const GenerationsPane: React.FC = () => {
                 serverPage={page}
                 onServerPageChange={handleServerPageChange}
                 onPrefetchAdjacentPages={handlePrefetchAdjacentPages}
+                currentViewingShotId={currentShotId || undefined}
                 />
             )}
             {paginatedData.items.length === 0 && !isLoading && (

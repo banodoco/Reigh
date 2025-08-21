@@ -103,6 +103,7 @@ interface ImageGalleryProps {
   currentToolType?: string; // Added for filtering
   initialFilterState?: boolean; // Added for default filter state
   onImageSaved?: (imageId: string, newImageUrl: string) => void; // Callback when image is saved with changes
+  currentViewingShotId?: string; // ID of the shot currently being viewed (hides navigation buttons)
   /** Zero-based offset of the first image in `images` relative to the full list after any server-side filtering/pagination. */
   offset?: number;
   /** Total number of items in the full list (after any server-side filtering/pagination but before client-side page slice). */
@@ -277,6 +278,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   currentToolType, 
   initialFilterState = true, 
   onImageSaved, 
+  currentViewingShotId,
   offset = 0, 
   totalCount, 
   whiteText = false, 
@@ -352,8 +354,39 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     return initial;
   });
   const [showTickForImageId, setShowTickForImageId] = useState<string | null>(null);
+  const [showTickForSecondaryImageId, setShowTickForSecondaryImageId] = useState<string | null>(null);
   const [addingToShotImageId, setAddingToShotImageId] = useState<string | null>(null);
   const [addingToShotWithoutPositionImageId, setAddingToShotWithoutPositionImageId] = useState<string | null>(null);
+
+  // Optimistic state to bridge server refresh latency
+  const [optimisticUnpositionedIds, setOptimisticUnpositionedIds] = useState<Set<string>>(new Set());
+  const [optimisticPositionedIds, setOptimisticPositionedIds] = useState<Set<string>>(new Set());
+
+  const markOptimisticUnpositioned = useCallback((imageId: string) => {
+    setOptimisticUnpositionedIds(prev => {
+      const next = new Set(prev);
+      next.add(imageId);
+      return next;
+    });
+    setOptimisticPositionedIds(prev => {
+      const next = new Set(prev);
+      next.delete(imageId);
+      return next;
+    });
+  }, []);
+
+  const markOptimisticPositioned = useCallback((imageId: string) => {
+    setOptimisticPositionedIds(prev => {
+      const next = new Set(prev);
+      next.add(imageId);
+      return next;
+    });
+    setOptimisticUnpositionedIds(prev => {
+      const next = new Set(prev);
+      next.delete(imageId);
+      return next;
+    });
+  }, []);
 
   // Fix race condition: Update selectedShotIdLocal when shots data loads or context changes
   useEffect(() => {
@@ -492,14 +525,43 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
 
   useEffect(() => {
     return () => {
-      if (tickTimeoutRef.current) {
-        clearTimeout(tickTimeoutRef.current);
+      if (mainTickTimeoutRef.current) {
+        clearTimeout(mainTickTimeoutRef.current);
+      }
+      if (secondaryTickTimeoutRef.current) {
+        clearTimeout(secondaryTickTimeoutRef.current);
       }
       if (doubleTapTimeoutRef.current) {
         clearTimeout(doubleTapTimeoutRef.current);
       }
     };
   }, []);
+
+  // Reconcile optimistic state when images update
+  useEffect(() => {
+    const currentImageIds = new Set(images.map(img => img.id));
+    
+    // Clean up optimistic sets - remove IDs for images no longer in the list
+    setOptimisticUnpositionedIds(prev => {
+      const next = new Set<string>();
+      for (const id of prev) {
+        if (currentImageIds.has(id)) {
+          next.add(id);
+        }
+      }
+      return next;
+    });
+    
+    setOptimisticPositionedIds(prev => {
+      const next = new Set<string>();
+      for (const id of prev) {
+        if (currentImageIds.has(id)) {
+          next.add(id);
+        }
+      }
+      return next;
+    });
+  }, [images]);
 
   // Handle mobile double-tap detection
   const handleMobileTap = (image: GeneratedImageWithMetadata) => {
@@ -591,10 +653,18 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
 
   const handleShowTick = (imageId: string) => {
     setShowTickForImageId(imageId);
-    if (tickTimeoutRef.current) clearTimeout(tickTimeoutRef.current);
-    tickTimeoutRef.current = setTimeout(() => {
+    if (mainTickTimeoutRef.current) clearTimeout(mainTickTimeoutRef.current);
+    mainTickTimeoutRef.current = setTimeout(() => {
       setShowTickForImageId(null);
-    }, 2000);
+    }, 1000);
+  };
+
+  const handleShowSecondaryTick = (imageId: string) => {
+    setShowTickForSecondaryImageId(imageId);
+    if (secondaryTickTimeoutRef.current) clearTimeout(secondaryTickTimeoutRef.current);
+    secondaryTickTimeoutRef.current = setTimeout(() => {
+      setShowTickForSecondaryImageId(null);
+    }, 1000);
   };
 
 
@@ -997,7 +1067,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     };
   }, [isMobile, mobilePopoverOpenImageId]);
   
-  const tickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const mainTickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const secondaryTickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Touch handling for mobile double-tap detection
   const lastTouchTimeRef = useRef<number>(0);
@@ -1315,6 +1386,12 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                           simplifiedShotOptions={simplifiedShotOptions}
                           showTickForImageId={showTickForImageId}
                           onShowTick={handleShowTick}
+                          showTickForSecondaryImageId={showTickForSecondaryImageId}
+                          onShowSecondaryTick={handleShowSecondaryTick}
+                          optimisticUnpositionedIds={optimisticUnpositionedIds}
+                          optimisticPositionedIds={optimisticPositionedIds}
+                          onOptimisticUnpositioned={markOptimisticUnpositioned}
+                          onOptimisticPositioned={markOptimisticPositioned}
                           addingToShotImageId={addingToShotImageId}
                           setAddingToShotImageId={setAddingToShotImageId}
                           addingToShotWithoutPositionImageId={addingToShotWithoutPositionImageId}
@@ -1332,6 +1409,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                           isPriority={loadingStrategy.shouldLoadInInitialBatch}
                           isGalleryLoading={isGalleryLoading}
                           onCreateShot={onCreateShot}
+                          currentViewingShotId={currentViewingShotId}
                         />
                       );
                     })}

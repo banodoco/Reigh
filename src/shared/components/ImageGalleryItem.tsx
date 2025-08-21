@@ -45,6 +45,12 @@ interface ImageGalleryItemProps {
   simplifiedShotOptions: { id: string; name: string }[];
   showTickForImageId: string | null;
   onShowTick: (imageId: string) => void;
+  showTickForSecondaryImageId?: string | null;
+  onShowSecondaryTick?: (imageId: string) => void;
+  optimisticUnpositionedIds?: Set<string>;
+  optimisticPositionedIds?: Set<string>;
+  onOptimisticUnpositioned?: (imageId: string) => void;
+  onOptimisticPositioned?: (imageId: string) => void;
   addingToShotImageId: string | null;
   setAddingToShotImageId: (id: string | null) => void;
   addingToShotWithoutPositionImageId?: string | null;
@@ -64,6 +70,7 @@ interface ImageGalleryItemProps {
   isGalleryLoading?: boolean;
   // Shot creation props
   onCreateShot?: (shotName: string, files: File[]) => Promise<void>;
+  currentViewingShotId?: string; // ID of the shot currently being viewed (hides navigation buttons)
 }
 
 export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
@@ -81,6 +88,12 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   simplifiedShotOptions,
   showTickForImageId,
   onShowTick,
+  showTickForSecondaryImageId,
+  onShowSecondaryTick,
+  optimisticUnpositionedIds,
+  optimisticPositionedIds,
+  onOptimisticUnpositioned,
+  onOptimisticPositioned,
   addingToShotImageId,
   setAddingToShotImageId,
   addingToShotWithoutPositionImageId,
@@ -98,6 +111,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   isPriority = false,
   isGalleryLoading = false,
   onCreateShot,
+  currentViewingShotId,
 }) => {
   const { toast } = useToast();
   const { selectedProjectId } = useProject();
@@ -378,9 +392,12 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   const isPlaceholder = !image.id && actualDisplayUrl === "/placeholder.svg";
   const currentTargetShotName = selectedShotIdLocal ? simplifiedShotOptions.find(s => s.id === selectedShotIdLocal)?.name : undefined;
   
-  // Check if image is already positioned in the selected shot
+  // Check if image is already positioned in the selected shot (DB + optimistic)
   const isAlreadyPositionedInSelectedShot = useMemo(() => {
     if (!selectedShotIdLocal || !image.id) return false;
+    
+    // Check optimistic state first
+    if (optimisticPositionedIds?.has(image.id)) return true;
     
     // Optimized: Check single shot first (most common case)
     if (image.shot_id === selectedShotIdLocal) {
@@ -398,7 +415,36 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
     }
     
     return false;
-  }, [selectedShotIdLocal, image.id, image.shot_id, image.position, image.all_shot_associations]);
+  }, [selectedShotIdLocal, image.id, image.shot_id, image.position, image.all_shot_associations, optimisticPositionedIds]);
+
+  // Check if image is already associated with the selected shot WITHOUT position (DB + optimistic)
+  const isAlreadyAssociatedWithoutPosition = useMemo(() => {
+    if (!selectedShotIdLocal || !image.id) return false;
+    
+    // Check optimistic state first
+    if (optimisticUnpositionedIds?.has(image.id)) return true;
+    
+    // Optimized: Check single shot first (most common case)
+    if (image.shot_id === selectedShotIdLocal) {
+      return image.position === null || image.position === undefined;
+    }
+    
+    // Check multiple shot associations only if needed
+    if (image.all_shot_associations) {
+      const matchingAssociation = image.all_shot_associations.find(
+        assoc => assoc.shot_id === selectedShotIdLocal
+      );
+      return matchingAssociation && 
+             (matchingAssociation.position === null || matchingAssociation.position === undefined);
+    }
+    
+    return false;
+  }, [selectedShotIdLocal, image.id, image.shot_id, image.position, image.all_shot_associations, optimisticUnpositionedIds]);
+
+  // Check if we're currently viewing the selected shot (hide buttons if so)
+  const isCurrentlyViewingSelectedShot = useMemo(() => {
+    return currentViewingShotId && selectedShotIdLocal && currentViewingShotId === selectedShotIdLocal;
+  }, [currentViewingShotId, selectedShotIdLocal]);
   
   let aspectRatioPadding = '100%'; 
   let minHeight = '120px'; // Minimum height for very small images
@@ -703,8 +749,23 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                         <Button
                             variant="outline"
                             size="icon"
-                            className={`h-7 w-7 p-0 rounded-full bg-black/50 hover:bg-black/70 text-white ${showTickForImageId === image.id ? 'bg-green-500 hover:bg-green-600 !text-white' : ''}`}
+                            className={`h-7 w-7 p-0 rounded-full bg-black/50 hover:bg-black/70 text-white ${
+                                showTickForImageId === image.id
+                                    ? 'bg-green-500 hover:bg-green-600 !text-white'
+                                    : isAlreadyPositionedInSelectedShot
+                                        ? 'bg-gray-500/60 hover:bg-gray-600/70 !text-white'
+                                        : ''
+                            }`}
                           onClick={async () => {
+                              // If in transient success or already positioned, navigate to shot
+                              if ((showTickForImageId === image.id || isAlreadyPositionedInSelectedShot) && selectedShotIdLocal && simplifiedShotOptions) {
+                                  const targetShot = simplifiedShotOptions.find(s => s.id === selectedShotIdLocal);
+                                  if (targetShot) {
+                                      navigateToShot(targetShot as any, { scrollToTop: true });
+                                      return;
+                                  }
+                              }
+                              
                               console.log('[GenerationsPane] Add to Shot button clicked', {
                                 imageId: image.id,
                                 selectedShotIdLocal,
@@ -714,12 +775,11 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                                 timestamp: Date.now()
                               });
                               
-                              // If already positioned in shot, do nothing
+                              // If already positioned in shot, nothing else to do (navigation already handled)
                               if (isAlreadyPositionedInSelectedShot) {
-                                  console.log('[GenerationsPane] Image already positioned in selected shot - skipping');
                                   return;
                               }
-                              
+
                               if (!selectedShotIdLocal) {
                                   console.log('[GenerationsPane] ❌ No shot selected for adding image');
                                   toast({ title: "Select a Shot", description: "Please select a shot first to add this image.", variant: "destructive" });
@@ -764,6 +824,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                                           if (success) {
                                               console.log(`[GenerationsPane] ✅ Success on attempt ${retryCount + 1} for image ${image.id}`);
                                               onShowTick(image.id!);
+                                              onOptimisticPositioned?.(image.id!);
                                               log('MobileAddToShot', `Success on attempt ${retryCount + 1} for image ${image.id}`);
                                           } else {
                                               console.log(`[GenerationsPane] ❌ Failed on attempt ${retryCount + 1} for image ${image.id}`);
@@ -816,10 +877,10 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                                   setAddingToShotImageId(null);
                               }
                           }}
-                          disabled={!selectedShotIdLocal || showTickForImageId === image.id || addingToShotImageId === image.id || isAlreadyPositionedInSelectedShot}
+                          disabled={!selectedShotIdLocal || addingToShotImageId === image.id}
                           aria-label={
-                              isAlreadyPositionedInSelectedShot ? `Already positioned in ${currentTargetShotName}` :
-                              showTickForImageId === image.id ? `Added to ${currentTargetShotName}` : 
+                              isAlreadyPositionedInSelectedShot ? `Jump to ${currentTargetShotName}` :
+                              showTickForImageId === image.id ? `Jump to ${currentTargetShotName}` : 
                               (currentTargetShotName ? `Add to '${currentTargetShotName}' at final position` : "Add to selected shot")
                           }
                           onPointerDown={(e) => e.stopPropagation()}
@@ -836,39 +897,39 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                       </Button>
                         </TooltipTrigger>
                         <TooltipContent side="bottom">
-                            {isAlreadyPositionedInSelectedShot ? `Already positioned in ${currentTargetShotName || 'shot'}` :
-                            showTickForImageId === image.id ? `Added to ${currentTargetShotName || 'shot'}` :
+                            {isAlreadyPositionedInSelectedShot ? `Jump to ${currentTargetShotName || 'shot'}` :
+                            showTickForImageId === image.id ? `Jump to ${currentTargetShotName || 'shot'}` :
                             (selectedShotIdLocal && currentTargetShotName ? `Add to '${currentTargetShotName}' at final position` : "Select a shot then click to add")}
                         </TooltipContent>
                     </Tooltip>
                     
-                    {/* Add without position button - positioned next to the main button (hide when showing tick or already positioned) */}
-                    {onAddToLastShotWithoutPosition && showTickForImageId !== image.id && !isAlreadyPositionedInSelectedShot && (
+                    {/* Add without position button - hide when positioned, during main button success, while main button is processing, or when currently viewing this shot */}
+                    {onAddToLastShotWithoutPosition && !isAlreadyPositionedInSelectedShot && showTickForImageId !== image.id && addingToShotImageId !== image.id && !isCurrentlyViewingSelectedShot && (
                         <Tooltip delayDuration={0} disableHoverableContent>
                             <TooltipTrigger asChild>
                                 <Button
                                     variant="outline"
                                     size="icon"
-                                    className="absolute -top-1 -right-1 h-4 w-4 p-0 rounded-full bg-black/60 hover:bg-black/80 text-white border-0 scale-75 hover:scale-100 transition-transform duration-200 ease-out"
+                                    className={`absolute -top-1 -right-1 h-4 w-4 p-0 rounded-full border-0 scale-75 hover:scale-100 transition-transform duration-200 ease-out ${
+                                        isAlreadyAssociatedWithoutPosition
+                                            ? 'bg-gray-500/80 hover:bg-gray-600/90 text-white'
+                                            : 'bg-black/60 hover:bg-black/80 text-white'
+                                    }`}
                                     onClick={async () => {
+                                        // If already associated without position, navigate to shot
+                                        if (isAlreadyAssociatedWithoutPosition && selectedShotIdLocal && simplifiedShotOptions) {
+                                            const targetShot = simplifiedShotOptions.find(s => s.id === selectedShotIdLocal);
+                                            if (targetShot) {
+                                                navigateToShot(targetShot as any, { scrollToTop: true });
+                                                return;
+                                            }
+                                        }
                                         console.log('[GenerationsPane] Add to Shot WITHOUT position button clicked', {
                                           imageId: image.id,
                                           selectedShotIdLocal,
                                           simplifiedShotOptions: simplifiedShotOptions.map(s => ({ id: s.id, name: s.name })),
                                           imageUrl: image.url?.substring(0, 50) + '...',
                                           timestamp: Date.now()
-                                        });
-                                        
-                                        if (!selectedShotIdLocal) {
-                                            console.log('[GenerationsPane] ❌ No shot selected for adding image without position');
-                                            toast({ title: "Select a Shot", description: "Please select a shot first to add this image.", variant: "destructive" });
-                                            return;
-                                        }
-                                        
-                                        console.log('[GenerationsPane] 🚀 Starting add to shot WITHOUT position process', {
-                                          imageId: image.id,
-                                          targetShotId: selectedShotIdLocal,
-                                          targetShotName: simplifiedShotOptions.find(s => s.id === selectedShotIdLocal)?.name
                                         });
                                         
                                         setAddingToShotWithoutPositionImageId?.(image.id!);
@@ -896,7 +957,8 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                                                     
                                                     if (success) {
                                                         console.log(`[GenerationsPane] ✅ Success without position on attempt ${retryCount + 1} for image ${image.id}`);
-                                                        onShowTick(image.id!);
+                                                        onShowSecondaryTick?.(image.id!);
+                                                        onOptimisticUnpositioned?.(image.id!);
                                                     } else {
                                                         console.log(`[GenerationsPane] ❌ Failed without position on attempt ${retryCount + 1} for image ${image.id}`);
                                                     }
@@ -907,16 +969,16 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                                                     const isRetryableError = (err: any): boolean => {
                                                         const message = err?.message?.toLowerCase() || '';
                                                         const isNetworkError = message.includes('load failed') || 
-                                                                              message.includes('network error') || 
-                                                                              message.includes('fetch') ||
-                                                                              message.includes('timeout');
+                                                                               message.includes('network error') || 
+                                                                               message.includes('fetch') ||
+                                                                               message.includes('timeout');
                                                         const isServerError = message.includes('unauthorized') || 
-                                                                             message.includes('forbidden') || 
-                                                                             message.includes('not found') ||
-                                                                             message.includes('quota') ||
-                                                                             err?.status === 401 || 
-                                                                             err?.status === 403 || 
-                                                                             err?.status === 404;
+                                                                              message.includes('forbidden') || 
+                                                                              message.includes('not found') ||
+                                                                              message.includes('quota') ||
+                                                                              err?.status === 401 || 
+                                                                              err?.status === 403 || 
+                                                                              err?.status === 404;
                                                         return isNetworkError && !isServerError;
                                                     };
                                                     
@@ -945,21 +1007,27 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                                             setAddingToShotWithoutPositionImageId?.(null);
                                         }
                                     }}
-                                    disabled={!selectedShotIdLocal || showTickForImageId === image.id || addingToShotWithoutPositionImageId === image.id || addingToShotImageId === image.id}
+                                    disabled={!selectedShotIdLocal || addingToShotWithoutPositionImageId === image.id || addingToShotImageId === image.id}
                                     aria-label={
-                                        (currentTargetShotName ? `Add to '${currentTargetShotName}' without position` : "Add to selected shot without position")
+                                        isAlreadyAssociatedWithoutPosition
+                                            ? (currentTargetShotName ? `Jump to ${currentTargetShotName}` : 'Jump to shot')
+                                            : (currentTargetShotName ? `Add to '${currentTargetShotName}' without position` : "Add to selected shot without position")
                                     }
                                     onPointerDown={(e) => e.stopPropagation()}
                                 >
                                     {addingToShotWithoutPositionImageId === image.id ? (
                                         <div className="h-2 w-2 animate-spin rounded-full border-b border-white"></div>
+                                    ) : isAlreadyAssociatedWithoutPosition ? (
+                                        <Check className="h-2 w-2" />
                                     ) : (
                                         <Plus className="h-2 w-2" />
                                     )}
                                 </Button>
                             </TooltipTrigger>
                             <TooltipContent side="bottom">
-                                {selectedShotIdLocal && currentTargetShotName ? `Add to '${currentTargetShotName}' without position` : "Add to selected shot without position"}
+                                {isAlreadyAssociatedWithoutPosition
+                                    ? `Jump to ${currentTargetShotName || 'shot'}`
+                                    : (selectedShotIdLocal && currentTargetShotName ? `Add to '${currentTargetShotName}' without position` : "Add to selected shot without position")}
                             </TooltipContent>
                         </Tooltip>
                     )}
