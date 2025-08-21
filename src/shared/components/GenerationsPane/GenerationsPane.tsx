@@ -67,6 +67,7 @@ export const GenerationsPane: React.FC = () => {
     handleServerPageChange,
     handleDeleteGeneration,
     handleAddToShot,
+    handleAddToShotWithoutPosition,
   } = useGenerationsPageLogic({
     itemsPerPage: GENERATIONS_PER_PAGE,
     mediaType: mediaTypeFilter
@@ -396,6 +397,19 @@ export const GenerationsPane: React.FC = () => {
                         timestamp: Date.now()
                       });
                       return handleAddToShot(generationId, imageUrl);
+                    }}
+                    onAddToLastShotWithoutPosition={(generationId, imageUrl, thumbUrl) => {
+                      console.log('[GenerationsPane] ImageGallery onAddToLastShotWithoutPosition called', {
+                        generationId,
+                        imageUrl: imageUrl?.substring(0, 50) + '...',
+                        thumbUrl: thumbUrl?.substring(0, 50) + '...',
+                        lastAffectedShotId,
+                        selectedShotFilter,
+                        excludePositioned,
+                        shotsAvailable: shotsData?.map(s => ({ id: s.id, name: s.name })),
+                        timestamp: Date.now()
+                      });
+                      return handleAddToShotWithoutPosition(generationId, imageUrl);
                     }}
                     offset={(page - 1) * GENERATIONS_PER_PAGE}
                     totalCount={totalCount}

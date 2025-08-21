@@ -1,6 +1,6 @@
 # Debug Logging & Performance Profiling
 
-> **Status:** ✅ Active (introduced August 2025)
+> **Status:** ✅ Active
 >
 > **Purpose:** Provide high-signal, low-overhead diagnostics to surface performance regressions such as infinite render loops, excessive React-Query invalidations, and long-running cron pollers.
 

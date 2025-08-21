@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { Trash2, Info, Settings, CheckCircle, AlertTriangle, Download, PlusCircle, Check, Sparkles, Star, Eye } from "lucide-react";
+import { Trash2, Info, Settings, CheckCircle, AlertTriangle, Download, PlusCircle, Check, Sparkles, Star, Eye, Link, Plus } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
 import { 
   Tooltip, 
@@ -38,6 +38,7 @@ interface ImageGalleryItemProps {
   onApplySettings?: (metadata: DisplayableMetadata) => void;
   onOpenLightbox: (image: GeneratedImageWithMetadata) => void;
   onAddToLastShot: (generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
+  onAddToLastShotWithoutPosition?: (generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
   onDownloadImage: (rawUrl: string, filename: string, imageId?: string, isVideo?: boolean, originalContentType?: string) => void;
   onToggleStar?: (id: string, starred: boolean) => void;
   selectedShotIdLocal: string;
@@ -46,6 +47,8 @@ interface ImageGalleryItemProps {
   onShowTick: (imageId: string) => void;
   addingToShotImageId: string | null;
   setAddingToShotImageId: (id: string | null) => void;
+  addingToShotWithoutPositionImageId?: string | null;
+  setAddingToShotWithoutPositionImageId?: (id: string | null) => void;
   downloadingImageId: string | null;
   isMobile: boolean;
   mobileActiveImageId: string | null;
@@ -71,6 +74,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   onApplySettings,
   onOpenLightbox,
   onAddToLastShot,
+  onAddToLastShotWithoutPosition,
   onDownloadImage,
   onToggleStar,
   selectedShotIdLocal,
@@ -79,6 +83,8 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   onShowTick,
   addingToShotImageId,
   setAddingToShotImageId,
+  addingToShotWithoutPositionImageId,
+  setAddingToShotWithoutPositionImageId,
   downloadingImageId,
   isMobile,
   mobileActiveImageId,
@@ -691,12 +697,13 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                   </SelectContent>
               </Select>
 
-              <Tooltip>
-                  <TooltipTrigger asChild>
-                      <Button
-                          variant="outline"
-                          size="icon"
-                          className={`h-7 w-7 p-0 rounded-full bg-black/50 hover:bg-black/70 text-white ${showTickForImageId === image.id ? 'bg-green-500 hover:bg-green-600 !text-white' : ''}`}
+              <div className="relative">
+                <Tooltip delayDuration={0} disableHoverableContent>
+                    <TooltipTrigger asChild>
+                        <Button
+                            variant="outline"
+                            size="icon"
+                            className={`h-7 w-7 p-0 rounded-full bg-black/50 hover:bg-black/70 text-white ${showTickForImageId === image.id ? 'bg-green-500 hover:bg-green-600 !text-white' : ''}`}
                           onClick={async () => {
                               console.log('[GenerationsPane] Add to Shot button clicked', {
                                 imageId: image.id,
@@ -813,7 +820,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                           aria-label={
                               isAlreadyPositionedInSelectedShot ? `Already positioned in ${currentTargetShotName}` :
                               showTickForImageId === image.id ? `Added to ${currentTargetShotName}` : 
-                              (currentTargetShotName ? `Add to shot: ${currentTargetShotName}` : "Add to selected shot")
+                              (currentTargetShotName ? `Add to '${currentTargetShotName}' at final position` : "Add to selected shot")
                           }
                           onPointerDown={(e) => e.stopPropagation()}
                       >
@@ -827,13 +834,136 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                               <PlusCircle className="h-4 w-4" />
                           )}
                       </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">
-                      {isAlreadyPositionedInSelectedShot ? `Already positioned in ${currentTargetShotName || 'shot'}` :
-                      showTickForImageId === image.id ? `Added to ${currentTargetShotName || 'shot'}` :
-                      (selectedShotIdLocal && currentTargetShotName ? `Add to: ${currentTargetShotName}` : "Select a shot then click to add")}
-                  </TooltipContent>
-              </Tooltip>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">
+                            {isAlreadyPositionedInSelectedShot ? `Already positioned in ${currentTargetShotName || 'shot'}` :
+                            showTickForImageId === image.id ? `Added to ${currentTargetShotName || 'shot'}` :
+                            (selectedShotIdLocal && currentTargetShotName ? `Add to '${currentTargetShotName}' at final position` : "Select a shot then click to add")}
+                        </TooltipContent>
+                    </Tooltip>
+                    
+                    {/* Add without position button - positioned next to the main button (hide when showing tick or already positioned) */}
+                    {onAddToLastShotWithoutPosition && showTickForImageId !== image.id && !isAlreadyPositionedInSelectedShot && (
+                        <Tooltip delayDuration={0} disableHoverableContent>
+                            <TooltipTrigger asChild>
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    className="absolute -top-1 -right-1 h-4 w-4 p-0 rounded-full bg-black/60 hover:bg-black/80 text-white border-0 scale-75 hover:scale-100 transition-transform duration-200 ease-out"
+                                    onClick={async () => {
+                                        console.log('[GenerationsPane] Add to Shot WITHOUT position button clicked', {
+                                          imageId: image.id,
+                                          selectedShotIdLocal,
+                                          simplifiedShotOptions: simplifiedShotOptions.map(s => ({ id: s.id, name: s.name })),
+                                          imageUrl: image.url?.substring(0, 50) + '...',
+                                          timestamp: Date.now()
+                                        });
+                                        
+                                        if (!selectedShotIdLocal) {
+                                            console.log('[GenerationsPane] ❌ No shot selected for adding image without position');
+                                            toast({ title: "Select a Shot", description: "Please select a shot first to add this image.", variant: "destructive" });
+                                            return;
+                                        }
+                                        
+                                        console.log('[GenerationsPane] 🚀 Starting add to shot WITHOUT position process', {
+                                          imageId: image.id,
+                                          targetShotId: selectedShotIdLocal,
+                                          targetShotName: simplifiedShotOptions.find(s => s.id === selectedShotIdLocal)?.name
+                                        });
+                                        
+                                        setAddingToShotWithoutPositionImageId?.(image.id!);
+                                        try {
+                                            // Add limited retry logic for mobile network issues
+                                            let success = false;
+                                            let retryCount = 0;
+                                            const maxRetries = isMobile ? 2 : 1;
+                                            
+                                            while (!success && retryCount < maxRetries) {
+                                                try {
+                                                    // Use the image URL directly instead of displayUrl to avoid potential URL resolution issues
+                                                    const imageUrlToUse = image.url || displayUrl;
+                                                    const thumbUrlToUse = image.thumbUrl || imageUrlToUse;
+                                                    
+                                                    console.log(`[GenerationsPane] Calling onAddToLastShotWithoutPosition - Attempt ${retryCount + 1}/${maxRetries}`, {
+                                                      imageId: image.id,
+                                                      imageUrlToUse: imageUrlToUse?.substring(0, 80) + '...',
+                                                      thumbUrlToUse: thumbUrlToUse?.substring(0, 80) + '...',
+                                                      selectedShotIdLocal,
+                                                      timestamp: Date.now()
+                                                    });
+                                                    
+                                                    success = await onAddToLastShotWithoutPosition(image.id!, imageUrlToUse, thumbUrlToUse);
+                                                    
+                                                    if (success) {
+                                                        console.log(`[GenerationsPane] ✅ Success without position on attempt ${retryCount + 1} for image ${image.id}`);
+                                                        onShowTick(image.id!);
+                                                    } else {
+                                                        console.log(`[GenerationsPane] ❌ Failed without position on attempt ${retryCount + 1} for image ${image.id}`);
+                                                    }
+                                                } catch (error) {
+                                                    retryCount++;
+                                                    
+                                                    // Don't retry for certain error types that won't benefit from retrying
+                                                    const isRetryableError = (err: any): boolean => {
+                                                        const message = err?.message?.toLowerCase() || '';
+                                                        const isNetworkError = message.includes('load failed') || 
+                                                                              message.includes('network error') || 
+                                                                              message.includes('fetch') ||
+                                                                              message.includes('timeout');
+                                                        const isServerError = message.includes('unauthorized') || 
+                                                                             message.includes('forbidden') || 
+                                                                             message.includes('not found') ||
+                                                                             message.includes('quota') ||
+                                                                             err?.status === 401 || 
+                                                                             err?.status === 403 || 
+                                                                             err?.status === 404;
+                                                        return isNetworkError && !isServerError;
+                                                    };
+                                                    
+                                                    if (retryCount < maxRetries && isRetryableError(error)) {
+                                                        // Show user feedback on retry
+                                                        if (retryCount === 1) {
+                                                            toast({ title: "Retrying...", description: "Network issue detected, trying again.", duration: 1500 });
+                                                        }
+                                                        
+                                                        // Wait before retry, with shorter delay to improve UX
+                                                        const waitTime = 800; // Fixed 800ms delay instead of exponential
+                                                        await new Promise(resolve => setTimeout(resolve, waitTime));
+                                                    } else {
+                                                        // Final retry failed, show user-friendly error
+                                                        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                                                        toast({ 
+                                                            title: "Network Error", 
+                                                            description: `Could not add image to shot without position. ${isMobile ? 'Please check your connection and try again.' : errorMessage}`,
+                                                            variant: "destructive" 
+                                                        });
+                                                        throw error;
+                                                    }
+                                                }
+                                            }
+                                        } finally {
+                                            setAddingToShotWithoutPositionImageId?.(null);
+                                        }
+                                    }}
+                                    disabled={!selectedShotIdLocal || showTickForImageId === image.id || addingToShotWithoutPositionImageId === image.id || addingToShotImageId === image.id}
+                                    aria-label={
+                                        (currentTargetShotName ? `Add to '${currentTargetShotName}' without position` : "Add to selected shot without position")
+                                    }
+                                    onPointerDown={(e) => e.stopPropagation()}
+                                >
+                                    {addingToShotWithoutPositionImageId === image.id ? (
+                                        <div className="h-2 w-2 animate-spin rounded-full border-b border-white"></div>
+                                    ) : (
+                                        <Plus className="h-2 w-2" />
+                                    )}
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom">
+                                {selectedShotIdLocal && currentTargetShotName ? `Add to '${currentTargetShotName}' without position` : "Add to selected shot without position"}
+                            </TooltipContent>
+                        </Tooltip>
+                    )}
+                </div>
           </div>
           )}
 

@@ -127,6 +127,7 @@ The worker polls the same task queue but specializes in video generation:
   - `claim_next_task/index.ts` - Worker task assignment (uses `func_claim_available_task`)
   - `complete_task/index.ts` - Task completion handling (uses `func_mark_task_complete`)
   - `calculate-task-cost/index.ts` - Credit cost calculation
+  - For complete Edge Functions reference including AI processing and payments, see [`edge_functions.md`](edge_functions.md)
 
 - **Database Functions** (cleaned up 2025-07-23)
   - **Task Management**:
@@ -137,23 +138,17 @@ The worker polls the same task queue but specializes in video generation:
     - `func_update_worker_heartbeat` - Worker health monitoring
     - `func_reset_orphaned_tasks` - Reset abandoned tasks
   - **Generation Management**:
-    - `add_generation_to_shot` - Link generation to shot (replaced 3 older functions)
+    - `add_generation_to_shot` - Link generation to shot
     - `create_generation_on_task_complete` - Trigger for auto-creating generations
     - `normalize_image_path` / `normalize_image_paths_in_jsonb` - Clean image URLs
-  - **Removed Functions** (obsolete/duplicates):
-    - `func_claim_task`, `func_claim_user_task` → use `func_claim_available_task`
-    - `complete_task_with_timing` → use `func_mark_task_complete`
-    - `associate_generation_with_shot`, `position_existing_generation_in_shot` → use `add_generation_to_shot`
-    - `noop_broadcast_*` triggers → using Supabase Realtime directly
-    - `ensure_user_exists` → use `auto_create_user_before_project`
+
 
 - **Database Triggers** (`/supabase/migrations/`)
   - `create_generation_on_task_complete` - Creates generations instantly when tasks complete
-  - Direct Supabase Realtime broadcasts (removed old HTTP broadcast triggers)
+  - Direct Supabase Realtime broadcasts
 
 - **Real-time Updates**
   - Direct Supabase Realtime connections from client
-  - **Removed**: Express WebSocket server (no longer needed)
 
 - **Client Hooks** (`/src/shared/hooks/`)
   - `useTasks.ts` - Task creation & monitoring

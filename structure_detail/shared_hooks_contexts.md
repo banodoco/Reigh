@@ -21,8 +21,8 @@
 |------|---------|-------------|
 | **`useFalImageGeneration`** | FAL AI integration | `generate()`, `upscale()`, progress tracking |
 | **`useGenerations`** | Media CRUD operations | `list()`, `delete()`, `upscale()` |
-| **`useUnifiedGenerations`** | ✨ **NEW**: Unified gallery data | Project-wide & shot-specific modes, task preloading |
-| **`useTaskFromUnifiedCache`** | ✨ **NEW**: Cached task lookup | Efficient task data retrieval from unified cache |
+| **`useUnifiedGenerations`** | Unified gallery data | Project-wide & shot-specific modes, task preloading, eliminates race conditions |
+| **`useTaskFromUnifiedCache`** | Cached task lookup | Efficient task data retrieval from unified cache |
 | **`useShots`** | Shot management | `create()`, `update()`, `delete()`, `reorder()` |
 | **`useVideoScrubbing`** | Video playback control | Frame-accurate scrubbing |
 
@@ -60,6 +60,8 @@
 | **`useWebSocket`** | WebSocket connection | Supabase real-time subscriptions |
 | **`useResources`** | LoRA/asset management | Upload, list, delete resources |
 | **`usePrefetchToolSettings`** | Settings preload | Performance optimization |
+| **`useVideoCountCache`** | Per-shot video caching | Instant skeleton display for video galleries |
+| **`useProjectVideoCountsCache`** | Project-wide video counts | Preloads all shot video counts for smooth UX |
 
 ---
 
@@ -149,9 +151,9 @@ Located in `/ui/` - Full shadcn-ui component library including:
 ### 🔧 Task & Generation Components
 - **`TaskItem`** - Individual task display with progress tracking, cancellation
 - **`TasksPane`** - Task queue management with filtering, pagination, real-time updates  
-- **`SharedTaskDetails`** - ✨ **NEW**: Reusable task info display with hover/modal/panel variants
-- **`TaskDetailsPanel`** - ✨ **NEW**: Full task details view used in MediaLightbox
-- **`TaskDetailsModal`** - ✨ **NEW**: Standalone task modal for mobile-friendly viewing
+- **`SharedTaskDetails`** - Reusable task info display with hover/modal/panel variants
+- **`TaskDetailsPanel`** - Full task details view used in MediaLightbox
+- **`TaskDetailsModal`** - Standalone task modal for mobile-friendly viewing
 
 ### 📸 Media Components
 - **`ImageGallery`** - Grid display with lightbox
@@ -160,7 +162,7 @@ Located in `/ui/` - Full shadcn-ui component library including:
   - Shot-based filtering with position exclusion
   - Prompt search functionality
   - Drag-and-drop support for desktop
-- **`VideoOutputsGallery`** - ✨ **NEW**: Now uses unified data system (`useUnifiedGenerations`)
+- **`VideoOutputsGallery`** - Uses unified data system (`useUnifiedGenerations`)
   - Background task preloading for better performance
   - Real-time updates via enhanced WebSocket system
   - Eliminates race conditions and duplicate API calls
@@ -169,7 +171,7 @@ Located in `/ui/` - Full shadcn-ui component library including:
   - Star/unstar functionality
   - Navigation, download, editing tools
   - Shot workflow integration
-  - ✨ **NEW**: Enhanced task details integration
+  - Enhanced task details integration
 - **`HoverScrubVideo`** - Video preview on hover
 - **`DraggableImage`** - Drag-and-drop images
 - **`TimeStamp`** - Consistent relative time display ("X mins ago")

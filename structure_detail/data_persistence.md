@@ -123,7 +123,7 @@ const [accelerated, setAccelerated] = usePersistentState(
   false
 );
 
-// ✅ New: database-synced approach
+// Database-synced approach
 const { settings: shotUISettings, update: updateShotUISettings } = useToolSettings<{
   acceleratedMode?: boolean;
 }>('travel-ui-state', { shotId: selectedShot?.id });
@@ -448,7 +448,7 @@ This pattern prevents UI flickering while ensuring data consistency.
 
 ---
 
-## 🔄 Unified Generations System ✨ **NEW**
+## 🔄 Unified Generations System
 
 ### Problem Solved
 Previously, `ImageGallery` and `VideoOutputsGallery` used completely different data fetching patterns:

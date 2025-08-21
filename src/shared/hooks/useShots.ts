@@ -487,6 +487,85 @@ export const useAddImageToShot = () => {
   });
 };
 
+// Add image to shot WITHOUT position VIA API
+export const useAddImageToShotWithoutPosition = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ shot_id, generation_id, imageUrl, thumbUrl, project_id }: { 
+      shot_id: string; 
+      generation_id: string; 
+      imageUrl?: string;
+      thumbUrl?: string;
+      project_id: string;
+    }) => {
+      log('MobileNetworkDebug', `Starting add image to shot WITHOUT position - ShotID: ${shot_id}, GenerationID: ${generation_id}, ImageURL: ${imageUrl?.substring(0, 100)}...`);
+      
+      const startTime = Date.now();
+      
+      // First create generation if imageUrl is provided
+      if (imageUrl && !generation_id) {
+        const { data: newGeneration, error: genError } = await supabase
+          .from('generations')
+          .insert({
+            location: imageUrl,
+            type: 'image',
+            project_id: project_id,
+            params: {}
+          })
+          .select()
+          .single();
+        
+        if (genError) throw genError;
+        generation_id = newGeneration.id;
+      }
+      
+      // Use RPC function to atomically add generation to shot WITHOUT position
+      const { data: shotGeneration, error: rpcError } = await supabase
+        .rpc('add_generation_to_shot', {
+          p_shot_id: shot_id,
+          p_generation_id: generation_id,
+          p_with_position: false
+        })
+        .single();
+      
+      if (rpcError) {
+        log('MobileNetworkDebug', `RPC Error after ${Date.now() - startTime}ms:`, rpcError);
+        throw rpcError;
+      }
+      
+      log('MobileNetworkDebug', `Successfully added image to shot WITHOUT position in ${Date.now() - startTime}ms`);
+      return shotGeneration;
+    },
+    onSuccess: (_, variables) => {
+      // Batch invalidate queries for better performance
+      const { project_id, shot_id } = variables;
+      
+      const invalidationPromises = [];
+      
+      if (project_id) {
+        invalidationPromises.push(
+          queryClient.invalidateQueries({ queryKey: ['shots', project_id] }),
+          queryClient.invalidateQueries({ queryKey: ['generations', project_id] })
+        );
+      }
+      
+      if (shot_id) {
+        invalidationPromises.push(
+          queryClient.invalidateQueries({ queryKey: ['all-shot-generations', shot_id] })
+        );
+      }
+      
+      // Execute all invalidations in parallel
+      Promise.all(invalidationPromises);
+    },
+    onError: (error: Error) => {
+      console.error('Error adding image to shot without position:', error);
+      toast.error(`Failed to add image to shot: ${error.message}`);
+    },
+  });
+};
+
 // Position existing generation with NULL position in shot
 export const usePositionExistingGenerationInShot = () => {
   const queryClient = useQueryClient();

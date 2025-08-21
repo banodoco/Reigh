@@ -194,9 +194,9 @@ supabase/
 └── migrations/         # RLS, functions, triggers
 ```
 
-## 📅 Recent Key Migrations
+## 📅 Migration Management
 
-For details on recent migrations (e.g., those adding credits systems, task costs, and generation timestamps), check the files in `supabase/migrations/`. They are named with timestamps and descriptive purposes. Run `supabase db push` to apply any pending ones.
+Check `supabase/migrations/` for all schema changes. Migration files are named with timestamps and descriptive purposes. Run `supabase db push` to apply any pending migrations.
 
 ---
 

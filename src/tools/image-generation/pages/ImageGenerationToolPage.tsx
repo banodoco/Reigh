@@ -6,7 +6,7 @@ import SettingsModal from "@/shared/components/SettingsModal";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/shared/components/ui/button";
-import { useAddImageToShot, usePositionExistingGenerationInShot, useCreateShot } from "@/shared/hooks/useShots";
+import { useAddImageToShot, useAddImageToShotWithoutPosition, usePositionExistingGenerationInShot, useCreateShot } from "@/shared/hooks/useShots";
 import { useShots } from '@/shared/contexts/ShotsContext';
 import { useLastAffectedShot } from "@/shared/hooks/useLastAffectedShot";
 import { useProject } from "@/shared/contexts/ProjectContext";
@@ -212,6 +212,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
 
 
   const addImageToShotMutation = useAddImageToShot();
+  const addImageToShotWithoutPositionMutation = useAddImageToShotWithoutPosition();
   const positionExistingGenerationMutation = usePositionExistingGenerationInShot();
   const createShotMutation = useCreateShot();
   const { lastAffectedShotId, setLastAffectedShotId } = useLastAffectedShot();
@@ -609,6 +610,43 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
       return false;
     }
   }, [targetShotInfo.targetShotIdForButton, selectedProjectId, addImageToShotMutation, positionExistingGenerationMutation, setLastAffectedShotId, selectedShotFilter, excludePositioned]);
+
+  const handleAddImageToTargetShotWithoutPosition = useCallback(async (generationId: string, imageUrl?: string, thumbUrl?: string): Promise<boolean> => {
+    if (!targetShotInfo.targetShotIdForButton) {
+      toast.error("No target shot available to add to. Create a shot first or interact with one.");
+      return false;
+    }
+    if (!generationId) {
+        toast.error("Image has no ID, cannot add to shot.");
+        return false;
+    }
+    if (!selectedProjectId) {
+        toast.error("No project selected. Cannot add image to shot.");
+        return false;
+    }
+
+    try {
+      // Always use the add without position function
+      const result = await addImageToShotWithoutPositionMutation?.mutateAsync({
+        shot_id: targetShotInfo.targetShotIdForButton,
+        generation_id: generationId,
+        imageUrl: imageUrl,
+        thumbUrl: thumbUrl,
+        project_id: selectedProjectId, 
+      });
+      
+      setLastAffectedShotId(targetShotInfo.targetShotIdForButton);
+      
+      // Force refresh of generations data to show updated association
+      queryClient.invalidateQueries({ queryKey: ['generations', selectedProjectId] });
+      
+      return true;
+    } catch (error) {
+      console.error("Error adding image to target shot without position:", error);
+      toast.error("Failed to add image to shot without position.");
+      return false;
+    }
+  }, [targetShotInfo.targetShotIdForButton, selectedProjectId, addImageToShotWithoutPositionMutation, setLastAffectedShotId, queryClient]);
 
   const isGenerating = isEnqueuing;
 
@@ -1041,6 +1079,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
                 onDelete={handleDeleteImage}
                 onImageSaved={handleImageSaved}
                 onAddToLastShot={handleAddImageToTargetShot}
+                onAddToLastShotWithoutPosition={handleAddImageToTargetShotWithoutPosition}
                 isDeleting={isDeleting}
                 allShots={validShots}
                 lastShotId={targetShotInfo.targetShotIdForButton}

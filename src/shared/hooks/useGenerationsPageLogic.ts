@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useContext } from 'react';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { useGenerations, useDeleteGeneration, useToggleGenerationStar } from '@/shared/hooks/useGenerations';
-import { useListShots, useAddImageToShot, usePositionExistingGenerationInShot } from '@/shared/hooks/useShots';
+import { useListShots, useAddImageToShot, useAddImageToShotWithoutPosition, usePositionExistingGenerationInShot } from '@/shared/hooks/useShots';
 import { LastAffectedShotContext } from '@/shared/contexts/LastAffectedShotContext';
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 import { useToolSettings } from '@/shared/hooks/useToolSettings';
@@ -231,6 +231,7 @@ export function useGenerationsPageLogic({
   const { lastAffectedShotId = null, setLastAffectedShotId = () => {} } = lastAffectedShotContext || {};
   
   const addImageToShotMutation = useAddImageToShot();
+  const addImageToShotWithoutPositionMutation = useAddImageToShotWithoutPosition();
   const positionExistingGenerationMutation = usePositionExistingGenerationInShot();
   const deleteGenerationMutation = useDeleteGeneration();
   const toggleStarMutation = useToggleGenerationStar();
@@ -319,6 +320,35 @@ export function useGenerationsPageLogic({
     }
   };
 
+  const handleAddToShotWithoutPosition = async (generationId: string, imageUrl?: string): Promise<boolean> => {
+    // Fast path: minimal validation and direct execution
+    const targetShotId = currentShotId || lastAffectedShotId;
+    
+    if (!targetShotId || !selectedProjectId) {
+      toast.error("No shot selected", {
+        description: "Please select a shot in the gallery or create one first.",
+      });
+      return false;
+    }
+    
+    try {
+      // Always use the add without position function - never position existing items
+      await addImageToShotWithoutPositionMutation.mutateAsync({
+        shot_id: targetShotId,
+        generation_id: generationId,
+        imageUrl: imageUrl,
+        project_id: selectedProjectId,
+      });
+      return true;
+    } catch (error) {
+      console.error('[ADDTOSHOT_NOPOS] Error:', error);
+      toast.error("Failed to add image to shot without position", {
+        description: error instanceof Error ? error.message : "Unknown error",
+      });
+      return false;
+    }
+  };
+
   return {
     // Data
     selectedProjectId,
@@ -353,6 +383,7 @@ export function useGenerationsPageLogic({
     handleServerPageChange,
     handleDeleteGeneration,
     handleAddToShot,
+    handleAddToShotWithoutPosition,
     handleToggleStar,
   };
 } 

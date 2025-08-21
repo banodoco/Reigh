@@ -99,6 +99,7 @@ interface ImageGalleryProps {
   lastShotId?: string;
   lastShotNameForTooltip?: string;
   onAddToLastShot: (generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
+  onAddToLastShotWithoutPosition?: (generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
   currentToolType?: string; // Added for filtering
   initialFilterState?: boolean; // Added for default filter state
   onImageSaved?: (imageId: string, newImageUrl: string) => void; // Callback when image is saved with changes
@@ -271,7 +272,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   onApplySettings, 
   allShots, 
   lastShotId, 
-  onAddToLastShot, 
+  onAddToLastShot,
+  onAddToLastShotWithoutPosition,
   currentToolType, 
   initialFilterState = true, 
   onImageSaved, 
@@ -351,6 +353,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   });
   const [showTickForImageId, setShowTickForImageId] = useState<string | null>(null);
   const [addingToShotImageId, setAddingToShotImageId] = useState<string | null>(null);
+  const [addingToShotWithoutPositionImageId, setAddingToShotWithoutPositionImageId] = useState<string | null>(null);
 
   // Fix race condition: Update selectedShotIdLocal when shots data loads or context changes
   useEffect(() => {
@@ -1305,6 +1308,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                           onApplySettings={onApplySettings}
                           onOpenLightbox={handleOpenLightbox}
                           onAddToLastShot={onAddToLastShot}
+                          onAddToLastShotWithoutPosition={onAddToLastShotWithoutPosition}
                           onDownloadImage={handleDownloadImage}
                           onToggleStar={onToggleStar}
                           selectedShotIdLocal={selectedShotIdLocal}
@@ -1313,6 +1317,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                           onShowTick={handleShowTick}
                           addingToShotImageId={addingToShotImageId}
                           setAddingToShotImageId={setAddingToShotImageId}
+                          addingToShotWithoutPositionImageId={addingToShotWithoutPositionImageId}
+                          setAddingToShotWithoutPositionImageId={setAddingToShotWithoutPositionImageId}
                           downloadingImageId={downloadingImageId}
                           isMobile={isMobile}
                           mobileActiveImageId={mobileActiveImageId}

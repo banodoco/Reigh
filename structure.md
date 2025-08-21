@@ -39,6 +39,7 @@
 | **Database & Storage** | [db_and_storage.md](structure_detail/db_and_storage.md) | Schema map, migration workflow, storage buckets |
 | **Data Persistence** | [data_persistence.md](structure_detail/data_persistence.md) | State management patterns, hooks, storage layers |
 | **Task System** | [task_worker_lifecycle.md](structure_detail/task_worker_lifecycle.md) | Async task queue, worker polling, Edge Functions |
+| **Edge Functions** | [edge_functions.md](structure_detail/edge_functions.md) | Complete serverless function reference and API details |
 | **Adding Tools** | [adding_new_tool.md](structure_detail/adding_new_tool.md) | Step-by-step guide for new tool modules |
 | **Design Standards** | [design_motion_guidelines.md](structure_detail/design_motion_guidelines.md) | UI/UX patterns, motion, accessibility, mobile touch interactions |
 | **Shared Code** | [shared_hooks_contexts.md](structure_detail/shared_hooks_contexts.md) | Reusable hooks, contexts, components catalog |
@@ -133,26 +134,11 @@ src/app/
 
 #### 🔧 Environment Variables
 
-See `.env.example` for all variables. Key ones:
-- `VITE_APP_ENV`: Controls tool visibility & homepage
-- `VITE_SUPABASE_*`: Database connection
-- `VITE_FAL_PROXY_*`: AI service configuration
-- `VITE_STRIPE_PUBLISHABLE_KEY`: Stripe frontend integration
-- `STRIPE_SECRET_KEY`: Stripe server-side operations (Edge Functions)
-- `STRIPE_WEBHOOK_SECRET`: Stripe webhook signature verification
-- `FRONTEND_URL`: Payment redirect URLs
+Configuration via environment variables for database, AI services, payments, and tool visibility. See `.env.example` for complete setup and [README.md](README.md) for configuration details.
 
-#### ⚡ Active Edge Functions
+#### ⚡ Edge Functions
 
-| Function | Purpose | Location |
-|----------|---------|----------|
-| `single-image-generate` | FAL image generation | `/supabase/functions/` |
-| `steerable-motion` | Video generation | `/supabase/functions/` |
-| `ai-prompt` | Prompt enhancement | `/supabase/functions/` |
-| `calculate-task-cost` | Credit calculation | `/supabase/functions/` |
-| ~~`process-completed-task`~~ | **REMOVED**: Replaced by SQL trigger `create_generation_on_task_complete` | ~~`/supabase/functions/`~~ |
-| `stripe-checkout` | Stripe payment sessions | `/supabase/functions/` |
-| `stripe-webhook` | Stripe payment webhooks | `/supabase/functions/` |
+Serverless functions handle AI processing, payments, and task management. For complete function reference and implementation details, see [`edge_functions.md`](structure_detail/edge_functions.md).
 
 ---
 
@@ -194,71 +180,16 @@ tool-name/
 | **Edit Travel** | ⚠️ Hidden | [`tool_edit_travel.md`](structure_detail/tool_edit_travel.md) | Text-guided transformations |
 | **Training Data** | ⚠️ Hidden | [`tool_training_data_helper.md`](structure_detail/tool_training_data_helper.md) | Video upload & segmentation |
 
-#### Recent Architecture Updates
-
-**Generation Method Preferences (Latest):**
-- **User Control**: Users can now choose whether to allow cloud processing, local processing, or both via Settings Modal
-- **Database Storage**: Preferences stored in `users.settings.ui.generationMethods` (onComputer/inCloud booleans)
-- **Task Filtering**: `claim_next_task` Edge Function respects preferences:
-  - Service role path (cloud): Only claims tasks from users who allow cloud processing (`inCloud: true`)
-  - PAT path (local): Only claims tasks for users who allow local processing (`onComputer: true`)
-- **Default Behavior**: Both options enabled by default for backward compatibility
-
-**Task Queue Refactor:**
-- **New Hook**: Added `useTaskQueueNotifier` to `src/shared/hooks/` for centralized task creation with realtime feedback
-- **Enhanced UX**: Replaced individual `useCreateTask` patterns across Image Generation and Video Travel tools
-- **Better Monitoring**: Added comprehensive debug logging throughout task lifecycle for improved troubleshooting
-- **UI Improvements**: TasksPane now shows "Cancel All" button consistently (disabled when no cancellable tasks)
-
-**Unified Generations System ✨ NEW:**
-- **Problem**: ImageGallery and VideoOutputsGallery used incompatible data patterns causing reliability issues
-- **Solution**: New `useUnifiedGenerations` hook serves both gallery types with consistent caching and realtime updates
-- **Benefits**: Eliminates race conditions, reduces API calls, background task preloading, shared cache invalidation
-- **Components**: Enhanced task display components (`SharedTaskDetails`, `TaskDetailsPanel`, `TaskDetailsModal`)
-
-**Generation-Task Integration Bridge ✨ NEW:**
-- **Problem**: Generation-to-task mapping logic duplicated across 6+ components (useGenerations, TaskDetailsModal, TaskItem, VideoOutputsGallery, etc.)
-- **Solution**: Centralized `GenerationTaskBridge` utility with React context for seamless data integration
-- **Features**: Batch task ID lookups, background preloading, cache management, bi-directional mapping (generation↔task)
-- **Context**: `GenerationTaskProvider` with hooks for automatic preloading and enhanced data access
-
-**React Hooks Stability Fixes ✨ NEW:**
-- **Problem**: "Rendered more/fewer hooks than during the previous render" errors during fast navigation and window resizing
-- **Root Cause**: Conditional hook execution in `ShotImageManager` (TouchSensor only called when `!isMobile`) and unstable function references
-- **Solution**: Always call hooks in same order, use activation constraints to gate behavior instead of conditional execution
-- **Key Fixes**: Stable `useSensor` calls, stable `onImageReorder` reference with useRef pattern, dependency array stabilization
-- **Components**: Enhanced `ShotImageManager`, `ShotEditor`, and `useGenerationActions` for consistent hook execution
-- **Latest Fix (Jan 2025)**: Fixed `ImageGalleryPagination` hook violation by moving early return **before** hook calls to comply with Rules of Hooks
-
-**Image Generation Form UX:**
-- **Collapsible Form**: Image generation form can now be collapsed/expanded to save screen space
-- **Persistent State**: Form expand/collapse state is saved per project via `usePersistentToolState`
-- **Visual Design**: Collapsed state shows gradient button with animated sparkles, similar to AI Prompt section in PromptEditorModal
-- **Sticky UI**: When collapsed, form toggle button sticks to top of screen while scrolling; clicking expands form and scrolls to it
-
-**Video Gallery Skeleton Optimization ✨ NEW:**
-- **Problem**: VideoOutputsGallery showed jarring skeleton transitions - fixed skeleton count causing abrupt disappearance, and stale data from previous shots contaminating skeleton counts during navigation
-- **Solution**: Intelligent skeleton system using multiple data sources with priority hierarchy and aggressive cache reset on shot changes
-- **Features**: Project-wide video count preloading (`useProjectVideoCountsCache`), per-shot fallback caching (`useVideoCountCache`), instant empty state display for zero videos
-- **Architecture**: Three-tier priority system (fresh current data > project cache > fallbacks), automatic cache invalidation on mismatches, shot change detection with state reset
-- **Components**: Enhanced `VideoOutputsGallery`, `ShotEditor` integration, disabled `placeholderData` in `useUnifiedGenerations` to prevent cross-shot contamination
-
----
-
-**Service-Role Active Task Filtering (Latest):**
-- New migration `20250808000001_filter_active_to_cloud_for_service_role.sql` refines how the service role counts active tasks.
-- When `include_active=true` in service-role analysis/counts, only cloud-claimed In Progress tasks are included (identified by non-null `worker_id`). Local user-claimed tasks are excluded from this path.
-- Introduced/updated SQL functions:
-  - `count_eligible_tasks_service_role(p_include_active boolean)`
-  - `analyze_task_availability_service_role(p_include_active boolean)`
-- Rationale: Align service role scheduling with cloud capacity by excluding local runs from active task pressure.
-
-- Follow-up migration `20250820000000_fix_count_active_filter.sql` further refines dry-run counting by restricting the "active" portion to tasks that are both cloud-claimed (non-null `worker_id`) and belong to eligible users (credits > 0, inCloud enabled, and <5 in-progress). This prevents over-counting when users already at/over the concurrency cap have many active tasks.
-
-
 ### 🔄 Shared Elements (`/src/shared/`)
 
 For the complete catalog, see [`shared_hooks_contexts.md`](structure_detail/shared_hooks_contexts.md).
+
+#### 🖼️ Image Gallery Features
+- **Dual Add-to-Shot Options**: Images can be added to shots in two ways:
+  - **With position** (main button): Adds image at the final position in the shot timeline
+  - **Without position** (secondary button): Associates image with shot but without timeline position
+- **Smart UI**: Secondary button appears as a smaller overlay in the top-right corner of the main button, with hover scaling and immediate tooltip hiding
+- **State Management**: After adding, secondary button disappears and main button shows confirmation state
 
 #### 🎨 Key Components
 
@@ -273,15 +204,7 @@ For the complete catalog, see [`shared_hooks_contexts.md`](structure_detail/shar
 
 #### 🪝 Essential Hooks
 
-| Hook | Purpose | Usage |
-|------|---------|-------|
-| **useToolSettings** | Tool config management | Fetches & merges settings across scopes |
-| **usePersistentState** | LocalStorage sync | Persists UI state locally |
-| **useTasks** | Task queue | Real-time task status & updates |
-| **useTaskQueueNotifier** | Centralized task creation | Unified task enqueueing with realtime feedback |
-| **useWebSocket** | Real-time updates | Supabase broadcast subscriptions |
-| **useVideoCountCache** | Per-shot video caching | Instant skeleton display for video galleries |
-| **useProjectVideoCountsCache** | Project-wide video counts | Preloads all shot video counts for smooth UX |
+Shared hooks provide data management, state persistence, real-time updates, and UI utilities. Complete hook catalog with usage examples: [`shared_hooks_contexts.md`](structure_detail/shared_hooks_contexts.md).
 
 #### 🧮 Services & Utilities
 
@@ -297,34 +220,13 @@ For the complete catalog, see [`shared_hooks_contexts.md`](structure_detail/shar
 
 Reigh uses an async task queue for AI workloads. For the complete flow diagram and implementation details, see [structure_detail/task_worker_lifecycle.md](structure_detail/task_worker_lifecycle.md).
 
-### Headless-Wan2GP Worker (GPU / Cloud)
-Headless-Wan2GP is the **primary worker responsible for _all_ AI tasks** — image & video generation, prompt enhancement, upscaling, stitching, and more. It polls the Supabase task queue and executes jobs in a GPU-accelerated Python environment.
-
-- Runs locally on any CUDA-capable GPU or scales horizontally in cloud GPU instances.
-- Setup & deployment guide: [Headless-Wan2GP GitHub](https://github.com/peteromallet/Headless-Wan2GP).
-- Task flow details: see the [Task & Worker Lifecycle doc](structure_detail/task_worker_lifecycle.md).
+### External Workers
+**Headless-Wan2GP** handles all AI processing tasks via GPU-accelerated Python environment. Supports local CUDA and cloud scaling. Complete setup and task flow details: [`task_worker_lifecycle.md`](structure_detail/task_worker_lifecycle.md).
 
 ## 5. Development Workflow
 
 ### Debug Logging & Performance Profiling  
-Reigh has a lightweight, env-toggleable logging system you can turn on during any local run:
-
-```bash
-# One-shot
-VITE_DEBUG_LOGS=true npm run dev
-
-# Persistently for all dev runs
-echo "VITE_DEBUG_LOGS=true" >> .env.local
-```
-
-When enabled, everything tagged `PerfDebug:*` appears in the browser console:
-
-* **React render counts** – `useRenderLogger()` flags runaway re-renders.
-* **Profiler timings** – global `<Profiler>` hooks into `logger.reactProfilerOnRender`.
-* **Realtime connections** – Supabase broadcast message details.
-* **WebSocket flush sizes** – see batched React-Query invalidations.
-
-Full API & examples live in [debug_logging.md](structure_detail/debug_logging.md).
+Reigh includes environment-toggleable debug logging for performance monitoring and troubleshooting. Enable with `VITE_DEBUG_LOGS=true`. Complete setup and API reference: [`debug_logging.md`](structure_detail/debug_logging.md).
 
 See [README.md](README.md) for:
 - Local environment setup (5-min quickstart)
