@@ -268,24 +268,49 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
         // If there's a shot_id, validate it exists
         if (shotId) {
           console.log(`[COMPLETE-TASK-DEBUG] Checking if shot ${shotId} exists...`);
-          const { data: shotData, error: shotError } = await supabaseAdmin
-            .from("shots")
-            .select("id")
-            .eq("id", shotId)
-            .single();
           
-          if (shotError || !shotData) {
-            console.log(`[COMPLETE-TASK-DEBUG] Shot ${shotId} does not exist (error: ${shotError?.message || 'not found'}), removing from task parameters`);
+          // Ensure shotId is properly converted from JSONB to string
+          let shotIdString;
+          if (typeof shotId === 'string') {
+            shotIdString = shotId;
+          } else if (typeof shotId === 'object' && shotId !== null) {
+            // If it's wrapped in an object, try to extract the actual UUID
+            shotIdString = String(shotId.id || shotId.uuid || shotId);
+          } else {
+            shotIdString = String(shotId);
+          }
+          
+          // Validate UUID format before using in query
+          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+          if (!uuidRegex.test(shotIdString)) {
+            console.log(`[COMPLETE-TASK-DEBUG] Invalid UUID format for shot: ${shotIdString}, removing from parameters`);
             needsParamsUpdate = true;
-            
-            // Remove shot_id from parameters
+            // Remove invalid shot_id from parameters
             if (currentTask.task_type === 'travel_stitch' && updatedParams.full_orchestrator_payload) {
               delete updatedParams.full_orchestrator_payload.shot_id;
             } else if (currentTask.task_type === 'single_image') {
               delete updatedParams.shot_id;
             }
           } else {
-            console.log(`[COMPLETE-TASK-DEBUG] Shot ${shotId} exists and is valid`);
+            const { data: shotData, error: shotError } = await supabaseAdmin
+              .from("shots")
+              .select("id")
+              .eq("id", shotIdString)
+              .single();
+            
+            if (shotError || !shotData) {
+              console.log(`[COMPLETE-TASK-DEBUG] Shot ${shotIdString} does not exist (error: ${shotError?.message || 'not found'}), removing from task parameters`);
+              needsParamsUpdate = true;
+              
+              // Remove shot_id from parameters
+              if (currentTask.task_type === 'travel_stitch' && updatedParams.full_orchestrator_payload) {
+                delete updatedParams.full_orchestrator_payload.shot_id;
+              } else if (currentTask.task_type === 'single_image') {
+                delete updatedParams.shot_id;
+              }
+            } else {
+              console.log(`[COMPLETE-TASK-DEBUG] Shot ${shotIdString} exists and is valid`);
+            }
           }
         }
         
