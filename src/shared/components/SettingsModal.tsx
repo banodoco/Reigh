@@ -220,7 +220,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       return `git clone https://github.com/peteromallet/Headless-Wan2GP.git
 cd Headless-Wan2GP
 python -m venv venv
-.\\venv\\Scripts\\Activate.ps1
+venv\\Scripts\\activate.bat
 pip install --no-cache-dir torch==2.6.0 torchvision torchaudio -f https://download.pytorch.org/whl/cu124
 pip install --no-cache-dir -r Wan2GP/requirements.txt
 pip install --no-cache-dir -r requirements.txt
