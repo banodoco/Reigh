@@ -90,9 +90,9 @@ export const Header: React.FC<HeaderProps> = ({
               </Button>
               
               <span 
-                className={`text-2xl font-normal text-primary truncate px-3 ${onUpdateShotName ? 'cursor-pointer hover:underline' : ''}`}
+                className={`text-2xl font-normal text-primary truncate px-3 w-[300px] ${onUpdateShotName ? 'cursor-pointer hover:underline' : ''}`}
                 onClick={onNameClick}
-                title={onUpdateShotName ? "Click to edit shot name" : undefined}
+                title={onUpdateShotName ? "Click to edit shot name" : selectedShot?.name || 'Untitled Shot'}
               >
                 {selectedShot?.name || 'Untitled Shot'}
               </span>
@@ -154,9 +154,9 @@ export const Header: React.FC<HeaderProps> = ({
               </Button>
               
               <span 
-                className={`text-xl font-normal text-primary truncate flex-1 text-center px-2 ${onUpdateShotName ? 'cursor-pointer hover:underline' : ''}`}
+                className={`text-xl font-normal text-primary truncate text-center px-2 min-w-0 max-w-[200px] flex-1 ${onUpdateShotName ? 'cursor-pointer hover:underline' : ''}`}
                 onClick={onNameClick}
-                title={onUpdateShotName ? "Click to edit shot name" : undefined}
+                title={onUpdateShotName ? "Click to edit shot name" : selectedShot?.name || 'Untitled Shot'}
               >
                 {selectedShot?.name || 'Untitled Shot'}
               </span>

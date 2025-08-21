@@ -1,5 +1,6 @@
 import React from 'react';
 import { Skeleton } from '@/shared/components/ui/skeleton';
+import { CardHeader, CardTitle, CardContent } from '@/shared/components/ui/card';
 import { GenerationRow } from '@/types/shots';
 
 interface ImageManagerSkeletonProps {
@@ -53,53 +54,56 @@ export const ImageManagerSkeleton: React.FC<ImageManagerSkeletonProps> = ({
   }, [projectAspectRatio]);
 
   return (
-    <div className="space-y-4">
-      {/* Header skeleton */}
-      <div className="flex items-center justify-between mb-4">
-        <Skeleton className="h-7 w-48" />
-        {!isMobile && (
-          <Skeleton className="h-8 w-36" />
-        )}
-      </div>
-      
-      {/* Description skeleton */}
-      <Skeleton className="h-4 w-full max-w-lg mb-6" />
-      
-      {/* Content area skeleton - matches real shot composition */}
-      <div className="p-1 min-h-[200px]">
-        {actualImageCount > 0 ? (
-          /* Real shot composition skeleton */
-          <div className={`grid gap-3 ${gridCols}`}>
-            {Array.from({ length: skeletonCount }).map((_, i) => (
-              <div key={i} style={aspectRatioStyle}>
-                <div className="w-full h-full relative">
-                  {/* Realistic image skeleton with subtle loading animation */}
-                  <Skeleton className="w-full h-full rounded-lg" />
-                  
-                  {/* Simulate loading indicator like real images */}
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="w-6 h-6 border-2 border-muted-foreground/30 border-t-muted-foreground/60 rounded-full animate-spin" />
+    <>
+      {/* Header skeleton - matches CardHeader structure */}
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-7 w-48" />
+          {!isMobile && (
+            <Skeleton className="h-8 w-36" />
+          )}
+        </div>
+        {/* Description skeleton - conditional like real component */}
+        <Skeleton className="h-4 w-full max-w-lg" />
+      </CardHeader>
+
+      {/* Content skeleton - matches CardContent structure */}
+      <CardContent>
+        <div className="p-1 min-h-[200px]">
+          {actualImageCount > 0 ? (
+            /* Real shot composition skeleton */
+            <div className={`grid gap-3 ${gridCols}`}>
+              {Array.from({ length: skeletonCount }).map((_, i) => (
+                <div key={i} style={aspectRatioStyle}>
+                  <div className="w-full h-full relative">
+                    {/* Realistic image skeleton with subtle loading animation */}
+                    <Skeleton className="w-full h-full rounded-lg" />
+                    
+                    {/* Simulate loading indicator like real images */}
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="w-6 h-6 border-2 border-muted-foreground/30 border-t-muted-foreground/60 rounded-full animate-spin" />
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          /* Fallback generic skeleton when no shot data available */
-          <div className={`grid gap-3 ${gridCols}`}>
-            {Array.from({ length: skeletonCount }).map((_, i) => (
-              <div key={i} style={aspectRatioStyle}>
-                <Skeleton className="w-full h-full rounded-lg" />
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-      
-      {/* Upload section skeleton */}
-      <div className="pt-4 border-t space-y-3">
+              ))}
+            </div>
+          ) : (
+            /* Fallback generic skeleton when no shot data available */
+            <div className={`grid gap-3 ${gridCols}`}>
+              {Array.from({ length: skeletonCount }).map((_, i) => (
+                <div key={i} style={aspectRatioStyle}>
+                  <Skeleton className="w-full h-full rounded-lg" />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </CardContent>
+
+      {/* Upload section skeleton - matches exact FileInput structure */}
+      <div className="p-4 border-t space-y-3">
         <Skeleton className="h-12 w-full" />
       </div>
-    </div>
+    </>
   );
 }; 
