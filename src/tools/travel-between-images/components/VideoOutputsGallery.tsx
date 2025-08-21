@@ -22,7 +22,7 @@ import { useUnifiedGenerations, useTaskFromUnifiedCache } from '@/shared/hooks/u
 import { useGenerationTaskPreloader, useEnhancedGenerations } from '@/shared/contexts/GenerationTaskContext';
 import { useVideoCountCache } from '@/shared/hooks/useVideoCountCache';
 
-
+// SIMPLIFIED: No wrapper needed - use direct HoverScrubVideo
 
 interface VideoOutputsGalleryProps {
   // Data source
@@ -93,9 +93,11 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   const [isInitialHover, setIsInitialHover] = useState(false);
   const [showTaskDetailsModal, setShowTaskDetailsModal] = useState(false);
   
-  // PERFORMANCE FIX: Track individual video loading states to prevent premature skeleton dismissal
-  const [loadedVideoIds, setLoadedVideoIds] = useState<Set<string>>(new Set());
-  const [videoLoadingStates, setVideoLoadingStates] = useState<Map<string, boolean>>(new Map());
+  // SIMPLIFIED FIX: Use a simple delay-based approach instead of complex video loading tracking
+  const [showVideosAfterDelay, setShowVideosAfterDelay] = useState(false);
+  // Stable content key to avoid resets during background refetches
+  const contentKey = `${shotId ?? ''}:${currentPage}`;
+  const prevContentKeyRef = useRef<string | null>(null);
   
   const itemsPerPage = 6;
   const taskDetailsButtonRef = useRef<HTMLButtonElement>(null);
@@ -124,6 +126,9 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
       
       // CRITICAL: Reset lastGoodCountRef to prevent cross-shot contamination
       lastGoodCountRef.current = null;
+      
+      // SIMPLIFIED FIX: Reset video delay state for new shot
+      setShowVideosAfterDelay(false);
       
       // Clear any cached count for the previous shot to prevent contamination
       if (prevShotIdRef.current) {
@@ -329,6 +334,27 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   // Mobile double-tap detection refs
   const lastTouchTimeRef = useRef<number>(0);
   const doubleTapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // SIMPLIFIED FIX: Use a simple delay after initial data load; do not reset on background refetches
+  useEffect(() => {
+    // Detect content key changes (shot or page) and reset only then
+    if (prevContentKeyRef.current !== contentKey) {
+      console.log('[VideoLoadingFix] Content key changed, resetting delay state', {
+        prev: prevContentKeyRef.current, next: contentKey
+      });
+      prevContentKeyRef.current = contentKey;
+      setShowVideosAfterDelay(false);
+    }
+
+    // Start delay only after initial load completes for this key
+    if (!isLoadingGenerations && !showVideosAfterDelay) {
+      const videoDelay = setTimeout(() => {
+        setShowVideosAfterDelay(true);
+        console.log('[VideoLoadingFix] Video delay complete, showing actual videos for key', contentKey);
+      }, 800);
+      return () => clearTimeout(videoDelay);
+    }
+  }, [contentKey, isLoadingGenerations, showVideosAfterDelay]);
 
   useEffect(() => {
     if (selectedVideoForDetails && taskDetailsButtonRef.current) {
@@ -562,33 +588,37 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     </div>
   );
 
-  // Determine number of skeletons to show based on actual video count
+  // SIMPLIFIED: Show skeletons during initial data loading OR during video delay period
   const getSkeletonCount = () => {
-    // Show skeletons when either loading initial data or fetching new data
-    const isLoading = isLoadingGenerations || isFetchingGenerations;
+    // Only gate on initial loading, not background refetches
+    const isDataLoading = isLoadingGenerations; 
+    
+    // SIMPLIFIED FIX: Show skeletons if data is loading OR videos haven't had time to load yet
+    const shouldShowSkeletons = isDataLoading || (!showVideosAfterDelay && videoOutputs.length > 0);
     
       // Get cached count for instant display
     const cachedCount = getCachedCount(shotId);
     // Get project-wide preloaded count (highest priority for instant display)
     const projectVideoCount = getShotVideoCount?.(shotId) ?? null;
     
-    console.log('[SkeletonOptimization] Getting skeleton count:', {
+    console.log('[VideoLoadingFix] Getting skeleton count:', {
       isLoadingGenerations,
       isFetchingGenerations,
-      isLoading,
+      isDataLoading,
+      shouldShowSkeletons,
+      showVideosAfterDelay,
+      videoOutputsLength: videoOutputs.length,
+      currentVideoOutputsLength: currentVideoOutputs.length,
       currentPage,
       itemsPerPage,
       shotId,
       projectVideoCount,
       cachedCount,
-      generationsDataExists: !!generationsData,
-      generationsDataTotal: (generationsData as any)?.total,
-      generationsDataItems: (generationsData as any)?.items?.length,
-      sortedVideoOutputsLength: sortedVideoOutputs.length,
       timestamp: Date.now()
     });
     
-    if (isLoading) {
+    // SIMPLIFIED FIX: Show skeletons during data loading or video delay period
+    if (shouldShowSkeletons) {
       // Priority 1: Use current data if available AND it's from current shot (most accurate)
       const totalVideos = (generationsData as any)?.total;
       const isDataFresh = !isFetchingGenerations; // Data is fresh if not currently fetching
@@ -621,20 +651,21 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
         
         // Handle case where currentPage is beyond available data
         if (startIndex >= countToUse) {
-          console.log('[SkeletonOptimization] Current page beyond available data, returning 0 skeletons:', {
+          console.log('[VideoLoadingFix] Current page beyond available data, returning 0 skeletons:', {
             startIndex,
             countToUse,
             currentPage,
-            itemsPerPage,
-            source: totalVideos > 0 ? 'current' : 'cached'
+            itemsPerPage
           });
           return 0;
         }
         
+        // SIMPLIFIED: No partial skeleton logic - just show all or none
+        
         const videosOnCurrentPage = Math.min(countToUse - startIndex, itemsPerPage);
         const result = Math.max(0, videosOnCurrentPage);
         const source = (totalVideos !== null && totalVideos !== undefined && isDataFresh) ? 'fresh-current' : 'project';
-        console.log('[SkeletonOptimization] Calculated skeleton count from count:', {
+        console.log('[VideoLoadingFix] Calculated skeleton count from count:', {
           countToUse,
           startIndex,
           videosOnCurrentPage,
@@ -660,15 +691,17 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
 
   const skeletonCount = getSkeletonCount();
   
-  // [SkeletonOptimization] Log the final skeleton count being used
-  console.log('[SkeletonOptimization] Final skeleton count result:', {
+  // [VideoLoadingFix] Log the final skeleton count being used
+  console.log('[VideoLoadingFix] Final skeleton count result:', {
     skeletonCount,
     isLoadingGenerations,
     isFetchingGenerations,
+    showVideosAfterDelay,
     videoOutputsLength: videoOutputs.length,
     sortedVideoOutputsLength: sortedVideoOutputs.length,
     willShowSkeletons: skeletonCount > 0,
     willShowActualVideos: skeletonCount === 0 && videoOutputs.length > 0,
+    reason: skeletonCount > 0 ? 'data-loading-or-video-delay' : 'ready-to-show-videos',
     timestamp: Date.now()
   });
   
