@@ -3,7 +3,6 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { SteerableMotionSettings, DEFAULT_STEERABLE_MOTION_SETTINGS } from '../components/ShotEditor/state/types';
 import { useCreateShot, useHandleExternalImageDrop, useUpdateShotName } from '@/shared/hooks/useShots';
 import { useShots } from '@/shared/contexts/ShotsContext';
-import { useListShots } from '@/shared/hooks/useShots';
 import { Shot } from '@/types/shots';
 import { Button } from '@/shared/components/ui/button';
 import { useProject } from "@/shared/contexts/ProjectContext";
@@ -35,9 +34,7 @@ const useVideoTravelData = (selectedShotId?: string, projectId?: string) => {
   // Get shots data from context (single source of truth) - full data for ShotEditor
   const { shots, isLoading: shotsLoading, error: shotsError, refetchShots } = useShots();
   
-  // Get limited shots for main list view (5 images max for performance)
-  // Always call the hook but pass null when no projectId to prevent conditional hook usage
-  const { data: limitedShots, isLoading: limitedShotsLoading } = useListShots(projectId || null, { maxImagesPerShot: 5 });
+  // Note: Removed limitedShots - ShotListDisplay now uses ShotsContext directly for consistency
   
   // Fetch public LoRAs data - always call this hook
   const publicLorasQuery = useListPublicResources('lora');
@@ -70,11 +67,9 @@ const useVideoTravelData = (selectedShotId?: string, projectId?: string) => {
 
   return {
     // Shots data
-    shots, // Full shots data for ShotEditor
-    limitedShots, // Limited shots for main list view
+    shots, // Full shots data for both ShotEditor and ShotListDisplay (from context)
     // Expose raw loading flags; page can decide how to combine based on context
     shotsLoading,
-    limitedShotsLoading, // Expose limited shots loading state for more granular control
     shotsError,
     refetchShots,
     
@@ -146,9 +141,7 @@ const VideoTravelToolPage: React.FC = () => {
   // Use parallelized data fetching for better performance
   const {
     shots,
-    limitedShots,
     shotsLoading: shotsLoadingRaw,
-    limitedShotsLoading,
     shotsError: error,
     refetchShots,
     availableLoras,
@@ -168,20 +161,16 @@ const VideoTravelToolPage: React.FC = () => {
   console.log(`${VIDEO_DEBUG_TAG} Data loading states:`, {
     shotsCount: shots?.length,
     shotsLoadingRaw,
-    limitedShotsLoading,
     selectedProjectId,
     fromContext: 'useVideoTravelData->useShots(context)'
   });
 
-  // Determine page loading state: if deep-linking to a shot via hash, don't block on limited shots loading
-  const hasHashShotIdForLoading = !!location.hash?.replace('#', '');
-  const isLoading = hasHashShotIdForLoading ? (shotsLoadingRaw) : (shotsLoadingRaw || limitedShotsLoading);
+  // Simplified loading state since both ShotEditor and ShotListDisplay use same context
+  const isLoading = shotsLoadingRaw;
   
   console.log(`${VIDEO_DEBUG_TAG} Final loading decision:`, {
     isLoading,
-    hasHashShotIdForLoading,
-    shotsLoadingRaw,
-    limitedShotsLoading
+    shotsLoadingRaw
   });
   
   const createShotMutation = useCreateShot();
@@ -1038,16 +1027,12 @@ const VideoTravelToolPage: React.FC = () => {
     return null;
   }
 
-  const shotsToDisplay = limitedShotsLoading ? undefined : (limitedShots || []);
-
   return (
     <div ref={mainContainerRef} className="w-full">
       {!shouldShowShotEditor ? (
         <>
           <ShotListDisplay
-            shots={shotsToDisplay}
             onSelectShot={handleShotSelect}
-            currentProjectId={selectedProjectId}
             onCreateNewShot={() => setIsCreateShotModalOpen(true)}
           />
         </>

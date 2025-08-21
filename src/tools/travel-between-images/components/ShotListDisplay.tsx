@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React from 'react';
 import {
   DndContext,
   closestCenter,
@@ -18,81 +18,28 @@ import {
 import { Shot } from '@/types/shots';
 import SortableShotItem from './SortableShotItem';
 import { Button } from '@/shared/components/ui/button';
-import { FadeInSection } from '@/shared/components/transitions';
 import { useReorderShots } from '@/shared/hooks/useShots';
+import { useShots } from '@/shared/contexts/ShotsContext';
+import { useProject } from '@/shared/contexts/ProjectContext';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 interface ShotListDisplayProps {
-  shots: Shot[] | undefined | null;
   onSelectShot: (shot: Shot) => void;
-  currentProjectId: string | null;
   onCreateNewShot?: () => void;
 }
 
-// Hook for progressive shot loading
-const usePrioritizedShotLoading = (shots: Shot[] | undefined | null) => {
-  const [loadedShotIndices, setLoadedShotIndices] = useState<Set<number>>(new Set());
-  const timeoutsRef = useRef<NodeJS.Timeout[]>([]);
 
-  useEffect(() => {
-    if (!shots || shots.length === 0) return;
-
-    // Clear any existing timeouts
-    timeoutsRef.current.forEach(timeout => clearTimeout(timeout));
-    timeoutsRef.current = [];
-
-    // Reset and load first 3 shots immediately
-    const initialIndices = new Set(Array.from({ length: Math.min(3, shots.length) }, (_, i) => i));
-    setLoadedShotIndices(initialIndices);
-
-    console.log('[ShotListDisplay] Loading first 3 shots immediately:', Array.from(initialIndices));
-
-    // Progressive loading for remaining shots (if more than 3)
-    if (shots.length > 3) {
-      const remainingShots = shots.length - 3;
-      const batchSize = 3;
-      const batches = Math.ceil(remainingShots / batchSize);
-
-      for (let batchIndex = 0; batchIndex < batches; batchIndex++) {
-        const delay = (batchIndex + 1) * 500; // 500ms delay between batches
-        const startIndex = 3 + (batchIndex * batchSize);
-        const endIndex = Math.min(startIndex + batchSize, shots.length);
-
-        const timeout = setTimeout(() => {
-          setLoadedShotIndices(prev => {
-            const newSet = new Set(prev);
-            for (let i = startIndex; i < endIndex; i++) {
-              newSet.add(i);
-            }
-            console.log(`[ShotListDisplay] Loading batch ${batchIndex + 1}, shots ${startIndex}-${endIndex - 1}`);
-            return newSet;
-          });
-        }, delay);
-
-        timeoutsRef.current.push(timeout);
-      }
-    }
-
-    // Cleanup function
-    return () => {
-      timeoutsRef.current.forEach(timeout => clearTimeout(timeout));
-      timeoutsRef.current = [];
-    };
-  }, [shots]);
-
-  return { loadedShotIndices };
-};
 
 const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
-  shots,
   onSelectShot,
-  currentProjectId,
   onCreateNewShot,
 }) => {
+  // Get shots data from the same context that ShotsPane uses
+  const { shots, isLoading: shotsLoading, error: shotsError } = useShots();
+  const { selectedProjectId: currentProjectId } = useProject();
   const reorderShotsMutation = useReorderShots();
   const queryClient = useQueryClient();
-  const { loadedShotIndices } = usePrioritizedShotLoading(shots);
 
   // Set up sensors for drag and drop
   const sensors = useSensors(
@@ -162,7 +109,7 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
   };
 
   // Show loading skeleton while data is being fetched
-  if (shots === undefined) {
+  if (shotsLoading || shots === undefined) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         {Array.from({ length: 6 }).map((_, idx) => (
@@ -172,8 +119,20 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
     );
   }
 
+  // Show error state if there's an error loading shots
+  if (shotsError) {
+    return (
+      <div className="py-8">
+        <p className="mb-6 text-red-500">Error loading shots: {shotsError.message}</p>
+        {onCreateNewShot && (
+          <Button onClick={onCreateNewShot}>New Shot</Button>
+        )}
+      </div>
+    );
+  }
+
   // Show empty state only when we definitively have no shots
-  if (shots.length === 0) {
+  if (!shots || shots.length === 0) {
     return (
       <div className="py-8">
         <p className="mb-6">No shots available for this project. You can create one using the button below.</p>
@@ -196,8 +155,6 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
       >
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {shots.map((shot, index) => {
-            const shouldLoadImages = loadedShotIndices.has(index);
-            
             return (
               <SortableShotItem
                 key={shot.id}
@@ -205,7 +162,7 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
                 onSelectShot={() => onSelectShot(shot)}
                 currentProjectId={currentProjectId}
                 isDragDisabled={reorderShotsMutation.isPending}
-                shouldLoadImages={shouldLoadImages}
+                shouldLoadImages={true} // Always load images since they're from context
                 shotIndex={index}
               />
             );
