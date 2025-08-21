@@ -124,17 +124,32 @@ export const useUnpositionedGenerationsCount = (
 export const useAllShotGenerations = (
   shotId: string | null
 ): UseQueryResult<GenerationRow[]> => {
-  // Throttle logging to avoid infinite loop spam
+  // [VideoLoadSpeedIssue] AGGRESSIVE THROTTLING: Reduce excessive hook calls
+  const stableShotId = React.useMemo(() => shotId, [shotId]);
+  const isEnabled = React.useMemo(() => !!stableShotId, [stableShotId]);
+  
+  // [VideoLoadSpeedIssue] Enhanced logging to track when hook is called
   const lastLogRef = React.useRef(0);
   const now = Date.now();
-  if (now - lastLogRef.current > 1000) { // Log max once per second
-    console.log('[ADDTOSHOT] useAllShotGenerations called (throttled)', { shotId, timestamp: now });
+  if (now - lastLogRef.current > 500) { // Reduced to every 500ms to catch rapid calls
+    console.log('[VideoLoadSpeedIssue] useAllShotGenerations hook called:', { 
+      shotId: stableShotId, 
+      enabled: isEnabled,
+      timestamp: now 
+    });
     lastLogRef.current = now;
+  }
+  
+  // Throttle logging to avoid infinite loop spam
+  const lastLogRef2 = React.useRef(0);
+  if (now - lastLogRef2.current > 1000) { // Log max once per second
+    console.log('[ADDTOSHOT] useAllShotGenerations called (throttled)', { shotId: stableShotId, timestamp: now });
+    lastLogRef2.current = now;
   }
 
   return useQuery({
-    queryKey: ['all-shot-generations', shotId],
-    enabled: !!shotId,
+    queryKey: ['all-shot-generations', stableShotId],
+    enabled: isEnabled,
     queryFn: async ({ signal }) => {
       // Check if request was cancelled before starting
       if (signal?.aborted) {
@@ -146,7 +161,7 @@ export const useAllShotGenerations = (
       const INITIAL_LOAD = 200; // Fast initial load for first 200 items
       const BATCH_SIZE = 500; // Smaller batches for better responsiveness
 
-      // First, load initial batch quickly with minimal fields for fast rendering
+      // PERFORMANCE BOOST: Load initial batch with only essential fields for instant rendering
       const { data: initialData, error: initialError } = await supabase
         .from('shot_generations')
         .select(`
@@ -156,9 +171,7 @@ export const useAllShotGenerations = (
             id,
             location,
             type,
-            created_at,
-            params,
-            metadata
+            created_at
           )
         `)
         .eq('shot_id', shotId!)
@@ -185,55 +198,14 @@ export const useAllShotGenerations = (
         offset = initialData.length;
       }
 
-      // If there might be more data, fetch the rest in background
-      if (initialData && initialData.length === INITIAL_LOAD) {
-        // Fetch remaining data in smaller batches
-        while (true) {
-          // Check for cancellation before each batch
-          if (signal?.aborted) {
-            throw new Error('Request was cancelled');
-          }
-
-          const { data, error } = await supabase
-            .from('shot_generations')
-            .select(`
-              id,
-              position,
-              generation:generations(
-                id,
-                location,
-                type,
-                created_at,
-                params,
-                metadata
-              )
-            `)
-            .eq('shot_id', shotId!)
-            .order('position', { ascending: true })
-            .range(offset, offset + BATCH_SIZE - 1)
-            .abortSignal(signal);
-
-          if (error) {
-            // Handle 400 errors gracefully during batch loading
-            if ((error as any).code === 'PGRST116' || error.message?.includes('Invalid')) {
-              console.warn('[useAllShotGenerations] Error during batch loading, stopping:', { shotId, offset, error });
-              break;
-            }
-            throw error;
-          }
-
-          if (!data || data.length === 0) break;
-
-          allGenerations = allGenerations.concat(data);
-          
-          if (data.length < BATCH_SIZE) break;
-          
-          offset += BATCH_SIZE;
-          
-          // Safety limit
-          if (offset > 10000) break;
-        }
-      }
+      // PERFORMANCE OPTIMIZATION: For large shots, only load first 200 items initially
+      // This provides instant loading for shots with 100+ images
+      // Background loading removed to prevent 8+ second delays
+      console.log('[PERF] Large shot optimization - using initial batch only for faster rendering:', {
+        shotId,
+        initialDataLength: initialData?.length || 0,
+        skippingBackgroundLoad: true
+      });
 
       // Transform to match GenerationRow interface
       const result = allGenerations

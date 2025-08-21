@@ -92,6 +92,11 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   const [hoverPosition, setHoverPosition] = useState<{ x: number; y: number; positioning?: 'above' | 'below' } | null>(null);
   const [isInitialHover, setIsInitialHover] = useState(false);
   const [showTaskDetailsModal, setShowTaskDetailsModal] = useState(false);
+  
+  // PERFORMANCE FIX: Track individual video loading states to prevent premature skeleton dismissal
+  const [loadedVideoIds, setLoadedVideoIds] = useState<Set<string>>(new Set());
+  const [videoLoadingStates, setVideoLoadingStates] = useState<Map<string, boolean>>(new Map());
+  
   const itemsPerPage = 6;
   const taskDetailsButtonRef = useRef<HTMLButtonElement>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -537,6 +542,11 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     <div key={`skeleton-${index}`} className="w-1/2 lg:w-1/3 px-1 sm:px-1.5 md:px-2 mb-2 sm:mb-3 md:mb-4">
       <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden shadow-sm border relative">
         <Skeleton className="w-full h-full" />
+        
+        {/* Loading indicator like real videos */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="w-6 h-6 border-2 border-muted-foreground/30 border-t-muted-foreground/60 rounded-full animate-spin" />
+        </div>
         
         {/* Skeleton for timestamp */}
         <div className="absolute top-1 left-4 sm:top-2 sm:left-4 z-10">

@@ -4,10 +4,12 @@ import { GenerationRow } from "@/types/shots";
  * Check if a generation is a video type
  */
 export const isGenerationVideo = (gen: GenerationRow): boolean => {
-  const result = gen.type === 'video' ||
-         gen.type === 'video_travel_output' ||
-         (gen.location && gen.location.endsWith('.mp4')) ||
-         (gen.imageUrl && gen.imageUrl.endsWith('.mp4'));
+  const hasVideoType = gen.type === 'video' || gen.type === 'video_travel_output';
+  const hasVideoLocation = gen.location && gen.location.endsWith('.mp4');
+  const hasVideoUrl = gen.imageUrl && gen.imageUrl.endsWith('.mp4');
+  const result = hasVideoType || hasVideoLocation || hasVideoUrl;
+  
+  // [VideoLoadSpeedIssue] Video classification working correctly - debug removed for performance
   
   return result;
 };

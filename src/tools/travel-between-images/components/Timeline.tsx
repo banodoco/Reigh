@@ -55,6 +55,20 @@ const Timeline: React.FC<TimelineProps> = ({
   pendingPositions,
   onPendingPositionApplied
 }) => {
+  // Light Timeline performance tracking
+  const renderCountRef = React.useRef(0);
+
+  React.useEffect(() => {
+    renderCountRef.current++;
+    // Only log significant render counts
+    if (renderCountRef.current === 1 || renderCountRef.current % 10 === 0) {
+      console.log('[PERF] Timeline renders:', {
+        renderCount: renderCountRef.current,
+        shotId,
+        imagesCount: images.length
+      });
+    }
+  });
   // Core state
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 

@@ -63,6 +63,21 @@ const ShotImageManager: React.FC<ShotImageManagerProps> = ({
   duplicateSuccessImageId,
   projectAspectRatio,
 }) => {
+  // Light performance tracking for ShotImageManager
+  const renderCountRef = React.useRef(0);
+
+  React.useEffect(() => {
+    renderCountRef.current++;
+    // Only log when there are many re-renders (potential issue)
+    if (renderCountRef.current > 5 && renderCountRef.current % 5 === 0) {
+      console.log('[PERF] ShotImageManager excessive renders:', {
+        renderCount: renderCountRef.current,
+        imagesCount: images.length,
+        columns,
+        generationMode
+      });
+    }
+  });
   // State for drag and drop
   const [activeId, setActiveId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -1071,20 +1086,9 @@ const MobileImageItem: React.FC<MobileImageItemProps> = ({
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageLoadError, setImageLoadError] = useState(false);
 
-  // Debug logging for this specific image
+  // [VideoLoadSpeedIssue] PERFORMANCE FIX: Removed excessive per-image logging
+  // This was causing severe performance issues with large image sets
   const debugId = `[MobileImageItem-${index}:${image.id?.substring(0, 8)}]`;
-
-  // Initial render logging
-  console.log(`${debugId} 🎬 Component render`, {
-    imageUrl: imageUrl?.substring(0, 50) + '...',
-    displayUrl: displayUrl?.substring(0, 50) + '...',
-    shouldLoad,
-    imageLoaded,
-    imageLoadError,
-    isPlaceholder: displayUrl === '/placeholder.svg',
-    hasDisplayUrl: !!displayUrl,
-    timestamp: Date.now()
-  });
 
   // Calculate aspect ratio for placeholder
   const getAspectRatioStyle = () => {
@@ -1204,92 +1208,39 @@ const MobileImageItem: React.FC<MobileImageItemProps> = ({
           alt=""
           style={{ display: 'none' }}
           onLoad={() => {
-            console.log(`${debugId} ✅ Image loaded successfully`, {
-              displayUrl: displayUrl?.substring(0, 50) + '...',
-              shouldLoad,
-              imageLoaded,
-              imageLoadError,
-              timestamp: Date.now()
-            });
+            // [VideoLoadSpeedIssue] Removed excessive logging for performance
             setImageLoaded(true);
             setImageLoadError(false);
           }}
           onError={() => {
-            console.error(`${debugId} ❌ Image failed to load`, {
-              displayUrl: displayUrl?.substring(0, 50) + '...',
-              shouldLoad,
-              imageLoaded,
-              imageLoadError,
-              timestamp: Date.now()
-            });
+            // [VideoLoadSpeedIssue] Keep error logging but reduce verbosity
+            console.error(`${debugId} ❌ Image failed to load`);
             setImageLoadError(true);
           }}
         />
-      ) : (
-        (() => {
-          console.log(`${debugId} ⏭️ Skipping hidden image creation`, {
-            shouldLoad,
-            hasDisplayUrl: !!displayUrl,
-            isPlaceholder: displayUrl === '/placeholder.svg',
-            displayUrl: displayUrl?.substring(0, 50) + '...',
-            timestamp: Date.now()
-          });
-          return null;
-        })()
-      )}
+      ) : null}
       
       {/* Show loading spinner or placeholder */}
       {shouldLoad && !imageLoaded && !imageLoadError ? (
-        (() => {
-          console.log(`${debugId} 🔄 Showing loading spinner`, {
-            shouldLoad,
-            imageLoaded,
-            imageLoadError,
-            timestamp: Date.now()
-          });
-          return (
-            <div className="w-full h-full flex items-center justify-center bg-muted animate-pulse">
-              <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-primary"></div>
-            </div>
-          );
-        })()
+        <div className="w-full h-full flex items-center justify-center bg-muted animate-pulse">
+          <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-primary"></div>
+        </div>
       ) : null}
       
       {/* Show error state */}
       {imageLoadError ? (
-        (() => {
-          console.log(`${debugId} ⚠️ Showing error state`, {
-            shouldLoad,
-            imageLoaded,
-            imageLoadError,
-            displayUrl: displayUrl?.substring(0, 50) + '...',
-            timestamp: Date.now()
-          });
-          return (
-            <div className="w-full h-full flex items-center justify-center bg-muted text-muted-foreground">
-              <div className="text-center">
-                <div className="text-lg mb-1">⚠️</div>
-                <div className="text-xs">Failed to load</div>
-              </div>
-            </div>
-          );
-        })()
+        <div className="w-full h-full flex items-center justify-center bg-muted text-muted-foreground">
+          <div className="text-center">
+            <div className="text-lg mb-1">⚠️</div>
+            <div className="text-xs">Failed to load</div>
+          </div>
+        </div>
       ) : null}
       
       {/* Show placeholder when shouldLoad is false */}
       {!shouldLoad ? (
-        (() => {
-          console.log(`${debugId} 📷 Showing placeholder (shouldLoad=false)`, {
-            shouldLoad,
-            imageLoaded,
-            imageLoadError,
-            timestamp: Date.now()
-          });
-          return (
-            <div className="w-full h-full bg-muted animate-pulse">
-            </div>
-          );
-        })()
+        <div className="w-full h-full bg-muted animate-pulse">
+        </div>
       ) : null}
       
       {!hideDeleteButton && (

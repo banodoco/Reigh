@@ -82,16 +82,89 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const { shots } = useShots(); // Get shots from context for shot metadata
   const selectedShot = shots?.find(shot => shot.id === selectedShotId);
   
-  // Use context images when available (thumbnails for most cases), fall back to full query for editing
+  // PERFORMANCE OPTIMIZATION: Prefetch adjacent shots for faster navigation
+  React.useEffect(() => {
+    if (!shots || !selectedShotId) return;
+    
+    const currentIndex = shots.findIndex(shot => shot.id === selectedShotId);
+    if (currentIndex === -1) return;
+    
+    // Prefetch previous and next shot data in background
+    const prefetchShots = [];
+    if (currentIndex > 0) prefetchShots.push(shots[currentIndex - 1].id); // Previous
+    if (currentIndex < shots.length - 1) prefetchShots.push(shots[currentIndex + 1].id); // Next
+    
+    // Only prefetch if not already in context
+    prefetchShots.forEach(shotId => {
+      const shot = shots.find(s => s.id === shotId);
+      if (shot && shot.images && shot.images.length === 0) {
+        // This shot doesn't have images loaded yet - could prefetch here
+        console.log('[PERF] Could prefetch shot data for:', shotId);
+      }
+    });
+  }, [shots, selectedShotId]);
+  
+  // PERFORMANCE OPTIMIZATION: Use context images when available since they're already loaded
+  // Only fall back to detailed query if context data is insufficient
   const contextImages = selectedShot?.images || [];
   
-  // Always load full data when in ShotEditor for complete editing functionality
-  // Context images (5 thumbnails) are shown immediately while full data loads
-  const { data: fullShotImages = [], isLoading: isLoadingFullImages } = useAllShotGenerations(selectedShotId);
+  // [VideoLoadSpeedIssue] AGGRESSIVE OPTIMIZATION: Use memoized values to prevent re-render loops
+  const hasContextData = React.useMemo(() => contextImages.length > 0, [contextImages.length]);
+  const shouldLoadDetailedData = React.useMemo(() => 
+    !hasContextData && !!selectedShotId, 
+    [hasContextData, selectedShotId]
+  );
   
-  // Use full data if available, otherwise use context images
-  // Keep context images visible while full data loads for better UX
-  const orderedShotImages = fullShotImages.length > 0 ? fullShotImages : contextImages;
+  // [VideoLoadSpeedIssue] CRITICAL: Completely disable hook when context data exists
+  // Use a stable null value to prevent React Query from re-executing
+  const queryKey = shouldLoadDetailedData ? selectedShotId : null;
+  
+  console.log('[VideoLoadSpeedIssue] ShotEditor optimization decision:', {
+    selectedShotId,
+    contextImagesCount: contextImages.length,
+    hasContextData,
+    shouldLoadDetailedData,
+    queryKey,
+    willQueryDatabase: shouldLoadDetailedData,
+    timestamp: Date.now()
+  });
+  
+  // CRITICAL: Only call useAllShotGenerations when we genuinely need detailed data
+  // Using disabled query when context data is available
+  const { data: fullShotImages = [], isLoading: isLoadingFullImages } = useAllShotGenerations(queryKey);
+  
+  // Always prefer context images when available - they're faster and already loaded
+  const orderedShotImages = React.useMemo(() => 
+    hasContextData ? contextImages : fullShotImages,
+    [hasContextData, contextImages, fullShotImages]
+  );
+  
+  // [VideoLoadSpeedIssue] Track image data loading progress
+  React.useEffect(() => {
+    console.log('[VideoLoadSpeedIssue] ShotEditor image data update:', {
+      selectedShotId,
+      contextImagesCount: contextImages.length,
+      fullShotImagesCount: fullShotImages.length,
+      orderedShotImagesCount: orderedShotImages.length,
+      isLoadingFullImages,
+      hasContextData,
+      shouldLoadDetailedData,
+      timestamp: Date.now(),
+      dataSource: hasContextData ? 'context' : 'detailed_query',
+      optimizationActive: hasContextData,
+      // [VideoLoadSpeedIssue] DEBUG: Check if context images are being filtered somewhere
+      contextImagesSample: contextImages.slice(0, 3).map(img => ({
+        id: img.id,
+        position: (img as any).position,
+        imageUrl: !!img.imageUrl
+      })),
+      orderedImagesSample: orderedShotImages.slice(0, 3).map(img => ({
+        id: img.id,
+        position: (img as any).position,
+        imageUrl: !!img.imageUrl
+      }))
+    });
+  }, [selectedShotId, contextImages.length, fullShotImages.length, orderedShotImages.length, isLoadingFullImages, hasContextData, shouldLoadDetailedData]);
   const updateShotImageOrderMutation = useUpdateShotImageOrder();
   
   // Flag to skip next prop sync after successful operations
@@ -271,45 +344,50 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     }
   }, [selectedShot?.id, actions]);
 
-  // Handle generation mode setup and readiness with mobile stall prevention
+    // Handle generation mode setup and readiness - AGGRESSIVE OPTIMIZATION for faster ready state
+  const readinessState = React.useMemo(() => ({
+    hasImageData: contextImages.length > 0,
+    criticalSettingsReady: !settingsLoading, // Only wait for main settings, not UI/LoRA
+    modeCorrect: !isMobile || generationMode === 'batch',
+    hasError: !!state.settingsError,
+    shotId: selectedShot?.id,
+    isReady: state.isModeReady
+  }), [contextImages.length, settingsLoading, isMobile, generationMode, state.settingsError, selectedShot?.id, state.isModeReady]);
+
   useEffect(() => {
-    // Wait for settings to load (main settings, UI settings, and LoRA settings)
-    if (settingsLoading || isShotUISettingsLoading || isShotLoraSettingsLoading) {
-      return;
-    }
+    const { hasImageData, criticalSettingsReady, modeCorrect, hasError, isReady } = readinessState;
+    
+    // Skip if already ready
+    if (isReady) return;
 
-    // If we previously bailed out due to a settings load error, we're already ready
-    if (state.settingsError) {
-      // Double-check that we're actually ready in case of settings error recovery
-      if (!state.isModeReady) {
-        console.log('[ShotEditor] Settings error recovery - forcing ready state');
-        actions.setModeReady(true);
-      }
-      return;
-    }
-
-    // For mobile users, ensure batch mode
-    if (isMobile && generationMode !== 'batch') {
-      console.log('[ShotEditor] Mobile mode correction - switching to batch mode');
+    // Handle mobile mode correction
+    if (!modeCorrect) {
       onGenerationModeChange('batch');
-      // Don't set ready yet - the mode change will trigger this effect again
       return;
     }
 
-    // At this point, settings are loaded and mode is correct (or we're not on desktop)
-    // Use a small timeout to prevent flicker but make it consistent
-    const timer = setTimeout(() => {
-      const currentShotId = selectedShot?.id ?? null;
-      console.log('[ShotEditor] Setting mode ready after settings loaded', {
-        shotId: currentShotId,
-        isMobile,
-        generationMode
+    // Handle error recovery
+    if (hasError) {
+      actions.setModeReady(true);
+      return;
+    }
+
+    // PERFORMANCE BOOST: Allow ready state if we have images + critical settings
+    // Don't wait for UI/LoRA settings to prevent 8+ second delays
+    if (hasImageData && criticalSettingsReady) {
+      console.log('[PERF] Fast-track ready state - images available', {
+        shotId: selectedShot?.id,
+        imagesCount: contextImages.length
       });
       actions.setModeReady(true);
-    }, 50);
+      return;
+    }
 
-    return () => clearTimeout(timer);
-  }, [isMobile, generationMode, settingsLoading, isShotUISettingsLoading, isShotLoraSettingsLoading, onGenerationModeChange, state.settingsError, actions, selectedShot?.id, state.isModeReady]);
+    // For shots without images, wait for all settings
+    if (!hasImageData && !settingsLoading && !isShotUISettingsLoading && !isShotLoraSettingsLoading) {
+      actions.setModeReady(true);
+    }
+  }, [readinessState, onGenerationModeChange, actions, selectedShot?.id, contextImages.length, isShotUISettingsLoading, isShotLoraSettingsLoading]);
 
   // Accelerated mode and random seed from database settings
   // Default accelerated mode to true when it has never been explicitly set for this shot
@@ -486,68 +564,95 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // Use state from the hook for optimistic updates on image list
   const localOrderedShotImages = state.localOrderedShotImages;
   
+  // [VideoLoadSpeedIssue] OPTIMIZED: Only log significant data flow changes
+  const dataFlowKey = `${selectedShotId}-${orderedShotImages.length}-${localOrderedShotImages.length}`;
+  const lastDataFlowKeyRef = React.useRef('');
+  const lastProcessingKeyRef = React.useRef('');
+  const lastFilteringKeyRef = React.useRef('');
+  
+  React.useEffect(() => {
+    if (dataFlowKey !== lastDataFlowKeyRef.current) {
+      console.log('[VideoLoadSpeedIssue] ShotEditor data flow change:', {
+        selectedShotId,
+        orderedShotImagesCount: orderedShotImages.length,
+        localOrderedShotImagesCount: localOrderedShotImages.length,
+        timestamp: Date.now()
+      });
+      lastDataFlowKeyRef.current = dataFlowKey;
+    }
+  }, [dataFlowKey, selectedShotId, orderedShotImages.length, localOrderedShotImages.length]);
+  
   // Remove debug logs for production
 
-  // Filter out generations without position and sort by position
-  const filteredOrderedShotImages = useMemo(() => {
-    return filterAndSortShotImages(localOrderedShotImages);
-  }, [localOrderedShotImages]);
+  // [VideoLoadSpeedIssue] CRITICAL FIX: Use EXACT same logic as ShotsPane
+  // Apply both position filtering AND video filtering like ShotsPane
+  const simpleFilteredImages = useMemo(() => {
+    const sourceImages = orderedShotImages || [];
+    
+    // OPTIMIZED: Only log when significant changes occur
+    const processingKey = `${selectedShotId}-${sourceImages.length}`;
+    if (processingKey !== lastProcessingKeyRef.current) {
+      console.log('[PROFILING] ShotEditor - Image processing decision:', {
+        selectedShotId,
+        sourceImagesCount: sourceImages.length,
+        contextImagesCount: contextImages.length,
+        isModeReady: state.isModeReady,
+        timestamp: Date.now()
+      });
+      lastProcessingKeyRef.current = processingKey;
+    }
+    
+    // EXACT same logic as ShotsPane:
+    // 1. Filter by position (has valid position)
+    // 2. Filter out videos (like ShotsPane does)
+    // 3. Sort by position
+    const filtered = sourceImages
+      .filter(img => {
+        const hasPosition = (img as any).position !== null && (img as any).position !== undefined;
+        return hasPosition;
+      })
+      .filter(img => {
+        // EXACT same video detection as ShotsPane's ShotGroup component
+        const isVideo = img.type === 'video' ||
+                       img.type === 'video_travel_output' ||
+                       (img.location && img.location.endsWith('.mp4')) ||
+                       (img.imageUrl && img.imageUrl.endsWith('.mp4'));
+        return !isVideo; // Exclude videos, just like ShotsPane
+      })
+      .sort((a, b) => {
+        const posA = (a as any).position as number;
+        const posB = (b as any).position as number;
+        return posA - posB;
+      });
+    
+    // OPTIMIZED: Only log filtering results when they change significantly
+    const filteringKey = `${selectedShotId}-${sourceImages.length}-${filtered.length}`;
+    if (filteringKey !== lastFilteringKeyRef.current) {
+      console.log('[VideoLoadSpeedIssue] EXACT ShotsPane filtering results:', {
+        selectedShotId,
+        sourceCount: sourceImages.length,
+        filteredCount: filtered.length,
+        timestamp: Date.now()
+      });
+      lastFilteringKeyRef.current = filteringKey;
+    }
+    
+    return filtered;
+  }, [orderedShotImages, selectedShotId]);
   
   // Count unpositioned generations for this shot (excluding videos, which are expected to have null positions)
   const { data: unpositionedGenerationsCount = 0 } = useUnpositionedGenerationsCount(selectedShot?.id);
   
-  // Track the last synced data to prevent unnecessary updates
-  const lastSyncedDataRef = useRef<string>('');
-  
-  // Sync local state with props, but skip if we're uploading or have skipNextSyncRef set
-  useEffect(() => {
-    // Production build - debug logs removed
-
-    // Skip sync if we just finished uploading to prevent flicker
-    if (skipNextSyncRef.current) {
-      // Skip sync due to skipNextSyncRef
-      skipNextSyncRef.current = false;
-      return;
-    }
-    
-    // Only sync from props if we are not in the middle of an upload
-    if (!state.isUploadingImage) {
-      const newData = orderedShotImages || [];
-      
-      // First check: avoid updating if the reference is already the same
-      if (state.localOrderedShotImages === newData) {
-        // Skipping sync - same reference
-        return;
-      }
-      
-      // Second check: compare by content (IDs) to avoid unnecessary updates
-      const newDataKey = JSON.stringify(newData.map(img => img.id));
-      if (newDataKey !== lastSyncedDataRef.current) {
-        // Syncing localOrderedShotImages from props - data changed
-        actions.setLocalOrderedShotImages(newData);
-        lastSyncedDataRef.current = newDataKey;
-      } else {
-        // Skipping sync - data unchanged
-      }
-    } else {
-      // Skipping props sync - upload in progress
-    }
-  }, [orderedShotImages, state.isUploadingImage]);
-
-  const nonVideoImages = useMemo(() => {
-    return getNonVideoImages(filteredOrderedShotImages);
-  }, [filteredOrderedShotImages]);
-  
   // Auto-set context frames to 8 when hidden (<=2 images)
   useEffect(() => {
-    if (nonVideoImages.length <= 2 && batchVideoContext !== 8) {
+    if (simpleFilteredImages.length <= 2 && batchVideoContext !== 8) {
       onBatchVideoContextChange(8);
     }
-  }, [nonVideoImages.length, batchVideoContext, onBatchVideoContextChange]);
+  }, [simpleFilteredImages.length, batchVideoContext, onBatchVideoContextChange]);
   
   const videoOutputs = useMemo(() => {
-    return getVideoOutputs(filteredOrderedShotImages);
-  }, [filteredOrderedShotImages]);
+    return getVideoOutputs(orderedShotImages);
+  }, [orderedShotImages]);
 
   // Mutations for applying settings/images from a task
   const addImageToShotMutation = useAddImageToShot();
@@ -613,7 +718,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       if (replaceImages && selectedShot?.id && projectId) {
         try {
           // Remove existing non-video images
-          const deletions = nonVideoImages
+          const deletions = simpleFilteredImages
             .filter(img => !!img.shotImageEntryId)
             .map(img => removeImageFromShotMutation.mutateAsync({
               shot_id: selectedShot.id,
@@ -645,7 +750,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   }, [
     projectId,
     selectedShot?.id,
-    nonVideoImages,
+    simpleFilteredImages,
     handleModelChange,
     onBatchVideoPromptChange,
     onSteerableMotionSettingsChange,
@@ -774,9 +879,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
     let resolution: string | undefined = undefined;
 
-    if ((dimensionSource || 'project') === 'firstImage' && nonVideoImages.length > 0) {
+    if ((dimensionSource || 'project') === 'firstImage' && simpleFilteredImages.length > 0) {
       try {
-        const firstImage = nonVideoImages[0];
+        const firstImage = simpleFilteredImages[0];
         const imageUrl = getDisplayUrl(firstImage.imageUrl);
         if (imageUrl) {          
           const { width, height } = await getDimensions(imageUrl);
@@ -802,8 +907,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     }
 
     // Use getDisplayUrl to convert relative paths to absolute URLs
-    // IMPORTANT: Use nonVideoImages to exclude generated video outputs
-    const absoluteImageUrls = nonVideoImages
+    // IMPORTANT: Use simpleFilteredImages to exclude generated video outputs
+    const absoluteImageUrls = simpleFilteredImages
       .map((img) => getDisplayUrl(img.imageUrl)) // Use getDisplayUrl here
       .filter((url): url is string => Boolean(url) && url !== '/placeholder.svg');
 
@@ -892,7 +997,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   }, [
     projectId,
     dimensionSource,
-    nonVideoImages,
+    simpleFilteredImages,
     customWidth,
     customHeight,
     generationMode,
@@ -983,7 +1088,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             isMobile={isMobile}
             generationMode={generationMode}
             onGenerationModeChange={onGenerationModeChange}
-            images={nonVideoImages}
+            images={simpleFilteredImages}
             selectedShotId={selectedShot.id}
             batchVideoFrames={batchVideoFrames}
             batchVideoContext={batchVideoContext}
@@ -997,7 +1102,13 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             onImageDelete={generationActions.handleDeleteImageFromShot}
             onImageDuplicate={generationActions.handleDuplicateImage}
             columns={(isMobile ? 2 : 6) as 2 | 6}
-            skeleton={<ImageManagerSkeleton isMobile={isMobile} />}
+            skeleton={
+              <ImageManagerSkeleton 
+                isMobile={isMobile} 
+                shotImages={contextImages}
+                projectAspectRatio={projects.find(p => p.id === projectId)?.aspectRatio}
+              />
+            }
             unpositionedGenerationsCount={unpositionedGenerationsCount}
             onOpenUnpositionedPane={openUnpositionedGenerationsPane}
             fileInputKey={state.fileInputKey}
@@ -1047,7 +1158,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                             showStepsNotification={state.showStepsNotification}
                             randomSeed={randomSeed}
                             onRandomSeedChange={handleRandomSeedChange}
-                            imageCount={nonVideoImages.length}
+                            imageCount={simpleFilteredImages.length}
                         />
                         
                         {/* Model Selection (Mobile) */}

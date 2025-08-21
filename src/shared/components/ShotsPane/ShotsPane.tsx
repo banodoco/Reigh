@@ -65,6 +65,17 @@ export const ShotsPane: React.FC = () => {
   
   // Filter and sort shots
   const filteredShots = useMemo(() => {
+    // [VideoLoadSpeedIssue] Track ShotsPane data availability
+    console.log('[VideoLoadSpeedIssue] ShotsPane shots data:', {
+      shotsCount: shots?.length || 0,
+      isLoading,
+      timestamp: Date.now(),
+      firstShotPreview: shots?.[0] ? {
+        id: shots[0].id,
+        imagesCount: shots[0].images?.length || 0
+      } : null
+    });
+    
     if (!shots) {
       return [];
     }

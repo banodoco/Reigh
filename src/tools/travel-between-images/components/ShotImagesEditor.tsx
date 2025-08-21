@@ -1,4 +1,4 @@
-import React, { Suspense } from "react";
+import React from "react";
 import { GenerationRow } from "@/types/shots";
 import { Card, CardHeader, CardTitle, CardContent } from "@/shared/components/ui/card";
 import { ToggleGroup, ToggleGroupItem } from "@/shared/components/ui/toggle-group";
@@ -96,6 +96,23 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   duplicateSuccessImageId,
   projectAspectRatio,
 }) => {
+  // Light performance tracking - only log significant events
+  const renderCountRef = React.useRef(0);
+  const mountTimeRef = React.useRef(Date.now());
+
+  React.useEffect(() => {
+    renderCountRef.current++;
+    // Only log every 10th render or when switching shots
+    if (renderCountRef.current % 10 === 0 || renderCountRef.current === 1) {
+      console.log('[PERF] ShotImagesEditor:', {
+        renderCount: renderCountRef.current,
+        selectedShotId,
+        imagesCount: images.length,
+        isModeReady,
+        totalTime: Date.now() - mountTimeRef.current
+      });
+    }
+  });
   /* ------------------------------------------------------------------ */
   /* Skeleton state                                                     */
   /* ------------------------------------------------------------------ */
@@ -156,27 +173,19 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
       <CardContent>
         <div className="p-1">
           {generationMode === "timeline" ? (
-            <Suspense
-              fallback={
-                <div className="flex items-center justify-center p-8">
-                  <div className="text-sm text-muted-foreground">Loading Timeline...</div>
-                </div>
-              }
-            >
-              <Timeline
-                shotId={selectedShotId}
-                images={images}
-                frameSpacing={batchVideoFrames}
-                contextFrames={batchVideoContext}
-                onImageReorder={onImageReorder}
-                onImageSaved={onImageSaved}
-                onContextFramesChange={onContextFramesChange}
-                onFramePositionsChange={onFramePositionsChange}
-                onImageDrop={onImageDrop}
-                pendingPositions={pendingPositions}
-                onPendingPositionApplied={onPendingPositionApplied}
-              />
-            </Suspense>
+            <Timeline
+              shotId={selectedShotId}
+              images={images}
+              frameSpacing={batchVideoFrames}
+              contextFrames={batchVideoContext}
+              onImageReorder={onImageReorder}
+              onImageSaved={onImageSaved}
+              onContextFramesChange={onContextFramesChange}
+              onFramePositionsChange={onFramePositionsChange}
+              onImageDrop={onImageDrop}
+              pendingPositions={pendingPositions}
+              onPendingPositionApplied={onPendingPositionApplied}
+            />
           ) : (
             <ShotImageManager
               images={images}
