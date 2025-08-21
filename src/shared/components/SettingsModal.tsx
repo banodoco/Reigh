@@ -247,12 +247,9 @@ python worker.py --db-type supabase \\
     const token = generatedToken || getActiveToken()?.token || 'your-api-token';
     
     if (computerType === "windows") {
-      return `git pull; \`
-& venv\\Scripts\\Activate.ps1; \`
-python worker.py --db-type supabase \`
-  --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \`
-  --supabase-anon-key ${SUPABASE_ANON_KEY} \`
-  --supabase-access-token ${token}`;
+      return `git pull
+venv\\Scripts\\activate.bat
+python worker.py --db-type supabase --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co --supabase-anon-key ${SUPABASE_ANON_KEY} --supabase-access-token ${token}`;
     } else {
       // Linux / Mac command
       return `git pull && \\
@@ -528,6 +525,7 @@ python worker.py --db-type supabase \\
                       </div>
                     )}
                     
+
                     {computerType !== "mac" && (
                       <Tabs value={activeInstallTab} onValueChange={setActiveInstallTab} className="w-full">
                         <TabsList className="grid w-full grid-cols-2 bg-gray-100 border border-gray-200">
@@ -547,6 +545,115 @@ python worker.py --db-type supabase \\
 
                       <TabsContent value="need-install" className="space-y-4">
                         <div className="space-y-4">
+                          {/* Windows Prerequisites */}
+                          {computerType === "windows" && (
+                            <Alert>
+                              <AlertDescription>
+                                <p className="text-sm">
+                                  Prerequisites (install manually if not already installed):
+                                </p>
+                                <ul className="list-disc pl-5 mt-2 text-sm space-y-3">
+                                  <li className="flex items-center gap-2">
+                                    <span>
+                                      Python 3.10+ from {""}
+                                      <a
+                                        href="https://python.org"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="underline text-blue-600 hover:text-blue-800"
+                                      >
+                                        python.org
+                                      </a>
+                                    </span>
+                                    <TooltipProvider>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help" />
+                                        </TooltipTrigger>
+                                        <TooltipContent className="max-w-sm">
+                                          <div className="py-2 space-y-2">
+                                            <p className="font-medium">Python Installation:</p>
+                                            <ol className="text-sm space-y-1 list-decimal list-inside">
+                                              <li>Download from python.org (not Microsoft Store)</li>
+                                              <li>During install, check "Add Python to PATH"</li>
+                                              <li>Verify by typing "python --version" in terminal</li>
+                                            </ol>
+                                          </div>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  </li>
+                                  <li className="flex items-center gap-2">
+                                    <span>
+                                      Git from {""}
+                                      <a
+                                        href="https://git-scm.com/download/win"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="underline text-blue-600 hover:text-blue-800"
+                                      >
+                                        git-scm.com/download/win
+                                      </a>
+                                    </span>
+                                    <TooltipProvider>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help" />
+                                        </TooltipTrigger>
+                                        <TooltipContent className="max-w-sm">
+                                          <div className="py-2 space-y-2">
+                                            <p className="font-medium">Git Installation:</p>
+                                            <ol className="text-sm space-y-1 list-decimal list-inside">
+                                              <li>Download Git for Windows installer</li>
+                                              <li>Use default settings during installation</li>
+                                              <li>Verify by typing "git --version" in terminal</li>
+                                              <li>Restart terminal/computer if command not found</li>
+                                            </ol>
+                                          </div>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  </li>
+                                  <li className="flex items-center gap-2">
+                                    <span>
+                                      FFmpeg from {""}
+                                      <a
+                                        href="https://ffmpeg.org/download.html"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="underline text-blue-600 hover:text-blue-800"
+                                      >
+                                        ffmpeg.org/download.html
+                                      </a>{" "}
+                                      (add to PATH)
+                                    </span>
+                                    <TooltipProvider>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help" />
+                                        </TooltipTrigger>
+                                        <TooltipContent className="max-w-sm">
+                                          <div className="py-2 space-y-2">
+                                            <p className="font-medium">FFmpeg Installation:</p>
+                                            <ol className="text-sm space-y-1 list-decimal list-inside">
+                                              <li>Download "Windows builds by BtbN" (recommended)</li>
+                                              <li>Extract to C:\ffmpeg</li>
+                                              <li>Add C:\ffmpeg\bin to system PATH</li>
+                                              <li>Restart terminal and verify with "ffmpeg -version"</li>
+                                            </ol>
+                                            <p className="text-xs text-gray-600 mt-2">
+                                              Need PATH help? Search "Windows add to PATH" on YouTube
+                                            </p>
+                                          </div>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  </li>
+                                </ul>
+                              </AlertDescription>
+                            </Alert>
+                          )}
+                          
                           <div>
                             <p className="text-sm text-gray-600 mb-4">
                               Run this command to install and start the local worker:
@@ -594,58 +701,14 @@ python worker.py --db-type supabase \\
                             </Button>
                           )}
 
-                          {computerType === "windows" && (
-                            <Alert>
-                              <AlertDescription>
-                                <p className="text-sm">
-                                  Prerequisites (install manually if not already installed):
-                                </p>
-                                <ul className="list-disc pl-5 mt-2 text-sm space-y-1">
-                                  <li>
-                                    Python 3.10+ from {""}
-                                    <a
-                                      href="https://python.org"
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="underline text-blue-600 hover:text-blue-800"
-                                    >
-                                      python.org
-                                    </a>
-                                  </li>
-                                  <li>
-                                    Git from {""}
-                                    <a
-                                      href="https://git-scm.com/download/win"
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="underline text-blue-600 hover:text-blue-800"
-                                    >
-                                      git-scm.com/download/win
-                                    </a>
-                                  </li>
-                                  <li>
-                                    FFmpeg from {""}
-                                    <a
-                                      href="https://ffmpeg.org/download.html"
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="underline text-blue-600 hover:text-blue-800"
-                                    >
-                                      ffmpeg.org/download.html
-                                    </a>{" "}
-                                    (add to PATH)
-                                  </li>
-                                </ul>
-                              </AlertDescription>
-                            </Alert>
-                          )}
 
-                          <Button 
-                            onClick={handleCopyInstallCommand}
-                            variant="wes"
-                            size="wes-default"
-                            className="w-full"
-                          >
+
+                                                     <Button 
+                             onClick={handleCopyInstallCommand}
+                             variant="outline"
+                             size="default"
+                             className="w-full"
+                           >
                             {copiedInstallCommand ? (
                               "Copied!"
                             ) : (
@@ -732,8 +795,8 @@ python worker.py --db-type supabase \\
 
                           <Button 
                             onClick={handleCopyRunCommand}
-                            variant="wes"
-                            size="wes-default"
+                            variant="outline"
+                            size="default"
                             className="w-full"
                           >
                             {copiedRunCommand ? (
