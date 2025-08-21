@@ -24,6 +24,32 @@ import { useVideoCountCache } from '@/shared/hooks/useVideoCountCache';
 
 // SIMPLIFIED: No wrapper needed - use direct HoverScrubVideo
 
+// Skeleton component for loading states - defined outside to prevent recreation
+const VideoSkeleton = React.memo(({ index }: { index: number }) => (
+  <div className="w-1/2 lg:w-1/3 px-1 sm:px-1.5 md:px-2 mb-2 sm:mb-3 md:mb-4">
+    <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden shadow-sm border relative">
+      <Skeleton className="w-full h-full" />
+      
+      {/* Loading indicator like real videos - stable animation */}
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="w-6 h-6 border-2 border-muted-foreground/30 border-t-muted-foreground/60 rounded-full animate-spin" 
+             style={{ animationDuration: '1s' }} />
+      </div>
+      
+      {/* Skeleton for timestamp */}
+      <div className="absolute top-1 left-4 sm:top-2 sm:left-4 z-10">
+        <Skeleton className="h-4 w-16 rounded" />
+      </div>
+      
+      {/* Skeleton for action buttons */}
+      <div className="absolute top-1/2 right-2 sm:right-3 flex flex-col items-end gap-1 -translate-y-1/2 z-20">
+        <Skeleton className="h-6 w-6 sm:h-7 sm:w-7 rounded-full" />
+        <Skeleton className="h-6 w-6 sm:h-7 sm:w-7 rounded-full" />
+      </div>
+    </div>
+  </div>
+));
+
 interface VideoOutputsGalleryProps {
   // Data source
   projectId: string | null;
@@ -563,31 +589,6 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   const endIndex = startIndex + itemsPerPage;
   const currentVideoOutputs = sortedVideoOutputs.slice(startIndex, endIndex);
 
-  // Skeleton component for loading states
-  const VideoSkeleton = ({ index }: { index: number }) => (
-    <div key={`skeleton-${index}`} className="w-1/2 lg:w-1/3 px-1 sm:px-1.5 md:px-2 mb-2 sm:mb-3 md:mb-4">
-      <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden shadow-sm border relative">
-        <Skeleton className="w-full h-full" />
-        
-        {/* Loading indicator like real videos */}
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="w-6 h-6 border-2 border-muted-foreground/30 border-t-muted-foreground/60 rounded-full animate-spin" />
-        </div>
-        
-        {/* Skeleton for timestamp */}
-        <div className="absolute top-1 left-4 sm:top-2 sm:left-4 z-10">
-          <Skeleton className="h-4 w-16 rounded" />
-        </div>
-        
-        {/* Skeleton for action buttons */}
-        <div className="absolute top-1/2 right-2 sm:right-3 flex flex-col items-end gap-1 -translate-y-1/2 z-20">
-          <Skeleton className="h-6 w-6 sm:h-7 sm:w-7 rounded-full" />
-          <Skeleton className="h-6 w-6 sm:h-7 sm:w-7 rounded-full" />
-        </div>
-      </div>
-    </div>
-  );
-
   // SIMPLIFIED: Show skeletons during initial data loading OR during video delay period
   const getSkeletonCount = () => {
     // Only gate on initial loading, not background refetches
@@ -828,7 +829,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
         <div className="flex flex-wrap -mx-1 sm:-mx-1.5 md:-mx-2">
           {/* Show skeletons when loading */}
           {skeletonCount > 0 && Array.from({ length: skeletonCount }, (_, index) => (
-            <VideoSkeleton key={`skeleton-${index}`} index={index} />
+            <VideoSkeleton key={`skeleton-${contentKey}-${index}`} index={index} />
           ))}
           
           {/* Show actual videos when not loading */}
