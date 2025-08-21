@@ -188,10 +188,7 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
         <Sparkles className={`${isSm ? 'w-5 h-5' : 'w-4 h-4'} text-primary animate-sway`} />
       </div>
 
-      {/* Hover shimmer effect (only for active tools) */}
-      {!isComingSoon && (
-        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-wes-vintage-gold/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1200 ease-out"></div>
-      )}
+      {/* Hover shimmer effect removed to prevent inset-0 overlay issues */}
     </div>
   );
 
@@ -261,26 +258,15 @@ const ToolSelectorPage: React.FC = () => {
 
   // Dynamic spacing based on content area - fixed padding to prevent right shift
   const containerPadding = isSm ? 'px-4' : 'px-2';
-  const containerSpacing = isLg ? 'pt-6 pb-4' : isSm ? 'pt-4 pb-2' : 'pt-3 pb-[0.333rem]';
-  const sectionGap = isLg ? 'gap-8' : isSm ? 'gap-6' : 'gap-4';
-  const itemGap = isSm ? 'gap-4' : 'gap-3';
-  const topMargin = isSm ? 'mt-4' : 'mt-2';
+  const containerSpacing = isLg ? 'pt-3 pb-4' : isSm ? 'pt-4 pb-2' : 'pt-3 pb-[0.333rem]';
+  const sectionGap = isLg ? 'gap-10' : isSm ? 'gap-8' : 'gap-6';
+  const itemGap = isLg ? 'gap-5' : isSm ? 'gap-6' : 'gap-5';
+  const topMargin = isLg ? 'mt-2' : isSm ? 'mt-4' : 'mt-2';
   const bottomMargin = ''; // layoutDirection === 'column' ? 'mb-8' : '';
 
   return (
     <PageFadeIn className="min-h-[70vh] relative overflow-hidden">
-      {/* Simplified background - reduced layering to prevent conflicts */}
-      <div className="absolute inset-0 bg-gradient-to-br from-wes-cream via-white to-wes-mint/20 opacity-70"></div>
-      
-      {/* Single subtle pattern instead of multiple conflicting ones */}
-      <div className="absolute inset-0 opacity-20" style={{
-        backgroundImage: `
-          linear-gradient(45deg, transparent 40%, hsl(var(--wes-coral) / 0.08) 40%, hsl(var(--wes-coral) / 0.08) 60%, transparent 60%),
-          linear-gradient(-45deg, transparent 40%, hsl(var(--wes-mint) / 0.08) 40%, hsl(var(--wes-mint) / 0.08) 60%, transparent 60%)
-        `,
-        backgroundSize: '24px 24px',
-        backgroundPosition: '0 0, 12px 12px'
-      }}></div>
+      {/* Background elements removed to prevent inset-0 overlay issues */}
       
       {/* Reduced floating elements to prevent visual clutter */}
       <div className="absolute top-20 right-20 w-32 h-32 bg-wes-pink/8 rounded-full blur-3xl animate-parallax-float"></div>

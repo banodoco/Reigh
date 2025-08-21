@@ -1042,7 +1042,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       }, [selectedShot, isMobile, updateGenerationsPaneSettings, setIsGenerationsPaneLocked]);
   
     return (
-    <div className="flex flex-col space-y-4 pb-16">
+    <div className="flex flex-col space-y-2 sm:space-y-4 pb-16">
       {/* Header */}
       <Header
         selectedShot={selectedShot}

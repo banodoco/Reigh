@@ -123,6 +123,18 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
           'opacity-100'
         )}
       >
+        <Button
+          variant="ghost"
+          size="icon"
+          onPointerUp={() => openPane()}
+          className={cn(
+            'text-zinc-300 hover:text-white hover:bg-zinc-700',
+            side === 'bottom' ? 'h-8 w-16' : 'h-16 w-8'
+          )}
+          aria-label="Open pane"
+        >
+          {getIcon()}
+        </Button>
         {thirdButton && (
           <Button
             variant="ghost"
@@ -137,18 +149,6 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
             {thirdButton.content || <Square className="h-4 w-4" />}
           </Button>
         )}
-        <Button
-          variant="ghost"
-          size="icon"
-          onPointerUp={() => openPane()}
-          className={cn(
-            'text-zinc-300 hover:text-white hover:bg-zinc-700',
-            side === 'bottom' ? 'h-8 w-16' : 'h-16 w-8'
-          )}
-          aria-label="Open pane"
-        >
-          {getIcon()}
-        </Button>
       </div>
     );
   }
@@ -167,15 +167,6 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
         onMouseEnter={handlePaneEnter}
         onMouseLeave={handlePaneLeave}
       >
-        <Button
-          variant="ghost"
-          size="icon"
-          onPointerUp={() => toggleLock(true)}
-          className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
-          aria-label="Lock pane"
-        >
-          <LockIcon className="h-4 w-4" />
-        </Button>
         {thirdButton && (
           <Button
             variant="ghost"
@@ -187,6 +178,15 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
             {thirdButton.content || <Square className="h-4 w-4" />}
           </Button>
         )}
+        <Button
+          variant="ghost"
+          size="icon"
+          onPointerUp={() => toggleLock(true)}
+          className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
+          aria-label="Lock pane"
+        >
+          <LockIcon className="h-4 w-4" />
+        </Button>
       </div>
     );
   }
@@ -201,15 +201,6 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
           getFlexDirection()
         )}
       >
-        <Button
-          variant="ghost"
-          size="icon"
-          onPointerUp={() => toggleLock(false)}
-          className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
-          aria-label="Unlock pane"
-        >
-          <UnlockIcon className="h-4 w-4" />
-        </Button>
         {thirdButton && (
           <Button
             variant="ghost"
@@ -221,6 +212,15 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
             {thirdButton.content || <Square className="h-4 w-4" />}
           </Button>
         )}
+        <Button
+          variant="ghost"
+          size="icon"
+          onPointerUp={() => toggleLock(false)}
+          className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
+          aria-label="Unlock pane"
+        >
+          <UnlockIcon className="h-4 w-4" />
+        </Button>
       </div>
     );
   }
@@ -236,26 +236,6 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
         isOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'
       )}
     >
-      <Button
-        variant="ghost"
-        size="icon"
-        onPointerUp={() => toggleLock(true)}
-        className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
-        aria-label="Lock pane"
-      >
-        <LockIcon className="h-4 w-4" />
-      </Button>
-      <Button
-        variant="ghost"
-        size="icon"
-        onPointerUp={() => openPane()}
-        className={cn(
-          'text-zinc-300 hover:text-white hover:bg-zinc-700 h-8 w-8'
-        )}
-        aria-label="Open pane"
-      >
-        {getIcon()}
-      </Button>
       {thirdButton && (
         <Button
           variant="ghost"
@@ -267,6 +247,26 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
           {thirdButton.content || <Square className="h-4 w-4" />}
         </Button>
       )}
+      <Button
+        variant="ghost"
+        size="icon"
+        onPointerUp={() => openPane()}
+        className={cn(
+          'text-zinc-300 hover:text-white hover:bg-zinc-700 h-8 w-8'
+        )}
+        aria-label="Open pane"
+      >
+        {getIcon()}
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon"
+        onPointerUp={() => toggleLock(true)}
+        className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
+        aria-label="Lock pane"
+      >
+        <LockIcon className="h-4 w-4" />
+      </Button>
     </div>
   );
 };

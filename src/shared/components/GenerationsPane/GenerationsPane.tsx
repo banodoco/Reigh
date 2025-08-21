@@ -75,6 +75,33 @@ export const GenerationsPane: React.FC = () => {
     mediaType: mediaTypeFilter
   });
 
+  // Debug: Log the current filter state
+  useEffect(() => {
+    console.log('[ExcludePositionedDebug] GenerationsPane filter state:', {
+      selectedShotFilter,
+      excludePositioned,
+      mediaTypeFilter,
+      currentShotId,
+      generationsCount: paginatedData.items.length,
+      hasPositionedItems: paginatedData.items.filter(item => {
+        // Check if any item has positioned associations with the selected shot
+        if (selectedShotFilter === 'all') return false;
+        if (item.shot_id === selectedShotFilter) {
+          return item.position !== null && item.position !== undefined;
+        }
+        if (item.all_shot_associations) {
+          return item.all_shot_associations.some(assoc => 
+            assoc.shot_id === selectedShotFilter && 
+            assoc.position !== null && 
+            assoc.position !== undefined
+          );
+        }
+        return false;
+      }).length,
+      timestamp: Date.now()
+    });
+  }, [selectedShotFilter, excludePositioned, mediaTypeFilter, currentShotId, paginatedData.items]);
+
   // Log every render with item count & page for loop detection
   useRenderLogger('GenerationsPane', { page, totalItems: totalCount });
 

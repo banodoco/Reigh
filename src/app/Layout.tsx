@@ -142,7 +142,7 @@ const Layout: React.FC = () => {
   // Content-responsive container padding
   const containerPadding = isLg ? 'px-6' : isSm ? 'px-4' : 'px-2';
   // Reduce vertical padding on small screens to avoid excessive space above headers
-  const containerSpacing = isLg ? 'py-8' : 'py-4';
+  const containerSpacing = isLg ? 'py-1' : 'py-1';
 
   return (
     <div className="flex flex-col min-h-screen">

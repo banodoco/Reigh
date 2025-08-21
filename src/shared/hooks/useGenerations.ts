@@ -154,10 +154,20 @@ export async function fetchGenerations(
       const unpositionedIds = shotGenerations
         ?.filter(sg => sg.position === null || sg.position === undefined)
         .map(sg => sg.generation_id) || [];
+      
+      // Debug logging for excludePositioned filtering
+      console.log('[ExcludePositionedDebug] Filtering shot generations:', {
+        shotId: filters.shotId,
+        excludePositioned: filters.excludePositioned,
+        totalShotGenerations: shotGenerations?.length || 0,
+        positionedCount: shotGenerations?.filter(sg => sg.position !== null && sg.position !== undefined).length || 0,
+        unpositionedCount: unpositionedIds.length,
+        unpositionedSample: unpositionedIds.slice(0, 3),
+        allPositions: shotGenerations?.map(sg => ({ id: sg.generation_id, position: sg.position })).slice(0, 5)
+      });
+      
       generationIds = unpositionedIds;
     }
-    
-    // Debug logging removed for performance
     
     if (generationIds.length > 0) {
       dataQuery = dataQuery.in('id', generationIds);

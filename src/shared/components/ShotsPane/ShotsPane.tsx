@@ -59,6 +59,8 @@ export const ShotsPane: React.FC = () => {
   const handleSortOrderChange = (newSortOrder: 'oldest' | 'newest') => {
     if (!selectedProjectId) return;
     updateShotsPaneSettings('project', { sortOrder: newSortOrder });
+    // Jump to page 1 when sort order changes
+    setCurrentPage(1);
   };
 
   useRenderLogger('ShotsPane', { shotsCount: shots?.length, currentPage });

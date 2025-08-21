@@ -663,7 +663,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                       </SelectValue>
                   </SelectTrigger>
                   <SelectContent 
-                      className="z-[9999] w-[var(--radix-select-trigger-width)] bg-zinc-900 border-zinc-700 text-white max-h-60 overflow-y-auto" 
+                      className="z-[9999] w-[var(--radix-select-trigger-width)] bg-zinc-900 border-zinc-700 text-white max-h-60 flex flex-col" 
                       style={{ zIndex: 10000 }}
                       position="popper"
                       side="top"
@@ -671,13 +671,14 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                       align="start"
                       collisionPadding={8}
                   >
+                      {/* Fixed Add Shot button at the top */}
                       {onCreateShot && (
-                        <div className="p-1 space-y-1">
+                        <div className="flex-shrink-0 bg-zinc-900 border-b border-zinc-700 p-1">
                           {quickCreateSuccess.isSuccessful ? (
                             <Button
                               variant="secondary"
                               size="sm"
-                              className="w-full h-8 text-xs justify-center bg-green-700 hover:bg-green-600 text-white border-green-600"
+                              className="w-full h-8 text-xs justify-center bg-zinc-600 hover:bg-zinc-500 text-white border-zinc-500"
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
@@ -712,7 +713,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                             <Button
                               variant="secondary"
                               size="sm"
-                              className="w-full h-8 text-xs justify-center bg-green-700 hover:bg-green-600 text-white border-green-600"
+                              className="w-full h-8 text-xs justify-center bg-zinc-600 hover:bg-zinc-500 text-white border-zinc-500"
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
@@ -735,11 +736,15 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                           )}
                         </div>
                       )}
-                      {simplifiedShotOptions.map(shot => (
-                          <SelectItem key={shot.id} value={shot.id} className="text-xs">
-                              {shot.name}
-                          </SelectItem>
-                      ))}
+                      
+                      {/* Scrollable shot list takes remaining space */}
+                      <div className="flex-1 overflow-y-auto min-h-0">
+                        {simplifiedShotOptions.map(shot => (
+                            <SelectItem key={shot.id} value={shot.id} className="text-xs">
+                                {shot.name}
+                            </SelectItem>
+                        ))}
+                      </div>
                   </SelectContent>
               </Select>
 

@@ -85,7 +85,7 @@ const ShotImage: React.FC<ShotImageProps> = ({ image, index, onSelectShot, shotN
 
   return (
     <div 
-      className="flex-shrink-0 w-32 h-32 rounded overflow-hidden border cursor-pointer hover:shadow-md transition-shadow duration-200 hover:scale-[1.02] transform transition-transform relative bg-gray-200"
+      className="flex-shrink-0 w-32 h-32 rounded overflow-hidden border cursor-pointer hover:shadow-sm transition-shadow duration-200 hover:scale-[1.01] transform transition-transform relative bg-gray-200"
       style={{ 
         animationDelay: `${index * 0.1}s`
       }}
@@ -275,7 +275,7 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
     <>
       <div 
         key={shot.id} 
-        className="mb-6 p-4 border rounded-lg hover:shadow-lg transition-shadow duration-200 relative cursor-pointer"
+        className="mb-6 p-4 border rounded-lg hover:shadow-sm transition-shadow duration-200 relative cursor-pointer"
         onClick={onSelectShot}
       >
         <div className="flex justify-between items-start mb-3">

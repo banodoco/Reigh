@@ -474,7 +474,7 @@ const VideoTravelToolPage: React.FC = () => {
     } else {
       // Show header when in shot list view
       const headerContent = (
-        <div className="flex items-center justify-between mb-6 sm:mb-8 mt-2 sm:mt-7">
+        <div className="flex items-center justify-between mb-4 sm:mb-6 mt-2 sm:mt-4">
           <h1 className="text-3xl font-light tracking-tight text-foreground sm:text-4xl">
             Shots:
           </h1>
@@ -941,14 +941,25 @@ const VideoTravelToolPage: React.FC = () => {
     // If deep-linked to a shot, show an editor-style skeleton instead of the main list skeleton
     if (hashShotId) {
       return (
-        <PageFadeIn className="pt-2 sm:pt-5">
+        <PageFadeIn className="pt-3 sm:pt-5">
           <div className="flex flex-col space-y-4 pb-16">
-            <div className="flex-shrink-0 flex flex-wrap justify-between items-center gap-y-2 px-2">
-              <Skeleton className="h-10 w-32" />
-              <Skeleton className="h-8 w-64" />
-              <div className="flex space-x-2">
-                <Skeleton className="h-8 w-20" />
-                <Skeleton className="h-8 w-16" />
+            <div className="flex-shrink-0 space-y-1 sm:space-y-3 pb-2">
+              {/* Desktop skeleton - centered shot name navigation */}
+              <div className="hidden sm:flex justify-center items-center gap-y-2 px-2">
+                <div className="flex items-center space-x-2">
+                  <Skeleton className="h-8 w-8" />
+                  <Skeleton className="h-12 w-64" />
+                  <Skeleton className="h-8 w-8" />
+                </div>
+              </div>
+              
+              {/* Mobile skeleton - centered shot name navigation only */}
+              <div className="sm:hidden flex justify-center px-2">
+                <div className="flex items-center space-x-1">
+                  <Skeleton className="h-8 w-8" />
+                  <Skeleton className="h-8 w-48" />
+                  <Skeleton className="h-8 w-8" />
+                </div>
               </div>
             </div>
             <Skeleton className="h-64 w-full" />
@@ -979,14 +990,25 @@ const VideoTravelToolPage: React.FC = () => {
     // If we have a hashShotId but shots are still loading, show editor skeleton
     if (hashShotId) {
       return (
-        <PageFadeIn className="pt-2 sm:pt-5">
+        <PageFadeIn className="pt-3 sm:pt-5">
           <div className="flex flex-col space-y-4 pb-16">
-            <div className="flex-shrink-0 flex flex-wrap justify-between items-center gap-y-2 px-2">
-              <Skeleton className="h-10 w-32" />
-              <Skeleton className="h-8 w-64" />
-              <div className="flex space-x-2">
-                <Skeleton className="h-8 w-20" />
-                <Skeleton className="h-8 w-16" />
+            <div className="flex-shrink-0 space-y-1 sm:space-y-3 pb-2">
+              {/* Desktop skeleton - centered shot name navigation */}
+              <div className="hidden sm:flex justify-center items-center gap-y-2 px-2">
+                <div className="flex items-center space-x-2">
+                  <Skeleton className="h-8 w-8" />
+                  <Skeleton className="h-12 w-64" />
+                  <Skeleton className="h-8 w-8" />
+                </div>
+              </div>
+              
+              {/* Mobile skeleton - centered shot name navigation only */}
+              <div className="sm:hidden flex justify-center px-2">
+                <div className="flex items-center space-x-1">
+                  <Skeleton className="h-8 w-8" />
+                  <Skeleton className="h-8 w-48" />
+                  <Skeleton className="h-8 w-8" />
+                </div>
               </div>
             </div>
             <Skeleton className="h-64 w-full" />
@@ -1032,14 +1054,25 @@ const VideoTravelToolPage: React.FC = () => {
       ) : (
         // Show a loading state while settings or component are being fetched
         <Suspense fallback={
-          <PageFadeIn className="pt-2 sm:pt-5">
+          <PageFadeIn className="pt-3 sm:pt-5">
             <div className="flex flex-col space-y-4 pb-16">
-              <div className="flex-shrink-0 flex flex-wrap justify-between items-center gap-y-2 px-2">
-                <Skeleton className="h-10 w-32" />
-                <Skeleton className="h-8 w-64" />
-                <div className="flex space-x-2">
-                  <Skeleton className="h-8 w-20" />
-                  <Skeleton className="h-8 w-16" />
+              <div className="flex-shrink-0 space-y-1 sm:space-y-3 pb-2">
+                {/* Desktop skeleton - centered shot name navigation */}
+                <div className="hidden sm:flex justify-center items-center gap-y-2 px-2">
+                  <div className="flex items-center space-x-2">
+                    <Skeleton className="h-8 w-8" />
+                    <Skeleton className="h-12 w-64" />
+                    <Skeleton className="h-8 w-8" />
+                  </div>
+                </div>
+                
+                {/* Mobile skeleton - centered shot name navigation only */}
+                <div className="sm:hidden flex justify-center px-2">
+                  <div className="flex items-center space-x-1">
+                    <Skeleton className="h-8 w-8" />
+                    <Skeleton className="h-8 w-48" />
+                    <Skeleton className="h-8 w-8" />
+                  </div>
                 </div>
               </div>
               <Skeleton className="h-64 w-full" />
@@ -1047,7 +1080,7 @@ const VideoTravelToolPage: React.FC = () => {
             </div>
           </PageFadeIn>
         }>
-          <PageFadeIn className="pt-2 sm:pt-5">
+          <PageFadeIn className="pt-3 sm:pt-5">
             {/* Only render ShotEditor if we have a valid shot to edit */}
             {shotToEdit ? (
               <ShotEditor
