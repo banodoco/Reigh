@@ -1,4 +1,4 @@
-c;import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
