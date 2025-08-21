@@ -49,6 +49,11 @@ export const ImageGalleryPagination: React.FC<ImageGalleryPaginationProps> = ({
   rightContent,
   isBottom = false,
 }) => {
+  // Don't render if conditions not met - MUST be before any hooks
+  if (totalPages <= 1 || reducedSpacing || hidePagination) {
+    return null;
+  }
+
   const [showStickyPagination, setShowStickyPagination] = useState(false);
   const topPaginationRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
@@ -60,11 +65,6 @@ export const ImageGalleryPagination: React.FC<ImageGalleryPaginationProps> = ({
     shotsPaneWidth,
     tasksPaneWidth
   } = usePanes();
-
-  // Don't render if conditions not met
-  if (totalPages <= 1 || reducedSpacing || hidePagination) {
-    return null;
-  }
 
   // Scroll detection for sticky pagination
   useEffect(() => {
