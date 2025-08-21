@@ -45,6 +45,10 @@ interface HoverScrubVideoProps extends Omit<React.HTMLAttributes<HTMLDivElement>
    * Disable scrubbing behavior for lightbox/fullscreen usage (defaults to false).
    */
   disableScrubbing?: boolean;
+  /**
+   * Load video content on demand (first hover/interaction) for better performance
+   */
+  loadOnDemand?: boolean;
 }
 
 /**
@@ -64,6 +68,7 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
   showNativeControls = false,
   speedControlsPosition = 'top-left',
   disableScrubbing = false,
+  loadOnDemand = false,
   ...rest
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -74,6 +79,7 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
   const [duration, setDuration] = useState(0);
   const [scrubberPosition, setScrubberPosition] = useState<number | null>(null);
   const [scrubberVisible, setScrubberVisible] = useState(true);
+  const [hasLoadedOnDemand, setHasLoadedOnDemand] = useState(false);
   const speedOptions = [0.25, 0.5, 1, 1.5, 2];
   const isMobile = useIsMobile();
   

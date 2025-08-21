@@ -219,15 +219,24 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     const prerequisites = isWindows ? `
 
 PREREQUISITES (Windows only - install these first):
-1. Python 3.10+ from python.org (NOT Microsoft Store)
+1. NVIDIA GPU with CUDA 6.0+ and 8GB+ VRAM
+   - Check with: nvidia-smi
+   - AMD/Intel GPUs will NOT work for local processing
+
+2. Latest NVIDIA drivers from nvidia.com/drivers
+   - Download and install latest drivers
+   - Restart computer after installation
+   - Verify with: nvidia-smi
+
+3. Python 3.10+ from python.org (NOT Microsoft Store)
    - During install, check "Add Python to PATH"
    - Verify with: python --version
 
-2. Git from git-scm.com/download/win
+4. Git from git-scm.com/download/win
    - Use default settings during installation
    - Verify with: git --version
 
-3. FFmpeg from ffmpeg.org/download.html
+5. FFmpeg from ffmpeg.org/download.html
    - Download "Windows builds by BtbN" (recommended)
    - Extract to C:\\ffmpeg
    - Add C:\\ffmpeg\\bin to system PATH
@@ -251,9 +260,12 @@ FIRST - Please ask me these questions to understand my setup:
 8. Do I have experience setting up AI/ML tools before?
 
 SYSTEM REQUIREMENTS:
+- NVIDIA GPU with CUDA Compute Capability 6.0+ (AMD/Intel GPUs will NOT work)
 - Minimum 8GB VRAM (graphics card memory) for local AI processing
+- Latest NVIDIA drivers and CUDA Toolkit
 - Windows 10/11, Linux, or Mac (though Mac isn't currently supported for local processing)
-- Git, Python 3.10+, FFmpeg installed${prerequisites}
+- Git, Python 3.10+, FFmpeg installed
+- PyTorch with CUDA support (critical - CPU-only PyTorch will NOT work)${prerequisites}
 
 MY CURRENT SITUATION:
 - Operating System: ${computerType === "windows" ? "Windows" : computerType === "linux" ? "Linux" : "Mac"}
@@ -292,9 +304,11 @@ Please be very specific with file paths, command syntax, and verification steps 
 cd Headless-Wan2GP
 python -m venv venv
 venv\\Scripts\\activate.bat
-pip install --no-cache-dir torch==2.6.0 torchvision torchaudio -f https://download.pytorch.org/whl/cu124
+pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
 pip install --no-cache-dir -r Wan2GP/requirements.txt
 pip install --no-cache-dir -r requirements.txt
+echo Checking CUDA availability...
+python -c "import torch; print(f'CUDA available: {torch.cuda.is_available()}'); print(f'CUDA devices: {torch.cuda.device_count()}'); print(f'CUDA device: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"None\"}')"
 python worker.py --db-type supabase --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co --supabase-anon-key ${SUPABASE_ANON_KEY} --supabase-access-token ${token}`;
     } else {
       // Linux command (existing)
@@ -623,37 +637,91 @@ python worker.py --db-type supabase \\
                                 <p className="text-sm">
                                   Prerequisites (install manually if not already installed):
                                 </p>
-                                <ul className="list-disc pl-5 mt-2 text-sm space-y-3">
-                                  <li className="flex items-center gap-2">
-                                    <span>
-                                      Python 3.10+ from {""}
-                                      <a
-                                        href="https://python.org"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="underline text-blue-600 hover:text-blue-800"
-                                      >
-                                        python.org
-                                      </a>
-                                    </span>
-                                    <TooltipProvider>
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help" />
-                                        </TooltipTrigger>
-                                        <TooltipContent className="max-w-sm">
-                                          <div className="py-2 space-y-2">
-                                            <p className="font-medium">Python Installation:</p>
-                                            <ol className="text-sm space-y-1 list-decimal list-inside">
-                                              <li>Download from python.org (not Microsoft Store)</li>
-                                              <li>During install, check "Add Python to PATH"</li>
-                                              <li>Verify by typing "python --version" in terminal</li>
-                                            </ol>
-                                          </div>
-                                        </TooltipContent>
-                                      </Tooltip>
-                                    </TooltipProvider>
-                                  </li>
+                                                          <ul className="list-disc pl-5 mt-2 text-sm space-y-3">
+                            <li className="flex items-center gap-2">
+                              <span>
+                                <strong>NVIDIA GPU with CUDA 6.0+</strong> (8GB+ VRAM required)
+                              </span>
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help" />
+                                  </TooltipTrigger>
+                                  <TooltipContent className="max-w-sm">
+                                    <div className="py-2 space-y-2">
+                                      <p className="font-medium">GPU Requirements:</p>
+                                      <ul className="text-sm space-y-1 list-disc list-inside">
+                                        <li>NVIDIA GPU with CUDA Compute Capability 6.0+</li>
+                                        <li>Minimum 8GB VRAM for AI video generation</li>
+                                        <li>Check your GPU: nvidia-smi in terminal</li>
+                                        <li>AMD/Intel GPUs will NOT work for local processing</li>
+                                      </ul>
+                                    </div>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </li>
+                            <li className="flex items-center gap-2">
+                              <span>
+                                <strong>Latest NVIDIA drivers</strong> from {""}
+                                <a
+                                  href="https://nvidia.com/drivers"
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="underline text-blue-600 hover:text-blue-800"
+                                >
+                                  nvidia.com/drivers
+                                </a>
+                              </span>
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help" />
+                                  </TooltipTrigger>
+                                  <TooltipContent className="max-w-sm">
+                                    <div className="py-2 space-y-2">
+                                      <p className="font-medium">NVIDIA Driver Installation:</p>
+                                      <ol className="text-sm space-y-1 list-decimal list-inside">
+                                        <li>Download latest drivers from nvidia.com</li>
+                                        <li>Run installer with default settings</li>
+                                        <li>Restart computer after installation</li>
+                                        <li>Verify with "nvidia-smi" command</li>
+                                      </ol>
+                                    </div>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </li>
+                            <li className="flex items-center gap-2">
+                              <span>
+                                Python 3.10+ from {""}
+                                <a
+                                  href="https://python.org"
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="underline text-blue-600 hover:text-blue-800"
+                                >
+                                  python.org
+                                </a>
+                              </span>
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help" />
+                                  </TooltipTrigger>
+                                  <TooltipContent className="max-w-sm">
+                                    <div className="py-2 space-y-2">
+                                      <p className="font-medium">Python Installation:</p>
+                                      <ol className="text-sm space-y-1 list-decimal list-inside">
+                                        <li>Download from python.org (not Microsoft Store)</li>
+                                        <li>During install, check "Add Python to PATH"</li>
+                                        <li>Verify by typing "python --version" in terminal</li>
+                                      </ol>
+                                    </div>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </li>
                                   <li className="flex items-center gap-2">
                                     <span>
                                       Git from {""}

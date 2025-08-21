@@ -39,6 +39,339 @@ const VideoSkeleton = React.memo(({ index }: { index: number }) => (
   </div>
 ));
 
+// VideoItem component with staggered loading and optimized loading behavior
+interface VideoItemProps {
+  video: GenerationRow;
+  index: number;
+  originalIndex: number;
+  isFirstVideo: boolean;
+  shouldPreload: string;
+  isMobile: boolean;
+  onLightboxOpen: (index: number) => void;
+  onMobileTap: (index: number) => void;
+  onDelete: (id: string) => void;
+  deletingVideoId: string | null;
+  onHoverStart: (video: GenerationRow, event: React.MouseEvent) => void;
+  onHoverEnd: () => void;
+  onMobileModalOpen: (video: GenerationRow) => void;
+  selectedVideoForDetails: GenerationRow | null;
+  showTaskDetailsModal: boolean;
+}
+
+const VideoItem = React.memo<VideoItemProps>(({ 
+  video, 
+  index, 
+  originalIndex, 
+  isFirstVideo, 
+  shouldPreload, 
+  isMobile, 
+  onLightboxOpen, 
+  onMobileTap, 
+  onDelete, 
+  deletingVideoId, 
+  onHoverStart, 
+  onHoverEnd,
+  onMobileModalOpen,
+  selectedVideoForDetails,
+  showTaskDetailsModal
+}) => {
+  const [shouldLoad, setShouldLoad] = useState(isFirstVideo); // First video loads immediately
+  const [videoMetadataLoaded, setVideoMetadataLoaded] = useState(false);
+  const [videoPosterLoaded, setVideoPosterLoaded] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const posterFallbackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hasTriggeredLoadRef = useRef(false); // Prevent multiple load() calls
+  
+  // Helper function to safely trigger load only once
+  const triggerLoadOnce = useCallback((reason: string) => {
+    if (!hasTriggeredLoadRef.current && videoRef.current && shouldPreload === 'none') {
+      hasTriggeredLoadRef.current = true;
+      videoRef.current.load();
+    }
+  }, [index, shouldPreload]);
+  
+  // Log initial mount (debug only)
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[VideoLoad] Video ${index + 1} ${isFirstVideo ? 'priority' : 'delayed'}`);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  
+  // Staggered loading: load videos with a delay based on their position
+  useEffect(() => {
+    if (!isFirstVideo) {
+      const delay = 200 + (index * 150); // 200ms base + 150ms per video
+      const timer = setTimeout(() => {
+        setShouldLoad(true);
+        
+        // For preload="none" videos, we need to manually trigger loading
+        setTimeout(() => {
+          triggerLoadOnce('(staggered timeout)');
+        }, 100); // Small delay to ensure video element is rendered
+      }, delay);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [index, isFirstVideo, triggerLoadOnce]);
+  
+  // Hook into HoverScrubVideo's internal video element for loading optimization
+  useEffect(() => {
+    if (!shouldLoad) return;
+    
+    // Find the video element inside the HoverScrubVideo component
+    const timeoutId = setTimeout(() => {
+      const container = document.querySelector(`[data-video-id="${video.id}"]`);
+      const videoElement = container?.querySelector('video') as HTMLVideoElement | null;
+      
+      if (videoElement) {
+        videoRef.current = videoElement;
+        
+        // Add our loading optimization event listeners
+        const handleLoadStart = () => {
+          console.log(`[VideoLoadProcess] 📡 Video ${index + 1} load started:`, {
+            videoId: video.id,
+            src: videoElement.src,
+            preload: shouldPreload,
+            timestamp: Date.now()
+          });
+        };
+        
+        const handleLoadedMetadata = () => {
+          console.log(`[VideoLoadProcess] ✅ Video ${index + 1} metadata loaded:`, {
+            videoId: video.id,
+            duration: videoElement?.duration,
+            dimensions: `${videoElement?.videoWidth}x${videoElement?.videoHeight}`,
+            timestamp: Date.now()
+          });
+          setVideoMetadataLoaded(true);
+          
+          // Fallback: If onLoadedData doesn't fire within 2 seconds, consider poster ready
+          if (posterFallbackTimeoutRef.current) {
+            clearTimeout(posterFallbackTimeoutRef.current);
+          }
+          posterFallbackTimeoutRef.current = setTimeout(() => {
+            if (!videoPosterLoaded) {
+              console.log(`[VideoLoadProcess] ⏰ Video ${index + 1} poster fallback triggered (onLoadedData didn't fire):`, {
+                videoId: video.id,
+                readyState: videoElement?.readyState,
+                networkState: videoElement?.networkState,
+                timestamp: Date.now()
+              });
+              setVideoPosterLoaded(true);
+            }
+          }, 2000);
+        };
+        
+        const handleLoadedData = () => {
+          console.log(`[VideoLoadProcess] 🖼️ Video ${index + 1} first frame loaded (poster ready):`, {
+            videoId: video.id,
+            currentTime: videoElement?.currentTime,
+            readyState: videoElement?.readyState,
+            timestamp: Date.now()
+          });
+          setVideoPosterLoaded(true);
+          
+          if (posterFallbackTimeoutRef.current) {
+            clearTimeout(posterFallbackTimeoutRef.current);
+            posterFallbackTimeoutRef.current = null;
+          }
+        };
+        
+        const handleSuspend = () => {
+          console.warn(`[VideoLoadProcess] ⏸️ Video ${index + 1} loading suspended:`, {
+            videoId: video.id,
+            readyState: videoElement?.readyState,
+            networkState: videoElement?.networkState,
+            preload: shouldPreload,
+            timestamp: Date.now()
+          });
+          
+          if (shouldPreload === 'none' && videoElement?.readyState === 0) {
+            setTimeout(() => {
+              triggerLoadOnce('(suspended with readyState=0)');
+            }, 500);
+          }
+        };
+        
+        const handleCanPlay = () => {
+          console.log(`[VideoLoadProcess] 🎬 Video ${index + 1} can play:`, {
+            videoId: video.id,
+            readyState: videoElement?.readyState,
+            timestamp: Date.now()
+          });
+          
+          if (!videoPosterLoaded && shouldPreload === 'none') {
+            console.log(`[VideoLoadProcess] 🎯 Video ${index + 1} canPlay fallback for preload=none:`, {
+              videoId: video.id,
+              triggeredBy: 'onCanPlay',
+              timestamp: Date.now()
+            });
+            setVideoPosterLoaded(true);
+            
+            if (posterFallbackTimeoutRef.current) {
+              clearTimeout(posterFallbackTimeoutRef.current);
+              posterFallbackTimeoutRef.current = null;
+            }
+          }
+        };
+        
+        // Add event listeners
+        videoElement.addEventListener('loadstart', handleLoadStart);
+        videoElement.addEventListener('loadedmetadata', handleLoadedMetadata);
+        videoElement.addEventListener('loadeddata', handleLoadedData);
+        videoElement.addEventListener('suspend', handleSuspend);
+        videoElement.addEventListener('canplay', handleCanPlay);
+        
+        // Trigger manual loading for preload="none" videos
+        if (shouldPreload === 'none') {
+          setTimeout(() => {
+            triggerLoadOnce('(HoverScrubVideo integration)');
+          }, 50);
+        }
+        
+        // Store cleanup function
+        return () => {
+          videoElement.removeEventListener('loadstart', handleLoadStart);
+          videoElement.removeEventListener('loadedmetadata', handleLoadedMetadata);
+          videoElement.removeEventListener('loadeddata', handleLoadedData);
+          videoElement.removeEventListener('suspend', handleSuspend);
+          videoElement.removeEventListener('canplay', handleCanPlay);
+        };
+      }
+    }, 100); // Small delay to ensure HoverScrubVideo has rendered
+    
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, [shouldLoad, video.id, index, shouldPreload, triggerLoadOnce, setVideoMetadataLoaded, setVideoPosterLoaded, videoPosterLoaded, posterFallbackTimeoutRef]);
+  
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (posterFallbackTimeoutRef.current) {
+        clearTimeout(posterFallbackTimeoutRef.current);
+      }
+    };
+  }, []);
+  
+  // Log state changes (throttled to reduce spam)
+  const lastLoggedStateRef = useRef<string>('');
+  useEffect(() => {
+    const currentState = `${shouldLoad}-${videoPosterLoaded}-${videoMetadataLoaded}`;
+    if (currentState !== lastLoggedStateRef.current) {
+      console.log(`[VideoLoadProcess] 📊 Video ${index + 1} state:`, {
+        shouldLoad,
+        videoPosterLoaded,
+        videoMetadataLoaded,
+        videoId: video.id
+      });
+      lastLoggedStateRef.current = currentState;
+    }
+  }, [shouldLoad, videoPosterLoaded, videoMetadataLoaded, index, video.id]);
+  
+  return (
+    <div className="w-1/2 lg:w-1/3 px-1 sm:px-1.5 md:px-2 mb-2 sm:mb-3 md:mb-4 relative group">
+      <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden shadow-sm border relative">
+        {/* Loading placeholder - shows until video poster is ready */}
+        {!videoPosterLoaded && (
+          <div className="absolute inset-0 bg-gray-200 flex items-center justify-center">
+            <div className="flex flex-col items-center space-y-2">
+              <div className="w-6 h-6 border-2 border-gray-400 border-t-gray-600 rounded-full animate-spin"></div>
+              <div className="text-gray-500 text-xs">Loading video...</div>
+            </div>
+          </div>
+        )}
+        
+        {/* Only render video when it's time to load */}
+        {shouldLoad && (
+          <div className="relative w-full h-full">
+            {/* HoverScrubVideo with loading optimization integration */}
+            <HoverScrubVideo
+              src={video.location || video.imageUrl}
+              preload={shouldPreload as 'auto' | 'metadata' | 'none'}
+              className="w-full h-full"
+              videoClassName="object-cover cursor-pointer"
+              data-video-id={video.id}
+              // Interaction events
+              onDoubleClick={isMobile ? undefined : () => {
+                onLightboxOpen(originalIndex);
+              }}
+              onTouchEnd={isMobile ? (e) => {
+                // Don't interfere with touches inside action buttons
+                const path = (e as any).nativeEvent?.composedPath?.() as HTMLElement[] | undefined;
+                const isInsideButton = path ? path.some((el) => (el as HTMLElement)?.tagName === 'BUTTON' || (el as HTMLElement)?.closest?.('button')) : !!(e.target as HTMLElement).closest('button');
+                if (isInsideButton) return;
+                e.preventDefault();
+                onMobileTap(originalIndex);
+              } : undefined}
+            />
+          </div>
+        )}
+        
+
+        
+        {/* Action buttons – positioned directly on the video container */}
+        <div className="absolute top-1/2 right-2 sm:right-3 flex flex-col items-end gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity -translate-y-1/2 z-20 pointer-events-auto">
+          <Button
+            variant="secondary"
+            size="icon"
+            onClick={(e) => {
+              e.stopPropagation();
+              console.log('[MobileButtonDebug] [InfoButton] Button clicked START:', {
+                isMobile,
+                videoId: video.id,
+                timestamp: Date.now()
+              });
+              
+              if (isMobile) {
+                // On mobile, open the modal
+                console.log('[MobileButtonDebug] [InfoButton] Setting modal state...');
+                onMobileModalOpen(video);
+              } else {
+                // On desktop, open the lightbox
+                console.log('[MobileButtonDebug] [InfoButton] Desktop - opening lightbox');
+                onLightboxOpen(originalIndex);
+              }
+            }}
+            onMouseEnter={(e) => onHoverStart(video, e)}
+            onMouseLeave={onHoverEnd}
+            className="h-6 w-6 sm:h-7 sm:w-7 p-0 rounded-full bg-black/50 hover:bg-black/70 text-white"
+          >
+            <Info className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+          </Button>
+          <Button
+            variant="destructive"
+            size="icon"
+            onClick={(e) => {
+              e.stopPropagation();
+              console.log('[MobileButtonDebug] [DeleteButton] Button clicked:', {
+                videoId: video.id,
+                deletingVideoId,
+                isDisabled: deletingVideoId === video.id,
+                timestamp: Date.now()
+              });
+              onDelete(video.id);
+              console.log('[MobileButtonDebug] [DeleteButton] onDelete called');
+            }}
+            disabled={deletingVideoId === video.id}
+            className="h-6 w-6 sm:h-7 sm:w-7 p-0 rounded-full"
+            title="Delete video"
+          >
+            <Trash2 className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+          </Button>
+        </div>
+      </div>
+      
+      {/* Timestamp - Top Left */}
+      <TimeStamp 
+        createdAt={video.createdAt || (video as { created_at?: string | null }).created_at} 
+        position="top-left"
+        className="z-10 !top-1 !left-4 sm:!top-2 sm:!left-4"
+      />
+    </div>
+  );
+});
+
 interface VideoOutputsGalleryProps {
   // Data source
   projectId: string | null;
@@ -103,8 +436,6 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   const [currentPage, setCurrentPage] = useState(1);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [selectedVideoForDetails, setSelectedVideoForDetails] = useState<GenerationRow | null>(null);
-  // Track ids we optimistically hide after delete click for instant UI feedback
-  const [optimisticallyDeletedIds, setOptimisticallyDeletedIds] = useState<string[]>([]);
   const [hoveredVideo, setHoveredVideo] = useState<GenerationRow | null>(null);
   const [hoverPosition, setHoverPosition] = useState<{ x: number; y: number; positioning?: 'above' | 'below' } | null>(null);
   const [isInitialHover, setIsInitialHover] = useState(false);
@@ -135,7 +466,6 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   const taskDetailsButtonRef = useRef<HTMLButtonElement>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isMobile = useIsMobile();
-  const queryClient = useQueryClient();
   
   // Video count cache for instant skeleton display
   const { getCachedCount, setCachedCount } = useVideoCountCache();
@@ -293,13 +623,6 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   // Enhanced generations with automatic task data preloading via context
   const enhancedVideoOutputs = useEnhancedGenerations(videoOutputs);
   
-  // Hide any videos that were optimistically deleted (until refetch confirms removal)
-  const visibleVideoOutputs = React.useMemo(() => {
-    if (!optimisticallyDeletedIds.length) return videoOutputs;
-    const hide = new Set(optimisticallyDeletedIds);
-    return videoOutputs.filter(v => !hide.has(v.id));
-  }, [videoOutputs, optimisticallyDeletedIds]);
-  
   // Background preload task data for current page
   useGenerationTaskPreloader(videoOutputs, !!projectId && !!shotId);
   
@@ -311,7 +634,6 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
       currentPage,
       itemsPerPage,
       videoOutputsCount: videoOutputs.length,
-      visibleVideoOutputsCount: visibleVideoOutputs.length,
       enhancedVideoOutputsCount: enhancedVideoOutputs.length,
       isLoadingGenerations,
       generationsError: generationsError?.message,
@@ -328,14 +650,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
         shotImageEntryId: (video as any).shotImageEntryId
       }))
     });
-  }, [videoOutputs, visibleVideoOutputs.length, enhancedVideoOutputs, currentPage, isLoadingGenerations, generationsError, generationsData]);
-
-  // After refetches, drop any ids from the optimistic list that are no longer present in results
-  useEffect(() => {
-    if (!optimisticallyDeletedIds.length) return;
-    const currentIds = new Set(videoOutputs.map(v => v.id));
-    setOptimisticallyDeletedIds((ids) => ids.filter(id => currentIds.has(id)));
-  }, [videoOutputs, optimisticallyDeletedIds.length]);
+  }, [videoOutputs, enhancedVideoOutputs, currentPage, isLoadingGenerations, generationsError, generationsData]);
 
   // Hooks for task details (now using unified cache)
   const lightboxVideoId = lightboxIndex !== null && videoOutputs[lightboxIndex] ? videoOutputs[lightboxIndex].id : null;
@@ -405,19 +720,18 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   }, [contentKey, isLoadingGenerations, showVideosAfterDelay]);
 
   useEffect(() => {
-    // Only use the hidden trigger click on desktop to avoid Radix toggle conflicts on mobile
-    if (!isMobile && selectedVideoForDetails && taskDetailsButtonRef.current) {
+    if (selectedVideoForDetails && taskDetailsButtonRef.current) {
       taskDetailsButtonRef.current.click();
     }
-  }, [selectedVideoForDetails, isMobile]);
+  }, [selectedVideoForDetails]);
 
   // Sort video outputs by creation date
   const sortedVideoOutputs = useMemo(() => {
-    return [...visibleVideoOutputs]
+    return [...videoOutputs]
       .map(v => ({ v, time: new Date(v.createdAt || (v as { created_at?: string | null }).created_at || 0).getTime() }))
       .sort((a, b) => b.time - a.time)
       .map(({ v }) => v);
-  }, [visibleVideoOutputs]);
+  }, [videoOutputs]);
 
   // Get current video for lightbox
   const currentVideo = lightboxIndex !== null ? sortedVideoOutputs[lightboxIndex] : null;
@@ -611,6 +925,31 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const currentVideoOutputs = sortedVideoOutputs.slice(startIndex, endIndex);
+  
+  // Log video loading strategy for this page (throttled to avoid spam)
+  const hasLoggedStrategyRef = useRef(false);
+  React.useEffect(() => {
+    if (currentVideoOutputs.length > 0 && !hasLoggedStrategyRef.current) {
+      console.log('[VideoLoadProcess] 🎯 Page loading strategy:', {
+        currentPage,
+        totalVideosOnPage: currentVideoOutputs.length,
+        loadingPlan: currentVideoOutputs.map((video, index) => ({
+          videoNum: index + 1,
+          videoId: video.id,
+          strategy: index === 0 ? 'IMMEDIATE (priority)' : `DELAYED (${200 + (index * 150)}ms)`,
+          preload: index === 0 ? 'metadata' : 'none',
+          posterStrategy: 'video-first-frame'
+        })),
+        timestamp: Date.now()
+      });
+      hasLoggedStrategyRef.current = true;
+    }
+  }, [currentVideoOutputs, currentPage]);
+  
+  // Reset the flag when page changes
+  React.useEffect(() => {
+    hasLoggedStrategyRef.current = false;
+  }, [currentPage, shotId]);
 
   // SIMPLIFIED: Show skeletons during initial data loading OR during video delay period
   const getSkeletonCount = () => {
@@ -858,125 +1197,31 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
           {/* Show actual videos when not loading */}
           {skeletonCount === 0 && currentVideoOutputs.map((video, index) => {
             const originalIndex = startIndex + index;
+            const isFirstVideo = index === 0; // Prioritize first video
+            const shouldPreload = isFirstVideo ? "metadata" : "none"; // Only preload first video
+            
             return (
-              <div key={video.id} className="w-1/2 lg:w-1/3 px-1 sm:px-1.5 md:px-2 mb-2 sm:mb-3 md:mb-4 relative group">
-                <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden shadow-sm border relative">
-                  <HoverScrubVideo
-                    src={getDisplayUrl(video.location || video.imageUrl)}
-                    poster={video.thumbUrl}
-                    className="w-full h-full object-cover cursor-pointer"
-                    onDoubleClick={isMobile ? undefined : () => {
-                      setLightboxIndex(originalIndex);
-                    }}
-                    onTouchEnd={isMobile ? (e) => {
-                      // Don't interfere with touches inside action buttons
-                      const path = (e as any).nativeEvent?.composedPath?.() as HTMLElement[] | undefined;
-                      const isInsideButton = path ? path.some((el) => (el as HTMLElement)?.tagName === 'BUTTON' || (el as HTMLElement)?.closest?.('button')) : !!(e.target as HTMLElement).closest('button');
-                      if (isInsideButton) return;
-                      e.preventDefault();
-                      handleMobileTap(originalIndex);
-                    } : undefined}
-                    preload="metadata"
-                  />
-                  
-                  {/* Action buttons – positioned directly on the video container */}
-                  <div className="absolute top-1/2 right-2 sm:right-3 flex flex-col items-end gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity -translate-y-1/2 z-20 pointer-events-auto">
-                    <Button
-                      variant="secondary"
-                      size="icon"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        console.log('[MobileButtonDebug] [InfoButton] Button clicked START:', {
-                          isMobile,
-                          videoId: video.id,
-                          currentSelectedVideo: selectedVideoForDetails?.id,
-                          currentShowModal: showTaskDetailsModal,
-                          timestamp: Date.now()
-                        });
-                        
-                        if (isMobile) {
-                          // On mobile, open the modal
-                          console.log('[MobileButtonDebug] [InfoButton] Setting modal state...');
-                          setSelectedVideoForDetails(video);
-                          setShowTaskDetailsModal(true);
-                          console.log('[MobileButtonDebug] [InfoButton] Modal state set - selectedVideo:', video.id);
-                          
-                          // Add a check to see if state was actually updated
-                          setTimeout(() => {
-                            console.log('[MobileButtonDebug] [InfoButton] State check after 100ms:', {
-                              selectedVideoForDetails: selectedVideoForDetails?.id,
-                              showTaskDetailsModal,
-                              expectedVideoId: video.id
-                            });
-                          }, 100);
-                        } else {
-                          // On desktop, open the lightbox
-                          console.log('[MobileButtonDebug] [InfoButton] Desktop - opening lightbox');
-                          setLightboxIndex(originalIndex);
-                        }
-                      }}
-                      onMouseEnter={(e) => handleHoverStart(video, e)}
-                      onMouseLeave={handleHoverEnd}
-                      className="h-6 w-6 sm:h-7 sm:w-7 p-0 rounded-full bg-black/50 hover:bg-black/70 text-white"
-                    >
-                      <Info className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      size="icon"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        console.log('[MobileButtonDebug] [DeleteButton] Button clicked:', {
-                          videoId: video.id,
-                          deletingVideoId,
-                          isDisabled: deletingVideoId === video.id,
-                          timestamp: Date.now()
-                        });
-                        // Optimistically hide the video
-                        setOptimisticallyDeletedIds((ids) => ids.includes(video.id) ? ids : [...ids, video.id]);
-                        onDelete(video.id);
-                        console.log('[MobileButtonDebug] [DeleteButton] onDelete called');
-                        // Proactively refetch unified generations for this shot/page
-                        try {
-                          const { getUnifiedGenerationsCacheKey } = require('@/shared/hooks/useUnifiedGenerations');
-                          const key = getUnifiedGenerationsCacheKey({
-                            projectId,
-                            mode: 'shot-specific',
-                            shotId,
-                            page: currentPage,
-                            limit: itemsPerPage,
-                            filters,
-                            includeTaskData: false,
-                            preloadTaskData: true,
-                            enabled: !!(projectId && shotId),
-                          } as any);
-                          queryClient.invalidateQueries({ queryKey: key });
-                        } catch (err) {
-                          console.warn('[VideoOutputsGallery] Failed to invalidate unified generations cache', err);
-                          // Fallback: invalidate all unified generations queries
-                          queryClient.invalidateQueries({ queryKey: ['unified-generations'] });
-                        }
-                        // Invalidate project video count cache if provided
-                        if (invalidateVideoCountsCache) {
-                          invalidateVideoCountsCache();
-                        }
-                      }}
-                      disabled={deletingVideoId === video.id}
-                      className="h-6 w-6 sm:h-7 sm:w-7 p-0 rounded-full"
-                      title="Delete video"
-                    >
-                      <Trash2 className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-                    </Button>
-                  </div>
-                </div>
-                
-                {/* Timestamp - Top Left */}
-                <TimeStamp 
-                  createdAt={video.createdAt || (video as { created_at?: string | null }).created_at} 
-                  position="top-left"
-                  className="z-10 !top-1 !left-4 sm:!top-2 sm:!left-4"
-                />
-              </div>
+              <VideoItem
+                key={video.id}
+                video={video}
+                index={index}
+                originalIndex={originalIndex}
+                isFirstVideo={isFirstVideo}
+                shouldPreload={shouldPreload}
+                isMobile={isMobile}
+                onLightboxOpen={setLightboxIndex}
+                onMobileTap={handleMobileTap}
+                onDelete={onDelete}
+                deletingVideoId={deletingVideoId}
+                onHoverStart={handleHoverStart}
+                onHoverEnd={handleHoverEnd}
+                onMobileModalOpen={(video: GenerationRow) => {
+                  setSelectedVideoForDetails(video);
+                  setShowTaskDetailsModal(true);
+                }}
+                selectedVideoForDetails={selectedVideoForDetails}
+                showTaskDetailsModal={showTaskDetailsModal}
+              />
             );
           })}
         </div>
@@ -1125,21 +1370,12 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
           return selectedVideoForDetails && showTaskDetailsModal;
         })() && (
           <TaskDetailsModal
-            generationId={(() => {
-              console.log('[MobileButtonDebug] [TaskDetailsModal] Rendering with generationId:', selectedVideoForDetails.id);
-              return selectedVideoForDetails.id;
-            })()}
+            generationId={selectedVideoForDetails.id}
             open={showTaskDetailsModal}
             onOpenChange={(open) => {
-              console.log('[MobileButtonDebug] [TaskDetailsModal] onOpenChange called:', { 
-                open, 
-                selectedVideo: selectedVideoForDetails?.id,
-                currentShowModal: showTaskDetailsModal,
-                timestamp: Date.now()
-              });
+              console.log('[TaskToggle] VideoOutputsGallery: TaskDetailsModal onOpenChange', { open, selectedVideo: selectedVideoForDetails?.id });
               if (!open) {
                 // When closing, reset both states
-                console.log('[MobileButtonDebug] [TaskDetailsModal] Resetting modal state due to onOpenChange(false)');
                 setShowTaskDetailsModal(false);
                 setSelectedVideoForDetails(null);
               }
