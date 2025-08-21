@@ -57,6 +57,35 @@ export const VideoItem = React.memo<VideoItemProps>(({
   useVideoElementIntegration(video, index, shouldLoad, shouldPreload, videoLoader);
   
   // ===============================================================================
+  // VIDEO TRANSITION STATE - Smooth transition from thumbnail to video
+  // ===============================================================================
+  
+  // Track when video is fully visible to prevent flashing
+  const [videoFullyVisible, setVideoFullyVisible] = useState(false);
+  
+  useEffect(() => {
+    if (videoPosterLoaded) {
+      // Delay hiding thumbnail until video transition completes
+      const timer = setTimeout(() => {
+        setVideoFullyVisible(true);
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`🎬 [VideoLifecycle] Video ${index + 1} - TRANSITION_COMPLETE:`, {
+            videoId: video.id,
+            phase: 'TRANSITION_COMPLETE',
+            thumbnailWillHide: true,
+            videoFullyVisible: true,
+            timestamp: Date.now()
+          });
+        }
+      }, 350); // Slightly longer than the 300ms transition
+      
+      return () => clearTimeout(timer);
+    } else {
+      setVideoFullyVisible(false);
+    }
+  }, [videoPosterLoaded, index, video.id]);
+  
+  // ===============================================================================
   // STATE TRACKING - Unified video lifecycle logging
   // ===============================================================================
   
@@ -90,18 +119,14 @@ export const VideoItem = React.memo<VideoItemProps>(({
   return (
     <div className="w-1/2 lg:w-1/3 px-1 sm:px-1.5 md:px-2 mb-2 sm:mb-3 md:mb-4 relative group">
       <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden shadow-sm border relative">
-        {/* Thumbnail - shows immediately if available, before video loads */}
+        {/* Thumbnail - shows immediately if available, stays visible until video fully transitions */}
         {hasThumbnail && !thumbnailError && (
           <img
             src={video.thumbUrl}
             alt="Video thumbnail"
-            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${
-              videoPosterLoaded ? 'opacity-0' : 'opacity-100'
+            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
+              videoFullyVisible ? 'opacity-0' : 'opacity-100'
             }`}
-            style={{ 
-              backgroundColor: '#f3f4f6', // gray-100 fallback during transition
-              zIndex: videoPosterLoaded ? 1 : 2 // Ensure proper layering during transition
-            }}
             onLoad={() => {
               setThumbnailLoaded(true);
               if (process.env.NODE_ENV === 'development') {
@@ -131,31 +156,22 @@ export const VideoItem = React.memo<VideoItemProps>(({
         
         {/* Loading placeholder - shows until thumbnail or video poster is ready */}
         {!thumbnailLoaded && !videoPosterLoaded && (
-          <div className="absolute inset-0 bg-gray-100 flex items-center justify-center z-10">
-            <div className="flex flex-col items-center space-y-2">
-              <div className="w-6 h-6 border-2 border-gray-400 border-t-gray-600 rounded-full animate-spin"></div>
-              <div className="text-gray-500 text-xs">
-                {hasThumbnail ? 'Loading thumbnail...' : 'Loading video...'}
-              </div>
-            </div>
+          <div className="absolute inset-0 bg-gray-200 flex items-center justify-center z-10">
+            <div className="w-6 h-6 border-2 border-gray-400 border-t-gray-600 rounded-full animate-spin"></div>
           </div>
         )}
         
         {/* Only render video when it's time to load */}
         {shouldLoad && (
-          <div className="absolute inset-0 w-full h-full" style={{ backgroundColor: '#f3f4f6' }}>
+          <div className="relative w-full h-full">
             {/* HoverScrubVideo with loading optimization integration */}
             <HoverScrubVideo
               src={video.location || video.imageUrl}
               preload={shouldPreload as 'auto' | 'metadata' | 'none'}
               className={`w-full h-full transition-opacity duration-500 ${
-                videoPosterLoaded ? 'opacity-100' : 'opacity-0'
+                videoPosterLoaded ? 'opacity-100' : 'opacity-0 pointer-events-none'
               }`}
               videoClassName="object-cover cursor-pointer"
-              style={{ 
-                backgroundColor: '#f3f4f6', // gray-100 background to prevent white flash
-                zIndex: videoPosterLoaded ? 2 : 1 // Ensure video is on top when ready
-              }}
               data-video-id={video.id}
               // Interaction events
               onDoubleClick={isMobile ? undefined : () => {
