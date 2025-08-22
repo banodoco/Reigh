@@ -370,7 +370,11 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   }, [generationsData, isLoadingGenerations, isFetchingGenerations, generationsError, shotId, setCachedCount, getShotVideoCount, invalidateVideoCountsCache]);
 
   // SIMPLIFIED: Use ImageGallery's pure and simple skeleton logic - no delays!
-  const showSkeletons = isLoadingGenerations && videoOutputs.length === 0;
+  // Only show skeletons during INITIAL loading (never loaded before)
+  // If we've fetched data and got 0 results, go straight to empty state
+  const hasEverFetched = !isLoadingGenerations || videoOutputs.length > 0 || generationsError;
+  const showSkeletons = isLoadingGenerations && videoOutputs.length === 0 && !hasEverFetched;
+  
   const skeletonCount = showSkeletons ? (getShotVideoCount?.(shotId) || 6) : 0;
   
   // AGGRESSIVE DEBUG: Always log skeleton state (no useEffect gating)
@@ -379,7 +383,9 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     skeletonCount,
     isLoadingGenerations,
     videoOutputsLength: videoOutputs.length,
-    logic: `isLoadingGenerations=${isLoadingGenerations} && videoOutputs.length=${videoOutputs.length} === 0`,
+    hasEverFetched,
+    generationsError: !!generationsError,
+    logic: `isLoadingGenerations=${isLoadingGenerations} && videoOutputs.length=${videoOutputs.length} === 0 && !hasEverFetched=${!hasEverFetched}`,
     decision: showSkeletons ? 'SHOW_SKELETONS' : 'SHOW_VIDEOS',
     getShotVideoCountResult: getShotVideoCount?.(shotId),
     shotId,
