@@ -228,9 +228,33 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     enabled: !!(projectId && shotId),
   });
 
+  // DEEP DEBUG: Log every change in loading states
+  useEffect(() => {
+    console.log(`[VideoGalleryPreload] DATA_LOADING_STATE_CHANGE:`, {
+      isLoadingGenerations,
+      isFetchingGenerations,
+      hasGenerationsData: !!generationsData,
+      generationsDataItems: generationsData?.items?.length || 0,
+      generationsDataTotal: generationsData?.total || 0,
+      generationsError: !!generationsError,
+      projectId,
+      shotId,
+      timestamp: Date.now()
+    });
+  }, [isLoadingGenerations, isFetchingGenerations, generationsData, generationsError, projectId, shotId]);
+
   // Get video outputs from unified data
   const videoOutputs = useMemo(() => {
-    if (!(generationsData as any)?.items) return [];
+    console.log(`[VideoGalleryPreload] VIDEO_OUTPUTS_PROCESSING:`, {
+      hasGenerationsData: !!(generationsData as any)?.items,
+      itemCount: (generationsData as any)?.items?.length || 0,
+      processingStarted: Date.now()
+    });
+
+    if (!(generationsData as any)?.items) {
+      console.log(`[VideoGalleryPreload] VIDEO_OUTPUTS_EMPTY: No generations data items`);
+      return [];
+    }
     
     // Debug log the raw data structure to see thumbnails
     console.log('[ThumbnailDebug] Raw generationsData.items:', {
@@ -240,7 +264,19 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
       timestamp: Date.now()
     });
     
-    return transformUnifiedGenerationsData((generationsData as any).items);
+    const transformed = transformUnifiedGenerationsData((generationsData as any).items);
+    console.log(`[VideoGalleryPreload] VIDEO_OUTPUTS_TRANSFORMED:`, {
+      originalCount: (generationsData as any).items.length,
+      transformedCount: transformed.length,
+      transformedItems: transformed.map(item => ({
+        id: item.id?.substring(0, 8),
+        hasThumbUrl: !!item.thumbUrl,
+        thumbUrl: item.thumbUrl?.substring(item.thumbUrl.lastIndexOf('/') + 1) || 'none'
+      })),
+      timestamp: Date.now()
+    });
+    
+    return transformed;
   }, [(generationsData as any)?.items]);
 
   // Enhanced generations with automatic task data preloading via context
@@ -250,11 +286,33 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   useGenerationTaskPreloader(videoOutputs, !!projectId && !!shotId);
   
   // Sort video outputs by creation date
-  const sortedVideoOutputs = useMemo(() => sortVideoOutputsByDate(videoOutputs), [videoOutputs]);
+  const sortedVideoOutputs = useMemo(() => {
+    const sorted = sortVideoOutputsByDate(videoOutputs);
+    console.log(`[VideoGalleryPreload] VIDEO_OUTPUTS_SORTED:`, {
+      originalCount: videoOutputs.length,
+      sortedCount: sorted.length,
+      sortedIds: sorted.slice(0, 5).map(item => item.id?.substring(0, 8)),
+      timestamp: Date.now()
+    });
+    return sorted;
+  }, [videoOutputs]);
 
   // Use pagination hook
   const paginationHook = useGalleryPagination(sortedVideoOutputs, itemsPerPage);
   const { currentPage, totalPages, currentVideoOutputs, handlePageChange, resetToFirstPage } = paginationHook;
+  
+  // DEEP DEBUG: Log pagination changes
+  useEffect(() => {
+    console.log(`[VideoGalleryPreload] PAGINATION_STATE:`, {
+      currentPage,
+      totalPages,
+      itemsPerPage,
+      totalVideos: sortedVideoOutputs.length,
+      currentVideoOutputsCount: currentVideoOutputs.length,
+      currentVideoIds: currentVideoOutputs.slice(0, 3).map(item => item.id?.substring(0, 8)),
+      timestamp: Date.now()
+    });
+  }, [currentPage, totalPages, currentVideoOutputs.length, sortedVideoOutputs.length]);
 
   // ===============================================================================
   // TASK DATA HOOKS
@@ -356,7 +414,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   const skeletonCount = calculateSkeletonCount(skeletonCalculationParams);
   
   // Enhanced debug logging for skeleton visibility
-  if (process.env.NODE_ENV === 'development') {
+  useEffect(() => {
     console.log(`[VideoGalleryPreload] SKELETON_DEBUG:`, {
       skeletonCount,
       isLoadingGenerations,
@@ -366,11 +424,12 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
       currentVideoOutputsLength: currentVideoOutputs.length,
       sortedVideoOutputsLength: sortedVideoOutputs.length,
       shouldShowSkeletons: skeletonCount > 0,
+      contentKey,
       projectId,
       shotId,
       timestamp: Date.now()
     });
-  }
+  }, [skeletonCount, isLoadingGenerations, isFetchingGenerations, showVideosAfterDelay, videoOutputs.length, currentVideoOutputs.length, contentKey]);
   const shouldShowEmpty = shouldShowEmptyState(
     getShotVideoCount,
     shotId,
@@ -511,16 +570,44 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
         />
 
         <div className="flex flex-wrap -mx-1 sm:-mx-1.5 md:-mx-2">
-          {/* Show skeletons when loading */}
-          {skeletonCount > 0 && Array.from({ length: skeletonCount }, (_, index) => (
+                  {/* Show skeletons when loading */}
+        {skeletonCount > 0 && (() => {
+          console.log(`[VideoGalleryPreload] RENDERING_SKELETONS:`, {
+            skeletonCount,
+            contentKey,
+            isLoadingGenerations,
+            showVideosAfterDelay,
+            timestamp: Date.now()
+          });
+          return Array.from({ length: skeletonCount }, (_, index) => (
             <VideoSkeleton key={`skeleton-${contentKey}-${index}`} index={index} />
-          ))}
-          
-          {/* Show actual videos when not loading */}
-          {skeletonCount === 0 && currentVideoOutputs.map((video, index) => {
+          ));
+        })()}
+
+        {/* Show actual videos when not loading */}
+        {skeletonCount === 0 && (() => {
+          console.log(`[VideoGalleryPreload] RENDERING_VIDEOS:`, {
+            videoCount: currentVideoOutputs.length,
+            contentKey,
+            isLoadingGenerations,
+            showVideosAfterDelay,
+            videoIds: currentVideoOutputs.slice(0, 3).map(v => v.id?.substring(0, 8)),
+            timestamp: Date.now()
+          });
+          return currentVideoOutputs.map((video, index) => {
             const originalIndex = (currentPage - 1) * itemsPerPage + index;
             const isFirstVideo = index === 0; // Prioritize first video
             const shouldPreload = isFirstVideo ? "metadata" : "none"; // Only preload first video
+            
+            console.log(`[VideoGalleryPreload] RENDERING_VIDEO_ITEM:`, {
+              videoId: video.id?.substring(0, 8),
+              index,
+              originalIndex,
+              hasThumbUrl: !!video.thumbUrl,
+              thumbUrl: video.thumbUrl?.substring(video.thumbUrl.lastIndexOf('/') + 1) || 'none',
+              shouldPreload,
+              timestamp: Date.now()
+            });
             
             return (
               <VideoItem
@@ -547,6 +634,22 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
             );
           })}
         </div>
+        
+        {/* DEEP DEBUG: Log current rendering state */}
+        {(() => {
+          console.log(`[VideoGalleryPreload] RENDER_STATE_SUMMARY:`, {
+            isRenderingSkeletons: skeletonCount > 0,
+            isRenderingVideos: skeletonCount === 0,
+            skeletonCount,
+            videoCount: currentVideoOutputs.length,
+            isLoadingGenerations,
+            isFetchingGenerations,
+            showVideosAfterDelay,
+            contentKey,
+            timestamp: Date.now()
+          });
+          return null;
+        })()}
 
         <GalleryPagination
           totalPages={totalPages}

@@ -71,7 +71,7 @@ export const calculateSkeletonCount = (params: SkeletonCalculationParams): numbe
   // Get project-wide preloaded count (highest priority for instant display)
   const projectVideoCount = getShotVideoCount?.(shotId) ?? null;
   
-  console.log('[VideoLoadingFix] Getting skeleton count:', {
+  console.log('[VideoGalleryPreload] SKELETON_CALCULATION_DETAILED:', {
     isLoadingGenerations,
     isFetchingGenerations,
     isDataLoading,
@@ -83,6 +83,13 @@ export const calculateSkeletonCount = (params: SkeletonCalculationParams): numbe
     shotId,
     projectVideoCount,
     cachedCount,
+    thumbnailsCached,
+    calculationFlow: {
+      step1_isDataLoading: isDataLoading,
+      step2_thumbnailsCached: thumbnailsCached,
+      step3_shouldShowSkeletons: shouldShowSkeletons,
+      finalDecision: shouldShowSkeletons ? 'SHOW_SKELETONS' : 'SHOW_VIDEOS'
+    },
     timestamp: Date.now()
   });
   
@@ -100,7 +107,7 @@ export const calculateSkeletonCount = (params: SkeletonCalculationParams): numbe
     const countToUse = (totalVideos !== null && totalVideos !== undefined && isDataFresh) ? totalVideos :
                       (projectVideoCount !== null && projectVideoCount >= 0) ? projectVideoCount : 0;
     
-    console.log('[SkeletonOptimization] Loading state - count sources (SAFE MODE):', {
+    console.log('[VideoGalleryPreload] SKELETON_COUNT_SOURCES:', {
       totalVideos,
       isDataFresh,
       projectVideoCount,
@@ -110,6 +117,8 @@ export const calculateSkeletonCount = (params: SkeletonCalculationParams): numbe
       usingFallback: !(totalVideos !== null && totalVideos !== undefined && isDataFresh) && projectVideoCount === null,
       generationsData: generationsData ? 'exists' : 'null',
       shotId,
+      shouldShowSkeletons,
+      thumbnailsCached,
       timestamp: Date.now()
     });
     

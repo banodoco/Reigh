@@ -42,6 +42,16 @@ export const VideoItem = React.memo<VideoItemProps>(({
   selectedVideoForDetails,
   showTaskDetailsModal
 }) => {
+  // DEEP DEBUG: Log component mount and state changes
+  console.log(`[VideoGalleryPreload] VIDEO_ITEM_MOUNT:`, {
+    videoId: video.id?.substring(0, 8),
+    index,
+    originalIndex,
+    hasThumbUrl: !!video.thumbUrl,
+    thumbUrlFile: video.thumbUrl?.substring(video.thumbUrl.lastIndexOf('/') + 1) || 'none',
+    fullThumbUrl: video.thumbUrl,
+    timestamp: Date.now()
+  });
   // ===============================================================================
   // HOOKS - Use extracted hooks for cleaner separation of concerns
   // ===============================================================================
@@ -61,6 +71,20 @@ export const VideoItem = React.memo<VideoItemProps>(({
     inPreloaderCache,
     inBrowserCache
   } = thumbnailLoader;
+
+  // DEEP DEBUG: Log thumbnail state changes
+  useEffect(() => {
+    console.log(`[VideoGalleryPreload] VIDEO_ITEM_THUMBNAIL_STATE:`, {
+      videoId: video.id?.substring(0, 8),
+      thumbnailLoaded,
+      thumbnailError,
+      hasThumbnail,
+      isInitiallyCached,
+      inPreloaderCache,
+      inBrowserCache,
+      timestamp: Date.now()
+    });
+  }, [video.id, thumbnailLoaded, thumbnailError, hasThumbnail, isInitiallyCached, inPreloaderCache, inBrowserCache]);
   
   // Hook for video element integration
   useVideoElementIntegration(video, index, shouldLoad, shouldPreload, videoLoader);
@@ -172,17 +196,30 @@ export const VideoItem = React.memo<VideoItemProps>(({
         
         {/* Loading placeholder - shows until thumbnail or video poster is ready */}
         {/* Don't show loading if thumbnail was initially cached */}
-        {!thumbnailLoaded && !videoPosterLoaded && !isInitiallyCached && (
-          <div className="absolute inset-0 bg-gray-200 flex items-center justify-center z-10">
-            <div className="w-6 h-6 border-2 border-gray-400 border-t-gray-600 rounded-full animate-spin"></div>
-            {process.env.NODE_ENV === 'development' && (
-              <div className="absolute bottom-1 left-1 text-xs bg-red-500 text-white px-1 rounded">
-                LOADING
-                <br/>T:{thumbnailLoaded ? 'Y' : 'N'} V:{videoPosterLoaded ? 'Y' : 'N'}
-              </div>
-            )}
-          </div>
-        )}
+        {!thumbnailLoaded && !videoPosterLoaded && !isInitiallyCached && (() => {
+          console.log(`[VideoGalleryPreload] VIDEO_ITEM_SHOWING_LOADING_SPINNER:`, {
+            videoId: video.id?.substring(0, 8),
+            thumbnailLoaded,
+            videoPosterLoaded,
+            isInitiallyCached,
+            hasThumbnail,
+            inPreloaderCache,
+            inBrowserCache,
+            reason: 'thumbnailLoaded=false AND videoPosterLoaded=false AND isInitiallyCached=false',
+            timestamp: Date.now()
+          });
+          return (
+            <div className="absolute inset-0 bg-gray-200 flex items-center justify-center z-10">
+              <div className="w-6 h-6 border-2 border-gray-400 border-t-gray-600 rounded-full animate-spin"></div>
+              {process.env.NODE_ENV === 'development' && (
+                <div className="absolute bottom-1 left-1 text-xs bg-red-500 text-white px-1 rounded">
+                  LOADING
+                  <br/>T:{thumbnailLoaded ? 'Y' : 'N'} V:{videoPosterLoaded ? 'Y' : 'N'}
+                </div>
+              )}
+            </div>
+          );
+        })()}
         
         {/* Enhanced debug logging for loading state visibility */}
         {process.env.NODE_ENV === 'development' && (!thumbnailLoaded || !videoPosterLoaded) && (
