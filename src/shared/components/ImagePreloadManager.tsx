@@ -17,6 +17,7 @@ interface ImagePreloadManagerProps {
   itemsPerPage: number;
   onPrefetchAdjacentPages?: (prevPage: number | null, nextPage: number | null) => void;
   allImages?: any[];
+  projectId?: string | null;
 }
 
 /**
@@ -31,7 +32,8 @@ export const ImagePreloadManager: React.FC<ImagePreloadManagerProps> = ({
   totalFilteredItems,
   itemsPerPage,
   onPrefetchAdjacentPages,
-  allImages = []
+  allImages = [],
+  projectId = null
 }) => {
   
   // Use the adjacent page preloading hook
@@ -44,6 +46,7 @@ export const ImagePreloadManager: React.FC<ImagePreloadManagerProps> = ({
     itemsPerPage,
     onPrefetchAdjacentPages,
     allImages,
+    projectId,
   });
 
   // This component doesn't render anything

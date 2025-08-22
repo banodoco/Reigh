@@ -5,7 +5,8 @@ import {
   setImageCacheStatus, 
   clearCacheForImages,
   keepOnlyInCache,
-  performMemoryAwareCleanup
+  performMemoryAwareCleanup,
+  clearCacheForProjectSwitch
 } from '@/shared/lib/imageCacheManager';
 import { performanceMonitoredTimeout } from '@/shared/lib/performanceUtils';
 
@@ -18,6 +19,7 @@ interface UseAdjacentPagePreloadingProps {
   itemsPerPage: number;
   onPrefetchAdjacentPages?: (prevPage: number | null, nextPage: number | null) => void;
   allImages?: any[]; // For client-side pagination
+  projectId?: string | null; // For project-aware cache clearing
 }
 
 // Legacy exports for backwards compatibility
@@ -755,6 +757,7 @@ export const useAdjacentPagePreloading = ({
   itemsPerPage,
   onPrefetchAdjacentPages,
   allImages = [],
+  projectId = null,
 }: UseAdjacentPagePreloadingProps) => {
   // Track ongoing preload operations for proper cancellation
   const preloadOperationsRef = useRef<PreloadOperation>({
@@ -921,6 +924,17 @@ export const useAdjacentPagePreloading = ({
     allImages,
     cancelAllPreloads,
   ]);
+
+  // Clear cache on project change
+  useEffect(() => {
+    if (projectId) {
+      console.log(`[AdjacentPagePreloading] Project changed to ${projectId}, clearing image cache`);
+      clearCacheForProjectSwitch('project switch in adjacent page preloading');
+      
+      // Also clear the global preload queue to start fresh
+      globalPreloadQueue.clear();
+    }
+  }, [projectId]);
 
   // Clean up all operations on unmount
   useEffect(() => {

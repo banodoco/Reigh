@@ -51,7 +51,16 @@ export const VideoItem = React.memo<VideoItemProps>(({
   
   // Destructure for easier access
   const { shouldLoad, videoMetadataLoaded, videoPosterLoaded, logVideoEvent } = videoLoader;
-  const { thumbnailLoaded, setThumbnailLoaded, thumbnailError, setThumbnailError, hasThumbnail } = thumbnailLoader;
+  const { 
+    thumbnailLoaded, 
+    setThumbnailLoaded, 
+    thumbnailError, 
+    setThumbnailError, 
+    hasThumbnail,
+    isInitiallyCached,
+    inPreloaderCache,
+    inBrowserCache
+  } = thumbnailLoader;
   
   // Hook for video element integration
   useVideoElementIntegration(video, index, shouldLoad, shouldPreload, videoLoader);
@@ -124,6 +133,8 @@ export const VideoItem = React.memo<VideoItemProps>(({
           <img
             src={video.thumbUrl}
             alt="Video thumbnail"
+            loading="eager"
+            decoding="sync"
             className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
               videoFullyVisible ? 'opacity-0' : 'opacity-100'
             }`}
@@ -135,6 +146,9 @@ export const VideoItem = React.memo<VideoItemProps>(({
                   thumbnailUrl: video.thumbUrl,
                   phase: 'THUMBNAIL_LOADED',
                   nextPhase: 'Will transition to video when ready',
+                  wasInitiallyCached: isInitiallyCached,
+                  inPreloaderCache,
+                  inBrowserCache,
                   timestamp: Date.now()
                 });
                 console.log(`[VideoGalleryPreload] THUMBNAIL_LOADED - URL: ${video.thumbUrl}`);
@@ -160,6 +174,19 @@ export const VideoItem = React.memo<VideoItemProps>(({
         {!thumbnailLoaded && !videoPosterLoaded && (
           <div className="absolute inset-0 bg-gray-200 flex items-center justify-center z-10">
             <div className="w-6 h-6 border-2 border-gray-400 border-t-gray-600 rounded-full animate-spin"></div>
+            {process.env.NODE_ENV === 'development' && (
+              <div className="absolute bottom-1 left-1 text-xs bg-red-500 text-white px-1 rounded">
+                LOADING{isInitiallyCached ? ' (WAS CACHED)' : ''}
+                <br/>T:{thumbnailLoaded ? 'Y' : 'N'} V:{videoPosterLoaded ? 'Y' : 'N'}
+              </div>
+            )}
+          </div>
+        )}
+        
+        {/* Debug indicator for cached state (dev only) */}
+        {process.env.NODE_ENV === 'development' && isInitiallyCached && (
+          <div className="absolute top-1 right-1 text-xs bg-green-500 text-white px-1 rounded z-20">
+            CACHED
           </div>
         )}
         

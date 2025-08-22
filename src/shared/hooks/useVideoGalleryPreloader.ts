@@ -106,8 +106,9 @@ export const useVideoGalleryPreloader = (options?: {
           )
         `)
         .eq('shot_id', shotId)
-        .order('position', { ascending: true })
+        // IMPORTANT: Match gallery sort (newest first)
         .order('created_at', { ascending: false })
+        .order('position', { ascending: true })
         .range(startIndex, endIndex);
 
       if (error) {
@@ -128,6 +129,7 @@ export const useVideoGalleryPreloader = (options?: {
         .filter((url: string) => url) as string[];
       
       console.log(`[VideoGalleryPreload] Shot ${shotId.slice(0, 8)} URLs - Found ${urls.length} URLs, ${data?.filter((sg: any) => sg.generation?.thumbnail_url && sg.generation.thumbnail_url !== sg.generation.location).length || 0} with separate thumbnails`);
+      console.log(`[VideoGalleryPreload] ORDER_STRATEGY: created_at desc (matching gallery)`);
       console.log(`[VideoGalleryPreload] Sample URLs:`, urls.slice(0, 2));
       console.log(`[VideoGalleryPreload] Raw URLs from database (no transformation):`, urls.slice(0, 3));
       return urls;
@@ -337,13 +339,28 @@ export const useVideoGalleryPreloader = (options?: {
     }
   }, [shouldShowShotEditor, selectedShot, shouldSkipPreload, queuePreloadForShotPage, getShotVideoCount]);
 
-  // Cleanup on project change - Note: Global cache persists, only clear queue
+  // Cleanup on project change - Clear cache for new project
   useEffect(() => {
     if (!selectedProjectId) {
-      // Clear only the processing queue, keep global cache
+      // Clear only the processing queue when no project
       preloadQueue.current = [];
+    } else {
+      // When switching to a new project, clear the cache for the new project to start fresh
+      // This ensures users see the most up-to-date content for each project
+      if (window.videoGalleryPreloaderCache!.preloadedUrlSetByProject[selectedProjectId]) {
+        console.log(`[VideoGalleryPreload] Clearing cache for project ${selectedProjectId} on project switch`);
+        delete window.videoGalleryPreloaderCache!.preloadedUrlSetByProject[selectedProjectId];
+        delete window.videoGalleryPreloaderCache!.hasStartedPreloadForProject[selectedProjectId];
+        
+        // Clear shot-specific cache for this project's shots
+        if (shots) {
+          shots.forEach(shot => {
+            delete window.videoGalleryPreloaderCache!.preloadedPagesByShot[shot.id];
+          });
+        }
+      }
     }
-  }, [selectedProjectId]);
+  }, [selectedProjectId, shots]);
 
   return {
     // Expose some state for debugging if needed

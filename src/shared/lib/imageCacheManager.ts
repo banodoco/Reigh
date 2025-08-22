@@ -188,6 +188,17 @@ export const clearAllCache = (): void => {
 };
 
 /**
+ * Clear cache for project switch - removes all cached images to ensure fresh content
+ */
+export const clearCacheForProjectSwitch = (reason: string = 'project switch'): number => {
+  const prevSize = globalImageCache.size;
+  globalImageCache.clear();
+  
+  console.log(`[ImageCacheManager] Cleared cache for ${reason}, removed ${prevSize} entries`);
+  return prevSize;
+};
+
+/**
  * Memory-aware cache cleanup - removes oldest entries when cache gets too large
  */
 export const performMemoryAwareCleanup = (maxEntries: number = 1000): number => {

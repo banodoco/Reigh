@@ -24,6 +24,7 @@ import { Label } from "@/shared/components/ui/label";
 
 // Removed nanoid import to avoid random generation overhead per render
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
+import { useProject } from '@/shared/contexts/ProjectContext';
 import { DraggableImage } from "@/shared/components/DraggableImage";
 import { getDisplayUrl } from "@/shared/lib/utils";
 import { ShotFilter } from "@/shared/components/ShotFilter";
@@ -309,6 +310,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   enableAdjacentPagePreloading = true,
   onCreateShot
 }) => {
+  // Get project context for cache clearing
+  const { selectedProjectId } = useProject();
   const [activeLightboxMedia, setActiveLightboxMedia] = useState<GenerationRow | null>(null);
   const [downloadingImageId, setDownloadingImageId] = useState<string | null>(null);
   const { toast } = useToast();
@@ -1292,6 +1295,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
           itemsPerPage={ITEMS_PER_PAGE}
           onPrefetchAdjacentPages={onPrefetchAdjacentPages}
           allImages={filteredImages}
+          projectId={selectedProjectId}
         />
 
         {/* Gallery content wrapper with minimum height to prevent layout jump when there are images */}
