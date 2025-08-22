@@ -109,61 +109,85 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   // [MobileStallFix] Enhanced auth state tracking with mobile recovery
-  // [PerformanceOptimization] Batch auth state changes to prevent excessive re-renders
+  // [AuthDebounce] Prevent cascading updates from duplicate auth events
   useEffect(() => {
     let authStateChangeCount = 0;
-    let batchedUpdates: Array<() => void> = [];
-    let batchTimeout: NodeJS.Timeout | null = null;
+    let debounceTimeout: NodeJS.Timeout | null = null;
+    let lastProcessedState: { event: string; userId: string | undefined } | null = null;
+    let pendingAuthState: { event: string; session: any } | null = null;
 
-    const flushBatchedUpdates = () => {
-      if (batchedUpdates.length > 0) {
-        // Apply all batched updates in a single render cycle using React's batching
-        React.startTransition(() => {
-          batchedUpdates.forEach(update => update());
-        });
-        batchedUpdates = [];
+    const processAuthChange = (event: string, session: any) => {
+      const currentUserId = session?.user?.id;
+      
+      // Check if this is a meaningful state transition
+      const isDuplicateEvent = lastProcessedState && 
+        lastProcessedState.event === event && 
+        lastProcessedState.userId === currentUserId;
+      
+      if (isDuplicateEvent) {
+        console.log(`[ProjectContext:MobileDebug] Skipping duplicate auth event: ${event}, userId: ${!!currentUserId}`);
+        return;
       }
-      batchTimeout = null;
+
+      console.log(`[ProjectContext:MobileDebug] Processing auth change: ${event}, userId: ${!!currentUserId}`);
+      
+      // Update user ID
+      setUserId(currentUserId);
+      
+      // [MobileStallFix] Reset preferences loading state on meaningful auth transitions
+      if (event === 'SIGNED_OUT' || (event === 'SIGNED_IN' && lastProcessedState?.event !== 'SIGNED_IN')) {
+        console.log(`[ProjectContext:MobileDebug] Resetting preferences loading state due to meaningful ${event} transition`);
+        setIsLoadingPreferences(false);
+        if (preferencesTimeoutRef.current) {
+          clearTimeout(preferencesTimeoutRef.current);
+          preferencesTimeoutRef.current = undefined;
+        }
+      }
+      
+      // Track the processed state
+      lastProcessedState = { event, userId: currentUserId };
     };
 
-    const enqueueBatchedUpdate = (update: () => void) => {
-      batchedUpdates.push(update);
+    const handleAuthStateChange = (event: string, session: any) => {
+      authStateChangeCount++;
+      console.log(`[ProjectContext:MobileDebug] Auth change #${authStateChangeCount}:`, event, !!session?.user?.id);
       
-      if (!batchTimeout) {
-        // Batch multiple rapid auth changes into a single update after 50ms
-        batchTimeout = setTimeout(flushBatchedUpdates, 50);
+      // Store the latest auth state
+      pendingAuthState = { event, session };
+      
+      // Clear existing debounce timer
+      if (debounceTimeout) {
+        clearTimeout(debounceTimeout);
       }
+      
+      // [AuthDebounce] Wait 150ms for additional auth events before processing
+      debounceTimeout = setTimeout(() => {
+        if (pendingAuthState) {
+          React.startTransition(() => {
+            processAuthChange(pendingAuthState!.event, pendingAuthState!.session);
+          });
+          pendingAuthState = null;
+        }
+        debounceTimeout = null;
+      }, 150);
     };
     
     supabase.auth.getSession().then(({ data: { session } }) => {
       console.log(`[ProjectContext:MobileDebug] Initial session:`, !!session?.user?.id);
       setUserId(session?.user?.id);
+      lastProcessedState = { event: 'INITIAL_SESSION', userId: session?.user?.id };
     });
 
-    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
-      authStateChangeCount++;
-      console.log(`[ProjectContext:MobileDebug] Auth change #${authStateChangeCount}:`, event, !!session?.user?.id);
-      
-      enqueueBatchedUpdate(() => {
-        setUserId(session?.user?.id);
-        
-        // [MobileStallFix] Reset preferences loading state on auth logout/signin
-        if (event === 'SIGNED_OUT' || event === 'SIGNED_IN') {
-          console.log(`[ProjectContext:MobileDebug] Resetting preferences loading state due to ${event}`);
-          setIsLoadingPreferences(false);
-          if (preferencesTimeoutRef.current) {
-            clearTimeout(preferencesTimeoutRef.current);
-            preferencesTimeoutRef.current = undefined;
-          }
-        }
-      });
-    });
+    const { data: listener } = supabase.auth.onAuthStateChange(handleAuthStateChange);
 
     return () => {
       listener.subscription.unsubscribe();
-      if (batchTimeout) {
-        clearTimeout(batchTimeout);
-        flushBatchedUpdates(); // Apply any pending updates on cleanup
+      if (debounceTimeout) {
+        clearTimeout(debounceTimeout);
+        // Process final pending state on cleanup if needed
+        if (pendingAuthState) {
+          processAuthChange(pendingAuthState.event, pendingAuthState.session);
+        }
       }
     };
   }, []);
