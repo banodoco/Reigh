@@ -373,19 +373,18 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   const showSkeletons = isLoadingGenerations && videoOutputs.length === 0;
   const skeletonCount = showSkeletons ? (getShotVideoCount?.(shotId) || 6) : 0;
   
-  // Simplified debug logging for skeleton visibility
-  useEffect(() => {
-    console.log(`[VideoGallerySimplified] SKELETON_DEBUG:`, {
-      showSkeletons,
-      skeletonCount,
-      isLoadingGenerations,
-      videoOutputsLength: videoOutputs.length,
-      logic: `isLoadingGenerations=${isLoadingGenerations} && videoOutputs.length=${videoOutputs.length} === 0`,
-      decision: showSkeletons ? 'SHOW_SKELETONS' : 'SHOW_VIDEOS',
-      shotId,
-      timestamp: Date.now()
-    });
-  }, [showSkeletons, skeletonCount, isLoadingGenerations, videoOutputs.length, shotId]);
+  // AGGRESSIVE DEBUG: Always log skeleton state (no useEffect gating)
+  console.log(`[VideoGallerySimplified] SKELETON_DEBUG:`, {
+    showSkeletons,
+    skeletonCount,
+    isLoadingGenerations,
+    videoOutputsLength: videoOutputs.length,
+    logic: `isLoadingGenerations=${isLoadingGenerations} && videoOutputs.length=${videoOutputs.length} === 0`,
+    decision: showSkeletons ? 'SHOW_SKELETONS' : 'SHOW_VIDEOS',
+    getShotVideoCountResult: getShotVideoCount?.(shotId),
+    shotId,
+    timestamp: Date.now()
+  });
 
   // Simple empty state check (no skeleton dependency needed)
   const shouldShowEmpty = !isLoadingGenerations && !isFetchingGenerations && sortedVideoOutputs.length === 0;
