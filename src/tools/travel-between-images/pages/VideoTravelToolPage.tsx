@@ -975,7 +975,7 @@ const VideoTravelToolPage: React.FC = () => {
     // Otherwise show the main grid skeleton while the project hydrates
     return (
       <div 
-        className="grid gap-4"
+        className="grid gap-4 px-4 py-4"
         style={{ gridTemplateColumns: `repeat(${skeletonGridCols}, minmax(0, 1fr))` }}
       >
         {Array.from({ length: 8 }).map((_, idx) => (
@@ -1024,7 +1024,7 @@ const VideoTravelToolPage: React.FC = () => {
     // Otherwise show main list skeleton
     return (
       <div 
-        className="grid gap-4"
+        className="grid gap-4 px-4 py-4"
         style={{ gridTemplateColumns: `repeat(${skeletonGridCols}, minmax(0, 1fr))` }}
       >
         {Array.from({ length: 8 }).map((_, idx) => (

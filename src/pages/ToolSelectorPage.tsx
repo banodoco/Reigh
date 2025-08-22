@@ -279,7 +279,7 @@ const ToolSelectorPage: React.FC = () => {
           <div className={`flex flex-col c-lg:flex-row ${sectionGap}`}>
             {/* Process Column */}
             <div className="w-full c-lg:w-2/3">
-              <div className={`flex flex-col ${itemGap} ${topMargin}`}>
+              <div className={`flex flex-col ${itemGap} ${topMargin} px-4 py-4`}>
                 {processTools.map((tool, index) => (
                   <FadeInSection key={tool.id}>
                     <ToolCard
@@ -294,7 +294,7 @@ const ToolSelectorPage: React.FC = () => {
 
             {/* Assistant Tools Column */}
             <div className="w-full c-lg:w-1/3">
-              <div className={`grid ${itemGap} ${topMargin} grid-cols-2`}>
+              <div className={`grid ${itemGap} ${topMargin} grid-cols-2 px-4 py-4`}>
                 {assistantTools.map((tool, index) => (
                   <FadeInSection key={tool.id}>
                     <ToolCard
