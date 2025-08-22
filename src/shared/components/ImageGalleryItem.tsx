@@ -21,7 +21,8 @@ import { getImageLoadingStrategy } from '@/shared/lib/imageLoadingPriority';
 import { TimeStamp } from "@/shared/components/TimeStamp";
 import { useToast } from "@/shared/hooks/use-toast";
 import * as PopoverPrimitive from "@radix-ui/react-popover";
-import { GeneratedImageWithMetadata, DisplayableMetadata, formatMetadataForDisplay } from "./ImageGallery";
+import { GeneratedImageWithMetadata, DisplayableMetadata } from "./ImageGallery";
+import SharedMetadataDetails from "./SharedMetadataDetails";
 import { log } from '@/shared/lib/logger';
 import { cn } from "@/shared/lib/utils";
 import CreateShotModal from "@/shared/components/CreateShotModal";
@@ -367,19 +368,14 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
     }
   }, [actualSrc, actualDisplayUrl, shouldLoad, image.id, index]);
 
-  // Only format metadata when actually needed (Info tooltip/popover is opened)
-  // This prevents 150-200ms of string building work during initial render on mobile
-  const metadataForDisplay = useMemo(() => {
-    if (!image.metadata) return "No metadata available.";
+  // Check if we should show metadata details (only when tooltip/popover is open for performance)
+  const shouldShowMetadata = useMemo(() => {
+    if (!image.metadata) return false;
     
-    // On mobile, only format when popover is open; on desktop, only when tooltip might be shown
-    const shouldFormat = isMobile 
+    // On mobile, only show when popover is open; on desktop, only when tooltip might be shown
+    return isMobile 
       ? (mobilePopoverOpenImageId === image.id)
       : isInfoOpen;
-    
-    if (!shouldFormat) return '';
-    
-    return formatMetadataForDisplay(image.metadata);
   }, [image.metadata, isMobile, mobilePopoverOpenImageId, image.id, isInfoOpen]);
   const isCurrentDeleting = isDeleting;
   const imageKey = image.id || `image-${actualDisplayUrl}-${index}`;
@@ -1073,18 +1069,15 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                         side="right"
                         align="start"
                         sideOffset={4}
-                        className="z-[10010] max-w-48 text-xs p-3 leading-relaxed shadow-lg bg-background border max-h-80 overflow-y-auto rounded-md"
+                        className="z-[10010] max-w-lg p-0 border bg-background shadow-lg rounded-md max-h-96 overflow-y-auto"
                       >
-                        {image.metadata?.userProvidedImageUrl && (
-                          <img
-                            src={image.metadata.userProvidedImageUrl}
-                            alt="User provided image preview"
-                            className="w-full h-auto max-h-24 object-contain rounded-sm mb-2 border"
-                            loading="lazy"
+                        {shouldShowMetadata && image.metadata && (
+                          <SharedMetadataDetails
+                            metadata={image.metadata}
+                            variant="panel"
+                            isMobile={true}
+                            showUserImage={true}
                           />
-                        )}
-                        {metadataForDisplay && (
-                          <pre className="font-sans whitespace-pre-wrap">{metadataForDisplay}</pre>
                         )}
                       </PopoverPrimitive.Content>
                     </PopoverPrimitive.Portal>
@@ -1101,18 +1094,17 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                     <TooltipContent
                       side="right"
                       align="start"
-                      className="max-w-48 text-xs p-3 leading-relaxed shadow-lg bg-background border max-h-80 overflow-y-auto"
+                      className="max-w-lg p-0 border-0 bg-background/95 backdrop-blur-sm"
+                      sideOffset={15}
+                      collisionPadding={10}
                     >
-                      {image.metadata?.userProvidedImageUrl && (
-                        <img
-                          src={image.metadata.userProvidedImageUrl}
-                          alt="User provided image preview"
-                          className="w-full h-auto max-h-24 object-contain rounded-sm mb-2 border"
-                          loading="lazy"
+                      {shouldShowMetadata && image.metadata && (
+                        <SharedMetadataDetails
+                          metadata={image.metadata}
+                          variant="hover"
+                          isMobile={false}
+                          showUserImage={true}
                         />
-                      )}
-                      {metadataForDisplay && (
-                        <pre className="font-sans whitespace-pre-wrap">{metadataForDisplay}</pre>
                       )}
                     </TooltipContent>
                   </Tooltip>

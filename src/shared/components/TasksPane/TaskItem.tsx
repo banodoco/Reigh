@@ -27,6 +27,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useTaskGenerationMapping } from '@/shared/lib/generationTaskBridge';
 import { SharedTaskDetails } from '@/tools/travel-between-images/components/SharedTaskDetails';
+import SharedMetadataDetails from '@/shared/components/SharedMetadataDetails';
 import { useUnifiedGenerations } from '@/shared/hooks/useUnifiedGenerations';
 
 // Function to create abbreviated task names for tight spaces
@@ -152,7 +153,9 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
 
   // Extract prompt for Image Generation tasks (single_image)
   const promptText: string = React.useMemo(() => {
-    if (task.taskType !== 'single_image') return '';
+    if (task.taskType !== 'single_image' && 
+        task.taskType !== 'edit_travel_kontext' && 
+        task.taskType !== 'edit_travel_flux') return '';
     const params = typeof task.params === 'string' ? JSON.parse(task.params) : task.params || {};
     return params?.orchestrator_details?.prompt || '';
   }, [task]);
@@ -160,7 +163,9 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
   // Check if this is a successful Image Generation task with output
   const hasGeneratedImage = React.useMemo(() => {
     return (
-      task.taskType === 'single_image' && 
+      (task.taskType === 'single_image' || 
+       task.taskType === 'edit_travel_kontext' || 
+       task.taskType === 'edit_travel_flux') && 
       task.status === 'Complete' && 
       task.outputLocation
     );
@@ -423,6 +428,11 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
   // Check if this is a travel_orchestrator task that should show SharedTaskDetails on hover
   const isTravelTask = task.taskType === 'travel_orchestrator';
   
+  // Check if this is a single image task that should show SharedMetadataDetails on hover
+  const isSingleImageTask = task.taskType === 'single_image' || 
+                            task.taskType === 'edit_travel_kontext' || 
+                            task.taskType === 'edit_travel_flux';
+  
   // Check if this is a completed travel task that should show "View Video" button
   const isCompletedTravelTask = isTravelTask && task.status === 'Complete';
   
@@ -669,6 +679,65 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
               inputImages={imageUrls}
               variant="hover"
               isMobile={false}
+            />
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
+
+  // Debug logging for single image tasks
+  React.useEffect(() => {
+    if (isSingleImageTask) {
+      console.log('[TaskTooltipDebug] Single image task analysis:', {
+        taskId: task.id,
+        taskType: task.taskType,
+        status: task.status,
+        hasActualGeneration: !!actualGeneration,
+        hasMetadata: !!actualGeneration?.metadata,
+        metadata: actualGeneration?.metadata,
+        hasOutputLocation: !!task.outputLocation,
+        outputLocation: task.outputLocation,
+        hasPromptText: !!promptText,
+        promptText: promptText.substring(0, 50) + (promptText.length > 50 ? '...' : ''),
+        hasTaskParams: !!task.params,
+        shouldShowTooltip: isSingleImageTask && (actualGeneration?.metadata || (task.status === 'Complete' && (task.params || promptText)))
+      });
+    }
+  }, [isSingleImageTask, task.id, task.taskType, task.status, actualGeneration, task.outputLocation, promptText, task.params]);
+
+  // Wrap with tooltip for single image tasks
+  // Show tooltip if we have metadata from actualGeneration OR task params
+  const shouldShowSingleImageTooltip = isSingleImageTask && (
+    actualGeneration?.metadata || 
+    (task.status === 'Complete' && (task.params || promptText))
+  );
+  
+  if (shouldShowSingleImageTooltip) {
+    // Use actualGeneration metadata if available, otherwise create from task params
+    const metadataToShow = actualGeneration?.metadata || {
+      prompt: promptText,
+      // We can add more fields from task.params if needed
+      tool_type: task.taskType,
+    };
+    
+    return (
+      <TooltipProvider>
+        <Tooltip delayDuration={200}>
+          <TooltipTrigger asChild>
+            {taskItemContent}
+          </TooltipTrigger>
+          <TooltipContent 
+            side="left" 
+            className="max-w-md p-0 border-0 bg-background/95 backdrop-blur-sm"
+            sideOffset={15}
+            collisionPadding={10}
+          >
+            <SharedMetadataDetails
+              metadata={metadataToShow}
+              variant="hover"
+              isMobile={false}
+              showUserImage={true}
             />
           </TooltipContent>
         </Tooltip>

@@ -1,164 +1,135 @@
 # Component Modularization
 
-## Philosophy
-When a React component grows beyond 500-1000 lines, it often becomes difficult to maintain, debug, and reason about. The solution is to break it down into smaller, focused modules that each handle a specific concern.
+## Overview
 
-## Directory Structure
+This document describes the shared, reusable UI components that display detailed information in a structured, consistent format across the application.
+
+## Shared Detail Components
+
+### SharedTaskDetails
+
+**Location**: `src/tools/travel-between-images/components/SharedTaskDetails.tsx`
+
+**Purpose**: Displays comprehensive task details including input images, prompts, and technical settings.
+
+**Variants**:
+- `hover`: Compact view for tooltip hover states
+- `modal`: Medium view for modal dialogs  
+- `panel`: Full view for panel/sidebar display
+
+**Key Features**:
+- Responsive image grids with overflow handling
+- Expandable prompt text with "Show More" functionality
+- Technical settings in organized grid layout
+- LoRA display with truncation for long names
+- Model name mapping (e.g., `vace_14B` → `Wan 2.1`)
+
+### SharedMetadataDetails
+
+**Location**: `src/shared/components/SharedMetadataDetails.tsx`
+
+**Purpose**: Displays generation metadata for individual images in a structured format, replacing the previous text-based display.
+
+**Variants**:
+- `hover`: Compact view for desktop tooltips
+- `modal`: Medium view for modal dialogs
+- `panel`: Full view for mobile popovers and panels
+
+**Key Features**:
+- Structured display of prompts, negative prompts, and generation settings
+- Reference image display when available
+- LoRA information with strength percentages
+- Technical parameters (seed, dimensions, steps, guidance, scheduler)
+- Additional settings (depth strength, soft edge strength)
+- Responsive design with mobile optimizations
+
+**Usage Example**:
+```tsx
+<SharedMetadataDetails
+  metadata={image.metadata}
+  variant="hover"
+  isMobile={false}
+  showUserImage={true}
+  showFullPrompt={showFullPrompt}
+  onShowFullPromptChange={setShowFullPrompt}
+/>
 ```
-ComponentName/
-  ├── index.tsx                 # Main orchestrator component
-  ├── state/
-  │   ├── types.ts             # All TypeScript interfaces and types
-  │   └── useComponentState.ts # Centralized state management
-  ├── hooks/
-  │   ├── useFeatureA.ts       # Feature-specific hooks
-  │   └── useFeatureB.ts
-  ├── ui/
-  │   ├── Header.tsx           # Pure presentational components
-  │   ├── Sidebar.tsx
-  │   └── Modal.tsx
-  └── utils/
-      ├── validation.ts        # Pure utility functions
-      └── formatting.ts
-```
 
-## Implementation Layers
+## Design Patterns
 
-### 1. State Layer (`state/`)
-- **`types.ts`**: All TypeScript interfaces and types
-- **`useComponentState.ts`**: Centralized state management using `useReducer`
-- Benefits: Single source of truth, predictable state updates, easier debugging
+### Variant-Based Configuration
 
-### 2. Hooks Layer (`hooks/`)
-- **Feature-specific hooks**: Encapsulate side effects and business logic
-- **Custom hooks**: Reusable logic that can be shared across components
-- Benefits: Separation of concerns, easier testing, reusability
+Both components use a configuration object pattern based on the `variant` prop:
 
-### 3. UI Layer (`ui/`)
-- **Pure presentational components**: Only receive props and render UI
-- **No side effects**: No useState, useEffect, or API calls
-- Benefits: Easier to test, reusable, predictable
-
-### 4. Utils Layer (`utils/`)
-- **Pure functions**: No side effects, predictable output
-- **Domain-specific utilities**: Business logic that doesn't belong in components
-- Benefits: Testable, reusable, cacheable
-
-### 5. Main Component (`index.tsx`)
-- **Orchestrator**: Wires together all the hooks and UI components
-- **Minimal logic**: Only coordination between modules
-- **Clear data flow**: Props flow down, events flow up
-
-## Performance Optimization
-
-### Re-render Prevention
-To prevent infinite re-render loops and unnecessary updates:
-
-#### 1. Reducer Guard Clauses
-```typescript
-const reducer = (state: State, action: Action): State => {
-  switch (action.type) {
-    case 'SET_VALUE':
-      // Prevent unnecessary re-renders by checking equality
-      if (action.payload === state.value) {
-        return state; // Return same reference to prevent re-render
-      }
-      return { ...state, value: action.payload };
+```tsx
+const config = {
+  hover: {
+    textSize: 'text-xs',
+    fontWeight: 'font-light',
+    // ... other compact settings
+  },
+  modal: {
+    textSize: 'text-sm',
+    // ... medium settings
+  },
+  panel: {
+    textSize: 'text-sm',
+    // ... full settings with mobile considerations
   }
-};
+}[variant];
 ```
 
-#### 2. useEffect Dependency Optimization
-```typescript
-// AVOID: Including function references in dependencies
-useEffect(() => {
-  // ...
-}, [orderedItems, state.loading, actions.setItems]); // ❌ actions.setItems changes on every render
+### Progressive Disclosure
 
-// PREFER: Only include primitive values and stable references
-useEffect(() => {
-  // ...
-}, [orderedItems, state.loading]); // ✅ Only primitives
-```
+- Text content can be truncated with "Show More" buttons
+- Image collections show limited items with overflow indicators
+- LoRA lists are capped with "+N more" indicators
 
-#### 3. Reference Equality Checks
-```typescript
-useEffect(() => {
-  const newData = propsData || [];
-  
-  // First check: avoid updating if references are the same
-  if (state.localData === newData) {
-    return; // ✅ Early return prevents unnecessary state update
-  }
-  
-  // Second check: compare by content if needed
-  const newDataKey = JSON.stringify(newData.map(item => item.id));
-  if (newDataKey !== lastSyncedRef.current) {
-    actions.setLocalData(newData);
-    lastSyncedRef.current = newDataKey;
-  }
-}, [propsData, state.loading]);
-```
+### Responsive Design
 
-#### 4. Memoization for Expensive Computations
-```typescript
-// Use useMemo for expensive filtering/sorting operations
-const filteredItems = useMemo(() => {
-  return items.filter(item => item.visible).sort((a, b) => a.position - b.position);
-}, [items]); // Only recalculate when items array changes
-```
+- Mobile-specific configurations in `panel` variant
+- Grid layouts adapt to screen size
+- Touch-friendly controls on mobile
 
-#### 5. Debug Throttling
-```typescript
-// Throttle debug logs to reduce performance impact
-useEffect(() => {
-  const timeoutId = setTimeout(() => {
-    console.log('[Debug] State changed:', state);
-  }, 100); // Throttle to every 100ms
-  
-  return () => clearTimeout(timeoutId);
-}, [state]);
-```
+## Integration Points
 
-## Benefits
-1. **Maintainability**: Easier to understand and modify individual pieces
-2. **Testability**: Each module can be tested in isolation
-3. **Reusability**: Hooks and utilities can be shared across components
-4. **Performance**: Optimized re-rendering and better memoization opportunities
-5. **Developer Experience**: Faster builds, better IDE support, clearer git diffs
-6. **Debugging**: Easier to trace issues to specific modules
+### ImageGallery Integration
 
-## Migration Strategy
-1. **Identify concerns**: Group related functionality together
-2. **Extract types**: Move all interfaces to `types.ts`
-3. **Create state management**: Implement `useReducer` pattern in `useComponentState.ts`
-4. **Extract hooks**: Move side effects and business logic to custom hooks
-5. **Create UI components**: Extract pure presentational components
-6. **Move utilities**: Extract pure functions to utils
-7. **Refactor main component**: Keep only orchestration logic
+The `SharedMetadataDetails` component is integrated into `ImageGalleryItem.tsx`:
+
+- **Desktop**: Shows in tooltip on info button hover
+- **Mobile**: Shows in popover on info button tap
+- **Performance**: Only renders when tooltip/popover is open
+
+### TaskItem Integration
+
+The `SharedTaskDetails` component is used in travel task tooltips in `TaskItem.tsx`.
+
+## Migration Notes
+
+### From Text-Based to Component-Based
+
+The `formatMetadataForDisplay` function in `ImageGallery.tsx` has been replaced by the `SharedMetadataDetails` component:
+
+- **Before**: Plain text with emoji headers and line breaks
+- **After**: Structured component with proper typography and responsive design
+- **Performance**: Metadata formatting only occurs when UI is visible
+
+### Backward Compatibility
+
+The legacy `formatMetadataForDisplay` function is kept as a private function in case any other code still depends on it, but it's no longer exported.
 
 ## Best Practices
-1. **Single Responsibility**: Each module should have one clear purpose
-2. **Clear Dependencies**: Minimize dependencies between modules
-3. **Type Safety**: Use TypeScript interfaces for all data structures
-4. **Performance**: Implement guard clauses and memoization where appropriate
-5. **Documentation**: Add JSDoc comments for complex logic
-6. **Testing**: Write unit tests for each module independently
 
-## Real-World Example: ShotEditor
-The `ShotEditor` component was successfully modularized from ~2100 LOC to:
-- `state/types.ts` (45 lines): All TypeScript interfaces
-- `state/useShotEditorState.ts` (148 lines): Centralized state with `useReducer`
-- `hooks/useGenerationActions.ts` (350+ lines): Image upload/delete/reorder logic
-- `hooks/useLoraSync.ts` (200+ lines): LoRA model synchronization
-- `ui/Header.tsx` (80 lines): Shot name editing and navigation
-- `ui/Skeleton.tsx` (25 lines): Loading skeleton
-- `utils/dimension-utils.ts` (20 lines): Image dimension utilities
-- `utils/generation-utils.ts` (35 lines): Generation filtering/sorting
-- `index.tsx` (677 lines): Main orchestrator component
+1. **Use appropriate variant**: Choose `hover` for tooltips, `panel` for mobile, `modal` for dialogs
+2. **Handle missing data**: Both components gracefully handle undefined or missing metadata
+3. **Performance**: Only render when needed (tooltip/popover open)
+4. **Accessibility**: Proper heading structure and keyboard navigation
+5. **Consistency**: Use the same component across similar display contexts
 
-This modularization improved:
-- **Performance**: Eliminated infinite re-render loops through proper state management
-- **Maintainability**: Each concern is isolated and easier to understand
-- **Testability**: Individual modules can be tested independently
-- **Developer Experience**: Faster iteration and debugging 
+## Future Enhancements
+
+- Add `onApplySettings` callback support to `SharedMetadataDetails`
+- Consider creating a base `DetailComponent` interface for consistency
+- Add theme/style variants for different contexts (dark mode, high contrast)
+- Implement keyboard navigation for expandable sections

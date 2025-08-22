@@ -1,0 +1,292 @@
+import React from 'react';
+import { Check, X } from 'lucide-react';
+import { Button } from '@/shared/components/ui/button';
+import { DisplayableMetadata, MetadataLora } from './ImageGallery';
+
+// Helper function to map model names to display names
+const getModelDisplayName = (modelName: string | undefined): string => {
+  if (!modelName) return 'Unknown';
+  
+  switch (modelName) {
+    case 'vace_14B':
+      return 'Wan 2.1';
+    case 'vace_14B_fake_cocktail_2_2':
+      return 'Wan 2.2';
+    default:
+      return modelName;
+  }
+};
+
+interface SharedMetadataDetailsProps {
+  metadata: DisplayableMetadata;
+  variant: 'hover' | 'modal' | 'panel';
+  isMobile?: boolean;
+  showFullPrompt?: boolean;
+  onShowFullPromptChange?: (show: boolean) => void;
+  showFullNegativePrompt?: boolean;
+  onShowFullNegativePromptChange?: (show: boolean) => void;
+  showUserImage?: boolean;
+}
+
+export const SharedMetadataDetails: React.FC<SharedMetadataDetailsProps> = ({
+  metadata,
+  variant,
+  isMobile = false,
+  showFullPrompt = false,
+  onShowFullPromptChange,
+  showFullNegativePrompt = false,
+  onShowFullNegativePromptChange,
+  showUserImage = true,
+}) => {
+  // Size configuration based on variant
+  const config = {
+    hover: {
+      textSize: 'text-xs',
+      fontWeight: 'font-light',
+      iconSize: 'h-2.5 w-2.5',
+      labelCase: 'uppercase tracking-wide',
+      gridCols: 'grid-cols-1',
+      promptLength: 100,
+      negativePromptLength: 80,
+      loraNameLength: 25,
+      maxLoras: 2,
+    },
+    modal: {
+      textSize: 'text-sm',
+      fontWeight: 'font-light',
+      iconSize: 'h-3 w-3',
+      labelCase: 'uppercase tracking-wide',
+      gridCols: 'grid-cols-2',
+      promptLength: 150,
+      negativePromptLength: 150,
+      loraNameLength: 30,
+      maxLoras: 10,
+    },
+    panel: {
+      textSize: 'text-sm',
+      fontWeight: 'font-light',
+      iconSize: 'h-3 w-3',
+      labelCase: 'uppercase tracking-wide',
+      gridCols: 'grid-cols-2',
+      promptLength: isMobile ? 100 : 150,
+      negativePromptLength: isMobile ? 100 : 150,
+      loraNameLength: 40,
+      maxLoras: 10,
+    },
+  }[variant];
+
+  // Extract data from metadata
+  const prompt = metadata.prompt || 
+                 (metadata as any).originalParams?.orchestrator_details?.prompt;
+  
+  const negativePrompt = (metadata as any).originalParams?.orchestrator_details?.negative_prompt || 
+                        metadata.negative_prompt;
+  
+  const model = (metadata as any).originalParams?.orchestrator_details?.model || metadata.model;
+  const seed = metadata.seed || (metadata as any).originalParams?.orchestrator_details?.seed;
+  const resolution = (metadata as any).originalParams?.orchestrator_details?.resolution;
+  const dimensions = metadata.width && metadata.height ? `${metadata.width}×${metadata.height}` : resolution;
+
+  // Get LoRAs from multiple possible locations
+  const additionalLoras = (metadata as any).originalParams?.orchestrator_details?.additional_loras;
+  const activeLoras = metadata.activeLoras;
+
+  // Determine which LoRAs to display
+  const lorasToDisplay = activeLoras && activeLoras.length > 0 
+    ? activeLoras.map(lora => ({
+        name: lora.name || lora.id || 'Unknown',
+        strength: `${lora.strength}%`
+      }))
+    : additionalLoras && Object.keys(additionalLoras).length > 0
+    ? Object.entries(additionalLoras).map(([url, strength]) => {
+        const urlParts = url.split('/');
+        const filename = urlParts[urlParts.length - 1] || url;
+        const displayName = filename.replace(/\.(safetensors|ckpt|pt).*$/i, '').replace(/_/g, ' ');
+        return {
+          name: displayName,
+          strength: `${((strength as number) * 100).toFixed(0)}%`
+        };
+      })
+    : [];
+
+  // Additional settings
+  const hasAdditionalSettings = metadata.depthStrength !== undefined || 
+                               metadata.softEdgeStrength !== undefined || 
+                               metadata.userProvidedImageUrl;
+
+  return (
+    <div className="space-y-3 p-3 bg-muted/30 rounded-lg border">
+      {/* User Provided Image */}
+      {showUserImage && metadata.userProvidedImageUrl && (
+        <div className="space-y-2">
+          <p className={`${config.textSize} ${config.fontWeight} text-muted-foreground ${config.labelCase}`}>
+            Reference Image
+          </p>
+          <div className="flex justify-center">
+            <img 
+              src={metadata.userProvidedImageUrl} 
+              alt="User provided image preview"
+              className="w-full h-auto max-h-24 object-contain rounded-sm border"
+              loading="lazy"
+            />
+          </div>
+        </div>
+      )}
+      
+      {/* Prompts and Generation Settings */}
+      <div className={`grid gap-3 ${variant === 'hover' ? 'grid-cols-1 lg:grid-cols-3' : 'grid-cols-1 lg:grid-cols-3'}`}>
+        {/* Prompts Section */}
+        <div className="space-y-3 lg:col-span-2">
+          {/* Prompt */}
+          {prompt ? (
+            <div className="space-y-1">
+              <p className={`${config.textSize} ${config.fontWeight} text-muted-foreground ${config.labelCase}`}>Prompt</p>
+              {(() => {
+                const shouldTruncate = prompt.length > config.promptLength;
+                const displayText = showFullPrompt || !shouldTruncate ? prompt : prompt.slice(0, config.promptLength) + '...';
+                return (
+                  <div>
+                    <p className={`${config.textSize} ${config.fontWeight} text-foreground break-words whitespace-pre-wrap leading-relaxed`}>
+                      "{displayText}"
+                    </p>
+                    {shouldTruncate && onShowFullPromptChange && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onShowFullPromptChange(!showFullPrompt)}
+                        className="h-6 px-0 text-xs text-primary mt-1"
+                      >
+                        {showFullPrompt ? 'Show Less' : 'Show More'}
+                      </Button>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+          ) : (
+            <div className="space-y-1">
+              <p className={`${config.textSize} ${config.fontWeight} text-muted-foreground ${config.labelCase}`}>Prompt</p>
+              <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>None</p>
+            </div>
+          )}
+          
+          {/* Negative Prompt */}
+          {negativePrompt && negativePrompt !== 'N/A' ? (
+            <div className="space-y-1">
+              <p className={`${config.textSize} ${config.fontWeight} text-muted-foreground ${config.labelCase}`}>Negative Prompt</p>
+              {(() => {
+                const shouldTruncate = negativePrompt.length > config.negativePromptLength;
+                const displayText = showFullNegativePrompt || !shouldTruncate ? negativePrompt : negativePrompt.slice(0, config.negativePromptLength) + '...';
+                return (
+                  <div>
+                    <p className={`${config.textSize} ${config.fontWeight} text-foreground break-words whitespace-pre-wrap leading-relaxed`}>
+                      "{displayText}"
+                    </p>
+                    {shouldTruncate && onShowFullNegativePromptChange && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onShowFullNegativePromptChange(!showFullNegativePrompt)}
+                        className="h-6 px-0 text-xs text-primary mt-1"
+                      >
+                        {showFullNegativePrompt ? 'Show Less' : 'Show More'}
+                      </Button>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+          ) : negativePrompt ? (
+            <div className="space-y-1">
+              <p className={`${config.textSize} ${config.fontWeight} text-muted-foreground ${config.labelCase}`}>Negative Prompt</p>
+              <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>None</p>
+            </div>
+          ) : null}
+        </div>
+        
+        {/* Model and Dimensions Section */}
+        <div className="space-y-3 lg:col-span-1">
+          <div className="space-y-1">
+            <p className={`${config.textSize} ${config.fontWeight} text-muted-foreground ${config.labelCase}`}>Model</p>
+            <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>
+              {getModelDisplayName(model)}
+            </p>
+          </div>
+          
+          <div className="space-y-1">
+            <p className={`${config.textSize} ${config.fontWeight} text-muted-foreground ${config.labelCase}`}>Dimensions</p>
+            <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>{dimensions || 'N/A'}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Additional Settings Section */}
+      {hasAdditionalSettings && (
+        <div className="pt-2 border-t border-muted-foreground/20">
+          <div className="space-y-2">
+            <p className={`${config.textSize} ${config.fontWeight} text-muted-foreground ${config.labelCase}`}>Additional Settings</p>
+            <div className={`grid gap-2 ${config.gridCols}`}>
+              {metadata.depthStrength !== undefined && (
+                <div className="space-y-1">
+                  <p className={`${config.textSize} ${config.fontWeight} text-muted-foreground ${config.labelCase}`}>Depth Strength</p>
+                  <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>
+                    {(metadata.depthStrength * 100).toFixed(0)}%
+                  </p>
+                </div>
+              )}
+              {metadata.softEdgeStrength !== undefined && (
+                <div className="space-y-1">
+                  <p className={`${config.textSize} ${config.fontWeight} text-muted-foreground ${config.labelCase}`}>Soft Edge Strength</p>
+                  <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>
+                    {(metadata.softEdgeStrength * 100).toFixed(0)}%
+                  </p>
+                </div>
+              )}
+              {metadata.userProvidedImageUrl && (
+                <div className="space-y-1">
+                  <p className={`${config.textSize} ${config.fontWeight} text-muted-foreground ${config.labelCase}`}>Reference Image</p>
+                  <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>
+                    {(() => {
+                      const urlParts = metadata.userProvidedImageUrl.split('/');
+                      return urlParts[urlParts.length - 1] || 'Image provided';
+                    })()}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* LoRAs Section */}
+      {lorasToDisplay.length > 0 && (
+        <div className="pt-2 border-t border-muted-foreground/20">
+          <div className="space-y-2">
+            <p className={`${config.textSize} ${config.fontWeight} text-muted-foreground ${config.labelCase}`}>LoRAs Used</p>
+            <div className="space-y-1">
+              {lorasToDisplay.slice(0, config.maxLoras).map((lora, index) => (
+                <div key={index} className={`flex items-center justify-between p-1.5 bg-background/50 rounded border ${config.textSize}`}>
+                  <div className="flex-1 min-w-0">
+                    <p className={`${config.fontWeight} truncate`} title={lora.name}>
+                      {lora.name.length > config.loraNameLength ? lora.name.slice(0, config.loraNameLength) + '...' : lora.name}
+                    </p>
+                  </div>
+                  <div className={`${config.fontWeight} text-muted-foreground ml-1`}>
+                    {lora.strength}
+                  </div>
+                </div>
+              ))}
+              {lorasToDisplay.length > config.maxLoras && (
+                <p className={`${config.textSize} text-muted-foreground`}>
+                  +{lorasToDisplay.length - config.maxLoras} more
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default SharedMetadataDetails;

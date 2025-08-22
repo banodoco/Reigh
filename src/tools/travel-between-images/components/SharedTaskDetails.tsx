@@ -42,7 +42,7 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
   onShowFullNegativePromptChange,
 }) => {
   // Helper to safely access orchestrator payload
-  const orchestratorPayload = (task?.params?.full_orchestrator_payload || task?.params?.orchestrator_details) as any;
+  const orchestratorPayload = task?.params?.full_orchestrator_payload as any;
   
   // Get LoRAs from the correct location (orchestrator payload first, then fallback to params)
   const additionalLoras = (orchestratorPayload?.additional_loras || task?.params?.additional_loras) as Record<string, any> | undefined;
@@ -82,7 +82,7 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
       labelCase: 'uppercase tracking-wide',
       gridCols: 'grid-cols-2',
       imageGridCols: isMobile ? 'grid-cols-3' : inputImages.length <= 4 ? 'grid-cols-4' : inputImages.length <= 8 ? 'grid-cols-4' : 'grid-cols-6',
-      maxImages: isMobile ? 6 : inputImages.length <= 4 ? 4 : inputImages.length <= 8 ? 8 : 12,
+      maxImages: isMobile ? 6 : inputImages.length <= 4 ? 4 : inputImages.length <= 8 ? 8 : 11,
       promptLength: isMobile ? 100 : 150,
       negativePromptLength: isMobile ? 100 : 150,
       loraNameLength: 40,
@@ -102,16 +102,7 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
             <span className={`${config.textSize} text-muted-foreground`}>
               ({inputImages.length} image{inputImages.length !== 1 ? 's' : ''})
             </span>
-            {inputImages.length > config.maxImages && onShowAllImagesChange && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onShowAllImagesChange(!showAllImages)}
-                className="h-6 px-2 text-xs"
-              >
-                {showAllImages ? 'Show Less' : `Show ${inputImages.length - config.maxImages} More`}
-              </Button>
-            )}
+
           </div>
           <div className={`grid gap-1 ${config.imageGridCols}`}>
             {(showAllImages ? inputImages : inputImages.slice(0, config.maxImages)).map((img: string, index: number) => (
@@ -127,9 +118,12 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
               </div>
             ))}
             {inputImages.length > config.maxImages && !showAllImages && (
-              <div className="w-full aspect-square bg-muted rounded border flex items-center justify-center">
+              <div className="w-full aspect-square bg-muted rounded border flex flex-col items-center justify-center">
                 <span className="text-xs text-muted-foreground">
                   +{inputImages.length - config.maxImages}
+                </span>
+                <span className="text-xs text-muted-foreground mt-1">
+                  See more
                 </span>
               </div>
             )}
@@ -212,14 +206,6 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
               );
             }
           })()}
-
-          {/* Model */}
-          <div className="space-y-1">
-            <p className={`${config.textSize} ${config.fontWeight} text-muted-foreground ${config.labelCase}`}>Model</p>
-            <p className={`${config.textSize} ${config.fontWeight}`}>
-              {getModelDisplayName(orchestratorPayload?.model_name || task?.params?.model_name)}
-            </p>
-          </div>
         </div>
         
         {/* Technical Settings */}
@@ -247,20 +233,10 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
             </p>
           </div>
           <div className="space-y-1">
-            <p className={`${config.textSize} ${config.fontWeight} text-muted-foreground ${config.labelCase}`}>Styleboost</p>
-            <div className="flex items-center space-x-1">
-              {(orchestratorPayload?.use_styleboost_loras) === true ? (
-                <div className="flex items-center space-x-1 text-green-600">
-                  <Check className={config.iconSize} />
-                  <span className={`${config.textSize} ${config.fontWeight}`}>True</span>
-                </div>
-              ) : (
-                <div className="flex items-center space-x-1 text-red-500">
-                  <X className={config.iconSize} />
-                  <span className={`${config.textSize} ${config.fontWeight}`}>False</span>
-                </div>
-              )}
-            </div>
+            <p className={`${config.textSize} ${config.fontWeight} text-muted-foreground ${config.labelCase}`}>Model</p>
+            <p className={`${config.textSize} ${config.fontWeight}`}>
+              {getModelDisplayName(orchestratorPayload?.model_name || task?.params?.model_name)}
+            </p>
           </div>
           <div className="space-y-1">
             <p className={`${config.textSize} ${config.fontWeight} text-muted-foreground ${config.labelCase}`}>Accelerated</p>

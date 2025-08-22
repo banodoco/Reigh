@@ -164,8 +164,8 @@ interface ImageGalleryProps {
   onCreateShot?: (shotName: string, files: File[]) => Promise<void>;
 }
 
-// Helper to format metadata for display
-export const formatMetadataForDisplay = (metadata: DisplayableMetadata): string => {
+// Helper to format metadata for display (legacy - being replaced by SharedMetadataDetails component)
+const formatMetadataForDisplay = (metadata: DisplayableMetadata): string => {
   
   let displayText = "";
   
