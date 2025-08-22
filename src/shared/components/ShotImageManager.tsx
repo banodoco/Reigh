@@ -1286,13 +1286,14 @@ const MobileImageItem: React.FC<MobileImageItemProps> = ({
 
 // Memoize ShotImageManager with custom comparison to prevent unnecessary re-renders
 const ShotImageManager = React.memo(ShotImageManagerComponent, (prevProps, nextProps) => {
-  // Compare images array by length and first/last item IDs for efficiency
+  // Compare images array thoroughly - check length first for early exit
   if (prevProps.images.length !== nextProps.images.length) return false;
-  if (prevProps.images.length > 0) {
-    const firstChanged = prevProps.images[0]?.shotImageEntryId !== nextProps.images[0]?.shotImageEntryId;
-    const lastChanged = prevProps.images[prevProps.images.length - 1]?.shotImageEntryId !== 
-                        nextProps.images[nextProps.images.length - 1]?.shotImageEntryId;
-    if (firstChanged || lastChanged) return false;
+  
+  // Compare each image ID to catch any changes, reorders, or replacements
+  for (let i = 0; i < prevProps.images.length; i++) {
+    if (prevProps.images[i]?.shotImageEntryId !== nextProps.images[i]?.shotImageEntryId) {
+      return false;
+    }
   }
   
   // Compare other critical props
