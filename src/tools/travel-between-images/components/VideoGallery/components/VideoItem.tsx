@@ -137,6 +137,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
                   nextPhase: 'Will transition to video when ready',
                   timestamp: Date.now()
                 });
+                console.log(`[VideoGalleryPreload] THUMBNAIL_LOADED - URL: ${video.thumbUrl}`);
               }
             }}
             onError={() => {
@@ -149,6 +150,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
                   fallback: 'Will show video loading directly',
                   timestamp: Date.now()
                 });
+                console.warn(`[VideoGalleryPreload] THUMBNAIL_FAILED - URL: ${video.thumbUrl}`);
               }
             }}
           />

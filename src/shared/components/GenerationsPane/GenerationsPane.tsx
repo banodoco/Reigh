@@ -17,6 +17,7 @@ import { ShotFilter } from '@/shared/components/ShotFilter';
 import { useGenerationsPageLogic } from '@/shared/hooks/useGenerationsPageLogic';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
+import { performanceMonitoredTimeout, measureAsync } from '@/shared/lib/performanceUtils';
 
 import { 
   Select,
@@ -134,9 +135,9 @@ const GenerationsPaneComponent: React.FC = () => {
     const currentPage = nextPage ? nextPage - 1 : (prevPage ? prevPage + 1 : 1);
     
     // Time-slice the cleanup operation to prevent UI blocking
-    setTimeout(() => {
+    performanceMonitoredTimeout(() => {
       smartCleanupOldPages(queryClient, currentPage, selectedProjectId, 'generations');
-    }, 0);
+    }, 0, 'GenerationsPane cleanup');
     
     // Trigger image garbage collection periodically for pane to free browser memory
     if (currentPage % 8 === 0) {
@@ -146,9 +147,9 @@ const GenerationsPaneComponent: React.FC = () => {
           triggerImageGarbageCollection();
         });
       } else {
-        setTimeout(() => {
+        performanceMonitoredTimeout(() => {
           triggerImageGarbageCollection();
-        }, 100);
+        }, 100, 'GenerationsPane garbage collection');
       }
     }
 
@@ -165,50 +166,44 @@ const GenerationsPaneComponent: React.FC = () => {
     const performPrefetchOperations = () => {
       // Prefetch next page first (higher priority) 
       if (nextPage) {
-        setTimeout(() => {
-          const queryStartTime = performance.now();
-          queryClient.prefetchQuery({
-            queryKey: ['generations', selectedProjectId, nextPage, GENERATIONS_PER_PAGE, filters],
-            queryFn: () => fetchGenerations(selectedProjectId, GENERATIONS_PER_PAGE, (nextPage - 1) * GENERATIONS_PER_PAGE, filters),
-            staleTime: 30 * 1000,
-          }).then(() => {
-            const queryDuration = performance.now() - queryStartTime;
-            if (queryDuration > 100) {
-              console.warn(`[PerformanceMonitor] Next page query took ${queryDuration.toFixed(1)}ms`);
-            }
-            
+        performanceMonitoredTimeout(async () => {
+          await measureAsync(
+            () => queryClient.prefetchQuery({
+              queryKey: ['generations', selectedProjectId, nextPage, GENERATIONS_PER_PAGE, filters],
+              queryFn: () => fetchGenerations(selectedProjectId, GENERATIONS_PER_PAGE, (nextPage - 1) * GENERATIONS_PER_PAGE, filters),
+              staleTime: 30 * 1000,
+            }),
+            'Next page query'
+          ).then(() => {
             const cached = queryClient.getQueryData(['generations', selectedProjectId, nextPage, GENERATIONS_PER_PAGE, filters]) as any;
             
             // Time-slice the image preloading
-            setTimeout(() => {
+            performanceMonitoredTimeout(() => {
               smartPreloadImages(cached, 'next', prefetchId, prefetchOperationsRef);
-            }, 0);
+            }, 0, 'GenerationsPane next page image preloading');
           });
-        }, 5); // Small delay to yield control
+        }, 5, 'GenerationsPane next page prefetch'); // Small delay to yield control
       }
 
       // Prefetch previous page second (lower priority) with additional delay
       if (prevPage) {
-        setTimeout(() => {
-          const queryStartTime = performance.now();
-          queryClient.prefetchQuery({
-            queryKey: ['generations', selectedProjectId, prevPage, GENERATIONS_PER_PAGE, filters],
-            queryFn: () => fetchGenerations(selectedProjectId, GENERATIONS_PER_PAGE, (prevPage - 1) * GENERATIONS_PER_PAGE, filters),
-            staleTime: 30 * 1000,
-          }).then(() => {
-            const queryDuration = performance.now() - queryStartTime;
-            if (queryDuration > 100) {
-              console.warn(`[PerformanceMonitor] Previous page query took ${queryDuration.toFixed(1)}ms`);
-            }
-            
+        performanceMonitoredTimeout(async () => {
+          await measureAsync(
+            () => queryClient.prefetchQuery({
+              queryKey: ['generations', selectedProjectId, prevPage, GENERATIONS_PER_PAGE, filters],
+              queryFn: () => fetchGenerations(selectedProjectId, GENERATIONS_PER_PAGE, (prevPage - 1) * GENERATIONS_PER_PAGE, filters),
+              staleTime: 30 * 1000,
+            }),
+            'Previous page query'
+          ).then(() => {
             const cached = queryClient.getQueryData(['generations', selectedProjectId, prevPage, GENERATIONS_PER_PAGE, filters]) as any;
             
             // Time-slice the image preloading
-            setTimeout(() => {
+            performanceMonitoredTimeout(() => {
               smartPreloadImages(cached, 'prev', prefetchId, prefetchOperationsRef);
-            }, 0);
+            }, 0, 'GenerationsPane previous page image preloading');
           });
-        }, 15); // Larger delay for lower priority
+        }, 15, 'GenerationsPane previous page prefetch'); // Larger delay for lower priority
       }
     };
     
@@ -216,12 +211,12 @@ const GenerationsPaneComponent: React.FC = () => {
     performPrefetchOperations();
     
     // Monitor total prefetch operation time
-    setTimeout(() => {
+    performanceMonitoredTimeout(() => {
       const totalPrefetchDuration = performance.now() - prefetchStartTime;
       if (totalPrefetchDuration > 50) {
         console.warn(`[PerformanceMonitor] Total prefetch operation took ${totalPrefetchDuration.toFixed(1)}ms`);
       }
-    }, 20);
+    }, 20, 'GenerationsPane total prefetch monitoring');
   }, [selectedProjectId, queryClient, mediaTypeFilter, selectedShotFilter, excludePositioned, starredOnly]);
 
   const {

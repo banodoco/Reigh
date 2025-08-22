@@ -29,6 +29,8 @@ import ShotEditor from '../components/ShotEditor';
 import { useAllShotGenerations } from '@/shared/hooks/useShotGenerations';
 import { useProjectVideoCountsCache } from '@/shared/hooks/useProjectVideoCountsCache';
 
+import { useVideoGalleryPreloader } from '@/shared/hooks/useVideoGalleryPreloader';
+
 // Custom hook to parallelize data fetching for better performance
 const useVideoTravelData = (selectedShotId?: string, projectId?: string) => {
   // Get shots data from context (single source of truth) - full data for ShotEditor
@@ -387,6 +389,24 @@ const VideoTravelToolPage: React.FC = () => {
     const fallbackShot = selectedShot || (viaShotClick && currentShotId ? shots?.find(s => s.id === currentShotId) : null);
     return fallbackShot;
   }, [selectedShot, viaShotClick, currentShotId, shots, hashShotId]);
+  
+  // Initialize video gallery thumbnail preloader (after dependencies are defined)
+  const preloaderState = useVideoGalleryPreloader({
+    selectedShot,
+    shouldShowShotEditor
+  });
+
+  // [VideoTravelDebug] Log preloader state
+  React.useEffect(() => {
+    if (selectedProjectId) {
+      console.log(`${VIDEO_DEBUG_TAG} Preloader state:`, {
+        isProcessing: preloaderState.isProcessingQueue,
+        queueLength: preloaderState.queueLength,
+        cacheUtilization: `${preloaderState.preloadedProjectUrls}/${preloaderState.targetCacheSize} (${preloaderState.cacheUtilization}%)`,
+        selectedProjectId
+      });
+    }
+  }, [preloaderState.isProcessingQueue, preloaderState.queueLength, preloaderState.preloadedProjectUrls, preloaderState.targetCacheSize, preloaderState.cacheUtilization, selectedProjectId]);
   
   // Calculate navigation state with memoization
   const navigationState = useMemo(() => {

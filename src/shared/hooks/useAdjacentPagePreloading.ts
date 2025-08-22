@@ -7,6 +7,7 @@ import {
   keepOnlyInCache,
   performMemoryAwareCleanup
 } from '@/shared/lib/imageCacheManager';
+import { performanceMonitoredTimeout } from '@/shared/lib/performanceUtils';
 
 interface UseAdjacentPagePreloadingProps {
   enabled?: boolean;
@@ -179,7 +180,7 @@ class PreloadQueue {
             this.activeRequests.delete(item.abortController);
             
             // Use setTimeout(0) to yield control before processing more
-            setTimeout(() => this.processQueue(), 0);
+            performanceMonitoredTimeout(() => this.processQueue(), 0, 'PreloadQueue video processing');
           });
       } else {
         this.preloadImageWithFetch(item.url, item)
@@ -194,14 +195,14 @@ class PreloadQueue {
             this.activeRequests.delete(item.abortController);
             
             // Use setTimeout(0) to yield control before processing more
-            setTimeout(() => this.processQueue(), 0);
+            performanceMonitoredTimeout(() => this.processQueue(), 0, 'PreloadQueue image processing');
           });
       }
     }
     
     // If we have more items but hit the batch limit, schedule next batch
     if (this.queue.length > 0 && this.active < this.maxConcurrent && processed >= MAX_ITEMS_PER_BATCH) {
-      setTimeout(() => this.processQueue(), 0);
+      performanceMonitoredTimeout(() => this.processQueue(), 0, 'PreloadQueue batch continuation');
     }
   }
 
@@ -320,7 +321,7 @@ export const smartCleanupOldPages = (
     
     if (queryIndex < allQueries.length) {
       // More queries to process, yield control and continue
-      setTimeout(processQueriesBatch, 0);
+      performanceMonitoredTimeout(processQueriesBatch, 0, 'SmartCleanup query processing');
       return;
     }
     
@@ -423,7 +424,7 @@ export const smartCleanupOldPages = (
         
         if (currentIndex < queriesToRemove.length) {
           // More items to process, yield control
-          setTimeout(clearBatch, 0);
+          performanceMonitoredTimeout(clearBatch, 0, 'SmartCleanup cache clearing');
           return;
         }
         
@@ -506,10 +507,10 @@ export const triggerImageGarbageCollection = () => {
   // Alternative: Create memory pressure to encourage cleanup
   if (typeof window !== 'undefined') {
     // Small memory pressure technique
-    setTimeout(() => {
+    performanceMonitoredTimeout(() => {
       const temp = new Array(1000).fill(null);
       temp.length = 0;
-    }, 100);
+    }, 100, 'Memory pressure technique');
   }
 };
 
@@ -618,7 +619,7 @@ export const smartPreloadImages = (
     });
     
     // Use setTimeout to create top-to-bottom loading effect with performance monitoring
-    setTimeout(() => {
+    performanceMonitoredTimeout(() => {
       const timeoutStartTime = performance.now();
       
       // Check if prefetch is still current before proceeding
@@ -650,7 +651,7 @@ export const smartPreloadImages = (
       if (timeoutDuration > 16) {
         console.warn(`[PerformanceMonitor] setTimeout in smartPreloadImages took ${timeoutDuration.toFixed(1)}ms (target: <16ms)`);
       }
-    }, progressiveDelay);
+    }, progressiveDelay, 'SmartPreloadImages progressive loading');
     
     queuedCount++;
   });
@@ -704,7 +705,7 @@ export const preloadClientSidePages = (
       // Use slightly slower timing than current page (25ms) to avoid resource conflicts
       const progressiveDelay = idx < 3 ? 0 : (idx - 2) * 60;
       
-      setTimeout(() => {
+      performanceMonitoredTimeout(() => {
         const timeoutStartTime = performance.now();
         
         // Double-check validity after delay
@@ -730,7 +731,7 @@ export const preloadClientSidePages = (
         if (timeoutDuration > 16) {
           console.warn(`[PerformanceMonitor] setTimeout in preloadClientSidePages took ${timeoutDuration.toFixed(1)}ms (target: <16ms)`);
         }
-      }, progressiveDelay);
+      }, progressiveDelay, 'PreloadClientSidePages image loading');
     });
   };
 
@@ -825,7 +826,7 @@ export const useAdjacentPagePreloading = ({
     
     // Debounce preloading to avoid excessive operations on rapid page changes
     console.log(`[ImageLoadingDebug][AdjacentPreload:${preloadSessionId}] Starting debounced preload timer (${debounceTime}ms)`);
-    const preloadTimer = setTimeout(() => {
+    const preloadTimer = performanceMonitoredTimeout(() => {
       const timeoutStartTime = performance.now();
       console.log(`[ImageLoadingDebug][AdjacentPreload:${preloadSessionId}] Debounce timer fired - calculating adjacent pages`);
       
@@ -902,7 +903,7 @@ export const useAdjacentPagePreloading = ({
       if (timeoutDuration > 16) {
         console.warn(`[PerformanceMonitor] Main preload setTimeout took ${timeoutDuration.toFixed(1)}ms (target: <16ms)`);
       }
-    }, debounceTime);
+    }, debounceTime, 'AdjacentPagePreloading main preload');
     
     preloadOperationsRef.current.timeouts.push(preloadTimer);
     

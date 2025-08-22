@@ -7,6 +7,7 @@ import { PageFadeIn, FadeInSection } from '@/shared/components/transitions';
 import { useContentResponsive, useContentResponsiveDirection, useContentResponsiveColumns } from '@/shared/hooks/useContentResponsive';
 import React, { memo } from 'react';
 import { time, timeEnd } from '@/shared/lib/logger';
+import { useVideoGalleryPreloader } from '@/shared/hooks/useVideoGalleryPreloader';
 
 // Define process tools (main workflow)
 const processTools = [
@@ -242,6 +243,9 @@ const ToolSelectorPage: React.FC = () => {
   // Content-responsive breakpoints and layout values
   const { isSm, isLg } = useContentResponsive();
   // Remove layoutDirection hook, use Tailwind classes instead
+
+  // Initialize video gallery preloader in background
+  const preloaderState = useVideoGalleryPreloader();
 
   // Scroll to top when component mounts
   useEffect(() => {
