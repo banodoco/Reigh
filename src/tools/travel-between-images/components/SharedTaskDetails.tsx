@@ -55,8 +55,8 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
       iconSize: 'h-2.5 w-2.5',
       labelCase: 'uppercase tracking-wide',
       gridCols: 'grid-cols-2',
-      imageGridCols: 'grid-cols-6',
-      maxImages: 6,
+      imageGridCols: 'grid-cols-5',
+      maxImages: 5,
       promptLength: 100,
       negativePromptLength: 80,
       loraNameLength: 25,
@@ -68,8 +68,8 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
       iconSize: 'h-3 w-3',
       labelCase: 'uppercase tracking-wide',
       gridCols: 'grid-cols-2',
-      imageGridCols: 'grid-cols-6',
-      maxImages: 6,
+      imageGridCols: 'grid-cols-5',
+      maxImages: 5,
       promptLength: 150,
       negativePromptLength: 150,
       loraNameLength: 30,
@@ -95,16 +95,17 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
       {/* Input Images Section */}
       {inputImages.length > 0 && (
         <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <p className={`${config.textSize} ${config.fontWeight} text-muted-foreground ${config.labelCase}`}>
-              Input Images
-            </p>
-            <span className={`${config.textSize} text-muted-foreground`}>
-              ({inputImages.length} image{inputImages.length !== 1 ? 's' : ''})
-            </span>
-
+          <div className="flex items-center justify-center">
+            <div className="flex items-center space-x-2">
+              <p className={`${config.textSize} ${config.fontWeight} text-muted-foreground ${config.labelCase}`}>
+                Input Images
+              </p>
+              <span className={`${config.textSize} text-muted-foreground`}>
+                ({inputImages.length} image{inputImages.length !== 1 ? 's' : ''})
+              </span>
+            </div>
           </div>
-          <div className={`grid gap-1 ${config.imageGridCols}`}>
+          <div className={`grid gap-1 ${config.imageGridCols} justify-center`}>
             {(showAllImages ? inputImages : inputImages.slice(0, config.maxImages)).map((img: string, index: number) => (
               <div key={index} className="relative group">
                 <img 
@@ -118,14 +119,15 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
               </div>
             ))}
             {inputImages.length > config.maxImages && !showAllImages && (
-              <div className="w-full aspect-square bg-muted rounded border flex flex-col items-center justify-center">
+              <Button
+                variant="outline"
+                onClick={() => onShowAllImagesChange?.(true)}
+                className="w-full aspect-square bg-muted hover:bg-muted/80 rounded border flex flex-col items-center justify-center transition-colors cursor-pointer"
+              >
                 <span className="text-xs text-muted-foreground">
-                  +{inputImages.length - config.maxImages}
+                  See {inputImages.length - config.maxImages} more
                 </span>
-                <span className="text-xs text-muted-foreground mt-1">
-                  See more
-                </span>
-              </div>
+              </Button>
             )}
           </div>
         </div>
