@@ -193,9 +193,6 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
       // CRITICAL: Reset lastGoodCountRef to prevent cross-shot contamination
       lastGoodCountRef.current = null;
       
-      // SIMPLIFIED FIX: Reset video delay state for new shot
-      setShowVideosAfterDelay(false);
-      
       // Clear any cached count for the previous shot to prevent contamination
       if (prevShotIdRef.current) {
         setCachedCount(prevShotIdRef.current, null);
