@@ -147,42 +147,6 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   const taskDetailsButtonRef = useRef<HTMLButtonElement>(null);
   const isMobile = useIsMobile();
   
-  // Minimum skeleton duration control (prevents instant flash)
-  const [skeletonActive, setSkeletonActive] = useState(false);
-  const skeletonStartTimeRef = useRef<number | null>(null);
-  const MIN_SKELETON_MS = 900; // ~1s as requested
-
-  // Manage skeleton activation/deactivation with a guaranteed minimum duration
-  useEffect(() => {
-    // Turn skeleton on immediately when loading with no data
-    if (isLoadingGenerations && videoOutputs.length === 0) {
-      if (!skeletonActive) {
-        setSkeletonActive(true);
-        skeletonStartTimeRef.current = Date.now();
-      }
-      return;
-    }
-
-    // When data is ready, keep skeleton for at least MIN_SKELETON_MS
-    if (!isLoadingGenerations) {
-      if (skeletonActive) {
-        const startedAt = skeletonStartTimeRef.current ?? Date.now();
-        const elapsed = Date.now() - startedAt;
-        if (elapsed >= MIN_SKELETON_MS) {
-          setSkeletonActive(false);
-          skeletonStartTimeRef.current = null;
-        } else {
-          const remaining = MIN_SKELETON_MS - elapsed;
-          const t = setTimeout(() => {
-            setSkeletonActive(false);
-            skeletonStartTimeRef.current = null;
-          }, remaining);
-          return () => clearTimeout(t);
-        }
-      }
-    }
-  }, [isLoadingGenerations, videoOutputs.length, skeletonActive]);
-
   // Video count cache for instant skeleton display
   const { getCachedCount, setCachedCount } = useVideoCountCache();
   
@@ -405,8 +369,23 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     }
   }, [generationsData, isLoadingGenerations, isFetchingGenerations, generationsError, shotId, setCachedCount, getShotVideoCount, invalidateVideoCountsCache]);
 
+  // Check if preloader has already preloaded page 0 for this shot (suppress skeletons if so)
+  const isPage0Preloaded = useMemo(() => {
+    try {
+      const globalCache: any = (window as any).videoGalleryPreloaderCache;
+      const pagesForShot: Set<number> | undefined = globalCache?.preloadedPagesByShot?.[shotId || ''];
+      const preloaded = !!pagesForShot && typeof (pagesForShot as any).has === 'function' && (pagesForShot as any).has(0);
+      if (preloaded) {
+        console.log('[VideoGalleryPreload] PAGE0_PRELOADED (suppressing skeletons):', { shotId, currentPage: 1 });
+      }
+      return preloaded;
+    } catch {
+      return false;
+    }
+  }, [shotId]);
+
   // SIMPLIFIED: Use ImageGallery's pure and simple skeleton logic - no delays!
-  const showSkeletons = skeletonActive;
+  const showSkeletons = isLoadingGenerations && videoOutputs.length === 0 && !isPage0Preloaded;
   const skeletonCount = showSkeletons ? (getShotVideoCount?.(shotId) || 6) : 0;
   
   // AGGRESSIVE DEBUG: Always log skeleton state (no useEffect gating)
@@ -415,8 +394,9 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     skeletonCount,
     isLoadingGenerations,
     videoOutputsLength: videoOutputs.length,
-    logic: `skeletonActive=${skeletonActive}`,
+    logic: `isLoadingGenerations=${isLoadingGenerations} && videoOutputs.length=${videoOutputs.length} === 0 && !isPage0Preloaded=${!isPage0Preloaded}`,
     decision: showSkeletons ? 'SHOW_SKELETONS' : 'SHOW_VIDEOS',
+    isPage0Preloaded,
     getShotVideoCountResult: getShotVideoCount?.(shotId),
     shotId,
     timestamp: Date.now()
