@@ -360,6 +360,23 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   };
 
   const skeletonCount = calculateSkeletonCount(skeletonCalculationParams);
+  
+  // Enhanced debug logging for skeleton visibility
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`[VideoGalleryPreload] SKELETON_DEBUG:`, {
+      skeletonCount,
+      isLoadingGenerations,
+      isFetchingGenerations,
+      showVideosAfterDelay,
+      videoOutputsLength: videoOutputs.length,
+      currentVideoOutputsLength: currentVideoOutputs.length,
+      sortedVideoOutputsLength: sortedVideoOutputs.length,
+      shouldShowSkeletons: skeletonCount > 0,
+      projectId,
+      shotId,
+      timestamp: Date.now()
+    });
+  }
   const shouldShowEmpty = shouldShowEmptyState(
     getShotVideoCount,
     shotId,
