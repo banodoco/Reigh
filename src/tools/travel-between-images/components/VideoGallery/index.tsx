@@ -333,8 +333,12 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
       // Keep showVideosAfterDelay true for immediate display
     }
 
-    // No more artificial delay - videos show immediately when data loads since we have thumbnail preloading
-  }, [contentKey, isLoadingGenerations, showVideosAfterDelay]);
+    // Set showVideosAfterDelay to true when data is ready (no artificial delay needed)
+    if (!isLoadingGenerations && !showVideosAfterDelay && videoOutputs.length > 0) {
+      setShowVideosAfterDelay(true);
+      console.log('[VideoLoadingFix] Data loaded, enabling video display for key', contentKey);
+    }
+  }, [contentKey, isLoadingGenerations, showVideosAfterDelay, videoOutputs.length]);
 
   // Calculate skeleton count
   const skeletonCalculationParams: SkeletonCalculationParams = {
