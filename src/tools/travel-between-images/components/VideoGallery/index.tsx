@@ -632,7 +632,8 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
                 showTaskDetailsModal={showTaskDetailsModal}
               />
             );
-          })}
+          });
+        })()}
         </div>
         
         {/* DEEP DEBUG: Log current rendering state */}
