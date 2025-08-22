@@ -145,8 +145,8 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   const [selectedVideoForDetails, setSelectedVideoForDetails] = useState<GenerationRow | null>(null);
   const [showTaskDetailsModal, setShowTaskDetailsModal] = useState(false);
   
-  // SIMPLIFIED FIX: Use a simple delay-based approach instead of complex video loading tracking
-  const [showVideosAfterDelay, setShowVideosAfterDelay] = useState(false);
+  // SIMPLIFIED FIX: Show videos immediately since we have thumbnail preloading
+  const [showVideosAfterDelay, setShowVideosAfterDelay] = useState(true);
   // Stable content key to avoid resets during background refetches
   const contentKey = `${shotId ?? ''}:pagination-will-be-handled-by-hook`;
   const prevContentKeyRef = useRef<string | null>(null);
@@ -330,17 +330,10 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
         prev: prevContentKeyRef.current, next: contentKey
       });
       prevContentKeyRef.current = contentKey;
-      setShowVideosAfterDelay(false);
+      // Keep showVideosAfterDelay true for immediate display
     }
 
-    // Start delay only after initial load completes for this key
-    if (!isLoadingGenerations && !showVideosAfterDelay) {
-      const videoDelay = setTimeout(() => {
-        setShowVideosAfterDelay(true);
-        console.log('[VideoLoadingFix] Video delay complete, showing actual videos for key', contentKey);
-      }, 800);
-      return () => clearTimeout(videoDelay);
-    }
+    // No more artificial delay - videos show immediately when data loads since we have thumbnail preloading
   }, [contentKey, isLoadingGenerations, showVideosAfterDelay]);
 
   // Calculate skeleton count
