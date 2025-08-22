@@ -21,6 +21,7 @@ export interface SkeletonCalculationParams {
 /**
  * Calculate skeleton count for loading states
  * Uses priority-based fallback system to prevent jarring transitions
+ * Now thumbnail-aware: don't show skeletons if thumbnails are already cached
  */
 export const calculateSkeletonCount = (params: SkeletonCalculationParams): number => {
   const {
@@ -40,8 +41,30 @@ export const calculateSkeletonCount = (params: SkeletonCalculationParams): numbe
   // Only gate on initial loading, not background refetches
   const isDataLoading = isLoadingGenerations; 
   
-  // SIMPLIFIED FIX: Show skeletons if data is loading OR videos haven't had time to load yet
-  const shouldShowSkeletons = isDataLoading || (!showVideosAfterDelay && videoOutputs.length > 0);
+  // Check if thumbnails are already cached (from preloader)
+  const thumbnailsCached = (() => {
+    if (!window.videoGalleryPreloaderCache?.preloadedImageRefs) return false;
+    if (videoOutputs.length === 0) return false;
+    
+    // Check if current page videos have cached thumbnails
+    const currentPageVideos = videoOutputs.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+    const cachedCount = currentPageVideos.filter(video => {
+      if (!video.thumbUrl) return false;
+      return window.videoGalleryPreloaderCache!.preloadedImageRefs.has(video.thumbUrl);
+    }).length;
+    
+    console.log(`[VideoGalleryPreload] THUMBNAIL_CACHE_CHECK:`, {
+      currentPageVideos: currentPageVideos.length,
+      cachedThumbnails: cachedCount,
+      allThumbnailsCached: cachedCount === currentPageVideos.length && cachedCount > 0,
+      shotId
+    });
+    
+    return cachedCount === currentPageVideos.length && cachedCount > 0;
+  })();
+  
+  // CRITICAL FIX: Don't show skeletons if thumbnails are already cached, even during data loading
+  const shouldShowSkeletons = isDataLoading && !thumbnailsCached;
   
   // Get cached count for instant display
   const cachedCount = getCachedCount(shotId);
