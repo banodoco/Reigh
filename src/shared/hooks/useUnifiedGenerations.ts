@@ -110,20 +110,26 @@ async function fetchShotSpecificGenerations({
     timestamp: Date.now()
   });
   
-  // Count query - can't filter on joined tables, so we'll count all and estimate
+  // Count query with media type filtering
   let countQuery = supabase
     .from('shot_generations')
-    .select('generation_id', { count: 'exact', head: true })
+    .select(`
+      generation_id,
+      generation:generations!inner(type)
+    `, { count: 'exact', head: true })
     .eq('shot_id', shotId);
+  
+  // Apply media type filter at database level for count
+  if (filters?.mediaType === 'video') {
+    countQuery = countQuery.like('generation.type', '%video%');
+  } else if (filters?.mediaType === 'image') {
+    countQuery = countQuery.not('generation.type', 'like', '%video%');
+  }
   
   // Apply exclude positioned filter (this works because it's on shot_generations table)
   if (filters?.excludePositioned) {
     countQuery = countQuery.is('position', null);
   }
-  
-  // For VideoOutputsGallery, fetch ALL data when filtering by video to show everything
-  const fetchLimit = filters?.mediaType === 'video' ? 1000 : limit; // Fetch ALL for video filtering
-  const fetchOffset = filters?.mediaType === 'video' ? 0 : offset; // Start from beginning for videos
   
   let dataQuery = supabase
     .from('shot_generations')
@@ -141,6 +147,13 @@ async function fetchShotSpecificGenerations({
       )
     `)
     .eq('shot_id', shotId);
+  
+  // Apply media type filter at database level for performance
+  if (filters?.mediaType === 'video') {
+    dataQuery = dataQuery.like('generation.type', '%video%');
+  } else if (filters?.mediaType === 'image') {
+    dataQuery = dataQuery.not('generation.type', 'like', '%video%');
+  }
   
   // Apply other filters that work on shot_generations table
   if (filters?.excludePositioned) {
@@ -163,7 +176,7 @@ async function fetchShotSpecificGenerations({
   
   const [{ count, error: countError }, { data, error: dataError }] = await Promise.all([
     countQuery,
-    dataQuery.range(fetchOffset, fetchOffset + fetchLimit - 1)
+    dataQuery.range(offset, offset + limit - 1)
   ]);
   
   console.log('[VideoGenMissing] Shot-specific query results:', {
@@ -241,14 +254,7 @@ async function fetchShotSpecificGenerations({
   // Store original count before client-side filtering
   const originalItemsCount = items.length;
   
-  // Apply client-side filters
-  if (filters?.mediaType && filters.mediaType !== 'all') {
-    items = items.filter(item => {
-      if (filters.mediaType === 'video') return item.isVideo;
-      if (filters.mediaType === 'image') return !item.isVideo;
-      return true;
-    });
-  }
+  // Apply remaining client-side filters (mediaType now handled at DB level)
   
   if (filters?.starredOnly) {
     items = items.filter(item => item.starred);
@@ -261,21 +267,11 @@ async function fetchShotSpecificGenerations({
     );
   }
   
-  // For video filtering, show ALL videos without pagination
-  let finalItems, finalTotal, finalHasMore;
-  
-  if (filters?.mediaType === 'video') {
-    // Show ALL videos found - no pagination for video gallery
-    finalItems = items;
-    finalTotal = items.length;
-    finalHasMore = false; // We fetched everything
-  } else {
-    // For other cases, use normal pagination
-    finalItems = items.slice(offset, offset + limit);
-    const filteringRatio = originalItemsCount > 0 ? items.length / originalItemsCount : 1;
-    finalTotal = Math.round((count || 0) * filteringRatio);
-    finalHasMore = items.length > limit;
-  }
+  // Use normal pagination for all cases (since filtering is now at DB level)
+  const finalItems = items.slice(0, limit); // Take only requested limit since we fetched exactly what we need
+  const filteringRatio = originalItemsCount > 0 ? items.length / originalItemsCount : 1;
+  const finalTotal = Math.round((count || 0) * filteringRatio);
+  const finalHasMore = finalTotal > offset + finalItems.length;
   
   const result = { items: finalItems, total: finalTotal, hasMore: finalHasMore };
   
@@ -284,13 +280,12 @@ async function fetchShotSpecificGenerations({
     shotId,
     offset,
     limit,
-    fetchedLimit: fetchLimit,
     rawCount: count,
     originalItemsCount,
     filteredItemsCount: items.length,
     finalItemsCount: finalItems.length,
-    isVideoMode: filters?.mediaType === 'video',
-    showingAllVideos: filters?.mediaType === 'video',
+    mediaTypeFilter: filters?.mediaType,
+    dbLevelFiltering: true,
     total: finalTotal,
     hasMore: finalHasMore,
     appliedFilters: {
