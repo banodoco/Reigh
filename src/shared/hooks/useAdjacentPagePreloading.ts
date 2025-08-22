@@ -65,7 +65,7 @@ const getPreloadConfig = (): PreloadConfig => {
     };
   } else {
     return {
-      maxCachedPages: 7, // Current + 3 adjacent pages each side
+      maxCachedPages: 5, // Current + 2 adjacent pages each side
       preloadStrategy: 'aggressive',
       maxConcurrentPreloads: 3,
       thumbnailOnlyPreload: false,

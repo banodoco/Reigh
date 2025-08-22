@@ -123,9 +123,9 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
                 className="relative group cursor-pointer"
                 onClick={() => onShowAllImagesChange?.(true)}
               >
-                <div className="w-full aspect-square bg-muted/50 hover:bg-muted/70 rounded border shadow-sm transition-all group-hover:scale-105 flex flex-col items-center justify-center">
-                  <span className={`${config.textSize} text-muted-foreground font-medium`}>
-                    See {inputImages.length - config.maxImages} more
+                <div className="w-full aspect-square bg-muted/50 hover:bg-muted/70 rounded border shadow-sm transition-all group-hover:scale-105 flex items-center justify-center">
+                  <span className={`${config.textSize} text-muted-foreground font-medium text-center`}>
+                    {inputImages.length - config.maxImages} more
                   </span>
                 </div>
               </div>
