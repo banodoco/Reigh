@@ -140,11 +140,8 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   const [selectedVideoForDetails, setSelectedVideoForDetails] = useState<GenerationRow | null>(null);
   const [showTaskDetailsModal, setShowTaskDetailsModal] = useState(false);
   
-  // SIMPLIFIED FIX: Show videos immediately since we have thumbnail preloading
-  const [showVideosAfterDelay, setShowVideosAfterDelay] = useState(true);
   // Stable content key to avoid resets during background refetches
   const contentKey = `${shotId ?? ''}:pagination-will-be-handled-by-hook`;
-  const prevContentKeyRef = useRef<string | null>(null);
   
   const itemsPerPage = 6;
   const taskDetailsButtonRef = useRef<HTMLButtonElement>(null);
@@ -372,25 +369,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     }
   }, [generationsData, isLoadingGenerations, isFetchingGenerations, generationsError, shotId, setCachedCount, getShotVideoCount, invalidateVideoCountsCache]);
 
-  // SIMPLIFIED FIX: Use a simple delay after initial data load; do not reset on background refetches
-  useEffect(() => {
-    // Detect content key changes (shot or page) and reset only then
-    if (prevContentKeyRef.current !== contentKey) {
-      console.log('[VideoLoadingFix] Content key changed, resetting delay state', {
-        prev: prevContentKeyRef.current, next: contentKey
-      });
-      prevContentKeyRef.current = contentKey;
-      // Keep showVideosAfterDelay true for immediate display
-    }
-
-    // Set showVideosAfterDelay to true when data is ready (no artificial delay needed)
-    if (!isLoadingGenerations && !showVideosAfterDelay && videoOutputs.length > 0) {
-      setShowVideosAfterDelay(true);
-      console.log('[VideoLoadingFix] Data loaded, enabling video display for key', contentKey);
-    }
-  }, [contentKey, isLoadingGenerations, showVideosAfterDelay, videoOutputs.length]);
-
-  // SIMPLIFIED: Use ImageGallery's simple and proven skeleton logic
+  // SIMPLIFIED: Use ImageGallery's pure and simple skeleton logic - no delays!
   const showSkeletons = isLoadingGenerations && videoOutputs.length === 0;
   const skeletonCount = showSkeletons ? (getShotVideoCount?.(shotId) || 6) : 0;
   
@@ -402,6 +381,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
       isLoadingGenerations,
       videoOutputsLength: videoOutputs.length,
       logic: `isLoadingGenerations=${isLoadingGenerations} && videoOutputs.length=${videoOutputs.length} === 0`,
+      decision: showSkeletons ? 'SHOW_SKELETONS' : 'SHOW_VIDEOS',
       shotId,
       timestamp: Date.now()
     });
@@ -539,13 +519,15 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
           currentPage={currentPage}
         />
 
-        {/* SIMPLIFIED: Show standard skeleton gallery or videos */}
+        {/* SIMPLIFIED: Show video-specific skeleton layout or videos */}
         {showSkeletons ? (
-          <SkeletonGallery 
-            count={skeletonCount} 
-            columns={{ base: 2, sm: 3, md: 3, lg: 3 }}
-            className="mt-4"
-          />
+          <div className="flex flex-wrap -mx-1 sm:-mx-1.5 md:-mx-2">
+            {Array.from({ length: skeletonCount }, (_, index) => (
+              <div key={`skeleton-${index}`} className="w-1/2 lg:w-1/3 px-1 sm:px-1.5 md:px-2 mb-2 sm:mb-3 md:mb-4">
+                <div className="aspect-video bg-muted rounded-lg animate-pulse border"></div>
+              </div>
+            ))}
+          </div>
         ) : (
           <div className="flex flex-wrap -mx-1 sm:-mx-1.5 md:-mx-2">
             {currentVideoOutputs.map((video, index) => {
