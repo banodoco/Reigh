@@ -349,10 +349,11 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
       if (newTotal > 0 || lastGoodCountRef.current === null) {
         setCachedCount(shotId, newTotal);
         lastGoodCountRef.current = newTotal;
-        console.log('[SkeletonOptimization] Updated stable count:', {
+        console.log(`[SkeletonIssue:${shotId?.substring(0, 8)}] CACHE_UPDATE:`, {
           shotId,
           newTotal,
           lastGoodCount: lastGoodCountRef.current,
+          reason: newTotal > 0 ? 'positive_count' : 'first_time_seeing_data',
           timestamp: Date.now()
         });
       } else if (newTotal === 0 && lastGoodCountRef.current && lastGoodCountRef.current > 0) {
@@ -373,11 +374,38 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   // Only show skeletons during INITIAL loading (never loaded before)
   // If we've fetched data and got 0 results, go straight to empty state
   const cachedCount = getShotVideoCount?.(shotId);
+  console.log(`[SkeletonIssue:${shotId?.substring(0, 8) || 'no-shot'}] GET_CACHED_COUNT:`, {
+    shotId,
+    cachedCount,
+    hasShotVideoCountFunction: !!getShotVideoCount,
+    timestamp: Date.now()
+  });
   const hasEverFetched = !isLoadingGenerations || videoOutputs.length > 0 || generationsError;
   // Suppress skeletons if cache says 0 for this shot
   const showSkeletons = isLoadingGenerations && videoOutputs.length === 0 && !hasEverFetched && (cachedCount === null || cachedCount > 0);
   
   const skeletonCount = showSkeletons ? (cachedCount || 6) : 0;
+  
+  // UNIQUE DEBUG ID for tracking this specific issue
+  const debugId = `[SkeletonIssue:${shotId?.substring(0, 8) || 'no-shot'}:${Date.now()}]`;
+  console.log(`${debugId} SKELETON_DECISION_BREAKDOWN:`, {
+    shotId,
+    isLoadingGenerations,
+    videoOutputsLength: videoOutputs.length,
+    generationsError: !!generationsError,
+    hasEverFetched,
+    cachedCount,
+    showSkeletons,
+    skeletonCount,
+    detailedLogic: {
+      condition1_isLoading: isLoadingGenerations,
+      condition2_noVideos: videoOutputs.length === 0,
+      condition3_notFetchedBefore: !hasEverFetched,
+      condition4_cacheAllows: cachedCount === null || cachedCount > 0,
+      finalDecision: `${isLoadingGenerations} && ${videoOutputs.length === 0} && ${!hasEverFetched} && ${cachedCount === null || cachedCount > 0} = ${showSkeletons}`
+    },
+    timestamp: Date.now()
+  });
   
   // AGGRESSIVE DEBUG: Always log skeleton state (no useEffect gating)
   console.log(`[VideoGallerySimplified] SKELETON_DEBUG:`, {
@@ -396,6 +424,17 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
 
   // Simple empty state check (no skeleton dependency needed)
   const shouldShowEmpty = !isLoadingGenerations && !isFetchingGenerations && sortedVideoOutputs.length === 0;
+  
+  // Log empty state decision
+  console.log(`${debugId} EMPTY_STATE_DECISION:`, {
+    shouldShowEmpty,
+    isLoadingGenerations,
+    isFetchingGenerations,
+    sortedVideoOutputsLength: sortedVideoOutputs.length,
+    emptyLogic: `!${isLoadingGenerations} && !${isFetchingGenerations} && ${sortedVideoOutputs.length} === 0 = ${shouldShowEmpty}`,
+    finalRenderDecision: shouldShowEmpty ? 'RENDER_EMPTY_STATE' : showSkeletons ? 'RENDER_SKELETONS' : 'RENDER_VIDEOS',
+    timestamp: Date.now()
+  });
 
   // ===============================================================================
   // EVENT HANDLERS

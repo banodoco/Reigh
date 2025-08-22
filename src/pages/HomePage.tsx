@@ -700,19 +700,51 @@ export default function HomePage() {
                 </div>
 
                 <div className="space-y-3">
-                  <h3 className="font-theme-light text-primary text-lg">3) We want to support people in the ecosystem</h3>
+                  <h3 className="font-theme-light text-primary text-lg">We're part of the open source ecosystem, and plan to systematically support both this and people within it</h3>
                   
                   <p className="text-sm leading-relaxed">
-                    We share 33% of our profits with people from the community who contribute to tutorials, documentation, community building, and artistic exploration that helps others discover what's possible with the tool.
+                    We will share our profits with people from the ecosystem.
                   </p>
-                </div>
-
-                <div className="space-y-3">
-                  <h3 className="font-theme-light text-primary text-lg">4) We want to support the ecosystem as a whole</h3>
                   
-                  <p className="text-sm leading-relaxed">
-                    We share another 33% of our profits with projects that benefit the broader open source AI art community—funding model development, dataset creation, and tools that make AI art more accessible to everyone.
-                  </p>
+                  <div className="rounded-lg border border-muted/30 bg-muted/10 p-3">
+                    <div className="grid grid-cols-3 gap-3">
+                      {/* 1/3 - Bandoco */}
+                      <div className="flex flex-col items-center justify-center rounded-md border border-muted/30 bg-white/60 p-3 text-center">
+                        <div className="mb-1 text-xs font-theme-light text-muted-foreground">1/3</div>
+                        <div className="text-sm text-primary">Bandoco</div>
+                      </div>
+                      {/* 1/3 - Technical */}
+                      <div className="flex flex-col rounded-md border border-muted/30 bg-white/60 p-3">
+                        <div className="text-center">
+                          <div className="mb-1 text-xs font-theme-light text-muted-foreground">1/3</div>
+                          <div className="text-sm text-primary">Technical people and projects</div>
+                        </div>
+                        <div className="mt-2 grid grid-cols-1 gap-2">
+                          <div className="rounded bg-muted/20 p-2 text-xs leading-relaxed">
+                            1/2 — Technical contributors to workflows and LoRAs
+                          </div>
+                          <div className="rounded bg-muted/20 p-2 text-xs leading-relaxed">
+                            1/3 — Fund to train models and build extensions
+                          </div>
+                        </div>
+                      </div>
+                      {/* 1/3 - Artistic */}
+                      <div className="flex flex-col rounded-md border border-muted/30 bg-white/60 p-3">
+                        <div className="text-center">
+                          <div className="mb-1 text-xs font-theme-light text-muted-foreground">1/3</div>
+                          <div className="text-sm text-primary">Artistic people and projects</div>
+                        </div>
+                        <div className="mt-2 grid grid-cols-1 gap-2">
+                          <div className="rounded bg-muted/20 p-2 text-xs leading-relaxed">
+                            1/2 — Artists who refer people to join Reigh will receive a share of their lifetime spend
+                          </div>
+                          <div className="rounded bg-muted/20 p-2 text-xs leading-relaxed">
+                            1/2 — We will fund art competitions with our profits
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
               
