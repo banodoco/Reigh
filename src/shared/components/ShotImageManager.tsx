@@ -50,7 +50,7 @@ export interface ShotImageManagerProps {
   projectAspectRatio?: string; // Add project aspect ratio
 }
 
-const ShotImageManager: React.FC<ShotImageManagerProps> = ({
+const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
   images,
   onImageDelete,
   onImageDuplicate,
@@ -1283,5 +1283,32 @@ const MobileImageItem: React.FC<MobileImageItemProps> = ({
     </div>
   );
 };
+
+// Memoize ShotImageManager with custom comparison to prevent unnecessary re-renders
+const ShotImageManager = React.memo(ShotImageManagerComponent, (prevProps, nextProps) => {
+  // Compare images array by length and first/last item IDs for efficiency
+  if (prevProps.images.length !== nextProps.images.length) return false;
+  if (prevProps.images.length > 0) {
+    const firstChanged = prevProps.images[0]?.shotImageEntryId !== nextProps.images[0]?.shotImageEntryId;
+    const lastChanged = prevProps.images[prevProps.images.length - 1]?.shotImageEntryId !== 
+                        nextProps.images[nextProps.images.length - 1]?.shotImageEntryId;
+    if (firstChanged || lastChanged) return false;
+  }
+  
+  // Compare other critical props
+  return (
+    prevProps.columns === nextProps.columns &&
+    prevProps.generationMode === nextProps.generationMode &&
+    prevProps.duplicatingImageId === nextProps.duplicatingImageId &&
+    prevProps.duplicateSuccessImageId === nextProps.duplicateSuccessImageId &&
+    prevProps.projectAspectRatio === nextProps.projectAspectRatio &&
+    // Functions should be stable if properly memoized in parent
+    prevProps.onImageDelete === nextProps.onImageDelete &&
+    prevProps.onImageDuplicate === nextProps.onImageDuplicate &&
+    prevProps.onImageReorder === nextProps.onImageReorder &&
+    prevProps.onImageSaved === nextProps.onImageSaved &&
+    prevProps.onMagicEdit === nextProps.onMagicEdit
+  );
+});
 
 export default ShotImageManager; 

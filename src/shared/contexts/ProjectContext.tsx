@@ -109,8 +109,31 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   // [MobileStallFix] Enhanced auth state tracking with mobile recovery
+  // [PerformanceOptimization] Batch auth state changes to prevent excessive re-renders
   useEffect(() => {
     let authStateChangeCount = 0;
+    let batchedUpdates: Array<() => void> = [];
+    let batchTimeout: NodeJS.Timeout | null = null;
+
+    const flushBatchedUpdates = () => {
+      if (batchedUpdates.length > 0) {
+        // Apply all batched updates in a single render cycle using React's batching
+        React.startTransition(() => {
+          batchedUpdates.forEach(update => update());
+        });
+        batchedUpdates = [];
+      }
+      batchTimeout = null;
+    };
+
+    const enqueueBatchedUpdate = (update: () => void) => {
+      batchedUpdates.push(update);
+      
+      if (!batchTimeout) {
+        // Batch multiple rapid auth changes into a single update after 50ms
+        batchTimeout = setTimeout(flushBatchedUpdates, 50);
+      }
+    };
     
     supabase.auth.getSession().then(({ data: { session } }) => {
       console.log(`[ProjectContext:MobileDebug] Initial session:`, !!session?.user?.id);
@@ -121,21 +144,27 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
       authStateChangeCount++;
       console.log(`[ProjectContext:MobileDebug] Auth change #${authStateChangeCount}:`, event, !!session?.user?.id);
       
-      setUserId(session?.user?.id);
-      
-      // [MobileStallFix] Reset preferences loading state on auth logout/signin
-      if (event === 'SIGNED_OUT' || event === 'SIGNED_IN') {
-        console.log(`[ProjectContext:MobileDebug] Resetting preferences loading state due to ${event}`);
-        setIsLoadingPreferences(false);
-        if (preferencesTimeoutRef.current) {
-          clearTimeout(preferencesTimeoutRef.current);
-          preferencesTimeoutRef.current = undefined;
+      enqueueBatchedUpdate(() => {
+        setUserId(session?.user?.id);
+        
+        // [MobileStallFix] Reset preferences loading state on auth logout/signin
+        if (event === 'SIGNED_OUT' || event === 'SIGNED_IN') {
+          console.log(`[ProjectContext:MobileDebug] Resetting preferences loading state due to ${event}`);
+          setIsLoadingPreferences(false);
+          if (preferencesTimeoutRef.current) {
+            clearTimeout(preferencesTimeoutRef.current);
+            preferencesTimeoutRef.current = undefined;
+          }
         }
-      }
+      });
     });
 
     return () => {
       listener.subscription.unsubscribe();
+      if (batchTimeout) {
+        clearTimeout(batchTimeout);
+        flushBatchedUpdates(); // Apply any pending updates on cleanup
+      }
     };
   }, []);
 

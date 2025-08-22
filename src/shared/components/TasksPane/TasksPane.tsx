@@ -135,7 +135,7 @@ interface TasksPaneProps {
   onOpenSettings: () => void;
 }
 
-export const TasksPane: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
+const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
   const queryClient = useQueryClient();
   const {
     isGenerationsPaneLocked,
@@ -456,4 +456,11 @@ export const TasksPane: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
   );
 };
 
-export default React.memo(TasksPane); 
+// Memoize TasksPane with custom comparison to prevent unnecessary re-renders
+export const TasksPane = React.memo(TasksPaneComponent, (prevProps, nextProps) => {
+  // Only re-render if onOpenSettings function reference changes
+  // (this should be stable if properly memoized in parent)
+  return prevProps.onOpenSettings === nextProps.onOpenSettings;
+});
+
+export default TasksPane; 

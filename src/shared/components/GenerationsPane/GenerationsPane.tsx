@@ -30,7 +30,7 @@ import { Label } from '@/shared/components/ui/label';
 import { PANE_CONFIG } from '@/shared/config/panes';
 const GENERATIONS_PER_PAGE = 18;
 
-export const GenerationsPane: React.FC = () => {
+const GenerationsPaneComponent: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
@@ -521,4 +521,7 @@ export const GenerationsPane: React.FC = () => {
   );
 };
 
-export default React.memo(GenerationsPane); 
+// Memoize GenerationsPane - it has no props so a simple memo is sufficient
+export const GenerationsPane = React.memo(GenerationsPaneComponent);
+
+export default GenerationsPane; 

@@ -21,7 +21,7 @@ import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useBottomOffset } from '@/shared/hooks/useBottomOffset';
 import { useShotNavigation } from '@/shared/hooks/useShotNavigation';
 
-export const ShotsPane: React.FC = () => {
+const ShotsPaneComponent: React.FC = () => {
   const { selectedProjectId } = useProject();
   const { shots, isLoading, error } = useShots();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -303,4 +303,7 @@ export const ShotsPane: React.FC = () => {
   );
 };
 
-export default React.memo(ShotsPane); 
+// Memoize ShotsPane - it has no props so a simple memo is sufficient
+export const ShotsPane = React.memo(ShotsPaneComponent);
+
+export default ShotsPane; 

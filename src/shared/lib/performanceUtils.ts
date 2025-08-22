@@ -1,6 +1,7 @@
 /**
  * Performance utilities to help prevent setTimeout violations and monitor execution times
  */
+import React from 'react';
 
 /**
  * Performance-monitored setTimeout wrapper
