@@ -75,7 +75,6 @@ export const TimeStamp: React.FC<TimeStampProps> = ({
     <span 
       ref={elementRef}
       className={`absolute ${positionClasses[position]} text-xs text-white bg-black/50 px-1.5 py-0.5 rounded-md ${hoverClass} ${className}`}
-      title={date.toLocaleString()}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >

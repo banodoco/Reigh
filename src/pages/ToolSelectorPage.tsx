@@ -17,7 +17,7 @@ const processTools = [
     description: 'Create images using a variety of models and styles, with support from LLMs.',
     tool: toolsUIManifest.find(t => t.id === 'image-generation'),
     icon: Paintbrush,
-    gradient: 'from-wes-pink via-wes-lavender to-wes-dusty-blue',
+    gradient: 'from-wes-vintage-gold via-wes-mustard to-wes-yellow',
     accent: 'wes-pink',
   },
   {
@@ -45,7 +45,7 @@ const processTools = [
     description: 'Enhance video quality and resolution using advanced AI upscaling techniques.',
     tool: null, // Coming soon
     icon: Maximize2,
-    gradient: 'from-wes-vintage-gold via-wes-mustard to-wes-yellow',
+    gradient: 'from-wes-pink via-wes-lavender to-wes-dusty-blue',
     accent: 'wes-vintage-gold',
     comingSoon: true,
   },

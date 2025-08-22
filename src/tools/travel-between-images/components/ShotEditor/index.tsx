@@ -275,6 +275,16 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     skipNextSyncRef,
   });
 
+  // Keep local optimistic list in sync with server-provided images
+  // unless we're explicitly skipping due to an optimistic mutation
+  useEffect(() => {
+    if (skipNextSyncRef.current) {
+      skipNextSyncRef.current = false;
+      return;
+    }
+    actions.setLocalOrderedShotImages(orderedShotImages);
+  }, [orderedShotImages, actions]);
+
   // Function to update GenerationsPane settings for current shot
   const updateGenerationsPaneSettings = (settings: Partial<GenerationsPaneSettings>) => {
     if (selectedShotId) {
@@ -587,7 +597,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // [VideoLoadSpeedIssue] CRITICAL FIX: Use EXACT same logic as ShotsPane
   // Apply both position filtering AND video filtering like ShotsPane
   const simpleFilteredImages = useMemo(() => {
-    const sourceImages = orderedShotImages || [];
+    const sourceImages = (localOrderedShotImages?.length > 0 ? localOrderedShotImages : orderedShotImages) || [];
     
     // OPTIMIZED: Only log when significant changes occur
     const processingKey = `${selectedShotId}-${sourceImages.length}`;
@@ -638,7 +648,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     }
     
     return filtered;
-  }, [orderedShotImages, selectedShotId]);
+  }, [orderedShotImages, localOrderedShotImages, selectedShotId]);
   
   // Count unpositioned generations for this shot (excluding videos, which are expected to have null positions)
   const { data: unpositionedGenerationsCount = 0 } = useUnpositionedGenerationsCount(selectedShot?.id);

@@ -622,10 +622,10 @@ export default function HomePage() {
         )}
 
         {/* Creative Partner Programme Side Pane */}
-        <div className={`fixed top-0 left-0 h-full w-5/6 max-w-[30rem] sm:w-[30rem] bg-white shadow-2xl z-[60] transform transition-transform duration-300 ease-in-out ${
+        <div className={`fixed top-0 left-0 h-full w-5/6 max-w-[30rem] sm:w-[30rem] bg-white shadow-2xl z-[70] transform transition-transform duration-300 ease-in-out overflow-visible ${
           showCreativePartner ? 'translate-x-0' : '-translate-x-full'
         }`}>
-          <div ref={creativeContentRef} className="p-4 sm:p-8 h-full overflow-y-auto">
+          <div ref={creativeContentRef} className="p-4 sm:p-8 h-full overflow-y-auto overflow-x-visible">
             {/* Close Button */}
             <button
               onClick={() => {
@@ -649,23 +649,19 @@ export default function HomePage() {
             
             <div className="space-y-6 text-muted-foreground">
               <p className="text-sm leading-relaxed">
-                This means four important things that set us apart from venture-backed AI art platforms:
+                Practically for you, this means three things:
               </p>
 
               <div className="space-y-6">
                 <div className="space-y-3">
-                  <h3 className="font-theme-light text-primary text-lg">1) Anyone can run Reigh for free on your computer</h3>
+                  <h3 className="font-theme-light text-primary text-lg">1) You can run Reigh for free on your computer</h3>
                   
                   <p className="text-sm leading-relaxed">
-                    When you sign up to Reigh, you'll notice something strange: if you have a decent computer, you can run it for free! We make this very easy—you can use the app in any browser while the tasks process at home.
+                    When you sign up to Reigh, you'll notice something strange: if you have a decent computer, you can run it for free! <strong>We make this very easy</strong>—you can use the app in any browser while the tasks process at home.
                   </p>
                   
                   <p className="text-sm leading-relaxed">
-                    This isn't just possible, but we make it very easy. Unlike other platforms that lock you into their expensive cloud services, we open source everything so you have real choice in how you create.
-                  </p>
-                  
-                  <p className="text-sm leading-relaxed">
-                    Today, venture-backed startups invest tens of millions in 'Creative Partner Programs'. The reason they do this is simple: it's valuable to have people make art with your tool—every piece you make is marketing for them. But it's not free—the cost is ultimately paid by the people you attract for them. On aggregate, they pay a higher price to cover the cost of your credits.
+                    This isn't just possible, but <strong>we make it very easy</strong>. To run it for free, you just need to run this command:
                   </p>
                   
                   <div className="rounded-lg overflow-hidden border border-gray-200 shadow-sm">
@@ -682,14 +678,18 @@ export default function HomePage() {
                 </div>
 
                 <div className="space-y-3">
-                  <h3 className="font-theme-light text-primary text-lg">2) It's very cheap to run on the cloud</h3>
+                  <h3 className="font-theme-light text-primary text-lg">2) Reigh is very convenient and cheap to run on the cloud</h3>
                   
                   <p className="text-sm leading-relaxed">
-                    Because we use open models and run on consumer-grade hardware, our cloud costs are a fraction of what big platforms charge. This means we can offer extremely affordable cloud processing for those who prefer convenience.
+                    Some open source tools can be difficult to run - you often need to run through a complicated local setup process to even start creating.
                   </p>
                   
                   <p className="text-sm leading-relaxed">
-                    We believe this approach creates a sustainable ecosystem where artists get affordable tools, the community gets supported, and innovation flourishes. If you agree and choose to create with Reigh, you'll be honouring the age-old truth in the sentiment expressed by Picasso:
+                    While we make it as easy as possible to run Reigh for free if you have a good computer, you can also run it conveniently and cheaply in the cloud. Because we use open models and run on consumer-grade hardware, <strong>our costs are a fraction of what big platforms charge.</strong>
+                  </p>
+                  
+                  <p className="text-sm leading-relaxed">
+                    Threfore, if you choose to create with Reigh, you'll be honouring the age-old truth in the sentiment expressed by Picasso:
                   </p>
                   
                   <blockquote className="bg-wes-coral/10 border-l-4 border-wes-coral p-3 rounded-r-lg">
@@ -700,73 +700,130 @@ export default function HomePage() {
                 </div>
 
                 <div className="space-y-3">
-                  <h3 className="font-theme-light text-primary text-lg">We're part of the open source ecosystem, and plan to systematically support both this and people within it</h3>
+                  <h3 className="font-theme-light text-primary text-lg">3) We're part of the open source ecosystem, and will systematically support this & the people within it</h3>
                   
                   <p className="text-sm leading-relaxed">
-                    We will share our profits with people from the ecosystem.
+                    To do this, we will share our profits with people from the ecosystem:
                   </p>
                   
                   <div className="space-y-2">
                     {/* Labels */}
-                    <div className="grid grid-cols-3 text-center text-xs font-theme-light text-primary">
-                      <div>Banodoco</div>
+                    <div className="grid grid-cols-3 text-center text-sm font-theme-light text-primary">
                       <div>Engineers</div>
                       <div>Artists</div>
+                      <div>Banodoco</div>
                     </div>
                     {/* Thin split bar */}
                     <div className="flex h-4 overflow-visible rounded-full">
-                      {/* Banodoco (1/3) */}
-                      <div className="flex-1 cursor-default select-none rounded-l-full bg-gradient-to-r from-wes-pink to-wes-coral transition-all duration-200 hover:brightness-110" aria-label="Banodoco" />
                       {/* Engineers (1/3) with two equal sub-splits and per-half hover labels */}
-                      <div className="relative flex-1 cursor-default select-none bg-transparent">
+                      <div className="relative flex-1 cursor-default select-none rounded-l-full bg-transparent">
                         <div className="flex h-full overflow-visible">
                           {/* Left half: Technical contributors to workflows and LoRAs */}
                           <div className="relative flex-1">
-                            <div className="peer h-full w-full bg-gradient-to-r from-wes-vintage-gold to-wes-coral transition-all duration-200 hover:brightness-110" />
-                            <div className="pointer-events-none absolute left-1/2 -top-10 z-10 hidden -translate-x-1/2 rounded-md border border-muted/30 bg-white px-3 py-2 text-[10px] leading-tight text-primary/90 shadow-wes-hover peer-hover:block w-48 sm:w-56 md:w-64 text-center">
-                              Technical contributors to workflows and LoRAs
-                              <div className="absolute -bottom-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 border border-muted/30 bg-white"></div>
-                            </div>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div className="h-full w-full bg-wes-yellow-dark transition-all duration-200 hover:brightness-110" />
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom" align="center" className="px-2 py-1 whitespace-nowrap text-center text-[11px] leading-tight">
+                                  Technical contributors to workflows and LoRAs
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
                           </div>
                           {/* Right half: Fund to train models and build extensions */}
                           <div className="relative flex-1">
-                            <div className="peer h-full w-full bg-gradient-to-r from-wes-vintage-gold/90 to-wes-coral/90 transition-all duration-200 hover:brightness-110" />
-                            <div className="pointer-events-none absolute left-1/2 -top-10 z-10 hidden -translate-x-1/2 rounded-md border border-muted/30 bg-white px-3 py-2 text-[10px] leading-tight text-primary/90 shadow-wes-hover peer-hover:block w-48 sm:w-56 md:w-64 text-center">
-                              Fund to train models and build extensions
-                              <div className="absolute -bottom-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 border border-muted/30 bg-white"></div>
-                            </div>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div className="h-full w-full bg-wes-yellow transition-all duration-200 hover:brightness-110" />
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom" align="center" className="px-2 py-1 whitespace-nowrap text-center text-[11px] leading-tight">
+                                  Fund to train models and build extensions
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
                           </div>
                         </div>
                       </div>
                       {/* Artists (1/3) with two equal sub-splits and per-half hover labels */}
-                      <div className="relative flex-1 cursor-default select-none rounded-r-full bg-transparent">
+                      <div className="relative flex-1 cursor-default select-none bg-transparent">
                         <div className="flex h-full overflow-visible">
                           {/* Left half: Artists who refer people... */}
                           <div className="relative flex-1">
-                            <div className="peer h-full w-full bg-gradient-to-r from-wes-mint to-wes-pink transition-all duration-200 hover:brightness-110" />
-                            <div className="pointer-events-none absolute left-1/2 -top-10 z-10 hidden -translate-x-1/2 rounded-md border border-muted/30 bg-white px-3 py-2 text-[10px] leading-tight text-primary/90 shadow-wes-hover peer-hover:block w-48 sm:w-56 md:w-64 text-center">
-                              Artists who refer people to join Reigh will receive a share of their lifetime spend
-                              <div className="absolute -bottom-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 border border-muted/30 bg-white"></div>
-                            </div>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div className="h-full w-full bg-wes-mint-dark transition-all duration-200 hover:brightness-110" />
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom" align="center" className="px-2 py-1 whitespace-nowrap text-center text-[11px] leading-tight">
+                                  Artists who refer people will receive a share of their lifetime spend
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
                           </div>
                           {/* Right half: Fund art competitions */}
                           <div className="relative flex-1">
-                            <div className="peer h-full w-full bg-gradient-to-r from-wes-mint/90 to-wes-pink/90 transition-all duration-200 hover:brightness-110" />
-                            <div className="pointer-events-none absolute left-1/2 -top-10 z-10 hidden -translate-x-1/2 rounded-md border border-muted/30 bg-white px-3 py-2 text-[10px] leading-tight text-primary/90 shadow-wes-hover peer-hover:block w-48 sm:w-56 md:w-64 text-center">
-                              We will fund art competitions with our profits
-                              <div className="absolute -bottom-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 border border-muted/30 bg-white"></div>
-                            </div>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div className="h-full w-full bg-wes-mint transition-all duration-200 hover:brightness-110" />
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom" align="center" className="px-2 py-1 whitespace-nowrap text-center text-[11px] leading-tight">
+                                  We will fund art competitions with our profits
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
                           </div>
                         </div>
+                      </div>
+                      {/* Banodoco (1/3) */}
+                      <div className="relative flex-1 cursor-default select-none rounded-r-full bg-transparent">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="h-full w-full bg-wes-pink hover:bg-wes-pink-dark transition-all duration-200" aria-label="Banodoco" />
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom" align="center" className="px-2 py-1 whitespace-nowrap text-center text-[11px] leading-tight">
+                              Yeah, we like money too
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-3 space-y-3 text-sm leading-relaxed text-muted-foreground">
+                    <p>
+                      Practically, we will charge roughly twice our inference costs — because we're running on consumer hardware, we'll still be over 50 times cheaper than Veo3, for example.
+                    </p>
+                    <p>After other costs like hosting, we'll <strong>split the profit three ways</strong>:</p>
+                    <div className="space-y-2">
+                      <div>
+                        <p className="text-primary font-theme-light">A) Artists — 1/3:</p>
+                        <p className="mt-1 text-sm text-muted-foreground">We'll share 1/3 with artists, of which half will go to those who refer others to Reigh, while half will go towards art competitions and support for arts.</p>
+                      </div>
+                      <div>
+                        <p className="text-primary font-theme-light">B) Engineers — 1/3:</p>
+                        <p className="mt-1 text-sm text-muted-foreground">We'll share 1/3 with engineers, of which half will go to developers whose LoRAs/workflows are used in Reigh, while half will fund open source projects (model training, extensions, etc.).</p>
+                      </div>
+                      <div>
+                        <p className="text-primary font-theme-light">C) Banodoco — 1/3:</p>
+                        <p className="mt-1 text-sm text-muted-foreground">A further third will go towards our company, to fund this and further projects.</p>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
               
+              {/* Divider */}
+              <div className="w-full h-px bg-muted/30"></div>
+
               <div className="space-y-4">
                 <p className="text-sm leading-relaxed">
-                  Accessible, cheap/free capabilities delivered through great tools = a flourishing ecosystem for all artists.
+                  We believe that the open source art ecosystem can be a beautiful place that helps humanity's relationship with AI flourish. We would like Reigh to support this as much as possible, and show a model for how others can build successful tools that support this ecosystem. 
+                  <br />
+                  <br />
+                  We hugely appreciate your support.
                 </p>
               </div>
               
@@ -796,10 +853,10 @@ export default function HomePage() {
         </div>
 
         {/* Philosophy Side Pane */}
-        <div className={`fixed top-0 right-0 h-full w-5/6 max-w-[30rem] sm:w-[30rem] bg-white shadow-2xl z-[60] transform transition-transform duration-300 ease-in-out ${
+        <div className={`fixed top-0 right-0 h-full w-5/6 max-w-[30rem] sm:w-[30rem] bg-white shadow-2xl z-[60] transform transition-transform duration-300 ease-in-out overflow-visible ${
           showPhilosophy ? 'translate-x-0' : 'translate-x-full'
         }`}>
-          <div ref={philosophyContentRef} className="p-4 sm:p-8 h-full overflow-y-auto">
+          <div ref={philosophyContentRef} className="p-4 sm:p-8 h-full overflow-y-auto overflow-x-visible">
             {/* Close Button */}
             <button
               onClick={() => {

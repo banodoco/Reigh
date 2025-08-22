@@ -291,6 +291,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
         createdAt={video.createdAt || (video as { created_at?: string | null }).created_at} 
         position="top-left"
         className="z-10 !top-1 !left-4 sm:!top-2 sm:!left-4"
+        showOnHover={false}
       />
     </div>
   );

@@ -165,9 +165,8 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
     const isTravelTask = task.taskType === 'travel_orchestrator';
     const isSingleImageTask = ['single_image', 'edit_travel_kontext', 'edit_travel_flux'].includes(task.taskType);
     const isCompletedTravelTask = isTravelTask && task.status === 'Complete';
-    const showsTooltip = (isTravelTask || isSingleImageTask) && 
-                        task.status !== TASK_STATUS.QUEUED && 
-                        task.status !== TASK_STATUS.IN_PROGRESS;
+    // Show tooltips for all stages of travel and image tasks
+    const showsTooltip = (isTravelTask || isSingleImageTask);
     
     return { isTravelTask, isSingleImageTask, isCompletedTravelTask, showsTooltip };
   }, [task.taskType, task.status]);
@@ -714,9 +713,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
           showsTooltip: taskInfo.showsTooltip
         },
         shouldShowTooltip: taskInfo.showsTooltip,
-        WHY_NO_TOOLTIP: !taskInfo.isSingleImageTask ? 'NOT_IMAGE_TASK' : 
-                        task.status === TASK_STATUS.QUEUED ? 'STILL_QUEUED' :
-                        task.status === TASK_STATUS.IN_PROGRESS ? 'STILL_IN_PROGRESS' : 'SHOULD_SHOW',
+        WHY_NO_TOOLTIP: !taskInfo.isSingleImageTask ? 'NOT_IMAGE_TASK' : 'SHOULD_SHOW',
         timestamp: Date.now()
       });
     }
@@ -769,6 +766,8 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
                 metadata={{
                   prompt: taskParams.promptText,
                   tool_type: task.taskType,
+                  // Include original task parameters to access LoRA data
+                  originalParams: task.params,
                   ...actualGeneration?.metadata
                 }}
                 variant="hover"

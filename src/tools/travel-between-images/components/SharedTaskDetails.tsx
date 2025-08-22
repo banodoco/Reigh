@@ -41,11 +41,16 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
   showFullNegativePrompt = false,
   onShowFullNegativePromptChange,
 }) => {
-  // Helper to safely access orchestrator payload
+  // Helper to safely access orchestrator payload from multiple possible locations
   const orchestratorPayload = task?.params?.full_orchestrator_payload as any;
+  const orchestratorDetails = task?.params?.orchestrator_details as any;
   
-  // Get LoRAs from the correct location (orchestrator payload first, then fallback to params)
-  const additionalLoras = (orchestratorPayload?.additional_loras || task?.params?.additional_loras) as Record<string, any> | undefined;
+  // Get LoRAs from the correct location (try all possible paths)
+  const additionalLoras = (
+    orchestratorPayload?.additional_loras || 
+    orchestratorDetails?.additional_loras || 
+    task?.params?.additional_loras
+  ) as Record<string, any> | undefined;
 
   // Size configuration based on variant
   const config = {
