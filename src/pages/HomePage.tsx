@@ -706,40 +706,56 @@ export default function HomePage() {
                     We will share our profits with people from the ecosystem.
                   </p>
                   
-                  <div className="rounded-lg border border-muted/30 bg-muted/10 p-3">
-                    <div className="grid grid-cols-3 gap-3">
-                      {/* 1/3 - Bandoco */}
-                      <div className="flex flex-col items-center justify-center rounded-md border border-muted/30 bg-white/60 p-3 text-center">
-                        <div className="mb-1 text-xs font-theme-light text-muted-foreground">1/3</div>
-                        <div className="text-sm text-primary">Bandoco</div>
+                  <div className="space-y-2">
+                    {/* Labels */}
+                    <div className="grid grid-cols-3 text-center text-xs font-theme-light text-primary">
+                      <div>Banodoco</div>
+                      <div>Engineers</div>
+                      <div>Artists</div>
+                    </div>
+                    {/* Thin split bar */}
+                    <div className="flex h-4 overflow-visible rounded-full">
+                      {/* Banodoco (1/3) */}
+                      <div className="flex-1 cursor-default select-none rounded-l-full bg-gradient-to-r from-wes-pink to-wes-coral transition-all duration-200 hover:brightness-110" aria-label="Banodoco" />
+                      {/* Engineers (1/3) with two equal sub-splits and per-half hover labels */}
+                      <div className="relative flex-1 cursor-default select-none bg-transparent">
+                        <div className="flex h-full overflow-visible">
+                          {/* Left half: Technical contributors to workflows and LoRAs */}
+                          <div className="relative flex-1">
+                            <div className="peer h-full w-full bg-gradient-to-r from-wes-vintage-gold to-wes-coral transition-all duration-200 hover:brightness-110" />
+                            <div className="pointer-events-none absolute left-1/2 -top-10 z-10 hidden -translate-x-1/2 rounded-md border border-muted/30 bg-white px-3 py-2 text-[10px] leading-tight text-primary/90 shadow-wes-hover peer-hover:block w-48 sm:w-56 md:w-64 text-center">
+                              Technical contributors to workflows and LoRAs
+                              <div className="absolute -bottom-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 border border-muted/30 bg-white"></div>
+                            </div>
+                          </div>
+                          {/* Right half: Fund to train models and build extensions */}
+                          <div className="relative flex-1">
+                            <div className="peer h-full w-full bg-gradient-to-r from-wes-vintage-gold/90 to-wes-coral/90 transition-all duration-200 hover:brightness-110" />
+                            <div className="pointer-events-none absolute left-1/2 -top-10 z-10 hidden -translate-x-1/2 rounded-md border border-muted/30 bg-white px-3 py-2 text-[10px] leading-tight text-primary/90 shadow-wes-hover peer-hover:block w-48 sm:w-56 md:w-64 text-center">
+                              Fund to train models and build extensions
+                              <div className="absolute -bottom-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 border border-muted/30 bg-white"></div>
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                      {/* 1/3 - Technical */}
-                      <div className="flex flex-col rounded-md border border-muted/30 bg-white/60 p-3">
-                        <div className="text-center">
-                          <div className="mb-1 text-xs font-theme-light text-muted-foreground">1/3</div>
-                          <div className="text-sm text-primary">Technical people and projects</div>
-                        </div>
-                        <div className="mt-2 grid grid-cols-1 gap-2">
-                          <div className="rounded bg-muted/20 p-2 text-xs leading-relaxed">
-                            1/2 — Technical contributors to workflows and LoRAs
+                      {/* Artists (1/3) with two equal sub-splits and per-half hover labels */}
+                      <div className="relative flex-1 cursor-default select-none rounded-r-full bg-transparent">
+                        <div className="flex h-full overflow-visible">
+                          {/* Left half: Artists who refer people... */}
+                          <div className="relative flex-1">
+                            <div className="peer h-full w-full bg-gradient-to-r from-wes-mint to-wes-pink transition-all duration-200 hover:brightness-110" />
+                            <div className="pointer-events-none absolute left-1/2 -top-10 z-10 hidden -translate-x-1/2 rounded-md border border-muted/30 bg-white px-3 py-2 text-[10px] leading-tight text-primary/90 shadow-wes-hover peer-hover:block w-48 sm:w-56 md:w-64 text-center">
+                              Artists who refer people to join Reigh will receive a share of their lifetime spend
+                              <div className="absolute -bottom-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 border border-muted/30 bg-white"></div>
+                            </div>
                           </div>
-                          <div className="rounded bg-muted/20 p-2 text-xs leading-relaxed">
-                            1/3 — Fund to train models and build extensions
-                          </div>
-                        </div>
-                      </div>
-                      {/* 1/3 - Artistic */}
-                      <div className="flex flex-col rounded-md border border-muted/30 bg-white/60 p-3">
-                        <div className="text-center">
-                          <div className="mb-1 text-xs font-theme-light text-muted-foreground">1/3</div>
-                          <div className="text-sm text-primary">Artistic people and projects</div>
-                        </div>
-                        <div className="mt-2 grid grid-cols-1 gap-2">
-                          <div className="rounded bg-muted/20 p-2 text-xs leading-relaxed">
-                            1/2 — Artists who refer people to join Reigh will receive a share of their lifetime spend
-                          </div>
-                          <div className="rounded bg-muted/20 p-2 text-xs leading-relaxed">
-                            1/2 — We will fund art competitions with our profits
+                          {/* Right half: Fund art competitions */}
+                          <div className="relative flex-1">
+                            <div className="peer h-full w-full bg-gradient-to-r from-wes-mint/90 to-wes-pink/90 transition-all duration-200 hover:brightness-110" />
+                            <div className="pointer-events-none absolute left-1/2 -top-10 z-10 hidden -translate-x-1/2 rounded-md border border-muted/30 bg-white px-3 py-2 text-[10px] leading-tight text-primary/90 shadow-wes-hover peer-hover:block w-48 sm:w-56 md:w-64 text-center">
+                              We will fund art competitions with our profits
+                              <div className="absolute -bottom-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 border border-muted/30 bg-white"></div>
+                            </div>
                           </div>
                         </div>
                       </div>

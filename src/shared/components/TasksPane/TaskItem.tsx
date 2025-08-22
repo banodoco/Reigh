@@ -684,6 +684,44 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
     </div>
   );
 
+  // ENHANCED Debug logging for single image tasks - why no tooltip?
+  // IMPORTANT: This useEffect must be called before any conditional returns to follow Rules of Hooks
+  React.useEffect(() => {
+    if (taskInfo.isSingleImageTask) {
+      console.log('[TaskTooltipDebug] Single image task tooltip analysis:', {
+        taskId: task.id,
+        taskType: task.taskType,
+        status: task.status,
+        hasActualGeneration: !!actualGeneration,
+        actualGenerationData: actualGeneration ? {
+          id: actualGeneration.id,
+          hasMetadata: !!actualGeneration.metadata,
+          metadataKeys: actualGeneration.metadata ? Object.keys(actualGeneration.metadata) : [],
+          location: actualGeneration.location,
+          metadata: actualGeneration.metadata
+        } : null,
+        hasOutputLocation: !!task.outputLocation,
+        outputLocation: task.outputLocation,
+        hasPromptText: !!taskParams.promptText,
+        promptText: taskParams.promptText.substring(0, 50) + (taskParams.promptText.length > 50 ? '...' : ''),
+        hasTaskParams: !!task.params,
+        taskParamsPreview: task.params ? (typeof task.params === 'string' ? 'STRING_PARAMS' : Object.keys(task.params).join(',')) : null,
+        conditionBreakdown: {
+          isImageTask: taskInfo.isSingleImageTask,
+          hasMetadata: !!actualGeneration?.metadata,
+          isComplete: task.status === 'Complete',
+          hasParamsOrPrompt: !!(task.params || taskParams.promptText),
+          showsTooltip: taskInfo.showsTooltip
+        },
+        shouldShowTooltip: taskInfo.showsTooltip,
+        WHY_NO_TOOLTIP: !taskInfo.isSingleImageTask ? 'NOT_IMAGE_TASK' : 
+                        task.status === TASK_STATUS.QUEUED ? 'STILL_QUEUED' :
+                        task.status === TASK_STATUS.IN_PROGRESS ? 'STILL_IN_PROGRESS' : 'SHOULD_SHOW',
+        timestamp: Date.now()
+      });
+    }
+  }, [taskInfo.isSingleImageTask, task.id, task.taskType, task.status, actualGeneration, task.outputLocation, taskParams.promptText, task.params]);
+
   // Unified tooltip wrapper for both travel and image tasks
   if (taskInfo.showsTooltip) {
     const isTravel = taskInfo.isTravelTask;
@@ -752,43 +790,6 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
       </Tooltip>
     );
   }
-
-  // ENHANCED Debug logging for single image tasks - why no tooltip?
-  React.useEffect(() => {
-    if (taskInfo.isSingleImageTask) {
-      console.log('[TaskTooltipDebug] Single image task tooltip analysis:', {
-        taskId: task.id,
-        taskType: task.taskType,
-        status: task.status,
-        hasActualGeneration: !!actualGeneration,
-        actualGenerationData: actualGeneration ? {
-          id: actualGeneration.id,
-          hasMetadata: !!actualGeneration.metadata,
-          metadataKeys: actualGeneration.metadata ? Object.keys(actualGeneration.metadata) : [],
-          location: actualGeneration.location,
-          metadata: actualGeneration.metadata
-        } : null,
-        hasOutputLocation: !!task.outputLocation,
-        outputLocation: task.outputLocation,
-        hasPromptText: !!taskParams.promptText,
-        promptText: taskParams.promptText.substring(0, 50) + (taskParams.promptText.length > 50 ? '...' : ''),
-        hasTaskParams: !!task.params,
-        taskParamsPreview: task.params ? (typeof task.params === 'string' ? 'STRING_PARAMS' : Object.keys(task.params).join(',')) : null,
-        conditionBreakdown: {
-          isImageTask: taskInfo.isSingleImageTask,
-          hasMetadata: !!actualGeneration?.metadata,
-          isComplete: task.status === 'Complete',
-          hasParamsOrPrompt: !!(task.params || taskParams.promptText),
-          showsTooltip: taskInfo.showsTooltip
-        },
-        shouldShowTooltip: taskInfo.showsTooltip,
-        WHY_NO_TOOLTIP: !taskInfo.isSingleImageTask ? 'NOT_IMAGE_TASK' : 
-                        task.status === TASK_STATUS.QUEUED ? 'STILL_QUEUED' :
-                        task.status === TASK_STATUS.IN_PROGRESS ? 'STILL_IN_PROGRESS' : 'SHOULD_SHOW',
-        timestamp: Date.now()
-      });
-    }
-  }, [taskInfo.isSingleImageTask, task.id, task.taskType, task.status, actualGeneration, task.outputLocation, taskParams.promptText, task.params]);
 
 
 
