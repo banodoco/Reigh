@@ -42,7 +42,6 @@ export const VideoItem = React.memo<VideoItemProps>(({
   selectedVideoForDetails,
   showTaskDetailsModal
 }) => {
-
   // ===============================================================================
   // HOOKS - Use extracted hooks for cleaner separation of concerns
   // ===============================================================================
