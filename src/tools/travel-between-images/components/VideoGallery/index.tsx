@@ -344,28 +344,40 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
         invalidateVideoCountsCache();
       }
       
-      // Only update cache and last good count if we have a valid positive count
-      // or if this is the first time we're seeing data (prevent data loss)
+      // Always update cache immediately when we get valid data (including 0)
+      setCachedCount(shotId, newTotal);
+      
+      // Only update lastGoodCountRef if we have a positive count or it's the first time
       if (newTotal > 0 || lastGoodCountRef.current === null) {
-        setCachedCount(shotId, newTotal);
         lastGoodCountRef.current = newTotal;
         console.log(`[SkeletonIssue:${shotId?.substring(0, 8)}] CACHE_UPDATE:`, {
           shotId,
           newTotal,
           lastGoodCount: lastGoodCountRef.current,
           reason: newTotal > 0 ? 'positive_count' : 'first_time_seeing_data',
+          cacheUpdated: true,
           timestamp: Date.now()
         });
       } else if (newTotal === 0 && lastGoodCountRef.current && lastGoodCountRef.current > 0) {
         // Data disappeared - this might be a race condition or cache invalidation
-        console.warn('[SkeletonOptimization] Data loss detected - preserving last good count:', {
+        console.warn(`[SkeletonIssue:${shotId?.substring(0, 8)}] DATA_LOSS_DETECTED:`, {
           shotId,
           newTotal,
           lastGoodCount: lastGoodCountRef.current,
           preservingCount: true,
+          cacheAlreadyUpdated: true, // We already updated cache above
           timestamp: Date.now()
         });
-        // Don't update the cache with 0 if we had a good count before
+        // Don't update lastGoodCountRef with 0 if we had a good count before
+      } else {
+        console.log(`[SkeletonIssue:${shotId?.substring(0, 8)}] CACHE_UPDATE_SKIPPED:`, {
+          shotId,
+          newTotal,
+          lastGoodCount: lastGoodCountRef.current,
+          reason: 'conditions_not_met',
+          cacheStillUpdated: true, // We still updated cache above
+          timestamp: Date.now()
+        });
       }
     }
   }, [generationsData, isLoadingGenerations, isFetchingGenerations, generationsError, shotId, setCachedCount, getShotVideoCount, invalidateVideoCountsCache]);
