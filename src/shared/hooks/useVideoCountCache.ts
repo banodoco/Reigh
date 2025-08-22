@@ -8,7 +8,8 @@ class VideoCountCache {
   private cache = new Map<string, number>();
   
   get(shotId: string): number | null {
-    return this.cache.get(shotId) || null;
+    const value = this.cache.get(shotId);
+    return value !== undefined ? value : null;
   }
   
   set(shotId: string, count: number): void {
