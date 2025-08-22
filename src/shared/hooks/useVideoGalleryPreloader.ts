@@ -13,6 +13,8 @@ declare global {
       preloadedUrlSetByProject: Record<string, Set<string>>;
       preloadedPagesByShot: Record<string, Set<number>>;
       hasStartedPreloadForProject: Record<string, boolean>;
+      // Keep references to preloaded images so they stay cached
+      preloadedImageRefs: Map<string, HTMLImageElement>;
     };
   }
 }
@@ -33,6 +35,9 @@ export const useVideoGalleryPreloader = (options?: {
 }) => {
   const { selectedShot, shouldShowShotEditor } = options || {};
   
+  // Track previous project ID to detect actual project switches (MUST be at top level)
+  const prevProjectIdRef = useRef<string | null>(null);
+  
   const GALLERY_PAGE_SIZE = 6; // Match VideoGallery's itemsPerPage
   const SHOTS_PANE_PAGE_SIZE = 5; // Match ShotsPane's pageSize
   const MAX_CONCURRENT_PRELOADS = 4;
@@ -49,7 +54,8 @@ export const useVideoGalleryPreloader = (options?: {
     window.videoGalleryPreloaderCache = {
       preloadedUrlSetByProject: {},
       preloadedPagesByShot: {},
-      hasStartedPreloadForProject: {}
+      hasStartedPreloadForProject: {},
+      preloadedImageRefs: new Map()
     };
   }
   
@@ -139,12 +145,19 @@ export const useVideoGalleryPreloader = (options?: {
     }
   }, [selectedProjectId]);
 
-  // Image preloader with Promise-based loading
+  // Image preloader with Promise-based loading - keeps image refs to ensure browser caching
   const preloadImage = useCallback((url: string): Promise<void> => {
     return new Promise((resolve) => {
       const img = new Image();
-      img.onload = () => resolve();
-      img.onerror = () => resolve(); // Don't fail the whole batch on single image error
+      img.onload = () => {
+        // Keep reference to ensure the image stays in browser cache
+        window.videoGalleryPreloaderCache!.preloadedImageRefs.set(url, img);
+        resolve();
+      };
+      img.onerror = () => {
+        // Still mark as "preloaded" to avoid retries, but don't store ref
+        resolve();
+      };
       img.src = url;
     });
   }, []);
@@ -229,6 +242,14 @@ export const useVideoGalleryPreloader = (options?: {
       window.videoGalleryPreloaderCache!.preloadedUrlSetByProject[selectedProjectId] = projectUrlCache;
       
       console.log(`[VideoGalleryPreload] Cache updated - project ${selectedProjectId} now has ${projectUrlCache.size} preloaded URLs`);
+      
+      // Notify listeners of cache update
+      window.dispatchEvent(new CustomEvent('videogallery-cache-updated', {
+        detail: {
+          projectId: selectedProjectId,
+          updatedUrls: newUrls
+        }
+      }));
       
       // Mark page as preloaded
       if (!window.videoGalleryPreloaderCache!.preloadedPagesByShot[shotId]) {
@@ -341,26 +362,33 @@ export const useVideoGalleryPreloader = (options?: {
 
   // Cleanup on project change - Clear cache for new project
   useEffect(() => {
+    const prevProjectId = prevProjectIdRef.current;
+    
     if (!selectedProjectId) {
       // Clear only the processing queue when no project
       preloadQueue.current = [];
-    } else {
-      // When switching to a new project, clear the cache for the new project to start fresh
-      // This ensures users see the most up-to-date content for each project
-      if (window.videoGalleryPreloaderCache!.preloadedUrlSetByProject[selectedProjectId]) {
-        console.log(`[VideoGalleryPreload] Clearing cache for project ${selectedProjectId} on project switch`);
-        delete window.videoGalleryPreloaderCache!.preloadedUrlSetByProject[selectedProjectId];
-        delete window.videoGalleryPreloaderCache!.hasStartedPreloadForProject[selectedProjectId];
-        
-        // Clear shot-specific cache for this project's shots
-        if (shots) {
-          shots.forEach(shot => {
-            delete window.videoGalleryPreloaderCache!.preloadedPagesByShot[shot.id];
-          });
-        }
+      prevProjectIdRef.current = null;
+    } else if (prevProjectId && prevProjectId !== selectedProjectId) {
+      // Only clear cache when actually switching between different projects
+      console.log(`[VideoGalleryPreload] Clearing cache for project ${selectedProjectId} on project switch (from ${prevProjectId})`);
+      
+      // Clear cache for the OLD project (not the new one)
+      if (window.videoGalleryPreloaderCache!.preloadedUrlSetByProject[prevProjectId]) {
+        delete window.videoGalleryPreloaderCache!.preloadedUrlSetByProject[prevProjectId];
+        delete window.videoGalleryPreloaderCache!.hasStartedPreloadForProject[prevProjectId];
       }
+      
+      // Clear shot-specific cache for old project's shots if we have them
+      Object.keys(window.videoGalleryPreloaderCache!.preloadedPagesByShot).forEach(shotId => {
+        delete window.videoGalleryPreloaderCache!.preloadedPagesByShot[shotId];
+      });
+      
+      prevProjectIdRef.current = selectedProjectId;
+    } else if (!prevProjectId && selectedProjectId) {
+      // First time setting a project ID
+      prevProjectIdRef.current = selectedProjectId;
     }
-  }, [selectedProjectId, shots]);
+  }, [selectedProjectId]); // Remove 'shots' from dependencies
 
   return {
     // Expose some state for debugging if needed
