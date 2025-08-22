@@ -185,7 +185,6 @@ export const MagicEditForm: React.FC<MagicEditFormProps> = ({
             onChange={(e) => setMagicEditPrompt(e.target.value)}
             placeholder="Describe how you want to transform this image..."
             className="min-h-[100px] resize-none"
-            autoFocus
           />
         </div>
 

@@ -26,6 +26,8 @@ import { useLastAffectedShot } from '@/shared/hooks/useLastAffectedShot';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useTaskGenerationMapping } from '@/shared/lib/generationTaskBridge';
+import { SharedTaskDetails } from '@/tools/travel-between-images/components/SharedTaskDetails';
+import { useUnifiedGenerations } from '@/shared/hooks/useUnifiedGenerations';
 
 // Function to create abbreviated task names for tight spaces
 const getAbbreviatedTaskName = (fullName: string): string => {
@@ -286,6 +288,10 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
   
   // State for hover functionality
   const [isHoveringImages, setIsHoveringImages] = useState<boolean>(false);
+  
+  // State for video lightbox
+  const [showVideoLightbox, setShowVideoLightbox] = useState<boolean>(false);
+  const [videoLightboxIndex, setVideoLightboxIndex] = useState<number>(0);
 
   // Local state to show progress percentage temporarily
   const [progressPercent, setProgressPercent] = useState<number | null>(null);
@@ -399,12 +405,57 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
     navigate(`/tools/travel-between-images#${shotId}`, { state: { fromShotClick: true } });
   };
 
+  // Handler for opening video lightbox
+  const handleViewVideo = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (videoOutputs.length > 0) {
+      setVideoLightboxIndex(0);
+      setShowVideoLightbox(true);
+    }
+  };
+
   const containerClass = cn(
     "p-3 mb-2 bg-zinc-800/95 rounded-md shadow border transition-colors overflow-hidden",
     isNew ? "border-teal-400 animate-[flash_3s_ease-in-out]" : "border-zinc-600 hover:border-zinc-400"
   );
 
-  return (
+  // Check if this is a travel_orchestrator task that should show SharedTaskDetails on hover
+  const isTravelTask = task.taskType === 'travel_orchestrator';
+  
+  // Check if this is a completed travel task that should show "View Video" button
+  const isCompletedTravelTask = isTravelTask && task.status === 'Complete';
+  
+  // Fetch video outputs for completed travel tasks
+  const { data: videoGenerationsData } = useUnifiedGenerations({
+    projectId: selectedProjectId,
+    mode: 'shot-specific',
+    shotId: shotId || undefined,
+    page: 1,
+    limit: 1000,
+    filters: { mediaType: 'video' },
+    includeTaskData: false,
+    enabled: !!(isCompletedTravelTask && shotId && selectedProjectId),
+  });
+  
+  // Transform video outputs for lightbox
+  const videoOutputs: GenerationRow[] = React.useMemo(() => {
+    if (!videoGenerationsData?.items) return [];
+    return videoGenerationsData.items.map((item: any) => ({
+      id: item.id,
+      imageUrl: item.url,
+      location: item.url,
+      thumbUrl: item.thumbUrl,
+      type: 'video_travel_output',
+      created_at: item.createdAt,
+      metadata: item.metadata || {},
+      params: item.metadata || {},
+      project_id: selectedProjectId,
+      tasks: item.taskId ? [item.taskId] : [],
+    })) as GenerationRow[];
+  }, [videoGenerationsData?.items, selectedProjectId]);
+
+  const taskItemContent = (
     <div className={containerClass}>
       <div className="flex justify-between items-center mb-1 gap-2">
         <span className="text-sm font-light text-zinc-200 flex-1 whitespace-nowrap overflow-hidden text-ellipsis cursor-default min-w-0">
@@ -442,10 +493,10 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
               <span className="text-xs text-zinc-400 ml-1">+ {extraImageCount}</span>
             )}
           </div>
-          {/* Visit Shot button overlay on hover */}
+          {/* Action buttons overlay on hover */}
           {isHoveringImages && shotId && (
             <div 
-              className="absolute inset-0 bg-black/20 backdrop-blur-[1px] rounded flex items-center justify-center"
+              className="absolute inset-0 bg-black/20 backdrop-blur-[1px] rounded flex items-center justify-center gap-2"
               onClick={(e) => e.stopPropagation()} // Prevent click from bubbling to parent
             >
               <Button
@@ -456,6 +507,16 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
               >
                 Visit Shot
               </Button>
+              {isCompletedTravelTask && videoOutputs.length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleViewVideo}
+                  className="text-xs px-2 py-1 h-auto bg-white/10 hover:bg-white/20 text-white border border-white/20 hover:border-white/30 transition-all"
+                >
+                  View Video
+                </Button>
+              )}
             </div>
           )}
         </div>
@@ -561,8 +622,61 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
           onShowTick={handleShowTick}
         />
       )}
+
+      {/* MediaLightbox for viewing travel videos */}
+      {showVideoLightbox && videoOutputs.length > 0 && (
+        <MediaLightbox
+          media={videoOutputs[videoLightboxIndex]}
+          onClose={() => setShowVideoLightbox(false)}
+          onNext={() => {
+            if (videoLightboxIndex < videoOutputs.length - 1) {
+              setVideoLightboxIndex(videoLightboxIndex + 1);
+            }
+          }}
+          onPrevious={() => {
+            if (videoLightboxIndex > 0) {
+              setVideoLightboxIndex(videoLightboxIndex - 1);
+            }
+          }}
+          showNavigation={videoOutputs.length > 1}
+          showImageEditTools={false}
+          showDownload={true}
+          showMagicEdit={false}
+          videoPlayerComponent="lightbox-scrub"
+          hasNext={videoLightboxIndex < videoOutputs.length - 1}
+          hasPrevious={videoLightboxIndex > 0}
+        />
+      )}
     </div>
   );
+
+  // Wrap with tooltip for travel tasks
+  if (isTravelTask) {
+    return (
+      <TooltipProvider>
+        <Tooltip delayDuration={200}>
+          <TooltipTrigger asChild>
+            {taskItemContent}
+          </TooltipTrigger>
+          <TooltipContent 
+            side="left" 
+            className="max-w-lg p-0 border-0 bg-background/95 backdrop-blur-sm"
+            sideOffset={15}
+            collisionPadding={10}
+          >
+            <SharedTaskDetails
+              task={task}
+              inputImages={imageUrls}
+              variant="hover"
+              isMobile={false}
+            />
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
+
+  return taskItemContent;
 };
 
 export default TaskItem; 
