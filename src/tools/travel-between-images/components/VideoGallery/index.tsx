@@ -373,6 +373,24 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   const showSkeletons = isLoadingGenerations && videoOutputs.length === 0;
   const skeletonCount = showSkeletons ? (getShotVideoCount?.(shotId) || 6) : 0;
   
+  // HYPER-AGGRESSIVE DEBUG: Always log every render 
+  console.log(`[VideoGalleryDEBUG] ===== COMPONENT RENDER =====`);
+  console.log(`[VideoGalleryDEBUG] RENDER_PROPS:`, {
+    projectId, 
+    shotId,
+    timestamp: Date.now()
+  });
+  console.log(`[VideoGalleryDEBUG] LOADING_STATE:`, {
+    isLoadingGenerations,
+    isFetchingGenerations,
+    hasGenerationsData: !!generationsData,
+    generationsDataLength: (generationsData as any)?.data?.length || 0
+  });
+  console.log(`[VideoGalleryDEBUG] VIDEO_OUTPUTS:`, {
+    videoOutputsLength: videoOutputs.length,
+    sortedVideoOutputsLength: sortedVideoOutputs.length
+  });
+  
   // AGGRESSIVE DEBUG: Always log skeleton state (no useEffect gating)
   console.log(`[VideoGallerySimplified] SKELETON_DEBUG:`, {
     showSkeletons,
