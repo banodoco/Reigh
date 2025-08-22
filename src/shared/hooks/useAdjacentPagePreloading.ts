@@ -53,7 +53,7 @@ const getPreloadConfig = (): PreloadConfig => {
       preloadStrategy: 'conservative',
       maxConcurrentPreloads: 1,
       thumbnailOnlyPreload: true,
-      debounceTime: 800
+      debounceTime: 1000 // Increased from 800ms to reduce setTimeout violations
     };
   } else if (isMobile || hasLowMemory || hasLowEndCPU) {
     return {
@@ -61,15 +61,15 @@ const getPreloadConfig = (): PreloadConfig => {
       preloadStrategy: 'moderate', 
       maxConcurrentPreloads: 2,
       thumbnailOnlyPreload: true,
-      debounceTime: 600
+      debounceTime: 800 // Increased from 600ms to reduce setTimeout violations
     };
   } else {
     return {
       maxCachedPages: 5, // Current + 2 adjacent pages each side
       preloadStrategy: 'aggressive',
-      maxConcurrentPreloads: 3,
+      maxConcurrentPreloads: 2, // Reduced from 3 to prevent overwhelming the queue
       thumbnailOnlyPreload: false,
-      debounceTime: 400
+      debounceTime: 600 // Increased from 400ms to reduce setTimeout violations
     };
   }
 };
@@ -148,10 +148,15 @@ class PreloadQueue {
   }
 
   private processQueue() {
-    while (this.active < this.maxConcurrent && this.queue.length > 0) {
+    // Time-slice queue processing to prevent blocking - process max 3 items per call
+    let processed = 0;
+    const MAX_ITEMS_PER_BATCH = 3;
+    
+    while (this.active < this.maxConcurrent && this.queue.length > 0 && processed < MAX_ITEMS_PER_BATCH) {
       const item = this.queue.shift()!;
       this.active++;
       this.activeRequests.add(item.abortController);
+      processed++;
       
       // Check if this is a video file - handle differently
       const isVideo = item.url.match(/\.(mp4|webm|mov|avi)$/i);
@@ -172,7 +177,9 @@ class PreloadQueue {
           .finally(() => {
             this.active--;
             this.activeRequests.delete(item.abortController);
-            this.processQueue();
+            
+            // Use setTimeout(0) to yield control before processing more
+            setTimeout(() => this.processQueue(), 0);
           });
       } else {
         this.preloadImageWithFetch(item.url, item)
@@ -185,9 +192,16 @@ class PreloadQueue {
           .finally(() => {
             this.active--;
             this.activeRequests.delete(item.abortController);
-            this.processQueue();
+            
+            // Use setTimeout(0) to yield control before processing more
+            setTimeout(() => this.processQueue(), 0);
           });
       }
+    }
+    
+    // If we have more items but hit the batch limit, schedule next batch
+    if (this.queue.length > 0 && this.active < this.maxConcurrent && processed >= MAX_ITEMS_PER_BATCH) {
+      setTimeout(() => this.processQueue(), 0);
     }
   }
 
@@ -271,7 +285,7 @@ class PreloadQueue {
 
 const globalPreloadQueue = new PreloadQueue();
 
-// Smart cleanup that adapts to device capabilities  
+// Smart cleanup that adapts to device capabilities with time-slicing to prevent UI blocking
 export const smartCleanupOldPages = (
   queryClient: any,
   currentPage: number,
@@ -283,124 +297,197 @@ export const smartCleanupOldPages = (
   
   // Get all generation queries and find the most recently accessed one
   const allQueries = queryClient.getQueryCache().getAll();
-  const generationQueries = allQueries.filter((query: any) => {
-    const queryKey = query.queryKey;
-    return queryKey?.[0] === baseQueryKey && 
-           queryKey?.[1] === projectId && 
-           typeof queryKey?.[2] === 'number'; // page number
-  });
   
-  if (generationQueries.length > 0) {
-    // Find the query with the most recent dataUpdatedAt
-    const mostRecentQuery = generationQueries.reduce((latest, current) => 
-      (current.state.dataUpdatedAt || 0) > (latest.state.dataUpdatedAt || 0) ? current : latest
-    );
+  // Time-slice the query filtering to prevent blocking the main thread
+  const generationQueries: any[] = [];
+  let queryIndex = 0;
+  
+  const processQueriesBatch = () => {
+    const startTime = performance.now();
+    const BATCH_SIZE = 10; // Process 10 queries at a time
+    const MAX_BATCH_TIME = 8; // Max 8ms per batch to stay under 16ms frame budget
     
-    const detectedPage = mostRecentQuery.queryKey[2];
-    
-    // If the detected page is very different from the passed page, use the detected one
-    if (Math.abs(detectedPage - currentPage) > 1) {
-      console.log(`[ImageLoadingDebug][CacheCleanup] Auto-correcting page: passed=${currentPage}, detected=${detectedPage} (using detected)`);
-      actualCurrentPage = detectedPage;
+    while (queryIndex < allQueries.length && (performance.now() - startTime) < MAX_BATCH_TIME) {
+      const query = allQueries[queryIndex];
+      const queryKey = query.queryKey;
+      if (queryKey?.[0] === baseQueryKey && 
+          queryKey?.[1] === projectId && 
+          typeof queryKey?.[2] === 'number') {
+        generationQueries.push(query);
+      }
+      queryIndex++;
     }
-  }
-  // Generate unique cleanup ID for tracking
-  const cleanupId = `cleanup-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    if (queryIndex < allQueries.length) {
+      // More queries to process, yield control and continue
+      setTimeout(processQueriesBatch, 0);
+      return;
+    }
+    
+    // All queries processed, continue with cleanup
+    continueCleanup();
+  };
   
-  console.log(`[ImageLoadingDebug][CacheCleanup:${cleanupId}] Starting smart cleanup:`, {
-    passedPage: currentPage,
-    actualCurrentPage,
-    projectId,
-    baseQueryKey,
-    timestamp: new Date().toISOString()
-  });
-  
-  const config = performanceMonitor.currentConfig;
-  const keepRange = Math.floor(config.maxCachedPages / 2);
-  
-  console.log(`[ImageLoadingDebug][CacheCleanup:${cleanupId}] Cleanup configuration:`, {
-    maxCachedPages: config.maxCachedPages,
-    keepRange,
-    strategy: config.preloadStrategy
-  });
-  
-  console.log(`[ImageLoadingDebug][CacheCleanup:${cleanupId}] Found cached queries:`, {
-    totalQueries: allQueries.length,
-    generationQueries: generationQueries.length,
-    pages: generationQueries.map(q => q.queryKey[2]).sort((a, b) => a - b)
-  });
-
-  // Sort by page distance from current page
-  const queriesWithDistance = generationQueries.map((query: any) => ({
-    query,
-    page: query.queryKey[2],
-    distance: Math.abs(query.queryKey[2] - actualCurrentPage)
-  }));
-
-  // Keep queries within range (current ± keepRange), remove distant ones
-  const queriesToRemove = queriesWithDistance
-    .filter(item => item.distance > keepRange)
-    .sort((a, b) => b.distance - a.distance); // Remove most distant first
-
-  console.log(`[ImageLoadingDebug][CacheCleanup:${cleanupId}] Cleanup analysis:`, {
-    keepRange,
-    pagesToKeep: queriesWithDistance.filter(item => item.distance <= keepRange).map(item => item.page),
-    pagesToRemove: queriesToRemove.map(item => item.page),
-    totalToRemove: queriesToRemove.length
-  });
-
-  // Clean up image cache flags for removed queries
-  let totalImagesCleared = 0;
-  queriesToRemove.forEach(({ query, page }) => {
-    const queryData = query.state?.data;
-    if (queryData?.items) {
-      const imageCount = queryData.items.length;
-      totalImagesCleared += imageCount;
+  const continueCleanup = () => {
+    if (generationQueries.length > 0) {
+      // Find the query with the most recent dataUpdatedAt
+      const mostRecentQuery = generationQueries.reduce((latest, current) => 
+        (current.state.dataUpdatedAt || 0) > (latest.state.dataUpdatedAt || 0) ? current : latest
+      );
       
-              console.log(`[ImageLoadingDebug][CacheCleanup:${cleanupId}] Clearing image cache flags for page ${page} (${imageCount} images)`);
-        
-        // Clear cache using centralized manager
-        clearCacheForImages(queryData.items);
+      const detectedPage = mostRecentQuery.queryKey[2];
+      
+      // If the detected page is very different from the passed page, use the detected one
+      if (Math.abs(detectedPage - currentPage) > 1) {
+        console.log(`[ImageLoadingDebug][CacheCleanup] Auto-correcting page: passed=${currentPage}, detected=${detectedPage} (using detected)`);
+        actualCurrentPage = detectedPage;
+      }
     }
-  });
-
-  // Remove distant queries from cache
-  queriesToRemove.forEach(({ query, page }) => {
-    console.log(`[ImageLoadingDebug][CacheCleanup:${cleanupId}] Removing query cache for page ${page}:`, query.queryKey);
-    queryClient.removeQueries({ queryKey: query.queryKey });
-  });
-
-  console.log(`[ImageLoadingDebug][CacheCleanup:${cleanupId}] Cleanup complete:`, {
-    queriesRemoved: queriesToRemove.length,
-    imagesCleared: totalImagesCleared,
-    queriesKept: generationQueries.length - queriesToRemove.length,
-    maxCachedPages: config.maxCachedPages
-  });
-  
-  // Log user-friendly cache summary for easy validation
-  const remainingPages = [...new Set(queriesWithDistance
-    .filter(item => item.distance <= keepRange)
-    .map(item => item.page))]
-    .sort((a: number, b: number) => a - b);
     
-  const removedPages = [...new Set(queriesToRemove.map(q => q.page))].sort((a: number, b: number) => a - b);
+    // Generate unique cleanup ID for tracking
+    const cleanupId = `cleanup-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
-  // Always log cache validation info (even when other logs are suppressed)
-  const cacheLog = `🗂️ [CacheValidator] Current cache: pages [${remainingPages.join(', ')}] around page ${actualCurrentPage} (max: ${config.maxCachedPages})`;
-  console.warn(cacheLog); // Use warn so it shows even with log suppression
-  
-  if (removedPages.length > 0) {
-    const cleanupLog = `🧹 [CacheValidator] Cleaned up distant pages: [${removedPages.join(', ')}]`;
-    console.warn(cleanupLog); // Use warn so it shows even with log suppression
-  }
+    console.log(`[ImageLoadingDebug][CacheCleanup:${cleanupId}] Starting smart cleanup:`, {
+      passedPage: currentPage,
+      actualCurrentPage,
+      projectId,
+      baseQueryKey,
+      timestamp: new Date().toISOString()
+    });
+    
+    const config = performanceMonitor.currentConfig;
+    const keepRange = Math.floor(config.maxCachedPages / 2);
+    
+    console.log(`[ImageLoadingDebug][CacheCleanup:${cleanupId}] Cleanup configuration:`, {
+      maxCachedPages: config.maxCachedPages,
+      keepRange,
+      strategy: config.preloadStrategy
+    });
+    
+    console.log(`[ImageLoadingDebug][CacheCleanup:${cleanupId}] Found cached queries:`, {
+      totalQueries: allQueries.length,
+      generationQueries: generationQueries.length,
+      pages: generationQueries.map(q => q.queryKey[2]).sort((a, b) => a - b)
+    });
 
-  // Record memory usage and adapt configuration
-  performanceMonitor.recordMemoryUsage();
-  performanceMonitor.adaptConfig();
-  globalPreloadQueue.updateConcurrency(performanceMonitor.currentConfig.maxConcurrentPreloads);
+    // Sort by page distance from current page
+    const queriesWithDistance = generationQueries.map((query: any) => ({
+      query,
+      page: query.queryKey[2],
+      distance: Math.abs(query.queryKey[2] - actualCurrentPage)
+    }));
+
+    // Keep queries within range (current ± keepRange), remove distant ones
+    const queriesToRemove = queriesWithDistance
+      .filter(item => item.distance > keepRange)
+      .sort((a, b) => b.distance - a.distance); // Remove most distant first
+
+    console.log(`[ImageLoadingDebug][CacheCleanup:${cleanupId}] Cleanup analysis:`, {
+      keepRange,
+      pagesToKeep: queriesWithDistance.filter(item => item.distance <= keepRange).map(item => item.page),
+      pagesToRemove: queriesToRemove.map(item => item.page),
+      totalToRemove: queriesToRemove.length
+    });
+
+    // Time-slice the cache clearing operation to prevent UI blocking
+    const performCacheClearing = () => {
+      let removedCount = 0;
+      let totalImagesCleared = 0;
+      let currentIndex = 0;
+      
+      const clearBatch = () => {
+        const startTime = performance.now();
+        const MAX_BATCH_TIME = 8; // Max 8ms per batch
+        
+        while (currentIndex < queriesToRemove.length && (performance.now() - startTime) < MAX_BATCH_TIME) {
+          const { query, page } = queriesToRemove[currentIndex];
+          const queryData = query.state?.data;
+          
+          if (queryData?.items) {
+            const imageCount = queryData.items.length;
+            totalImagesCleared += imageCount;
+            
+            console.log(`[ImageLoadingDebug][CacheCleanup:${cleanupId}] Clearing image cache flags for page ${page} (${imageCount} images)`);
+            
+            // Clear cache using centralized manager (this should be fast)
+            clearCacheForImages(queryData.items);
+          }
+          
+          // Remove query from cache
+          console.log(`[ImageLoadingDebug][CacheCleanup:${cleanupId}] Removing query cache for page ${page}:`, query.queryKey);
+          queryClient.removeQueries({ queryKey: query.queryKey });
+          
+          removedCount++;
+          currentIndex++;
+        }
+        
+        if (currentIndex < queriesToRemove.length) {
+          // More items to process, yield control
+          setTimeout(clearBatch, 0);
+          return;
+        }
+        
+        // All items processed, complete cleanup
+        finishCleanup(cleanupId, removedCount, totalImagesCleared, queriesWithDistance, keepRange, actualCurrentPage, config);
+      };
+      
+      clearBatch();
+    };
+    
+    if (queriesToRemove.length > 0) {
+      performCacheClearing();
+    } else {
+      finishCleanup(cleanupId, 0, 0, queriesWithDistance, keepRange, actualCurrentPage, config);
+    }
+  };
   
-  // Perform memory-aware cache cleanup to prevent unlimited growth
-  performMemoryAwareCleanup(300); // Keep max 300 cached images
+  const finishCleanup = (
+    cleanupId: string, 
+    removedCount: number, 
+    totalImagesCleared: number, 
+    queriesWithDistance: any[], 
+    keepRange: number, 
+    actualCurrentPage: number, 
+    config: any
+  ) => {
+    console.log(`[ImageLoadingDebug][CacheCleanup:${cleanupId}] Cleanup complete:`, {
+      queriesRemoved: removedCount,
+      imagesCleared: totalImagesCleared,
+      queriesKept: generationQueries.length - removedCount,
+      maxCachedPages: config.maxCachedPages
+    });
+    
+    // Log user-friendly cache summary for easy validation
+    const remainingPages = [...new Set(queriesWithDistance
+      .filter(item => item.distance <= keepRange)
+      .map(item => item.page))]
+      .sort((a: number, b: number) => a - b);
+      
+    const removedPages = [...new Set(queriesWithDistance
+      .filter(item => item.distance > keepRange)
+      .map(item => item.page))]
+      .sort((a: number, b: number) => a - b);
+      
+    // Always log cache validation info (even when other logs are suppressed)
+    const cacheLog = `🗂️ [CacheValidator] Current cache: pages [${remainingPages.join(', ')}] around page ${actualCurrentPage} (max: ${config.maxCachedPages})`;
+    console.warn(cacheLog); // Use warn so it shows even with log suppression
+    
+    if (removedPages.length > 0) {
+      const cleanupLog = `🧹 [CacheValidator] Cleaned up distant pages: [${removedPages.join(', ')}]`;
+      console.warn(cleanupLog); // Use warn so it shows even with log suppression
+    }
+
+    // Record memory usage and adapt configuration
+    performanceMonitor.recordMemoryUsage();
+    performanceMonitor.adaptConfig();
+    globalPreloadQueue.updateConcurrency(performanceMonitor.currentConfig.maxConcurrentPreloads);
+    
+    // Perform memory-aware cache cleanup to prevent unlimited growth
+    performMemoryAwareCleanup(300); // Keep max 300 cached images
+  };
+  
+  // Start the time-sliced query processing
+  processQueriesBatch();
 };
 
 // Centralized function to trigger garbage collection for images (browser-level cleanup)
@@ -530,8 +617,10 @@ export const smartPreloadImages = (
       thumbnailOnly: config.thumbnailOnlyPreload
     });
     
-    // Use setTimeout to create top-to-bottom loading effect
+    // Use setTimeout to create top-to-bottom loading effect with performance monitoring
     setTimeout(() => {
+      const timeoutStartTime = performance.now();
+      
       // Check if prefetch is still current before proceeding
       if (prefetchOperationsRef.current.currentPrefetchId !== currentPrefetchId) {
         return;
@@ -555,6 +644,12 @@ export const smartPreloadImages = (
           });
         }
       );
+      
+      // Monitor setTimeout execution time
+      const timeoutDuration = performance.now() - timeoutStartTime;
+      if (timeoutDuration > 16) {
+        console.warn(`[PerformanceMonitor] setTimeout in smartPreloadImages took ${timeoutDuration.toFixed(1)}ms (target: <16ms)`);
+      }
     }, progressiveDelay);
     
     queuedCount++;
@@ -610,6 +705,8 @@ export const preloadClientSidePages = (
       const progressiveDelay = idx < 3 ? 0 : (idx - 2) * 60;
       
       setTimeout(() => {
+        const timeoutStartTime = performance.now();
+        
         // Double-check validity after delay
         if (operations.currentPageId !== pageId) return;
         
@@ -627,6 +724,12 @@ export const preloadClientSidePages = (
             console.warn(`[ImageLoadingDebug][SmartPreload] Failed to preload client-side image:`, imageUrl);
           }
         );
+        
+        // Monitor setTimeout execution time
+        const timeoutDuration = performance.now() - timeoutStartTime;
+        if (timeoutDuration > 16) {
+          console.warn(`[PerformanceMonitor] setTimeout in preloadClientSidePages took ${timeoutDuration.toFixed(1)}ms (target: <16ms)`);
+        }
       }, progressiveDelay);
     });
   };
@@ -723,6 +826,7 @@ export const useAdjacentPagePreloading = ({
     // Debounce preloading to avoid excessive operations on rapid page changes
     console.log(`[ImageLoadingDebug][AdjacentPreload:${preloadSessionId}] Starting debounced preload timer (${debounceTime}ms)`);
     const preloadTimer = setTimeout(() => {
+      const timeoutStartTime = performance.now();
       console.log(`[ImageLoadingDebug][AdjacentPreload:${preloadSessionId}] Debounce timer fired - calculating adjacent pages`);
       
       const totalPages = Math.max(1, Math.ceil(totalFilteredItems / itemsPerPage));
@@ -791,6 +895,12 @@ export const useAdjacentPagePreloading = ({
             shouldPreloadNext
           });
         }
+      }
+      
+      // Monitor setTimeout execution time
+      const timeoutDuration = performance.now() - timeoutStartTime;
+      if (timeoutDuration > 16) {
+        console.warn(`[PerformanceMonitor] Main preload setTimeout took ${timeoutDuration.toFixed(1)}ms (target: <16ms)`);
       }
     }, debounceTime);
     

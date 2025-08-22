@@ -113,6 +113,8 @@ export const GenerationsPane: React.FC = () => {
 
   // Prefetch adjacent pages callback for ImageGallery with cancellation
   const handlePrefetchAdjacentPages = useCallback((prevPage: number | null, nextPage: number | null) => {
+    const prefetchStartTime = performance.now();
+    
     if (!selectedProjectId) return;
 
     // Cancel previous image preloads immediately
@@ -130,11 +132,24 @@ export const GenerationsPane: React.FC = () => {
     // Clean up old pagination cache to prevent memory leaks
     // Use nextPage-1 as approximation of current page for cleanup
     const currentPage = nextPage ? nextPage - 1 : (prevPage ? prevPage + 1 : 1);
-    smartCleanupOldPages(queryClient, currentPage, selectedProjectId, 'generations');
+    
+    // Time-slice the cleanup operation to prevent UI blocking
+    setTimeout(() => {
+      smartCleanupOldPages(queryClient, currentPage, selectedProjectId, 'generations');
+    }, 0);
     
     // Trigger image garbage collection periodically for pane to free browser memory
     if (currentPage % 8 === 0) {
-      triggerImageGarbageCollection();
+      // Use requestIdleCallback if available for garbage collection (low priority)
+      if ('requestIdleCallback' in window) {
+        requestIdleCallback(() => {
+          triggerImageGarbageCollection();
+        });
+      } else {
+        setTimeout(() => {
+          triggerImageGarbageCollection();
+        }, 100);
+      }
     }
 
     const filters = { 
@@ -144,31 +159,69 @@ export const GenerationsPane: React.FC = () => {
       starredOnly
     };
 
-    // Using centralized preload function from shared hooks
+    // Using centralized preload function from shared hooks - time-sliced for performance
 
-    // Prefetch next page first (higher priority)
-    if (nextPage) {
-      queryClient.prefetchQuery({
-        queryKey: ['generations', selectedProjectId, nextPage, GENERATIONS_PER_PAGE, filters],
-        queryFn: () => fetchGenerations(selectedProjectId, GENERATIONS_PER_PAGE, (nextPage - 1) * GENERATIONS_PER_PAGE, filters),
-        staleTime: 30 * 1000,
-      }).then(() => {
-        const cached = queryClient.getQueryData(['generations', selectedProjectId, nextPage, GENERATIONS_PER_PAGE, filters]) as any;
-        smartPreloadImages(cached, 'next', prefetchId, prefetchOperationsRef);
-      });
-    }
+    // Time-slice the prefetch operations to prevent UI blocking
+    const performPrefetchOperations = () => {
+      // Prefetch next page first (higher priority) 
+      if (nextPage) {
+        setTimeout(() => {
+          const queryStartTime = performance.now();
+          queryClient.prefetchQuery({
+            queryKey: ['generations', selectedProjectId, nextPage, GENERATIONS_PER_PAGE, filters],
+            queryFn: () => fetchGenerations(selectedProjectId, GENERATIONS_PER_PAGE, (nextPage - 1) * GENERATIONS_PER_PAGE, filters),
+            staleTime: 30 * 1000,
+          }).then(() => {
+            const queryDuration = performance.now() - queryStartTime;
+            if (queryDuration > 100) {
+              console.warn(`[PerformanceMonitor] Next page query took ${queryDuration.toFixed(1)}ms`);
+            }
+            
+            const cached = queryClient.getQueryData(['generations', selectedProjectId, nextPage, GENERATIONS_PER_PAGE, filters]) as any;
+            
+            // Time-slice the image preloading
+            setTimeout(() => {
+              smartPreloadImages(cached, 'next', prefetchId, prefetchOperationsRef);
+            }, 0);
+          });
+        }, 5); // Small delay to yield control
+      }
 
-    // Prefetch previous page second (lower priority)
-    if (prevPage) {
-      queryClient.prefetchQuery({
-        queryKey: ['generations', selectedProjectId, prevPage, GENERATIONS_PER_PAGE, filters],
-        queryFn: () => fetchGenerations(selectedProjectId, GENERATIONS_PER_PAGE, (prevPage - 1) * GENERATIONS_PER_PAGE, filters),
-        staleTime: 30 * 1000,
-      }).then(() => {
-        const cached = queryClient.getQueryData(['generations', selectedProjectId, prevPage, GENERATIONS_PER_PAGE, filters]) as any;
-        smartPreloadImages(cached, 'prev', prefetchId, prefetchOperationsRef);
-      });
-    }
+      // Prefetch previous page second (lower priority) with additional delay
+      if (prevPage) {
+        setTimeout(() => {
+          const queryStartTime = performance.now();
+          queryClient.prefetchQuery({
+            queryKey: ['generations', selectedProjectId, prevPage, GENERATIONS_PER_PAGE, filters],
+            queryFn: () => fetchGenerations(selectedProjectId, GENERATIONS_PER_PAGE, (prevPage - 1) * GENERATIONS_PER_PAGE, filters),
+            staleTime: 30 * 1000,
+          }).then(() => {
+            const queryDuration = performance.now() - queryStartTime;
+            if (queryDuration > 100) {
+              console.warn(`[PerformanceMonitor] Previous page query took ${queryDuration.toFixed(1)}ms`);
+            }
+            
+            const cached = queryClient.getQueryData(['generations', selectedProjectId, prevPage, GENERATIONS_PER_PAGE, filters]) as any;
+            
+            // Time-slice the image preloading
+            setTimeout(() => {
+              smartPreloadImages(cached, 'prev', prefetchId, prefetchOperationsRef);
+            }, 0);
+          });
+        }, 15); // Larger delay for lower priority
+      }
+    };
+    
+    // Start the prefetch operations
+    performPrefetchOperations();
+    
+    // Monitor total prefetch operation time
+    setTimeout(() => {
+      const totalPrefetchDuration = performance.now() - prefetchStartTime;
+      if (totalPrefetchDuration > 50) {
+        console.warn(`[PerformanceMonitor] Total prefetch operation took ${totalPrefetchDuration.toFixed(1)}ms`);
+      }
+    }, 20);
   }, [selectedProjectId, queryClient, mediaTypeFilter, selectedShotFilter, excludePositioned, starredOnly]);
 
   const {
