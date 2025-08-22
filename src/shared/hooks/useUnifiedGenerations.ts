@@ -110,27 +110,6 @@ async function fetchShotSpecificGenerations({
     timestamp: Date.now()
   });
   
-  // Count query with media type filtering
-  let countQuery = supabase
-    .from('shot_generations')
-    .select(`
-      generation_id,
-      generation:generations!inner(type)
-    `, { count: 'exact', head: true })
-    .eq('shot_id', shotId);
-  
-  // Apply media type filter at database level for count
-  if (filters?.mediaType === 'video') {
-    countQuery = countQuery.like('generation.type', '%video%');
-  } else if (filters?.mediaType === 'image') {
-    countQuery = countQuery.not('generation.type', 'like', '%video%');
-  }
-  
-  // Apply exclude positioned filter (this works because it's on shot_generations table)
-  if (filters?.excludePositioned) {
-    countQuery = countQuery.is('position', null);
-  }
-  
   let dataQuery = supabase
     .from('shot_generations')
     .select(`
@@ -165,39 +144,27 @@ async function fetchShotSpecificGenerations({
     .order('position', { ascending: true })
     .order('created_at', { ascending: false });
   
-  // Execute queries
-  console.log('[VideoGenMissing] Executing shot-specific queries...', {
+  // Execute single query with limit+1 to detect hasMore
+  console.log('[VideoGenMissing] Executing shot-specific query (no count)...', {
     projectId,
     shotId,
     offset,
     limit,
+    fetchingLimit: limit + 1, // Fetch one extra to detect hasMore
     timestamp: Date.now()
   });
   
-  const [{ count, error: countError }, { data, error: dataError }] = await Promise.all([
-    countQuery,
-    dataQuery.range(offset, offset + limit - 1)
-  ]);
+  const { data, error: dataError } = await dataQuery.range(offset, offset + limit); // Fetch limit+1 items
   
   console.log('[VideoGenMissing] Shot-specific query results:', {
     projectId,
     shotId,
-    count,
     dataLength: data?.length,
-    countError: countError?.message,
     dataError: dataError?.message,
+    eliminatedCountQuery: true,
     timestamp: Date.now()
   });
   
-  if (countError) {
-    console.error('[VideoGenMissing] Shot-specific count query failed:', {
-      projectId,
-      shotId,
-      error: countError,
-      timestamp: Date.now()
-    });
-    throw countError;
-  }
   if (dataError) {
     console.error('[VideoGenMissing] Shot-specific data query failed:', {
       projectId,
@@ -267,11 +234,11 @@ async function fetchShotSpecificGenerations({
     );
   }
   
-  // Use normal pagination for all cases (since filtering is now at DB level)
-  const finalItems = items.slice(0, limit); // Take only requested limit since we fetched exactly what we need
-  const filteringRatio = originalItemsCount > 0 ? items.length / originalItemsCount : 1;
-  const finalTotal = Math.round((count || 0) * filteringRatio);
-  const finalHasMore = finalTotal > offset + finalItems.length;
+  // Use limit+1 pattern for hasMore detection (no count query needed)
+  const hasMore = items.length > limit; // If we got more than requested, there are more pages
+  const finalItems = items.slice(0, limit); // Take only the requested limit
+  const finalTotal = hasMore ? offset + finalItems.length + 1 : offset + finalItems.length; // Estimate total
+  const finalHasMore = hasMore;
   
   const result = { items: finalItems, total: finalTotal, hasMore: finalHasMore };
   
@@ -280,7 +247,7 @@ async function fetchShotSpecificGenerations({
     shotId,
     offset,
     limit,
-    rawCount: count,
+    eliminatedCountQuery: true,
     originalItemsCount,
     filteredItemsCount: items.length,
     finalItemsCount: finalItems.length,
