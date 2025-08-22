@@ -171,10 +171,22 @@ export default function HomePage() {
       console.log('[AuthDebug] Auth state change:', event, !!session?.user?.id);
       setSession(session);
       
-      // If we get a successful sign-in, navigate to tools
+      // If we get a successful sign-in, navigate to tools – but avoid auto-redirect
+      // on initial session restoration when the user is just viewing /home.
       if (event === 'SIGNED_IN' && session) {
-        console.log('[AuthDebug] Successful sign-in, navigating to /tools');
-        navigate('/tools');
+        const isHomePath = location.pathname === '/home' || location.pathname === '/';
+        const oauthInProgress = localStorage.getItem('oauthInProgress') === 'true';
+        if (oauthInProgress) {
+          // Clear flag and proceed to tools
+          localStorage.removeItem('oauthInProgress');
+          console.log('[AuthDebug] OAuth flow completed, navigating to /tools');
+          navigate('/tools');
+        } else if (!isHomePath) {
+          console.log('[AuthDebug] SIGNED_IN outside home, navigating to /tools');
+          navigate('/tools');
+        } else {
+          console.log('[AuthDebug] SIGNED_IN on home without oauth flag; staying on home');
+        }
       }
     });
     
@@ -186,6 +198,8 @@ export default function HomePage() {
   const handleDiscordSignIn = async () => {
     try {
       console.log('[AuthDebug] Starting Discord OAuth flow');
+      // Mark that OAuth was user-initiated so we can safely redirect post-login
+      try { localStorage.setItem('oauthInProgress', 'true'); } catch {}
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'discord',
         options: {
