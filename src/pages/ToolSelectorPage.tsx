@@ -117,7 +117,7 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
   const iconSize = isLg ? 'w-10 h-10' : isSm ? 'w-8 h-8' : 'w-6 h-6';
   const iconContainerSize = isLg ? 'w-20 h-20' : isSm ? 'w-16 h-16' : 'w-12 h-12';
   const titleSize = isLg ? 'text-3xl' : isSm ? 'text-2xl' : 'text-xl';
-  const descriptionSize = isSm ? 'text-base' : 'text-sm';
+  const descriptionSize = isSm ? 'text-base' : 'text-xs';
 
   const content = (
     <div className={`wes-tool-card relative overflow-hidden ${isSquare ? 'min-h-48' : 'h-32 sm:h-32'} ${isComingSoon ? 'opacity-40' : ''} h-full`}>
@@ -161,9 +161,9 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
         </div>
       ) : (
         /* Square layout for Assistant tools - Responsive padding and sizing */
-        <div className={`${isSm ? 'p-2' : 'p-1'} ${isLg ? 'p-3' : ''} h-full flex flex-col`}>
+        <div className={`${isSm ? 'p-2' : 'p-1'} ${isLg ? 'p-3' : ''} h-full flex flex-col justify-center`}>
           {/* Tool Header without icon */}
-          <div className={`wes-symmetry ${isSm ? 'mb-3' : 'mb-2'} relative`}>
+          <div className={`wes-symmetry ${isSm ? 'mb-1' : 'mb-0.5'} relative`}>
             <div className="">
               <h3 className={`font-theme ${titleSize} font-theme-heading text-primary mb-2 ${!isComingSoon ? 'group-hover:text-primary/80' : ''} transition-colors duration-300 text-shadow-vintage text-center leading-tight whitespace-pre-line`}>
                 {item.name}
@@ -172,14 +172,12 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
             </div>
           </div>
 
-          {/* Description - hidden on mobile to save space */}
-          {isSm && (
-            <div className="flex-1">
-              <p className={`font-theme font-theme-body text-muted-foreground leading-relaxed text-center ${descriptionSize}`}>
-                {item.description}
-              </p>
-            </div>
-          )}
+          {/* Description - always show on mobile with adjusted styling */}
+          <div className={`${isSm ? 'mt-1' : 'mt-0.5'}`}>
+            <p className={`font-theme font-theme-body text-muted-foreground leading-relaxed text-center ${descriptionSize}`}>
+              {item.description}
+            </p>
+          </div>
         </div>
       )}
 
@@ -259,7 +257,7 @@ const ToolSelectorPage: React.FC = () => {
   // Dynamic spacing based on content area - fixed padding to prevent right shift
   const containerPadding = isSm ? 'px-4' : 'px-2';
   const containerSpacing = isLg ? 'pt-3 pb-4' : isSm ? 'pt-4 pb-2' : 'pt-3 pb-[0.333rem]';
-  const sectionGap = isLg ? 'gap-6' : isSm ? 'gap-4' : 'gap-3';
+  const sectionGap = isLg ? 'gap-3' : isSm ? 'gap-2' : 'gap-1';
   const itemGap = isLg ? 'gap-5' : isSm ? 'gap-6' : 'gap-5';
   const topMargin = isLg ? 'mt-0' : isSm ? 'mt-1' : 'mt-0';
   const bottomMargin = ''; // layoutDirection === 'column' ? 'mb-8' : '';

@@ -170,8 +170,23 @@ export const TasksPane: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
   useEffect(() => {
     if ((!isPaginatedLoading && paginatedData) || (!displayPaginatedData && paginatedData)) {
       setDisplayPaginatedData(paginatedData);
+      
+      // CRITICAL DEBUGGING: Track pagination data in TasksPane
+      console.log('[TasksPaginationDebug] TasksPane received new pagination data:', {
+        selectedFilter,
+        currentPage,
+        isLoading: isPaginatedLoading,
+        tasksReceived: paginatedData?.tasks?.length || 0,
+        totalFromHook: paginatedData?.total || 0,
+        totalPagesFromHook: paginatedData?.totalPages || 0,
+        hasMoreFromHook: paginatedData?.hasMore,
+        calculatedOffset: (currentPage - 1) * ITEMS_PER_PAGE,
+        expectedItemsPerPage: ITEMS_PER_PAGE,
+        ISSUE_DETECTED: paginatedData?.tasks?.length === 0 && currentPage > 2 && (paginatedData?.total || 0) > 0,
+        timestamp: Date.now()
+      });
     }
-  }, [paginatedData, isPaginatedLoading, displayPaginatedData]);
+  }, [paginatedData, isPaginatedLoading, displayPaginatedData, selectedFilter, currentPage]);
   
   // Get status counts for indicators
   const { data: statusCounts, isLoading: isStatusCountsLoading } = useTaskStatusCounts(selectedProjectId);

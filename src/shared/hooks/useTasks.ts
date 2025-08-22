@@ -1,11 +1,20 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Task, TaskStatus } from '@/types/tasks';
+import { Task, TaskStatus, TASK_STATUS } from '@/types/tasks';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useProject } from '../contexts/ProjectContext';
 import { filterVisibleTasks } from '@/shared/lib/taskConfig';
 
 const TASKS_QUERY_KEY = 'tasks';
+
+// Pagination configuration constants
+const PAGINATION_CONFIG = {
+  // For Processing tasks that need custom sorting
+  PROCESSING_FETCH_MULTIPLIER: 3,
+  PROCESSING_MAX_FETCH: 500,
+  // Default limits
+  DEFAULT_LIMIT: 50,
+} as const;
 
 // Types for API responses and request bodies
 // Ensure these align with your server-side definitions and Task type in @/types/tasks.ts
@@ -276,19 +285,29 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
         countQuery = countQuery.in('status', status);
       }
 
-      // 2. Get paginated data directly from database with proper status ordering
-      // Since PostgREST doesn't support custom CASE statements in order(),
-      // we'll fetch and sort on client-side, but limit the fetch size
+      // 2. Get paginated data with proper database pagination
+      // Strategy: Use database pagination for most cases, only fetch extra for Processing status that needs sorting
+      const needsCustomSorting = status?.some(s => s === TASK_STATUS.QUEUED || s === TASK_STATUS.IN_PROGRESS);
+      
       let dataQuery = supabase
         .from('tasks')
         .select('*')
         .eq('project_id', projectId)
         .is('params->orchestrator_task_id_ref', null) // Only parent tasks
-        .order('created_at', { ascending: false })
-        .limit(Math.min(limit * 2, 100)); // Fetch 2x records (max 100) for sorting, prevent huge queries
+        .order('created_at', { ascending: false });
 
       if (status && status.length > 0) {
         dataQuery = dataQuery.in('status', status);
+      }
+
+      if (needsCustomSorting) {
+        // For Processing tasks: fetch more records to allow proper In Progress vs Queued sorting
+        // But still use reasonable limits to prevent performance issues
+        const fetchLimit = Math.min(limit * PAGINATION_CONFIG.PROCESSING_FETCH_MULTIPLIER, PAGINATION_CONFIG.PROCESSING_MAX_FETCH);
+        dataQuery = dataQuery.limit(fetchLimit);
+      } else {
+        // For Succeeded/Failed: use proper database pagination - no client sorting needed
+        dataQuery = dataQuery.range(offset, offset + limit - 1);
       }
 
       // Execute both queries
@@ -336,32 +355,57 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
       const allTasks = (data || []).map(mapDbTaskToTask);
       const visibleTasks = filterVisibleTasks(allTasks);
       
-      // FIXED: Client-side sorting to prioritize "In Progress" over "Queued"
-      const sortedTasks = visibleTasks.sort((a, b) => {
-        // Priority: In Progress (1), Queued (2), Others (3)
-        const getStatusPriority = (status: string) => {
-          switch (status) {
-            case 'In Progress': return 1;
-            case 'Queued': return 2;
-            default: return 3;
-          }
-        };
-        
-        const aPriority = getStatusPriority(a.status);
-        const bPriority = getStatusPriority(b.status);
-        
-        if (aPriority !== bPriority) {
-          return aPriority - bPriority; // Lower number = higher priority
-        }
-        
-        // Within same status, sort by created_at descending (newest first)
-        const aDate = new Date(a.createdAt || 0);
-        const bDate = new Date(b.createdAt || 0);
-        return bDate.getTime() - aDate.getTime();
-      });
+      let paginatedTasks: typeof allTasks;
       
-      // Apply pagination to sorted results
-      const paginatedTasks = sortedTasks.slice(offset, offset + limit);
+      if (needsCustomSorting) {
+        // For Processing tasks: apply custom sorting then paginate
+        const sortedTasks = visibleTasks.sort((a, b) => {
+          // Priority: In Progress (1), Queued (2), Others (3)
+          const getStatusPriority = (status: string) => {
+            switch (status) {
+              case TASK_STATUS.IN_PROGRESS: return 1;
+              case TASK_STATUS.QUEUED: return 2;
+              default: return 3;
+            }
+          };
+          
+          const aPriority = getStatusPriority(a.status);
+          const bPriority = getStatusPriority(b.status);
+          
+          if (aPriority !== bPriority) {
+            return aPriority - bPriority; // Lower number = higher priority
+          }
+          
+          // Within same status, sort by created_at descending (newest first)
+          const aDate = new Date(a.createdAt || 0);
+          const bDate = new Date(b.createdAt || 0);
+          return bDate.getTime() - aDate.getTime();
+        });
+        
+        // Apply pagination to sorted results
+        paginatedTasks = sortedTasks.slice(offset, offset + limit);
+      } else {
+        // For Succeeded/Failed: data is already paginated by database, no client-side pagination needed
+        paginatedTasks = visibleTasks;
+      }
+      
+      // CRITICAL DEBUGGING: Track pagination math issues
+      console.log('[TasksPaginationDebug] Pagination logic breakdown:', {
+        projectId,
+        page,
+        limit,
+        offset,
+        needsCustomSorting,
+        paginationStrategy: needsCustomSorting ? 'CLIENT_SIDE_SORT_AND_PAGINATE' : 'DATABASE_PAGINATED',
+        rawFetched: allTasks.length,
+        filteredTasks: visibleTasks.length,
+        actualPaginatedCount: paginatedTasks.length,
+        totalFromDB: count,
+        calculatedTotalPages: Math.ceil((count || 0) / limit),
+        fetchLimit: needsCustomSorting ? Math.min(limit * PAGINATION_CONFIG.PROCESSING_FETCH_MULTIPLIER, PAGINATION_CONFIG.PROCESSING_MAX_FETCH) : limit,
+        FIXED_PAGINATION: !needsCustomSorting || (needsCustomSorting && offset < visibleTasks.length),
+        timestamp: Date.now()
+      });
       
       // Debug log to verify sorting is working (throttled to prevent spam)
       if (paginatedTasks.length > 0 && Math.random() < 0.1) { // Only log 10% of the time
