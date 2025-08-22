@@ -6,6 +6,7 @@ import type { Session } from '@supabase/supabase-js';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
+import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { toast } from '@/shared/components/ui/use-toast';
 import { PageFadeIn } from '@/shared/components/transitions';
 import { FadeInSection } from '@/shared/components/transitions/FadeInSection';
@@ -38,6 +39,12 @@ export default function HomePage() {
   const [isExamplesPaneClosing, setIsExamplesPaneClosing] = useState(false);
   const [openTipOpen, setOpenTipOpen] = useState(false);
   const [openTipDisabled, setOpenTipDisabled] = useState(false);
+  const isMobile = useIsMobile();
+  const [engLeftOpen, setEngLeftOpen] = useState(false);
+  const [engRightOpen, setEngRightOpen] = useState(false);
+  const [artLeftOpen, setArtLeftOpen] = useState(false);
+  const [artRightOpen, setArtRightOpen] = useState(false);
+  const [banoOpen, setBanoOpen] = useState(false);
 
   // Tooltip state: "for exploring"
   const [exploringTipOpen, setExploringTipOpen] = useState(false);
@@ -721,9 +728,12 @@ export default function HomePage() {
                           {/* Left half: Technical contributors to workflows and LoRAs */}
                           <div className="relative flex-1">
                             <TooltipProvider>
-                              <Tooltip>
+                              <Tooltip open={engLeftOpen} onOpenChange={setEngLeftOpen}>
                                 <TooltipTrigger asChild>
-                                  <div className="h-full w-full bg-wes-yellow-dark transition-all duration-200 hover:brightness-110" />
+                                  <div
+                                    className="h-full w-full bg-wes-yellow-dark transition-all duration-200 hover:brightness-90"
+                                    onClick={() => { if (isMobile) setEngLeftOpen((v) => !v); }}
+                                  />
                                 </TooltipTrigger>
                                 <TooltipContent side="bottom" align="center" className="px-2 py-1 whitespace-nowrap text-center text-[11px] leading-tight">
                                   Technical contributors to workflows and LoRAs
@@ -734,9 +744,12 @@ export default function HomePage() {
                           {/* Right half: Fund to train models and build extensions */}
                           <div className="relative flex-1">
                             <TooltipProvider>
-                              <Tooltip>
+                              <Tooltip open={engRightOpen} onOpenChange={setEngRightOpen}>
                                 <TooltipTrigger asChild>
-                                  <div className="h-full w-full bg-wes-yellow transition-all duration-200 hover:brightness-110" />
+                                  <div
+                                    className="h-full w-full bg-wes-yellow transition-all duration-200 hover:brightness-95"
+                                    onClick={() => { if (isMobile) setEngRightOpen((v) => !v); }}
+                                  />
                                 </TooltipTrigger>
                                 <TooltipContent side="bottom" align="center" className="px-2 py-1 whitespace-nowrap text-center text-[11px] leading-tight">
                                   Fund to train models and build extensions
@@ -752,9 +765,12 @@ export default function HomePage() {
                           {/* Left half: Artists who refer people... */}
                           <div className="relative flex-1">
                             <TooltipProvider>
-                              <Tooltip>
+                              <Tooltip open={artLeftOpen} onOpenChange={setArtLeftOpen}>
                                 <TooltipTrigger asChild>
-                                  <div className="h-full w-full bg-wes-mint-dark transition-all duration-200 hover:brightness-110" />
+                                  <div
+                                    className="h-full w-full bg-wes-mint-dark transition-all duration-200 hover:brightness-110"
+                                    onClick={() => { if (isMobile) setArtLeftOpen((v) => !v); }}
+                                  />
                                 </TooltipTrigger>
                                 <TooltipContent side="bottom" align="center" className="px-2 py-1 whitespace-nowrap text-center text-[11px] leading-tight">
                                   Artists who refer people will receive a share of their lifetime spend
@@ -765,9 +781,12 @@ export default function HomePage() {
                           {/* Right half: Fund art competitions */}
                           <div className="relative flex-1">
                             <TooltipProvider>
-                              <Tooltip>
+                              <Tooltip open={artRightOpen} onOpenChange={setArtRightOpen}>
                                 <TooltipTrigger asChild>
-                                  <div className="h-full w-full bg-wes-mint transition-all duration-200 hover:brightness-110" />
+                                  <div
+                                    className="h-full w-full bg-wes-mint transition-all duration-200 hover:brightness-110"
+                                    onClick={() => { if (isMobile) setArtRightOpen((v) => !v); }}
+                                  />
                                 </TooltipTrigger>
                                 <TooltipContent side="bottom" align="center" className="px-2 py-1 whitespace-nowrap text-center text-[11px] leading-tight">
                                   We will fund art competitions with our profits
@@ -780,9 +799,13 @@ export default function HomePage() {
                       {/* Banodoco (1/3) */}
                       <div className="relative flex-1 cursor-default select-none rounded-r-full bg-transparent">
                         <TooltipProvider>
-                          <Tooltip>
+                          <Tooltip open={banoOpen} onOpenChange={setBanoOpen}>
                             <TooltipTrigger asChild>
-                              <div className="h-full w-full bg-wes-pink hover:bg-wes-pink-dark transition-all duration-200" aria-label="Banodoco" />
+                              <div
+                                className="h-full w-full bg-wes-pink hover:bg-wes-pink-dark transition-all duration-200"
+                                aria-label="Banodoco"
+                                onClick={() => { if (isMobile) setBanoOpen((v) => !v); }}
+                              />
                             </TooltipTrigger>
                             <TooltipContent side="bottom" align="center" className="px-2 py-1 whitespace-nowrap text-center text-[11px] leading-tight">
                               Yeah, we like money too
@@ -879,7 +902,7 @@ export default function HomePage() {
               <div className="w-16 h-1 bg-gradient-to-r from-wes-vintage-gold to-wes-coral rounded-full animate-pulse-breathe"></div>
             </div>
 
-            <div className="space-y-6 pb-4 text-left">
+            <div className="space-y-3 pb-4 text-left text-muted-foreground">
               {/* New intro paragraphs */}
               <p className="text-sm leading-relaxed">
                 There are many tools that aim to be a 'one-stop-shop' for creating with AI - a kind of 'Amazon for art'. 
@@ -891,7 +914,7 @@ export default function HomePage() {
               It's a tool <em>just</em> for travelling between images:
               </p>
               {/* Section 1 */}
-              <div className="space-y-4">
+              <div className="space-y-2 mt-4 mb-4">
                 {/* Inputs row */}
                 <div className="flex gap-4">
                   {imagePairIndices.map(i => (
@@ -901,7 +924,7 @@ export default function HomePage() {
                   ))}
                 </div>
                 {/* Spacer between inputs and output */}
-                <div className="h-1" />
+                <div className="h-0.5" />
                 {/* Output row */}
                 <div className="bg-muted/20 border rounded-lg w-full aspect-video flex items-center justify-center text-xs text-muted-foreground">
                   16:9 Output
@@ -909,7 +932,7 @@ export default function HomePage() {
               </div>
 
               {/* Section 2 */}
-              <div className="space-y-4">
+              <div className="space-y-3 mt-4 mb-4">
                 <p className="text-sm leading-relaxed">
                   Just as a songwriter who sticks to only guitar might uncover infinite nuance to be found in six strings, we believe an entire artform lies waiting in the AI-driven journey between images:
                 </p>
@@ -930,9 +953,9 @@ export default function HomePage() {
               </div>
 
               {/* Section 3 - Structural Control */}
-              <div className="space-y-4">
+              <div className="space-y-3 mt-4 mb-4">
                 <p className="text-sm leading-relaxed">
-                  Using images in combination with structural control can allow for deep control and intentionality:
+                  Using images to steer video in combination with structural control can allow for deep control and intentionality:
                 </p>
                 <div className="flex items-center gap-3 w-full">
                   {/* 2 images stacked */}
@@ -958,9 +981,9 @@ export default function HomePage() {
               </div>
 
               {/* Section 4 - LoRAs */}
-              <div className="space-y-4">
+              <div className="space-y-3 mt-4 mb-4">
                 <p className="text-sm leading-relaxed">
-                  Combining those with LoRAs can allow for artists to discover a style that's truly unique:
+                  Combining those with LoRAs can allow for artists to discover a style that's truly their own:
                 </p>
                 <div className="grid grid-cols-2 gap-4">
                   {motionExamples.map(example => (
@@ -979,10 +1002,10 @@ export default function HomePage() {
               </div>
 
               {/* Closing message & CTA */}
-              <div className="space-y-4 mb-8">
-                <div className="space-y-6">
-                  <p className="text-sm leading-relaxed">
-                    Reigh is a tool just for exploring this artform. By creating with it and endlessly refining every element, I want to make it extremely good, and build a community of people who want to explore it with me.
+              <div className="space-y-3 mb-8">
+                <div className="space-y-3">
+                  <p className="text-sm leading-relaxed mt-6">
+                    Reigh is a tool <strong>just</strong> for exploring this artform. By creating with it and endlessly refining every element, I want to make it extremely good, and build a community of people who want to explore it with me.
                   </p>
                   <p className="text-sm leading-relaxed">
                     If you're interested in joining, you're very welcome! If we're successful, I hope that we can inspire a whole ecosystem of similar tools and communities focusing on discovering and creating their own artforms.

@@ -139,6 +139,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [selectedVideoForDetails, setSelectedVideoForDetails] = useState<GenerationRow | null>(null);
   const [showTaskDetailsModal, setShowTaskDetailsModal] = useState(false);
+  const [optimisticallyRemovedIds, setOptimisticallyRemovedIds] = useState<Set<string>>(new Set());
   
   // Stable content key to avoid resets during background refetches
   const contentKey = `${shotId ?? ''}:pagination-will-be-handled-by-hook`;
@@ -289,8 +290,14 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     return sorted;
   }, [videoOutputs]);
 
+  // Apply optimistic deletions to the displayed list
+  const displaySortedVideoOutputs = useMemo(() => {
+    if (optimisticallyRemovedIds.size === 0) return sortedVideoOutputs;
+    return sortedVideoOutputs.filter(v => !optimisticallyRemovedIds.has(v.id));
+  }, [sortedVideoOutputs, optimisticallyRemovedIds]);
+
   // Use pagination hook
-  const paginationHook = useGalleryPagination(sortedVideoOutputs, itemsPerPage);
+  const paginationHook = useGalleryPagination(displaySortedVideoOutputs, itemsPerPage);
   const { currentPage, totalPages, currentVideoOutputs, handlePageChange, resetToFirstPage } = paginationHook;
   
   // DEEP DEBUG: Log pagination changes
@@ -311,7 +318,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   // ===============================================================================
   
   // Hooks for task details (now using unified cache)
-  const lightboxVideoId = lightboxIndex !== null && sortedVideoOutputs[lightboxIndex] ? sortedVideoOutputs[lightboxIndex].id : null;
+  const lightboxVideoId = lightboxIndex !== null && displaySortedVideoOutputs[lightboxIndex] ? displaySortedVideoOutputs[lightboxIndex].id : null;
   const { data: lightboxTaskMapping } = useTaskFromUnifiedCache(lightboxVideoId || '');
   const { data: task, isLoading: isLoadingTask, error: taskError } = useGetTask(lightboxTaskMapping?.taskId || '');
   
@@ -464,7 +471,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   // Handle opening details from hover
   const handleOpenDetailsFromHover = createHoverDetailsHandler(
     hoveredVideo,
-    sortedVideoOutputs,
+    displaySortedVideoOutputs,
     isMobile,
     setSelectedVideoForDetails,
     setLightboxIndex,
@@ -475,24 +482,53 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   const handleShowTaskDetails = useCallback(() => 
     createTaskDetailsHandler(
       lightboxIndex,
-      sortedVideoOutputs,
+      displaySortedVideoOutputs,
       setSelectedVideoForDetails,
       setShowTaskDetailsModal,
       setLightboxIndex
-    )(), [lightboxIndex, sortedVideoOutputs]);
+    )(), [lightboxIndex, displaySortedVideoOutputs]);
 
   // Lightbox navigation
   const handleNext = () => {
     if (lightboxIndex !== null) {
-      setLightboxIndex((lightboxIndex + 1) % sortedVideoOutputs.length);
+      setLightboxIndex((lightboxIndex + 1) % displaySortedVideoOutputs.length);
     }
   };
 
   const handlePrevious = () => {
     if (lightboxIndex !== null) {
-      setLightboxIndex((lightboxIndex - 1 + sortedVideoOutputs.length) % sortedVideoOutputs.length);
+      setLightboxIndex((lightboxIndex - 1 + displaySortedVideoOutputs.length) % displaySortedVideoOutputs.length);
     }
   };
+
+  // Optimistic delete handler: hide immediately, then delegate to parent
+  const handleDeleteOptimistic = useCallback((generationId: string) => {
+    setOptimisticallyRemovedIds(prev => {
+      const next = new Set(prev);
+      next.add(generationId);
+      return next;
+    });
+    try {
+      const maybePromise = (onDelete as unknown as (id: string) => Promise<void> | void)(generationId) as Promise<void> | void;
+      if (maybePromise && typeof (maybePromise as any).then === 'function') {
+        (maybePromise as Promise<void>).catch(() => {
+          // Rollback on explicit failure if parent reports it via rejection
+          setOptimisticallyRemovedIds(prev => {
+            const next = new Set(prev);
+            next.delete(generationId);
+            return next;
+          });
+        });
+      }
+    } catch (e) {
+      // Rollback if synchronous error thrown
+      setOptimisticallyRemovedIds(prev => {
+        const next = new Set(prev);
+        next.delete(generationId);
+        return next;
+      });
+    }
+  }, [onDelete]);
 
   // ===============================================================================
   // EFFECT HANDLERS
@@ -576,7 +612,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     <Card className="p-4 sm:p-6">
       <div className="flex flex-col space-y-2 sm:space-y-3">
         <GalleryControls
-          sortedVideoOutputs={sortedVideoOutputs}
+          sortedVideoOutputs={displaySortedVideoOutputs}
           isLoadingGenerations={isLoadingGenerations}
           isFetchingGenerations={isFetchingGenerations}
           totalPages={totalPages}
@@ -610,7 +646,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
                   isMobile={isMobile}
                   onLightboxOpen={setLightboxIndex}
                   onMobileTap={handleMobileTap}
-                  onDelete={onDelete}
+                  onDelete={handleDeleteOptimistic}
                   deletingVideoId={deletingVideoId}
                   onHoverStart={handleHoverStart}
                   onHoverEnd={handleHoverEnd}
@@ -639,7 +675,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
         {lightboxIndex !== null && (
           <MediaLightbox
             media={(() => {
-              const media = sortedVideoOutputs[lightboxIndex];
+              const media = displaySortedVideoOutputs[lightboxIndex];
               console.log('[StarDebug:VideoOutputsGallery] MediaLightbox media', {
                 mediaId: media.id,
                 mediaKeys: Object.keys(media),
@@ -657,9 +693,9 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
             showImageEditTools={false}
             showDownload={true}
             videoPlayerComponent="lightbox-scrub"
-            hasNext={lightboxIndex < sortedVideoOutputs.length - 1}
+            hasNext={lightboxIndex < displaySortedVideoOutputs.length - 1}
             hasPrevious={lightboxIndex > 0}
-            starred={(sortedVideoOutputs[lightboxIndex] as { starred?: boolean }).starred || false}
+            starred={(displaySortedVideoOutputs[lightboxIndex] as { starred?: boolean }).starred || false}
             showTaskDetails={!isMobile}
             taskDetailsData={{
               task,
@@ -703,7 +739,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
             }}
             onShowVideo={isMobile ? () => {
               setShowTaskDetailsModal(false);
-              const index = sortedVideoOutputs.findIndex(v => v.id === selectedVideoForDetails.id);
+              const index = displaySortedVideoOutputs.findIndex(v => v.id === selectedVideoForDetails.id);
               if (index !== -1) {
                 setLightboxIndex(index);
               }

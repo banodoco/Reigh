@@ -64,8 +64,8 @@ export const Header: React.FC<HeaderProps> = ({
                 onChange={(e) => onEditingNameChange(e.target.value)}
                 onKeyDown={onNameKeyDown}
                 onBlur={onNameSave}
-                className="text-3xl font-bold text-primary h-auto py-2 px-3 min-w-[250px] border-2 text-center !text-3xl !font-bold"
-                style={{ fontSize: '1.875rem', fontWeight: '700', lineHeight: '2.25rem' }}
+                className="text-2xl font-bold text-primary h-auto py-1.5 px-2.5 min-w-[135px] border-2 text-center"
+                style={{ fontSize: '1.5rem', fontWeight: '700', lineHeight: '2rem' }}
                 autoFocus
                 maxLength={30}
               />
@@ -88,7 +88,7 @@ export const Header: React.FC<HeaderProps> = ({
               </Button>
               
               <span 
-                className={`text-3xl font-bold text-primary truncate px-4 min-w-[250px] text-center border-2 border-transparent rounded-md py-2 ${onUpdateShotName ? 'cursor-pointer hover:underline hover:border-border hover:bg-accent/50 transition-all duration-200' : ''}`}
+                className={`text-3xl font-bold text-primary truncate px-4 min-w-[135px] text-center border-2 border-transparent rounded-md py-2 ${onUpdateShotName ? 'cursor-pointer hover:underline hover:border-border hover:bg-accent/50 transition-all duration-200' : ''}`}
                 onClick={onNameClick}
                 title={onUpdateShotName ? "Click to edit shot name" : selectedShot?.name || 'Untitled Shot'}
               >
@@ -116,7 +116,7 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="flex justify-center px-2">
           {isEditingName ? (
             // Hide navigation buttons when editing on mobile too
-            <div className="flex items-center space-x-2 w-full max-w-sm">
+            <div className="flex items-center space-x-2 w-full max-w-xs">
               <Button 
                 size="sm" 
                 variant="ghost" 
@@ -130,7 +130,7 @@ export const Header: React.FC<HeaderProps> = ({
                 onChange={(e) => onEditingNameChange(e.target.value)}
                 onKeyDown={onNameKeyDown}
                 onBlur={onNameSave}
-                className="text-xl font-normal text-primary h-auto py-1 px-2 flex-1 text-center"
+                className="text-lg font-normal text-primary h-auto py-0.5 px-1.5 flex-1 text-center"
                 autoFocus
                 maxLength={30}
               />
@@ -153,7 +153,7 @@ export const Header: React.FC<HeaderProps> = ({
               </Button>
               
               <span 
-                className={`text-xl font-semibold text-primary truncate text-center px-2 min-w-0 max-w-[200px] flex-1 ${onUpdateShotName ? 'cursor-pointer hover:underline' : ''}`}
+                className={`text-xl font-semibold text-primary truncate text-center px-2 min-w-0 max-w-[135px] flex-1 ${onUpdateShotName ? 'cursor-pointer hover:underline' : ''}`}
                 onClick={onNameClick}
                 title={onUpdateShotName ? "Click to edit shot name" : selectedShot?.name || 'Untitled Shot'}
               >

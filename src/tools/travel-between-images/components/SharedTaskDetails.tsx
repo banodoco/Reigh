@@ -214,6 +214,14 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
               );
             }
           })()}
+
+          {/* Model - placed below negative prompt */}
+          <div className="space-y-1">
+            <p className={`${config.textSize} ${config.fontWeight} text-muted-foreground ${config.labelCase}`}>Model</p>
+            <p className={`${config.textSize} ${config.fontWeight}`}>
+              {getModelDisplayName(orchestratorPayload?.model_name || task?.params?.model_name)}
+            </p>
+          </div>
         </div>
         
         {/* Technical Settings */}
@@ -241,15 +249,25 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
             </p>
           </div>
           <div className="space-y-1">
-            <p className={`${config.textSize} ${config.fontWeight} text-muted-foreground ${config.labelCase}`}>Model</p>
-            <p className={`${config.textSize} ${config.fontWeight}`}>
-              {getModelDisplayName(orchestratorPayload?.model_name || task?.params?.model_name)}
-            </p>
-          </div>
-          <div className="space-y-1">
             <p className={`${config.textSize} ${config.fontWeight} text-muted-foreground ${config.labelCase}`}>Accelerated</p>
             <div className="flex items-center space-x-1">
               {(orchestratorPayload?.accelerated_mode || task?.params?.accelerated_mode) === true ? (
+                <div className="flex items-center space-x-1 text-green-600">
+                  <Check className={config.iconSize} />
+                  <span className={`${config.textSize} ${config.fontWeight}`}>True</span>
+                </div>
+              ) : (
+                <div className="flex items-center space-x-1 text-red-500">
+                  <X className={config.iconSize} />
+                  <span className={`${config.textSize} ${config.fontWeight}`}>False</span>
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="space-y-1">
+            <p className={`${config.textSize} ${config.fontWeight} text-muted-foreground ${config.labelCase}`}>StyleBoost</p>
+            <div className="flex items-center space-x-1">
+              {(orchestratorPayload?.use_styleboost_loras || task?.params?.use_styleboost_loras) === true ? (
                 <div className="flex items-center space-x-1 text-green-600">
                   <Check className={config.iconSize} />
                   <span className={`${config.textSize} ${config.fontWeight}`}>True</span>
