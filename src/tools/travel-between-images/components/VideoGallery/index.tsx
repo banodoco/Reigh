@@ -14,18 +14,13 @@ import { useVideoCountCache } from '@/shared/hooks/useVideoCountCache';
 // Import our extracted hooks and components
 import { useGalleryPagination, useVideoHover } from './hooks';
 import {
-  VideoSkeleton,
   VideoItem,
   VideoHoverPreview,
   GalleryControls,
   GalleryPagination,
   EmptyState
 } from './components';
-import {
-  calculateSkeletonCount,
-  shouldShowEmptyState,
-  SkeletonCalculationParams
-} from './utils/skeleton-utils';
+import { SkeletonGallery } from '@/shared/components/ui/skeleton-gallery';
 import {
   sortVideoOutputsByDate,
   transformUnifiedGenerationsData,
@@ -395,50 +390,25 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     }
   }, [contentKey, isLoadingGenerations, showVideosAfterDelay, videoOutputs.length]);
 
-  // Calculate skeleton count
-  const skeletonCalculationParams: SkeletonCalculationParams = {
-    isLoadingGenerations,
-    isFetchingGenerations,
-    showVideosAfterDelay,
-    videoOutputs,
-    currentVideoOutputs,
-    currentPage,
-    itemsPerPage,
-    shotId,
-    generationsData,
-    getCachedCount,
-    getShotVideoCount,
-    lastGoodCountRef
-  };
-
-  const skeletonCount = calculateSkeletonCount(skeletonCalculationParams);
+  // SIMPLIFIED: Use ImageGallery's simple and proven skeleton logic
+  const showSkeletons = isLoadingGenerations && videoOutputs.length === 0;
+  const skeletonCount = showSkeletons ? (getShotVideoCount?.(shotId) || 6) : 0;
   
-  // Enhanced debug logging for skeleton visibility
+  // Simplified debug logging for skeleton visibility
   useEffect(() => {
-    console.log(`[VideoGalleryPreload] SKELETON_DEBUG:`, {
+    console.log(`[VideoGallerySimplified] SKELETON_DEBUG:`, {
+      showSkeletons,
       skeletonCount,
       isLoadingGenerations,
-      isFetchingGenerations,
-      showVideosAfterDelay,
       videoOutputsLength: videoOutputs.length,
-      currentVideoOutputsLength: currentVideoOutputs.length,
-      sortedVideoOutputsLength: sortedVideoOutputs.length,
-      shouldShowSkeletons: skeletonCount > 0,
-      contentKey,
-      projectId,
+      logic: `isLoadingGenerations=${isLoadingGenerations} && videoOutputs.length=${videoOutputs.length} === 0`,
       shotId,
       timestamp: Date.now()
     });
-  }, [skeletonCount, isLoadingGenerations, isFetchingGenerations, showVideosAfterDelay, videoOutputs.length, currentVideoOutputs.length, contentKey]);
-  const shouldShowEmpty = shouldShowEmptyState(
-    getShotVideoCount,
-    shotId,
-    generationsData,
-    sortedVideoOutputs,
-    isLoadingGenerations,
-    isFetchingGenerations,
-    skeletonCount
-  );
+  }, [showSkeletons, skeletonCount, isLoadingGenerations, videoOutputs.length, shotId]);
+
+  // Simple empty state check (no skeleton dependency needed)
+  const shouldShowEmpty = !isLoadingGenerations && !isFetchingGenerations && sortedVideoOutputs.length === 0;
 
   // ===============================================================================
   // EVENT HANDLERS
@@ -569,43 +539,46 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
           currentPage={currentPage}
         />
 
-        <div className="flex flex-wrap -mx-1 sm:-mx-1.5 md:-mx-2">
-                  {/* Show skeletons when loading */}
-        {skeletonCount > 0 && Array.from({ length: skeletonCount }, (_, index) => (
-          <VideoSkeleton key={`skeleton-${contentKey}-${index}`} index={index} />
-        ))}
-
-        {/* Show actual videos when not loading */}
-        {skeletonCount === 0 && currentVideoOutputs.map((video, index) => {
-          const originalIndex = (currentPage - 1) * itemsPerPage + index;
-          const isFirstVideo = index === 0; // Prioritize first video
-          const shouldPreload = isFirstVideo ? "metadata" : "none"; // Only preload first video
-          
-          return (
-              <VideoItem
-                key={video.id}
-                video={video}
-                index={index}
-                originalIndex={originalIndex}
-                isFirstVideo={isFirstVideo}
-                shouldPreload={shouldPreload}
-                isMobile={isMobile}
-                onLightboxOpen={setLightboxIndex}
-                onMobileTap={handleMobileTap}
-                onDelete={onDelete}
-                deletingVideoId={deletingVideoId}
-                onHoverStart={handleHoverStart}
-                onHoverEnd={handleHoverEnd}
-                onMobileModalOpen={(video: GenerationRow) => {
-                  setSelectedVideoForDetails(video);
-                  setShowTaskDetailsModal(true);
-                }}
-                selectedVideoForDetails={selectedVideoForDetails}
-                showTaskDetailsModal={showTaskDetailsModal}
-              />
-            );
-        })}
-        </div>
+        {/* SIMPLIFIED: Show standard skeleton gallery or videos */}
+        {showSkeletons ? (
+          <SkeletonGallery 
+            count={skeletonCount} 
+            columns={{ base: 2, sm: 3, md: 3, lg: 3 }}
+            className="mt-4"
+          />
+        ) : (
+          <div className="flex flex-wrap -mx-1 sm:-mx-1.5 md:-mx-2">
+            {currentVideoOutputs.map((video, index) => {
+              const originalIndex = (currentPage - 1) * itemsPerPage + index;
+              const isFirstVideo = index === 0; // Prioritize first video
+              const shouldPreload = isFirstVideo ? "metadata" : "none"; // Only preload first video
+              
+              return (
+                <VideoItem
+                  key={video.id}
+                  video={video}
+                  index={index}
+                  originalIndex={originalIndex}
+                  isFirstVideo={isFirstVideo}
+                  shouldPreload={shouldPreload}
+                  isMobile={isMobile}
+                  onLightboxOpen={setLightboxIndex}
+                  onMobileTap={handleMobileTap}
+                  onDelete={onDelete}
+                  deletingVideoId={deletingVideoId}
+                  onHoverStart={handleHoverStart}
+                  onHoverEnd={handleHoverEnd}
+                  onMobileModalOpen={(video: GenerationRow) => {
+                    setSelectedVideoForDetails(video);
+                    setShowTaskDetailsModal(true);
+                  }}
+                  selectedVideoForDetails={selectedVideoForDetails}
+                  showTaskDetailsModal={showTaskDetailsModal}
+                />
+              );
+            })}
+          </div>
+        )}
         
 
 
