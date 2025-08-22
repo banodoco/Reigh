@@ -3,7 +3,6 @@ import { Settings, Key, Copy, Trash2, AlertCircle, Terminal, Coins, Monitor, Log
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "@/shared/components/ui/tooltip";
 import { Button } from "@/shared/components/ui/button";
@@ -264,11 +263,8 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
       imageUrl: actualGeneration.location,
       thumbUrl: actualGeneration.location,
       type: actualGeneration.type || 'image',
-      created_at: actualGeneration.created_at,
+      createdAt: (actualGeneration as any).created_at || actualGeneration.createdAt, // Handle both snake_case and camelCase
       metadata: actualGeneration.metadata || {},
-      params: actualGeneration.params || {},
-      project_id: actualGeneration.project_id,
-      tasks: actualGeneration.tasks || [task.id],
     } as GenerationRow;
   }, [hasGeneratedImage, actualGeneration, task.id]);
 
@@ -292,7 +288,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
   const { setCurrentShotId } = useCurrentShot();
   
   // State for hover functionality
-  const [isHoveringImages, setIsHoveringImages] = useState<boolean>(false);
+  const [isHoveringTaskItem, setIsHoveringTaskItem] = useState<boolean>(false);
   
   // State for video lightbox
   const [showVideoLightbox, setShowVideoLightbox] = useState<boolean>(false);
@@ -342,12 +338,20 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
         computeAndShowProgress(tasks);
       } else {
         console.log('[TaskProgressDebug] No data available for progress computation');
-        toast.error('Failed to load tasks for progress computation');
+        toast({
+          title: "Error",
+          description: "Failed to load tasks for progress computation",
+          variant: "destructive",
+        });
       }
     } catch (error) {
       console.error('[TaskProgressDebug] Error fetching tasks for progress:', error);
       console.error('[PollingBreakageIssue] TaskItem progress check failed:', error);
-      toast.error('Failed to load tasks for progress computation');
+      toast({
+        title: "Error",
+        description: "Failed to load tasks for progress computation",
+        variant: "destructive",
+      });
     }
   };
 
@@ -420,8 +424,17 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
     }
   };
 
+  // Handler for opening image lightbox
+  const handleViewImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (generationData) {
+      setShowLightbox(true);
+    }
+  };
+
   const containerClass = cn(
-    "p-3 mb-2 bg-zinc-800/95 rounded-md shadow border transition-colors overflow-hidden",
+    "relative p-3 mb-2 bg-zinc-800/95 rounded-md shadow border transition-colors overflow-hidden",
     isNew ? "border-teal-400 animate-[flash_3s_ease-in-out]" : "border-zinc-600 hover:border-zinc-400"
   );
 
@@ -466,7 +479,11 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
   }, [videoGenerationsData?.items, selectedProjectId]);
 
   const taskItemContent = (
-    <div className={containerClass}>
+    <div 
+      className={containerClass}
+      onMouseEnter={() => setIsHoveringTaskItem(true)}
+      onMouseLeave={() => setIsHoveringTaskItem(false)}
+    >
       <div className="flex justify-between items-center mb-1 gap-2">
         <span className="text-sm font-light text-zinc-200 flex-1 whitespace-nowrap overflow-hidden text-ellipsis cursor-default min-w-0">
           {abbreviatedTaskType}
@@ -487,8 +504,6 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
       {imagesToShow.length > 0 && (
         <div 
           className="relative flex items-center overflow-x-auto mb-1 mt-2"
-          onMouseEnter={() => setIsHoveringImages(true)}
-          onMouseLeave={() => setIsHoveringImages(false)}
         >
           <div className="flex items-center">
             {imagesToShow.map((url, idx) => (
@@ -504,7 +519,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
             )}
           </div>
           {/* Action buttons overlay on hover */}
-          {isHoveringImages && shotId && (
+          {isHoveringTaskItem && shotId && (
             <div 
               className="absolute inset-0 bg-black/20 backdrop-blur-[1px] rounded flex items-center justify-center gap-2"
               onClick={(e) => e.stopPropagation()} // Prevent click from bubbling to parent
@@ -540,25 +555,16 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
             </div>
             {/* Tiny thumbnail for successful Image Generation tasks */}
             {generationData && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      onClick={() => setShowLightbox(true)}
-                      className="w-8 h-8 rounded border border-zinc-500 overflow-hidden hover:border-zinc-400 transition-colors flex-shrink-0"
-                    >
-                      <img
-                        src={generationData.imageUrl}
-                        alt="Generated image"
-                        className="w-full h-full object-cover"
-                      />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Click to view image</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+              <button
+                onClick={() => setShowLightbox(true)}
+                className="w-8 h-8 rounded border border-zinc-500 overflow-hidden hover:border-zinc-400 transition-colors flex-shrink-0"
+              >
+                <img
+                  src={generationData.imageUrl}
+                  alt="Generated image"
+                  className="w-full h-full object-cover"
+                />
+              </button>
             )}
           </div>
         </div>
@@ -657,22 +663,48 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
           hasPrevious={videoLightboxIndex > 0}
         />
       )}
+
+      {/* Action button overlay for image generation tasks on hover */}
+      {isHoveringTaskItem && isSingleImageTask && generationData && (
+        <div 
+          className="absolute inset-0 bg-black/20 backdrop-blur-[1px] rounded flex items-center justify-center"
+          onClick={(e) => e.stopPropagation()} // Prevent click from bubbling to parent
+        >
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleViewImage}
+            className="text-xs px-2 py-1 h-auto bg-white/10 hover:bg-white/20 text-white border border-white/20 hover:border-white/30 transition-all"
+          >
+            View Image
+          </Button>
+        </div>
+      )}
     </div>
   );
 
   // Wrap with tooltip for travel tasks
   if (isTravelTask) {
     return (
-      <TooltipProvider>
-        <Tooltip delayDuration={200}>
-          <TooltipTrigger asChild>
-            {taskItemContent}
-          </TooltipTrigger>
-          <TooltipContent 
-            side="left" 
-            className="max-w-lg p-0 border-0 bg-background/95 backdrop-blur-sm"
-            sideOffset={15}
-            collisionPadding={10}
+      <Tooltip delayDuration={100}>
+        <TooltipTrigger asChild>
+          {taskItemContent}
+        </TooltipTrigger>
+        <TooltipContent 
+          side="left" 
+          className="max-w-lg p-0 border-0 bg-background/95 backdrop-blur-sm"
+          sideOffset={15}
+          collisionPadding={10}
+        >
+          <div 
+            className="relative cursor-pointer hover:bg-background/90 transition-colors rounded-lg group"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (isCompletedTravelTask && videoOutputs.length > 0) {
+                setVideoLightboxIndex(0);
+                setShowVideoLightbox(true);
+              }
+            }}
           >
             <SharedTaskDetails
               task={task}
@@ -680,9 +712,17 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
               variant="hover"
               isMobile={false}
             />
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+            {/* Click to view indicator */}
+            {isCompletedTravelTask && videoOutputs.length > 0 && (
+              <div className="absolute top-0 left-0 right-0 bg-gradient-to-b from-zinc-900/90 via-zinc-800/60 to-transparent p-2 rounded-t-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="text-xs text-zinc-100 text-center font-medium drop-shadow-md">
+                  Click to view video
+                </div>
+              </div>
+            )}
+          </div>
+        </TooltipContent>
+      </Tooltip>
     );
   }
 
@@ -722,16 +762,24 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
     };
     
     return (
-      <TooltipProvider>
-        <Tooltip delayDuration={200}>
-          <TooltipTrigger asChild>
-            {taskItemContent}
-          </TooltipTrigger>
-          <TooltipContent 
-            side="left" 
-            className="max-w-md p-0 border-0 bg-background/95 backdrop-blur-sm"
-            sideOffset={15}
-            collisionPadding={10}
+      <Tooltip delayDuration={100}>
+        <TooltipTrigger asChild>
+          {taskItemContent}
+        </TooltipTrigger>
+        <TooltipContent 
+          side="left" 
+          className="max-w-md p-0 border-0 bg-background/95 backdrop-blur-sm"
+          sideOffset={15}
+          collisionPadding={10}
+        >
+          <div 
+            className="relative cursor-pointer hover:bg-background/90 transition-colors rounded-lg group"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (generationData) {
+                setShowLightbox(true);
+              }
+            }}
           >
             <SharedMetadataDetails
               metadata={metadataToShow}
@@ -739,9 +787,17 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
               isMobile={false}
               showUserImage={true}
             />
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+            {/* Click to view indicator */}
+            {generationData && (
+              <div className="absolute top-0 left-0 right-0 bg-gradient-to-b from-zinc-900/90 via-zinc-800/60 to-transparent p-2 rounded-t-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="text-xs text-zinc-100 text-center font-medium drop-shadow-md">
+                  Click to view image
+                </div>
+              </div>
+            )}
+          </div>
+        </TooltipContent>
+      </Tooltip>
     );
   }
 

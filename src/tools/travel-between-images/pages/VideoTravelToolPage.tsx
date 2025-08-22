@@ -165,6 +165,22 @@ const VideoTravelToolPage: React.FC = () => {
     fromContext: 'useVideoTravelData->useShots(context)'
   });
 
+  // [VideoTravelDebug] Log what shots we're passing to ShotListDisplay
+  React.useEffect(() => {
+    if (shots && shots.length > 0) {
+      console.log(`${VIDEO_DEBUG_TAG} === SHOTS BEING PASSED TO DISPLAY ===`, {
+        shotsArrayLength: shots.length,
+        querySource: 'useVideoTravelData->useShots()',
+        timestamp: Date.now()
+      });
+      
+      // [VideoTravelDebug] Log each shot individually to avoid array collapse
+      shots.slice(0, 10).forEach((shot, index) => {
+        console.log(`${VIDEO_DEBUG_TAG} Passing ${index}: ${shot.name} (ID: ${shot.id.substring(0, 8)}) - Position: ${shot.position}`);
+      });
+    }
+  }, [shots]);
+
   // Simplified loading state since both ShotEditor and ShotListDisplay use same context
   const isLoading = shotsLoadingRaw;
   
@@ -1033,6 +1049,7 @@ const VideoTravelToolPage: React.FC = () => {
           <ShotListDisplay
             onSelectShot={handleShotSelect}
             onCreateNewShot={() => setIsCreateShotModalOpen(true)}
+            shots={shots}
           />
         </>
       ) : (

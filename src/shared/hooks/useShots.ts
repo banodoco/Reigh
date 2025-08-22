@@ -231,7 +231,7 @@ export const useListShots = (projectId?: string | null, options: { maxImagesPerS
         .from('shots')
         .select('*')
         .eq('project_id', projectId)
-        .order('position', { ascending: true });
+        .order('position', { ascending: true, nullsFirst: false });
       
       if (shotsError) {
         throw shotsError;
@@ -287,6 +287,19 @@ export const useListShots = (projectId?: string | null, options: { maxImagesPerS
       });
       
       const result = await Promise.all(shotPromises);
+      
+      // [ShotReorderDebug] Log actual database positions returned
+      console.log('[ShotReorderDebug] Database query returned shots:', {
+        projectId,
+        shotsCount: result.length,
+        timestamp: Date.now()
+      });
+      
+      // [ShotReorderDebug] Log each position individually to avoid array collapse
+      result.slice(0, 10).forEach((shot, index) => {
+        console.log(`[ShotReorderDebug] Shot ${index}: ${shot.name} (ID: ${shot.id.substring(0, 8)}) - Position: ${shot.position}`);
+      });
+      
       return result;
     },
     enabled: !!projectId,
@@ -301,37 +314,102 @@ interface ReorderShotsArgs {
 
 // Hook to reorder shots by updating their position values
 export const useReorderShots = () => {
+  // [ShotReorderDebug] Debug tag for shot reordering issues
+  const REORDER_DEBUG_TAG = '[ShotReorderDebug]';
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async ({ projectId, shotOrders }: ReorderShotsArgs) => {
+      console.log(`${REORDER_DEBUG_TAG} === MUTATION FUNCTION START ===`);
+      console.log(`${REORDER_DEBUG_TAG} Mutation input:`, {
+        projectId,
+        shotOrders,
+        shotOrdersCount: shotOrders.length,
+        timestamp: Date.now()
+      });
+
       // Update each shot's position in a batch
-      const updates = shotOrders.map(({ shotId, position }) =>
-        supabase
+      const updates = shotOrders.map(({ shotId, position }) => {
+        console.log(`${REORDER_DEBUG_TAG} Creating update for shot:`, {
+          shotId,
+          position,
+          projectId
+        });
+        
+        return supabase
           .from('shots')
           .update({ position })
           .eq('id', shotId)
-          .eq('project_id', projectId)
-      );
+          .eq('project_id', projectId);
+      });
 
+      console.log(`${REORDER_DEBUG_TAG} Executing ${updates.length} database updates...`);
       const results = await Promise.all(updates);
+      
+      console.log(`${REORDER_DEBUG_TAG} Database updates completed:`, {
+        results: results.map((result, index) => ({
+          shotId: shotOrders[index].shotId,
+          position: shotOrders[index].position,
+          success: !result.error,
+          error: result.error?.message,
+          data: result.data
+        }))
+      });
       
       // Check for any errors
       const errors = results.filter(result => result.error);
       if (errors.length > 0) {
-        throw new Error(`Failed to update shot positions: ${errors.map(e => e.error?.message).join(', ')}`);
+        const errorMessage = `Failed to update shot positions: ${errors.map(e => e.error?.message).join(', ')}`;
+        console.log(`${REORDER_DEBUG_TAG} Database errors found:`, {
+          errorCount: errors.length,
+          errors: errors.map(e => e.error),
+          errorMessage
+        });
+        throw new Error(errorMessage);
       }
 
+      console.log(`${REORDER_DEBUG_TAG} All database updates successful`);
       return results;
     },
-    onSuccess: (data, { projectId }) => {
-      // Don't invalidate immediately - let optimistic updates handle the UI
-      // The component using this mutation should handle optimistic updates
-      // and only revert on error (which is handled in onError above)
+    onSuccess: (data, { projectId, shotOrders }) => {
+      console.log(`${REORDER_DEBUG_TAG} === MUTATION SUCCESS ===`, {
+        projectId,
+        shotOrders,
+        data,
+        timestamp: Date.now()
+      });
+      // Invalidate queries to refresh from database and confirm the actual order
+      if (projectId) {
+        queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
+        console.log(`${REORDER_DEBUG_TAG} Invalidated queries for project: ${projectId}`);
+      }
     },
-    onError: (error) => {
+    onError: (error, { projectId, shotOrders }) => {
+      console.log(`${REORDER_DEBUG_TAG} === MUTATION ERROR ===`, {
+        error: error.message,
+        errorDetails: error,
+        projectId,
+        shotOrders,
+        timestamp: Date.now()
+      });
       console.error('Error reordering shots:', error);
     },
+    onMutate: ({ projectId, shotOrders }) => {
+      console.log(`${REORDER_DEBUG_TAG} === MUTATION STARTING ===`, {
+        projectId,
+        shotOrders,
+        timestamp: Date.now()
+      });
+    },
+    onSettled: (data, error, { projectId, shotOrders }) => {
+      console.log(`${REORDER_DEBUG_TAG} === MUTATION SETTLED ===`, {
+        success: !error,
+        error: error?.message,
+        projectId,
+        shotOrders,
+        timestamp: Date.now()
+      });
+    }
   });
 };
 

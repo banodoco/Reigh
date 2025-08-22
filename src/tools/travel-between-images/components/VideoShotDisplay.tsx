@@ -55,20 +55,16 @@ const ShotImage: React.FC<ShotImageProps> = ({ image, index, onSelectShot, shotN
   const [imageLoaded, setImageLoaded] = useState(isImageCached);
   const [imageLoadError, setImageLoadError] = useState(false);
 
-  console.log(`[ShotImage-${index}] Rendering image:`, {
-    imageUrl,
-    thumbUrl,
-    displayUrl,
-    hasImageUrl: !!imageUrl,
-    hasThumbUrl: !!thumbUrl,
-    hasDisplayUrl: !!displayUrl,
-    isImageCached,
-    imageLoaded,
-    shouldLoad
-  });
+  // [Performance] Disabled excessive logging
+  // console.log(`[ShotImage-${index}] Rendering image:`, {
+  //   imageUrl, thumbUrl, displayUrl, hasImageUrl: !!imageUrl,
+  //   hasThumbUrl: !!thumbUrl, hasDisplayUrl: !!displayUrl,
+  //   isImageCached, imageLoaded, shouldLoad
+  // });
 
   const handleImageLoad = () => {
-    console.log(`[ShotImage-${index}] Image loaded successfully`);
+    // [Performance] Only log errors, not successful loads
+    // console.log(`[ShotImage-${index}] Image loaded successfully`);
     setImageLoaded(true);
   };
 
@@ -85,7 +81,7 @@ const ShotImage: React.FC<ShotImageProps> = ({ image, index, onSelectShot, shotN
 
   return (
     <div 
-      className="flex-shrink-0 w-32 h-32 rounded overflow-hidden border cursor-pointer hover:shadow-sm transition-shadow duration-200 hover:scale-[1.01] transform transition-transform relative bg-gray-200"
+      className="flex-shrink-0 w-32 h-32 rounded overflow-hidden border cursor-pointer hover:shadow-wes-deep hover:scale-105 transition-all duration-300 relative bg-gray-200"
       style={{ 
         animationDelay: `${index * 0.1}s`
       }}
@@ -256,26 +252,20 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
   const imagesOnly = shot.images?.filter(image => image.type !== 'video' && image.type !== 'video_travel_output') || [];
   const imagesToShow: GenerationRow[] = imagesOnly.slice(0, 5);
 
+  // [Performance] Disabled excessive logging that was causing render cascades
   // Debug logging
-  console.log(`[VideoShotDisplay] Shot "${shot.name}" (index ${shotIndex}):`, {
-    totalImages: shot.images?.length || 0,
-    imagesOnly: imagesOnly.length,
-    imagesToShow: imagesToShow.length,
-    shouldLoadImages,
-    isPriority: shotIndex < 3,
-    shotImages: shot.images?.map(img => ({
-      id: img.id,
-      type: img.type,
-      hasImageUrl: !!(img.imageUrl || img.location),
-      hasThumbUrl: !!(img.thumbUrl || img.location)
-    }))
-  });
+  // console.log(`[VideoShotDisplay] Shot "${shot.name}" (index ${shotIndex}):`, {
+  //   totalImages: shot.images?.length || 0, imagesOnly: imagesOnly.length,
+  //   imagesToShow: imagesToShow.length, shouldLoadImages, isPriority: shotIndex < 3,
+  //   shotImages: shot.images?.map(img => ({ id: img.id, type: img.type,
+  //     hasImageUrl: !!(img.imageUrl || img.location), hasThumbUrl: !!(img.thumbUrl || img.location) }))
+  // });
 
   return (
     <>
       <div 
         key={shot.id} 
-        className="h-48 p-4 border rounded-lg hover:shadow-sm transition-shadow duration-200 relative cursor-pointer flex flex-col"
+        className="group h-48 p-4 border rounded-lg bg-card/50 hover:bg-card/80 hover:shadow-wes-hover hover:scale-[1.02] transition-all duration-300 relative cursor-pointer flex flex-col"
         onClick={onSelectShot}
       >
         <div className="flex justify-between items-start mb-3">
@@ -305,7 +295,7 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
             </div>
           ) : (
             <h3 
-              className="text-xl font-light hover:text-primary flex-grow mr-2"
+              className="text-xl font-light group-hover:text-primary/80 transition-colors duration-300 flex-grow mr-2"
             >
               {shot.name}
             </h3>
@@ -363,7 +353,7 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
           )}
           {imagesOnly.length > 5 && (
             <div 
-              className="flex-shrink-0 w-32 h-32 rounded border bg-muted flex items-center justify-center cursor-pointer hover:bg-muted/80 transition-colors duration-200 animate-in fade-in-up"
+              className="flex-shrink-0 w-32 h-32 rounded border bg-muted flex items-center justify-center cursor-pointer hover:bg-muted/80 hover:shadow-wes-deep hover:scale-105 transition-all duration-300 animate-in fade-in-up"
               style={{ animationDelay: `${imagesToShow.length * 0.1}s` }}
               onClick={(e) => {
                 e.stopPropagation();

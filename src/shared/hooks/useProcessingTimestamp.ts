@@ -70,14 +70,26 @@ const formatCompletedTime = (completedDate: Date): string => {
     return `Completed: ${diffMinutes} min${diffMinutes === 1 ? '' : 's'} ago`;
   }
   
-  // Hours and minutes
-  const hours = Math.floor(diffMinutes / 60);
-  const remainingMinutes = diffMinutes % 60;
+  // Less than 24 hours - show hours and minutes
+  if (diffMinutes < 24 * 60) {
+    const hours = Math.floor(diffMinutes / 60);
+    const remainingMinutes = diffMinutes % 60;
+    
+    if (remainingMinutes === 0) {
+      return `Completed: ${hours} hr${hours === 1 ? '' : 's'} ago`;
+    } else {
+      return `Completed: ${hours} hr${hours === 1 ? '' : 's'}, ${remainingMinutes} min${remainingMinutes === 1 ? '' : 's'} ago`;
+    }
+  }
   
-  if (remainingMinutes === 0) {
-    return `Completed: ${hours} hr${hours === 1 ? '' : 's'} ago`;
+  // Days and hours
+  const days = Math.floor(diffMinutes / (24 * 60));
+  const remainingHours = Math.floor((diffMinutes % (24 * 60)) / 60);
+  
+  if (remainingHours === 0) {
+    return `Completed: ${days} day${days === 1 ? '' : 's'} ago`;
   } else {
-    return `Completed: ${hours} hr${hours === 1 ? '' : 's'}, ${remainingMinutes} min${remainingMinutes === 1 ? '' : 's'} ago`;
+    return `Completed: ${days} day${days === 1 ? '' : 's'}, ${remainingHours} hr${remainingHours === 1 ? '' : 's'} ago`;
   }
 };
 

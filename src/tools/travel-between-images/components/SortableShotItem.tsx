@@ -21,6 +21,9 @@ const SortableShotItem: React.FC<SortableShotItemProps> = ({
   shouldLoadImages = true,
   shotIndex = 0,
 }) => {
+  // [ShotReorderDebug] Debug tag for shot reordering issues
+  const REORDER_DEBUG_TAG = '[ShotReorderDebug]';
+  
   const {
     attributes,
     listeners,
@@ -32,6 +35,20 @@ const SortableShotItem: React.FC<SortableShotItemProps> = ({
     id: shot.id,
     disabled: isDragDisabled,
   });
+
+  // [ShotReorderDebug] Log dragging state changes (only when actually dragging to reduce noise)
+  React.useEffect(() => {
+    if (isDragging) {
+      console.log(`${REORDER_DEBUG_TAG} Shot ${shot.id} is being dragged:`, {
+        shotId: shot.id,
+        shotName: shot.name,
+        shotPosition: shot.position,
+        shotIndex,
+        isDragging,
+        timestamp: Date.now()
+      });
+    }
+  }, [isDragging]);
 
   const style = {
     transform: CSS.Transform.toString(transform),

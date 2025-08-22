@@ -17,14 +17,38 @@ interface ShotsProviderProps {
 }
 
 export const ShotsProvider: React.FC<ShotsProviderProps> = ({ children }) => {
+  // [ShotReorderDebug] Debug tag for shot reordering issues
+  const REORDER_DEBUG_TAG = '[ShotReorderDebug]';
+  
   const { selectedProjectId } = useProject();
   const { data: shots, isLoading, error, refetch } = useListShots(selectedProjectId); // Default to unlimited images
+
+  // [ShotReorderDebug] Log shots context data changes
+  React.useEffect(() => {
+    console.log(`${REORDER_DEBUG_TAG} ShotsContext data updated:`, {
+      selectedProjectId,
+      shotsCount: shots?.length || 0,
+      isLoading,
+      error: error?.message,
+      shotsData: shots?.map(s => ({ id: s.id, position: s.position, name: s.name })) || [],
+      timestamp: Date.now()
+    });
+  }, [shots, selectedProjectId, isLoading, error]);
+
+  // [ShotReorderDebug] Log refetch calls
+  const debugRefetch = React.useCallback(() => {
+    console.log(`${REORDER_DEBUG_TAG} ShotsContext refetch called:`, {
+      selectedProjectId,
+      timestamp: Date.now()
+    });
+    return refetch();
+  }, [refetch, selectedProjectId]);
 
   const value: ShotsContextType = {
     shots,
     isLoading,
     error,
-    refetchShots: refetch,
+    refetchShots: debugRefetch,
   };
 
   return (
