@@ -63,8 +63,22 @@ export const calculateSkeletonCount = (params: SkeletonCalculationParams): numbe
     return cachedCount === currentPageVideos.length && cachedCount > 0;
   })();
   
-  // CRITICAL FIX: Don't show skeletons if thumbnails are already cached, even during data loading
-  const shouldShowSkeletons = isDataLoading && !thumbnailsCached;
+  // Extra guard: if preloader has marked this page as preloaded for the shot, avoid skeletons
+  const pagePreloadedByShot = (() => {
+    try {
+      const pagesForShot = window.videoGalleryPreloaderCache?.preloadedPagesByShot?.[shotId || ''];
+      const isPreloaded = !!pagesForShot && pagesForShot.has(currentPage);
+      if (isPreloaded) {
+        console.log('[VideoGalleryPreload] PAGE_PRELOADED_CHECK:', { shotId, currentPage, isPreloaded });
+      }
+      return !!isPreloaded;
+    } catch {
+      return false;
+    }
+  })();
+  
+  // CRITICAL FIX: Don't show skeletons if thumbnails are already cached or page was preloaded, even during data loading
+  const shouldShowSkeletons = isDataLoading && !thumbnailsCached && !pagePreloadedByShot;
   
   // Get cached count for instant display
   const cachedCount = getCachedCount(shotId);
