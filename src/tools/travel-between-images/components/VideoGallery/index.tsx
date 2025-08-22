@@ -147,6 +147,42 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   const taskDetailsButtonRef = useRef<HTMLButtonElement>(null);
   const isMobile = useIsMobile();
   
+  // Minimum skeleton duration control (prevents instant flash)
+  const [skeletonActive, setSkeletonActive] = useState(false);
+  const skeletonStartTimeRef = useRef<number | null>(null);
+  const MIN_SKELETON_MS = 900; // ~1s as requested
+
+  // Manage skeleton activation/deactivation with a guaranteed minimum duration
+  useEffect(() => {
+    // Turn skeleton on immediately when loading with no data
+    if (isLoadingGenerations && videoOutputs.length === 0) {
+      if (!skeletonActive) {
+        setSkeletonActive(true);
+        skeletonStartTimeRef.current = Date.now();
+      }
+      return;
+    }
+
+    // When data is ready, keep skeleton for at least MIN_SKELETON_MS
+    if (!isLoadingGenerations) {
+      if (skeletonActive) {
+        const startedAt = skeletonStartTimeRef.current ?? Date.now();
+        const elapsed = Date.now() - startedAt;
+        if (elapsed >= MIN_SKELETON_MS) {
+          setSkeletonActive(false);
+          skeletonStartTimeRef.current = null;
+        } else {
+          const remaining = MIN_SKELETON_MS - elapsed;
+          const t = setTimeout(() => {
+            setSkeletonActive(false);
+            skeletonStartTimeRef.current = null;
+          }, remaining);
+          return () => clearTimeout(t);
+        }
+      }
+    }
+  }, [isLoadingGenerations, videoOutputs.length, skeletonActive]);
+
   // Video count cache for instant skeleton display
   const { getCachedCount, setCachedCount } = useVideoCountCache();
   
@@ -370,26 +406,8 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   }, [generationsData, isLoadingGenerations, isFetchingGenerations, generationsError, shotId, setCachedCount, getShotVideoCount, invalidateVideoCountsCache]);
 
   // SIMPLIFIED: Use ImageGallery's pure and simple skeleton logic - no delays!
-  const showSkeletons = isLoadingGenerations && videoOutputs.length === 0;
+  const showSkeletons = skeletonActive;
   const skeletonCount = showSkeletons ? (getShotVideoCount?.(shotId) || 6) : 0;
-  
-  // HYPER-AGGRESSIVE DEBUG: Always log every render 
-  console.log(`[VideoGalleryDEBUG] ===== COMPONENT RENDER =====`);
-  console.log(`[VideoGalleryDEBUG] RENDER_PROPS:`, {
-    projectId, 
-    shotId,
-    timestamp: Date.now()
-  });
-  console.log(`[VideoGalleryDEBUG] LOADING_STATE:`, {
-    isLoadingGenerations,
-    isFetchingGenerations,
-    hasGenerationsData: !!generationsData,
-    generationsDataLength: (generationsData as any)?.data?.length || 0
-  });
-  console.log(`[VideoGalleryDEBUG] VIDEO_OUTPUTS:`, {
-    videoOutputsLength: videoOutputs.length,
-    sortedVideoOutputsLength: sortedVideoOutputs.length
-  });
   
   // AGGRESSIVE DEBUG: Always log skeleton state (no useEffect gating)
   console.log(`[VideoGallerySimplified] SKELETON_DEBUG:`, {
@@ -397,7 +415,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     skeletonCount,
     isLoadingGenerations,
     videoOutputsLength: videoOutputs.length,
-    logic: `isLoadingGenerations=${isLoadingGenerations} && videoOutputs.length=${videoOutputs.length} === 0`,
+    logic: `skeletonActive=${skeletonActive}`,
     decision: showSkeletons ? 'SHOW_SKELETONS' : 'SHOW_VIDEOS',
     getShotVideoCountResult: getShotVideoCount?.(shotId),
     shotId,
