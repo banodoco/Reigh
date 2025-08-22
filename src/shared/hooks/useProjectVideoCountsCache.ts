@@ -15,7 +15,9 @@ class ProjectVideoCountsCache {
   
   getShotCount(projectId: string, shotId: string): number | null {
     const projectCounts = this.cache.get(projectId);
-    return projectCounts?.get(shotId) || null;
+    if (!projectCounts) return null;
+    const value = projectCounts.get(shotId);
+    return value !== undefined ? value : null;
   }
   
   setProjectCounts(projectId: string, counts: Map<string, number>): void {
@@ -113,7 +115,8 @@ export function useProjectVideoCountsCache(projectId: string | null) {
     
     // Then try current query data
     if (projectCounts) {
-      return projectCounts.get(shotId) || null;
+      const value = projectCounts.get(shotId);
+      return value !== undefined ? value : null;
     }
     
     return null;
