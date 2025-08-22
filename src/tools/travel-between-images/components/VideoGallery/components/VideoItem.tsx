@@ -201,34 +201,10 @@ export const VideoItem = React.memo<VideoItemProps>(({
           return (
             <div className="absolute inset-0 bg-gray-200 flex items-center justify-center z-10">
               <div className="w-6 h-6 border-2 border-gray-400 border-t-gray-600 rounded-full animate-spin"></div>
-              {process.env.NODE_ENV === 'development' && (
-                <div className="absolute bottom-1 left-1 text-xs bg-red-500 text-white px-1 rounded">
-                  LOADING
-                  <br/>T:{thumbnailLoaded ? 'Y' : 'N'} V:{videoPosterLoaded ? 'Y' : 'N'}
-                </div>
-              )}
+
             </div>
           );
         })()}
-        
-        {/* Enhanced debug logging for loading state visibility */}
-        {process.env.NODE_ENV === 'development' && (!thumbnailLoaded || !videoPosterLoaded) && (
-          <div className="absolute top-1 left-1 text-xs bg-blue-500 text-white px-1 rounded z-30">
-            LOADING_DEBUG
-            <br/>showLoading: {(!thumbnailLoaded && !videoPosterLoaded && !isInitiallyCached) ? 'Y' : 'N'}
-            <br/>thumbLoaded: {thumbnailLoaded ? 'Y' : 'N'}
-            <br/>videoPoster: {videoPosterLoaded ? 'Y' : 'N'}
-            <br/>initialCache: {isInitiallyCached ? 'Y' : 'N'}
-            <br/>hasThumbnail: {hasThumbnail ? 'Y' : 'N'}
-          </div>
-        )}
-        
-        {/* Debug indicator for cached state (dev only) */}
-        {process.env.NODE_ENV === 'development' && isInitiallyCached && (
-          <div className="absolute top-1 right-1 text-xs bg-green-500 text-white px-1 rounded z-20">
-            CACHED
-          </div>
-        )}
         
         {/* Only render video when it's time to load */}
         {shouldLoad && (
