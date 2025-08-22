@@ -261,7 +261,7 @@ const ToolSelectorPage: React.FC = () => {
   const containerSpacing = isLg ? 'pt-3 pb-4' : isSm ? 'pt-4 pb-2' : 'pt-3 pb-[0.333rem]';
   const sectionGap = isLg ? 'gap-6' : isSm ? 'gap-4' : 'gap-3';
   const itemGap = isLg ? 'gap-5' : isSm ? 'gap-6' : 'gap-5';
-  const topMargin = isLg ? 'mt-2' : isSm ? 'mt-4' : 'mt-2';
+  const topMargin = isLg ? 'mt-0' : isSm ? 'mt-1' : 'mt-0';
   const bottomMargin = ''; // layoutDirection === 'column' ? 'mb-8' : '';
 
   return (
