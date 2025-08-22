@@ -55,7 +55,7 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
       iconSize: 'h-2.5 w-2.5',
       labelCase: 'uppercase tracking-wide',
       gridCols: 'grid-cols-2',
-      imageGridCols: 'grid-cols-5',
+      imageGridCols: 'grid-cols-6',
       maxImages: 5,
       promptLength: 100,
       negativePromptLength: 80,
@@ -68,7 +68,7 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
       iconSize: 'h-3 w-3',
       labelCase: 'uppercase tracking-wide',
       gridCols: 'grid-cols-2',
-      imageGridCols: 'grid-cols-5',
+      imageGridCols: 'grid-cols-6',
       maxImages: 5,
       promptLength: 150,
       negativePromptLength: 150,
@@ -119,15 +119,16 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
               </div>
             ))}
             {inputImages.length > config.maxImages && !showAllImages && (
-              <Button
-                variant="outline"
+              <div 
+                className="relative group cursor-pointer"
                 onClick={() => onShowAllImagesChange?.(true)}
-                className="w-full aspect-square bg-muted hover:bg-muted/80 rounded border flex flex-col items-center justify-center transition-colors cursor-pointer"
               >
-                <span className="text-xs text-muted-foreground">
-                  See {inputImages.length - config.maxImages} more
-                </span>
-              </Button>
+                <div className="w-full aspect-square bg-muted/50 hover:bg-muted/70 rounded border shadow-sm transition-all group-hover:scale-105 flex flex-col items-center justify-center">
+                  <span className={`${config.textSize} text-muted-foreground font-medium`}>
+                    See {inputImages.length - config.maxImages} more
+                  </span>
+                </div>
+              </div>
             )}
           </div>
         </div>
