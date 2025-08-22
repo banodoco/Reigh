@@ -571,45 +571,17 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
 
         <div className="flex flex-wrap -mx-1 sm:-mx-1.5 md:-mx-2">
                   {/* Show skeletons when loading */}
-        {skeletonCount > 0 && (() => {
-          console.log(`[VideoGalleryPreload] RENDERING_SKELETONS:`, {
-            skeletonCount,
-            contentKey,
-            isLoadingGenerations,
-            showVideosAfterDelay,
-            timestamp: Date.now()
-          });
-          return Array.from({ length: skeletonCount }, (_, index) => (
-            <VideoSkeleton key={`skeleton-${contentKey}-${index}`} index={index} />
-          ));
-        })()}
+        {skeletonCount > 0 && Array.from({ length: skeletonCount }, (_, index) => (
+          <VideoSkeleton key={`skeleton-${contentKey}-${index}`} index={index} />
+        ))}
 
         {/* Show actual videos when not loading */}
-        {skeletonCount === 0 && (() => {
-          console.log(`[VideoGalleryPreload] RENDERING_VIDEOS:`, {
-            videoCount: currentVideoOutputs.length,
-            contentKey,
-            isLoadingGenerations,
-            showVideosAfterDelay,
-            videoIds: currentVideoOutputs.slice(0, 3).map(v => v.id?.substring(0, 8)),
-            timestamp: Date.now()
-          });
-          return currentVideoOutputs.map((video, index) => {
-            const originalIndex = (currentPage - 1) * itemsPerPage + index;
-            const isFirstVideo = index === 0; // Prioritize first video
-            const shouldPreload = isFirstVideo ? "metadata" : "none"; // Only preload first video
-            
-            console.log(`[VideoGalleryPreload] RENDERING_VIDEO_ITEM:`, {
-              videoId: video.id?.substring(0, 8),
-              index,
-              originalIndex,
-              hasThumbUrl: !!video.thumbUrl,
-              thumbUrl: video.thumbUrl?.substring(video.thumbUrl.lastIndexOf('/') + 1) || 'none',
-              shouldPreload,
-              timestamp: Date.now()
-            });
-            
-            return (
+        {skeletonCount === 0 && currentVideoOutputs.map((video, index) => {
+          const originalIndex = (currentPage - 1) * itemsPerPage + index;
+          const isFirstVideo = index === 0; // Prioritize first video
+          const shouldPreload = isFirstVideo ? "metadata" : "none"; // Only preload first video
+          
+          return (
               <VideoItem
                 key={video.id}
                 video={video}
@@ -632,25 +604,10 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
                 showTaskDetailsModal={showTaskDetailsModal}
               />
             );
-          });
-        })()}
+        })}
         </div>
         
-        {/* DEEP DEBUG: Log current rendering state */}
-        {(() => {
-          console.log(`[VideoGalleryPreload] RENDER_STATE_SUMMARY:`, {
-            isRenderingSkeletons: skeletonCount > 0,
-            isRenderingVideos: skeletonCount === 0,
-            skeletonCount,
-            videoCount: currentVideoOutputs.length,
-            isLoadingGenerations,
-            isFetchingGenerations,
-            showVideosAfterDelay,
-            contentKey,
-            timestamp: Date.now()
-          });
-          return null;
-        })()}
+
 
         <GalleryPagination
           totalPages={totalPages}

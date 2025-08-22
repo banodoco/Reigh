@@ -42,16 +42,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
   selectedVideoForDetails,
   showTaskDetailsModal
 }) => {
-  // DEEP DEBUG: Log component mount and state changes
-  console.log(`[VideoGalleryPreload] VIDEO_ITEM_MOUNT:`, {
-    videoId: video.id?.substring(0, 8),
-    index,
-    originalIndex,
-    hasThumbUrl: !!video.thumbUrl,
-    thumbUrlFile: video.thumbUrl?.substring(video.thumbUrl.lastIndexOf('/') + 1) || 'none',
-    fullThumbUrl: video.thumbUrl,
-    timestamp: Date.now()
-  });
+
   // ===============================================================================
   // HOOKS - Use extracted hooks for cleaner separation of concerns
   // ===============================================================================
