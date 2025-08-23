@@ -1,0 +1,310 @@
+import { useState, useRef, useCallback, useEffect } from 'react';
+import { GenerationRow } from '@/types/shots';
+import { GeneratedImageWithMetadata } from '../ImageGallery';
+
+export interface UseImageGalleryStateProps {
+  images: GeneratedImageWithMetadata[];
+  currentShotId?: string;
+  lastShotId?: string;
+  simplifiedShotOptions: { id: string; name: string }[];
+}
+
+export interface UseImageGalleryStateReturn {
+  // Lightbox state
+  activeLightboxMedia: GenerationRow | null;
+  setActiveLightboxMedia: (media: GenerationRow | null) => void;
+  
+  // Task details state
+  selectedImageForDetails: GenerationRow | null;
+  setSelectedImageForDetails: (image: GenerationRow | null) => void;
+  showTaskDetailsModal: boolean;
+  setShowTaskDetailsModal: (show: boolean) => void;
+  
+  // Optimistic state
+  optimisticUnpositionedIds: Set<string>;
+  optimisticPositionedIds: Set<string>;
+  optimisticDeletedIds: Set<string>;
+  markOptimisticUnpositioned: (imageId: string) => void;
+  markOptimisticPositioned: (imageId: string) => void;
+  markOptimisticDeleted: (imageId: string) => void;
+  removeOptimisticDeleted: (imageId: string) => void;
+  
+  // Shot selection state
+  selectedShotIdLocal: string;
+  setSelectedShotIdLocal: (id: string) => void;
+  
+  // UI state
+  showTickForImageId: string | null;
+  setShowTickForImageId: (id: string | null) => void;
+  showTickForSecondaryImageId: string | null;
+  setShowTickForSecondaryImageId: (id: string | null) => void;
+  addingToShotImageId: string | null;
+  setAddingToShotImageId: (id: string | null) => void;
+  addingToShotWithoutPositionImageId: string | null;
+  setAddingToShotWithoutPositionImageId: (id: string | null) => void;
+  downloadingImageId: string | null;
+  setDownloadingImageId: (id: string | null) => void;
+  
+  // Mobile state
+  mobileActiveImageId: string | null;
+  setMobileActiveImageId: (id: string | null) => void;
+  mobilePopoverOpenImageId: string | null;
+  setMobilePopoverOpenImageId: (id: string | null) => void;
+  
+  // Pagination state
+  pendingLightboxTarget: 'first' | 'last' | null;
+  setPendingLightboxTarget: (target: 'first' | 'last' | null) => void;
+  
+  // Refs
+  mainTickTimeoutRef: React.MutableRefObject<NodeJS.Timeout | null>;
+  secondaryTickTimeoutRef: React.MutableRefObject<NodeJS.Timeout | null>;
+  lastTouchTimeRef: React.MutableRefObject<number>;
+  doubleTapTimeoutRef: React.MutableRefObject<NodeJS.Timeout | null>;
+  galleryTopRef: React.MutableRefObject<HTMLDivElement | null>;
+  safetyTimeoutRef: React.MutableRefObject<NodeJS.Timeout | null>;
+}
+
+export const useImageGalleryState = ({
+  images,
+  currentShotId,
+  lastShotId,
+  simplifiedShotOptions
+}: UseImageGalleryStateProps): UseImageGalleryStateReturn => {
+  
+  // Lightbox state
+  const [activeLightboxMedia, setActiveLightboxMedia] = useState<GenerationRow | null>(null);
+  
+  // Task details state for mobile modal
+  const [selectedImageForDetails, setSelectedImageForDetails] = useState<GenerationRow | null>(null);
+  const [showTaskDetailsModal, setShowTaskDetailsModal] = useState(false);
+  
+  // State for tracking which item to open after page navigation
+  const [pendingLightboxTarget, setPendingLightboxTarget] = useState<'first' | 'last' | null>(null);
+  
+  // Shot selection state
+  const [selectedShotIdLocal, setSelectedShotIdLocal] = useState<string>(() => {
+    const initial = currentShotId || lastShotId || (simplifiedShotOptions.length > 0 ? simplifiedShotOptions[0].id : "");
+    console.log('[GenerationsPane] ImageGallery initial selectedShotIdLocal:', {
+      initial,
+      currentShotId,
+      lastShotId,
+      simplifiedShotOptionsLength: simplifiedShotOptions.length,
+      firstShotId: simplifiedShotOptions[0]?.id
+    });
+    return initial;
+  });
+  
+  // UI state
+  const [showTickForImageId, setShowTickForImageId] = useState<string | null>(null);
+  const [showTickForSecondaryImageId, setShowTickForSecondaryImageId] = useState<string | null>(null);
+  const [addingToShotImageId, setAddingToShotImageId] = useState<string | null>(null);
+  const [addingToShotWithoutPositionImageId, setAddingToShotWithoutPositionImageId] = useState<string | null>(null);
+  const [downloadingImageId, setDownloadingImageId] = useState<string | null>(null);
+  
+  // Optimistic state to bridge server refresh latency
+  const [optimisticUnpositionedIds, setOptimisticUnpositionedIds] = useState<Set<string>>(new Set());
+  const [optimisticPositionedIds, setOptimisticPositionedIds] = useState<Set<string>>(new Set());
+  const [optimisticDeletedIds, setOptimisticDeletedIds] = useState<Set<string>>(new Set());
+
+  // Mobile-only state
+  const [mobileActiveImageId, setMobileActiveImageId] = useState<string | null>(null);
+  const [mobilePopoverOpenImageId, setMobilePopoverOpenImageId] = useState<string | null>(null);
+  
+  // Optimistic state handlers
+  const markOptimisticUnpositioned = useCallback((imageId: string) => {
+    setOptimisticUnpositionedIds(prev => {
+      const next = new Set(prev);
+      next.add(imageId);
+      return next;
+    });
+    setOptimisticPositionedIds(prev => {
+      const next = new Set(prev);
+      next.delete(imageId);
+      return next;
+    });
+  }, []);
+
+  const markOptimisticPositioned = useCallback((imageId: string) => {
+    setOptimisticPositionedIds(prev => {
+      const next = new Set(prev);
+      next.add(imageId);
+      return next;
+    });
+    setOptimisticUnpositionedIds(prev => {
+      const next = new Set(prev);
+      next.delete(imageId);
+      return next;
+    });
+  }, []);
+
+  const markOptimisticDeleted = useCallback((imageId: string) => {
+    setOptimisticDeletedIds(prev => {
+      const next = new Set(prev);
+      next.add(imageId);
+      return next;
+    });
+  }, []);
+
+  const removeOptimisticDeleted = useCallback((imageId: string) => {
+    setOptimisticDeletedIds(prev => {
+      const next = new Set(prev);
+      next.delete(imageId);
+      return next;
+    });
+  }, []);
+  
+  // Refs
+  const mainTickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const secondaryTickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastTouchTimeRef = useRef<number>(0);
+  const doubleTapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const galleryTopRef = useRef<HTMLDivElement | null>(null);
+  const safetyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Fix race condition: Update selectedShotIdLocal when shots data loads or context changes
+  useEffect(() => {
+    // When viewing a specific shot (currentShotId exists), always prioritize that shot for the selector
+    if (currentShotId && simplifiedShotOptions.find(shot => shot.id === currentShotId)) {
+      if (selectedShotIdLocal !== currentShotId) {
+        console.log('[ShotSelectionDebug] Setting shot selector to current shot (GenerationsPane context):', {
+          oldSelection: selectedShotIdLocal,
+          newSelection: currentShotId,
+          context: 'viewing specific shot'
+        });
+        setSelectedShotIdLocal(currentShotId);
+      }
+      return;
+    }
+    
+    // Only update if current selection is empty/invalid and we're not viewing a specific shot
+    const isCurrentSelectionValid = selectedShotIdLocal && simplifiedShotOptions.find(shot => shot.id === selectedShotIdLocal);
+    
+    if (!isCurrentSelectionValid) {
+      const newSelection = lastShotId || (simplifiedShotOptions.length > 0 ? simplifiedShotOptions[0].id : "");
+      if (newSelection && newSelection !== selectedShotIdLocal) {
+        console.log('[ShotSelectionDebug] Fixing selectedShotIdLocal race condition:', {
+          oldSelection: selectedShotIdLocal,
+          newSelection,
+          lastShotId,
+          availableShots: simplifiedShotOptions.length,
+          firstShotId: simplifiedShotOptions[0]?.id,
+          context: 'no specific shot context'
+        });
+        setSelectedShotIdLocal(newSelection);
+      }
+    }
+  }, [currentShotId, lastShotId, simplifiedShotOptions, selectedShotIdLocal]);
+
+  // Reconcile optimistic state when images update
+  useEffect(() => {
+    const currentImageIds = new Set(images.map(img => img.id));
+    
+    // Clean up optimistic sets - remove IDs for images no longer in the list
+    setOptimisticUnpositionedIds(prev => {
+      const next = new Set<string>();
+      for (const id of prev) {
+        if (currentImageIds.has(id)) {
+          next.add(id);
+        }
+      }
+      return next;
+    });
+    
+    setOptimisticPositionedIds(prev => {
+      const next = new Set<string>();
+      for (const id of prev) {
+        if (currentImageIds.has(id)) {
+          next.add(id);
+        }
+      }
+      return next;
+    });
+
+    // Clean up optimistic deleted IDs - remove IDs for images that are actually deleted from the server
+    setOptimisticDeletedIds(prev => {
+      const next = new Set<string>();
+      for (const id of prev) {
+        if (currentImageIds.has(id)) {
+          // If the image is still in the list, keep it in optimistic deleted state
+          next.add(id);
+        }
+        // If the image is no longer in the list, it was successfully deleted on the server
+        // so we don't need to keep tracking it in optimistic state
+      }
+      return next;
+    });
+  }, [images]);
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (mainTickTimeoutRef.current) {
+        clearTimeout(mainTickTimeoutRef.current);
+      }
+      if (secondaryTickTimeoutRef.current) {
+        clearTimeout(secondaryTickTimeoutRef.current);
+      }
+      if (doubleTapTimeoutRef.current) {
+        clearTimeout(doubleTapTimeoutRef.current);
+      }
+      if (safetyTimeoutRef.current) {
+        clearTimeout(safetyTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  return {
+    // Lightbox state
+    activeLightboxMedia,
+    setActiveLightboxMedia,
+    
+    // Task details state
+    selectedImageForDetails,
+    setSelectedImageForDetails,
+    showTaskDetailsModal,
+    setShowTaskDetailsModal,
+    
+    // Optimistic state
+    optimisticUnpositionedIds,
+    optimisticPositionedIds,
+    optimisticDeletedIds,
+    markOptimisticUnpositioned,
+    markOptimisticPositioned,
+    markOptimisticDeleted,
+    removeOptimisticDeleted,
+    
+    // Shot selection state
+    selectedShotIdLocal,
+    setSelectedShotIdLocal,
+    
+    // UI state
+    showTickForImageId,
+    setShowTickForImageId,
+    showTickForSecondaryImageId,
+    setShowTickForSecondaryImageId,
+    addingToShotImageId,
+    setAddingToShotImageId,
+    addingToShotWithoutPositionImageId,
+    setAddingToShotWithoutPositionImageId,
+    downloadingImageId,
+    setDownloadingImageId,
+    
+    // Mobile state
+    mobileActiveImageId,
+    setMobileActiveImageId,
+    mobilePopoverOpenImageId,
+    setMobilePopoverOpenImageId,
+    
+    // Pagination state
+    pendingLightboxTarget,
+    setPendingLightboxTarget,
+    
+    // Refs
+    mainTickTimeoutRef,
+    secondaryTickTimeoutRef,
+    lastTouchTimeRef,
+    doubleTapTimeoutRef,
+    galleryTopRef,
+    safetyTimeoutRef,
+  };
+};

@@ -499,7 +499,7 @@ const VideoTravelToolPage: React.FC = () => {
     } else {
       // Show header when in shot list view
       const headerContent = (
-        <div className="flex items-center justify-between mb-2 sm:mb-4 mt-4 sm:mt-6">
+        <div className="flex items-center justify-between mb-2 sm:mb-4 mt-4 sm:mt-6 px-3 sm:px-4">
           <h1 className="text-3xl font-light tracking-tight text-foreground sm:text-4xl">
             Shots:
           </h1>

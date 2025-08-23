@@ -45,7 +45,7 @@ const StatusIndicator: React.FC<StatusIndicatorProps> = ({ count, type, onClick,
         borderStyle,
         borderColor,
         count === 0 ? "opacity-50" : "opacity-100",
-        isSelected ? "bg-white/20" : "bg-white/10 hover:bg-white/15"
+        isSelected ? "bg-white/20" : "bg-white/10 md:hover:bg-white/15"
       )}
       onClick={onClick}
     >
@@ -364,8 +364,8 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
                     className={cn(
                       "w-full text-xs flex items-center justify-center",
                       selectedFilter === filter 
-                        ? "bg-zinc-600 text-zinc-100 hover:bg-zinc-500" 
-                        : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700"
+                        ? "bg-zinc-600 text-zinc-100 md:hover:bg-zinc-500" 
+                        : "text-zinc-400 md:hover:text-zinc-200 md:hover:bg-zinc-700"
                     )}
                   >
                     <span>{filter}</span>
@@ -404,8 +404,8 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
                       className={cn(
                         "flex-1 text-xs flex items-center justify-center",
                         selectedFilter === filter 
-                          ? "bg-zinc-600 text-zinc-100 hover:bg-zinc-500" 
-                          : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700"
+                          ? "bg-zinc-600 text-zinc-100 md:hover:bg-zinc-500" 
+                          : "text-zinc-400 md:hover:text-zinc-200 md:hover:bg-zinc-700"
                       )}
                     >
                       <span>{filter}</span>

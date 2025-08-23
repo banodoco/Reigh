@@ -706,58 +706,42 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     }
   }, [selectedProjectId, createShotMutation, queryClient, setLastAffectedShotId]);
 
-  // Handle toggling the form expand/collapse state
-  const handleToggleFormExpanded = useCallback(() => {
+  // Unified handler for Collapsible open/close with smooth scroll on open
+  const handleCollapsibleOpenChange = useCallback((nextOpen: boolean) => {
     const wasExpanded = isFormExpanded === true;
-    setIsFormExpanded(prev => prev !== true); // Explicitly toggle to boolean
-    try { window.sessionStorage.setItem('ig:formExpanded', (!wasExpanded).toString()); } catch {}
+    setIsFormExpanded(nextOpen);
+    try { window.sessionStorage.setItem('ig:formExpanded', String(nextOpen)); } catch {}
 
     // If we're expanding (was collapsed), initiate scroll behavior
-    if (!wasExpanded) {
+    if (nextOpen && !wasExpanded) {
       setIsScrollingToForm(true);
-      
-      // Wait longer for form expansion to complete, then use RAF for smooth scroll
+      // Wait for expansion, then smooth scroll to the form container
       setTimeout(() => {
-        // Use requestAnimationFrame to ensure DOM has fully updated
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
             if (collapsibleContainerRef.current) {
               try {
-                // Calculate a scroll position that shows the button above the form
                 const element = collapsibleContainerRef.current;
                 const elementRect = element.getBoundingClientRect();
-                const headerHeight = isMobile ? 150 : 96;
-                const bufferSpace = 30; // Increased buffer for better visibility
-                
-                // Calculate target scroll position
+                const headerHeight = isMobile ? 80 : 96;
+                const bufferSpace = 30;
                 const targetScrollTop = window.scrollY + elementRect.top - headerHeight - bufferSpace;
-                
-                window.scrollTo({
-                  top: Math.max(0, targetScrollTop),
-                  behavior: 'smooth'
-                });
+                window.scrollTo({ top: Math.max(0, targetScrollTop), behavior: 'smooth' });
               } catch (error) {
                 console.warn('Scroll calculation failed:', error);
-                // Fallback to simple scrollIntoView
-                collapsibleContainerRef.current?.scrollIntoView({ 
-                  behavior: 'smooth', 
-                  block: 'start' 
-                });
+                collapsibleContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
               }
             }
-            
-            // Reset scrolling state after scroll completes
-            setTimeout(() => {
-              setIsScrollingToForm(false);
-            }, 1000);
+            // Reset scrolling state after scroll begins
+            setTimeout(() => { setIsScrollingToForm(false); }, 1000);
           });
         });
-      }, 300); // Increased delay to let form fully expand
-    } else {
-      // If we're collapsing (was expanded), immediately reset scroll state
+      }, 300);
+    } else if (!nextOpen) {
+      // If collapsing, immediately reset scroll state
       setIsScrollingToForm(false);
     }
-  }, [isFormExpanded, markFormStateInteracted]);
+  }, [isFormExpanded, isMobile]);
 
   // Effect for sticky header (RAF + precomputed threshold to avoid layout thrash)
   useEffect(() => {
@@ -971,14 +955,13 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
           <div ref={collapsibleContainerRef}>
             <Collapsible 
               open={isFormExpanded} 
-              onOpenChange={setIsFormExpanded}
+              onOpenChange={handleCollapsibleOpenChange}
             >
               {/* Keep the trigger always visible - let it scroll naturally */}
               <CollapsibleTrigger asChild>
                   <Button
                     variant="ghost"
                     className={`${isFormExpanded ? 'w-full justify-between px-6 py-6 hover:bg-accent/30 bg-accent/10 border border-b-0 rounded-t-lg shadow-sm' : 'w-full justify-between p-4 gradient-primary-collapsed rounded-lg'} transition-colors duration-300`}
-                    onClick={handleToggleFormExpanded}
                     type="button"
                   >
                     <div className="flex items-center gap-2">
@@ -1037,7 +1020,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
                 <Button
                   variant="ghost"
                   className={`justify-between ${isMobile ? 'p-3 text-sm' : 'p-4'} w-full max-w-2xl gradient-primary-collapsed backdrop-blur-md shadow-xl transition-all duration-300 rounded-lg`}
-                  onClick={handleToggleFormExpanded}
+                  onClick={() => handleCollapsibleOpenChange(true)}
                   type="button"
                 >
                   <div className="flex items-center gap-2">

@@ -50,6 +50,7 @@ interface ImageGalleryItemProps {
   onShowSecondaryTick?: (imageId: string) => void;
   optimisticUnpositionedIds?: Set<string>;
   optimisticPositionedIds?: Set<string>;
+  optimisticDeletedIds?: Set<string>;
   onOptimisticUnpositioned?: (imageId: string) => void;
   onOptimisticPositioned?: (imageId: string) => void;
   addingToShotImageId: string | null;
@@ -93,6 +94,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   onShowSecondaryTick,
   optimisticUnpositionedIds,
   optimisticPositionedIds,
+  optimisticDeletedIds,
   onOptimisticUnpositioned,
   onOptimisticPositioned,
   addingToShotImageId,
@@ -489,10 +491,15 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
     );
   }
 
+  // Check if this image is optimistically deleted
+  const isOptimisticallyDeleted = optimisticDeletedIds?.has(image.id) ?? false;
+
   // Conditionally wrap with DraggableImage only on desktop to avoid interfering with mobile scrolling
   const imageContent = (
     <div 
-        className="border rounded-lg overflow-hidden hover:shadow-md transition-shadow relative group bg-card"
+        className={`border rounded-lg overflow-hidden hover:shadow-md transition-all duration-300 relative group bg-card ${
+          isOptimisticallyDeleted ? 'opacity-50 scale-95 pointer-events-none' : ''
+        }`}
     >
       <div className="relative w-full">
       <div 
@@ -1041,6 +1048,16 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
             createdAt={image.createdAt} 
             position="top-right"
           />
+
+          {/* Optimistic delete overlay */}
+          {isOptimisticallyDeleted && (
+            <div className="absolute inset-0 bg-black/30 flex items-center justify-center rounded-lg">
+              <div className="bg-white/90 px-3 py-2 rounded-md flex items-center gap-2 text-sm font-medium text-gray-700">
+                <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-gray-600"></div>
+                Deleting...
+              </div>
+            </div>
+          )}
 
           {/* Action buttons - Top Right (Info & Apply) */}
           <div className="absolute top-2 right-2 flex flex-col items-end gap-1.5 mt-8">
