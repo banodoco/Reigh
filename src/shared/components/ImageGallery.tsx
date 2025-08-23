@@ -38,6 +38,10 @@ import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { ImageGalleryItem } from "./ImageGalleryItem";
 import { getImageLoadingStrategy, shouldIncludeInInitialBatch } from '@/shared/lib/imageLoadingPriority';
 import '@/shared/lib/imageLoadingDebugger'; // Make debugger available globally
+// Task details functionality
+import { useTaskFromUnifiedCache } from '@/shared/hooks/useUnifiedGenerations';
+import { useGetTask } from '@/shared/hooks/useTasks';
+import TaskDetailsModal from '@/tools/travel-between-images/components/TaskDetailsModal';
 
 // Define the structure for individual LoRA details within metadata
 export interface MetadataLora {
@@ -254,7 +258,18 @@ const formatMetadataForDisplay = (metadata: DisplayableMetadata): string => {
   return displayText.trim() || "No metadata available.";
 };
 
-
+/**
+ * Derive input images from task params
+ */
+const deriveInputImages = (task: any): string[] => {
+  const p = task?.params || {};
+  if (Array.isArray(p.input_images) && p.input_images.length > 0) return p.input_images;
+  if (p.full_orchestrator_payload && Array.isArray(p.full_orchestrator_payload.input_image_paths_resolved)) {
+    return p.full_orchestrator_payload.input_image_paths_resolved;
+  }
+  if (Array.isArray(p.input_image_paths_resolved)) return p.input_image_paths_resolved;
+  return [];
+};
 
 /**
  * ImageGallery Component
@@ -319,6 +334,13 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   const { currentShotId } = useCurrentShot();
   const isMobile = useIsMobile();
   
+  // Task details state for mobile modal
+  const [selectedImageForDetails, setSelectedImageForDetails] = useState<GenerationRow | null>(null);
+  const [showTaskDetailsModal, setShowTaskDetailsModal] = useState(false);
+  
+  // State for tracking which item to open after page navigation
+  const [pendingLightboxTarget, setPendingLightboxTarget] = useState<'first' | 'last' | null>(null);
+  
   // Use mobile-optimized defaults to improve initial render performance
   const defaultItemsPerPage = isMobile ? 20 : 45;
   const actualItemsPerPage = itemsPerPage ?? defaultItemsPerPage;
@@ -344,6 +366,14 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   
   // Star functionality
   const toggleStarMutation = useToggleGenerationStar();
+  
+  // Task details functionality - similar to VideoGallery
+  const lightboxImageId = activeLightboxMedia?.id || null;
+  const { data: lightboxTaskMapping } = useTaskFromUnifiedCache(lightboxImageId || '');
+  const { data: task, isLoading: isLoadingTask, error: taskError } = useGetTask(lightboxTaskMapping?.taskId || '');
+  
+  // Derive input images from multiple possible locations within task params
+  const inputImages: string[] = useMemo(() => deriveInputImages(task), [task]);
 
   const [selectedShotIdLocal, setSelectedShotIdLocal] = useState<string>(() => {
     const initial = currentShotId || lastShotId || (simplifiedShotOptions.length > 0 ? simplifiedShotOptions[0].id : "");
@@ -626,16 +656,54 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   const handleNextImage = () => {
     if (!activeLightboxMedia) return;
     const currentIndex = filteredImages.findIndex(img => img.id === activeLightboxMedia.id);
-    if (currentIndex < filteredImages.length - 1) {
-      handleOpenLightbox(filteredImages[currentIndex + 1]);
+    
+    if (isServerPagination) {
+      // For server pagination, handle page boundaries
+      if (currentIndex < filteredImages.length - 1) {
+        // Move to next item on current page
+        handleOpenLightbox(filteredImages[currentIndex + 1]);
+      } else {
+        // At the end of current page, go to next page if available
+        const currentServerPage = serverPage || 1;
+        if (currentServerPage < totalPages && onServerPageChange) {
+          // Close lightbox and navigate to next page
+          setActiveLightboxMedia(null);
+          setPendingLightboxTarget('first'); // Open first item of next page
+          onServerPageChange(currentServerPage + 1);
+        }
+      }
+    } else {
+      // For client pagination, use existing logic
+      if (currentIndex < filteredImages.length - 1) {
+        handleOpenLightbox(filteredImages[currentIndex + 1]);
+      }
     }
   };
 
   const handlePreviousImage = () => {
     if (!activeLightboxMedia) return;
     const currentIndex = filteredImages.findIndex(img => img.id === activeLightboxMedia.id);
-    if (currentIndex > 0) {
-      handleOpenLightbox(filteredImages[currentIndex - 1]);
+    
+    if (isServerPagination) {
+      // For server pagination, handle page boundaries
+      if (currentIndex > 0) {
+        // Move to previous item on current page
+        handleOpenLightbox(filteredImages[currentIndex - 1]);
+      } else {
+        // At the beginning of current page, go to previous page if available
+        const currentServerPage = serverPage || 1;
+        if (currentServerPage > 1 && onServerPageChange) {
+          // Close lightbox and navigate to previous page
+          setActiveLightboxMedia(null);
+          setPendingLightboxTarget('last'); // Open last item of previous page
+          onServerPageChange(currentServerPage - 1);
+        }
+      }
+    } else {
+      // For client pagination, use existing logic
+      if (currentIndex > 0) {
+        handleOpenLightbox(filteredImages[currentIndex - 1]);
+      }
     }
   };
 
@@ -841,6 +909,18 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     return currentFiltered;
   }, [images, filterByToolType, currentToolType, mediaTypeFilter, searchTerm, showStarredOnly, onServerPageChange, serverPage]);
 
+  // Handle opening lightbox after page navigation
+  useEffect(() => {
+    if (pendingLightboxTarget && filteredImages.length > 0) {
+      const targetIndex = pendingLightboxTarget === 'first' ? 0 : filteredImages.length - 1;
+      const targetImage = filteredImages[targetIndex];
+      if (targetImage) {
+        handleOpenLightbox(targetImage);
+        setPendingLightboxTarget(null);
+      }
+    }
+  }, [filteredImages, pendingLightboxTarget]);
+
   // Determine if we should show the shot notifier
   // Show when: 1) There's a form/shot mismatch, OR 2) Filtering for a specific shot
   const shouldShowShotNotifier = React.useMemo(() => {
@@ -1000,11 +1080,27 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     if (!activeLightboxMedia) return { hasNext: false, hasPrevious: false };
     
     const currentIndex = filteredImages.findIndex(img => img.id === activeLightboxMedia.id);
-    return {
-      hasNext: currentIndex < filteredImages.length - 1,
-      hasPrevious: currentIndex > 0
-    };
-  }, [activeLightboxMedia, filteredImages]);
+    
+    if (isServerPagination) {
+      // For server pagination, consider page boundaries
+      const currentServerPage = serverPage || 1;
+      const isOnLastItemOfPage = currentIndex === filteredImages.length - 1;
+      const isOnFirstItemOfPage = currentIndex === 0;
+      const hasNextPage = currentServerPage < totalPages;
+      const hasPrevPage = currentServerPage > 1;
+      
+      return {
+        hasNext: !isOnLastItemOfPage || hasNextPage,
+        hasPrevious: !isOnFirstItemOfPage || hasPrevPage
+      };
+    } else {
+      // For client pagination, use existing logic
+      return {
+        hasNext: currentIndex < filteredImages.length - 1,
+        hasPrevious: currentIndex > 0
+      };
+    }
+  }, [activeLightboxMedia, filteredImages, isServerPagination, serverPage, totalPages]);
   
   const paginatedImages = React.useMemo(() => {
     if (isServerPagination) {
@@ -1069,6 +1165,30 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [isMobile, mobilePopoverOpenImageId]);
+  
+  // Task details handlers
+  const handleShowTaskDetails = useCallback(() => {
+    console.log('[TaskToggle] ImageGallery: handleShowTaskDetails called', { 
+      activeLightboxMedia: activeLightboxMedia?.id,
+    });
+    if (activeLightboxMedia) {
+      // Set up task details modal state first
+      setSelectedImageForDetails(activeLightboxMedia);
+      // Use setTimeout to ensure state update happens before opening modal
+      setTimeout(() => {
+        setShowTaskDetailsModal(true);
+        // Close lightbox after modal is set to open
+        setActiveLightboxMedia(null);
+        console.log('[TaskToggle] ImageGallery: State updated for task details modal', {
+          newSelectedImage: activeLightboxMedia.id,
+          newShowModal: true,
+          closedLightbox: true
+        });
+      }, 100);
+    } else {
+      console.error('[TaskToggle] ImageGallery: No active lightbox media found');
+    }
+  }, [activeLightboxMedia]);
   
   const mainTickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const secondaryTickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -1483,6 +1603,32 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
             // TODO: Implement magic edit generation
             console.log('Magic Edit:', { imageUrl, prompt, numImages });
           }}
+          // Task details functionality - same pattern as VideoGallery
+          showTaskDetails={!isMobile}
+          taskDetailsData={{
+            task,
+            isLoading: isLoadingTask,
+            error: taskError,
+            inputImages,
+            taskId: lightboxTaskMapping?.taskId || null,
+            onApplyTaskSettings: onApplySettings,
+            onClose: () => setActiveLightboxMedia(null)
+          }}
+          onShowTaskDetails={isMobile ? handleShowTaskDetails : undefined}
+        />
+      )}
+
+      {/* Mobile Task Details Modal */}
+      {selectedImageForDetails && showTaskDetailsModal && (
+        <TaskDetailsModal
+          open={showTaskDetailsModal}
+          onOpenChange={(open) => {
+            if (!open) {
+              setShowTaskDetailsModal(false);
+              setSelectedImageForDetails(null);
+            }
+          }}
+          generationId={selectedImageForDetails.id}
         />
       )}
     </TooltipProvider>

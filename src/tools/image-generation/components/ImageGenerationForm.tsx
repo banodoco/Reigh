@@ -809,100 +809,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         <div className="flex flex-col md:flex-row gap-6">
           {/* Left Column */}
           <div className="flex-1 space-y-6">
-            {/* Associated Shot Selector */}
-            <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Label htmlFor="associatedShot" className="inline-block">Associated with Shot</Label>
-              {associatedShotId && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          markAsInteracted();
-                          setAssociatedShotId(null);
-                        }}
-                        disabled={!hasApiKey || isGenerating}
-                        className="h-6 w-6 p-0 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
-                        aria-label="Clear shot selection"
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top">
-                      <p>Clear selection</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
-            </div>
-            {/* Select dropdown and create button */}
-            <div className="flex items-center gap-2">
-            <Select
-              value={associatedShotId || "none"}
-              onValueChange={(value) => {
-                console.log('[ImageGenerationForm] Changing shot from', associatedShotId, 'to', value);
-                markAsInteracted();
-                const newShotId = value === "none" ? null : value;
-                setAssociatedShotId(newShotId);
-                
-                // Initialize prompts for the new shot if they don't exist
-                const newEffectiveShotId = newShotId || 'none';
-                if (!promptsByShot[newEffectiveShotId]) {
-                  console.log('[ImageGenerationForm] Initializing prompts for shot:', newEffectiveShotId);
-                  setPromptsByShot(prev => ({
-                    ...prev,
-                    [newEffectiveShotId]: [{ id: generatePromptId(), fullPrompt: "", shortPrompt: "" }]
-                  }));
-                } else {
-                  console.log('[ImageGenerationForm] Shot', newEffectiveShotId, 'already has', promptsByShot[newEffectiveShotId]?.length, 'prompts');
-                }
-              }}
-              disabled={!hasApiKey || isGenerating}
-            >
-              <SelectTrigger id="associatedShot" className="inline-flex flex-1 min-w-[200px]">
-                <SelectValue placeholder="None" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">None</SelectItem>
-                {shots?.map((shot) => (
-                  <SelectItem key={shot.id} value={shot.id}>
-                    {shot.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setIsCreateShotModalOpen(true)}
-              disabled={!hasApiKey || isGenerating}
-              className="gap-1"
-            >
-              <PlusCircle className="h-4 w-4" />
-              <span className="hidden sm:inline">Create New Shot</span>
-            </Button>
-            </div>
-            {/* Jump to animate shot link */}
-            {associatedShotId && shots && (() => {
-              const selectedShot = shots.find(shot => shot.id === associatedShotId);
-              return selectedShot ? (
-                <div className="flex justify-start">
-                  <button
-                    type="button"
-                    onClick={() => navigateToShot(selectedShot)}
-                    className="text-xs font-light text-gray-500 hover:text-gray-700 hover:underline transition-colors duration-200 px-2 py-1 rounded-md hover:bg-gray-50"
-                  >
-                    Jump to animate '{selectedShot.name}' →
-                  </button>
-                </div>
-              ) : null;
-            })()}
-          </div>
 
             {/* Prompts Section */}
             <div className="space-y-4">
@@ -1031,17 +937,18 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
             {/* LoRA Section - Combined Header and Active List */}
             <div className="space-y-4">
             {/* LoRA Header (label + manage button) */}
-            <div className="flex items-center gap-2">
-              <Label>LoRA Models (Wan)</Label>
-              <Button
-                type="button"
-                variant="outline"
-                className="mt-1"
-                onClick={() => loraManager.setIsLoraModalOpen(true)}
-                disabled={isGenerating}
-              >
-                Add or Manage LoRA Models
-              </Button>
+            <div className="space-y-2">
+              <Label className="text-lg font-light">LoRA Models</Label>
+              <div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => loraManager.setIsLoraModalOpen(true)}
+                  disabled={isGenerating}
+                >
+                  Add or Manage LoRA Models
+                </Button>
+              </div>
             </div>
 
             {/* Active LoRAs Display */}
@@ -1056,6 +963,101 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
               renderHeaderActions={() => loraManager.renderHeaderActions?.(handleLoadProjectLoras)}
             />
             </div>
+
+            {/* Associated Shot Selector */}
+            <div className="space-y-4 mt-6">
+            <div className="flex items-center gap-2">
+              <Label htmlFor="associatedShot" className="text-lg font-light">Associated with Shot</Label>
+              {associatedShotId && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          markAsInteracted();
+                          setAssociatedShotId(null);
+                        }}
+                        disabled={!hasApiKey || isGenerating}
+                        className="h-6 w-6 p-0 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                        aria-label="Clear shot selection"
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      <p>Clear selection</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </div>
+            {/* Select dropdown and create button */}
+            <div className="flex items-center gap-2">
+            <Select
+              value={associatedShotId || "none"}
+              onValueChange={(value) => {
+                console.log('[ImageGenerationForm] Changing shot from', associatedShotId, 'to', value);
+                markAsInteracted();
+                const newShotId = value === "none" ? null : value;
+                setAssociatedShotId(newShotId);
+                
+                // Initialize prompts for the new shot if they don't exist
+                const newEffectiveShotId = newShotId || 'none';
+                if (!promptsByShot[newEffectiveShotId]) {
+                  console.log('[ImageGenerationForm] Initializing prompts for shot:', newEffectiveShotId);
+                  setPromptsByShot(prev => ({
+                    ...prev,
+                    [newEffectiveShotId]: [{ id: generatePromptId(), fullPrompt: "", shortPrompt: "" }]
+                  }));
+                } else {
+                  console.log('[ImageGenerationForm] Shot', newEffectiveShotId, 'already has', promptsByShot[newEffectiveShotId]?.length, 'prompts');
+                }
+              }}
+              disabled={!hasApiKey || isGenerating}
+            >
+              <SelectTrigger id="associatedShot" className="inline-flex flex-1 min-w-[200px]">
+                <SelectValue placeholder="None" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">None</SelectItem>
+                {shots?.map((shot) => (
+                  <SelectItem key={shot.id} value={shot.id}>
+                    {shot.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setIsCreateShotModalOpen(true)}
+              disabled={!hasApiKey || isGenerating}
+              className="gap-1"
+            >
+              <PlusCircle className="h-4 w-4" />
+              <span className="hidden sm:inline">Create New Shot</span>
+            </Button>
+            </div>
+            {/* Jump to animate shot link */}
+            {associatedShotId && shots && (() => {
+              const selectedShot = shots.find(shot => shot.id === associatedShotId);
+              return selectedShot ? (
+                <div className="flex justify-start">
+                  <button
+                    type="button"
+                    onClick={() => navigateToShot(selectedShot)}
+                    className="text-xs font-light text-gray-500 hover:text-gray-700 hover:underline transition-colors duration-200 px-2 py-1 rounded-md hover:bg-gray-50"
+                  >
+                    Jump to animate '{selectedShot.name}' →
+                  </button>
+                </div>
+              ) : null;
+            })()}
+          </div>
           </div>
         </div>
 

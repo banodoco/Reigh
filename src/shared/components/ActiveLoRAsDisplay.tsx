@@ -39,7 +39,7 @@ const ActiveLoRAsDisplayComponent: React.FC<ActiveLoRAsDisplayProps> = ({
   return (
     <div className={`space-y-4 pt-2 ${className}`}>
       <div className="flex items-center justify-between">
-        <h3 className="text-md font-light">Active LoRAs:</h3>
+        <Label>Active LoRAs:</Label>
         {renderHeaderActions && renderHeaderActions()}
       </div>
       
