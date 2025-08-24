@@ -500,6 +500,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
         className={`border rounded-lg overflow-hidden hover:shadow-md transition-all duration-300 relative group bg-card ${
           isOptimisticallyDeleted ? 'opacity-50 scale-95 pointer-events-none' : ''
         }`}
+        draggable={false}
     >
       <div className="relative w-full">
       <div 
@@ -536,6 +537,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                         (e.target as HTMLVideoElement).currentTime = 0; // Reset to beginning
                       }
                     }}
+                    draggable={false}
                     style={{ cursor: 'pointer' }}
                     onError={handleImageError}
                     onLoadStart={() => setImageLoading(true)}
@@ -599,6 +601,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                     e.preventDefault();
                     onMobileTap(image);
                   } : undefined}
+                  draggable={false}
                   style={{ cursor: 'pointer' }}
                 />
               )}
@@ -1195,6 +1198,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
     </div>
   );
 
+  // On mobile, drag is already disabled by using the non-draggable branch.
   return isMobile ? (
     <React.Fragment key={imageKey}>
       {imageContent}
@@ -1208,7 +1212,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
       )}
     </React.Fragment>
   ) : (
-    <DraggableImage key={`draggable-${imageKey}`} image={image}>
+    <DraggableImage key={`draggable-${imageKey}`} image={image} onDoubleClick={() => onOpenLightbox(image)}>
       {imageContent}
       {onCreateShot && (
         <CreateShotModal

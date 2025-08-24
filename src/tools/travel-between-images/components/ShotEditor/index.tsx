@@ -110,9 +110,11 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   
   // [VideoLoadSpeedIssue] AGGRESSIVE OPTIMIZATION: Use memoized values to prevent re-render loops
   const hasContextData = React.useMemo(() => contextImages.length > 0, [contextImages.length]);
+  // CRITICAL FIX: Always load detailed data in ShotEditor to ensure consistency with VideoTravelToolPage
+  // This prevents video pair config mismatches when context data is limited (e.g., 5 images vs 10 total)
   const shouldLoadDetailedData = React.useMemo(() => 
-    !hasContextData && !!selectedShotId, 
-    [hasContextData, selectedShotId]
+    !!selectedShotId, // Always load full data in editor mode
+    [selectedShotId]
   );
   
   // [VideoLoadSpeedIssue] CRITICAL: Completely disable hook when context data exists
@@ -133,10 +135,11 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // Using disabled query when context data is available
   const { data: fullShotImages = [], isLoading: isLoadingFullImages } = useAllShotGenerations(queryKey);
   
-  // Always prefer context images when available - they're faster and already loaded
+  // CRITICAL FIX: Always use full images when available in editor mode to ensure consistency
+  // This prevents video pair config mismatches between VideoTravelToolPage and ShotEditor
   const orderedShotImages = React.useMemo(() => 
-    hasContextData ? contextImages : fullShotImages,
-    [hasContextData, contextImages, fullShotImages]
+    fullShotImages.length > 0 ? fullShotImages : contextImages,
+    [fullShotImages, contextImages]
   );
   
   // [VideoLoadSpeedIssue] Track image data loading progress
@@ -597,7 +600,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // [VideoLoadSpeedIssue] CRITICAL FIX: Use EXACT same logic as ShotsPane
   // Apply both position filtering AND video filtering like ShotsPane
   const simpleFilteredImages = useMemo(() => {
-    const sourceImages = (localOrderedShotImages?.length > 0 ? localOrderedShotImages : orderedShotImages) || [];
+    // CRITICAL FIX: Always use orderedShotImages for consistency with VideoTravelToolPage
+    // This ensures timeline positions and video generation use the same dataset
+    const sourceImages = orderedShotImages || [];
     
     // OPTIMIZED: Only log when significant changes occur
     const processingKey = `${selectedShotId}-${sourceImages.length}`;
@@ -648,7 +653,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     }
     
     return filtered;
-  }, [orderedShotImages, localOrderedShotImages, selectedShotId]);
+  }, [orderedShotImages, selectedShotId]);
   
   // Count unpositioned generations for this shot (excluding videos, which are expected to have null positions)
   const { data: unpositionedGenerationsCount = 0 } = useUnpositionedGenerationsCount(selectedShot?.id);

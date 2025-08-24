@@ -428,7 +428,9 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & { onClose: () => void
                                 src={image.url}
                                 className="h-28 w-auto rounded border p-0.5 hover:opacity-80 transition-opacity cursor-pointer"
                                 videoClassName="object-contain"
-                                
+                                thumbnailMode
+                                disableScrubbing
+                                preload="none"
                                 loop
                                 muted
                               />
@@ -439,6 +441,7 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & { onClose: () => void
                                 alt={image.alt_text || `${lora.Name} sample ${index + 1}`}
                                 className="h-28 w-auto object-contain rounded border p-0.5 hover:opacity-80 transition-opacity cursor-pointer"
                                 title={image.alt_text || image.url}
+                                loading="lazy"
                               />
                             );
                           })}

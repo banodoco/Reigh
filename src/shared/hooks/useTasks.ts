@@ -307,6 +307,11 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
         dataQuery = dataQuery.limit(fetchLimit);
       } else {
         // For Succeeded/Failed: use proper database pagination - no client sorting needed
+        // For Complete tasks, sort by completion time (generationProcessedAt) instead of created_at
+        const hasCompleteStatus = status?.includes(TASK_STATUS.COMPLETE);
+        if (hasCompleteStatus) {
+          dataQuery = dataQuery.order('generation_processed_at', { ascending: false, nullsLast: true });
+        }
         dataQuery = dataQuery.range(offset, offset + limit - 1);
       }
 
@@ -758,7 +763,8 @@ export const useTaskStatusCounts = (projectId: string | null) => {
           .select('id', { count: 'exact', head: true })
           .eq('project_id', projectId)
           .in('status', ['Queued', 'In Progress'])
-          .is('params->orchestrator_task_id_ref', null), // Only parent tasks
+          .is('params->orchestrator_task_id_ref', null) // Only parent tasks
+          .not('task_type', 'like', '%orchestrator%'), // Exclude orchestrator tasks
           
         // Query for recent successes (last hour)
         supabase

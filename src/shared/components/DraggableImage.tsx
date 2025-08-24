@@ -6,9 +6,10 @@ import { GeneratedImageWithMetadata } from '@/shared/components/ImageGallery'; /
 interface DraggableImageProps {
   image: GeneratedImageWithMetadata;
   children: React.ReactNode;
+  onDoubleClick?: (e: React.MouseEvent<HTMLDivElement>) => void;
 }
 
-export const DraggableImage: React.FC<DraggableImageProps> = ({ image, children }) => {
+export const DraggableImage: React.FC<DraggableImageProps> = ({ image, children, onDoubleClick }) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: image.id || `draggable-${image.url}`, // Ensure a unique ID
     data: {
@@ -28,7 +29,7 @@ export const DraggableImage: React.FC<DraggableImageProps> = ({ image, children 
   };
 
   return (
-    <div ref={setNodeRef} style={style} {...listeners} {...attributes}>
+    <div ref={setNodeRef} style={style} {...listeners} {...attributes} onDoubleClick={onDoubleClick}>
       {children}
     </div>
   );

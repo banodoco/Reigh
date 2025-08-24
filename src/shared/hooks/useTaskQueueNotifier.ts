@@ -40,6 +40,7 @@ export const useTaskQueueNotifier = ({
   /* Realtime helpers */
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const pendingInsertTargetRef = useRef<number | null>(null);
+  const hasSucceededRef = useRef(false);
 
   // Clean up realtime channel
   useEffect(() => {
@@ -55,6 +56,13 @@ export const useTaskQueueNotifier = ({
   /* Shared success handler                                       */
   /* ------------------------------------------------------------ */
   const handleSuccess = useCallback(async () => {
+    // Prevent multiple success calls for the same task creation
+    if (hasSucceededRef.current) {
+      console.log(`[${Date.now()}] [TaskQueueNotifier] Success already handled, skipping duplicate call`);
+      return;
+    }
+    hasSucceededRef.current = true;
+
     // Refresh TasksPane queries before showing success
     console.log(`[${Date.now()}] [TaskQueueNotifier] Refreshing TasksPane queries`);
     await Promise.all([
@@ -99,6 +107,8 @@ export const useTaskQueueNotifier = ({
       const initialCount = currentTaskCount;
       console.log(`[${Date.now()}] [TaskQueueNotifier] Initial task count:`, initialCount);
 
+      // Reset success flag for new task creation
+      hasSucceededRef.current = false;
       setIsEnqueuing(true);
 
       /* Create tasks in parallel */
@@ -126,6 +136,7 @@ export const useTaskQueueNotifier = ({
       if (successful === 0) {
         console.log(`[${Date.now()}] [TaskQueueNotifier] No tasks created successfully, stopping`);
         setIsEnqueuing(false);
+        hasSucceededRef.current = false; // Reset success flag when no tasks created
         return;
       }
 
@@ -253,6 +264,7 @@ export const useTaskQueueNotifier = ({
         setIsEnqueuing(false);
         setTargetTotal(null);
         pendingInsertTargetRef.current = null;
+        hasSucceededRef.current = false; // Reset success flag on timeout
         clearInterval(pollId);
         if (channelRef.current) channelRef.current.unsubscribe();
       }, 30000);

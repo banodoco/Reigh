@@ -612,14 +612,18 @@ const VideoTravelToolPage: React.FC = () => {
 
   // Get full image data when editing a shot to avoid thumbnail limitation
   const contextImages = selectedShot?.images || [];
-  const needsFullImageData = contextImages.length === 5 || shouldShowShotEditor; // Load full data when editing OR hit thumbnail limit
+  
+  // CRITICAL FIX: Use same logic as ShotEditor to prevent data inconsistency
+  // Always load full data when in ShotEditor mode to ensure pair configs match generation logic
+  const needsFullImageData = shouldShowShotEditor;
   // Always call the hook to prevent hook order issues - the hook internally handles enabling/disabling
   const { data: fullShotImages = [] } = useAllShotGenerations(
     needsFullImageData ? (selectedShot?.id || null) : null
   );
   
-  // Use full images if available, otherwise fall back to context images
-  const shotImagesForCalculation = fullShotImages.length > 0 ? fullShotImages : contextImages;
+  // Use full images if available AND needed, otherwise fall back to context images
+  // This ensures consistency with ShotEditor's image selection logic
+  const shotImagesForCalculation = needsFullImageData && fullShotImages.length > 0 ? fullShotImages : contextImages;
 
   // Memoize video pair configs calculation using full image data
   const computedVideoPairConfigs = useMemo(() => {

@@ -29,7 +29,11 @@ const TARGET_ASPECT_RATIOS: TargetAspectRatio[] = [
 export const cropImageToClosestAspectRatio = async (
   inputFile: File
 ): Promise<CropResult | null> => {
-  if (!inputFile.type.startsWith("image/")) {
+  // Mobile browsers (especially iOS) sometimes provide files with an empty MIME type
+  // or HEIC/HEIF types. Treat known image extensions as images even if MIME is missing.
+  const hasImageMime = typeof inputFile.type === 'string' && inputFile.type.startsWith('image/');
+  const looksLikeImageByName = typeof inputFile.name === 'string' && /\.(heic|heif|jpg|jpeg|png|webp|gif|bmp|tif|tiff)$/i.test(inputFile.name);
+  if (!hasImageMime && !looksLikeImageByName) {
     console.error("Invalid file type. Only images are allowed.");
     return null;
   }
@@ -160,7 +164,11 @@ export const cropImageToProjectAspectRatio = async (
   inputFile: File,
   targetAspectRatio: number
 ): Promise<ProjectCropResult | null> => {
-  if (!inputFile.type.startsWith("image/")) {
+  // Mobile browsers (especially iOS) sometimes provide files with an empty MIME type
+  // or HEIC/HEIF types. Treat known image extensions as images even if MIME is missing.
+  const hasImageMime = typeof inputFile.type === 'string' && inputFile.type.startsWith('image/');
+  const looksLikeImageByName = typeof inputFile.name === 'string' && /\.(heic|heif|jpg|jpeg|png|webp|gif|bmp|tif|tiff)$/i.test(inputFile.name);
+  if (!hasImageMime && !looksLikeImageByName) {
     console.error("Invalid file type. Only images are allowed.");
     return null;
   }

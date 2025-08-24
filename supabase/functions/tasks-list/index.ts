@@ -57,8 +57,15 @@ serve(async (req) => {
     let query = supabase
       .from("tasks")
       .select("*")
-      .eq("project_id", projectId)
-      .order("created_at", { ascending: false });
+      .eq("project_id", projectId);
+    
+    // For Complete tasks, sort by completion time instead of created_at
+    const hasCompleteStatus = statusFilter.includes("Complete");
+    if (hasCompleteStatus && statusFilter.length === 1) {
+      query = query.order("generation_processed_at", { ascending: false, nullsLast: true });
+    } else {
+      query = query.order("created_at", { ascending: false });
+    }
 
     // Apply status filter if provided
     if (statusFilter.length > 0) {

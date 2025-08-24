@@ -199,9 +199,8 @@ export const VideoItem = React.memo<VideoItemProps>(({
             timestamp: Date.now()
           });
           return (
-            <div className="absolute inset-0 bg-gray-200 flex items-center justify-center z-10">
+            <div className={`absolute inset-0 bg-gray-200 flex items-center justify-center z-10 transition-opacity duration-300 ${videoFullyVisible ? 'opacity-0' : 'opacity-100'}`}>
               <div className="w-6 h-6 border-2 border-gray-400 border-t-gray-600 rounded-full animate-spin"></div>
-
             </div>
           );
         })()}
@@ -217,6 +216,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
                 videoPosterLoaded ? 'opacity-100' : 'opacity-0 pointer-events-none'
               }`}
               videoClassName="object-cover cursor-pointer"
+              poster={video.thumbUrl}
               data-video-id={video.id}
               // Interaction events
               onDoubleClick={isMobile ? undefined : () => {

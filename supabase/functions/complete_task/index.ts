@@ -481,7 +481,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
             const { error: orchError } = await supabaseAdmin.from("tasks").update({
               status: "Complete",
               output_location: publicUrl,
-              generation_processed_at: new Date().toISOString()
+              generation_processed_at: new Date().toISOString(),
+              worker_id: null
             }).eq("id", orchestratorIdString).eq("status", "In Progress"); // Only update if still in progress
             if (orchError) {
               console.error(`[COMPLETE-TASK-DEBUG] Failed to update orchestrator ${params.orchestrator_task_id_ref}:`, orchError);
