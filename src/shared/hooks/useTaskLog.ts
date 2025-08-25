@@ -105,15 +105,8 @@ export function useTaskLog(
         query = query.in('project_id', filters.projectIds);
       }
 
-      // Sort by completion time for Complete tasks, otherwise by created_at
-      const hasCompleteStatus = filters.status?.includes('Complete');
-      if (hasCompleteStatus && filters.status?.length === 1) {
-        query = query.order('generation_processed_at', { ascending: false, nullsLast: true });
-      } else {
-        query = query.order('created_at', { ascending: false });
-      }
-      
       const { data: tasksData, error: tasksError, count } = await query
+        .order('created_at', { ascending: false })
         .range(offset, offset + limit - 1);
 
       if (tasksError) {

@@ -56,16 +56,7 @@ verify_jwt = false
 [functions.calculate-task-cost]
 verify_jwt = false
 
-[functions.claim_next_task_optimized]
-verify_jwt = false
-
 [functions.claim-next-task]
-verify_jwt = false
-
-[functions.claim-next-task-original-backup]
-verify_jwt = false
-
-[functions.complete_task]
 verify_jwt = false
 
 [functions.create_task]

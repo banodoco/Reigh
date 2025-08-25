@@ -19,13 +19,12 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
  * Headers: Authorization: Bearer <JWT or PAT>
  * Body: {
  *   worker_id?: string,        // Optional worker ID for service role
- *   dry_run?: boolean,         // If true, only count tasks without claiming
- *   include_active?: boolean   // If true, include In Progress tasks in count
+ *   count?: boolean           // If true, return detailed counts and debugging info
  * }
  * 
  * Returns:
- * - 200 OK with task data or count
- * - 204 No Content if no tasks available
+ * - 200 OK with task data (claiming) or detailed counts (count mode)
+ * - 204 No Content if no tasks available (claiming only)
  * - 401 Unauthorized if no valid token
  * - 403 Forbidden if token invalid or user not found
  * - 500 Internal Server Error
@@ -62,15 +61,11 @@ serve(async (req) => {
     console.log("No valid JSON body provided, using defaults");
   }
 
-  const isDryRun = requestBody.dry_run === true;
-  const includeActive = requestBody.include_active === true;
+  const isCountMode = requestBody.count === true;
   const workerId = requestBody.worker_id || `edge_${crypto.randomUUID()}`;
 
-  if (isDryRun) {
-    console.log("⚙️  Dry-run mode enabled – no tasks will be claimed, only counted.");
-  }
-  if (includeActive) {
-    console.log("⚙️  Include active mode – counting both Queued AND In Progress tasks.");
+  if (isCountMode) {
+    console.log("🧮 Count mode enabled – returning queued, active, and per-user breakdown.");
   }
 
   // Create admin client for database operations
@@ -148,20 +143,101 @@ serve(async (req) => {
       // ═══════════════════════════════════════════════════════════════
       console.log("Service role: Using optimized PostgreSQL function");
       
-      if (isDryRun) {
-        // Count eligible tasks without claiming
-        const { data: countResult, error: countError } = await supabaseAdmin
-          .rpc('count_eligible_tasks_service_role', {
-            p_include_active: includeActive
-          });
+      if (isCountMode) {
+        // Aggregated counts and per-user breakdown for service role
+        // queued_only = count(include_active=false)
+        // queued_plus_active = count(include_active=true)
+        // active_only = diff (cloud-claimed, orchestrators excluded per migration)
+        console.log('[ClaimNextTask:CountDebug] Service-role: starting count computations');
+        const [countQueuedOnly, countQueuedPlusActive] = await Promise.all([
+          supabaseAdmin.rpc('count_eligible_tasks_service_role', { p_include_active: false }),
+          supabaseAdmin.rpc('count_eligible_tasks_service_role', { p_include_active: true })
+        ]);
 
-        if (countError) {
-          console.error("Service role count error:", countError);
-          throw countError;
+        if (countQueuedOnly.error) {
+          console.error("Service role count (queued only) error:", countQueuedOnly.error);
+          throw countQueuedOnly.error;
+        }
+        if (countQueuedPlusActive.error) {
+          console.error("Service role count (queued+active) error:", countQueuedPlusActive.error);
+          throw countQueuedPlusActive.error;
         }
 
-        console.log(`Service role dry-run: ${countResult} eligible tasks`);
-        return new Response(JSON.stringify({ available_tasks: countResult }), {
+        const queued_only = countQueuedOnly.data ?? 0;
+        const queued_plus_active = countQueuedPlusActive.data ?? 0;
+        const active_only = Math.max(0, queued_plus_active - queued_only);
+        console.log(`[ClaimNextTask:CountDebug] Service-role totals: queued_only=${queued_only}, active_only=${active_only}, queued_plus_active=${queued_plus_active}`);
+
+        // Per-user breakdown (cloud-claimed active only in function; may include orchestrators)
+        let user_stats: any[] = [];
+        try {
+          console.log('[ClaimNextTask:CountDebug] Calling analyze_task_availability_service_role(include_active=true)');
+          const { data: analysis } = await supabaseAdmin
+            .rpc('analyze_task_availability_service_role', { p_include_active: true });
+          if (analysis && Array.isArray(analysis.user_stats) && analysis.user_stats.length > 0) {
+            user_stats = analysis.user_stats;
+            console.log(`[ClaimNextTask:CountDebug] Analysis user_stats count=${user_stats.length}`);
+          }
+        } catch (e) {
+          console.log('Service role analyze_task_availability failed:', (e as any)?.message);
+        }
+        // Fallback: always-on per-user capacity stats when analysis provides no breakdown
+        if (user_stats.length === 0) {
+          console.log('[ClaimNextTask:CountDebug] Analysis returned no user_stats; using per_user_capacity_stats_service_role fallback');
+          try {
+            const { data: perUser } = await supabaseAdmin
+              .rpc('per_user_capacity_stats_service_role');
+            if (Array.isArray(perUser)) {
+              user_stats = perUser.map((u: any) => ({
+                user_id: u.user_id,
+                credits: u.credits,
+                queued_tasks: u.queued_tasks,
+                in_progress_tasks: u.in_progress_tasks,
+                allows_cloud: u.allows_cloud,
+                at_limit: u.at_limit
+              }));
+              console.log(`[ClaimNextTask:CountDebug] Fallback user_stats count=${user_stats.length}`);
+              const preview = user_stats.slice(0, 5).map(u => `${u.user_id}: queued=${u.queued_tasks}, in_progress=${u.in_progress_tasks}, credits=${u.credits}, at_limit=${u.at_limit}`);
+              console.log('[ClaimNextTask:CountDebug] Fallback users preview:', preview);
+            }
+          } catch (e) {
+            console.log('per_user_capacity_stats_service_role failed:', (e as any)?.message);
+          }
+        }
+
+        // Additional debugging data
+        const { data: globalStats } = await supabaseAdmin
+          .from('tasks')
+          .select('status, task_type, worker_id, created_at')
+          .in('status', ['Queued', 'In Progress'])
+          .order('created_at', { ascending: false })
+          .limit(20);
+
+        const taskBreakdown = {
+          queued_total: (globalStats || []).filter(t => t.status === 'Queued').length,
+          in_progress_total: (globalStats || []).filter(t => t.status === 'In Progress').length,
+          in_progress_cloud: (globalStats || []).filter(t => t.status === 'In Progress' && t.worker_id).length,
+          in_progress_local: (globalStats || []).filter(t => t.status === 'In Progress' && !t.worker_id).length,
+          orchestrator_tasks: (globalStats || []).filter(t => t.task_type?.toLowerCase().includes('orchestrator')).length
+        };
+
+        return new Response(JSON.stringify({
+          mode: 'count',
+          timestamp: new Date().toISOString(),
+          totals: {
+            queued_only,
+            active_only,
+            queued_plus_active
+          },
+          global_task_breakdown: taskBreakdown,
+          users: user_stats,
+          recent_tasks: (globalStats || []).slice(0, 10).map(t => ({
+            status: t.status,
+            type: t.task_type,
+            is_cloud: !!t.worker_id,
+            age_minutes: Math.round((Date.now() - new Date(t.created_at).getTime()) / 60000)
+          }))
+        }), {
           status: 200,
           headers: { "Content-Type": "application/json" }
         });
@@ -170,7 +246,7 @@ serve(async (req) => {
         const { data: claimResult, error: claimError } = await supabaseAdmin
           .rpc('claim_next_task_service_role', {
             p_worker_id: workerId,
-            p_include_active: includeActive
+            p_include_active: false
           });
 
         if (claimError) {
@@ -182,15 +258,15 @@ serve(async (req) => {
           console.log("Service role: No eligible tasks available");
           
           // Add detailed debugging analysis like original
-          try {
+                      try {
             const { data: analysis } = await supabaseAdmin
               .rpc('analyze_task_availability_service_role', {
-                p_include_active: includeActive
+                p_include_active: false
               });
             
             if (analysis) {
               console.log('\n🔍 DETAILED ANALYSIS:');
-              console.log(`Total ${includeActive ? 'queued + in progress' : 'queued'} tasks: ${analysis.total_tasks}`);
+              console.log(`Total queued tasks: ${analysis.total_tasks}`);
               console.log(`Eligible tasks: ${analysis.eligible_tasks}`);
               
               if (analysis.total_tasks > 0 && analysis.eligible_tasks === 0) {
@@ -237,21 +313,114 @@ serve(async (req) => {
       // ═══════════════════════════════════════════════════════════════
       console.log(`User token: Using optimized PostgreSQL function for user ${callerId}`);
       
-      if (isDryRun) {
-        // Count eligible tasks for this user without claiming
-        const { data: countResult, error: countError } = await supabaseAdmin
-          .rpc('count_eligible_tasks_user', {
-            p_user_id: callerId,
-            p_include_active: includeActive
-          });
+      if (isCountMode) {
+        // Aggregated counts and details for a single user
+        console.log(`[ClaimNextTask:CountDebug] User ${callerId}: starting count computations`);
+        const [countQueuedOnly, countQueuedPlusActive] = await Promise.all([
+          supabaseAdmin.rpc('count_eligible_tasks_user', { p_user_id: callerId, p_include_active: false }),
+          supabaseAdmin.rpc('count_eligible_tasks_user', { p_user_id: callerId, p_include_active: true })
+        ]);
 
-        if (countError) {
-          console.error("User count error:", countError);
-          throw countError;
+        if (countQueuedOnly.error) {
+          console.error("User count (queued only) error:", countQueuedOnly.error);
+          throw countQueuedOnly.error;
+        }
+        if (countQueuedPlusActive.error) {
+          console.error("User count (queued+active) error:", countQueuedPlusActive.error);
+          throw countQueuedPlusActive.error;
         }
 
-        console.log(`User ${callerId} dry-run: ${countResult} eligible tasks`);
-        return new Response(JSON.stringify({ available_tasks: countResult }), {
+        const queued_only_capacity = countQueuedOnly.data ?? 0;
+        const queued_plus_active_capacity = countQueuedPlusActive.data ?? 0;
+        const active_only_capacity = Math.max(0, queued_plus_active_capacity - queued_only_capacity);
+        console.log(`[ClaimNextTask:CountDebug] User ${callerId} totals: queued_only_capacity=${queued_only_capacity}, active_only_capacity=${active_only_capacity}, queued_plus_active_capacity=${queued_plus_active_capacity}`);
+
+        // Get eligible queued count and some context via analysis RPC
+        let eligible_queued = 0;
+        let user_info: any = {};
+        try {
+          console.log(`[ClaimNextTask:CountDebug] User ${callerId}: calling analyze_task_availability_user(include_active=true)`);
+          const { data: analysis } = await supabaseAdmin
+            .rpc('analyze_task_availability_user', { p_user_id: callerId, p_include_active: true });
+          if (analysis) {
+            eligible_queued = analysis.eligible_count ?? 0;
+            user_info = analysis.user_info ?? {};
+            console.log(`[ClaimNextTask:CountDebug] User ${callerId}: eligible_queued=${eligible_queued}`);
+          }
+        } catch (e) {
+          console.log('User analyze_task_availability failed:', (e as any)?.message);
+        }
+
+        // Compute live in-progress metrics for this user
+        // 1) Fetch user project ids
+        const { data: projects, error: projErr } = await supabaseAdmin
+          .from('projects')
+          .select('id')
+          .eq('user_id', callerId);
+        if (projErr) {
+          console.error('Fetch projects error:', projErr);
+          throw projErr;
+        }
+        const projectIds = (projects || []).map((p: any) => p.id);
+
+        let in_progress_any = 0;
+        let in_progress_cloud = 0;
+        let in_progress_cloud_non_orchestrator = 0;
+        if (projectIds.length > 0) {
+          const [qAny, qCloud, qCloudNonOrch] = await Promise.all([
+            supabaseAdmin.from('tasks').select('id', { count: 'exact', head: true }).in('project_id', projectIds).eq('status', 'In Progress'),
+            supabaseAdmin.from('tasks').select('id', { count: 'exact', head: true }).in('project_id', projectIds).eq('status', 'In Progress').not('worker_id', 'is', null),
+            supabaseAdmin.from('tasks').select('id', { count: 'exact', head: true }).in('project_id', projectIds).eq('status', 'In Progress').not('worker_id', 'is', null).not('task_type', 'ilike', '%orchestrator%')
+          ]);
+          in_progress_any = qAny.count ?? 0;
+          in_progress_cloud = qCloud.count ?? 0;
+          in_progress_cloud_non_orchestrator = qCloudNonOrch.count ?? 0;
+        }
+
+        // Get recent tasks for this user for debugging
+        let recent_user_tasks: any[] = [];
+        if (projectIds.length > 0) {
+          const { data: recentTasks } = await supabaseAdmin
+            .from('tasks')
+            .select('id, status, task_type, worker_id, created_at, dependant_on')
+            .in('project_id', projectIds)
+            .in('status', ['Queued', 'In Progress', 'Complete'])
+            .order('created_at', { ascending: false })
+            .limit(15);
+          
+          recent_user_tasks = (recentTasks || []).map(t => ({
+            id: t.id,
+            status: t.status,
+            type: t.task_type,
+            is_cloud: !!t.worker_id,
+            has_dependency: !!t.dependant_on,
+            age_minutes: Math.round((Date.now() - new Date(t.created_at).getTime()) / 60000)
+          }));
+        }
+
+        return new Response(JSON.stringify({
+          mode: 'count',
+          timestamp: new Date().toISOString(),
+          user_id: callerId,
+          totals: {
+            queued_only_capacity,
+            active_only_capacity,
+            queued_plus_active_capacity,
+            eligible_queued,
+            in_progress_any,
+            in_progress_cloud,
+            in_progress_cloud_non_orchestrator
+          },
+          user_info,
+          recent_tasks: recent_user_tasks,
+          debug_summary: {
+            at_capacity: in_progress_any >= 5,
+            capacity_used_pct: Math.round((in_progress_any / 5) * 100),
+            orchestrator_count: recent_user_tasks.filter(t => t.type?.toLowerCase().includes('orchestrator')).length,
+            queued_with_deps: recent_user_tasks.filter(t => t.status === 'Queued' && t.has_dependency).length,
+            can_claim_more: in_progress_any < 5 && eligible_queued > 0
+          }
+        }), {
           status: 200,
           headers: { "Content-Type": "application/json" }
         });
@@ -260,7 +429,7 @@ serve(async (req) => {
         const { data: claimResult, error: claimError } = await supabaseAdmin
           .rpc('claim_next_task_user', {
             p_user_id: callerId,
-            p_include_active: includeActive
+            p_include_active: false
           });
 
         if (claimError) {
@@ -272,11 +441,11 @@ serve(async (req) => {
           console.log(`User ${callerId}: No eligible tasks available`);
           
           // Add detailed debugging analysis for user like original
-          try {
+                      try {
             const { data: analysis } = await supabaseAdmin
               .rpc('analyze_task_availability_user', {
                 p_user_id: callerId,
-                p_include_active: includeActive
+                p_include_active: false
               });
             
             if (analysis) {

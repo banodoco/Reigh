@@ -293,25 +293,29 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
         .from('tasks')
         .select('*')
         .eq('project_id', projectId)
-        .is('params->orchestrator_task_id_ref', null) // Only parent tasks
-        .order('created_at', { ascending: false });
+        .is('params->orchestrator_task_id_ref', null); // Only parent tasks
+
+      // For Succeeded view, order by completion time (most recent first)
+      const succeededOnly = status && status.length === 1 && status[0] === TASK_STATUS.COMPLETE;
+      if (succeededOnly) {
+        dataQuery = dataQuery
+          .order('generation_processed_at', { ascending: false, nullsFirst: false })
+          .order('created_at', { ascending: false }); // tie-breaker
+      } else {
+        // Default DB ordering; Processing will use client-side custom sort
+        dataQuery = dataQuery.order('created_at', { ascending: false });
+      }
 
       if (status && status.length > 0) {
         dataQuery = dataQuery.in('status', status);
       }
 
       if (needsCustomSorting) {
-        // For Processing tasks: fetch more records to allow proper In Progress vs Queued sorting
-        // But still use reasonable limits to prevent performance issues
+        // For Processing tasks: fetch more records to allow correct client-side sorting
         const fetchLimit = Math.min(limit * PAGINATION_CONFIG.PROCESSING_FETCH_MULTIPLIER, PAGINATION_CONFIG.PROCESSING_MAX_FETCH);
         dataQuery = dataQuery.limit(fetchLimit);
       } else {
         // For Succeeded/Failed: use proper database pagination - no client sorting needed
-        // For Complete tasks, sort by completion time (generationProcessedAt) instead of created_at
-        const hasCompleteStatus = status?.includes(TASK_STATUS.COMPLETE);
-        if (hasCompleteStatus) {
-          dataQuery = dataQuery.order('generation_processed_at', { ascending: false, nullsLast: true });
-        }
         dataQuery = dataQuery.range(offset, offset + limit - 1);
       }
 
@@ -363,9 +367,8 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
       let paginatedTasks: typeof allTasks;
       
       if (needsCustomSorting) {
-        // For Processing tasks: apply custom sorting then paginate
+        // In Progress first, then Queued; within each, oldest to newest by created_at
         const sortedTasks = visibleTasks.sort((a, b) => {
-          // Priority: In Progress (1), Queued (2), Others (3)
           const getStatusPriority = (status: string) => {
             switch (status) {
               case TASK_STATUS.IN_PROGRESS: return 1;
@@ -373,24 +376,18 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
               default: return 3;
             }
           };
-          
           const aPriority = getStatusPriority(a.status);
           const bPriority = getStatusPriority(b.status);
-          
           if (aPriority !== bPriority) {
-            return aPriority - bPriority; // Lower number = higher priority
+            return aPriority - bPriority; // lower is higher priority
           }
-          
-          // Within same status, sort by created_at descending (newest first)
           const aDate = new Date(a.createdAt || 0);
           const bDate = new Date(b.createdAt || 0);
-          return bDate.getTime() - aDate.getTime();
+          return aDate.getTime() - bDate.getTime(); // oldest first
         });
-        
-        // Apply pagination to sorted results
         paginatedTasks = sortedTasks.slice(offset, offset + limit);
       } else {
-        // For Succeeded/Failed: data is already paginated by database, no client-side pagination needed
+        // For Succeeded/Failed: data is already paginated by database
         paginatedTasks = visibleTasks;
       }
       

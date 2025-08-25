@@ -101,7 +101,7 @@ The worker polls the same task queue but specializes in video generation:
 - Uses PostgreSQL (Supabase) for both local development and production
 
 ### 3. Task Completion
-- Worker calls `complete_task` Edge Function with:
+- Worker calls `process-completed-task` Edge Function with:
   - Task ID
   - Output data (URLs, metadata)
   - Error info (if failed)
@@ -125,7 +125,7 @@ The worker polls the same task queue but specializes in video generation:
 - **Edge Functions** (`/supabase/functions/`)
   - `create_task/index.ts` - Task creation & validation
   - `claim_next_task/index.ts` - Worker task assignment (uses `func_claim_available_task`)
-  - `complete_task/index.ts` - Task completion handling (uses `func_mark_task_complete`)
+  - `process-completed-task/index.ts` - Task completion handling (uses `func_mark_task_complete`)
   - `calculate-task-cost/index.ts` - Credit cost calculation
   - For complete Edge Functions reference including AI processing and payments, see [`edge_functions.md`](edge_functions.md)
 

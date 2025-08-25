@@ -21,8 +21,6 @@
 |----------|---------|-------------|
 | **`create_task`** | Task creation | Validates credits, creates queued task |
 | **`claim_next_task`** | Worker polling | Returns next available task for processing |
-| **`claim_next_task_optimized`** | Optimized claiming | Performance-optimized task claiming |
-| **`complete_task`** | Task completion | Marks task complete, triggers generation creation |
 | **`update-task-status`** | Status updates | Real-time task status broadcasting |
 
 ### Payment Processing

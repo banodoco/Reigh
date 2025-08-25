@@ -70,7 +70,7 @@ def process_task(task):
         output_url = upload_to_supabase_storage(result.file)
         
         # Mark complete
-        complete_task(task['id'], {
+        process_completed_task(task['id'], {
             'output_location': output_url,
             'metadata': result.metadata
         })
@@ -79,7 +79,7 @@ def process_task(task):
         fail_task(task['id'], str(e))
 ```
 
-### 3. Task Completion (`complete_task` Edge Function)
+### 3. Task Completion (`process-completed-task` Edge Function)
 
 ```typescript
 // Update task status
@@ -250,7 +250,7 @@ When a task isn't working properly:
 ### Edge Functions (`/supabase/functions/`)
 - `create_task/index.ts` - Task creation & validation
 - `claim_next_task/index.ts` - Worker assignment  
-- `complete_task/index.ts` - Task completion
+- `process-completed-task/index.ts` - Task completion
 - `calculate-task-cost/index.ts` - Cost estimation
 
 ### Database Triggers (`/supabase/migrations/`)
