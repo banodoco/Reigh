@@ -75,6 +75,15 @@ const LightboxScrubVideo: React.FC<LightboxScrubVideoProps> = ({
   const speedOptions = [0.25, 0.5, 1, 1.5, 2];
   const isMobile = useIsMobile();
 
+  // Component initialization log
+  console.log('[LIGHTBOX-DEBUG] 🚀 LightboxScrubVideo component render', {
+    src: src.substring(src.lastIndexOf('/') + 1) || 'no-src',
+    poster: poster?.substring(poster.lastIndexOf('/') + 1) || 'no-poster',
+    isMobile,
+    currentState: { posterLoaded, isVideoPlaying },
+    timestamp: Date.now()
+  });
+
   const startAutoPlay = useCallback(() => {
     if (videoRef.current && !isScrubbingRef.current) {
       // Check if video is already playing to prevent restart
@@ -372,19 +381,27 @@ const LightboxScrubVideo: React.FC<LightboxScrubVideoProps> = ({
     };
 
     const handlePlay = () => {
-      setIsVideoPlaying(true);
-      console.log('[AutoplayDebugger:LIGHTBOX] ▶️ Video started playing', {
-        src: video.src?.substring(video.src.lastIndexOf('/') + 1) || 'no-src',
+      console.log('[LIGHTBOX-DEBUG] 🎬 handlePlay called - setting isVideoPlaying to true', {
+        oldIsVideoPlaying: isVideoPlaying,
+        newIsVideoPlaying: true,
+        videoSrc: video.src?.substring(video.src.lastIndexOf('/') + 1) || 'no-src',
+        videoPaused: video.paused,
+        videoCurrentTime: video.currentTime,
         timestamp: Date.now()
       });
+      setIsVideoPlaying(true);
     };
 
     const handlePause = () => {
-      setIsVideoPlaying(false);
-      console.log('[AutoplayDebugger:LIGHTBOX] ⏸️ Video paused', {
-        src: video.src?.substring(video.src.lastIndexOf('/') + 1) || 'no-src',
+      console.log('[LIGHTBOX-DEBUG] ⏸️ handlePause called - setting isVideoPlaying to false', {
+        oldIsVideoPlaying: isVideoPlaying,
+        newIsVideoPlaying: false,
+        videoSrc: video.src?.substring(video.src.lastIndexOf('/') + 1) || 'no-src',
+        videoPaused: video.paused,
+        videoCurrentTime: video.currentTime,
         timestamp: Date.now()
       });
+      setIsVideoPlaying(false);
     };
 
     video.addEventListener('canplay', handleCanPlay);
@@ -480,7 +497,16 @@ const LightboxScrubVideo: React.FC<LightboxScrubVideoProps> = ({
       {...rest}
     >
       {/* Always show static img poster first on mobile to prevent blink - hide when video starts playing */}
-      {isMobile && poster && !isVideoPlaying && (
+      {isMobile && poster && !isVideoPlaying && (() => {
+        console.log('[LIGHTBOX-DEBUG] 📸 Static IMG poster should be visible', {
+          isMobile,
+          hasPoster: !!poster,
+          isVideoPlaying,
+          condition: isMobile && poster && !isVideoPlaying,
+          timestamp: Date.now()
+        });
+        return true;
+      })() && (
         <img
           src={getDisplayUrl(poster)}
           alt="Video poster"
@@ -492,13 +518,13 @@ const LightboxScrubVideo: React.FC<LightboxScrubVideoProps> = ({
             objectPosition: 'center'
           }}
           onLoad={() => {
+            console.log('[LIGHTBOX-DEBUG] 🖼️ Static poster IMG loaded', {
+              posterSrc: poster.substring(poster.lastIndexOf('/') + 1) || 'no-poster',
+              willMountVideo: true,
+              currentState: { posterLoaded, isVideoPlaying },
+              timestamp: Date.now()
+            });
             setPosterLoaded(true);
-            if (process.env.NODE_ENV === 'development') {
-              console.log('[AutoplayDebugger:LIGHTBOX] 📱 Static poster loaded, safe to mount video', {
-                src: poster.substring(poster.lastIndexOf('/') + 1) || 'no-poster',
-                timestamp: Date.now()
-              });
-            }
           }}
           onError={() => {
             setPosterLoaded(true); // Still allow video to mount even if poster fails
@@ -513,41 +539,111 @@ const LightboxScrubVideo: React.FC<LightboxScrubVideoProps> = ({
       )}
 
       {/* Only mount video after poster loads on mobile, or immediately on desktop */}
-      {(posterLoaded || !isMobile) && (
-        <>
-          {/* Poster overlay - shows poster image until video actually starts playing */}
-          {poster && !isVideoPlaying && (
-            <div 
-              className="absolute inset-0 z-10 pointer-events-none"
-              style={{
-                backgroundImage: `url(${getDisplayUrl(poster)})`,
-                backgroundSize: 'contain',
-                backgroundPosition: 'center',
-                backgroundRepeat: 'no-repeat'
-              }}
-            />
-          )}
+      {(posterLoaded || !isMobile) && (() => {
+        console.log('[LIGHTBOX-DEBUG] 🎬 Video mounting condition met', {
+          isMobile,
+          posterLoaded,
+          isVideoPlaying,
+          condition: posterLoaded || !isMobile,
+          timestamp: Date.now()
+        });
+        return (
+          <>
+            {/* Poster overlay - shows poster image until video actually starts playing */}
+            {poster && !isVideoPlaying && (() => {
+              console.log('[LIGHTBOX-DEBUG] 🎭 Background poster overlay rendering', {
+                posterUrl: poster.substring(poster.lastIndexOf('/') + 1) || 'no-poster',
+                isVideoPlaying,
+                willShow: true,
+                timestamp: Date.now()
+              });
+              return (
+                <div 
+                  className="absolute inset-0 z-10 pointer-events-none"
+                  style={{
+                    backgroundImage: `url(${getDisplayUrl(poster)})`,
+                    backgroundSize: 'contain',
+                    backgroundPosition: 'center',
+                    backgroundRepeat: 'no-repeat'
+                  }}
+                />
+              );
+            })()}
 
-          <video
-            ref={videoRef}
-            src={getDisplayUrl(src)}
-            poster={poster ? getDisplayUrl(poster) : undefined}
-            preload={isMobile ? 'auto' : preloadProp}
-            controls={false}
-            onLoadedMetadata={handleLoadedMetadata}
-            loop={loop}
-            muted={true}
-            autoPlay={false} // We control play/pause manually
-            playsInline={true}
-            className={cn('w-full h-full object-contain', videoClassName)}
-            onDoubleClick={onDoubleClick}
-            onTouchEnd={onTouchEnd}
-            data-lightbox-video="true"
-          >
-            Your browser does not support the video tag.
-          </video>
-        </>
-      )}
+            <video
+              ref={(el) => {
+                console.log('[LIGHTBOX-DEBUG] 🎥 Video element ref set', {
+                  videoElement: !!el,
+                  src: el?.src?.substring(el.src.lastIndexOf('/') + 1) || 'no-src',
+                  poster: el?.poster?.substring(el.poster.lastIndexOf('/') + 1) || 'no-poster',
+                  readyState: el?.readyState,
+                  paused: el?.paused,
+                  muted: el?.muted,
+                  playsInline: el?.playsInline,
+                  timestamp: Date.now()
+                });
+                videoRef.current = el;
+              }}
+              src={getDisplayUrl(src)}
+              poster={poster ? getDisplayUrl(poster) : undefined}
+              preload={isMobile ? 'auto' : preloadProp}
+              controls={false}
+              onLoadedMetadata={(e) => {
+                console.log('[LIGHTBOX-DEBUG] 📊 Video metadata loaded', {
+                  duration: e.currentTarget.duration,
+                  readyState: e.currentTarget.readyState,
+                  videoWidth: e.currentTarget.videoWidth,
+                  videoHeight: e.currentTarget.videoHeight,
+                  timestamp: Date.now()
+                });
+                handleLoadedMetadata();
+              }}
+              onCanPlay={(e) => {
+                console.log('[LIGHTBOX-DEBUG] ✅ Video can play', {
+                  readyState: e.currentTarget.readyState,
+                  paused: e.currentTarget.paused,
+                  currentTime: e.currentTarget.currentTime,
+                  timestamp: Date.now()
+                });
+              }}
+              onPlay={(e) => {
+                console.log('[LIGHTBOX-DEBUG] ▶️ Video play event fired', {
+                  currentTime: e.currentTarget.currentTime,
+                  paused: e.currentTarget.paused,
+                  isVideoPlayingState: isVideoPlaying,
+                  timestamp: Date.now()
+                });
+              }}
+              onPause={(e) => {
+                console.log('[LIGHTBOX-DEBUG] ⏸️ Video pause event fired', {
+                  currentTime: e.currentTarget.currentTime,
+                  paused: e.currentTarget.paused,
+                  isVideoPlayingState: isVideoPlaying,
+                  timestamp: Date.now()
+                });
+              }}
+              onError={(e) => {
+                console.error('[LIGHTBOX-DEBUG] ❌ Video error', {
+                  error: e.currentTarget.error,
+                  networkState: e.currentTarget.networkState,
+                  readyState: e.currentTarget.readyState,
+                  timestamp: Date.now()
+                });
+              }}
+              loop={loop}
+              muted={true}
+              autoPlay={false} // We control play/pause manually
+              playsInline={true}
+              className={cn('w-full h-full object-contain', videoClassName)}
+              onDoubleClick={onDoubleClick}
+              onTouchEnd={onTouchEnd}
+              data-lightbox-video="true"
+            >
+              Your browser does not support the video tag.
+            </video>
+          </>
+        );
+      })()}
 
       {/* Scrubber Line - Desktop only */}
       {!isMobile && scrubberPosition !== null && (
