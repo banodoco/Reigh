@@ -51,7 +51,7 @@ const GenerationsPaneComponent: React.FC = () => {
   const [shotFilterOpen, setShotFilterOpen] = useState(false);
   const [mediaTypeFilterOpen, setMediaTypeFilterOpen] = useState(false);
 
-  // Use the generalized logic - disable data loading when on video travel page to reduce mobile overhead
+  // Use the generalized logic - data loading now enabled on all pages
   const {
     selectedProjectId,
     shotsData,
@@ -75,7 +75,7 @@ const GenerationsPaneComponent: React.FC = () => {
   } = useGenerationsPageLogic({
     itemsPerPage: GENERATIONS_PER_PAGE,
     mediaType: mediaTypeFilter,
-    enableDataLoading: !isOnVideoTravelPage
+    enableDataLoading: true
   });
 
   // Debug: Log the current filter state
