@@ -735,6 +735,38 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
                 });
                 const shouldLoad = true; // Force load immediately to mirror ShotsPane behavior
                 
+                // Helper function to check if placing selected items at this index would result in actual movement
+                const wouldActuallyMove = (targetIndex: number) => {
+                  // Get indices of selected items
+                  const selectedIndices = mobileSelectedIds
+                    .map(id => currentImages.findIndex(img => img.shotImageEntryId === id))
+                    .filter(idx => idx !== -1)
+                    .sort((a, b) => a - b);
+                  
+                  if (selectedIndices.length === 0) return false;
+                  
+                  // For multiple items selected, be more permissive - allow movement to more positions
+                  // since we're moving them as a group and the logic is more complex
+                  if (selectedIndices.length > 1) {
+                    return true; // Allow movement to any non-selected position
+                  }
+                  
+                  // For single item selection, apply the strict adjacency rules
+                  const firstSelectedIndex = selectedIndices[0];
+                  const lastSelectedIndex = selectedIndices[selectedIndices.length - 1];
+                  
+                  // If targeting before the first selected item and it's immediately before
+                  if (targetIndex === firstSelectedIndex) return false;
+                  
+                  // If targeting after the last selected item and it's immediately after
+                  if (targetIndex === lastSelectedIndex + 1) return false;
+                  
+                  return true;
+                };
+                
+                const showLeftArrow = mobileSelectedIds.length > 0 && !isSelected && wouldActuallyMove(index);
+                const showRightArrow = mobileSelectedIds.length > 0 && isLastItem && !isSelected && wouldActuallyMove(index + 1);
+                
                 return (
                   <React.Fragment key={image.shotImageEntryId}>
                     <div className="relative">
@@ -752,38 +784,37 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
                          projectAspectRatio={projectAspectRatio}
                        />
                        
-                      {/* Move button before first image */}
-                      {index === 0 && mobileSelectedIds.length > 0 && (
+                      {/* Move button on left side of each non-selected item */}
+                      {showLeftArrow && (
                         <div className="absolute top-1/2 -left-1 -translate-y-1/2 -translate-x-1/2 z-10">
                           <Button
                             size="icon"
                             variant="secondary"
                             className="h-12 w-6 rounded-full p-0"
-                            onClick={() => handleMoveHere(0)}
+                            onClick={() => handleMoveHere(index)}
                             onPointerDown={e=>e.stopPropagation()}
-                            title="Move to beginning"
+                            title={index === 0 ? "Move to beginning" : "Move here"}
                           >
                             <ArrowDown className="h-4 w-4" />
                           </Button>
                         </div>
                       )}
 
-                      {/* Move here button after this item */}
-                      {mobileSelectedIds.length > 0 &&
-                       (!isSelected || isLastItem) &&
-                       <div className="absolute top-1/2 -right-1 -translate-y-1/2 translate-x-1/2 z-10">
-                         <Button
-                           size="icon"
-                           variant="secondary"
-                           className="h-12 w-6 rounded-full p-0"
-                           onClick={() => handleMoveHere(index + 1)}
-                           onPointerDown={e=>e.stopPropagation()}
-                           title={isLastItem ? "Move to end" : "Move here"}
-                         >
-                           <ArrowDown className="h-4 w-4" />
-                         </Button>
-                       </div>
-                      }
+                      {/* Move to end button on right side of last item (if not selected) */}
+                      {showRightArrow && (
+                        <div className="absolute top-1/2 -right-1 -translate-y-1/2 translate-x-1/2 z-10">
+                          <Button
+                            size="icon"
+                            variant="secondary"
+                            className="h-12 w-6 rounded-full p-0"
+                            onClick={() => handleMoveHere(index + 1)}
+                            onPointerDown={e=>e.stopPropagation()}
+                            title="Move to end"
+                          >
+                            <ArrowDown className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   </React.Fragment>
                 );
