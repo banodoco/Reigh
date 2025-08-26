@@ -597,6 +597,19 @@ const LightboxScrubVideo: React.FC<LightboxScrubVideoProps> = ({
                   timestamp: Date.now()
                 });
                 handleLoadedMetadata();
+                
+                // CRITICAL: Trigger autoplay immediately after metadata loads
+                console.log('[LIGHTBOX-DEBUG] 🎯 Triggering autoplay after metadata load');
+                setTimeout(() => {
+                  if (videoRef.current && !isVideoPlaying) {
+                    console.log('[LIGHTBOX-DEBUG] 🚀 Attempting autoplay via metadata callback', {
+                      videoPaused: videoRef.current.paused,
+                      readyState: videoRef.current.readyState,
+                      timestamp: Date.now()
+                    });
+                    startAutoPlay();
+                  }
+                }, 10); // Tiny delay to ensure ref is stable
               }}
               onCanPlay={(e) => {
                 console.log('[LIGHTBOX-DEBUG] ✅ Video can play', {
@@ -605,6 +618,19 @@ const LightboxScrubVideo: React.FC<LightboxScrubVideoProps> = ({
                   currentTime: e.currentTarget.currentTime,
                   timestamp: Date.now()
                 });
+                
+                // BACKUP: Also trigger autoplay on canplay event
+                console.log('[LIGHTBOX-DEBUG] 🎯 Triggering autoplay on canplay event');
+                setTimeout(() => {
+                  if (videoRef.current && !isVideoPlaying && videoRef.current.paused) {
+                    console.log('[LIGHTBOX-DEBUG] 🚀 Attempting autoplay via canplay callback', {
+                      videoPaused: videoRef.current.paused,
+                      readyState: videoRef.current.readyState,
+                      timestamp: Date.now()
+                    });
+                    startAutoPlay();
+                  }
+                }, 10);
               }}
               onPlay={(e) => {
                 console.log('[LIGHTBOX-DEBUG] ▶️ Video play event fired', {
