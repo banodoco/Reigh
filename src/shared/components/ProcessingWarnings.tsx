@@ -29,19 +29,34 @@ export const GlobalProcessingWarning: React.FC<ProcessingWarningsProps> = ({ onO
   // If both generation methods are disabled, show a dedicated warning.
   const generationDisabled = !inCloudChecked && !onComputerChecked;
 
-
+  // DEBUG: Log warning conditions to help diagnose desktop issues
+  console.log('[ProcessingWarningsDesktopDebug] Warning conditions:', {
+    isLoadingBalance,
+    isLoadingTokens,
+    balance: balance?.balance,
+    hasCredits,
+    tokensCount: tokens.length,
+    hasValidToken,
+    inCloudChecked,
+    onComputerChecked,
+    generationDisabled,
+    noCreditsButCloudEnabled: inCloudChecked && !hasCredits,
+    shouldShowFinalWarning: !hasCredits && !hasValidToken
+  });
 
   // Avoid showing any warning while data is loading.
   if (isLoadingBalance || isLoadingTokens) {
+    console.log('[ProcessingWarningsDesktopDebug] Still loading, not showing warnings');
     return null;
   }
 
   // 1. Generation disabled takes top priority.
   if (generationDisabled) {
+    console.log('[ProcessingWarningsDesktopDebug] Showing GENERATION DISABLED warning');
     return (
       <div className="mt-16 animate-in slide-in-from-top-2 fade-in duration-300">
         <div className="container mx-auto px-4 md:px-6 mt-4">
-          <Alert className="border-orange-200 bg-orange-50 text-orange-900 flex items-center justify-between py-3 pr-4">
+          <Alert className="border-orange-200 bg-orange-50 text-orange-900 flex items-center justify-between py-3 pr-4 shadow-lg border-2">
             <div className="flex items-center space-x-3">
               <span className="inline-flex items-center">
                 <AlertTriangle className="h-5 w-5 text-orange-700 mr-2" />
@@ -66,10 +81,11 @@ export const GlobalProcessingWarning: React.FC<ProcessingWarningsProps> = ({ onO
   const noCreditsButCloudEnabled = inCloudChecked && !hasCredits;
 
   if (noCreditsButCloudEnabled) {
+    console.log('[ProcessingWarningsDesktopDebug] Showing NO CREDITS BUT CLOUD ENABLED warning');
     return (
       <div className="mt-8 animate-in slide-in-from-top-2 fade-in duration-300">
         <div className="container mx-auto px-4 md:px-6 mt-4">
-          <Alert className="border-orange-200 bg-orange-50 text-orange-900 flex items-center justify-between py-3 pr-4">
+          <Alert className="border-orange-200 bg-orange-50 text-orange-900 flex items-center justify-between py-3 pr-4 shadow-lg border-2">
             <div className="flex items-center space-x-3">
               <span className="inline-flex items-center">
                 <AlertTriangle className="h-5 w-5 text-orange-700 mr-2" />
@@ -100,9 +116,11 @@ export const GlobalProcessingWarning: React.FC<ProcessingWarningsProps> = ({ onO
 
   // 3. Show the existing credits/token warning if both cloud processing is disabled AND no valid token.
   if (hasCredits || hasValidToken) {
+    console.log('[ProcessingWarningsDesktopDebug] NOT showing warning because hasCredits or hasValidToken is true');
     return null;
   }
   
+  console.log('[ProcessingWarningsDesktopDebug] Showing FALLBACK warning - no credits and no valid token');
   return (
     <div className="mt-4 animate-in slide-in-from-top-2 fade-in duration-300">
       <div className="container mx-auto px-4 md:px-6 mt-4">

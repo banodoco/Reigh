@@ -139,19 +139,89 @@ export const VideoItem = React.memo<VideoItemProps>(({
   // RENDER - Clean component rendering
   // ===============================================================================
 
+  // MOBILE OPTIMIZATION: Use poster images instead of video elements on mobile to prevent autoplay budget exhaustion
+  // ALL gallery videos use posters on mobile to leave maximum budget for lightbox autoplay
+  const shouldUsePosterOnMobile = isMobile;
+  
+  // Determine poster image source: prefer thumbnail, fallback to video poster frame
+  const posterImageSrc = (() => {
+    if (video.thumbUrl) return video.thumbUrl; // Use thumbnail if available
+    if (video.location) return video.location; // Use video URL (browser will show first frame)
+    return video.imageUrl; // Final fallback
+  })();
+  
+  if (process.env.NODE_ENV === 'development' && shouldUsePosterOnMobile) {
+    console.log('[AutoplayDebugger:GALLERY] 📱 Using poster optimization', {
+      videoId: video.id?.substring(0, 8),
+      hasThumbnail,
+      posterSrc: posterImageSrc?.substring(posterImageSrc.lastIndexOf('/') + 1) || 'none',
+      reason: 'Mobile optimization - ALL gallery videos use posters to maximize lightbox autoplay budget',
+      timestamp: Date.now()
+    });
+  }
+
   return (
     <div className="w-1/2 lg:w-1/3 px-1 sm:px-1.5 md:px-2 mb-2 sm:mb-3 md:mb-4 relative group">
       <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden shadow-sm border relative">
-        {/* Thumbnail - shows immediately if available, stays visible until video fully transitions */}
-        {hasThumbnail && !thumbnailError && (
-          <img
-            src={video.thumbUrl}
-            alt="Video thumbnail"
-            loading="eager"
-            decoding="sync"
-            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
-              videoFullyVisible ? 'opacity-0' : 'opacity-100'
-            }`}
+        
+        {shouldUsePosterOnMobile ? (
+          // MOBILE POSTER MODE: Show static image - clickable to open lightbox
+          <div 
+            className="absolute inset-0 w-full h-full cursor-pointer"
+            onClick={(e) => {
+              // Don't interfere with touches inside action buttons
+              const path = (e as any).nativeEvent?.composedPath?.() as HTMLElement[] | undefined;
+              const isInsideButton = path ? path.some((el) => (el as HTMLElement)?.tagName === 'BUTTON' || (el as HTMLElement)?.closest?.('button')) : !!(e.target as HTMLElement).closest('button');
+              if (isInsideButton) return;
+              e.preventDefault();
+              e.stopPropagation();
+              if (process.env.NODE_ENV === 'development') {
+                console.log('[AutoplayDebugger:GALLERY] 📱 Poster clicked, opening lightbox', {
+                  videoId: video.id?.substring(0, 8),
+                  originalIndex,
+                  timestamp: Date.now()
+                });
+              }
+              onMobileTap(originalIndex);
+            }}
+            onTouchEnd={isMobile ? (e) => {
+              // Don't interfere with touches inside action buttons
+              const path = (e as any).nativeEvent?.composedPath?.() as HTMLElement[] | undefined;
+              const isInsideButton = path ? path.some((el) => (el as HTMLElement)?.tagName === 'BUTTON' || (el as HTMLElement)?.closest?.('button')) : !!(e.target as HTMLElement).closest('button');
+              if (isInsideButton) return;
+              e.preventDefault();
+              e.stopPropagation();
+              if (process.env.NODE_ENV === 'development') {
+                console.log('[AutoplayDebugger:GALLERY] 📱 Poster touched, opening lightbox', {
+                  videoId: video.id?.substring(0, 8),
+                  originalIndex,
+                  timestamp: Date.now()
+                });
+              }
+              onMobileTap(originalIndex);
+            } : undefined}
+          >
+            <img
+              src={posterImageSrc}
+              alt="Video poster"
+              loading="eager"
+              decoding="sync"
+              className="w-full h-full object-cover"
+            />
+          </div>
+        ) : (
+          // DESKTOP OR PRIORITY VIDEO MODE: Use actual video element
+          <>
+            {/* Thumbnail - shows immediately if available, stays visible until video fully transitions */}
+            {hasThumbnail && !thumbnailError && (
+              <img
+                src={video.thumbUrl}
+                alt="Video thumbnail"
+                loading="eager"
+                decoding="sync"
+                className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
+                  videoFullyVisible ? 'opacity-0' : 'opacity-100'
+                }`}
             onLoad={() => {
               setThumbnailLoaded(true);
               if (process.env.NODE_ENV === 'development') {
@@ -182,59 +252,61 @@ export const VideoItem = React.memo<VideoItemProps>(({
               }
             }}
           />
+            )}
+            
+            {/* Loading placeholder - shows until thumbnail or video poster is ready */}
+            {/* Don't show loading if thumbnail was initially cached */}
+            {!thumbnailLoaded && !videoPosterLoaded && !isInitiallyCached && (() => {
+              console.log(`[VideoGalleryPreload] VIDEO_ITEM_SHOWING_LOADING_SPINNER:`, {
+                videoId: video.id?.substring(0, 8),
+                thumbnailLoaded,
+                videoPosterLoaded,
+                isInitiallyCached,
+                hasThumbnail,
+                inPreloaderCache,
+                inBrowserCache,
+                reason: 'thumbnailLoaded=false AND videoPosterLoaded=false AND isInitiallyCached=false',
+                timestamp: Date.now()
+              });
+              return (
+                <div className={`absolute inset-0 bg-gray-200 flex items-center justify-center z-10 transition-opacity duration-300 ${videoFullyVisible ? 'opacity-0' : 'opacity-100'}`}>
+                  <div className="w-6 h-6 border-2 border-gray-400 border-t-gray-600 rounded-full animate-spin"></div>
+                </div>
+              );
+            })()}
+            
+            {/* Only render video when it's time to load */}
+            {shouldLoad && (
+              <div className="relative w-full h-full">
+                {/* HoverScrubVideo with loading optimization integration */}
+                <HoverScrubVideo
+                  src={video.location || video.imageUrl}
+                  preload={shouldPreload as 'auto' | 'metadata' | 'none'}
+                  className={`w-full h-full transition-opacity duration-500 ${
+                    videoPosterLoaded ? 'opacity-100' : 'opacity-0 pointer-events-none'
+                  }`}
+                  videoClassName="object-cover cursor-pointer"
+                  poster={video.thumbUrl}
+                  data-video-id={video.id}
+                  // Interaction events
+                  onDoubleClick={isMobile ? undefined : () => {
+                    onLightboxOpen(originalIndex);
+                  }}
+                  onTouchEnd={isMobile ? (e) => {
+                    // Don't interfere with touches inside action buttons
+                    const path = (e as any).nativeEvent?.composedPath?.() as HTMLElement[] | undefined;
+                    const isInsideButton = path ? path.some((el) => (el as HTMLElement)?.tagName === 'BUTTON' || (el as HTMLElement)?.closest?.('button')) : !!(e.target as HTMLElement).closest('button');
+                    if (isInsideButton) return;
+                    e.preventDefault();
+                    onMobileTap(originalIndex);
+                  } : undefined}
+                />
+              </div>
+            )}
+          </>
         )}
         
-        {/* Loading placeholder - shows until thumbnail or video poster is ready */}
-        {/* Don't show loading if thumbnail was initially cached */}
-        {!thumbnailLoaded && !videoPosterLoaded && !isInitiallyCached && (() => {
-          console.log(`[VideoGalleryPreload] VIDEO_ITEM_SHOWING_LOADING_SPINNER:`, {
-            videoId: video.id?.substring(0, 8),
-            thumbnailLoaded,
-            videoPosterLoaded,
-            isInitiallyCached,
-            hasThumbnail,
-            inPreloaderCache,
-            inBrowserCache,
-            reason: 'thumbnailLoaded=false AND videoPosterLoaded=false AND isInitiallyCached=false',
-            timestamp: Date.now()
-          });
-          return (
-            <div className={`absolute inset-0 bg-gray-200 flex items-center justify-center z-10 transition-opacity duration-300 ${videoFullyVisible ? 'opacity-0' : 'opacity-100'}`}>
-              <div className="w-6 h-6 border-2 border-gray-400 border-t-gray-600 rounded-full animate-spin"></div>
-            </div>
-          );
-        })()}
-        
-        {/* Only render video when it's time to load */}
-        {shouldLoad && (
-          <div className="relative w-full h-full">
-            {/* HoverScrubVideo with loading optimization integration */}
-            <HoverScrubVideo
-              src={video.location || video.imageUrl}
-              preload={shouldPreload as 'auto' | 'metadata' | 'none'}
-              className={`w-full h-full transition-opacity duration-500 ${
-                videoPosterLoaded ? 'opacity-100' : 'opacity-0 pointer-events-none'
-              }`}
-              videoClassName="object-cover cursor-pointer"
-              poster={video.thumbUrl}
-              data-video-id={video.id}
-              // Interaction events
-              onDoubleClick={isMobile ? undefined : () => {
-                onLightboxOpen(originalIndex);
-              }}
-              onTouchEnd={isMobile ? (e) => {
-                // Don't interfere with touches inside action buttons
-                const path = (e as any).nativeEvent?.composedPath?.() as HTMLElement[] | undefined;
-                const isInsideButton = path ? path.some((el) => (el as HTMLElement)?.tagName === 'BUTTON' || (el as HTMLElement)?.closest?.('button')) : !!(e.target as HTMLElement).closest('button');
-                if (isInsideButton) return;
-                e.preventDefault();
-                onMobileTap(originalIndex);
-              } : undefined}
-            />
-          </div>
-        )}
-        
-        {/* Action buttons – positioned directly on the video container */}
+        {/* Action buttons – positioned directly on the video/poster container */}
         <div className="absolute top-1/2 right-2 sm:right-3 flex flex-col items-end gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity -translate-y-1/2 z-20 pointer-events-auto">
           <Button
             variant="secondary"

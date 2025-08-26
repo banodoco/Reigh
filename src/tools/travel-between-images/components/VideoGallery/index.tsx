@@ -403,7 +403,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   // Suppress skeletons if cache says 0 for this shot
   const showSkeletons = isLoadingGenerations && videoOutputs.length === 0 && !hasEverFetched && (cachedCount === null || cachedCount > 0);
   
-  const skeletonCount = showSkeletons ? (cachedCount || 6) : 0;
+  const skeletonCount = showSkeletons ? Math.min(cachedCount || 6, 6) : 0;
   
   // UNIQUE DEBUG ID for tracking this specific issue
   const debugId = `[SkeletonIssue:${shotId?.substring(0, 8) || 'no-shot'}:${Date.now()}]`;

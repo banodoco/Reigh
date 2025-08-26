@@ -111,9 +111,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   
   const isMobile = useIsMobile();
   
-  // Global, capture-phase interception of tap/click to guarantee
-  // the first outside tap closes the lightbox (not the pane),
-  // and no events reach underlying UI while the lightbox is open.
+  // Global minimal outside-click interceptor (capture). Do not block inside interactions.
   useEffect(() => {
     let closedFromOutside = false;
 
@@ -123,30 +121,26 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       const path = (e as any).composedPath ? (e as any).composedPath() as any[] : undefined;
       const isInside = !!(contentEl && (path ? path.includes(contentEl) : (target && contentEl.contains(target))));
 
-      // Always stop immediate propagation if available to beat any other listeners
+      // Allow all interactions inside the dialog content
+      if (isInside) return;
+
       if (typeof (e as any).stopImmediatePropagation === 'function') {
         (e as any).stopImmediatePropagation();
       }
       e.stopPropagation();
+      try { e.preventDefault(); } catch {}
 
-      if (!isInside) {
-        // Only close once per outside gesture
-        if (!closedFromOutside) {
-          closedFromOutside = true;
-          try { e.preventDefault(); } catch {}
-          onClose();
-        } else {
-          try { e.preventDefault(); } catch {}
-        }
+      if (!closedFromOutside) {
+        closedFromOutside = true;
+        onClose();
       }
-      // If inside, we already stopped propagation so nothing leaks through
     };
 
     const options: AddEventListenerOptions = { capture: true, passive: false } as any;
-    const events = ['pointerdown', 'pointerup', 'click', 'mousedown', 'mouseup', 'touchstart', 'touchend'];
-    events.forEach(evt => document.addEventListener(evt, intercept, options));
+    // Only intercept pointerdown to avoid breaking target handlers
+    document.addEventListener('pointerdown', intercept, options);
     return () => {
-      events.forEach(evt => document.removeEventListener(evt, intercept, options as any));
+      document.removeEventListener('pointerdown', intercept, options as any);
     };
   }, [onClose]);
 
@@ -1255,7 +1249,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
               {/* Mobile Task Details Button for Videos - Below the video */}
               {isMobile && isVideo && onShowTaskDetails && (
-                <div className="mt-4 flex justify-center">
+                <div className="mt-4 flex justify-center relative z-40">
                   <Button
                     variant="secondary"
                     size="default"
@@ -1273,7 +1267,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     onPointerDown={(e) => {
                       e.stopPropagation();
                     }}
-                    className="bg-black/80 hover:bg-black/90 text-white backdrop-blur-sm"
+                    className="bg-black/80 hover:bg-black/90 text-white backdrop-blur-sm relative z-50 pointer-events-auto"
                   >
                     Show Task Details
                   </Button>
