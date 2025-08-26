@@ -199,70 +199,70 @@ const VideoTravelToolPage: React.FC = () => {
   const noOpCallback = useCallback(() => {}, []);
   
   const handleVideoControlModeChange = useCallback((mode: 'individual' | 'batch') => {
-    if (isLoadingSettings) return;
+    if (isLoadingSettingsRef.current) return;
     userHasInteracted.current = true;
     setVideoControlMode(mode);
-  }, [isLoadingSettings]);
+  }, []);
 
   const handlePairConfigChange = useCallback((pairId: string, field: 'prompt' | 'frames' | 'context', value: string | number) => {
-    if (isLoadingSettings) return;
+    if (isLoadingSettingsRef.current) return;
     userHasInteracted.current = true;
     setVideoPairConfigs(prev => prev.map(p => p.id === pairId ? { ...p, [field]: value } : p));
-  }, [isLoadingSettings]);
+  }, []);
 
   const handleBatchVideoPromptChange = useCallback((prompt: string) => {
-    if (isLoadingSettings) return;
+    if (isLoadingSettingsRef.current) return;
     userHasInteracted.current = true;
     setBatchVideoPrompt(prompt);
-  }, [isLoadingSettings]);
+  }, []);
 
   const handleBatchVideoFramesChange = useCallback((frames: number) => {
-    if (isLoadingSettings) return;
+    if (isLoadingSettingsRef.current) return;
     userHasInteracted.current = true;
     setBatchVideoFrames(frames);
-  }, [isLoadingSettings]);
+  }, []);
 
   const handleBatchVideoContextChange = useCallback((context: number) => {
-    if (isLoadingSettings) return;
+    if (isLoadingSettingsRef.current) return;
     userHasInteracted.current = true;
     setBatchVideoContext(context);
-  }, [isLoadingSettings]);
+  }, []);
 
   const handleBatchVideoStepsChange = useCallback((steps: number) => {
-    if (isLoadingSettings) return;
+    if (isLoadingSettingsRef.current) return;
     userHasInteracted.current = true;
     setBatchVideoSteps(steps);
-  }, [isLoadingSettings]);
+  }, []);
 
   const handleDimensionSourceChange = useCallback((source: 'project' | 'firstImage' | 'custom') => {
-    if (isLoadingSettings) return;
+    if (isLoadingSettingsRef.current) return;
     userHasInteracted.current = true;
     setDimensionSource(source);
-  }, [isLoadingSettings]);
+  }, []);
 
   const handleCustomWidthChange = useCallback((width?: number) => {
-    if (isLoadingSettings) return;
+    if (isLoadingSettingsRef.current) return;
     userHasInteracted.current = true;
     setCustomWidth(width);
-  }, [isLoadingSettings]);
+  }, []);
 
   const handleCustomHeightChange = useCallback((height?: number) => {
-    if (isLoadingSettings) return;
+    if (isLoadingSettingsRef.current) return;
     userHasInteracted.current = true;
     setCustomHeight(height);
-  }, [isLoadingSettings]);
+  }, []);
 
   const handleEnhancePromptChange = useCallback((enhance: boolean) => {
-    if (isLoadingSettings) return;
+    if (isLoadingSettingsRef.current) return;
     userHasInteracted.current = true;
     setEnhancePrompt(enhance);
-  }, [isLoadingSettings]);
+  }, []);
 
   const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
-    if (isLoadingSettings) return;
+    if (isLoadingSettingsRef.current) return;
     userHasInteracted.current = true;
     setGenerationMode(mode);
-  }, [isLoadingSettings]);
+  }, []);
   const [isCreateShotModalOpen, setIsCreateShotModalOpen] = useState(false);
   const queryClient = useQueryClient();
   // const { lastAffectedShotId, setLastAffectedShotId } = useLastAffectedShot(); // Keep for later if needed
@@ -467,6 +467,10 @@ const VideoTravelToolPage: React.FC = () => {
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const userHasInteracted = useRef(false);
   const lastSavedSettingsRef = useRef<VideoTravelSettings | null>(null);
+  const isLoadingSettingsRef = useRef(false);
+  
+  // Update loading ref to stabilize callbacks
+  isLoadingSettingsRef.current = isLoadingSettings;
 
   // [NavPerf] Stop timers once the page mounts
   useEffect(() => {
@@ -858,13 +862,14 @@ const VideoTravelToolPage: React.FC = () => {
   //   }
   // };
 
-  const handleSteerableMotionSettingsChange = (settings: Partial<typeof steerableMotionSettings>) => {
+  const handleSteerableMotionSettingsChange = useCallback((settings: Partial<typeof steerableMotionSettings>) => {
+    if (isLoadingSettingsRef.current) return;
     userHasInteracted.current = true;
     setSteerableMotionSettings(prev => ({
       ...prev,
       ...settings
     }));
-  };
+  }, []);
 
   // Memoize current settings to reduce effect runs
   const currentSettings = useMemo<VideoTravelSettings>(() => ({
@@ -1132,7 +1137,7 @@ const VideoTravelToolPage: React.FC = () => {
               customHeight={isLoadingSettings ? undefined : customHeight}
               onCustomHeightChange={handleCustomHeightChange}
               steerableMotionSettings={isLoadingSettings ? DEFAULT_STEERABLE_MOTION_SETTINGS : steerableMotionSettings}
-              onSteerableMotionSettingsChange={isLoadingSettings ? noOpCallback : handleSteerableMotionSettingsChange}
+              onSteerableMotionSettingsChange={handleSteerableMotionSettingsChange}
               onGenerateAllSegments={noOpCallback}
               // LoRA props removed - now managed internally by ShotEditor
               availableLoras={availableLoras}

@@ -149,6 +149,18 @@ export const ImageGallery: React.FC<ImageGalleryProps> = (props) => {
     timestamp: Date.now()
   });
 
+  // [DEEP DEBUG] Add debug logging after hooks to see data flow
+  const debugAfterHooks = () => {
+    console.log('[GalleryRenderDebug] 🔍 DATA FLOW DEBUG:', {
+      originalImages: images.length,
+      filteredImages: filtersHook.filteredImages.length,
+      paginatedImages: paginationHook.paginatedImages.length,
+      isServerPagination: !!onServerPageChange,
+      hasFilters: filtersHook.hasFilters,
+      timestamp: Date.now()
+    });
+  };
+
   const {
     images, 
     onDelete, 
@@ -325,6 +337,9 @@ export const ImageGallery: React.FC<ImageGalleryProps> = (props) => {
     doubleTapTimeoutRef: stateHook.doubleTapTimeoutRef,
     onOpenLightbox: actionsHook.handleOpenLightbox,
   });
+
+  // [DEEP DEBUG] Call debug function after all hooks are initialized
+  debugAfterHooks();
 
   // Task details functionality
   const lightboxImageId = stateHook.activeLightboxMedia?.id || null;

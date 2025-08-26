@@ -42,7 +42,10 @@ export const useVideoGalleryPreloader = (options?: {
   const SHOTS_PANE_PAGE_SIZE = 5; // Match ShotsPane's pageSize
   const MAX_CONCURRENT_PRELOADS = 4;
   const PRELOAD_IDLE_TIMEOUT = 150;
-  const TARGET_CACHED_IMAGES = 48; // Target number of images to cache (8 shots × 6 images)
+  
+  // Reduce target cache size on mobile to prevent performance issues
+  const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+  const TARGET_CACHED_IMAGES = isMobile ? 12 : 48; // 2 shots × 6 images on mobile, 8 shots × 6 images on desktop
 
   // Get project and shots data from contexts
   const { selectedProjectId } = useProject();
@@ -267,6 +270,12 @@ export const useVideoGalleryPreloader = (options?: {
   // Effect: Preload images until target cache size is reached
   useEffect(() => {
     if (!selectedProjectId || !shots || shouldSkipPreload) return;
+    
+    // Reduce preloading when shot editor is open on mobile to prevent performance issues
+    if (shouldShowShotEditor && isMobile) {
+      console.log('[VideoGalleryPreload] Skipping preload - shot editor open on mobile');
+      return;
+    }
     
     // Check if we've already started preloading for this project
     if (window.videoGalleryPreloaderCache!.hasStartedPreloadForProject[selectedProjectId]) {

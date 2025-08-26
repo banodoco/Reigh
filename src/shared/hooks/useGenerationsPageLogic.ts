@@ -216,18 +216,21 @@ export function useGenerationsPageLogic({
     }
   }, [mediaType]);
 
+  // Memoize filters to prevent unnecessary re-renders and duplicate progressive loading sessions
+  const filters = useMemo(() => ({
+    mediaType,
+    toolType,
+    shotId: selectedShotFilter === 'all' ? undefined : selectedShotFilter,
+    excludePositioned: selectedShotFilter !== 'all' ? excludePositioned : undefined,
+    starredOnly
+  }), [mediaType, toolType, selectedShotFilter, excludePositioned, starredOnly]);
+
   const { data: generationsResponse, isLoading, isFetching, isError, error } = useGenerations(
     shouldLoadData ? selectedProjectId : null, 
     page, 
     itemsPerPage, 
     shouldLoadData,
-    {
-      mediaType,
-      toolType,
-      shotId: selectedShotFilter === 'all' ? undefined : selectedShotFilter,
-      excludePositioned: selectedShotFilter !== 'all' ? excludePositioned : undefined,
-      starredOnly
-    }
+    filters
   );
 
   const lastAffectedShotContext = useContext(LastAffectedShotContext);

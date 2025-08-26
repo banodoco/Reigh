@@ -60,13 +60,17 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
     }
     
     const sorted = [...baseList].sort((a, b) => (a.position || 0) - (b.position || 0));
-    console.log(`${REORDER_DEBUG_TAG} Frontend sorting applied:`, {
-      originalFirst: baseList[0]?.name,
-      sortedFirst: sorted[0]?.name,
-      originalFirstPosition: baseList[0]?.position,
-      sortedFirstPosition: sorted[0]?.position,
-      timestamp: Date.now()
-    });
+    
+    // Only log if debug flag is enabled to reduce mobile console overhead
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`${REORDER_DEBUG_TAG} Frontend sorting applied:`, {
+        originalFirst: baseList[0]?.name,
+        sortedFirst: sorted[0]?.name,
+        originalFirstPosition: baseList[0]?.position,
+        sortedFirstPosition: sorted[0]?.position,
+        timestamp: Date.now()
+      });
+    }
     return sorted;
   }, [propShots, optimisticShots, reorderShotsMutation.isPending]);
 
@@ -77,49 +81,55 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
     }
   }, [reorderShotsMutation.isPending, optimisticShots]);
   
-  // [ShotReorderDebug] Log data source to confirm fix
+  // [ShotReorderDebug] Log data source to confirm fix - only in development
   React.useEffect(() => {
-    console.log(`${REORDER_DEBUG_TAG} ShotListDisplay data source:`, {
-      usingProps: !!propShots,
-      propsCount: propShots?.length || 0,
-      finalCount: shots?.length || 0,
-      timestamp: Date.now()
-    });
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`${REORDER_DEBUG_TAG} ShotListDisplay data source:`, {
+        usingProps: !!propShots,
+        propsCount: propShots?.length || 0,
+        finalCount: shots?.length || 0,
+        timestamp: Date.now()
+      });
+    }
   }, [propShots?.length, shots?.length]);
 
-  // [ShotReorderDebug] Log what's actually being rendered visually
+  // [ShotReorderDebug] Log what's actually being rendered visually - only in development
   React.useEffect(() => {
-    if (shots && shots.length > 0) {
+    if (process.env.NODE_ENV === 'development' && shots && shots.length > 0) {
       console.log(`${REORDER_DEBUG_TAG} === VISUAL RENDER ORDER ===`, {
         shotsCount: shots.length,
         timestamp: Date.now()
       });
       
-      // [ShotReorderDebug] Log each visual position individually
+      // [ShotReorderDebug] Log each visual position individually - limit to first 10
       shots.slice(0, 10).forEach((shot, index) => {
         console.log(`${REORDER_DEBUG_TAG} Visual ${index}: ${shot.name} (ID: ${shot.id.substring(0, 8)}) - Position: ${shot.position}`);
       });
     }
   }, [shots]);
 
-  // [ShotReorderDebug] Log shots data only when count changes (to reduce noise)
+  // [ShotReorderDebug] Log shots data only when count changes (to reduce noise) - only in development
   React.useEffect(() => {
-    console.log(`${REORDER_DEBUG_TAG} Shots count changed:`, {
-      shotsCount: shots?.length || 0,
-      currentProjectId,
-      shotsLoading,
-      timestamp: Date.now()
-    });
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`${REORDER_DEBUG_TAG} Shots count changed:`, {
+        shotsCount: shots?.length || 0,
+        currentProjectId,
+        shotsLoading,
+        timestamp: Date.now()
+      });
+    }
   }, [shots?.length, currentProjectId, shotsLoading]);
 
-  // [ShotReorderDebug] Log mutation state changes
+  // [ShotReorderDebug] Log mutation state changes - only in development
   React.useEffect(() => {
-    console.log(`${REORDER_DEBUG_TAG} Reorder mutation state:`, {
-      isPending: reorderShotsMutation.isPending,
-      isError: reorderShotsMutation.isError,
-      error: reorderShotsMutation.error?.message,
-      timestamp: Date.now()
-    });
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`${REORDER_DEBUG_TAG} Reorder mutation state:`, {
+        isPending: reorderShotsMutation.isPending,
+        isError: reorderShotsMutation.isError,
+        error: reorderShotsMutation.error?.message,
+        timestamp: Date.now()
+      });
+    }
   }, [reorderShotsMutation.isPending, reorderShotsMutation.isError, reorderShotsMutation.error]);
 
   // Set up sensors for drag and drop
