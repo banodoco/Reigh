@@ -74,11 +74,25 @@ const LightboxScrubVideo: React.FC<LightboxScrubVideoProps> = ({
 
   const startAutoPlay = useCallback(() => {
     if (videoRef.current && !isScrubbingRef.current) {
-      videoRef.current.play().catch(() => {
-        // Ignore play errors
+      console.log('[LightboxAutoplay] Attempting to start autoplay', {
+        src: videoRef.current.src,
+        paused: videoRef.current.paused,
+        readyState: videoRef.current.readyState,
+        isMobile,
+        userAgent: navigator.userAgent,
+        timestamp: Date.now()
+      });
+      
+      videoRef.current.play().catch((error) => {
+        console.warn('[LightboxAutoplay] Play failed', {
+          error: error.message,
+          src: videoRef.current?.src,
+          isMobile,
+          timestamp: Date.now()
+        });
       });
     }
-  }, []);
+  }, [isMobile]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     // Skip mouse interactions on mobile devices
@@ -163,34 +177,95 @@ const LightboxScrubVideo: React.FC<LightboxScrubVideoProps> = ({
 
     setDuration(0);
 
-    const handleCanPlay = () => {
-      // Auto-start playing when video can play (unless user is actively scrubbing)
-      if (!isScrubbingRef.current) {
+    // Track if we've attempted autoplay to avoid multiple attempts
+    let hasAttemptedAutoplay = false;
+
+    const attemptAutoplay = () => {
+      if (!hasAttemptedAutoplay && !isScrubbingRef.current) {
+        console.log('[LightboxAutoplay] attemptAutoplay called', {
+          hasAttemptedAutoplay,
+          isScrubbingRef: isScrubbingRef.current,
+          videoPaused: video.paused,
+          readyState: video.readyState,
+          isMobile,
+          timestamp: Date.now()
+        });
+        hasAttemptedAutoplay = true;
         startAutoPlay();
       }
+    };
+
+    const handleCanPlay = () => {
+      console.log('[LightboxAutoplay] canplay event fired', {
+        readyState: video.readyState,
+        paused: video.paused,
+        isMobile,
+        timestamp: Date.now()
+      });
+      // Primary autoplay trigger
+      attemptAutoplay();
+    };
+
+    const handleLoadedData = () => {
+      console.log('[LightboxAutoplay] loadeddata event fired', {
+        readyState: video.readyState,
+        paused: video.paused,
+        isMobile,
+        timestamp: Date.now()
+      });
+      // Fallback for iOS/iPadOS when canplay doesn't fire reliably with multiple videos
+      // Use a small delay to ensure the video is truly ready
+      setTimeout(() => {
+        console.log('[LightboxAutoplay] loadeddata timeout triggered', {
+          hasAttemptedAutoplay,
+          videoPaused: video.paused,
+          timestamp: Date.now()
+        });
+        attemptAutoplay();
+      }, 100);
     };
 
     const handleEnded = () => {
       // Restart from beginning when video ends (if loop is enabled)
       if (loop && !isScrubbingRef.current) {
+        hasAttemptedAutoplay = false; // Reset for loop
         startAutoPlay();
       }
     };
 
+    // iOS/iPadOS specific: Also try on first user interaction if autoplay hasn't started
+    const handleFirstInteraction = () => {
+      if (!hasAttemptedAutoplay && video.paused) {
+        attemptAutoplay();
+      }
+    };
+
     video.addEventListener('canplay', handleCanPlay);
+    video.addEventListener('loadeddata', handleLoadedData);
     video.addEventListener('ended', handleEnded);
+    
+    // Add interaction listeners for iOS/iPadOS autoplay policy workaround
+    if (isMobile) {
+      document.addEventListener('touchstart', handleFirstInteraction, { once: true });
+      document.addEventListener('click', handleFirstInteraction, { once: true });
+    }
 
     return () => {
       if (video) {
         video.removeEventListener('canplay', handleCanPlay);
+        video.removeEventListener('loadeddata', handleLoadedData);
         video.removeEventListener('ended', handleEnded);
+      }
+      if (isMobile) {
+        document.removeEventListener('touchstart', handleFirstInteraction);
+        document.removeEventListener('click', handleFirstInteraction);
       }
       if (mouseMoveTimeoutRef.current) {
         clearTimeout(mouseMoveTimeoutRef.current);
         mouseMoveTimeoutRef.current = null;
       }
     };
-  }, [src, loop, startAutoPlay]);
+  }, [src, loop, startAutoPlay, isMobile]);
 
   return (
     <div
