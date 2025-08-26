@@ -1041,9 +1041,10 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
           <div ref={galleryRef} className="pt-0 pb-5">
             {/* Show SkeletonGallery on initial load or when filter changes take too long */}
             {(() => {
-              const showSkeleton = isLoadingGenerations && imagesToShow.length === 0;
+              const showSkeleton = !selectedProjectId || (isLoadingGenerations && imagesToShow.length === 0);
               console.log(`${DEBUG_TAG} Render #${renderCount.current} - Skeleton decision:`, {
                 showSkeleton,
+                selectedProjectId,
                 isLoadingGenerations,
                 imagesToShowLength: imagesToShow.length,
                 hasGenerationsResponse: !!generationsResponse,
