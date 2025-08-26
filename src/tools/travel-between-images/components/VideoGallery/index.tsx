@@ -160,6 +160,21 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   const itemsPerPage = 6;
   const taskDetailsButtonRef = useRef<HTMLButtonElement>(null);
   const isMobile = useIsMobile();
+  // Treat iPads/tablets as mobile for lightbox layout width decisions.
+  // This is more defensive than useIsMobile alone to handle "Request Desktop Website" cases on iPadOS.
+  const isTouchLikeDevice = React.useMemo(() => {
+    if (typeof window === 'undefined') return isMobile;
+    try {
+      const coarsePointer = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+      const ua = (navigator as any)?.userAgent || '';
+      const tabletUA = /iPad|Tablet|Android(?!.*Mobile)|Silk|Kindle|PlayBook/i.test(ua);
+      const maxTouchPoints = (navigator as any)?.maxTouchPoints || 0;
+      const isIpadOsLike = (navigator as any)?.platform === 'MacIntel' && maxTouchPoints > 1;
+      return Boolean(isMobile || coarsePointer || tabletUA || isIpadOsLike);
+    } catch {
+      return isMobile;
+    }
+  }, [isMobile]);
   
   // Video count cache for instant skeleton display
   const { getCachedCount, setCachedCount } = useVideoCountCache();
@@ -750,7 +765,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
             hasNext={lightboxIndex < displaySortedVideoOutputs.length - 1}
             hasPrevious={lightboxIndex > 0}
             starred={(displaySortedVideoOutputs[lightboxIndex] as { starred?: boolean }).starred || false}
-            showTaskDetails={!isMobile}
+            showTaskDetails={!isTouchLikeDevice}
             taskDetailsData={{
               task,
               isLoading: isLoadingTask,
@@ -761,7 +776,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
               onApplySettingsFromTask,
               onClose: () => setLightboxIndex(null)
             }}
-            onShowTaskDetails={isMobile ? handleShowTaskDetails : undefined}
+            onShowTaskDetails={isTouchLikeDevice ? handleShowTaskDetails : undefined}
           />
         )}
 

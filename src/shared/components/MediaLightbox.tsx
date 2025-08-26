@@ -110,6 +110,20 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   const contentRef = useRef<HTMLDivElement>(null);
   
   const isMobile = useIsMobile();
+  // Treat iPads/tablets as mobile for lightbox sizing even in "Request Desktop Website" mode
+  const isTouchLikeDevice = useMemo(() => {
+    if (typeof window === 'undefined') return !!isMobile;
+    try {
+      const coarsePointer = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+      const ua = (navigator as any)?.userAgent || '';
+      const tabletUA = /iPad|Tablet|Android(?!.*Mobile)|Silk|Kindle|PlayBook/i.test(ua);
+      const maxTouchPoints = (navigator as any)?.maxTouchPoints || 0;
+      const isIpadOsLike = (navigator as any)?.platform === 'MacIntel' && maxTouchPoints > 1;
+      return Boolean(isMobile || coarsePointer || tabletUA || isIpadOsLike);
+    } catch {
+      return !!isMobile;
+    }
+  }, [isMobile]);
   
   // Global minimal outside-click interceptor (capture). Do not block inside interactions.
   useEffect(() => {
@@ -961,14 +975,21 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     <LightboxScrubVideo
                       src={displayUrl}
                       poster={media.thumbUrl}
-                      className="h-auto max-h-[85vh] sm:max-h-[85vh] object-contain w-[95vw] sm:w-auto"
+                      className={cn(
+                        'h-auto object-contain w-[95vw]',
+                        // Keep full-viewport width on touch-like devices; allow responsive sm: rules on desktop
+                        isTouchLikeDevice ? 'max-h-[85vh]' : 'max-h-[85vh] sm:max-h-[85vh]'
+                      )}
                       style={{ maxWidth: '95vw' }}
                     />
                   ) : (
                     <HoverScrubVideo
                       src={displayUrl}
                       poster={media.thumbUrl}
-                      className="h-auto max-h-[85vh] sm:max-h-[85vh] object-contain w-[95vw] sm:w-auto"
+                      className={cn(
+                        'h-auto object-contain w-[95vw]',
+                        isTouchLikeDevice ? 'max-h-[85vh]' : 'max-h-[85vh] sm:max-h-[85vh]'
+                      )}
                       style={{ maxWidth: '95vw' }}
                       disableScrubbing={true}
                     />
