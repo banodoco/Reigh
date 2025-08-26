@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, X, FlipHorizontal, Save, Download, Trash2, Settings, PlusCircle, CheckCircle, Star } from 'lucide-react';
 import { GenerationRow } from '@/types/shots';
 import * as DialogPrimitive from "@radix-ui/react-dialog";
@@ -125,6 +125,46 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     }
   }, [isMobile]);
   
+  // Short-lived global click shield to absorb iOS synthetic clicks after touchend
+  const activateClickShield = useCallback(() => {
+    try {
+      const shield = document.createElement('div');
+      shield.setAttribute('data-mobile-click-shield', 'true');
+      shield.style.position = 'fixed';
+      shield.style.top = '0';
+      shield.style.left = '0';
+      shield.style.right = '0';
+      shield.style.bottom = '0';
+      shield.style.background = 'transparent';
+      shield.style.pointerEvents = 'all';
+      shield.style.zIndex = '2147483647';
+      (shield.style as any).touchAction = 'none';
+
+      const block = (ev: Event) => {
+        try { ev.preventDefault(); } catch {}
+        try { ev.stopPropagation(); } catch {}
+        try { (ev as any).stopImmediatePropagation?.(); } catch {}
+      };
+
+      shield.addEventListener('click', block, true);
+      shield.addEventListener('pointerdown', block, true);
+      shield.addEventListener('pointerup', block, true);
+      shield.addEventListener('touchstart', block, { capture: true, passive: false } as any);
+      shield.addEventListener('touchend', block, { capture: true, passive: false } as any);
+
+      document.body.appendChild(shield);
+
+      window.setTimeout(() => {
+        try { shield.remove(); } catch {}
+      }, 350);
+    } catch {}
+  }, []);
+
+  const safeClose = useCallback(() => {
+    activateClickShield();
+    onClose();
+  }, [activateClickShield, onClose]);
+  
   // Global minimal outside-click interceptor (capture). Do not block inside interactions.
   useEffect(() => {
     let closedFromOutside = false;
@@ -146,17 +186,22 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
       if (!closedFromOutside) {
         closedFromOutside = true;
-        onClose();
+        safeClose();
       }
     };
 
     const options: AddEventListenerOptions = { capture: true, passive: false } as any;
-    // Only intercept pointerdown to avoid breaking target handlers
+    // Intercept multiple event types for better mobile protection
     document.addEventListener('pointerdown', intercept, options);
+    document.addEventListener('touchstart', intercept, options);
+    document.addEventListener('click', intercept, options);
+    
     return () => {
       document.removeEventListener('pointerdown', intercept, options as any);
+      document.removeEventListener('touchstart', intercept, options as any);
+      document.removeEventListener('click', intercept, options as any);
     };
-  }, [onClose]);
+  }, [safeClose]);
 
 
   
@@ -395,13 +440,75 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
           <DialogPrimitive.Overlay 
             className="fixed inset-0 z-[10000] bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
             onPointerDown={(e) => {
-              // Prevent the tap/click from reaching underlying elements (e.g., task item)
+              // Completely block all pointer events from reaching underlying elements
+              e.preventDefault();
               e.stopPropagation();
+              if (e.nativeEvent && typeof e.nativeEvent.stopImmediatePropagation === 'function') {
+                e.nativeEvent.stopImmediatePropagation();
+              }
             }}
             onClick={(e) => {
-              // Explicitly close on overlay click and prevent bubbling
+              // Completely block all click events from reaching underlying elements
+              e.preventDefault();
               e.stopPropagation();
+              if (e.nativeEvent && typeof e.nativeEvent.stopImmediatePropagation === 'function') {
+                e.nativeEvent.stopImmediatePropagation();
+              }
               onClose();
+            }}
+            onPointerUp={(e) => {
+              // Also block pointer up events to prevent accidental interactions
+              e.preventDefault();
+              e.stopPropagation();
+              if (e.nativeEvent && typeof e.nativeEvent.stopImmediatePropagation === 'function') {
+                e.nativeEvent.stopImmediatePropagation();
+              }
+            }}
+            onTouchStart={(e) => {
+              // Block touch events on mobile
+              e.preventDefault();
+              e.stopPropagation();
+              if (e.nativeEvent && typeof e.nativeEvent.stopImmediatePropagation === 'function') {
+                e.nativeEvent.stopImmediatePropagation();
+              }
+            }}
+            onTouchMove={(e) => {
+              // Block touch move events on mobile
+              e.preventDefault();
+              e.stopPropagation();
+              if (e.nativeEvent && typeof e.nativeEvent.stopImmediatePropagation === 'function') {
+                e.nativeEvent.stopImmediatePropagation();
+              }
+            }}
+            onTouchEnd={(e) => {
+              // Block touch end events on mobile and close lightbox
+              e.preventDefault();
+              e.stopPropagation();
+              if (e.nativeEvent && typeof e.nativeEvent.stopImmediatePropagation === 'function') {
+                e.nativeEvent.stopImmediatePropagation();
+              }
+              onClose();
+            }}
+            onTouchCancel={(e) => {
+              // Block touch cancel events on mobile
+              e.preventDefault();
+              e.stopPropagation();
+              if (e.nativeEvent && typeof e.nativeEvent.stopImmediatePropagation === 'function') {
+                e.nativeEvent.stopImmediatePropagation();
+              }
+            }}
+            style={{ 
+              // Ensure the overlay captures all pointer events
+              pointerEvents: 'all',
+              touchAction: 'none',
+              // Make sure overlay is above everything else
+              zIndex: 10000,
+              // Ensure full coverage
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0
             }}
           />
           <DialogPrimitive.Content
@@ -417,9 +524,36 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
             // Ensure clicks within the dialog never reach the app behind it
             onPointerDown={(e) => {
               e.stopPropagation();
+              if (e.nativeEvent && typeof e.nativeEvent.stopImmediatePropagation === 'function') {
+                e.nativeEvent.stopImmediatePropagation();
+              }
             }}
             onClick={(e) => {
               e.stopPropagation();
+              if (e.nativeEvent && typeof e.nativeEvent.stopImmediatePropagation === 'function') {
+                e.nativeEvent.stopImmediatePropagation();
+              }
+            }}
+            onTouchStart={(e) => {
+              // Block touch events from bubbling through dialog content
+              e.stopPropagation();
+              if (e.nativeEvent && typeof e.nativeEvent.stopImmediatePropagation === 'function') {
+                e.nativeEvent.stopImmediatePropagation();
+              }
+            }}
+            onTouchMove={(e) => {
+              // Block touch move events from bubbling through dialog content
+              e.stopPropagation();
+              if (e.nativeEvent && typeof e.nativeEvent.stopImmediatePropagation === 'function') {
+                e.nativeEvent.stopImmediatePropagation();
+              }
+            }}
+            onTouchEnd={(e) => {
+              // Block touch end events from bubbling through dialog content
+              e.stopPropagation();
+              if (e.nativeEvent && typeof e.nativeEvent.stopImmediatePropagation === 'function') {
+                e.nativeEvent.stopImmediatePropagation();
+              }
             }}
             className={cn(
               "fixed z-[10000]",
@@ -438,6 +572,11 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               // Always stop propagation and default so the gesture does not reach elements behind
               event.preventDefault();
               event.stopPropagation();
+              
+              // Extra mobile protection: block all event propagation
+              if (typeof event.stopImmediatePropagation === 'function') {
+                event.stopImmediatePropagation();
+              }
 
               if (showTaskDetails && !isMobile) {
                 // Desktop with task details: only close if clicking on the overlay background
@@ -446,7 +585,11 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   return;
                 }
               }
-              onClose();
+              
+              // Use setTimeout to ensure the event is fully blocked before closing
+              setTimeout(() => {
+                onClose();
+              }, 0);
             }}
           >
             {/* Accessibility: Hidden dialog title for screen readers */}
