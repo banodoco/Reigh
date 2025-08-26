@@ -70,6 +70,7 @@ const LightboxScrubVideo: React.FC<LightboxScrubVideoProps> = ({
   const [duration, setDuration] = useState(0);
   const [scrubberPosition, setScrubberPosition] = useState<number | null>(null);
   const [scrubberVisible, setScrubberVisible] = useState(false);
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false); // Track if video is actually playing
   const speedOptions = [0.25, 0.5, 1, 1.5, 2];
   const isMobile = useIsMobile();
 
@@ -134,6 +135,7 @@ const LightboxScrubVideo: React.FC<LightboxScrubVideoProps> = ({
       const playPromise = videoRef.current.play();
       
       playPromise.then(() => {
+        setIsVideoPlaying(true); // Mark as playing when play succeeds
         logAutoplayAttempt(autoplayContext, videoRef.current!.src, true);
       }).catch((error) => {
         logAutoplayAttempt(autoplayContext, videoRef.current!.src, false, error);
@@ -212,7 +214,6 @@ const LightboxScrubVideo: React.FC<LightboxScrubVideoProps> = ({
   const handleLoadedMetadata = useCallback(() => {
     if (videoRef.current) {
       setDuration(videoRef.current.duration);
-      // Don't autoplay here - let the useEffect handle it to prevent multiple attempts
       console.log('[LightboxAutoplay] Metadata loaded, duration set', {
         duration: videoRef.current.duration,
         timestamp: Date.now()
@@ -226,6 +227,7 @@ const LightboxScrubVideo: React.FC<LightboxScrubVideoProps> = ({
     if (!video) return;
 
     setDuration(0);
+    setIsVideoPlaying(false); // Reset playing state when src changes
 
     // DEEP DEBUG: Log lightbox video initialization context
     const pageVideoCount = document.querySelectorAll('video').length;
@@ -297,6 +299,7 @@ const LightboxScrubVideo: React.FC<LightboxScrubVideoProps> = ({
         autoplayContext: canPlayContext,
         timestamp: Date.now()
       });
+      // Video can now play, but don't hide poster until it actually plays
       // Primary autoplay trigger
       attemptAutoplay();
     };
@@ -312,6 +315,7 @@ const LightboxScrubVideo: React.FC<LightboxScrubVideoProps> = ({
         autoplayContext: loadedDataContext,
         timestamp: Date.now()
       });
+      // Video data loaded, but keep poster until video actually plays
       // Fallback for iOS/iPadOS when canplay doesn't fire reliably with multiple videos
       // Use a small delay to ensure the video is truly ready
       setTimeout(() => {
@@ -365,9 +369,27 @@ const LightboxScrubVideo: React.FC<LightboxScrubVideoProps> = ({
       }
     };
 
+    const handlePlay = () => {
+      setIsVideoPlaying(true);
+      console.log('[AutoplayDebugger:LIGHTBOX] ▶️ Video started playing', {
+        src: video.src?.substring(video.src.lastIndexOf('/') + 1) || 'no-src',
+        timestamp: Date.now()
+      });
+    };
+
+    const handlePause = () => {
+      setIsVideoPlaying(false);
+      console.log('[AutoplayDebugger:LIGHTBOX] ⏸️ Video paused', {
+        src: video.src?.substring(video.src.lastIndexOf('/') + 1) || 'no-src',
+        timestamp: Date.now()
+      });
+    };
+
     video.addEventListener('canplay', handleCanPlay);
     video.addEventListener('loadeddata', handleLoadedData);
     video.addEventListener('ended', handleEnded);
+    video.addEventListener('play', handlePlay);
+    video.addEventListener('pause', handlePause);
     
     // Add interaction listeners for iOS/iPadOS autoplay policy workaround
     if (isMobile) {
@@ -405,7 +427,7 @@ const LightboxScrubVideo: React.FC<LightboxScrubVideoProps> = ({
           }
           attemptAutoplay();
         }
-      }, 200); // Small delay to let poster click gesture context persist
+      }, 50); // Minimal delay to avoid flicker but preserve gesture context
 
       return () => {
         clearTimeout(mountTimeoutId);
@@ -413,6 +435,8 @@ const LightboxScrubVideo: React.FC<LightboxScrubVideoProps> = ({
           video.removeEventListener('canplay', handleCanPlay);
           video.removeEventListener('loadeddata', handleLoadedData);
           video.removeEventListener('ended', handleEnded);
+          video.removeEventListener('play', handlePlay);
+          video.removeEventListener('pause', handlePause);
         }
         if (isMobile) {
           document.removeEventListener('touchstart', handleFirstInteraction);
@@ -430,6 +454,8 @@ const LightboxScrubVideo: React.FC<LightboxScrubVideoProps> = ({
         video.removeEventListener('canplay', handleCanPlay);
         video.removeEventListener('loadeddata', handleLoadedData);
         video.removeEventListener('ended', handleEnded);
+        video.removeEventListener('play', handlePlay);
+        video.removeEventListener('pause', handlePause);
       }
       if (isMobile) {
         document.removeEventListener('touchstart', handleFirstInteraction);
@@ -445,12 +471,25 @@ const LightboxScrubVideo: React.FC<LightboxScrubVideoProps> = ({
   return (
     <div
       ref={containerRef}
-      className={cn('relative group', className)}
+      className={cn('relative group bg-black', className)}
       onMouseEnter={isMobile ? undefined : handleMouseEnter}
       onMouseLeave={isMobile ? undefined : handleMouseLeave}
       onMouseMove={isMobile ? undefined : handleMouseMove}
       {...rest}
     >
+      {/* Poster overlay - shows poster image until video actually starts playing */}
+      {poster && !isVideoPlaying && (
+        <div 
+          className="absolute inset-0 z-10 pointer-events-none"
+          style={{
+            backgroundImage: `url(${getDisplayUrl(poster)})`,
+            backgroundSize: 'contain',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat'
+          }}
+        />
+      )}
+
       <video
         ref={videoRef}
         src={getDisplayUrl(src)}
