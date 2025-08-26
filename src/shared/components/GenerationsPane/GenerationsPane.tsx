@@ -18,6 +18,7 @@ import { useGenerationsPageLogic } from '@/shared/hooks/useGenerationsPageLogic'
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 import { performanceMonitoredTimeout, measureAsync } from '@/shared/lib/performanceUtils';
+import { useShots } from '@/shared/contexts/ShotsContext';
 
 import { 
   Select,
@@ -77,6 +78,12 @@ const GenerationsPaneComponent: React.FC = () => {
     mediaType: mediaTypeFilter,
     enableDataLoading: true
   });
+
+  // Fallback: use shots from shared context when local hook hasn't loaded yet
+  const { shots: contextShots } = useShots();
+  const shotsForFilter = (shotsData && shotsData.length > 0)
+    ? shotsData
+    : (contextShots || []);
 
   // Debug: Log the current filter state
   useEffect(() => {
@@ -400,7 +407,7 @@ const GenerationsPaneComponent: React.FC = () => {
                   )}
                 >
                   <ShotFilter
-                    shots={shotsData || []}
+                    shots={shotsForFilter}
                     selectedShotId={selectedShotFilter}
                     onShotChange={setSelectedShotFilter}
                     excludePositioned={excludePositioned}

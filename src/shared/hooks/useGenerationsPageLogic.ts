@@ -113,10 +113,10 @@ export function useGenerationsPageLogic({
       return shotSettings;
     }
 
-    // Always default to 'all' shots instead of auto-selecting current shot
-    // This allows users to see all shots in the dropdown and choose themselves
+    // Otherwise, determine default based on whether shot has images
+    const defaultFilter = getDefaultShotFilter(currentShotId);
     return {
-      selectedShotFilter: 'all',
+      selectedShotFilter: defaultFilter,
       excludePositioned: true,
       userHasCustomized: false
     };
@@ -165,23 +165,14 @@ export function useGenerationsPageLogic({
         return;
       }
       
-      // Only apply user customized settings, don't auto-select shot filter
-      if (shotSettings?.userHasCustomized) {
-        const settingsToApply = getCurrentShotSettings();
-        console.log('[ShotFilterLogic] Applying user customized settings for shot:', {
-          currentShotId,
-          settingsToApply
-        });
-        
-        setSelectedShotFilter(settingsToApply.selectedShotFilter);
-        setExcludePositioned(settingsToApply.excludePositioned);
-      } else {
-        // For non-customized settings, keep current state or default to 'all'
-        console.log('[ShotFilterLogic] No user customization, keeping current filter state');
-        if (selectedShotFilter === '') {
-          setSelectedShotFilter('all');
-        }
-      }
+      const settingsToApply = getCurrentShotSettings();
+      console.log('[ShotFilterLogic] Applying settings for shot:', {
+        currentShotId,
+        settingsToApply
+      });
+      
+      setSelectedShotFilter(settingsToApply.selectedShotFilter);
+      setExcludePositioned(settingsToApply.excludePositioned);
       setLastCurrentShotId(currentShotId);
       
     } else if (!currentShotId) {
