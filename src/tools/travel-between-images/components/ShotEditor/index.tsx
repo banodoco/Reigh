@@ -243,6 +243,94 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   }, []);
   
   const isMobile = useIsMobile();
+  
+  // Detect tablets (iPad, Android tablets, etc.) and track orientation for better column layout
+  const [isTablet, setIsTablet] = React.useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    const nav: any = navigator || {};
+    const ua: string = nav.userAgent || '';
+    const platform: string = nav.platform || '';
+    const maxTouchPoints: number = nav.maxTouchPoints || 0;
+    
+    // iPad detection (including iPadOS 13+ that masquerades as Mac)
+    const isIpadUA = /iPad/i.test(ua);
+    const isIpadOsLike = platform === 'MacIntel' && maxTouchPoints > 1;
+    
+    // Android tablets and other tablets (similar to use-mobile.tsx logic)
+    const isAndroidTablet = /Android(?!.*Mobile)/i.test(ua);
+    const isOtherTablet = /Tablet|Silk|Kindle|PlayBook/i.test(ua);
+    
+    // Width-based tablet detection (devices between phone and desktop)
+    const screenWidth = window.innerWidth;
+    const isTabletWidth = screenWidth >= 768 && screenWidth <= 1024;
+    
+    // Coarse pointer usually indicates touch devices (phones/tablets)
+    const hasCoarsePointer = (() => {
+      try {
+        return window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+      } catch {
+        return false;
+      }
+    })();
+    
+    return Boolean(
+      isIpadUA || isIpadOsLike || isAndroidTablet || isOtherTablet || 
+      (isTabletWidth && hasCoarsePointer && maxTouchPoints > 0)
+    );
+  });
+  
+  const [orientation, setOrientation] = React.useState<'portrait' | 'landscape'>(() => {
+    if (typeof window === 'undefined') return 'portrait';
+    try {
+      return window.matchMedia('(orientation: portrait)').matches ? 'portrait' : 'landscape';
+    } catch {
+      return 'portrait';
+    }
+  });
+  
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mq = window.matchMedia('(orientation: portrait)');
+    const handleOrientation = () => setOrientation(mq.matches ? 'portrait' : 'landscape');
+    const handleResize = () => {
+      const nav: any = navigator || {};
+      const ua: string = nav.userAgent || '';
+      const platform: string = nav.platform || '';
+      const maxTouchPoints: number = nav.maxTouchPoints || 0;
+      
+      // Re-detect tablet on resize (handles rotation, window resizing)
+      const isIpadUA = /iPad/i.test(ua);
+      const isIpadOsLike = platform === 'MacIntel' && maxTouchPoints > 1;
+      const isAndroidTablet = /Android(?!.*Mobile)/i.test(ua);
+      const isOtherTablet = /Tablet|Silk|Kindle|PlayBook/i.test(ua);
+      const screenWidth = window.innerWidth;
+      const isTabletWidth = screenWidth >= 768 && screenWidth <= 1024;
+      const hasCoarsePointer = (() => {
+        try {
+          return window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+        } catch {
+          return false;
+        }
+      })();
+      
+      setIsTablet(Boolean(
+        isIpadUA || isIpadOsLike || isAndroidTablet || isOtherTablet || 
+        (isTabletWidth && hasCoarsePointer && maxTouchPoints > 0)
+      ));
+    };
+    try { mq.addEventListener('change', handleOrientation); } catch { /* no-op */ }
+    window.addEventListener('resize', handleResize);
+    return () => {
+      try { mq.removeEventListener('change', handleOrientation); } catch { /* no-op */ }
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
+
+  const mobileColumns = React.useMemo(() => {
+    if (!isMobile) return 6 as 6;
+    if (isTablet) return (orientation === 'portrait' ? 3 : 4) as 3 | 4;
+    return 2 as 2;
+  }, [isMobile, isTablet, orientation]);
   const { setIsGenerationsPaneLocked } = usePanes();
 
   // Use shots.settings to store GenerationsPane settings (shared with useGenerationsPageLogic)
@@ -1117,10 +1205,11 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             onPendingPositionApplied={handlePendingPositionApplied}
             onImageDelete={generationActions.handleDeleteImageFromShot}
             onImageDuplicate={generationActions.handleDuplicateImage}
-            columns={(isMobile ? 2 : 6) as 2 | 6}
+            columns={mobileColumns as 2 | 3 | 4 | 6}
             skeleton={
               <ImageManagerSkeleton 
-                isMobile={isMobile} 
+                isMobile={isMobile}
+                {...({ columns: mobileColumns } as any)}
                 shotImages={contextImages}
                 projectAspectRatio={projects.find(p => p.id === projectId)?.aspectRatio}
               />

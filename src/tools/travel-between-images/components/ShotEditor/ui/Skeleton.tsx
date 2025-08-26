@@ -7,12 +7,14 @@ interface ImageManagerSkeletonProps {
   isMobile: boolean;
   shotImages?: GenerationRow[]; // New prop: actual shot image data
   projectAspectRatio?: string; // New prop: project aspect ratio for proper dimensions
+  columns?: 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12; // Match grid to runtime layout
 }
 
 export const ImageManagerSkeleton: React.FC<ImageManagerSkeletonProps> = ({ 
   isMobile, 
   shotImages = [], 
-  projectAspectRatio 
+  projectAspectRatio,
+  columns
 }) => {
   // Filter out videos to match the actual filtering logic
   const actualImageCount = React.useMemo(() => {
@@ -34,11 +36,20 @@ export const ImageManagerSkeleton: React.FC<ImageManagerSkeletonProps> = ({
     return nonVideoImages.length;
   }, [shotImages, projectAspectRatio]);
 
-  // Determine grid columns based on device and actual image count
-  const gridCols = isMobile ? 'grid-cols-2' : 'grid-cols-6';
+  // Determine grid columns based on explicit columns prop if provided
+  const gridCols = React.useMemo(() => {
+    if (columns) {
+      return `grid-cols-${columns}`;
+    }
+    return isMobile ? 'grid-cols-2' : 'grid-cols-6';
+  }, [columns, isMobile]);
   
   // If we have shot data, show exact count; otherwise fall back to default
-  const skeletonCount = actualImageCount > 0 ? actualImageCount : (isMobile ? 2 : 6);
+  const fallbackCols = React.useMemo(() => {
+    if (columns) return columns;
+    return isMobile ? 2 : 6;
+  }, [columns, isMobile]);
+  const skeletonCount = actualImageCount > 0 ? actualImageCount : fallbackCols;
   
   // Calculate exact aspect ratio for skeleton items based on project dimensions
   const aspectRatioStyle = React.useMemo(() => {
