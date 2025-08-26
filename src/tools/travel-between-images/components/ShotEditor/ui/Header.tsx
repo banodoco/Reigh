@@ -113,7 +113,7 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Mobile layout - centered */}
       <div className="sm:hidden">
         {/* Shot name with navigation buttons centered */}
-        <div className="flex justify-center px-2">
+        <div className="flex justify-center px-3">
           {isEditingName ? (
             // Hide navigation buttons when editing on mobile too
             <div className="flex items-center space-x-2 w-full max-w-xs">
@@ -139,8 +139,8 @@ export const Header: React.FC<HeaderProps> = ({
               </Button>
             </div>
           ) : (
-            // Show navigation buttons tightly around the shot name on mobile
-            <div className="flex items-center space-x-1">
+            // Show navigation buttons with better spacing on mobile
+            <div className="flex items-center space-x-2">
               <Button 
                 variant="outline" 
                 size="sm" 

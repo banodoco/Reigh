@@ -1279,7 +1279,7 @@ const MobileImageItem: React.FC<MobileImageItemProps> = ({
           <Button
             variant="destructive"
             size="icon"
-            className="absolute top-1 right-1 h-7 w-7 p-0 rounded-full opacity-70 hover:opacity-100 transition-opacity z-10"
+            className="absolute top-2 right-2 h-7 w-7 p-0 rounded-full opacity-70 hover:opacity-100 transition-opacity z-10"
             onClick={(e) => {
               e.stopPropagation();
               onDelete();
@@ -1291,7 +1291,7 @@ const MobileImageItem: React.FC<MobileImageItemProps> = ({
           <Button
             variant="secondary"
             size="icon"
-            className="absolute top-1 left-1 h-7 w-7 p-0 rounded-full opacity-70 hover:opacity-100 transition-opacity z-10"
+            className="absolute top-2 left-2 h-7 w-7 p-0 rounded-full opacity-70 hover:opacity-100 transition-opacity z-10"
             onClick={(e) => {
               e.stopPropagation();
               onDuplicate?.(image.shotImageEntryId, (image as any).position ?? index);
