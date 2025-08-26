@@ -34,6 +34,14 @@ export const ProgressiveLoadingManager: React.FC<ProgressiveLoadingManagerProps>
   children
 }) => {
   
+  console.log(`🔍 [PAGELOADINGDEBUG] [MANAGER:${instanceId}] ProgressiveLoadingManager rendering with:`, {
+    imagesLength: images.length,
+    page,
+    enabled,
+    isLightboxOpen,
+    timestamp: Date.now()
+  });
+  
   const { showImageIndices } = useProgressiveImageLoading({
     images,
     page,
@@ -42,6 +50,12 @@ export const ProgressiveLoadingManager: React.FC<ProgressiveLoadingManagerProps>
     onImagesReady,
     isLightboxOpen,
     instanceId,
+  });
+
+  console.log(`🔍 [PAGELOADINGDEBUG] [MANAGER:${instanceId}] showImageIndices:`, {
+    size: showImageIndices.size,
+    indices: Array.from(showImageIndices).slice(0, 10),
+    timestamp: Date.now()
   });
 
   // Render children with showImageIndices via render prop
