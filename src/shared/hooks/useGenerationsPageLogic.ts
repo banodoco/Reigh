@@ -25,6 +25,9 @@ export function useGenerationsPageLogic({
   enableDataLoading = true
 }: UseGenerationsPageLogicOptions = {}) {
   const { selectedProjectId } = useProject();
+  
+  // Gate all data loading based on project availability and enableDataLoading flag
+  const shouldLoadData = enableDataLoading && !!selectedProjectId;
   const [page, setPage] = useState(1);
   
   // Use regular state for the current filter values
@@ -34,7 +37,7 @@ export function useGenerationsPageLogic({
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [starredOnly, setStarredOnly] = useState<boolean>(false);
   
-  const { data: shotsData } = useListShots(selectedProjectId);
+  const { data: shotsData } = useListShots(shouldLoadData ? selectedProjectId : null);
   const { currentShotId } = useCurrentShot();
 
   // Use shots.settings to store GenerationsPane settings for the current shot
@@ -44,7 +47,7 @@ export function useGenerationsPageLogic({
     isLoading: isLoadingShotSettings 
   } = useToolSettings<GenerationsPaneSettings>('generations-pane', { 
     shotId: currentShotId || undefined, 
-    enabled: !!currentShotId 
+    enabled: shouldLoadData && !!currentShotId 
   });
 
   // Helper function to check if a shot has any images
@@ -214,10 +217,10 @@ export function useGenerationsPageLogic({
   }, [mediaType]);
 
   const { data: generationsResponse, isLoading, isFetching, isError, error } = useGenerations(
-    selectedProjectId, 
+    shouldLoadData ? selectedProjectId : null, 
     page, 
     itemsPerPage, 
-    enableDataLoading,
+    shouldLoadData,
     {
       mediaType,
       toolType,

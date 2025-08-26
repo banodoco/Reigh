@@ -39,6 +39,7 @@ const GenerationsPaneComponent: React.FC = () => {
   // Check if we're on the generations page or image generation tool page
   const isOnGenerationsPage = location.pathname === '/generations';
   const isOnImageGenerationPage = location.pathname === '/tools/image-generation';
+  const isOnVideoTravelPage = location.pathname === '/tools/travel-between-images';
   
   const isMobile = useIsMobile();
   const { currentShotId } = useCurrentShot();
@@ -50,7 +51,7 @@ const GenerationsPaneComponent: React.FC = () => {
   const [shotFilterOpen, setShotFilterOpen] = useState(false);
   const [mediaTypeFilterOpen, setMediaTypeFilterOpen] = useState(false);
 
-  // Use the generalized logic
+  // Use the generalized logic - disable data loading when on video travel page to reduce mobile overhead
   const {
     selectedProjectId,
     shotsData,
@@ -73,7 +74,8 @@ const GenerationsPaneComponent: React.FC = () => {
     handleAddToShotWithoutPosition,
   } = useGenerationsPageLogic({
     itemsPerPage: GENERATIONS_PER_PAGE,
-    mediaType: mediaTypeFilter
+    mediaType: mediaTypeFilter,
+    enableDataLoading: !isOnVideoTravelPage
   });
 
   // Debug: Log the current filter state

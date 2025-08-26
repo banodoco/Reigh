@@ -14,6 +14,7 @@ import { useToast } from '@/shared/hooks/use-toast';
 import { TasksPaneProcessingWarning } from '../ProcessingWarnings';
 import { TASK_STATUS, TaskStatus } from '@/types/database';
 import { useBottomOffset } from '@/shared/hooks/useBottomOffset';
+import { useLocation } from 'react-router-dom';
 
 const ITEMS_PER_PAGE = 50;
 
@@ -154,10 +155,15 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
 
   // Project context & task helpers
   const { selectedProjectId } = useProject();
+  const location = useLocation();
+  
+  // Disable data loading when on video travel page to reduce mobile overhead
+  const isOnVideoTravelPage = location.pathname === '/tools/travel-between-images';
+  const shouldLoadTasks = !!selectedProjectId && !isOnVideoTravelPage;
   
   // Get paginated tasks
   const { data: paginatedData, isLoading: isPaginatedLoading } = usePaginatedTasks({
-    projectId: selectedProjectId,
+    projectId: shouldLoadTasks ? selectedProjectId : null,
     status: STATUS_GROUPS[selectedFilter],
     limit: ITEMS_PER_PAGE,
     offset: (currentPage - 1) * ITEMS_PER_PAGE,
@@ -189,7 +195,7 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
   }, [paginatedData, isPaginatedLoading, displayPaginatedData, selectedFilter, currentPage]);
   
   // Get status counts for indicators
-  const { data: statusCounts, isLoading: isStatusCountsLoading } = useTaskStatusCounts(selectedProjectId);
+  const { data: statusCounts, isLoading: isStatusCountsLoading } = useTaskStatusCounts(shouldLoadTasks ? selectedProjectId : null);
   
   // Store previous status counts to avoid flickering during loading
   const [displayStatusCounts, setDisplayStatusCounts] = useState<typeof statusCounts>(statusCounts);

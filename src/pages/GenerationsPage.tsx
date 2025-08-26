@@ -58,6 +58,19 @@ const GenerationsPage: React.FC = () => {
     isError,
     errorMessage: error?.message,
     page,
+    isLoadingProjects,
+    timestamp: Date.now()
+  });
+
+  // [DEEP DEBUG] Log the exact skeleton gate conditions  
+  console.log('[GalleryRenderDebug] 🔍 SKELETON GATE CONDITIONS:', {
+    condition1_isLoadingProjects: isLoadingProjects,
+    condition2_emptyItems: paginatedData.items.length === 0,
+    condition3_isLoading: isLoading,
+    condition4_isFetching: isFetching,
+    condition5_totalCountNull: totalCount == null,
+    combinedCondition2: paginatedData.items.length === 0 && (isLoading || isFetching || totalCount == null),
+    willShowSkeleton: isLoadingProjects || (paginatedData.items.length === 0 && (isLoading || isFetching || totalCount == null)),
     timestamp: Date.now()
   });
 
