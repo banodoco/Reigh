@@ -482,37 +482,30 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   {/* Media Content */}
                   <div className="relative max-w-full max-h-full flex items-center justify-center">
                     {isVideo ? (
-                      // FIXED CONTAINER: Prevents size jumps when navigating between videos with different aspect ratios
-                      <div 
-                        className="flex items-center justify-center"
-                        style={{ 
-                          width: '55vw', 
-                          height: '90vh',
-                          maxWidth: '55vw', 
-                          maxHeight: '90vh' 
-                        }}
-                      >
-                        {videoPlayerComponent === 'simple-player' ? (
+                      videoPlayerComponent === 'simple-player' ? (
+                        <div style={{ maxWidth: '55vw', maxHeight: '90vh' }}>
                           <SimpleVideoPlayer
                             src={displayUrl}
                             poster={media.thumbUrl}
-                            className="max-w-full max-h-full object-contain"
+                            className="w-full h-full object-contain"
                           />
-                        ) : videoPlayerComponent === 'lightbox-scrub' ? (
-                          <LightboxScrubVideo
-                            src={displayUrl}
-                            poster={media.thumbUrl}
-                            className="max-w-full max-h-full object-contain"
-                          />
-                        ) : (
-                          <HoverScrubVideo
-                            src={displayUrl}
-                            poster={media.thumbUrl}
-                            className="max-w-full max-h-full object-contain"
-                            disableScrubbing={true}
-                          />
-                        )}
-                      </div>
+                        </div>
+                      ) : videoPlayerComponent === 'lightbox-scrub' ? (
+                        <LightboxScrubVideo
+                          src={displayUrl}
+                          poster={media.thumbUrl}
+                          className="object-contain"
+                          style={{ maxWidth: '55vw', maxHeight: '90vh' }}
+                        />
+                      ) : (
+                        <HoverScrubVideo
+                          src={displayUrl}
+                          poster={media.thumbUrl}
+                          className="object-contain"
+                          style={{ maxWidth: '55vw', maxHeight: '90vh' }}
+                          disableScrubbing={true}
+                        />
+                      )
                     ) : (
                       <div className="relative">
                         {isSaving ? (
@@ -784,35 +777,28 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   {/* Media Content - same as above but adapted for mobile */}
                   <div className="relative w-full h-full flex items-center justify-center">
                     {isVideo ? (
-                      // FIXED CONTAINER: Prevents size jumps when navigating between videos with different aspect ratios
-                      <div 
-                        className="w-full h-full flex items-center justify-center"
-                        style={{ 
-                          maxWidth: '95vw',
-                          maxHeight: '60vh' // Use 60vh since this is the mobile stacked layout
-                        }}
-                      >
-                        {videoPlayerComponent === 'simple-player' ? (
+                      videoPlayerComponent === 'simple-player' ? (
+                        <div className="w-full h-full flex items-center justify-center">
                           <SimpleVideoPlayer
                             src={displayUrl}
                             poster={media.thumbUrl}
                             className="max-w-full max-h-full object-contain"
                           />
-                        ) : videoPlayerComponent === 'lightbox-scrub' ? (
-                          <LightboxScrubVideo
-                            src={displayUrl}
-                            poster={media.thumbUrl}
-                            className="max-w-full max-h-full object-contain"
-                          />
-                        ) : (
-                          <HoverScrubVideo
-                            src={displayUrl}
-                            poster={media.thumbUrl}
-                            className="max-w-full max-h-full object-contain"
-                            disableScrubbing={true}
-                          />
-                        )}
-                      </div>
+                        </div>
+                      ) : videoPlayerComponent === 'lightbox-scrub' ? (
+                        <LightboxScrubVideo
+                          src={displayUrl}
+                          poster={media.thumbUrl}
+                          className="max-w-full max-h-full object-contain"
+                        />
+                      ) : (
+                        <HoverScrubVideo
+                          src={displayUrl}
+                          poster={media.thumbUrl}
+                          className="max-w-full max-h-full object-contain"
+                          disableScrubbing={true}
+                        />
+                      )
                     ) : (
                       <div className="relative">
                         {isSaving ? (
@@ -963,37 +949,30 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               {/* Media Content */}
               <div className="relative">
                 {isVideo ? (
-                  // FIXED CONTAINER: Prevents size jumps when navigating between videos with different aspect ratios
-                  <div 
-                    className="flex items-center justify-center"
-                    style={{ 
-                      width: '95vw',
-                      height: '85vh',
-                      maxWidth: '95vw', 
-                      maxHeight: '85vh' 
-                    }}
-                  >
-                    {videoPlayerComponent === 'simple-player' ? (
+                  videoPlayerComponent === 'simple-player' ? (
+                    <div style={{ maxWidth: '95vw' }}>
                       <SimpleVideoPlayer
                         src={displayUrl}
                         poster={media.thumbUrl}
-                        className="max-w-full max-h-full object-contain"
+                        className="h-auto max-h-[85vh] sm:max-h-[85vh] object-contain"
                       />
-                    ) : videoPlayerComponent === 'lightbox-scrub' ? (
-                      <LightboxScrubVideo
-                        src={displayUrl}
-                        poster={media.thumbUrl}
-                        className="max-w-full max-h-full object-contain"
-                      />
-                    ) : (
-                      <HoverScrubVideo
-                        src={displayUrl}
-                        poster={media.thumbUrl}
-                        className="max-w-full max-h-full object-contain"
-                        disableScrubbing={true}
-                      />
-                    )}
-                  </div>
+                    </div>
+                  ) : videoPlayerComponent === 'lightbox-scrub' ? (
+                    <LightboxScrubVideo
+                      src={displayUrl}
+                      poster={media.thumbUrl}
+                      className="h-auto max-h-[85vh] sm:max-h-[85vh] object-contain w-[95vw] sm:w-auto"
+                      style={{ maxWidth: '95vw' }}
+                    />
+                  ) : (
+                    <HoverScrubVideo
+                      src={displayUrl}
+                      poster={media.thumbUrl}
+                      className="h-auto max-h-[85vh] sm:max-h-[85vh] object-contain w-[95vw] sm:w-auto"
+                      style={{ maxWidth: '95vw' }}
+                      disableScrubbing={true}
+                    />
+                  )
                 ) : (
                   <div className="relative">
                     {isSaving ? (

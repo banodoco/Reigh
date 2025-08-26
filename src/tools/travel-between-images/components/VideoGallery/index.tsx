@@ -626,32 +626,32 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
         />
 
         {/* SIMPLIFIED: Show video-specific skeleton layout or videos */}
-        {showSkeletons ? (
-          <div className="flex flex-wrap -mx-1 sm:-mx-1.5 md:-mx-2">
-            {Array.from({ length: skeletonCount }, (_, index) => {
-              // Calculate aspect ratio for skeleton items based on project dimensions
-              const aspectRatioStyle = React.useMemo(() => {
-                if (!projectAspectRatio) return { aspectRatio: '16/9' }; // Default 16:9
-                
-                const [width, height] = projectAspectRatio.split(':').map(Number);
-                if (width && height) {
-                  return { aspectRatio: `${width}/${height}` };
-                }
-                
-                return { aspectRatio: '16/9' }; // Fallback
-              }, [projectAspectRatio]);
+        {showSkeletons ? (() => {
+          // Calculate aspect ratio for skeleton items based on project dimensions (moved outside loop)
+          const aspectRatioStyle = React.useMemo(() => {
+            if (!projectAspectRatio) return { aspectRatio: '16/9' }; // Default 16:9
+            
+            const [width, height] = projectAspectRatio.split(':').map(Number);
+            if (width && height) {
+              return { aspectRatio: `${width}/${height}` };
+            }
+            
+            return { aspectRatio: '16/9' }; // Fallback
+          }, [projectAspectRatio]);
 
-              return (
+          return (
+            <div className="flex flex-wrap -mx-1 sm:-mx-1.5 md:-mx-2">
+              {Array.from({ length: skeletonCount }, (_, index) => (
                 <div key={`skeleton-${index}`} className="w-1/2 lg:w-1/3 px-1 sm:px-1.5 md:px-2 mb-2 sm:mb-3 md:mb-4">
                   <div 
                     className="bg-muted rounded-lg animate-pulse border"
                     style={aspectRatioStyle}
                   ></div>
                 </div>
-              );
-            })}
-          </div>
-        ) : (
+              ))}
+            </div>
+          );
+        })() : (
           <div className="flex flex-wrap -mx-1 sm:-mx-1.5 md:-mx-2">
             {currentVideoOutputs.map((video, index) => {
               const originalIndex = (currentPage - 1) * itemsPerPage + index;

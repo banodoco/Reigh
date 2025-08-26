@@ -594,11 +594,6 @@ const LightboxScrubVideo: React.FC<LightboxScrubVideoProps> = ({
                   readyState: e.currentTarget.readyState,
                   videoWidth: e.currentTarget.videoWidth,
                   videoHeight: e.currentTarget.videoHeight,
-                  aspectRatio: e.currentTarget.videoWidth / e.currentTarget.videoHeight,
-                  containerStyle: {
-                    maxWidth: (e.currentTarget.parentElement as HTMLElement)?.style.maxWidth,
-                    maxHeight: (e.currentTarget.parentElement as HTMLElement)?.style.maxHeight,
-                  },
                   timestamp: Date.now()
                 });
                 handleLoadedMetadata();
