@@ -216,7 +216,8 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   const positionExistingGenerationMutation = usePositionExistingGenerationInShot();
   const createShotMutation = useCreateShot();
   const { lastAffectedShotId, setLastAffectedShotId } = useLastAffectedShot();
-  const itemsPerPage = isMobile ? 24 : 20;
+  // Use consistent page sizes with ImageGallery defaults to prevent cache mismatches
+  const itemsPerPage = isMobile ? 20 : 45;
   
   // Use stable object for filters to prevent recreating on every render
   const generationsFilters = useStableObject(() => ({
@@ -230,11 +231,12 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   
   // Debug logging removed for performance
   
+  // Only fetch generations when project is ready to prevent unnecessary queries
   const { data: generationsResponse, isLoading: isLoadingGenerations } = useGenerations(
     selectedProjectId, 
     currentPage, 
     itemsPerPage, 
-    true,
+    !!selectedProjectId, // Only enable when project is selected
     generationsFilters
   );
 

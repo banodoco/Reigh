@@ -132,24 +132,38 @@ const GenerationsPage: React.FC = () => {
   }, [selectedProjectId, queryClient, mediaTypeFilter, selectedShotFilter, excludePositioned, starredOnly]);
 
 
+    // EARLY SKELETON GATE: Show skeleton immediately if we're in any loading state
+  // This prevents any UI flash (header, filters, empty state) during initial load
+  if (
+    isLoadingProjects ||
+    (paginatedData.items.length === 0 && (isLoading || isFetching || totalCount == null))
+  ) {
+    console.log('[GalleryRenderDebug] 🔄 EARLY SKELETON GATE: Preventing all UI flash', {
+      isLoadingProjects,
+      itemsLength: paginatedData.items.length,
+      isLoading,
+      isFetching,
+      totalCount,
+      timestamp: Date.now()
+    });
     return (
+      <div className="container mx-auto p-4 flex flex-col h-full">
+        <SkeletonGallery 
+          count={GENERATIONS_PER_PAGE}
+          columns={{ base: 2, sm: 3, md: 4, lg: 5, xl: 6, '2xl': 6 }}
+          showControls={true}
+        />
+      </div>
+    );
+  }
+
+  return (
     <div className="container mx-auto p-4 flex flex-col h-full">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-light">All Generations</h1>
       </div>
       
       {(() => {
-        if (isLoadingProjects) {
-          console.log('[GalleryRenderDebug] 🔄 Showing skeleton: isLoadingProjects=true');
-          return (
-            <SkeletonGallery 
-              count={GENERATIONS_PER_PAGE}
-              columns={{ base: 2, sm: 3, md: 4, lg: 5, xl: 6, '2xl': 6 }}
-              showControls={true}
-            />
-          );
-        }
-        
         if (!selectedProjectId) {
           console.log('[GalleryRenderDebug] ❌ No project selected');
           return <div className="text-center py-10">Please select a project to view generations.</div>;
@@ -160,27 +174,10 @@ const GenerationsPage: React.FC = () => {
           return <div className="text-center py-10 text-red-500">Error loading generations: {error?.message}</div>;
         }
         
-        if ((isLoading || isFetching) && paginatedData.items.length === 0) {
-          console.log('[GalleryRenderDebug] 🔄 Showing skeleton: loading with no data');
-          return (
-            <SkeletonGallery 
-              count={GENERATIONS_PER_PAGE}
-              columns={{ base: 2, sm: 3, md: 4, lg: 5, xl: 6, '2xl': 6 }}
-              showControls={true}
-            />
-          );
-        }
-        
-        // Show skeleton if we have no data and haven't loaded yet (initial state)
+        // Explicit empty state (true zero results)
         if (paginatedData.items.length === 0 && totalCount === 0) {
-          console.log('[GalleryRenderDebug] 🔄 Showing skeleton: no data and no total count yet');
-          return (
-            <SkeletonGallery 
-              count={GENERATIONS_PER_PAGE}
-              columns={{ base: 2, sm: 3, md: 4, lg: 5, xl: 6, '2xl': 6 }}
-              showControls={true}
-            />
-          );
+          console.log('[GalleryRenderDebug] 📭 True empty state: no generations exist');
+          return <div className="text-center py-10">No generations found.</div>;
         }
         
         console.log('[GalleryRenderDebug] ✅ Rendering ImageGallery with:', {
