@@ -1089,6 +1089,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           shotKey={selectedShotId}
           getShotVideoCount={getShotVideoCount}
           invalidateVideoCountsCache={invalidateVideoCountsCache}
+          projectAspectRatio={projects.find(p => p.id === projectId)?.aspectRatio}
         />
       </div>
 

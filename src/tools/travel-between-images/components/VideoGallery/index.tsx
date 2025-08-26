@@ -118,6 +118,11 @@ interface VideoOutputsGalleryProps {
    * Function to invalidate video counts cache when videos are added/deleted
    */
   invalidateVideoCountsCache?: () => void;
+  
+  /**
+   * Project aspect ratio for proper video dimensions (e.g., "4:3", "16:9")
+   */
+  projectAspectRatio?: string;
 }
 
 const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
@@ -131,6 +136,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   shotKey,
   getShotVideoCount,
   invalidateVideoCountsCache,
+  projectAspectRatio,
 }) => {
   // ===============================================================================
   // STATE MANAGEMENT
@@ -622,11 +628,28 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
         {/* SIMPLIFIED: Show video-specific skeleton layout or videos */}
         {showSkeletons ? (
           <div className="flex flex-wrap -mx-1 sm:-mx-1.5 md:-mx-2">
-            {Array.from({ length: skeletonCount }, (_, index) => (
-              <div key={`skeleton-${index}`} className="w-1/2 lg:w-1/3 px-1 sm:px-1.5 md:px-2 mb-2 sm:mb-3 md:mb-4">
-                <div className="aspect-video bg-muted rounded-lg animate-pulse border"></div>
-              </div>
-            ))}
+            {Array.from({ length: skeletonCount }, (_, index) => {
+              // Calculate aspect ratio for skeleton items based on project dimensions
+              const aspectRatioStyle = React.useMemo(() => {
+                if (!projectAspectRatio) return { aspectRatio: '16/9' }; // Default 16:9
+                
+                const [width, height] = projectAspectRatio.split(':').map(Number);
+                if (width && height) {
+                  return { aspectRatio: `${width}/${height}` };
+                }
+                
+                return { aspectRatio: '16/9' }; // Fallback
+              }, [projectAspectRatio]);
+
+              return (
+                <div key={`skeleton-${index}`} className="w-1/2 lg:w-1/3 px-1 sm:px-1.5 md:px-2 mb-2 sm:mb-3 md:mb-4">
+                  <div 
+                    className="bg-muted rounded-lg animate-pulse border"
+                    style={aspectRatioStyle}
+                  ></div>
+                </div>
+              );
+            })}
           </div>
         ) : (
           <div className="flex flex-wrap -mx-1 sm:-mx-1.5 md:-mx-2">
@@ -644,6 +667,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
                   isFirstVideo={isFirstVideo}
                   shouldPreload={shouldPreload}
                   isMobile={isMobile}
+                  projectAspectRatio={projectAspectRatio}
                   onLightboxOpen={setLightboxIndex}
                   onMobileTap={handleMobileTap}
                   onDelete={handleDeleteOptimistic}

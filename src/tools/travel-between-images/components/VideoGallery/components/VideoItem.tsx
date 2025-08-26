@@ -14,6 +14,7 @@ interface VideoItemProps {
   isFirstVideo: boolean;
   shouldPreload: string;
   isMobile: boolean;
+  projectAspectRatio?: string;
   onLightboxOpen: (index: number) => void;
   onMobileTap: (index: number) => void;
   onDelete: (id: string) => void;
@@ -32,6 +33,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
   isFirstVideo, 
   shouldPreload, 
   isMobile, 
+  projectAspectRatio,
   onLightboxOpen, 
   onMobileTap, 
   onDelete, 
@@ -136,6 +138,24 @@ export const VideoItem = React.memo<VideoItemProps>(({
   }, [shouldLoad, videoPosterLoaded, videoMetadataLoaded, thumbnailLoaded, hasThumbnail, thumbnailError, logVideoEvent, video.thumbUrl, video.location]);
 
   // ===============================================================================
+  // ASPECT RATIO CALCULATION - Dynamic aspect ratio based on project settings
+  // ===============================================================================
+  
+  // Calculate aspect ratio for video container based on project dimensions
+  const aspectRatioStyle = React.useMemo(() => {
+    if (!projectAspectRatio) {
+      return { aspectRatio: '16/9' }; // Default to 16:9 if no project aspect ratio
+    }
+    
+    const [width, height] = projectAspectRatio.split(':').map(Number);
+    if (width && height) {
+      return { aspectRatio: `${width}/${height}` };
+    }
+    
+    return { aspectRatio: '16/9' }; // Fallback to 16:9
+  }, [projectAspectRatio]);
+
+  // ===============================================================================
   // RENDER - Clean component rendering
   // ===============================================================================
 
@@ -162,7 +182,10 @@ export const VideoItem = React.memo<VideoItemProps>(({
 
   return (
     <div className="w-1/2 lg:w-1/3 px-1 sm:px-1.5 md:px-2 mb-2 sm:mb-3 md:mb-4 relative group">
-      <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden shadow-sm border relative">
+      <div 
+        className="bg-gray-100 rounded-lg overflow-hidden shadow-sm border relative"
+        style={aspectRatioStyle}
+      >
         
         {shouldUsePosterOnMobile ? (
           // MOBILE POSTER MODE: Show static image - clickable to open lightbox
