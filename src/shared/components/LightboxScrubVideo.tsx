@@ -72,6 +72,7 @@ const LightboxScrubVideo: React.FC<LightboxScrubVideoProps> = ({
   const [scrubberVisible, setScrubberVisible] = useState(false);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false); // Track if video is actually playing
   const [posterLoaded, setPosterLoaded] = useState(false); // Track if static poster has loaded on mobile
+  const [videoDimensions, setVideoDimensions] = useState<{ width: number; height: number } | null>(null); // Track video dimensions for smooth transitions
   const speedOptions = [0.25, 0.5, 1, 1.5, 2];
   const isMobile = useIsMobile();
 
@@ -239,6 +240,8 @@ const LightboxScrubVideo: React.FC<LightboxScrubVideoProps> = ({
     setDuration(0);
     setIsVideoPlaying(false); // Reset playing state when src changes
     setPosterLoaded(false); // Reset poster loaded state when src changes
+    // Keep previous video dimensions during transition to prevent layout jumps
+    // setVideoDimensions will be updated when new video metadata loads
 
     // DEEP DEBUG: Log lightbox video initialization context
     const pageVideoCount = document.querySelectorAll('video').length;
@@ -596,6 +599,13 @@ const LightboxScrubVideo: React.FC<LightboxScrubVideoProps> = ({
                   videoHeight: e.currentTarget.videoHeight,
                   timestamp: Date.now()
                 });
+                
+                // Update video dimensions for smooth transitions
+                setVideoDimensions({
+                  width: e.currentTarget.videoWidth,
+                  height: e.currentTarget.videoHeight
+                });
+                
                 handleLoadedMetadata();
                 
                 // CRITICAL: Trigger autoplay immediately after metadata loads
@@ -661,6 +671,12 @@ const LightboxScrubVideo: React.FC<LightboxScrubVideoProps> = ({
               autoPlay={false} // We control play/pause manually
               playsInline={true}
               className={cn('w-full h-full object-contain', videoClassName)}
+              style={{
+                // Apply dimensions hint to help with layout stability during transitions
+                ...(videoDimensions && {
+                  aspectRatio: `${videoDimensions.width} / ${videoDimensions.height}`
+                })
+              }}
               onDoubleClick={onDoubleClick}
               onTouchEnd={onTouchEnd}
               data-lightbox-video="true"
