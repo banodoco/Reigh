@@ -28,6 +28,7 @@ import { useTaskGenerationMapping } from '@/shared/lib/generationTaskBridge';
 import { SharedTaskDetails } from '@/tools/travel-between-images/components/SharedTaskDetails';
 import SharedMetadataDetails from '@/shared/components/SharedMetadataDetails';
 import { useUnifiedGenerations } from '@/shared/hooks/useUnifiedGenerations';
+import { useIsMobile } from '@/shared/hooks/use-mobile';
 
 // Function to create abbreviated task names for tight spaces
 const getAbbreviatedTaskName = (fullName: string): string => {
@@ -53,6 +54,9 @@ interface TaskItemProps {
 
 const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
   const { toast } = useToast();
+  
+  // Mobile detection hook - declare early for use throughout component
+  const isMobile = useIsMobile();
 
   // Access project context early so it can be used in other hooks
   const { selectedProjectId } = useProject();
@@ -478,11 +482,33 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
     })) as GenerationRow[];
   }, [videoGenerationsData?.items, selectedProjectId]);
 
+  // Handler for mobile tap - directly open content
+  const handleMobileTap = (e: React.MouseEvent) => {
+    if (!isMobile) return; // Only handle on mobile
+    
+    e.stopPropagation();
+    e.preventDefault();
+    
+    // For travel tasks - open video if available
+    if (taskInfo.isTravelTask && taskInfo.isCompletedTravelTask && travelData.videoOutputs && travelData.videoOutputs.length > 0) {
+      setVideoLightboxIndex(0);
+      setShowVideoLightbox(true);
+      return;
+    }
+    
+    // For image generation tasks - open image if available
+    if (taskInfo.isSingleImageTask && generationData) {
+      setShowLightbox(true);
+      return;
+    }
+  };
+
   const taskItemContent = (
     <div 
       className={containerClass}
       onMouseEnter={() => setIsHoveringTaskItem(true)}
       onMouseLeave={() => setIsHoveringTaskItem(false)}
+      onClick={handleMobileTap}
     >
       <div className="flex justify-between items-center mb-1 gap-2">
         <span className="text-sm font-light text-zinc-200 flex-1 whitespace-nowrap overflow-hidden text-ellipsis cursor-default min-w-0">
@@ -518,8 +544,8 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
               <span className="text-xs text-zinc-400 ml-1">+ {extraImageCount}</span>
             )}
           </div>
-          {/* Action buttons overlay on hover */}
-          {isHoveringTaskItem && shotId && (
+          {/* Action buttons overlay on hover - desktop only */}
+          {isHoveringTaskItem && shotId && !isMobile && (
             <div 
               className="absolute inset-0 bg-black/20 backdrop-blur-[1px] rounded flex items-center justify-center gap-2"
               onClick={(e) => e.stopPropagation()} // Prevent click from bubbling to parent
@@ -664,8 +690,8 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
         />
       )}
 
-      {/* Action button overlay for image generation tasks on hover */}
-      {isHoveringTaskItem && taskInfo.isSingleImageTask && generationData && (
+      {/* Action button overlay for image generation tasks on hover - desktop only */}
+      {isHoveringTaskItem && taskInfo.isSingleImageTask && generationData && !isMobile && (
         <div 
           className="absolute inset-0 bg-black/20 backdrop-blur-[1px] rounded flex items-center justify-center"
           onClick={(e) => e.stopPropagation()} // Prevent click from bubbling to parent
@@ -720,7 +746,8 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
   }, [taskInfo.isSingleImageTask, task.id, task.taskType, task.status, actualGeneration, task.outputLocation, taskParams.promptText, task.params]);
 
   // Unified tooltip wrapper for both travel and image tasks
-  if (taskInfo.showsTooltip) {
+  // Don't show tooltips on mobile to improve performance and UX
+  if (taskInfo.showsTooltip && !isMobile) {
     const isTravel = taskInfo.isTravelTask;
     const hasClickableContent = isTravel ? 
       (taskInfo.isCompletedTravelTask && travelData.videoOutputs && travelData.videoOutputs.length > 0) : 

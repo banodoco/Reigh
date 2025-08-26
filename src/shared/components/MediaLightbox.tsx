@@ -111,6 +111,45 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   
   const isMobile = useIsMobile();
   
+  // Global, capture-phase interception of tap/click to guarantee
+  // the first outside tap closes the lightbox (not the pane),
+  // and no events reach underlying UI while the lightbox is open.
+  useEffect(() => {
+    let closedFromOutside = false;
+
+    const intercept = (e: Event) => {
+      const contentEl = contentRef.current;
+      const target = e.target as Node | null;
+      const path = (e as any).composedPath ? (e as any).composedPath() as any[] : undefined;
+      const isInside = !!(contentEl && (path ? path.includes(contentEl) : (target && contentEl.contains(target))));
+
+      // Always stop immediate propagation if available to beat any other listeners
+      if (typeof (e as any).stopImmediatePropagation === 'function') {
+        (e as any).stopImmediatePropagation();
+      }
+      e.stopPropagation();
+
+      if (!isInside) {
+        // Only close once per outside gesture
+        if (!closedFromOutside) {
+          closedFromOutside = true;
+          try { e.preventDefault(); } catch {}
+          onClose();
+        } else {
+          try { e.preventDefault(); } catch {}
+        }
+      }
+      // If inside, we already stopped propagation so nothing leaks through
+    };
+
+    const options: AddEventListenerOptions = { capture: true, passive: false } as any;
+    const events = ['pointerdown', 'pointerup', 'click', 'mousedown', 'mouseup', 'touchstart', 'touchend'];
+    events.forEach(evt => document.addEventListener(evt, intercept, options));
+    return () => {
+      events.forEach(evt => document.removeEventListener(evt, intercept, options as any));
+    };
+  }, [onClose]);
+
 
   
   // Star functionality
@@ -347,6 +386,15 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
         <DialogPrimitive.Portal>
           <DialogPrimitive.Overlay 
             className="fixed inset-0 z-[10000] bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+            onPointerDown={(e) => {
+              // Prevent the tap/click from reaching underlying elements (e.g., task item)
+              e.stopPropagation();
+            }}
+            onClick={(e) => {
+              // Explicitly close on overlay click and prevent bubbling
+              e.stopPropagation();
+              onClose();
+            }}
           />
           <DialogPrimitive.Content
             ref={contentRef}
@@ -358,6 +406,13 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               // Manually focus the dialog content so keyboard navigation works right away
               contentRef.current?.focus();
             }}
+            // Ensure clicks within the dialog never reach the app behind it
+            onPointerDown={(e) => {
+              e.stopPropagation();
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+            }}
             className={cn(
               "fixed z-[10000] duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
               "p-0 border-none bg-transparent shadow-none",
@@ -367,12 +422,15 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
             )}
             onKeyDown={handleKeyDown}
             onPointerDownOutside={(event) => {
-              // 🚀 MOBILE FIX: Always allow closing on mobile, but be more specific for task details
+              // 🚀 MOBILE FIX: Prevent underlying click-throughs and then close manually
+              // Always stop propagation and default so the gesture does not reach elements behind
+              event.preventDefault();
+              event.stopPropagation();
+
               if (showTaskDetails && !isMobile) {
                 // Desktop with task details: only close if clicking on the overlay background
                 const target = event.target as Element;
                 if (target.closest('[data-task-details-panel]') || target.closest('[role="button"]')) {
-                  event.preventDefault();
                   return;
                 }
               }
@@ -392,7 +450,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               <div 
                 className="w-full h-full flex bg-black/90"
                 onClick={(e) => {
-                  // Close if clicking on the background (not on content)
+                  // Swallow event, and close if clicking on the background (not on content)
+                  e.stopPropagation();
                   if (e.target === e.currentTarget) {
                     onClose();
                   }
@@ -403,7 +462,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   className="flex-1 flex items-center justify-center relative"
                   style={{ width: '60%' }}
                   onClick={(e) => {
-                    // Close if clicking on the media section background (not on content)
+                    // Swallow event, and close if clicking on the media section background (not on content)
+                    e.stopPropagation();
                     if (e.target === e.currentTarget) {
                       onClose();
                     }
@@ -1059,7 +1119,14 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   <Button
                     variant="secondary"
                     size="sm"
-                    onClick={onClose}
+                    onPointerDown={(e) => {
+                      // Avoid bubbling to elements behind the dialog when it unmounts
+                      e.stopPropagation();
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onClose();
+                    }}
                     className="bg-black/50 hover:bg-black/70 text-white"
                   >
                     <X className="h-4 w-4" />
