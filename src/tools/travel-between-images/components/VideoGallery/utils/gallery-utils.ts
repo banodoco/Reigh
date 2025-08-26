@@ -1,12 +1,13 @@
 import { GenerationRow } from '@/types/shots';
 
 /**
- * Mobile double-tap detection logic
+ * Mobile double-tap detection logic with video preloading on first tap
  */
 export const createMobileTapHandler = (
   lastTouchTimeRef: React.MutableRefObject<number>,
   doubleTapTimeoutRef: React.MutableRefObject<NodeJS.Timeout | null>,
-  onLightboxOpen: (index: number) => void
+  onLightboxOpen: (index: number) => void,
+  onFirstTapPreload?: (index: number) => void
 ) => {
   return (originalIndex: number) => {
     const currentTime = Date.now();
@@ -18,14 +19,34 @@ export const createMobileTapHandler = (
         clearTimeout(doubleTapTimeoutRef.current);
         doubleTapTimeoutRef.current = null;
       }
+      console.log('[MobilePreload] Double-tap detected - opening lightbox', {
+        originalIndex,
+        timeSinceLastTap,
+        timestamp: Date.now()
+      });
       onLightboxOpen(originalIndex);
     } else {
-      // This is a single tap, set a timeout to handle it if no second tap comes
+      // This is a single tap, start preloading the video for faster lightbox experience
       if (doubleTapTimeoutRef.current) {
         clearTimeout(doubleTapTimeoutRef.current);
       }
+      
+      // NEW: Start preloading video immediately on first tap
+      if (onFirstTapPreload) {
+        console.log('[MobilePreload] First tap detected - starting video preload', {
+          originalIndex,
+          timeSinceLastTap,
+          timestamp: Date.now()
+        });
+        onFirstTapPreload(originalIndex);
+      }
+      
       doubleTapTimeoutRef.current = setTimeout(() => {
-        // Single tap on mobile - you could add single tap behavior here if needed
+        // Single tap timeout - video preloading continues in background
+        console.log('[MobilePreload] Single tap timeout - video continues preloading', {
+          originalIndex,
+          timestamp: Date.now()
+        });
         doubleTapTimeoutRef.current = null;
       }, 300);
     }

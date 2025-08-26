@@ -1,4 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
+
+// TypeScript declaration for global mobile video preload map
+declare global {
+  interface Window {
+    mobileVideoPreloadMap?: Map<number, () => void>;
+  }
+}
 import { GenerationRow } from '@/types/shots';
 import { Button } from '@/shared/components/ui/button';
 import { Trash2, Info } from 'lucide-react';
@@ -6,6 +13,7 @@ import HoverScrubVideo from '@/shared/components/HoverScrubVideo';
 import { TimeStamp } from '@/shared/components/TimeStamp';
 import { useVideoLoader, useThumbnailLoader, useVideoElementIntegration } from '../hooks';
 import { determineVideoPhase, createLoadingSummary } from '../utils/video-loading-utils';
+import { getDisplayUrl } from '@/shared/lib/utils';
 
 interface VideoItemProps {
   video: GenerationRow;
@@ -17,6 +25,7 @@ interface VideoItemProps {
   projectAspectRatio?: string;
   onLightboxOpen: (index: number) => void;
   onMobileTap: (index: number) => void;
+  onMobilePreload?: (index: number) => void;
   onDelete: (id: string) => void;
   deletingVideoId: string | null;
   onHoverStart: (video: GenerationRow, event: React.MouseEvent) => void;
@@ -36,6 +45,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
   projectAspectRatio,
   onLightboxOpen, 
   onMobileTap, 
+  onMobilePreload,
   onDelete, 
   deletingVideoId, 
   onHoverStart, 
@@ -87,6 +97,153 @@ export const VideoItem = React.memo<VideoItemProps>(({
   
   // Track when video is fully visible to prevent flashing
   const [videoFullyVisible, setVideoFullyVisible] = useState(false);
+  
+  // ===============================================================================
+  // MOBILE PRELOADING STATE - Video preloading on first tap
+  // ===============================================================================
+  
+  // Track mobile video preloading state
+  const [isMobilePreloading, setIsMobilePreloading] = useState(false);
+  const preloadVideoRef = useRef<HTMLVideoElement | null>(null);
+  
+  // ===============================================================================
+  // MOBILE VIDEO PRELOADING FUNCTION
+  // ===============================================================================
+  
+  const startMobileVideoPreload = React.useCallback(() => {
+    if (!isMobile || isMobilePreloading || preloadVideoRef.current) {
+      console.log('[MobilePreload] Skipping preload', {
+        videoId: video.id?.substring(0, 8),
+        isMobile,
+        isMobilePreloading,
+        hasExistingPreloadVideo: !!preloadVideoRef.current,
+        timestamp: Date.now()
+      });
+      return;
+    }
+    
+    console.log('[MobilePreload] Starting video preload', {
+      videoId: video.id?.substring(0, 8),
+      videoSrc: video.location?.substring(video.location.lastIndexOf('/') + 1) || 'no-src',
+      timestamp: Date.now()
+    });
+    
+    setIsMobilePreloading(true);
+    
+    // Create hidden video element for preloading
+    const preloadVideo = document.createElement('video');
+    const resolvedSrc = getDisplayUrl((video.location || video.imageUrl || '') as string);
+    preloadVideo.src = resolvedSrc;
+    preloadVideo.preload = 'auto';
+    preloadVideo.muted = true;
+    preloadVideo.playsInline = true;
+    preloadVideo.style.display = 'none';
+    preloadVideo.style.position = 'absolute';
+    preloadVideo.style.top = '-9999px';
+    preloadVideo.style.left = '-9999px';
+    
+    // Add event listeners for preload tracking
+    const handleCanPlay = () => {
+      console.log('[MobilePreload] Video can play - preload successful', {
+        videoId: video.id?.substring(0, 8),
+        readyState: preloadVideo.readyState,
+        timestamp: Date.now()
+      });
+    };
+    
+    const handleLoadedData = () => {
+      console.log('[MobilePreload] Video data loaded - preload progressing', {
+        videoId: video.id?.substring(0, 8),
+        readyState: preloadVideo.readyState,
+        timestamp: Date.now()
+      });
+    };
+    
+    const handleError = () => {
+      console.warn('[MobilePreload] Video preload failed', {
+        videoId: video.id?.substring(0, 8),
+        error: preloadVideo.error,
+        timestamp: Date.now()
+      });
+    };
+    
+    preloadVideo.addEventListener('canplay', handleCanPlay);
+    preloadVideo.addEventListener('loadeddata', handleLoadedData);
+    preloadVideo.addEventListener('error', handleError);
+    
+    // Store ref and append to DOM (hidden)
+    preloadVideoRef.current = preloadVideo;
+    document.body.appendChild(preloadVideo);
+    
+    // Cleanup function
+    const cleanup = () => {
+      if (preloadVideoRef.current) {
+        preloadVideoRef.current.removeEventListener('canplay', handleCanPlay);
+        preloadVideoRef.current.removeEventListener('loadeddata', handleLoadedData);
+        preloadVideoRef.current.removeEventListener('error', handleError);
+        if (preloadVideoRef.current.parentNode) {
+          preloadVideoRef.current.parentNode.removeChild(preloadVideoRef.current);
+        }
+        preloadVideoRef.current = null;
+      }
+    };
+    
+    // Auto-cleanup after 30 seconds if video not opened
+    const timeoutId = setTimeout(() => {
+      console.log('[MobilePreload] Auto-cleanup preload video after timeout', {
+        videoId: video.id?.substring(0, 8),
+        timestamp: Date.now()
+      });
+      cleanup();
+      setIsMobilePreloading(false);
+    }, 30000);
+    
+    // Store cleanup function for manual cleanup
+    preloadVideo.dataset.cleanupTimeoutId = timeoutId.toString();
+    
+    return cleanup;
+  }, [isMobile, isMobilePreloading, video.id, video.location, video.imageUrl]);
+  
+  // Cleanup preload video on unmount or video change
+  useEffect(() => {
+    return () => {
+      if (preloadVideoRef.current) {
+        const timeoutId = preloadVideoRef.current.dataset.cleanupTimeoutId;
+        if (timeoutId) {
+          clearTimeout(parseInt(timeoutId));
+        }
+        if (preloadVideoRef.current.parentNode) {
+          preloadVideoRef.current.parentNode.removeChild(preloadVideoRef.current);
+        }
+        preloadVideoRef.current = null;
+      }
+    };
+  }, [video.id]);
+  
+  // ===============================================================================
+  // MOBILE PRELOAD TRIGGER - Connect to parent callback
+  // ===============================================================================
+  
+  // Create stable preload handler for this video item
+  const handleMobilePreload = React.useCallback(() => {
+    startMobileVideoPreload();
+  }, [startMobileVideoPreload]);
+  
+  // Expose preload function to parent via callback effect
+  React.useEffect(() => {
+    if (onMobilePreload) {
+      // Store this video's preload function globally so parent can call it
+      // We'll use a map keyed by originalIndex
+      if (!window.mobileVideoPreloadMap) {
+        window.mobileVideoPreloadMap = new Map();
+      }
+      window.mobileVideoPreloadMap.set(originalIndex, handleMobilePreload);
+      
+      return () => {
+        window.mobileVideoPreloadMap?.delete(originalIndex);
+      };
+    }
+  }, [originalIndex, handleMobilePreload, onMobilePreload]);
   
   useEffect(() => {
     if (videoPosterLoaded) {

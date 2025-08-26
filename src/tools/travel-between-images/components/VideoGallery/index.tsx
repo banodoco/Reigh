@@ -1,4 +1,11 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+
+// TypeScript declaration for global mobile video preload map
+declare global {
+  interface Window {
+    mobileVideoPreloadMap?: Map<number, () => void>;
+  }
+}
 import { GenerationRow } from '@/types/shots';
 import { Button } from '@/shared/components/ui/button';
 import { Card } from '@/shared/components/ui/card';
@@ -471,8 +478,28 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   // EVENT HANDLERS
   // ===============================================================================
   
-  // Mobile double-tap handler
-  const handleMobileTap = createMobileTapHandler(lastTouchTimeRef, doubleTapTimeoutRef, setLightboxIndex);
+  // Mobile video preload handler
+  const handleMobilePreload = useCallback((index: number) => {
+    console.log('[MobilePreload] Gallery received preload request', {
+      index,
+      timestamp: Date.now()
+    });
+    
+    // Call the VideoItem's preload function via the global map
+    if (window.mobileVideoPreloadMap?.has(index)) {
+      const preloadFunction = window.mobileVideoPreloadMap.get(index);
+      if (preloadFunction) {
+        preloadFunction();
+      } else {
+        console.warn('[MobilePreload] Preload function not found for index', index);
+      }
+    } else {
+      console.warn('[MobilePreload] No preload mapping found for index', index);
+    }
+  }, []);
+
+  // Mobile double-tap handler with preloading
+  const handleMobileTap = createMobileTapHandler(lastTouchTimeRef, doubleTapTimeoutRef, setLightboxIndex, handleMobilePreload);
 
   // Handle opening details from hover
   const handleOpenDetailsFromHover = createHoverDetailsHandler(
@@ -672,6 +699,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
                   projectAspectRatio={projectAspectRatio}
                   onLightboxOpen={setLightboxIndex}
                   onMobileTap={handleMobileTap}
+                  onMobilePreload={isMobile ? handleMobilePreload : undefined}
                   onDelete={handleDeleteOptimistic}
                   deletingVideoId={deletingVideoId}
                   onHoverStart={handleHoverStart}
