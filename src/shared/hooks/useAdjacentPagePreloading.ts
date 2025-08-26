@@ -20,6 +20,7 @@ interface UseAdjacentPagePreloadingProps {
   onPrefetchAdjacentPages?: (prevPage: number | null, nextPage: number | null) => void;
   allImages?: any[]; // For client-side pagination
   projectId?: string | null; // For project-aware cache clearing
+  isLightboxOpen?: boolean; // Pause preloading when lightbox is open
 }
 
 // Legacy exports for backwards compatibility
@@ -758,6 +759,7 @@ export const useAdjacentPagePreloading = ({
   onPrefetchAdjacentPages,
   allImages = [],
   projectId = null,
+  isLightboxOpen = false,
 }: UseAdjacentPagePreloadingProps) => {
   // Track ongoing preload operations for proper cancellation
   const preloadOperationsRef = useRef<PreloadOperation>({
@@ -793,8 +795,11 @@ export const useAdjacentPagePreloading = ({
 
   // Main preloading effect with smart configuration
   useEffect(() => {
-    if (!enabled) {
-      console.log('[AdjacentPreload] Disabled - skipping preload effect');
+    if (!enabled || isLightboxOpen) {
+      console.log('[AdjacentPreload] Disabled or lightbox open - skipping preload effect', {
+        enabled,
+        isLightboxOpen
+      });
       return;
     }
     
@@ -923,6 +928,7 @@ export const useAdjacentPagePreloading = ({
     onPrefetchAdjacentPages,
     allImages,
     cancelAllPreloads,
+    isLightboxOpen,
   ]);
 
   // Clear cache on project change

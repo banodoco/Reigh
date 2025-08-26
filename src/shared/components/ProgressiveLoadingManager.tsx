@@ -14,6 +14,7 @@ interface ProgressiveLoadingManagerProps {
   enabled?: boolean;
   isMobile: boolean;
   onImagesReady?: () => void;
+  isLightboxOpen?: boolean;
   children: (showImageIndices: Set<number>) => React.ReactNode;
 }
 
@@ -27,6 +28,7 @@ export const ProgressiveLoadingManager: React.FC<ProgressiveLoadingManagerProps>
   enabled = true,
   isMobile,
   onImagesReady,
+  isLightboxOpen = false,
   children
 }) => {
   
@@ -36,6 +38,7 @@ export const ProgressiveLoadingManager: React.FC<ProgressiveLoadingManagerProps>
     enabled,
     isMobile,
     onImagesReady,
+    isLightboxOpen,
   });
 
   // Render children with showImageIndices via render prop

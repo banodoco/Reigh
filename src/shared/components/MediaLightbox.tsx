@@ -366,8 +366,27 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                 : "left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] w-auto h-auto data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]"
             )}
             onKeyDown={handleKeyDown}
-            onPointerDownOutside={showTaskDetails && !isMobile ? undefined : onClose}
+            onPointerDownOutside={(event) => {
+              // 🚀 MOBILE FIX: Always allow closing on mobile, but be more specific for task details
+              if (showTaskDetails && !isMobile) {
+                // Desktop with task details: only close if clicking on the overlay background
+                const target = event.target as Element;
+                if (target.closest('[data-task-details-panel]') || target.closest('[role="button"]')) {
+                  event.preventDefault();
+                  return;
+                }
+              }
+              onClose();
+            }}
           >
+            {/* Accessibility: Hidden dialog title for screen readers */}
+            <DialogPrimitive.Title className="sr-only">
+              {media.type?.includes('video') ? 'Video' : 'Image'} Lightbox - {media.id?.substring(0, 8)}
+            </DialogPrimitive.Title>
+            <DialogPrimitive.Description className="sr-only">
+              View and interact with {media.type?.includes('video') ? 'video' : 'image'} in full screen. Use arrow keys to navigate, Escape to close.
+            </DialogPrimitive.Description>
+            
             {showTaskDetails && !isMobile ? (
               // Desktop layout with task details - side by side
               <div 
@@ -662,6 +681,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
                 {/* Task Details Panel - Right side (40% width) */}
                 <div 
+                  data-task-details-panel
                   className="bg-background border-l border-border overflow-hidden"
                   style={{ width: '40%' }}
                 >
@@ -816,6 +836,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
                 {/* Task Details Panel - Bottom (40% height) */}
                 <div 
+                  data-task-details-panel
                   className="bg-background border-t border-border overflow-hidden"
                   style={{ height: '40%' }}
                 >

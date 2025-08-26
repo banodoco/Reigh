@@ -28,6 +28,7 @@ interface UseProgressiveImageLoadingProps {
   onImagesReady?: () => void; // Callback when first batch is ready
   isMobile: boolean; // Mobile context for adaptive behavior
   useIntersectionObserver?: boolean; // Optional: use intersection observer for lazy loading
+  isLightboxOpen?: boolean; // Pause loading when lightbox is open
 }
 
 // Session management for proper cleanup and race condition prevention
@@ -45,7 +46,8 @@ export const useProgressiveImageLoading = ({
   enabled = true,
   onImagesReady,
   isMobile,
-  useIntersectionObserver = false // Disable by default for compatibility
+  useIntersectionObserver = false, // Disable by default for compatibility
+  isLightboxOpen = false // Pause loading when lightbox is open
 }: UseProgressiveImageLoadingProps) => {
   const [showImageIndices, setShowImageIndices] = useState<Set<number>>(new Set());
   const currentPageRef = useRef(page);
@@ -83,18 +85,19 @@ export const useProgressiveImageLoading = ({
     
     console.log(`🔍 [PAGELOADINGDEBUG] [PROG] Effect triggered - imageSetId: ${imageSetId.substring(0, 20)}...`);
     
-    if (!enabled || images.length === 0) {
+    if (!enabled || images.length === 0 || isLightboxOpen) {
       console.log(`❌ [PAGELOADINGDEBUG] [PROG] Effect skipped:`, {
         enabled,
         imagesLength: images.length,
-        reason: !enabled ? 'disabled' : 'no images'
+        isLightboxOpen,
+        reason: !enabled ? 'disabled' : images.length === 0 ? 'no images' : 'lightbox open'
       });
       // Call onImagesReady even for empty images to clear loading states
       if (images.length === 0 && onImagesReady) {
         console.log(`✅ [PAGELOADINGDEBUG] [PROG] Ready callback for empty page`);
         onImagesReady();
       }
-      cancelActiveSession('disabled or no images');
+      cancelActiveSession('disabled, no images, or lightbox open');
       return;
     }
     
@@ -196,7 +199,7 @@ export const useProgressiveImageLoading = ({
         cancelActiveSession('effect cleanup');
       }
     };
-  }, [imageSetId, page, enabled, isMobile, useIntersectionObserver, onImagesReady]);
+  }, [imageSetId, page, enabled, isMobile, useIntersectionObserver, onImagesReady, isLightboxOpen]);
   
   // Debug: Track when images prop changes
   useEffect(() => {

@@ -165,7 +165,19 @@ serve(async (req) => {
 
         const queued_only = countQueuedOnly.data ?? 0;
         const queued_plus_active = countQueuedPlusActive.data ?? 0;
-        const active_only = Math.max(0, queued_plus_active - queued_only);
+        // Compute active_only directly from cloud In Progress tasks (exclude orchestrators)
+        let active_only = 0;
+        try {
+          const { count: activeCloudNonOrchestrator } = await supabaseAdmin
+            .from('tasks')
+            .select('id', { count: 'exact', head: true })
+            .eq('status', 'In Progress')
+            .not('worker_id', 'is', null);
+          active_only = activeCloudNonOrchestrator ?? 0;
+        } catch (e) {
+          console.log('[ClaimNextTask:CountDebug] Failed to compute active_only directly, falling back to diff method:', (e as any)?.message);
+          active_only = Math.max(0, queued_plus_active - queued_only);
+        }
         console.log(`[ClaimNextTask:CountDebug] Service-role totals: queued_only=${queued_only}, active_only=${active_only}, queued_plus_active=${queued_plus_active}`);
 
         // Per-user breakdown (cloud-claimed active only in function; may include orchestrators)
@@ -272,7 +284,6 @@ serve(async (req) => {
               if (analysis.total_tasks > 0 && analysis.eligible_tasks === 0) {
                 console.log('\n❌ WHY NO TASKS ARE READY:');
                 const reasons = analysis.rejection_reasons || {};
-                console.log(`  📊 Rejection reasons:`);
                 if (reasons.no_credits) console.log(`     • No credits: ${reasons.no_credits} tasks`);
                 if (reasons.cloud_disabled) console.log(`     • Cloud disabled: ${reasons.cloud_disabled} tasks`);
                 if (reasons.concurrency_limit) console.log(`     • Concurrency limit (≥5 tasks): ${reasons.concurrency_limit} tasks`);

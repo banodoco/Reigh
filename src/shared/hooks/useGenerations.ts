@@ -26,7 +26,18 @@ export async function fetchGenerations(
   total: number;
   hasMore: boolean;
 }> {
-  if (!projectId) return { items: [], total: 0, hasMore: false };
+  console.log('[GalleryRenderDebug] 🔍 fetchGenerations STARTED with:', {
+    projectId,
+    limit,
+    offset,
+    filters,
+    timestamp: Date.now()
+  });
+  
+  if (!projectId) {
+    console.log('[GalleryRenderDebug] ❌ fetchGenerations: No projectId provided');
+    return { items: [], total: 0, hasMore: false };
+  }
   
   // Build count query
   let countQuery = supabase
@@ -41,7 +52,7 @@ export async function fetchGenerations(
       // Filter by tool_type in params for image-generation
       countQuery = countQuery.eq('params->>tool_type', 'image-generation');
     } else {
-      countQuery = countQuery.or(`params->>tool_type.eq.${filters.toolType},metadata->>tool_type.eq.${filters.toolType},params->>tool_type.eq.${filters.toolType}-reconstructed-client,metadata->>tool_type.eq.${filters.toolType}-reconstructed-client`);
+      countQuery = countQuery.or(`params->>tool_type.eq.${filters.toolType},params->>tool_type.eq.${filters.toolType}-reconstructed-client`);
     }
   }
 
@@ -93,16 +104,35 @@ export async function fetchGenerations(
     }
   }
 
-  // Get total count first  
-  const { count, error: countError } = await countQuery;
+  // 🚀 PERFORMANCE FIX: Skip expensive count query for small pages
+  // DISABLED: Enable full count for accurate pagination
+  const shouldSkipCount = false; // limit <= 100 && !filters?.searchTerm?.trim();
+  
+  let totalCount = 0;
+  if (!shouldSkipCount) {
+    console.log('[GalleryRenderDebug] 🔢 Executing count query...');
+    const { count, error: countError } = await countQuery;
+    if (countError) {
+      console.error('[GalleryRenderDebug] ❌ Count query failed:', countError);
+      throw countError;
+    }
+    totalCount = count || 0;
+    console.log('[GalleryRenderDebug] ✅ Count query result:', totalCount);
+  } else {
+    console.log('[GalleryRenderDebug] ⏭️ Skipping count query (shouldSkipCount=true)');
+  }
 
-  if (countError) throw countError;
-
-  // Always include shot associations but optimize the query
+  // 🚀 PERFORMANCE FIX: Optimize query - select only needed fields
   let dataQuery = supabase
     .from('generations')
     .select(`
-      *,
+      id,
+      location,
+      thumbnail_url,
+      type,
+      created_at,
+      params,
+      starred,
       shot_generations(shot_id, position)
     `)
     .eq('project_id', projectId);
@@ -113,7 +143,7 @@ export async function fetchGenerations(
       // Filter by tool_type in params for image-generation
       dataQuery = dataQuery.eq('params->>tool_type', 'image-generation');
     } else {
-      dataQuery = dataQuery.or(`params->>tool_type.eq.${filters.toolType},metadata->>tool_type.eq.${filters.toolType},params->>tool_type.eq.${filters.toolType}-reconstructed-client,metadata->>tool_type.eq.${filters.toolType}-reconstructed-client`);
+      dataQuery = dataQuery.or(`params->>tool_type.eq.${filters.toolType},params->>tool_type.eq.${filters.toolType}-reconstructed-client`);
     }
   }
 
@@ -177,22 +207,67 @@ export async function fetchGenerations(
     }
   }
 
+  // 🚀 PERFORMANCE FIX: Use limit+1 pattern for fast pagination when count is skipped
+  const fetchLimit = shouldSkipCount ? limit + 1 : limit;
+  console.log('[GalleryRenderDebug] 📊 Executing data query with range:', {
+    offset,
+    fetchLimit,
+    rangeEnd: offset + fetchLimit - 1
+  });
+  
   const { data, error } = await dataQuery
     .order('created_at', { ascending: false })
-    .range(offset, offset + limit - 1);
+    .range(offset, offset + fetchLimit - 1);
   
-  if (error) throw error;
+  if (error) {
+    console.error('[GalleryRenderDebug] ❌ Data query failed:', error);
+    throw error;
+  }
+  
+  console.log('[GalleryRenderDebug] ✅ Data query result:', {
+    dataLength: data?.length || 0,
+    firstItemId: data?.[0]?.id?.substring(0, 8),
+    firstItemLocation: data?.[0]?.location?.substring(0, 50) + '...'
+  });
 
-  const items = data?.map((item: any) => {
+  // Calculate hasMore and process results based on count strategy
+  let finalData = data || [];
+  let hasMore = false;
+  
+  if (shouldSkipCount) {
+    // Fast pagination: detect hasMore by checking if we got limit+1 items
+    hasMore = finalData.length > limit;
+    if (hasMore) {
+      finalData = finalData.slice(0, limit); // Remove the extra item
+    }
+    totalCount = offset + finalData.length + (hasMore ? 1 : 0); // Approximate total
+    console.log('[GalleryRenderDebug] 📊 Fast pagination calculation:', {
+      originalDataLength: data?.length,
+      finalDataLength: finalData.length,
+      hasMore,
+      approximateTotalCount: totalCount,
+      offset,
+      limit
+    });
+  } else {
+    hasMore = (offset + limit) < totalCount;
+    console.log('[GalleryRenderDebug] 📊 Full count pagination:', {
+      totalCount,
+      hasMore,
+      offset,
+      limit
+    });
+  }
+
+  const items = finalData?.map((item: any) => {
     const baseItem = {
       id: item.id,
       url: item.location,
       thumbUrl: item.thumbnail_url || item.location, // Use thumbnail_url if available, fallback to main location
       prompt: item.params?.originalParams?.orchestrator_details?.prompt || 
               item.params?.prompt || 
-              item.metadata?.prompt || 
               'No prompt',
-      metadata: item.params || item.metadata || {},
+      metadata: item.params || {},
       createdAt: item.created_at,
       isVideo: item.type?.includes('video'),
       starred: item.starred || false,
@@ -239,12 +314,18 @@ export async function fetchGenerations(
     return baseItem;
   }) || [];
 
-  // Debug logging removed for performance
+  // Debug logging for gallery rendering pipeline
+  console.log('[GalleryRenderDebug] fetchGenerations returning:', {
+    dataItemsCount: finalData.length,
+    itemsCount: items.length,
+    total: totalCount,
+    hasMore,
+    firstImageId: items[0]?.id?.substring(0, 8),
+    firstImageUrl: items[0]?.url?.substring(0, 50) + '...',
+    timestamp: Date.now()
+  });
 
-  const total = count || 0;
-  const hasMore = offset + limit < total;
-
-  return { items, total, hasMore };
+  return { items, total: totalCount, hasMore };
 }
 
 /**
@@ -336,8 +417,8 @@ export function useGenerations(
   const queryClient = useQueryClient();
   const queryKey = ['generations', projectId, page, limit, filters];
 
-  // [GalleryPollingDebug] Add comprehensive logging for useGenerations
-  console.log('[GalleryPollingDebug:useGenerations] Hook called with:', {
+  // [GalleryRenderDebug] Add comprehensive logging for useGenerations
+  console.log('[GalleryRenderDebug] useGenerations called with:', {
     projectId,
     page,
     limit,

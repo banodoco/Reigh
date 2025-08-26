@@ -87,6 +87,13 @@ export const useImageGalleryActions = ({
   }, [markOptimisticDeleted, removeOptimisticDeleted, onDelete, activeLightboxMedia, setActiveLightboxMedia, toast]);
 
   const handleOpenLightbox = useCallback((image: GeneratedImageWithMetadata) => {
+    console.log('[MobileDebug] handleOpenLightbox called with image:', {
+      imageId: image.id?.substring(0, 8),
+      imageUrl: image.url?.substring(0, 50) + '...',
+      isVideo: image.isVideo,
+      timestamp: Date.now()
+    });
+    
     // We need to map the partial `GeneratedImageWithMetadata` to a `GenerationRow` for the lightbox
     const mediaRow: GenerationRow = {
       id: image.id,
@@ -97,6 +104,13 @@ export const useImageGalleryActions = ({
       metadata: image.metadata,
       thumbUrl: image.isVideo ? image.url : undefined, // simple fallback
     };
+    
+    console.log('[MobileDebug] Setting activeLightboxMedia to:', {
+      mediaRowId: mediaRow.id?.substring(0, 8),
+      mediaRowType: mediaRow.type,
+      hasMetadata: !!mediaRow.metadata
+    });
+    
     setActiveLightboxMedia(mediaRow);
   }, [setActiveLightboxMedia]);
 

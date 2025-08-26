@@ -140,6 +140,15 @@ export interface ImageGalleryProps {
  * - Main component for coordination and composition
  */
 export const ImageGallery: React.FC<ImageGalleryProps> = (props) => {
+  // [UPSTREAM DEBUG] Track ImageGallery component rendering
+  console.log('[GalleryRenderDebug] 🎬 ImageGallery component rendering with:', {
+    imagesCount: props.images?.length || 0,
+    hasImages: !!props.images,
+    totalCount: props.totalCount,
+    isDeleting: props.isDeleting,
+    timestamp: Date.now()
+  });
+
   const {
     images, 
     onDelete, 
@@ -188,8 +197,42 @@ export const ImageGallery: React.FC<ImageGalleryProps> = (props) => {
   // Get project context for cache clearing
   const { selectedProjectId } = useProject();
   const { currentShotId } = useCurrentShot();
-  const isMobile = useIsMobile();
+  const rawIsMobile = useIsMobile();
   const { toast } = useToast();
+  
+  // Fallback mobile detection in case useIsMobile fails
+  const isMobile = rawIsMobile ?? (typeof window !== 'undefined' && window.innerWidth < 768);
+  
+  // Debug mobile detection (reduced frequency)
+  React.useEffect(() => {
+    console.log('[MobileDebug] Mobile detection changed:', {
+      rawIsMobile,
+      isMobile,
+      windowWidth: typeof window !== 'undefined' ? window.innerWidth : 'undefined',
+      isMobileType: typeof isMobile,
+      timestamp: Date.now()
+    });
+  }, [isMobile]); // Only log when isMobile actually changes
+  
+  // Add global debug function for mobile testing
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as any).debugMobile = () => {
+        const debugInfo = {
+          isMobile,
+          rawIsMobile,
+          windowWidth: window.innerWidth,
+          windowHeight: window.innerHeight,
+          userAgent: navigator.userAgent,
+          touchSupported: 'ontouchstart' in window,
+          timestamp: Date.now()
+        };
+        console.log('[MobileDebug] Debug info:', debugInfo);
+        alert(`Mobile Debug:\nisMobile: ${isMobile}\nrawIsMobile: ${rawIsMobile}\nWindow: ${window.innerWidth}x${window.innerHeight}\nTouch: ${'ontouchstart' in window}`);
+        return debugInfo;
+      };
+    }
+  }, [isMobile, rawIsMobile]);
   
   // Star functionality
   const toggleStarMutation = useToggleGenerationStar();
@@ -294,17 +337,18 @@ export const ImageGallery: React.FC<ImageGalleryProps> = (props) => {
   // Calculate effective page for progressive loading
   const effectivePage = paginationHook.isServerPagination ? 0 : paginationHook.page;
   
-  console.log(`[GalleryDebug] 📊 Page state:`, {
-    isServerPagination: paginationHook.isServerPagination,
-    serverPage,
-    clientPage: paginationHook.page,
-    effectivePage,
-    paginatedImagesLength: paginationHook.paginatedImages.length,
-    isGalleryLoading: paginationHook.isGalleryLoading,
-    loadingButton: paginationHook.loadingButton,
-    enableAdjacentPagePreloading,
-    timestamp: new Date().toISOString()
-  });
+  // Page state logging disabled for performance
+  // console.log(`[GalleryDebug] 📊 Page state:`, {
+  //   isServerPagination: paginationHook.isServerPagination,
+  //   serverPage,
+  //   clientPage: paginationHook.page,
+  //   effectivePage,
+  //   paginatedImagesLength: paginationHook.paginatedImages.length,
+  //   isGalleryLoading: paginationHook.isGalleryLoading,
+  //   loadingButton: paginationHook.loadingButton,
+  //   enableAdjacentPagePreloading,
+  //   timestamp: new Date().toISOString()
+  // });
 
   // Sync selection when lastShotId changes
   useEffect(() => {
@@ -565,6 +609,9 @@ export const ImageGallery: React.FC<ImageGalleryProps> = (props) => {
           // Progressive loading props
           effectivePage={effectivePage}
           isMobile={isMobile}
+          
+          // Lightbox state
+          isLightboxOpen={!!stateHook.activeLightboxMedia}
           
           // Preloading props
           enableAdjacentPagePreloading={enableAdjacentPagePreloading}

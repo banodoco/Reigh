@@ -18,6 +18,7 @@ interface ImagePreloadManagerProps {
   onPrefetchAdjacentPages?: (prevPage: number | null, nextPage: number | null) => void;
   allImages?: any[];
   projectId?: string | null;
+  isLightboxOpen?: boolean;
 }
 
 /**
@@ -33,7 +34,8 @@ export const ImagePreloadManager: React.FC<ImagePreloadManagerProps> = ({
   itemsPerPage,
   onPrefetchAdjacentPages,
   allImages = [],
-  projectId = null
+  projectId = null,
+  isLightboxOpen = false
 }) => {
   
   // Use the adjacent page preloading hook
@@ -47,6 +49,7 @@ export const ImagePreloadManager: React.FC<ImagePreloadManagerProps> = ({
     onPrefetchAdjacentPages,
     allImages,
     projectId,
+    isLightboxOpen,
   });
 
   // This component doesn't render anything

@@ -49,13 +49,15 @@ export const useImageGalleryPagination = ({
   // Pagination state
   const [page, setPage] = useState(0);
   const [loadingButton, setLoadingButton] = useState<'prev' | 'next' | null>(null);
-  const [isGalleryLoading, setIsGalleryLoading] = useState<boolean>(false);
+  // Determine if we're in server-side pagination mode (available at init time)
+  const isServerPagination = !!(onServerPageChange && serverPage);
+  // Start with loading when in server pagination to avoid initial empty flash
+  const [isGalleryLoading, setIsGalleryLoading] = useState<boolean>(isServerPagination);
   
   // Safety timeout ref for clearing stuck loading states
   const safetyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
-  // Determine if we're in server-side pagination mode
-  const isServerPagination = !!(onServerPageChange && serverPage);
+  // isServerPagination already computed
   
   // When filters change, reset to first page (debounced to avoid rapid state changes)
   useEffect(() => {

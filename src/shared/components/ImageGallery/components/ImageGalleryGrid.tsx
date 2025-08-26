@@ -28,6 +28,9 @@ export interface ImageGalleryGridProps {
   effectivePage: number;
   isMobile: boolean;
   
+  // Lightbox state
+  isLightboxOpen?: boolean;
+  
   // Preloading props
   enableAdjacentPagePreloading?: boolean;
   page: number;
@@ -66,6 +69,9 @@ export const ImageGalleryGrid: React.FC<ImageGalleryGridProps> = ({
   effectivePage,
   isMobile,
   
+  // Lightbox state
+  isLightboxOpen = false,
+  
   // Preloading props
   enableAdjacentPagePreloading = true,
   page,
@@ -95,6 +101,7 @@ export const ImageGalleryGrid: React.FC<ImageGalleryGridProps> = ({
         onPrefetchAdjacentPages={onPrefetchAdjacentPages}
         allImages={filteredImages}
         projectId={selectedProjectId}
+        isLightboxOpen={isLightboxOpen}
       />
 
       {/* Gallery content wrapper with minimum height to prevent layout jump when there are images */}
@@ -113,7 +120,7 @@ export const ImageGalleryGrid: React.FC<ImageGalleryGridProps> = ({
         )}
 
         {/* No images generated yet message */}
-        {images.length === 0 && !isGalleryLoading && (
+        {images.length === 0 && !isGalleryLoading && !isServerPagination && (
            <div className={`text-center py-12 mt-8 rounded-lg ${
              whiteText 
                ? "text-zinc-400 border-zinc-700 bg-zinc-800/50" 
@@ -132,6 +139,7 @@ export const ImageGalleryGrid: React.FC<ImageGalleryGridProps> = ({
             page={effectivePage}
             enabled={true}
             isMobile={isMobile}
+            isLightboxOpen={isLightboxOpen}
             onImagesReady={() => {
               console.log(`🎯 [PAGELOADINGDEBUG] [GALLERY] Images ready - clearing gallery loading state`);
               setIsGalleryLoading(false);
@@ -162,18 +170,18 @@ export const ImageGalleryGrid: React.FC<ImageGalleryGridProps> = ({
                       isPreloaded: false // Will be checked inside the component
                     });
                     
-                    // Debug logging for first few images AND any that should show but don't
-                    if (index < 8 || (loadingStrategy.shouldLoadInInitialBatch && !shouldShow)) {
-                      console.log(`[GalleryDebug] 🖼️ Image ${index} render:`, {
-                        imageId: image.id?.substring(0, 8),
-                        shouldShow,
-                        batchGroup: loadingStrategy.batchGroup,
-                        shouldLoadInInitialBatch: loadingStrategy.shouldLoadInInitialBatch,
-                        showImageIndicesSize: showImageIndices.size,
-                        showImageIndicesArray: Array.from(showImageIndices).slice(0, 10),
-                        isGalleryLoading
-                      });
-                    }
+                    // Debug logging disabled for performance (was causing excessive re-renders)
+                    // if (index < 8 || (loadingStrategy.shouldLoadInInitialBatch && !shouldShow)) {
+                    //   console.log(`[GalleryDebug] 🖼️ Image ${index} render:`, {
+                    //     imageId: image.id?.substring(0, 8),
+                    //     shouldShow,
+                    //     batchGroup: loadingStrategy.batchGroup,
+                    //     shouldLoadInInitialBatch: loadingStrategy.shouldLoadInInitialBatch,
+                    //     showImageIndicesSize: showImageIndices.size,
+                    //     showImageIndicesArray: Array.from(showImageIndices).slice(0, 10),
+                    //     isGalleryLoading
+                    //   });
+                    // }
                     
                     return (
                       <ImageGalleryItem
@@ -183,6 +191,7 @@ export const ImageGalleryGrid: React.FC<ImageGalleryGridProps> = ({
                         shouldLoad={shouldShow}
                         isPriority={loadingStrategy.shouldLoadInInitialBatch}
                         isGalleryLoading={isGalleryLoading}
+                        isMobile={isMobile}
                         {...itemProps}
                       />
                     );

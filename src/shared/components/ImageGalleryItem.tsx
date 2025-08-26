@@ -116,6 +116,17 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   onCreateShot,
   currentViewingShotId,
 }) => {
+  // Debug mobile state for first few items (reduced frequency)
+  React.useEffect(() => {
+    if (index < 3) {
+      console.log(`[MobileDebug] ImageGalleryItem ${index} mounted:`, {
+        isMobile,
+        imageId: image.id?.substring(0, 8),
+        hasOnMobileTap: typeof onMobileTap === 'function',
+        timestamp: Date.now()
+      });
+    }
+  }, [isMobile, image.id]); // Only log when key props change
   const { toast } = useToast();
   const { selectedProjectId } = useProject();
   const addImageToShotMutation = useAddImageToShot();
@@ -144,7 +155,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   
   // Track successful image load events
   const handleImageLoad = useCallback(() => {
-    console.log(`[ItemDebug] ✅ Image ${index} LOADED successfully:`, {
+    console.log(`[GalleryRenderDebug] ✅ Image ${index} LOADED successfully:`, {
       imageId: image.id?.substring(0, 8),
       wasCached: isPreloadedAndCached,
       loadTime: Date.now()
@@ -327,13 +338,15 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
     const isPreloaded = isImageCached(image);
     
     if (index < 8) {
-      console.log(`[ItemDebug:${loadId}] Loading decision for image ${index}:`, {
+      console.log(`[GalleryRenderDebug] Loading decision for image ${index}:`, {
         imageId: image.id.substring(0, 8),
         actualSrc: !!actualSrc,
+        imageLoaded,
         shouldLoad,
         isPriority,
         isPreloaded,
         actualDisplayUrl: actualDisplayUrl?.substring(0, 50) + '...',
+        canRender: !!(actualSrc && imageLoaded),
         decision: !actualSrc && shouldLoad ? 'LOAD' : actualSrc ? 'SKIP_ALREADY_SET' : !shouldLoad ? 'SKIP_NOT_READY' : 'UNKNOWN'
       });
     }
@@ -343,30 +356,30 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
       
       // Don't load placeholder URLs - they indicate missing/invalid image data
       if (actualDisplayUrl === '/placeholder.svg' || !actualDisplayUrl) {
-        console.error(`[ItemDebug:${loadId}] ❌ INVALID URL - setting error state:`, actualDisplayUrl);
+        console.error(`[GalleryRenderDebug] ❌ INVALID URL - setting error state for image ${index}:`, actualDisplayUrl);
         setImageLoadError(true);
         return;
       }
       
       // Only set loading if the image isn't already cached/loaded
       if (!isPreloaded) {
-        console.log(`[ItemDebug:${loadId}] 🔄 Setting loading state (uncached)`);
+        console.log(`[GalleryRenderDebug] 🔄 Setting loading state for image ${index} (uncached)`);
         setImageLoading(true);
       } else {
-        console.log(`[ItemDebug:${loadId}] ⚡ Skipping loading state (cached)`);
+        console.log(`[GalleryRenderDebug] ⚡ Skipping loading state for image ${index} (cached)`);
       }
       
       // No additional delay - progressive loading system handles all timing
       // Images load immediately when shouldLoad becomes true
       if (index < 8) {
-        console.log(`[ItemDebug:${loadId}] 🚀 SETTING actualSrc immediately`);
+        console.log(`[GalleryRenderDebug] 🚀 SETTING actualSrc for image ${index} immediately`);
       }
       setActualSrc(actualDisplayUrl);
       
     } else if (!shouldLoad) {
-      console.log(`[ItemDebug:${loadId}] ⏸️ WAITING for shouldLoad=true`);
+      console.log(`[GalleryRenderDebug] ⏸️ Image ${index} WAITING for shouldLoad=true`);
     } else if (actualSrc) {
-      console.log(`[ItemDebug:${loadId}] ✅ ALREADY LOADED`);
+      console.log(`[GalleryRenderDebug] ✅ Image ${index} ALREADY LOADED`);
     }
   }, [actualSrc, actualDisplayUrl, shouldLoad, image.id, index]);
 
@@ -521,6 +534,11 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                     className="absolute inset-0 w-full h-full object-contain group-hover:opacity-80 transition-opacity duration-300 bg-black"
                     onDoubleClick={isMobile ? undefined : () => onOpenLightbox(image)}
                     onTouchEnd={isMobile ? (e) => {
+                      console.log('[MobileDebug] Video onTouchEnd fired', {
+                        imageId: image.id?.substring(0, 8),
+                        target: (e.target as HTMLElement)?.tagName,
+                        timestamp: Date.now()
+                      });
                       e.preventDefault();
                       onMobileTap(image);
                     } : undefined}
@@ -591,20 +609,34 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
           ) : (
             <>
               {/* Show image once it's loaded, regardless of shouldLoad state */}
-              {actualSrc && imageLoaded && (
+              {actualSrc && imageLoaded && (() => {
+                console.log(`[GalleryRenderDebug] 🖼️ RENDERING Image ${index}:`, {
+                  imageId: image.id?.substring(0, 8),
+                  actualSrc: !!actualSrc,
+                  imageLoaded,
+                  actualSrcUrl: actualSrc?.substring(0, 50) + '...',
+                  timestamp: Date.now()
+                });
+                return (
                 <img
                   src={actualSrc}
                   alt={image.prompt || `Generated image ${index + 1}`}
                   className="absolute inset-0 w-full h-full object-cover group-hover:opacity-80 transition-opacity duration-300"
                   onDoubleClick={isMobile ? undefined : () => onOpenLightbox(image)}
                   onTouchEnd={isMobile ? (e) => {
+                    console.log('[MobileDebug] Image onTouchEnd fired', {
+                      imageId: image.id?.substring(0, 8),
+                      target: (e.target as HTMLElement)?.tagName,
+                      timestamp: Date.now()
+                    });
                     e.preventDefault();
                     onMobileTap(image);
                   } : undefined}
                   draggable={false}
                   style={{ cursor: 'pointer' }}
                 />
-              )}
+                );
+              })()}
               
               {/* Hidden image for background loading - only when image hasn't loaded yet */}
               {actualSrc && !imageLoaded && (
@@ -1050,6 +1082,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
           <TimeStamp 
             createdAt={image.createdAt} 
             position="top-right"
+            showOnHover={!isMobile} // Always show on mobile, hover on desktop
           />
 
           {/* Optimistic delete overlay */}

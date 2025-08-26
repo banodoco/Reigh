@@ -32,8 +32,18 @@ export const useMobileInteractions = ({
     const currentTime = Date.now();
     const timeSinceLastTap = currentTime - lastTouchTimeRef.current;
     
-    if (timeSinceLastTap < 300 && timeSinceLastTap > 0) {
+    console.log('[MobileDebug] Tap detected:', {
+      imageId: image.id?.substring(0, 8),
+      currentTime,
+      lastTouchTime: lastTouchTimeRef.current,
+      timeSinceLastTap,
+      isDoubleTap: timeSinceLastTap < 800 && timeSinceLastTap > 10 && lastTouchTimeRef.current > 0,
+      hasTimeout: !!doubleTapTimeoutRef.current
+    });
+    
+    if (timeSinceLastTap < 800 && timeSinceLastTap > 10 && lastTouchTimeRef.current > 0) {
       // This is a double-tap, clear any pending timeout and open lightbox
+      console.log('[MobileDebug] ✅ Double-tap detected! Opening lightbox');
       if (doubleTapTimeoutRef.current) {
         clearTimeout(doubleTapTimeoutRef.current);
         doubleTapTimeoutRef.current = null;
@@ -41,18 +51,20 @@ export const useMobileInteractions = ({
       onOpenLightbox(image);
     } else {
       // This is a single tap, set a timeout to handle it if no second tap comes
+      console.log('[MobileDebug] Single tap detected, setting timeout for settings');
       if (doubleTapTimeoutRef.current) {
         clearTimeout(doubleTapTimeoutRef.current);
       }
       doubleTapTimeoutRef.current = setTimeout(() => {
         // Single tap (mobile): reveal action controls for this image
+        console.log('[MobileDebug] ⏰ Single tap timeout fired, showing settings');
         // Close any existing popover if tapping a different image
         if (mobilePopoverOpenImageId && mobilePopoverOpenImageId !== image.id) {
           setMobilePopoverOpenImageId(null);
         }
         setMobileActiveImageId(image.id);
         doubleTapTimeoutRef.current = null;
-      }, 300);
+      }, 800);
     }
     
     lastTouchTimeRef.current = currentTime;

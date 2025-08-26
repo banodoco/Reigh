@@ -11,6 +11,9 @@ import { smartPreloadImages, initializePrefetchOperations, smartCleanupOldPages,
 const GENERATIONS_PER_PAGE = 30; // 30 items per page for consistency
 
 const GenerationsPage: React.FC = () => {
+  // [UPSTREAM DEBUG] Track GenerationsPage component rendering
+  console.log('[GalleryRenderDebug] 📄 GenerationsPage component rendering');
+  
   const { isLoadingProjects } = useProject();
   const queryClient = useQueryClient();
   // Add state for media type filter
@@ -43,6 +46,19 @@ const GenerationsPage: React.FC = () => {
   } = useGenerationsPageLogic({
     itemsPerPage: GENERATIONS_PER_PAGE,
     mediaType: mediaTypeFilter // Pass dynamic mediaType instead of hardcoded 'image'
+  });
+
+  // [UPSTREAM DEBUG] Track data from useGenerationsPageLogic
+  console.log('[GalleryRenderDebug] 📊 GenerationsPageLogic data:', {
+    selectedProjectId,
+    paginatedItemsCount: paginatedData?.items?.length || 0,
+    totalCount,
+    isLoading,
+    isFetching,
+    isError,
+    errorMessage: error?.message,
+    page,
+    timestamp: Date.now()
   });
 
   // Handle media type filter change
@@ -122,23 +138,57 @@ const GenerationsPage: React.FC = () => {
         <h1 className="text-3xl font-light">All Generations</h1>
       </div>
       
-      {isLoadingProjects ? (
-        <SkeletonGallery 
-          count={GENERATIONS_PER_PAGE}
-          columns={{ base: 2, sm: 3, md: 4, lg: 5, xl: 6, '2xl': 6 }}
-          showControls={true}
-        />
-      ) : !selectedProjectId ? (
-        <div className="text-center py-10">Please select a project to view generations.</div>
-      ) : isError ? (
-        <div className="text-center py-10 text-red-500">Error loading generations: {error?.message}</div>
-      ) : (isLoading || isFetching) && paginatedData.items.length === 0 ? (
-        <SkeletonGallery 
-          count={GENERATIONS_PER_PAGE}
-          columns={{ base: 2, sm: 3, md: 4, lg: 5, xl: 6, '2xl': 6 }}
-          showControls={true}
-        />
-      ) : (
+      {(() => {
+        if (isLoadingProjects) {
+          console.log('[GalleryRenderDebug] 🔄 Showing skeleton: isLoadingProjects=true');
+          return (
+            <SkeletonGallery 
+              count={GENERATIONS_PER_PAGE}
+              columns={{ base: 2, sm: 3, md: 4, lg: 5, xl: 6, '2xl': 6 }}
+              showControls={true}
+            />
+          );
+        }
+        
+        if (!selectedProjectId) {
+          console.log('[GalleryRenderDebug] ❌ No project selected');
+          return <div className="text-center py-10">Please select a project to view generations.</div>;
+        }
+        
+        if (isError) {
+          console.log('[GalleryRenderDebug] ❌ Error state:', error?.message);
+          return <div className="text-center py-10 text-red-500">Error loading generations: {error?.message}</div>;
+        }
+        
+        if ((isLoading || isFetching) && paginatedData.items.length === 0) {
+          console.log('[GalleryRenderDebug] 🔄 Showing skeleton: loading with no data');
+          return (
+            <SkeletonGallery 
+              count={GENERATIONS_PER_PAGE}
+              columns={{ base: 2, sm: 3, md: 4, lg: 5, xl: 6, '2xl': 6 }}
+              showControls={true}
+            />
+          );
+        }
+        
+        // Show skeleton if we have no data and haven't loaded yet (initial state)
+        if (paginatedData.items.length === 0 && totalCount === 0) {
+          console.log('[GalleryRenderDebug] 🔄 Showing skeleton: no data and no total count yet');
+          return (
+            <SkeletonGallery 
+              count={GENERATIONS_PER_PAGE}
+              columns={{ base: 2, sm: 3, md: 4, lg: 5, xl: 6, '2xl': 6 }}
+              showControls={true}
+            />
+          );
+        }
+        
+        console.log('[GalleryRenderDebug] ✅ Rendering ImageGallery with:', {
+          itemsCount: paginatedData.items.length,
+          totalCount,
+          page
+        });
+        return (
         <ImageGallery
           images={paginatedData.items}
           onDelete={handleDeleteGeneration}
@@ -167,7 +217,8 @@ const GenerationsPage: React.FC = () => {
           onStarredFilterChange={setStarredOnly}
           onPrefetchAdjacentPages={handlePrefetchAdjacentPages}
         />
-      )}
+        );
+      })()}
     </div>
   );
 };

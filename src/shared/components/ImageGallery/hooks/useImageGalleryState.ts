@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { GenerationRow } from '@/types/shots';
 import { GeneratedImageWithMetadata } from '../ImageGallery';
 
@@ -73,6 +73,16 @@ export const useImageGalleryState = ({
   
   // Lightbox state
   const [activeLightboxMedia, setActiveLightboxMedia] = useState<GenerationRow | null>(null);
+  
+  // Debug logging for lightbox state changes
+  useEffect(() => {
+    console.log('[MobileDebug] activeLightboxMedia state changed:', {
+      hasMedia: !!activeLightboxMedia,
+      mediaId: activeLightboxMedia?.id?.substring(0, 8),
+      mediaType: activeLightboxMedia?.type,
+      timestamp: Date.now()
+    });
+  }, [activeLightboxMedia]);
   
   // Task details state for mobile modal
   const [selectedImageForDetails, setSelectedImageForDetails] = useState<GenerationRow | null>(null);
@@ -195,9 +205,14 @@ export const useImageGalleryState = ({
     }
   }, [currentShotId, lastShotId, simplifiedShotOptions, selectedShotIdLocal]);
 
+  // 🚀 PERFORMANCE FIX: Memoize image IDs to prevent unnecessary effect triggers
+  const currentImageIds = useMemo(() => 
+    new Set(images.map(img => img.id)), 
+    [images]
+  );
+
   // Reconcile optimistic state when images update
   useEffect(() => {
-    const currentImageIds = new Set(images.map(img => img.id));
     
     // Clean up optimistic sets - remove IDs for images no longer in the list
     setOptimisticUnpositionedIds(prev => {
@@ -233,7 +248,7 @@ export const useImageGalleryState = ({
       }
       return next;
     });
-  }, [images]);
+  }, [currentImageIds]); // 🚀 PERFORMANCE FIX: Use memoized IDs instead of raw images array
 
   // Cleanup timeouts on unmount
   useEffect(() => {

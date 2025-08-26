@@ -2,6 +2,7 @@ import React from 'react';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { GeneratedImageWithMetadata } from '@/shared/components/ImageGallery'; // Updated import path
+import { useIsMobile } from '@/shared/hooks/use-mobile';
 
 interface DraggableImageProps {
   image: GeneratedImageWithMetadata;
@@ -10,6 +11,17 @@ interface DraggableImageProps {
 }
 
 export const DraggableImage: React.FC<DraggableImageProps> = ({ image, children, onDoubleClick }) => {
+  const isMobile = useIsMobile();
+
+  // Disable dragging entirely on mobile to avoid interfering with scroll/gestures
+  if (isMobile) {
+    return (
+      <div draggable={false} onDoubleClick={onDoubleClick}>
+        {children}
+      </div>
+    );
+  }
+
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: image.id || `draggable-${image.url}`, // Ensure a unique ID
     data: {
