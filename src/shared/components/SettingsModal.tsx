@@ -90,6 +90,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     update: updateGenerationMethods, 
     isLoading: isLoadingGenerationMethods 
   } = useUserUIState('generationMethods', { onComputer: true, inCloud: true });
+
+  // Enhanced update function that notifies other components
+  const updateGenerationMethodsWithNotification = (patch: Partial<typeof generationMethods>) => {
+    updateGenerationMethods(patch);
+    
+    // Notify other components immediately
+    window.dispatchEvent(new CustomEvent('generation-settings-changed'));
+    
+    // For cross-tab communication
+    localStorage.setItem('generation-settings-updated', Date.now().toString());
+    localStorage.removeItem('generation-settings-updated');
+  };
   
   const onComputerChecked = generationMethods.onComputer;
   const inCloudChecked = generationMethods.inCloud;
@@ -412,7 +424,7 @@ python worker.py --db-type supabase \\
                     <Checkbox
                       id="in-cloud"
                       checked={inCloudChecked}
-                      onCheckedChange={(checked) => updateGenerationMethods({ inCloud: checked === true })}
+                      onCheckedChange={(checked) => updateGenerationMethodsWithNotification({ inCloud: checked === true })}
                     />
                     <label
                       htmlFor="in-cloud"
@@ -426,7 +438,7 @@ python worker.py --db-type supabase \\
                     <Checkbox
                       id="on-computer"
                       checked={onComputerChecked}
-                      onCheckedChange={(checked) => updateGenerationMethods({ onComputer: checked === true })}
+                      onCheckedChange={(checked) => updateGenerationMethodsWithNotification({ onComputer: checked === true })}
                     />
                     <label
                       htmlFor="on-computer"
@@ -599,7 +611,7 @@ python worker.py --db-type supabase \\
                               <button
                                 className="text-blue-600 hover:text-blue-700 underline font-light transition-colors duration-200 hover:bg-blue-50 px-1 py-0.5 rounded"
                                 onClick={() => {
-                                  updateGenerationMethods({ onComputer: false, inCloud: true });
+                                  updateGenerationMethodsWithNotification({ onComputer: false, inCloud: true });
                                 }}
                               >
                                 Process in the cloud
