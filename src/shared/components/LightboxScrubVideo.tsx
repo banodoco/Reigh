@@ -71,6 +71,7 @@ const LightboxScrubVideo: React.FC<LightboxScrubVideoProps> = ({
   const [scrubberPosition, setScrubberPosition] = useState<number | null>(null);
   const [scrubberVisible, setScrubberVisible] = useState(false);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false); // Track if video is actually playing
+  const [posterLoaded, setPosterLoaded] = useState(false); // Track if static poster has loaded on mobile
   const speedOptions = [0.25, 0.5, 1, 1.5, 2];
   const isMobile = useIsMobile();
 
@@ -228,6 +229,7 @@ const LightboxScrubVideo: React.FC<LightboxScrubVideoProps> = ({
 
     setDuration(0);
     setIsVideoPlaying(false); // Reset playing state when src changes
+    setPosterLoaded(false); // Reset poster loaded state when src changes
 
     // DEEP DEBUG: Log lightbox video initialization context
     const pageVideoCount = document.querySelectorAll('video').length;
@@ -477,37 +479,75 @@ const LightboxScrubVideo: React.FC<LightboxScrubVideoProps> = ({
       onMouseMove={isMobile ? undefined : handleMouseMove}
       {...rest}
     >
-      {/* Poster overlay - shows poster image until video actually starts playing */}
-      {poster && !isVideoPlaying && (
-        <div 
-          className="absolute inset-0 z-10 pointer-events-none"
+      {/* Always show static img poster first on mobile to prevent blink - hide when video starts playing */}
+      {isMobile && poster && !isVideoPlaying && (
+        <img
+          src={getDisplayUrl(poster)}
+          alt="Video poster"
+          className="absolute inset-0 z-20 pointer-events-none"
           style={{
-            backgroundImage: `url(${getDisplayUrl(poster)})`,
-            backgroundSize: 'contain',
-            backgroundPosition: 'center',
-            backgroundRepeat: 'no-repeat'
+            width: '100%',
+            height: '100%',
+            objectFit: 'contain',
+            objectPosition: 'center'
+          }}
+          onLoad={() => {
+            setPosterLoaded(true);
+            if (process.env.NODE_ENV === 'development') {
+              console.log('[AutoplayDebugger:LIGHTBOX] 📱 Static poster loaded, safe to mount video', {
+                src: poster.substring(poster.lastIndexOf('/') + 1) || 'no-poster',
+                timestamp: Date.now()
+              });
+            }
+          }}
+          onError={() => {
+            setPosterLoaded(true); // Still allow video to mount even if poster fails
+            if (process.env.NODE_ENV === 'development') {
+              console.warn('[AutoplayDebugger:LIGHTBOX] 📱 Static poster failed, mounting video anyway', {
+                src: poster.substring(poster.lastIndexOf('/') + 1) || 'no-poster',
+                timestamp: Date.now()
+              });
+            }
           }}
         />
       )}
 
-      <video
-        ref={videoRef}
-        src={getDisplayUrl(src)}
-        poster={poster ? getDisplayUrl(poster) : undefined}
-        preload={isMobile ? 'auto' : preloadProp}
-        controls={false}
-        onLoadedMetadata={handleLoadedMetadata}
-        loop={loop}
-        muted={true}
-        autoPlay={false} // We control play/pause manually
-        playsInline={true}
-        className={cn('w-full h-full object-contain', videoClassName)}
-        onDoubleClick={onDoubleClick}
-        onTouchEnd={onTouchEnd}
-        data-lightbox-video="true"
-      >
-        Your browser does not support the video tag.
-      </video>
+      {/* Only mount video after poster loads on mobile, or immediately on desktop */}
+      {(posterLoaded || !isMobile) && (
+        <>
+          {/* Poster overlay - shows poster image until video actually starts playing */}
+          {poster && !isVideoPlaying && (
+            <div 
+              className="absolute inset-0 z-10 pointer-events-none"
+              style={{
+                backgroundImage: `url(${getDisplayUrl(poster)})`,
+                backgroundSize: 'contain',
+                backgroundPosition: 'center',
+                backgroundRepeat: 'no-repeat'
+              }}
+            />
+          )}
+
+          <video
+            ref={videoRef}
+            src={getDisplayUrl(src)}
+            poster={poster ? getDisplayUrl(poster) : undefined}
+            preload={isMobile ? 'auto' : preloadProp}
+            controls={false}
+            onLoadedMetadata={handleLoadedMetadata}
+            loop={loop}
+            muted={true}
+            autoPlay={false} // We control play/pause manually
+            playsInline={true}
+            className={cn('w-full h-full object-contain', videoClassName)}
+            onDoubleClick={onDoubleClick}
+            onTouchEnd={onTouchEnd}
+            data-lightbox-video="true"
+          >
+            Your browser does not support the video tag.
+          </video>
+        </>
+      )}
 
       {/* Scrubber Line - Desktop only */}
       {!isMobile && scrubberPosition !== null && (

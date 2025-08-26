@@ -408,11 +408,15 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               e.stopPropagation();
             }}
             className={cn(
-              "fixed z-[10000] duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
+              "fixed z-[10000]",
+              // Disable animations on mobile to prevent blink during zoom/fade
+              isMobile ? "" : "duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
               "p-0 border-none bg-transparent shadow-none",
               showTaskDetails && !isMobile
                 ? "left-0 top-0 w-full h-full" // Full screen layout for desktop with task details
-                : "left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] w-auto h-auto data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]"
+                : isMobile 
+                  ? "left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] w-auto h-auto" // Mobile: no animations
+                  : "left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] w-auto h-auto data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]"
             )}
             onKeyDown={handleKeyDown}
             onPointerDownOutside={(event) => {
