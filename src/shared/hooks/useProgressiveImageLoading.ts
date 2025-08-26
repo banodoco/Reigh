@@ -29,6 +29,7 @@ interface UseProgressiveImageLoadingProps {
   isMobile: boolean; // Mobile context for adaptive behavior
   useIntersectionObserver?: boolean; // Optional: use intersection observer for lazy loading
   isLightboxOpen?: boolean; // Pause loading when lightbox is open
+  instanceId?: string; // Unique instance ID to prevent state conflicts
 }
 
 // Session management for proper cleanup and race condition prevention
@@ -47,7 +48,8 @@ export const useProgressiveImageLoading = ({
   onImagesReady,
   isMobile,
   useIntersectionObserver = false, // Disable by default for compatibility
-  isLightboxOpen = false // Pause loading when lightbox is open
+  isLightboxOpen = false, // Pause loading when lightbox is open
+  instanceId = 'default' // Default instance ID
 }: UseProgressiveImageLoadingProps) => {
   const [showImageIndices, setShowImageIndices] = useState<Set<number>>(new Set());
   const currentPageRef = useRef(page);
@@ -83,10 +85,10 @@ export const useProgressiveImageLoading = ({
     const now = Date.now();
     const timeSinceLastTrigger = now - lastTriggerTimeRef.current;
     
-    console.log(`🔍 [PAGELOADINGDEBUG] [PROG] Effect triggered - imageSetId: ${imageSetId.substring(0, 20)}...`);
+    console.log(`🔍 [PAGELOADINGDEBUG] [PROG:${instanceId}] Effect triggered - imageSetId: ${imageSetId.substring(0, 20)}...`);
     
     if (!enabled || images.length === 0 || isLightboxOpen) {
-      console.log(`❌ [PAGELOADINGDEBUG] [PROG] Effect skipped:`, {
+      console.log(`❌ [PAGELOADINGDEBUG] [PROG:${instanceId}] Effect skipped:`, {
         enabled,
         imagesLength: images.length,
         isLightboxOpen,

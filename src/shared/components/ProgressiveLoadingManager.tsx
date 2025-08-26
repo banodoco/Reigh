@@ -15,6 +15,7 @@ interface ProgressiveLoadingManagerProps {
   isMobile: boolean;
   onImagesReady?: () => void;
   isLightboxOpen?: boolean;
+  instanceId?: string; // Unique ID to prevent state conflicts between multiple instances
   children: (showImageIndices: Set<number>) => React.ReactNode;
 }
 
@@ -29,6 +30,7 @@ export const ProgressiveLoadingManager: React.FC<ProgressiveLoadingManagerProps>
   isMobile,
   onImagesReady,
   isLightboxOpen = false,
+  instanceId,
   children
 }) => {
   
@@ -39,6 +41,7 @@ export const ProgressiveLoadingManager: React.FC<ProgressiveLoadingManagerProps>
     isMobile,
     onImagesReady,
     isLightboxOpen,
+    instanceId,
   });
 
   // Render children with showImageIndices via render prop

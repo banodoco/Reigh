@@ -135,11 +135,13 @@ export const ImageGalleryGrid: React.FC<ImageGalleryGridProps> = ({
         {/* Images grid */}
         {paginatedImages.length > 0 && (
           <ProgressiveLoadingManager
+            key={`progressive-${paginatedImages.length}-${paginatedImages[0]?.id || 'empty'}`}
             images={paginatedImages}
             page={effectivePage}
             enabled={true}
             isMobile={isMobile}
             isLightboxOpen={isLightboxOpen}
+            instanceId={`gallery-${paginatedImages.length}-${Date.now()}`}
             onImagesReady={() => {
               console.log(`🎯 [PAGELOADINGDEBUG] [GALLERY] Images ready - clearing gallery loading state`);
               setIsGalleryLoading(false);
