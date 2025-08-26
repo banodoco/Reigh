@@ -711,37 +711,83 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   // Unified handler for Collapsible open/close with smooth scroll on open
   const handleCollapsibleOpenChange = useCallback((nextOpen: boolean) => {
     const wasExpanded = isFormExpanded === true;
-    setIsFormExpanded(nextOpen);
-    try { window.sessionStorage.setItem('ig:formExpanded', String(nextOpen)); } catch {}
-
-    // If we're expanding (was collapsed), initiate scroll behavior
+    
+    // If we're expanding from collapsed state, scroll first, then expand
     if (nextOpen && !wasExpanded) {
       setIsScrollingToForm(true);
-      // Wait for expansion, then smooth scroll to the form container
-      setTimeout(() => {
+      
+      // Scroll to the form container first
+      requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            if (collapsibleContainerRef.current) {
-              try {
-                const element = collapsibleContainerRef.current;
-                const elementRect = element.getBoundingClientRect();
-                const headerHeight = isMobile ? 80 : 96;
-                const bufferSpace = 30;
-                const targetScrollTop = window.scrollY + elementRect.top - headerHeight - bufferSpace;
-                window.scrollTo({ top: Math.max(0, targetScrollTop), behavior: 'smooth' });
-              } catch (error) {
-                console.warn('Scroll calculation failed:', error);
-                collapsibleContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-              }
+          if (collapsibleContainerRef.current) {
+            try {
+              const element = collapsibleContainerRef.current;
+              const elementRect = element.getBoundingClientRect();
+              const headerHeight = isMobile ? 80 : 96;
+              const bufferSpace = 30;
+              const targetScrollTop = window.scrollY + elementRect.top - headerHeight - bufferSpace;
+              
+              // Use smooth scroll with completion detection
+              window.scrollTo({ top: Math.max(0, targetScrollTop), behavior: 'smooth' });
+              
+              // Listen for scroll completion or timeout
+              let scrollTimeout: NodeJS.Timeout;
+              let lastScrollTop = window.scrollY;
+              let scrollStableCount = 0;
+              
+              const checkScrollComplete = () => {
+                const currentScrollTop = window.scrollY;
+                const targetReached = Math.abs(currentScrollTop - Math.max(0, targetScrollTop)) < 5;
+                
+                if (targetReached || currentScrollTop === lastScrollTop) {
+                  scrollStableCount++;
+                  if (scrollStableCount >= 3 || targetReached) {
+                    // Scroll completed - now expand the form
+                    setIsFormExpanded(nextOpen);
+                    try { window.sessionStorage.setItem('ig:formExpanded', String(nextOpen)); } catch {}
+                    setTimeout(() => { setIsScrollingToForm(false); }, 300);
+                    clearTimeout(scrollTimeout);
+                    return;
+                  }
+                } else {
+                  scrollStableCount = 0;
+                }
+                
+                lastScrollTop = currentScrollTop;
+                scrollTimeout = setTimeout(checkScrollComplete, 50);
+              };
+              
+              // Start checking for scroll completion after a brief delay
+              setTimeout(checkScrollComplete, 100);
+              
+              // Fallback timeout - expand form after max 1.5 seconds regardless
+              setTimeout(() => {
+                if (!isFormExpanded) {
+                  setIsFormExpanded(nextOpen);
+                  try { window.sessionStorage.setItem('ig:formExpanded', String(nextOpen)); } catch {}
+                  setIsScrollingToForm(false);
+                }
+                clearTimeout(scrollTimeout);
+              }, 1500);
+              
+            } catch (error) {
+              console.warn('Scroll calculation failed:', error);
+              // Fallback - just expand immediately
+              collapsibleContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              setIsFormExpanded(nextOpen);
+              try { window.sessionStorage.setItem('ig:formExpanded', String(nextOpen)); } catch {}
+              setTimeout(() => { setIsScrollingToForm(false); }, 1000);
             }
-            // Reset scrolling state after scroll begins
-            setTimeout(() => { setIsScrollingToForm(false); }, 1000);
-          });
+          }
         });
-      }, 300);
-    } else if (!nextOpen) {
-      // If collapsing, immediately reset scroll state
-      setIsScrollingToForm(false);
+      });
+    } else {
+      // For collapsing or immediate expanding, handle normally
+      setIsFormExpanded(nextOpen);
+      try { window.sessionStorage.setItem('ig:formExpanded', String(nextOpen)); } catch {}
+      if (!nextOpen) {
+        setIsScrollingToForm(false);
+      }
     }
   }, [isFormExpanded, isMobile]);
 
@@ -963,7 +1009,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
               <CollapsibleTrigger asChild>
                   <Button
                     variant="ghost"
-                    className={`${isFormExpanded ? 'w-full justify-between px-6 py-6 hover:bg-accent/30 bg-accent/10 border border-b-0 rounded-t-lg shadow-sm' : 'w-full justify-between p-4 gradient-primary-collapsed rounded-lg'} transition-colors duration-300`}
+                    className={`${isFormExpanded ? 'w-full justify-between px-6 py-6 hover:bg-accent/30 bg-accent/10 border border-b-0 rounded-t-lg shadow-sm' : 'w-full justify-between p-4 gradient-primary-collapsed rounded-lg'} transition-all duration-500 ease-out`}
                     type="button"
                   >
                     <div className="flex items-center gap-2">
@@ -980,7 +1026,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
                     )}
                   </Button>
                 </CollapsibleTrigger>
-              <CollapsibleContent>
+              <CollapsibleContent className="transition-all duration-500 ease-out">
                 <div ref={formContainerRef} className="p-6 border rounded-lg shadow-sm bg-card w-full max-w-full">
                   <ImageGenerationForm
                     ref={imageGenerationFormRef}
@@ -1021,7 +1067,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
               >
                 <Button
                   variant="ghost"
-                  className={`justify-between ${isMobile ? 'p-3 text-sm' : 'p-4'} w-full max-w-2xl gradient-primary-collapsed backdrop-blur-md shadow-xl transition-all duration-300 rounded-lg`}
+                  className={`justify-between ${isMobile ? 'p-3 text-sm' : 'p-4'} w-full max-w-2xl gradient-primary-collapsed backdrop-blur-md shadow-xl transition-all duration-500 ease-out hover:scale-105 active:scale-95 rounded-lg`}
                   onClick={() => handleCollapsibleOpenChange(true)}
                   type="button"
                 >
