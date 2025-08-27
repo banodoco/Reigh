@@ -317,13 +317,7 @@ export const PromptInputRow: React.FC<PromptInputRowProps> = React.memo(({
   );
 });
 
-// Track if this is the first visit to this page in the session
-const hasVisitedImageGeneration = (() => {
-  if (typeof window !== 'undefined') {
-    return window.sessionStorage.getItem('hasVisitedImageGeneration') === 'true';
-  }
-  return false;
-})();
+// Track visit state per session using component state (prevents stale module-scope cache)
 
 export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageGenerationFormProps>(({
   onGenerate,
@@ -333,6 +327,26 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   openaiApiKey,
   justQueued = false,
 }, ref) => {
+  // Track first-visit for this session using component state to avoid stale module-level cache
+  const [hasVisitedImageGeneration, setHasVisitedImageGeneration] = useState<boolean>(() => {
+    try {
+      return typeof window !== 'undefined' && window.sessionStorage.getItem('hasVisitedImageGeneration') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  // Remember last known prompt count to show correct skeleton
+  // Initialize synchronously from sessionStorage to avoid a first-render flash of 1
+  const [lastKnownPromptCount, setLastKnownPromptCount] = useState<number>(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const globalStored = window.sessionStorage.getItem('ig:lastPromptCount');
+        if (globalStored) return parseInt(globalStored, 10);
+      }
+    } catch {}
+    return 1;
+  });
   // Store prompts by shot ID (including 'none' for no shot)
   const [promptsByShot, setPromptsByShot] = useState<Record<string, PromptEntry[]>>({});
   const promptIdCounter = useRef(1);
@@ -345,10 +359,15 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   
   // Mark that we've visited this page in the session
   React.useEffect(() => {
-    if (typeof window !== 'undefined') {
-      window.sessionStorage.setItem('hasVisitedImageGeneration', 'true');
-    }
-  }, []);
+    try {
+      if (!hasVisitedImageGeneration && typeof window !== 'undefined') {
+        window.sessionStorage.setItem('hasVisitedImageGeneration', 'true');
+        setHasVisitedImageGeneration(true);
+      }
+    } catch {}
+  }, [hasVisitedImageGeneration]);
+
+
 
   // Text to prepend/append to every prompt
   const [beforeEachPromptText, setBeforeEachPromptText] = useState("");
@@ -432,7 +451,43 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       afterEachPromptText: [afterEachPromptText, setAfterEachPromptText],
       associatedShotId: [associatedShotId, setAssociatedShotId],
     }
+    // Remove enabled: !!selectedProjectId - let persistence work even without project to preserve state
   );
+
+  // Load shot-specific prompt count when shot changes
+  React.useEffect(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        // Try shot-specific count first
+        const shotSpecificKey = `ig:lastPromptCount:${effectiveShotId}`;
+        let stored = window.sessionStorage.getItem(shotSpecificKey);
+        
+        // Fall back to global count if no shot-specific count
+        if (!stored) {
+          stored = window.sessionStorage.getItem('ig:lastPromptCount');
+        }
+        
+        const count = stored ? parseInt(stored, 10) : 1;
+        setLastKnownPromptCount(count);
+      }
+    } catch {}
+  }, [effectiveShotId]);
+
+  // Save prompt count whenever it changes (for better skeleton display on revisit)
+  React.useEffect(() => {
+    if (ready && prompts.length > 0) {
+      try {
+        if (typeof window !== 'undefined') {
+          // Use shot-specific key to remember count per shot
+          const storageKey = `ig:lastPromptCount:${effectiveShotId}`;
+          window.sessionStorage.setItem(storageKey, prompts.length.toString());
+          // Also save globally for fallback
+          window.sessionStorage.setItem('ig:lastPromptCount', prompts.length.toString());
+          setLastKnownPromptCount(prompts.length);
+        }
+      } catch {}
+    }
+  }, [ready, prompts.length, effectiveShotId]);
 
   // Debug persistence state changes
   useEffect(() => {
@@ -483,13 +538,25 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     }
   }, [associatedShotId, shots, markAsInteracted]);
 
-  // Initialize prompts for a shot if they don't exist
+  // Initialize prompts for a shot if they don't exist - debounced to prevent rapid resets during hydration
   useEffect(() => {
     if (ready && !promptsByShot[effectiveShotId]) {
-      setPromptsByShot(prev => ({
-        ...prev,
-        [effectiveShotId]: [{ id: generatePromptId(), fullPrompt: "", shortPrompt: "" }]
-      }));
+      // Add a small delay to prevent rapid resets during persistence hydration
+      const timeoutId = setTimeout(() => {
+        // Double-check that we still need to initialize after the delay
+        setPromptsByShot(prev => {
+          if (!prev[effectiveShotId] || prev[effectiveShotId].length === 0) {
+            console.log('[ImageGenerationForm] Initializing empty prompts for shot:', effectiveShotId);
+            return {
+              ...prev,
+              [effectiveShotId]: [{ id: generatePromptId(), fullPrompt: "", shortPrompt: "" }]
+            };
+          }
+          return prev; // No change needed
+        });
+      }, 50); // 50ms delay to allow persistence hydration to complete
+
+      return () => clearTimeout(timeoutId);
     }
   }, [ready, effectiveShotId]); // Remove promptsByShot from dependencies to avoid infinite loops
 
@@ -752,55 +819,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     }
   }, [prompts]);
 
-  // Show a minimal skeleton while settings hydrate so the layout is visible immediately
-  // Only show skeleton on first visit to prevent flash on subsequent visits
-  if (!ready && !hasVisitedImageGeneration) {
-    return (
-      <div className="space-y-6">
-        <div className="flex flex-col md:flex-row gap-6 animate-pulse">
-          {/* Left Column Skeleton */}
-          <div className="flex-1 space-y-6">
-            {/* Associated Shot Skeleton */}
-            <div className="space-y-2">
-              <div className="h-6 bg-muted rounded w-32" />
-              <div className="h-10 bg-muted rounded" />
-            </div>
-            
-            {/* Prompts Section Skeleton */}
-            <div className="space-y-4">
-              <div className="h-8 bg-muted rounded" /> {/* Header */}
-              <div className="space-y-3">
-                <div className="h-20 bg-muted rounded" /> {/* Prompt 1 */}
-                <div className="h-20 bg-muted rounded" /> {/* Prompt 2 */}
-              </div>
-              <div className="h-10 bg-muted rounded w-32" /> {/* Add button */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="h-24 bg-muted rounded" /> {/* Before */}
-                <div className="h-24 bg-muted rounded" /> {/* After */}
-              </div>
-              <div className="h-16 bg-muted rounded" /> {/* Slider */}
-            </div>
-          </div>
-          
-          {/* Right Column Skeleton */}
-          <div className="flex-1">
-            {/* LoRA Section Skeleton */}
-            <div className="space-y-4">
-              <div className="h-8 bg-muted rounded" /> {/* Label + Button */}
-              <div className="space-y-2">
-                <div className="h-24 bg-muted rounded" /> {/* Active LoRAs */}
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        {/* Button Skeleton */}
-        <div className="flex justify-center">
-          <div className="h-10 bg-muted rounded w-full md:w-1/2" />
-        </div>
-      </div>
-    );
-  }
+  // Removed early return skeleton: rely on stored prompt count and inline loading states instead
 
   return (
     <>
@@ -815,8 +834,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
                 <div className="flex justify-between items-center mb-2">
                   <Label className="text-lg font-light">Prompts</Label>
                   <div className="flex items-center space-x-2">
-                    {/* Manage Prompts button (hidden when >3 prompts) */}
-                    {prompts.length <= 3 && (
+                    {/* Manage Prompts button (hidden when >3 prompts, but shown during skeleton based on last known count) */}
+                    {(!ready ? lastKnownPromptCount <= 3 : prompts.length <= 3) && (
                       <TooltipProvider delayDuration={300}>
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -824,7 +843,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
                               type="button"
                               variant="outline"
                               onClick={() => setIsPromptModalOpen(true)}
-                              disabled={!hasApiKey || isGenerating}
+                              disabled={!hasApiKey || isGenerating || !ready}
                               aria-label="Manage Prompts"
                             >
                               <Edit3 className="h-4 w-4 mr-0 sm:mr-2" />
@@ -841,7 +860,31 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
                 </div>
 
                 <div className="space-y-3">
-                  {prompts.length <= 3 ? (
+                  {!ready ? (
+                    // Use stored prompt count to show actual UI structure instead of skeleton
+                    lastKnownPromptCount <= 3 ? (
+                      // Show individual loading prompt boxes for small counts
+                      <div className="space-y-3">
+                        {Array.from({ length: Math.min(lastKnownPromptCount, 3) }, (_, i) => (
+                          <div key={i} className="p-3 rounded-md shadow-sm bg-slate-50/30 dark:bg-slate-800/30">
+                            <div className="flex justify-between items-center mb-2">
+                              <div className="text-sm font-light text-muted-foreground">Prompt #{i + 1}</div>
+                              <div className="h-6 w-6 bg-muted rounded animate-pulse" />
+                            </div>
+                            <div className="mt-1 min-h-[60px] bg-muted rounded animate-pulse" />
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      // Show summary box with stored count
+                      <div className="p-3 border rounded-md text-center bg-slate-50/50">
+                        <p className="text-sm text-muted-foreground">
+                          <span className="font-light text-primary">{lastKnownPromptCount} prompts</span> currently active.
+                        </p>
+                        <p className="text-xs text-primary">(Loading...)</p>
+                      </div>
+                    )
+                  ) : prompts.length <= 3 ? (
                     prompts.map((promptEntry, index) => (
                       <PromptInputRow
                         key={promptEntry.id}
@@ -866,8 +909,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
                   )}
                 </div>
 
-                {/* Add Prompt button below list, larger, left-aligned */}
-                {prompts.length <= 3 && (
+                                {/* Add Prompt button below list, larger, left-aligned - show when appropriate based on count */}
+                {(!ready ? lastKnownPromptCount <= 3 : ready && prompts.length <= 3) && (
                   <div className="mt-3">
                     <TooltipProvider delayDuration={300}>
                       <Tooltip>
@@ -876,7 +919,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
                             type="button"
                             variant="outline"
                             onClick={() => handleAddPrompt('form')}
-                            disabled={!hasApiKey || isGenerating}
+                            disabled={!hasApiKey || isGenerating || !ready}
                             aria-label="Add Prompt"
                           >
                             <PlusCircle className="h-4 w-4 mr-2" />
@@ -886,9 +929,9 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
                         <TooltipContent side="top">
                           Add Prompt
                         </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </div>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
                 )}
 
               {/* Before / After prompt modifiers */}

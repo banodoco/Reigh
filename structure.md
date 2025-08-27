@@ -44,7 +44,7 @@
 | **Design Standards** | [design_motion_guidelines.md](structure_detail/design_motion_guidelines.md) | UI/UX patterns, motion, accessibility, mobile touch interactions |
 | **Shared Code** | [shared_hooks_contexts.md](structure_detail/shared_hooks_contexts.md) | Reusable hooks, contexts, components catalog |
 | **Component Modularity** | [component_modularization.md](structure_detail/component_modularization.md) | Reusable UI component patterns and shared details |
-| **Tool: Image Gen** | [tool_image_generation.md](structure_detail/tool_image_generation.md) | Wan-local image generation tool details |
+| **Tool: Image Gen** | [tool_image_generation.md](structure_detail/tool_image_generation.md) | Wan-local image generation tool details, intelligent skeleton system |
 | **Tool: Video Travel** | [tool_video_travel.md](structure_detail/tool_video_travel.md) | Frame-accurate video generation workflow, shot reordering, mobile video preloading |
 | **Tool: Edit Travel** | [tool_edit_travel.md](structure_detail/tool_edit_travel.md) | Text-guided image transformations |
 | **Tool: Training Data** | [tool_training_data_helper.md](structure_detail/tool_training_data_helper.md) | Training video upload & segmentation |
