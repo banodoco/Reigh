@@ -426,7 +426,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
 
   // SIMPLIFIED: Use ImageGallery's pure and simple skeleton logic - no delays!
   // Only show skeletons during INITIAL loading (never loaded before)
-  // If we've fetched data and got 0 results, go straight to empty state
+  // If we know the count is zero (from cache or local hint), show empty immediately
   const cachedCountRaw = getShotVideoCount?.(shotId);
   // If project cache hasn't loaded yet but local shot data hints 0 videos,
   // treat the effective cached count as 0 to avoid a skeleton flicker.
@@ -481,12 +481,12 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     timestamp: Date.now()
   });
 
-  // Enhanced empty state check - show immediately if cache says 0, or after loading completes with 0
+  // Enhanced empty state check - show immediately if cache says 0 OR local hint says 0, 
+  // otherwise show after loading completes with 0 results.
+  const effectiveZero = (cachedCount === 0) || Boolean(localZeroHint);
   const shouldShowEmpty = (
-    // After loading completes with 0 results
-    (!isLoadingGenerations && !isFetchingGenerations && sortedVideoOutputs.length === 0) ||
-    // OR immediately if cache indicates 0 videos (skip loading state)
-    (cachedCount === 0 && isLoadingGenerations && videoOutputs.length === 0)
+    (sortedVideoOutputs.length === 0 && effectiveZero) ||
+    (!isLoadingGenerations && !isFetchingGenerations && sortedVideoOutputs.length === 0)
   );
   
   // Log empty state decision
