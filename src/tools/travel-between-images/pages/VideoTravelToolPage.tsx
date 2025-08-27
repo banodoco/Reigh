@@ -20,7 +20,7 @@ import { PageFadeIn } from '@/shared/components/transitions';
 import { useListPublicResources } from '@/shared/hooks/useResources';
 import { ToolPageHeader } from '@/shared/components/ToolPageHeader';
 import { useToolPageHeader } from '@/shared/contexts/ToolPageHeaderContext';
-import { useContentResponsive, useContentResponsiveColumns } from '@/shared/hooks/useContentResponsive';
+import { useContentResponsive } from '@/shared/hooks/useContentResponsive';
 import { timeEnd } from '@/shared/lib/logger';
 
 import { useShotNavigation } from '@/shared/hooks/useShotNavigation';
@@ -269,11 +269,6 @@ const VideoTravelToolPage: React.FC = () => {
 
   // Content-responsive breakpoints for dynamic layout
   const { isSm, isLg } = useContentResponsive();
-  const skeletonGridCols = useContentResponsiveColumns({
-    base: 1,
-    md: 2,
-    lg: 3,
-  });
 
   // Add ref for main container to enable scroll-to-top functionality
   const mainContainerRef = useRef<HTMLDivElement>(null);
@@ -1035,11 +1030,8 @@ const VideoTravelToolPage: React.FC = () => {
     }
     // Otherwise show the main grid skeleton while the project hydrates
     return (
-      <div 
-        className="grid gap-4 px-4 py-4"
-        style={{ gridTemplateColumns: `repeat(${skeletonGridCols}, minmax(0, 1fr))` }}
-      >
-        {Array.from({ length: 8 }).map((_, idx) => (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-x-8 md:gap-y-8 pb-6 md:pb-8 px-4 py-4">
+        {Array.from({ length: 6 }).map((_, idx) => (
           <Skeleton key={idx} className="h-40 rounded-lg" />
         ))}
       </div>
@@ -1084,11 +1076,8 @@ const VideoTravelToolPage: React.FC = () => {
     }
     // Otherwise show main list skeleton
     return (
-      <div 
-        className="grid gap-4 px-4 py-4"
-        style={{ gridTemplateColumns: `repeat(${skeletonGridCols}, minmax(0, 1fr))` }}
-      >
-        {Array.from({ length: 8 }).map((_, idx) => (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-x-8 md:gap-y-8 pb-6 md:pb-8 px-4 py-4">
+        {Array.from({ length: 6 }).map((_, idx) => (
           <Skeleton key={idx} className="h-40 rounded-lg" />
         ))}
       </div>

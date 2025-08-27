@@ -730,7 +730,7 @@ export default function HomePage() {
                   <h3 className="font-theme-light text-primary text-lg">2) Reigh is very convenient and cheap to run on the cloud</h3>
                   
                   <p className="text-sm leading-relaxed">
-                    Some open source tools can be difficult to run - you often need to run through a complicated local setup process to even start creating.
+                    Some open source tools can be difficult to run - you often need to go through a complicated local setup process to even start creating.
                   </p>
                   
                   <p className="text-sm leading-relaxed">
