@@ -198,11 +198,6 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
           </div>
         )}
 
-        {/* Preserve spacing for helper during loading to prevent layout shift */}
-        {!isModeReady && unpositionedGenerationsCount > 0 && (
-          <div className="mx-1 mt-4 p-3 rounded-lg invisible">spacing-preserver</div>
-        )}
-
         {/* Helper for un-positioned generations */}
         {isModeReady && unpositionedGenerationsCount > 0 && (
           <div className="mx-1 mt-4 p-3 bg-muted/50 rounded-lg flex items-center justify-between">
