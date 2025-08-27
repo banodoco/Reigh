@@ -127,13 +127,14 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
         )}
         <div className="flex items-center justify-between">
           <CardTitle>Manage Shot Images</CardTitle>
-          {!isMobile && isModeReady && (
+          {!isMobile && (
             <div className="flex items-center space-x-2">
               <ToggleGroup
                 type="single"
                 value={generationMode}
                 onValueChange={(value: "batch" | "timeline") => value && onGenerationModeChange(value)}
                 size="sm"
+                disabled={!isModeReady}
               >
                 <ToggleGroupItem value="batch" aria-label="Toggle batch">
                   Batch
@@ -145,7 +146,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
             </div>
           )}
         </div>
-        {(isMobile || (isModeReady && generationMode === "timeline")) && (
+        {(isMobile || generationMode === "timeline") && (
           <p className="text-sm text-muted-foreground pt-1">
             {isMobile
               ? "Tap to select and move multiple images."
