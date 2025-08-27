@@ -967,6 +967,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
                     duplicatingImageId={duplicatingImageId}
                     duplicateSuccessImageId={duplicateSuccessImageId}
                     shouldLoad={shouldLoad}
+                    projectAspectRatio={projectAspectRatio}
                   />
                 );
               })}

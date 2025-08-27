@@ -37,6 +37,8 @@ interface SortableImageItemProps {
   duplicateSuccessImageId?: string | null;
   /** When provided, image src will only be set once this is true */
   shouldLoad?: boolean;
+  /** Project aspect ratio for proper dimensions */
+  projectAspectRatio?: string;
 }
 
 export const SortableImageItem: React.FC<SortableImageItemProps> = ({
@@ -55,9 +57,47 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
   duplicatingImageId,
   duplicateSuccessImageId,
   shouldLoad = true,
+  projectAspectRatio,
 }) => {
   // Simple approach like ShotsPane - just use the image URL directly
   const displayImageUrl = getDisplayUrl(image.thumbUrl || image.imageUrl);
+
+  // Calculate aspect ratio for consistent sizing with skeletons
+  const getAspectRatioStyle = () => {
+    // Try to get dimensions from image metadata first
+    let width = (image as any).metadata?.width;
+    let height = (image as any).metadata?.height;
+    
+    // If not found, try to extract from resolution string
+    if (!width || !height) {
+      const resolution = (image as any).metadata?.originalParams?.orchestrator_details?.resolution;
+      if (resolution && typeof resolution === 'string' && resolution.includes('x')) {
+        const [w, h] = resolution.split('x').map(Number);
+        if (!isNaN(w) && !isNaN(h)) {
+          width = w;
+          height = h;
+        }
+      }
+    }
+    
+    // If we have image dimensions, use them
+    if (width && height) {
+      const aspectRatio = width / height;
+      return { aspectRatio: `${aspectRatio}` };
+    }
+    
+    // Fall back to project aspect ratio if available
+    if (projectAspectRatio) {
+      const [w, h] = projectAspectRatio.split(':').map(Number);
+      if (!isNaN(w) && !isNaN(h)) {
+        const aspectRatio = w / h;
+        return { aspectRatio: `${aspectRatio}` };
+      }
+    }
+    
+    // Default to square aspect ratio
+    return { aspectRatio: '1' };
+  };
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: image.shotImageEntryId,
@@ -93,11 +133,14 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
     touchStartRef.current = null;
   };
 
+  const aspectRatioStyle = getAspectRatioStyle();
+  
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
     touchAction: isDragDisabled ? 'auto' : 'none',
+    ...aspectRatioStyle, // Apply aspect ratio to maintain consistent dimensions
   };
 
   const handleDeleteClick = (e: React.MouseEvent) => {
