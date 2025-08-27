@@ -1029,7 +1029,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
                     </div>
                   </Button>
                 </CollapsibleTrigger>
-              <CollapsibleContent className="data-[state=closed]:animate-out data-[state=closed]:slide-out-to-top-2 data-[state=closed]:fade-out-50 data-[state=open]:animate-in data-[state=open]:slide-in-from-top-2 data-[state=open]:fade-in-50 transition-all duration-700 ease-in-out overflow-hidden">
+              <CollapsibleContent className="data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0 transition-all duration-700 ease-in-out overflow-hidden">
                 <div ref={formContainerRef} className="p-6 border rounded-lg shadow-sm bg-card w-full max-w-full transition-all duration-700 ease-in-out">
                   <ImageGenerationForm
                     ref={imageGenerationFormRef}
