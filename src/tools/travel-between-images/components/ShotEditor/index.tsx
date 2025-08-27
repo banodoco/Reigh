@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { Info } from "lucide-react";
+import { Info, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/card";
 import { useProject } from "@/shared/contexts/ProjectContext";
@@ -67,6 +67,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   onGenerationModeChange,
   onPreviousShot,
   onNextShot,
+  onPreviousShotNoScroll,
+  onNextShotNoScroll,
   hasPrevious,
   hasNext,
   onUpdateShotName,
@@ -331,7 +333,13 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     if (isTablet) return (orientation === 'portrait' ? 3 : 4) as 3 | 4;
     return 2 as 2;
   }, [isMobile, isTablet, orientation]);
-  const { setIsGenerationsPaneLocked } = usePanes();
+  const { 
+    setIsGenerationsPaneLocked,
+    isShotsPaneLocked,
+    isTasksPaneLocked,
+    shotsPaneWidth,
+    tasksPaneWidth
+  } = usePanes();
 
   // Use shots.settings to store GenerationsPane settings (shared with useGenerationsPageLogic)
   const { 
@@ -344,6 +352,136 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
   // Use the new modular state management
   const { state, actions } = useShotEditorState();
+
+  // Sticky header visibility similar to ImageGenerationToolPage
+  const headerContainerRef = useRef<HTMLDivElement>(null);
+  const [isSticky, setIsSticky] = useState(false);
+  const savedOnApproachRef = useRef(false);
+
+  useEffect(() => {
+    const containerEl = headerContainerRef.current;
+    if (!containerEl) return;
+
+    const stickyThresholdY = { current: 0 } as { current: number };
+    const isStickyRef = { current: isSticky } as { current: boolean };
+    let rafId = 0 as number | 0;
+
+    const computeThreshold = () => {
+      const rect = containerEl.getBoundingClientRect();
+      const docTop = window.pageYOffset || document.documentElement.scrollTop || 0;
+      const containerDocTop = rect.top + docTop;
+      const headerHeight = isMobile ? 150 : 96; // match ImageGenerationToolPage
+      const extra = isMobile ? 0 : -40;
+      // Make sticky trigger a bit earlier than before
+      const stickyAdvance = isMobile ? 12 : 20; // earlier by ~12px on mobile, 20px on desktop
+      stickyThresholdY.current = containerDocTop + headerHeight + extra - stickyAdvance;
+    };
+
+    const checkSticky = () => {
+      rafId = 0 as number | 0;
+      const currentScroll = (window.pageYOffset || document.documentElement.scrollTop || 0);
+      const preTriggerOffset = isMobile ? 16 : 24; // Save/close just before sticky shows
+      const shouldBeSticky = currentScroll > stickyThresholdY.current;
+
+      // Save/close slightly before sticky activates to avoid visual jump
+      if (state.isEditingName && !savedOnApproachRef.current && currentScroll > (stickyThresholdY.current - preTriggerOffset)) {
+        if (onUpdateShotName && state.editingName.trim() && state.editingName.trim() !== selectedShot?.name) {
+          onUpdateShotName(state.editingName.trim());
+        }
+        actions.setEditingName(false);
+        actions.setEditingNameValue(selectedShot?.name || '');
+        savedOnApproachRef.current = true;
+      }
+
+      if (shouldBeSticky !== isStickyRef.current) {
+        isStickyRef.current = shouldBeSticky;
+        setIsSticky(shouldBeSticky);
+        
+        // Failsafe: if we somehow missed the pre-trigger, save/close when sticky activates
+        if (shouldBeSticky && state.isEditingName && !savedOnApproachRef.current) {
+          if (onUpdateShotName && state.editingName.trim() && state.editingName.trim() !== selectedShot?.name) {
+            onUpdateShotName(state.editingName.trim());
+          }
+          actions.setEditingName(false);
+          actions.setEditingNameValue(selectedShot?.name || '');
+          savedOnApproachRef.current = true;
+        }
+      }
+    };
+
+    const onScroll = () => {
+      if (rafId) return;
+      rafId = requestAnimationFrame(checkSticky) as unknown as number;
+    };
+
+    const onResize = () => {
+      computeThreshold();
+      if (rafId) cancelAnimationFrame(rafId as unknown as number);
+      rafId = requestAnimationFrame(checkSticky) as unknown as number;
+    };
+
+    computeThreshold();
+    checkSticky();
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onResize);
+
+    const ro = new ResizeObserver(() => onResize());
+    ro.observe(containerEl);
+
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onResize);
+      if (rafId) cancelAnimationFrame(rafId as unknown as number);
+      ro.disconnect();
+    };
+  }, [isMobile, isSticky, state.isEditingName, state.editingName, onUpdateShotName, selectedShot?.name, actions]);
+
+  // Reset the pre-trigger guard whenever user enters edit mode
+  useEffect(() => {
+    if (state.isEditingName) {
+      savedOnApproachRef.current = false;
+    }
+  }, [state.isEditingName]);
+
+  const handleStickyNameClick = useCallback(() => {
+    const containerEl = headerContainerRef.current;
+    if (!containerEl) {
+      actions.setEditingName(true);
+      return;
+    }
+    try {
+      const rect = containerEl.getBoundingClientRect();
+      const headerHeight = isMobile ? 80 : 96;
+      const bufferSpace = 30;
+      const targetScrollTop = (window.scrollY || window.pageYOffset || 0) + rect.top - headerHeight - bufferSpace;
+      window.scrollTo({ top: Math.max(0, targetScrollTop), behavior: 'smooth' });
+
+      let scrollTimeout: number;
+      let lastScrollTop = window.scrollY;
+      let scrollStableCount = 0;
+      const checkScrollComplete = () => {
+        const currentScrollTop = window.scrollY;
+        const targetReached = Math.abs(currentScrollTop - Math.max(0, targetScrollTop)) < 5;
+        if (targetReached || currentScrollTop === lastScrollTop) {
+          scrollStableCount++;
+          if (scrollStableCount >= 3 || targetReached) {
+            actions.setEditingName(true);
+            if (scrollTimeout) window.clearTimeout(scrollTimeout);
+            return;
+          }
+        } else {
+          scrollStableCount = 0;
+        }
+        lastScrollTop = currentScrollTop;
+        scrollTimeout = window.setTimeout(checkScrollComplete, 50);
+      };
+      window.setTimeout(checkScrollComplete, 100);
+      window.setTimeout(() => actions.setEditingName(true), 1500);
+    } catch {
+      actions.setEditingName(true);
+    }
+  }, [actions, isMobile]);
 
   // Use the LoRA sync hook
   const { loraManager, isShotLoraSettingsLoading, hasInitializedShot: loraInitialized } = useLoraSync({
@@ -1147,6 +1285,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     return (
     <div className="flex flex-col space-y-4 pb-16">
       {/* Header */}
+      <div ref={headerContainerRef}>
       <Header
         selectedShot={selectedShot}
         isEditingName={state.isEditingName}
@@ -1164,6 +1303,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         onNameKeyDown={handleNameKeyDown}
         onEditingNameChange={actions.setEditingNameValue}
       />
+      </div>
 
       {/* Output Videos Section - Now at the top */}
       <div className="">
@@ -1414,6 +1554,75 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         </div>
       </div>
       
+      {/* Sticky shot header - appears when original header is out of view */}
+      {(!state.isEditingName) && isSticky && (() => {
+        // Use exact positioning from ImageGenerationToolPage but adjust for desktop header
+        const headerHeight = isMobile ? 20 : 96; // Mobile header VERY close to top, desktop is 96px (h-24)
+        const topPosition = isMobile ? headerHeight + 4 : 96 + 8; // Add more space for desktop header
+        
+        // Calculate horizontal constraints based on locked panes
+        const leftOffset = isShotsPaneLocked ? shotsPaneWidth : 0;
+        const rightOffset = isTasksPaneLocked ? tasksPaneWidth : 0;
+        
+        return (
+          <div 
+            className={`fixed z-50 flex justify-center transition-all duration-300 ease-out animate-in fade-in slide-in-from-top-2`}
+            style={{
+              top: `${topPosition}px`,
+              left: `${leftOffset}px`,
+              right: `${rightOffset}px`,
+              paddingLeft: '16px',
+              paddingRight: '16px',
+              willChange: 'transform, opacity',
+              transform: 'translateZ(0)'
+            }}
+          >
+            {/* Center-aligned compact design with slightly transparent background */}
+            <div className={`relative overflow-hidden flex items-center justify-center space-x-2 ${isMobile ? 'p-3' : 'p-3'} bg-background/60 backdrop-blur-md shadow-xl transition-all duration-500 ease-out rounded-lg border border-border`}>
+              {/* Subtle grain overlay to match GlobalHeader vibe */}
+              <div className="pointer-events-none absolute inset-0 bg-film-grain opacity-10 animate-film-grain"></div>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (onPreviousShotNoScroll) onPreviousShotNoScroll();
+                }}
+                disabled={!hasPrevious || state.isTransitioningFromNameEdit}
+                className="flex-shrink-0"
+                title="Previous shot"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              
+              <span 
+                className={`${isMobile ? 'text-lg' : 'text-xl'} font-semibold text-primary truncate px-2 min-w-[135px] text-center ${onUpdateShotName ? 'cursor-pointer hover:underline transition-all duration-200' : ''}`}
+                onClick={handleStickyNameClick}
+                title={onUpdateShotName ? "Click to edit shot name" : selectedShot?.name || 'Untitled Shot'}
+              >
+                {selectedShot?.name || 'Untitled Shot'}
+              </span>
+              
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (onNextShotNoScroll) onNextShotNoScroll();
+                }}
+                disabled={!hasNext || state.isTransitioningFromNameEdit}
+                className="flex-shrink-0"
+                title="Next shot"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        );
+      })()}
+
       <LoraSelectorModal
         isOpen={loraManager.isLoraModalOpen}
         onClose={() => loraManager.setIsLoraModalOpen(false)}

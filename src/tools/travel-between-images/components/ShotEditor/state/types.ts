@@ -124,6 +124,8 @@ export interface ShotEditorProps {
   // Navigation props
   onPreviousShot?: () => void;
   onNextShot?: () => void;
+  onPreviousShotNoScroll?: () => void;
+  onNextShotNoScroll?: () => void;
   hasPrevious?: boolean;
   hasNext?: boolean;
   // Shot name editing

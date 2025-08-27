@@ -758,6 +758,19 @@ const VideoTravelToolPage: React.FC = () => {
     }
   };
 
+  // Navigation handlers that preserve scroll position (for sticky header)
+  const handlePreviousShotNoScroll = () => {
+    if (shots && selectedShot) {
+      navigateToPreviousShot(shots, selectedShot, { scrollToTop: false });
+    }
+  };
+
+  const handleNextShotNoScroll = () => {
+    if (shots && selectedShot) {
+      navigateToNextShot(shots, selectedShot, { scrollToTop: false });
+    }
+  };
+
   // Navigation state is now memoized above
   const { currentShotIndex, hasPrevious, hasNext } = navigationState;
 
@@ -1148,6 +1161,8 @@ const VideoTravelToolPage: React.FC = () => {
 
               onPreviousShot={handlePreviousShot}
               onNextShot={handleNextShot}
+              onPreviousShotNoScroll={handlePreviousShotNoScroll}
+              onNextShotNoScroll={handleNextShotNoScroll}
               hasPrevious={hasPrevious}
               hasNext={hasNext}
               onUpdateShotName={handleUpdateShotName}

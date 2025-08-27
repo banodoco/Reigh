@@ -66,21 +66,8 @@ export const ImageManagerSkeleton: React.FC<ImageManagerSkeletonProps> = ({
 
   return (
     <>
-      {/* Header skeleton - matches CardHeader structure */}
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <Skeleton className="h-7 w-48" />
-          {!isMobile && (
-            <Skeleton className="h-8 w-36" />
-          )}
-        </div>
-        {/* Description skeleton - conditional like real component */}
-        <Skeleton className="h-4 w-full max-w-lg" />
-      </CardHeader>
-
-      {/* Content skeleton - matches CardContent structure */}
-      <CardContent>
-        <div className="p-1 min-h-[200px]">
+      {/* Only render content skeleton since header is now always rendered in ShotImagesEditor */}
+      <div className="p-1 min-h-[200px]">
           {actualImageCount > 0 ? (
             /* Real shot composition skeleton */
             <div className={`grid gap-3 ${gridCols}`}>
@@ -109,12 +96,6 @@ export const ImageManagerSkeleton: React.FC<ImageManagerSkeletonProps> = ({
             </div>
           )}
         </div>
-      </CardContent>
-
-      {/* Upload section skeleton - matches exact FileInput structure */}
-      <div className="p-4 border-t space-y-3">
-        <Skeleton className="h-12 w-full" />
-      </div>
     </>
   );
 }; 

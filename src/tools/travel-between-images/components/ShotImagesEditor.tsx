@@ -114,22 +114,11 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
     }
   });
   /* ------------------------------------------------------------------ */
-  /* Skeleton state                                                     */
-  /* ------------------------------------------------------------------ */
-  if (!isModeReady) {
-    return (
-      <Card className="flex flex-col">
-        {skeleton}
-      </Card>
-    );
-  }
-
-  /* ------------------------------------------------------------------ */
-  /* Main card                                                          */
+  /* Main card with immediate header rendering                          */
   /* ------------------------------------------------------------------ */
   return (
     <Card className="flex flex-col">
-      {/* Header */}
+      {/* Header - Always render immediately (static content) */}
       <CardHeader>
         {settingsError && (
           <div className="mb-4 p-3 rounded bg-yellow-100 text-yellow-800 text-sm">
@@ -138,7 +127,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
         )}
         <div className="flex items-center justify-between">
           <CardTitle>Manage Shot Images</CardTitle>
-          {!isMobile && (
+          {!isMobile && isModeReady && (
             <div className="flex items-center space-x-2">
               <ToggleGroup
                 type="single"
@@ -156,56 +145,60 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
             </div>
           )}
         </div>
-        {images.length > 0 && (
-          (isMobile || generationMode === "timeline") && (
-            <p className="text-sm text-muted-foreground pt-1">
-              {isMobile
-                ? "Tap to select and move multiple images."
-                : "Drag images to precise frame positions. Drop on other images to reorder."}
-            </p>
-          )
+        {(isMobile || (isModeReady && generationMode === "timeline")) && (
+          <p className="text-sm text-muted-foreground pt-1">
+            {isMobile
+              ? "Tap to select and move multiple images."
+              : "Drag images to precise frame positions. Drop on other images to reorder."}
+          </p>
         )}
       </CardHeader>
 
-      {/* Content */}
+      {/* Content - Show skeleton if not ready, otherwise show actual content */}
       <CardContent>
-        <div className="p-1">
-          {generationMode === "timeline" ? (
-            <Timeline
-              shotId={selectedShotId}
-              images={images}
-              frameSpacing={batchVideoFrames}
-              contextFrames={batchVideoContext}
-              onImageReorder={onImageReorder}
-              onImageSaved={onImageSaved}
-              onContextFramesChange={onContextFramesChange}
-              onFramePositionsChange={onFramePositionsChange}
-              onImageDrop={onImageDrop}
-              pendingPositions={pendingPositions}
-              onPendingPositionApplied={onPendingPositionApplied}
-            />
-          ) : (
-            <ShotImageManager
-              images={images}
-              onImageDelete={onImageDelete}
-              onImageDuplicate={onImageDuplicate}
-              onImageReorder={onImageReorder}
-              columns={columns}
-              generationMode={isMobile ? "batch" : generationMode}
-              onImageSaved={onImageSaved}
-              onMagicEdit={(imageUrl, prompt, numImages) => {
-                // TODO: Wire through real magic-edit handler later.
-                console.log("Magic Edit:", { imageUrl, prompt, numImages });
-              }}
-              duplicatingImageId={duplicatingImageId}
-              duplicateSuccessImageId={duplicateSuccessImageId}
-              projectAspectRatio={projectAspectRatio}
-            />
-          )}
-        </div>
+        {!isModeReady ? (
+          <div className="p-1">
+            {skeleton}
+          </div>
+        ) : (
+          <div className="p-1">
+            {generationMode === "timeline" ? (
+              <Timeline
+                shotId={selectedShotId}
+                images={images}
+                frameSpacing={batchVideoFrames}
+                contextFrames={batchVideoContext}
+                onImageReorder={onImageReorder}
+                onImageSaved={onImageSaved}
+                onContextFramesChange={onContextFramesChange}
+                onFramePositionsChange={onFramePositionsChange}
+                onImageDrop={onImageDrop}
+                pendingPositions={pendingPositions}
+                onPendingPositionApplied={onPendingPositionApplied}
+              />
+            ) : (
+              <ShotImageManager
+                images={images}
+                onImageDelete={onImageDelete}
+                onImageDuplicate={onImageDuplicate}
+                onImageReorder={onImageReorder}
+                columns={columns}
+                generationMode={isMobile ? "batch" : generationMode}
+                onImageSaved={onImageSaved}
+                onMagicEdit={(imageUrl, prompt, numImages) => {
+                  // TODO: Wire through real magic-edit handler later.
+                  console.log("Magic Edit:", { imageUrl, prompt, numImages });
+                }}
+                duplicatingImageId={duplicatingImageId}
+                duplicateSuccessImageId={duplicateSuccessImageId}
+                projectAspectRatio={projectAspectRatio}
+              />
+            )}
+          </div>
+        )}
 
         {/* Helper for un-positioned generations */}
-        {unpositionedGenerationsCount > 0 && (
+        {isModeReady && unpositionedGenerationsCount > 0 && (
           <div className="mx-1 mt-4 p-3 bg-muted/50 rounded-lg flex items-center justify-between">
             <span className="text-sm text-muted-foreground">
               There {unpositionedGenerationsCount === 1 ? "is" : "are"} {unpositionedGenerationsCount} generation
@@ -218,14 +211,14 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
         )}
       </CardContent>
 
-      {/* File input */}
+      {/* File input - Always visible, only disabled during uploads */}
       <div className="p-4 border-t space-y-3">
         <FileInput
           key={fileInputKey}
           onFileChange={onImageUpload}
           acceptTypes={["image"]}
           label="Add more images"
-          disabled={isUploadingImage || !isModeReady}
+          disabled={isUploadingImage}
           multiple
         />
       </div>
