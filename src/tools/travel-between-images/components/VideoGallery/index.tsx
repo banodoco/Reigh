@@ -474,7 +474,9 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     // After loading completes with 0 results
     (!isLoadingGenerations && !isFetchingGenerations && sortedVideoOutputs.length === 0) ||
     // OR immediately if cache indicates 0 videos (skip loading state)
-    (cachedCount === 0 && isLoadingGenerations && videoOutputs.length === 0)
+    (cachedCount === 0 && isLoadingGenerations && videoOutputs.length === 0) ||
+    // OR if we're loading but have no cached data and no skeletons are showing (transition case)
+    (isLoadingGenerations && videoOutputs.length === 0 && !showSkeletons)
   );
   
   // Log empty state decision
@@ -484,7 +486,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     isFetchingGenerations,
     sortedVideoOutputsLength: sortedVideoOutputs.length,
     cachedCount,
-    emptyLogic: `((!${isLoadingGenerations} && !${isFetchingGenerations} && ${sortedVideoOutputs.length} === 0) || (${cachedCount} === 0 && ${isLoadingGenerations} && ${videoOutputs.length} === 0)) = ${shouldShowEmpty}`,
+    emptyLogic: `((!${isLoadingGenerations} && !${isFetchingGenerations} && ${sortedVideoOutputs.length} === 0) || (${cachedCount} === 0 && ${isLoadingGenerations} && ${videoOutputs.length} === 0) || (${isLoadingGenerations} && ${videoOutputs.length} === 0 && !${showSkeletons})) = ${shouldShowEmpty}`,
     finalRenderDecision: shouldShowEmpty ? 'RENDER_EMPTY_STATE' : showSkeletons ? 'RENDER_SKELETONS' : 'RENDER_VIDEOS',
     timestamp: Date.now()
   });
