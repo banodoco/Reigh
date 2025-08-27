@@ -88,7 +88,7 @@ export const Header: React.FC<HeaderProps> = ({
               </Button>
               
               <span 
-                className={`text-3xl font-bold text-primary truncate px-4 min-w-[135px] text-center border-2 border-transparent rounded-md py-2 ${onUpdateShotName ? 'cursor-pointer hover:underline hover:border-border hover:bg-accent/50 transition-all duration-200' : ''}`}
+                className={`text-3xl font-bold text-primary truncate px-4 w-[200px] text-center border-2 border-transparent rounded-md py-2 ${onUpdateShotName ? 'cursor-pointer hover:underline hover:border-border hover:bg-accent/50 transition-all duration-200' : ''}`}
                 onClick={onNameClick}
                 title={onUpdateShotName ? "Click to edit shot name" : selectedShot?.name || 'Untitled Shot'}
               >
@@ -153,7 +153,7 @@ export const Header: React.FC<HeaderProps> = ({
               </Button>
               
               <span 
-                className={`text-xl font-semibold text-primary truncate text-center px-2 min-w-0 max-w-[135px] flex-1 ${onUpdateShotName ? 'cursor-pointer hover:underline' : ''}`}
+                className={`text-xl font-semibold text-primary truncate text-center px-2 w-[135px] ${onUpdateShotName ? 'cursor-pointer hover:underline' : ''}`}
                 onClick={onNameClick}
                 title={onUpdateShotName ? "Click to edit shot name" : selectedShot?.name || 'Untitled Shot'}
               >

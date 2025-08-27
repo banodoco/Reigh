@@ -1597,7 +1597,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
               </Button>
               
               <span 
-                className={`${isMobile ? 'text-lg' : 'text-xl'} font-semibold text-primary truncate px-2 min-w-[135px] text-center ${onUpdateShotName ? 'cursor-pointer hover:underline transition-all duration-200' : ''}`}
+                className={`${isMobile ? 'text-lg' : 'text-xl'} font-semibold text-primary truncate px-2 ${isMobile ? 'w-[135px]' : 'w-[200px]'} text-center ${onUpdateShotName ? 'cursor-pointer hover:underline transition-all duration-200' : ''}`}
                 onClick={handleStickyNameClick}
                 title={onUpdateShotName ? "Click to edit shot name" : selectedShot?.name || 'Untitled Shot'}
               >
