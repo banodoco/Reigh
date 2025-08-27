@@ -709,11 +709,12 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   }, [selectedProjectId, createShotMutation, queryClient, setLastAffectedShotId]);
 
   // Unified handler for Collapsible open/close with smooth scroll on open
-  const handleCollapsibleOpenChange = useCallback((nextOpen: boolean) => {
+  // Only perform scroll-then-open when triggered from the sticky toggle
+  const handleCollapsibleOpenChange = useCallback((nextOpen: boolean, triggeredFromSticky?: boolean) => {
     const wasExpanded = isFormExpanded === true;
     
     // If we're expanding from collapsed state, scroll first, then expand
-    if (nextOpen && !wasExpanded) {
+    if (nextOpen && !wasExpanded && triggeredFromSticky) {
       setIsScrollingToForm(true);
       
       // Scroll to the form container first
@@ -1009,25 +1010,27 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
               <CollapsibleTrigger asChild>
                   <Button
                     variant="ghost"
-                    className={`${isFormExpanded ? 'w-full justify-between px-6 py-6 hover:bg-accent/30 bg-accent/10 border border-b-0 rounded-t-lg shadow-sm' : 'w-full justify-between p-4 gradient-primary-collapsed rounded-lg'} transition-all duration-500 ease-out`}
+                    className={`${isFormExpanded ? 'w-full justify-between px-6 py-6 hover:bg-accent/30 bg-accent/10 border border-b-0 rounded-t-lg shadow-sm' : 'w-full justify-between px-6 py-6 gradient-primary-collapsed rounded-lg'} transition-all duration-700 ease-in-out transform hover:scale-[1.02] active:scale-[0.98]`}
                     type="button"
                   >
-                    <div className="flex items-center gap-2">
-                      <Settings2 className={`h-4 w-4 ${!isFormExpanded ? 'text-white' : ''}`} />
-                      <span className={`font-light flex items-center gap-1 ${!isFormExpanded ? 'text-white' : ''}`}>
+                    <div className="flex items-center gap-2 transition-all duration-700 ease-in-out">
+                      <Settings2 className={`h-4 w-4 transition-all duration-700 ease-in-out ${!isFormExpanded ? 'text-white' : ''}`} />
+                      <span className={`font-light flex items-center gap-1 transition-all duration-700 ease-in-out ${!isFormExpanded ? 'text-white' : ''}`}>
                         Image Generation
-                        <Sparkles className={`h-3 w-3 animate-pulse ${!isFormExpanded ? 'text-white' : ''}`} />
+                        <Sparkles className={`h-3 w-3 transition-all duration-700 ease-in-out ${!isFormExpanded ? 'text-white' : ''}`} />
                       </span>
                     </div>
-                    {isFormExpanded ? (
-                      <ChevronDown className="h-4 w-4" />
-                    ) : (
-                      <ChevronLeft className="h-4 w-4 text-white" />
-                    )}
+                    <div className="transition-transform duration-700 ease-in-out">
+                      {isFormExpanded ? (
+                        <ChevronDown className="h-4 w-4 transition-all duration-700 ease-in-out" />
+                      ) : (
+                        <ChevronLeft className="h-4 w-4 text-white transition-all duration-700 ease-in-out" />
+                      )}
+                    </div>
                   </Button>
                 </CollapsibleTrigger>
-              <CollapsibleContent className="transition-all duration-500 ease-out">
-                <div ref={formContainerRef} className="p-6 border rounded-lg shadow-sm bg-card w-full max-w-full">
+              <CollapsibleContent className="data-[state=closed]:animate-out data-[state=closed]:slide-out-to-top-2 data-[state=closed]:fade-out-50 data-[state=open]:animate-in data-[state=open]:slide-in-from-top-2 data-[state=open]:fade-in-50 transition-all duration-700 ease-in-out overflow-hidden">
+                <div ref={formContainerRef} className="p-6 border rounded-lg shadow-sm bg-card w-full max-w-full transition-all duration-700 ease-in-out">
                   <ImageGenerationForm
                     ref={imageGenerationFormRef}
                     onGenerate={handleNewGenerate}
@@ -1067,18 +1070,18 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
               >
                 <Button
                   variant="ghost"
-                  className={`justify-between ${isMobile ? 'p-3 text-sm' : 'p-4'} w-full max-w-2xl gradient-primary-collapsed backdrop-blur-md shadow-xl transition-all duration-500 ease-out hover:scale-105 active:scale-95 rounded-lg`}
-                  onClick={() => handleCollapsibleOpenChange(true)}
+                  className={`justify-between ${isMobile ? 'p-3 text-sm' : 'p-4'} w-full max-w-2xl gradient-primary-collapsed backdrop-blur-md shadow-xl transition-all duration-700 ease-in-out hover:scale-105 active:scale-95 rounded-lg transform hover:shadow-2xl`}
+                  onClick={() => handleCollapsibleOpenChange(true, true)}
                   type="button"
                 >
-                  <div className="flex items-center gap-2">
-                    <Settings2 className="h-4 w-4 text-white" />
-                    <span className="font-light flex items-center gap-1 text-white">
+                  <div className="flex items-center gap-2 transition-all duration-700 ease-in-out">
+                    <Settings2 className="h-4 w-4 text-white transition-all duration-700 ease-in-out" />
+                    <span className="font-light flex items-center gap-1 text-white transition-all duration-700 ease-in-out">
                       {isMobile ? 'Image Generation' : 'Image Generation'}
-                      <Sparkles className="h-3 w-3 text-white animate-pulse" />
+                      <Sparkles className="h-3 w-3 text-white transition-all duration-700 ease-in-out" />
                     </span>
                   </div>
-                  <ChevronDown className="h-4 w-4 text-white" />
+                  <ChevronDown className="h-4 w-4 text-white transition-transform duration-700 ease-in-out" />
                 </Button>
               </div>
             );
