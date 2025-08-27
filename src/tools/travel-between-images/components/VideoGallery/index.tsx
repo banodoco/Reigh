@@ -368,15 +368,15 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     const projectVideoCount = getShotVideoCount?.(shotId) ?? null;
     
     if (shotId && typeof newTotal === 'number' && newTotal >= 0) {
-      // Check for cache mismatch and invalidate if needed
-      if (projectVideoCount !== null && projectVideoCount !== newTotal && invalidateVideoCountsCache) {
-        console.log('[SkeletonOptimization] Cache mismatch detected - invalidating project cache:', {
+      // Check for cache mismatch; do NOT invalidate globally to avoid transient nulls/flicker.
+      // We immediately update the per-shot cache below which resolves the mismatch.
+      if (projectVideoCount !== null && projectVideoCount !== newTotal) {
+        console.log('[SkeletonOptimization] Cache mismatch detected - updating per-shot cache only (no global invalidate):', {
           shotId,
           projectVideoCount,
           actualTotal: newTotal,
           timestamp: Date.now()
         });
-        invalidateVideoCountsCache();
       }
       
       // Always update cache immediately when we get valid data (including 0)
@@ -474,9 +474,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     // After loading completes with 0 results
     (!isLoadingGenerations && !isFetchingGenerations && sortedVideoOutputs.length === 0) ||
     // OR immediately if cache indicates 0 videos (skip loading state)
-    (cachedCount === 0 && isLoadingGenerations && videoOutputs.length === 0) ||
-    // OR if we're loading but have no cached data and no skeletons are showing (transition case)
-    (isLoadingGenerations && videoOutputs.length === 0 && !showSkeletons)
+    (cachedCount === 0 && isLoadingGenerations && videoOutputs.length === 0)
   );
   
   // Log empty state decision
@@ -486,7 +484,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     isFetchingGenerations,
     sortedVideoOutputsLength: sortedVideoOutputs.length,
     cachedCount,
-    emptyLogic: `((!${isLoadingGenerations} && !${isFetchingGenerations} && ${sortedVideoOutputs.length} === 0) || (${cachedCount} === 0 && ${isLoadingGenerations} && ${videoOutputs.length} === 0) || (${isLoadingGenerations} && ${videoOutputs.length} === 0 && !${showSkeletons})) = ${shouldShowEmpty}`,
+    emptyLogic: `((!${isLoadingGenerations} && !${isFetchingGenerations} && ${sortedVideoOutputs.length} === 0) || (${cachedCount} === 0 && ${isLoadingGenerations} && ${videoOutputs.length} === 0)) = ${shouldShowEmpty}`,
     finalRenderDecision: shouldShowEmpty ? 'RENDER_EMPTY_STATE' : showSkeletons ? 'RENDER_SKELETONS' : 'RENDER_VIDEOS',
     timestamp: Date.now()
   });
