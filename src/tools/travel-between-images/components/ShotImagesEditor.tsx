@@ -201,7 +201,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
         {/* Helper for un-positioned generations - Reserve space during loading to prevent layout shift */}
         <div className="mx-1 mt-4" style={{ minHeight: isModeReady && unpositionedGenerationsCount > 0 ? 'auto' : '0px' }}>
           {isModeReady && unpositionedGenerationsCount > 0 && (
-            <div className="p-3 bg-muted/50 rounded-lg flex items-center justify-between">
+            <div className="p-3 bg-muted/50 rounded-lg flex items-center justify-between animate-in fade-in duration-300">
               <span className="text-sm text-muted-foreground">
                 There {unpositionedGenerationsCount === 1 ? "is" : "are"} {unpositionedGenerationsCount} generation
                 {unpositionedGenerationsCount === 1 ? "" : "s"} associated with this shot that {unpositionedGenerationsCount === 1 ? "doesn't" : "don't"} have a position
