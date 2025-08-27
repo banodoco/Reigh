@@ -116,7 +116,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
               className="group flex items-center space-x-4 relative p-2 -m-2 cursor-pointer"
             >
               <div className="relative">
-                <div className="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-wes-pink via-wes-lavender to-wes-dusty-blue rounded-2xl border-3 border-wes-vintage-gold/40 shadow-wes-vintage group-hover:shadow-wes-hover transition-all duration-500 wes-badge">
+                <div className="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-wes-pink via-wes-lavender to-wes-dusty-blue rounded-2xl border-3 border-wes-vintage-gold/40 shadow-wes-vintage group-hover:shadow-wes-hover transition-all duration-500 wes-badge animate-reigh-color-cycle">
                   <Palette className="h-8 w-8 text-white group-hover:rotate-12 transition-transform duration-500 drop-shadow-lg" />
                 </div>
                 <div className="absolute -inset-1 border border-wes-vintage-gold/20 rounded-2xl animate-rotate-slow opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
@@ -266,11 +266,11 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
               >
                 <div className="relative flex items-center space-x-2">
                   <div className="relative">
-                    <div className="flex items-center justify-center w-8 h-8 bg-gradient-to-br from-wes-pink via-wes-lavender to-wes-dusty-blue rounded-xl border-2 border-wes-vintage-gold/40 shadow-wes-vintage group-hover:shadow-wes-hover transition-all duration-300">
-                      <Palette className="h-4 w-4 text-white group-hover:rotate-12 transition-transform duration-300 drop-shadow-lg" />
+                    <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-wes-pink via-wes-lavender to-wes-dusty-blue rounded-xl border-2 border-wes-vintage-gold/40 shadow-wes-vintage group-hover:shadow-wes-hover transition-all duration-300 animate-reigh-color-cycle">
+                      <Palette className="h-5 w-5 text-white group-hover:rotate-12 transition-transform duration-300 drop-shadow-lg" />
                     </div>
                     <div className="absolute -top-1 -right-1">
-                      <Crown className="w-2 h-2 text-wes-vintage-gold animate-bounce-gentle opacity-60" />
+                      <Crown className="w-2.5 h-2.5 text-wes-vintage-gold animate-bounce-gentle opacity-60" />
                     </div>
                   </div>
                   

@@ -1375,6 +1375,16 @@
   }
 }
 
+/* Clean, subtle color cycling with smooth loop back to start */
+@keyframes reighColorCycle {
+  0% { filter: hue-rotate(0deg) saturate(1.0) brightness(1.0); }      /* Original clean */
+  20% { filter: hue-rotate(30deg) saturate(0.95) brightness(1.02); }  /* Clean shift toward gold */
+  40% { filter: hue-rotate(60deg) saturate(1.05) brightness(0.98); }  /* Clean shift toward mint */
+  60% { filter: hue-rotate(90deg) saturate(0.9) brightness(1.01); }   /* Clean shift toward coral */
+  80% { filter: hue-rotate(60deg) saturate(0.95) brightness(0.99); }  /* Smooth return journey */
+  100% { filter: hue-rotate(0deg) saturate(1.0) brightness(1.0); }    /* Back to original - smooth loop */
+}
+
 @keyframes dreamyShimmer {
   0%, 100% { opacity: 0.4; }
   50% { opacity: 0.8; }
@@ -1701,6 +1711,10 @@
 .animate-shimmer {
   background-size: 200% auto;
   animation: shimmer 3s linear infinite;
+}
+
+.animate-reigh-color-cycle {
+  animation: reighColorCycle 20s ease-in-out infinite;
 }
 
 .animate-pulse-glow {
