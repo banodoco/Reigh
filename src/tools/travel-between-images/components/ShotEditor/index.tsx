@@ -1318,6 +1318,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           getShotVideoCount={getShotVideoCount}
           invalidateVideoCountsCache={invalidateVideoCountsCache}
           projectAspectRatio={projects.find(p => p.id === projectId)?.aspectRatio}
+          localZeroHint={videoOutputs.length === 0}
         />
       </div>
 

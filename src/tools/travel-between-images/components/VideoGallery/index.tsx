@@ -130,6 +130,12 @@ interface VideoOutputsGalleryProps {
    * Project aspect ratio for proper video dimensions (e.g., "4:3", "16:9")
    */
   projectAspectRatio?: string;
+
+  /**
+   * Hint from parent that local shot data indicates zero video outputs.
+   * Used to immediately show the empty state before project-wide counts load.
+   */
+  localZeroHint?: boolean;
 }
 
 const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
@@ -144,6 +150,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   getShotVideoCount,
   invalidateVideoCountsCache,
   projectAspectRatio,
+  localZeroHint,
 }) => {
   // ===============================================================================
   // STATE MANAGEMENT
@@ -420,10 +427,15 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   // SIMPLIFIED: Use ImageGallery's pure and simple skeleton logic - no delays!
   // Only show skeletons during INITIAL loading (never loaded before)
   // If we've fetched data and got 0 results, go straight to empty state
-  const cachedCount = getShotVideoCount?.(shotId);
+  const cachedCountRaw = getShotVideoCount?.(shotId);
+  // If project cache hasn't loaded yet but local shot data hints 0 videos,
+  // treat the effective cached count as 0 to avoid a skeleton flicker.
+  const cachedCount = (typeof cachedCountRaw === 'number') ? cachedCountRaw : (localZeroHint ? 0 : null);
   console.log(`[SkeletonIssue:${shotId?.substring(0, 8) || 'no-shot'}] GET_CACHED_COUNT:`, {
     shotId,
     cachedCount,
+    cachedCountRaw,
+    localZeroHint,
     hasShotVideoCountFunction: !!getShotVideoCount,
     timestamp: Date.now()
   });
