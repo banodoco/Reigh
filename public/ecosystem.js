@@ -12,7 +12,10 @@ export function runEcosystem(appendToEl = document.body) {
   // ---------------------------------------------------------------------
   // 0a. Basic Config Constants
   // ---------------------------------------------------------------------
-  const VIEW_SIZE = 385;          
+  const BASE_VIEW_SIZE = 385;
+  // For orthographic camera: smaller VIEW_SIZE = larger objects (zoom in)
+  // Scale factor 1.1 means 10% bigger, so we divide VIEW_SIZE by 1.1
+  const VIEW_SIZE = BASE_VIEW_SIZE / (window.__ECOSYSTEM_SCALE_FACTOR__ || 1);          
   const DOT_FADE_DURATION = 200;  
   const MAX_DOTS_PER_CLICK = 20;  
 
@@ -348,6 +351,9 @@ export function runEcosystem(appendToEl = document.body) {
       label.style.position = 'absolute';
       label.style.pointerEvents = 'none';
       label.style.backgroundColor = 'rgba(255,255,255,0.5)';
+      label.style.fontWeight = '400';
+      label.style.fontFamily = "'Cocogoose', system-ui, sans-serif";
+      label.style.fontSize = '8px';
       simulationContainer.appendChild(label);
 
       nodeLabelDivs[section.id] = label;
@@ -1005,4 +1011,10 @@ export function runEcosystem(appendToEl = document.body) {
 }
 
 // By default, run automatically if this file is included directly:
-runEcosystem();
+if (typeof window !== 'undefined' && window.__RUN_ECOSYSTEM_AUTO__ !== false) {
+  try {
+    runEcosystem();
+  } catch (err) {
+    console.error('[EcosystemTooltip] Auto runEcosystem failed:', err);
+  }
+}

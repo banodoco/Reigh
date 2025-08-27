@@ -63,6 +63,25 @@ export default function HomePage() {
     console.log('[EcosystemTooltip] State change - open:', ecosystemTipOpen, 'disabled:', ecosystemTipDisabled);
   }, [ecosystemTipOpen, ecosystemTipDisabled]);
 
+  // Close tooltip on mobile scroll
+  useEffect(() => {
+    if (!isMobile || !ecosystemTipOpen) return;
+
+    const handleScroll = () => {
+      console.log('[EcosystemTooltip] Mobile scroll detected, closing tooltip');
+      setEcosystemTipOpen(false);
+      setEcosystemTipDisabled(false);
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    document.addEventListener('touchmove', handleScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      document.removeEventListener('touchmove', handleScroll);
+    };
+  }, [isMobile, ecosystemTipOpen]);
+
   // New handler for activating the open tool feature and closing the tooltip
   const handleOpenToolActivate = () => {
     // Open the side pane
@@ -751,6 +770,19 @@ export default function HomePage() {
                               console.log('[EcosystemTooltip] Mouse leave, disabled:', ecosystemTipDisabled);
                               if (ecosystemTipDisabled) setEcosystemTipDisabled(false);
                             }}
+                            onClick={() => {
+                              console.log('[EcosystemTooltip] Click/Touch, current state:', ecosystemTipOpen, 'disabled:', ecosystemTipDisabled);
+                              if (isMobile) {
+                                // On mobile, toggle the tooltip on click
+                                if (ecosystemTipOpen) {
+                                  setEcosystemTipOpen(false);
+                                  setEcosystemTipDisabled(false);
+                                } else {
+                                  setEcosystemTipOpen(true);
+                                  setEcosystemTipDisabled(true);
+                                }
+                              }
+                            }}
                             className={`sparkle-underline cursor-pointer transition-colors duration-200 ${ecosystemTipOpen ? 'tooltip-open' : ''} ${ecosystemTipDisabled ? 'pointer-events-none' : ''}`}
                           >
                             open source ecosystem
@@ -760,28 +792,38 @@ export default function HomePage() {
                           side="top"
                           align="center"
                           className="group p-2 sm:p-3 bg-wes-cream/90 border-2 border-transparent rounded-lg shadow-md"
+                          onPointerEnter={() => {
+                            console.log('[EcosystemTooltip] Pointer entered content – holding open');
+                            if (!isMobile) {
+                              setEcosystemTipDisabled(true);
+                              setEcosystemTipOpen(true);
+                            }
+                          }}
+                          onPointerLeave={() => {
+                            console.log('[EcosystemTooltip] Pointer left content – releasing hold');
+                            if (!isMobile) {
+                              setEcosystemTipDisabled(false);
+                              setEcosystemTipOpen(false);
+                            }
+                          }}
                         >
-                          <div className="w-[360px] h-[220px] overflow-hidden rounded border relative bg-white">
+                          <div className="w-[360px] h-[270px] overflow-hidden rounded border relative bg-white">
                             <iframe
                               title="Open Source Ecosystem"
-                              style={{ width: '360px', height: '220px', border: 0 }}
+                              style={{ width: '360px', height: '270px', border: 0 }}
                               onLoad={() => console.log('[EcosystemTooltip] Iframe loaded')}
                               onError={() => console.log('[EcosystemTooltip] Iframe error')}
-                              srcDoc={`<!DOCTYPE html><html><head><meta charset=\"utf-8\"/><style>html,body{margin:0;height:100%;background:#f5f5f5;}</style></head><body><script>console.log('[EcosystemTooltip] Iframe HTML loaded, attempting to load ecosystem.js');</script><script type=\"module\">
-                                import { runEcosystem } from '/ecosystem.js';
-                                console.log('[EcosystemTooltip] ecosystem.js loaded, running visualization...');
-                                runEcosystem(document.body);
-                              </script></body></html>`}
+                              src={`/ecosystem-embed.html?scale=1.1`}
                             />
                           </div>
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
-                    , a loose collection of companies, engineers, and and artists, who build on top of open models and share their work for others to use. We see a responsibility to help this ecosystem flourish.
+                    , meaning we have a responsibility to help this ecosystem flourish.
                   </p>
 
                   <p className="text-sm leading-relaxed">
-                    To do this, we will share our profits with people from the ecosystem:
+                    To do this, we will share our profits with projects and people whose contributions enabled Reigh to exist:
                   </p>
                   
                   <div className="space-y-2">
