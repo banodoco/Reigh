@@ -666,7 +666,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   
   // Show empty state if needed
   if (shouldShowEmpty) {
-    return <EmptyState />;
+    return <EmptyState cachedCount={cachedCount} />;
   }
 
   // Get current video for lightbox
@@ -681,6 +681,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
           isFetchingGenerations={isFetchingGenerations}
           totalPages={totalPages}
           currentPage={currentPage}
+          cachedCount={cachedCount}
         />
 
         {/* SIMPLIFIED: Show video-specific skeleton layout or videos */}

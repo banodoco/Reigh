@@ -9,6 +9,7 @@ interface GalleryControlsProps {
   isFetchingGenerations: boolean;
   totalPages: number;
   currentPage: number;
+  cachedCount?: number | null; // Add cached count prop
 }
 
 export const GalleryControls = React.memo<GalleryControlsProps>(({
@@ -16,14 +17,16 @@ export const GalleryControls = React.memo<GalleryControlsProps>(({
   isLoadingGenerations,
   isFetchingGenerations,
   totalPages,
-  currentPage
+  currentPage,
+  cachedCount
 }) => (
   <>
     <div className="flex items-center justify-between flex-wrap gap-2">
       <h3 className="text-base sm:text-lg font-light flex items-center gap-2">
         Output Videos &nbsp;
         {(isLoadingGenerations || isFetchingGenerations) ? (
-          <Skeleton className="h-5 w-8 inline-block" />
+          // Show cached count immediately if available, otherwise skeleton
+          typeof cachedCount === 'number' ? `(${cachedCount})` : <Skeleton className="h-5 w-8 inline-block" />
         ) : (
           `(${sortedVideoOutputs.length})`
         )}

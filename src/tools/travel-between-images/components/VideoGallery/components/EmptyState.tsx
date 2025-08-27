@@ -2,12 +2,16 @@ import React from 'react';
 import { Card } from '@/shared/components/ui/card';
 import { Separator } from '@/shared/components/ui/separator';
 
-export const EmptyState = React.memo(() => (
+interface EmptyStateProps {
+  cachedCount?: number | null;
+}
+
+export const EmptyState = React.memo<EmptyStateProps>(({ cachedCount }) => (
   <Card className="p-4 sm:p-6">
     <div className="flex flex-col space-y-2 sm:space-y-3">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h3 className="text-base sm:text-lg font-light flex items-center gap-2">
-          Output Videos &nbsp;(0)
+          Output Videos &nbsp;({typeof cachedCount === 'number' ? cachedCount : 0})
         </h3>
       </div>
 
