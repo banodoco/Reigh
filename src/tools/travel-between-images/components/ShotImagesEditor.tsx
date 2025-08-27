@@ -198,18 +198,20 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
           </div>
         )}
 
-        {/* Helper for un-positioned generations */}
-        {isModeReady && unpositionedGenerationsCount > 0 && (
-          <div className="mx-1 mt-4 p-3 bg-muted/50 rounded-lg flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">
-              There {unpositionedGenerationsCount === 1 ? "is" : "are"} {unpositionedGenerationsCount} generation
-              {unpositionedGenerationsCount === 1 ? "" : "s"} associated with this shot that {unpositionedGenerationsCount === 1 ? "doesn't" : "don't"} have a position
-            </span>
-            <Button variant="outline" size="sm" onClick={onOpenUnpositionedPane}>
-              Open Pane
-            </Button>
-          </div>
-        )}
+        {/* Helper for un-positioned generations - Reserve space during loading to prevent layout shift */}
+        <div className="mx-1 mt-4" style={{ minHeight: isModeReady && unpositionedGenerationsCount > 0 ? 'auto' : '0px' }}>
+          {isModeReady && unpositionedGenerationsCount > 0 && (
+            <div className="p-3 bg-muted/50 rounded-lg flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">
+                There {unpositionedGenerationsCount === 1 ? "is" : "are"} {unpositionedGenerationsCount} generation
+                {unpositionedGenerationsCount === 1 ? "" : "s"} associated with this shot that {unpositionedGenerationsCount === 1 ? "doesn't" : "don't"} have a position
+              </span>
+              <Button variant="outline" size="sm" onClick={onOpenUnpositionedPane}>
+                Open Pane
+              </Button>
+            </div>
+          )}
+        </div>
       </CardContent>
 
       {/* File input - Always visible, only disabled during uploads */}
