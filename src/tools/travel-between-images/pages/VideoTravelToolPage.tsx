@@ -748,13 +748,13 @@ const VideoTravelToolPage: React.FC = () => {
   // Navigation handlers
   const handlePreviousShot = () => {
     if (shots && selectedShot) {
-      navigateToPreviousShot(shots, selectedShot);
+      navigateToPreviousShot(shots, selectedShot, { scrollToTop: false });
     }
   };
 
   const handleNextShot = () => {
     if (shots && selectedShot) {
-      navigateToNextShot(shots, selectedShot);
+      navigateToNextShot(shots, selectedShot, { scrollToTop: false });
     }
   };
 
