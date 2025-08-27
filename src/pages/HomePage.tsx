@@ -54,6 +54,15 @@ export default function HomePage() {
   const [emergingTipOpen, setEmergingTipOpen] = useState(false);
   const [emergingTipDisabled, setEmergingTipDisabled] = useState(false);
 
+  // Tooltip state: Ecosystem preview
+  const [ecosystemTipOpen, setEcosystemTipOpen] = useState(false);
+  const [ecosystemTipDisabled, setEcosystemTipDisabled] = useState(false);
+
+  // Debug ecosystem tooltip state
+  useEffect(() => {
+    console.log('[EcosystemTooltip] State change - open:', ecosystemTipOpen, 'disabled:', ecosystemTipDisabled);
+  }, [ecosystemTipOpen, ecosystemTipDisabled]);
+
   // New handler for activating the open tool feature and closing the tooltip
   const handleOpenToolActivate = () => {
     // Open the side pane
@@ -670,7 +679,7 @@ export default function HomePage() {
             
             <div className="space-y-6 text-muted-foreground">
               <p className="text-sm leading-relaxed">
-                Practically for you, this means three things:
+                Practically for you, <strong>this means three things</strong>:
               </p>
 
               <div className="space-y-6">
@@ -723,6 +732,54 @@ export default function HomePage() {
                 <div className="space-y-3">
                   <h3 className="font-theme-light text-primary text-lg">3) We're part of the open source ecosystem, and will systematically support this & the people within it</h3>
                   
+                  <p className="text-sm leading-relaxed">
+                    We're part of the{' '}
+                    <TooltipProvider>
+                      <Tooltip
+                        open={ecosystemTipOpen}
+                        onOpenChange={(o) => {
+                          console.log('[EcosystemTooltip] onOpenChange:', o, 'disabled:', ecosystemTipDisabled);
+                          if (!ecosystemTipDisabled) setEcosystemTipOpen(o);
+                        }}
+                      >
+                        <TooltipTrigger asChild>
+                          <span
+                            onMouseEnter={() => {
+                              console.log('[EcosystemTooltip] Mouse enter, disabled:', ecosystemTipDisabled);
+                            }}
+                            onMouseLeave={() => {
+                              console.log('[EcosystemTooltip] Mouse leave, disabled:', ecosystemTipDisabled);
+                              if (ecosystemTipDisabled) setEcosystemTipDisabled(false);
+                            }}
+                            className={`sparkle-underline cursor-pointer transition-colors duration-200 ${ecosystemTipOpen ? 'tooltip-open' : ''} ${ecosystemTipDisabled ? 'pointer-events-none' : ''}`}
+                          >
+                            open source ecosystem
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent
+                          side="top"
+                          align="center"
+                          className="group p-2 sm:p-3 bg-wes-cream/90 border-2 border-transparent rounded-lg shadow-md"
+                        >
+                          <div className="w-[360px] h-[220px] overflow-hidden rounded border relative bg-white">
+                            <iframe
+                              title="Open Source Ecosystem"
+                              style={{ width: '360px', height: '220px', border: 0 }}
+                              onLoad={() => console.log('[EcosystemTooltip] Iframe loaded')}
+                              onError={() => console.log('[EcosystemTooltip] Iframe error')}
+                              srcDoc={`<!DOCTYPE html><html><head><meta charset=\"utf-8\"/><style>html,body{margin:0;height:100%;background:#f5f5f5;}</style></head><body><script>console.log('[EcosystemTooltip] Iframe HTML loaded, attempting to load ecosystem.js');</script><script type=\"module\">
+                                import { runEcosystem } from '/ecosystem.js';
+                                console.log('[EcosystemTooltip] ecosystem.js loaded, running visualization...');
+                                runEcosystem(document.body);
+                              </script></body></html>`}
+                            />
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    , a loose collection of companies, engineers, and and artists, who build on top of open models and share their work for others to use. We see a responsibility to help this ecosystem flourish.
+                  </p>
+
                   <p className="text-sm leading-relaxed">
                     To do this, we will share our profits with people from the ecosystem:
                   </p>

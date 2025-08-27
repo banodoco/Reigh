@@ -235,19 +235,6 @@ See [README.md](README.md) for:
 - Mobile testing
 - Troubleshooting
 
----
-
-## Performance Optimizations
-
-**Recent performance improvements implemented:**
-- **Auth State Batching**: ProjectContext now batches rapid auth state changes using React.startTransition to prevent excessive re-renders
-- **Component Memoization**: TasksPane, ShotsPane, GenerationsPane, and ShotImageManager are now wrapped with React.memo with custom comparison functions
-- **Performance Utilities**: Added `/shared/lib/performanceUtils.ts` with React memoization utilities, stable callback hooks, and render optimization tools
-- **Context Optimization**: Improved callback memoization in PanesContext to reduce unnecessary child re-renders
-- **Video Gallery Preloader**: Intelligent background thumbnail preloading system (`useVideoGalleryPreloader`) that preloads up to 48 images across priority shots for instant display. Includes cache detection to eliminate loading states for preloaded content.
-
-These optimizations specifically target the excessive re-render issues identified in performance logs where components were rendering 8-15+ times unnecessarily.
-
 <div align="center">
 
 **🎯 Quick Links**

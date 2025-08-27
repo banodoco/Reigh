@@ -183,13 +183,7 @@ const VideoTravelToolPage: React.FC = () => {
     }
   }, [shots]);
 
-  // Simplified loading state since both ShotEditor and ShotListDisplay use same context
-  const isLoading = shotsLoadingRaw;
-  
-  console.log(`${VIDEO_DEBUG_TAG} Final loading decision:`, {
-    isLoading,
-    shotsLoadingRaw
-  });
+  // isLoading is computed after deep-link initialization guard is set
   
   const createShotMutation = useCreateShot();
   const handleExternalImageDropMutation = useHandleExternalImageDrop();
@@ -310,6 +304,23 @@ const VideoTravelToolPage: React.FC = () => {
     return '';
   }, [location.hash]);
 
+  // Stabilize initial deep-link loading to avoid flicker when project resolves after mount
+  const [initializingFromHash, setInitializingFromHash] = useState<boolean>(false);
+
+  useEffect(() => {
+    // When deep-linking to a shot, consider the page "initializing" until:
+    // - a project is selected AND
+    // - shots have begun and finished loading
+    if (hashShotId) {
+      const stillInitializing = !selectedProjectId || shotsLoadingRaw || !shots;
+      if (initializingFromHash !== stillInitializing) {
+        setInitializingFromHash(stillInitializing);
+      }
+    } else if (initializingFromHash) {
+      setInitializingFromHash(false);
+    }
+  }, [hashShotId, selectedProjectId, shotsLoadingRaw, shots, initializingFromHash]);
+
   // If deep-linked to a shot, set current shot id immediately to prevent list-clearing logic
   useEffect(() => {
     if (hashShotId && !currentShotId) {
@@ -355,6 +366,14 @@ const VideoTravelToolPage: React.FC = () => {
 
   // Data fetching is now handled by the useVideoTravelData hook above
   
+  // Final loading flag used by the page
+  const isLoading = shotsLoadingRaw || initializingFromHash;
+  
+  console.log(`${VIDEO_DEBUG_TAG} Final loading decision:`, {
+    isLoading,
+    shotsLoadingRaw
+  });
+
   // Add state for video generation settings - wait for settings to load before initializing
   const [videoControlMode, setVideoControlMode] = useState<'individual' | 'batch'>('batch');
   const [batchVideoPrompt, setBatchVideoPrompt] = useState('');
