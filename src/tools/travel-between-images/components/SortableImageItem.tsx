@@ -147,23 +147,25 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
       onPointerDown={onPointerDown}
       onDoubleClick={isMobile ? undefined : onDoubleClick}
     >
-      {/* Simple image display like ShotsPane - no complex loading states */}
-      <img
-        src={shouldLoad ? displayImageUrl : '/placeholder.svg'}
-        alt={`Generated image ${(position ?? 0) + 1}`}
-        className="w-full h-full object-cover transition-opacity duration-200"
-        onTouchStart={isMobile ? handleTouchStart : undefined}
-        onTouchEnd={isMobile ? handleTouchEnd : undefined}
-        loading="lazy"
-        draggable={false}
-        onError={(e) => {
-          // Fallback to original URL if display URL fails
-          const target = e.target as HTMLImageElement;
-          if (target.src !== (image.thumbUrl || image.imageUrl)) {
-            target.src = image.thumbUrl || image.imageUrl;
-          }
-        }}
-      />
+      {/* Enforce consistent aspect ratio to match skeletons and prevent layout shift */}
+      <div className="relative w-full" style={{ aspectRatio: '1' }}>
+        <img
+          src={shouldLoad ? displayImageUrl : '/placeholder.svg'}
+          alt={`Generated image ${(position ?? 0) + 1}`}
+          className="absolute inset-0 w-full h-full object-cover transition-opacity duration-200"
+          onTouchStart={isMobile ? handleTouchStart : undefined}
+          onTouchEnd={isMobile ? handleTouchEnd : undefined}
+          loading="lazy"
+          draggable={false}
+          onError={(e) => {
+            // Fallback to original URL if display URL fails
+            const target = e.target as HTMLImageElement;
+            if (target.src !== (image.thumbUrl || image.imageUrl)) {
+              target.src = image.thumbUrl || image.imageUrl;
+            }
+          }}
+        />
+      </div>
       {(!isMobile || !isDragDisabled) && (
         <>
           {onDuplicate && position !== undefined && (

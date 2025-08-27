@@ -67,7 +67,7 @@ export const ImageManagerSkeleton: React.FC<ImageManagerSkeletonProps> = ({
   return (
     <>
       {/* Only render content skeleton since header is now always rendered in ShotImagesEditor */}
-      <div className="p-1 min-h-[200px]">
+      <div className="p-1">
           {actualImageCount > 0 ? (
             /* Real shot composition skeleton */
             <div className={`grid gap-3 ${gridCols}`}>
