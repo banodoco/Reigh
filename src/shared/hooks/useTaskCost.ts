@@ -54,8 +54,8 @@ export function useTaskCost() {
       queryClient.invalidateQueries({ queryKey: ['credits', 'ledger'] });
       
       // Task cost calculated
-      const costInDollars = (data.cost / 100).toFixed(2);
-      console.log(`Task cost calculated: $${costInDollars} for ${data.duration_seconds}s - Task: ${data.task_type}`);
+      const costInDollars = data.cost.toFixed(3);
+      console.log(`Task cost calculated: $${costInDollars} (${data.billing_type}) for ${data.duration_seconds}s - Task: ${data.task_type}`);
     },
     onError: (error) => {
       console.error('Error calculating task cost:', error);
@@ -71,40 +71,9 @@ export function useTaskCost() {
 }
 
 // Utility function to format cost as currency
-export function formatTaskCost(costInCents: number): string {
+export function formatTaskCost(costInDollars: number): string {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
-  }).format(costInCents / 100);
-}
-
-// Utility function to calculate estimated cost preview (without actually charging)
-export function estimateTaskCostPreview(
-  baseCostPerSecond: number,
-  durationSeconds: number,
-  costFactors: any = {},
-  taskParams: any = {}
-): number {
-  let totalCost = baseCostPerSecond * durationSeconds;
-
-  if (costFactors) {
-    // Resolution-based cost multiplier
-    if (costFactors.resolution && taskParams.resolution) {
-      const resolutionMultiplier = costFactors.resolution[taskParams.resolution] || 1;
-      totalCost *= resolutionMultiplier;
-    }
-
-    // Frame count-based additional cost
-    if (costFactors.frameCount && taskParams.frame_count) {
-      totalCost += costFactors.frameCount * taskParams.frame_count * durationSeconds;
-    }
-
-    // Model type-based cost multiplier
-    if (costFactors.modelType && taskParams.model_type) {
-      const modelMultiplier = costFactors.modelType[taskParams.model_type] || 1;
-      totalCost *= modelMultiplier;
-    }
-  }
-
-  return Math.ceil(totalCost);
+  }).format(costInDollars);
 } 

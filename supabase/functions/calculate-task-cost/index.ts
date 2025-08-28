@@ -17,16 +17,26 @@ function jsonResponse(body: any, status = 200) {
   });
 }
 
-// Calculate cost based on time duration and cost factors
+// Calculate cost based on billing type and task configuration
 function calculateTaskCost(
+  billingType: string,
   baseCostPerSecond: number,
+  unitCost: number | null,
   durationSeconds: number,
   costFactors: any,
   taskParams: any
 ): number {
-  // baseCostPerSecond is now in cents per second
-  let totalCost = baseCostPerSecond * durationSeconds;
+  let totalCost: number;
 
+  if (billingType === 'per_unit') {
+    // For per_unit billing, use the fixed unit_cost
+    totalCost = unitCost || 0;
+  } else {
+    // For per_second billing, multiply time by base_cost_per_second
+    totalCost = baseCostPerSecond * durationSeconds;
+  }
+
+  // Apply cost factors regardless of billing type
   if (costFactors) {
     // Resolution-based cost multiplier
     if (costFactors.resolution && taskParams.resolution) {
@@ -36,7 +46,11 @@ function calculateTaskCost(
 
     // Frame count-based additional cost
     if (costFactors.frameCount && taskParams.frame_count) {
-      totalCost += costFactors.frameCount * taskParams.frame_count * durationSeconds;
+      if (billingType === 'per_unit') {
+        totalCost += costFactors.frameCount * taskParams.frame_count;
+      } else {
+        totalCost += costFactors.frameCount * taskParams.frame_count * durationSeconds;
+      }
     }
 
     // Model type-based cost multiplier
@@ -116,18 +130,18 @@ serve(async (req) => {
       });
     }
 
-    // Get task cost configuration
-    const { data: costConfig, error: costConfigError } = await supabaseAdmin
-      .from('task_cost_configs')
+    // Get task type configuration
+    const { data: taskType, error: taskTypeError } = await supabaseAdmin
+      .from('task_types')
       .select('*')
-      .eq('task_type', task.task_type)
+      .eq('name', task.task_type)
       .eq('is_active', true)
       .single();
 
-    if (costConfigError || !costConfig) {
-      console.error('Error fetching cost config:', costConfigError);
+    if (taskTypeError || !taskType) {
+      console.error('Error fetching task type config:', taskTypeError);
       // Use default cost if no config found
-      const defaultCostPerSecond = 1; // 1 cent per second
+      const defaultCostPerSecond = 0.01; // 1 cent per second (in dollars)
       const startTime = new Date(task.generation_started_at);
       const endTime = new Date(task.generation_processed_at);
       const durationSeconds = Math.max(1, Math.ceil((endTime.getTime() - startTime.getTime()) / 1000));
@@ -144,9 +158,10 @@ serve(async (req) => {
           metadata: {
             task_type: task.task_type,
             duration_seconds: durationSeconds,
-            cost_per_second: defaultCostPerSecond,
+            base_cost_per_second: defaultCostPerSecond,
+            billing_type: 'per_second',
             calculated_at: new Date().toISOString(),
-            note: 'Default cost used - no configuration found'
+            note: 'Default cost used - no task type configuration found'
           }
         });
 
@@ -159,8 +174,9 @@ serve(async (req) => {
         success: true,
         cost: cost,
         duration_seconds: durationSeconds,
-        cost_per_second: defaultCostPerSecond,
-        note: 'Default cost used - no configuration found'
+        base_cost_per_second: defaultCostPerSecond,
+        billing_type: 'per_second',
+        note: 'Default cost used - no task type configuration found'
       });
     }
 
@@ -169,17 +185,25 @@ serve(async (req) => {
     const endTime = new Date(task.generation_processed_at);
     const durationSeconds = Math.max(1, Math.ceil((endTime.getTime() - startTime.getTime()) / 1000));
 
-    // Calculate cost based on configuration
+    // Calculate cost based on task type configuration
     const cost = calculateTaskCost(
-      costConfig.base_cost_per_second,
+      taskType.billing_type,
+      taskType.base_cost_per_second,
+      taskType.unit_cost,
       durationSeconds,
-      costConfig.cost_factors,
+      taskType.cost_factors,
       task.params
     );
 
     // Validate cost calculation
     if (isNaN(cost) || cost < 0) {
-      console.error('Invalid cost calculated:', { cost, baseCost: costConfig.base_cost_per_second, duration: durationSeconds });
+      console.error('Invalid cost calculated:', { 
+        cost, 
+        billing_type: taskType.billing_type,
+        base_cost_per_second: taskType.base_cost_per_second, 
+        unit_cost: taskType.unit_cost,
+        duration: durationSeconds 
+      });
       return jsonResponse({ error: 'Invalid cost calculation' }, 500);
     }
 
@@ -205,12 +229,14 @@ serve(async (req) => {
         type: 'spend',
         metadata: {
           task_type: task.task_type,
+          billing_type: taskType.billing_type,
           duration_seconds: durationSeconds,
-          base_cost_per_second: costConfig.base_cost_per_second,
-          cost_factors: costConfig.cost_factors,
+          base_cost_per_second: taskType.base_cost_per_second,
+          unit_cost: taskType.unit_cost,
+          cost_factors: taskType.cost_factors,
           task_params: task.params,
           calculated_at: new Date().toISOString(),
-          cost_config_id: costConfig.id
+          task_type_id: taskType.id
         }
       });
 
@@ -220,7 +246,13 @@ serve(async (req) => {
         user_id: task.projects.user_id, 
         task_id: task.id, 
         amount: -cost,
-        cost_details: { cost, baseCost: costConfig.base_cost_per_second, duration: durationSeconds }
+        cost_details: { 
+          cost, 
+          billing_type: taskType.billing_type,
+          base_cost_per_second: taskType.base_cost_per_second, 
+          unit_cost: taskType.unit_cost,
+          duration: durationSeconds 
+        }
       });
       return jsonResponse({ error: `Failed to record cost in ledger: ${ledgerError.message}` }, 500);
     }
@@ -228,9 +260,11 @@ serve(async (req) => {
     return jsonResponse({
       success: true,
       cost: cost,
+      billing_type: taskType.billing_type,
       duration_seconds: durationSeconds,
-      base_cost_per_second: costConfig.base_cost_per_second,
-      cost_factors: costConfig.cost_factors,
+      base_cost_per_second: taskType.base_cost_per_second,
+      unit_cost: taskType.unit_cost,
+      cost_factors: taskType.cost_factors,
       task_type: task.task_type,
       task_id: task.id
     });

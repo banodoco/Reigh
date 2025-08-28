@@ -211,7 +211,7 @@ Shared hooks provide data management, state persistence, real-time updates, and 
 
 | Service | Location | Purpose |
 |---------|----------|---------|
-| **edge functions** | `/supabase/functions/` | Task completion, cost calc, payments |
+| **edge functions** | `/supabase/functions/` | Task completion, post-execution billing, payments |
 | **database triggers** | migr. SQL | Instant task processing, status broadcasts |
 | **lib/** utilities | `/src/shared/lib/` | Image upload, auth, math helpers |
 

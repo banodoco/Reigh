@@ -101,13 +101,7 @@ export interface CreditLedger {
   stripe_payment_intent_id?: string;
 }
 
-export interface TaskCostConfig {
-  id: string;
-  task_type: string;
-  base_cost_per_second: number;
-  created_at: string;
-  updated_at?: string;
-}
+
 
 export interface UserAPIToken {
   id: string;

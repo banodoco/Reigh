@@ -55,10 +55,6 @@ async function seed() {
     await linkGenerationsToShots(db, shotIds, generationIds);
     console.log(`[Seed] Linked generations to shots`);
 
-    // Create sample task cost configs
-    await createSampleTaskCostConfigs(db);
-    console.log(`[Seed] Created sample task cost configs`);
-
     // Create sample credits
     await createSampleCredits(db, userId);
     console.log(`[Seed] Created sample credits`);
@@ -299,34 +295,7 @@ async function linkGenerationsToShots(db: ReturnType<typeof drizzle>, shotIds: s
   }
 }
 
-async function createSampleTaskCostConfigs(db: ReturnType<typeof drizzle>): Promise<void> {
-  const configs = [
-    {
-      taskType: 'single_image',
-      baseCostPerSecond: '0.000278',
-    },
-    {
-      taskType: 'travel_between_images',
-      baseCostPerSecond: '0.001000',
-    },
-    {
-      taskType: 'ai_prompt_enhancement',
-      baseCostPerSecond: '0.000100',
-    },
-  ];
-  
-  // Insert only if they don't exist
-  for (const config of configs) {
-    const existing = await db.select()
-      .from(schema.taskCostConfigs)
-      .where(eq(schema.taskCostConfigs.taskType, config.taskType))
-      .limit(1);
-    
-    if (existing.length === 0) {
-      await db.insert(schema.taskCostConfigs).values(config);
-    }
-  }
-}
+
 
 async function createSampleCredits(db: ReturnType<typeof drizzle>, userId: string): Promise<void> {
   // Add some sample credit history

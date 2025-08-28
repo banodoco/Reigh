@@ -92,13 +92,7 @@ export const creditsLedger = pgTable('credits_ledger', {
   stripePaymentIntentId: text('stripe_payment_intent_id'),
 });
 
-export const taskCostConfigs = pgTable('task_cost_configs', {
-  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
-  taskType: text('task_type').notNull(),
-  baseCostPerSecond: numeric('base_cost_per_second', { precision: 10, scale: 6 }).notNull(), // Cost per second in dollars
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }),
-});
+
 
 export const userApiTokens = pgTable('user_api_tokens', {
   id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
