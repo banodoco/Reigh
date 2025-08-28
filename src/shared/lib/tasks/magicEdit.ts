@@ -171,7 +171,7 @@ export async function createMagicEditTask(params: MagicEditTaskParams): Promise<
     // 4. Create task using unified create-task function
     const result = await createTask({
       project_id: params.project_id,
-      task_type: "image_edit",
+      task_type: "qwen_image_edit",
       params: taskParams,
     });
 
