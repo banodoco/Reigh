@@ -18,19 +18,21 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
  * POST /functions/v1/claim-next-task
  * Headers: Authorization: Bearer <JWT or PAT>
  * Body: {
+ * 
  *   worker_id?: string,        // Optional worker ID for service role
- *   count?: boolean           // If true, return detailed counts and debugging info
+ *   count?: boolean,          // If true, return detailed counts and debugging info
+ *   run_type?: 'gpu' | 'api'  // Optional: filter tasks by execution environment
  * }
  * 
  * Returns:
  * - 200 OK with task data (claiming) or detailed counts (count mode)
  * - 204 No Content if no tasks available (claiming only)
  * - 401 Unauthorized if no valid token
- * - 403 Forbidden if token invalid or user not found
+ * - 403 Forbidden if token invalid ..or user not found
  * - 500 Internal Server Error
  */
 serve(async (req) => {
-  // Only accept POST requests
+  // Only accept POST requesgts
   if (req.method !== "POST") {
     return new Response("Method not allowed", { status: 405 });
   }
@@ -63,9 +65,17 @@ serve(async (req) => {
 
   const isCountMode = requestBody.count === true;
   const workerId = requestBody.worker_id || `edge_${crypto.randomUUID()}`;
+  const runType = requestBody.run_type || null; // 'gpu', 'api', or null (no filtering)
 
   if (isCountMode) {
     console.log("🧮 Count mode enabled – returning queued, active, and per-user breakdown.");
+  }
+  
+  if (runType) {
+    console.log(`🎯 Run type filter enabled: ${runType}`);
+    if (runType === 'api') {
+      console.log(`[API_PATH] Starting API task processing - Count mode: ${isCountMode}, Worker ID: ${workerId}`);
+    }
   }
 
   // Create admin client for database operations
@@ -149,9 +159,12 @@ serve(async (req) => {
         // queued_plus_active = count(include_active=true)
         // active_only = diff (cloud-claimed, orchestrators excluded per migration)
         console.log('[ClaimNextTask:CountDebug] Service-role: starting count computations');
+        if (runType === 'api') {
+          console.log(`[API_PATH] Service role count mode - calling count functions with run_type=${runType}`);
+        }
         const [countQueuedOnly, countQueuedPlusActive] = await Promise.all([
-          supabaseAdmin.rpc('count_eligible_tasks_service_role', { p_include_active: false }),
-          supabaseAdmin.rpc('count_eligible_tasks_service_role', { p_include_active: true })
+          supabaseAdmin.rpc('count_eligible_tasks_service_role', { p_include_active: false, p_run_type: runType }),
+          supabaseAdmin.rpc('count_eligible_tasks_service_role', { p_include_active: true, p_run_type: runType })
         ]);
 
         if (countQueuedOnly.error) {
@@ -165,14 +178,40 @@ serve(async (req) => {
 
         const queued_only = countQueuedOnly.data ?? 0;
         const queued_plus_active = countQueuedPlusActive.data ?? 0;
+        
+        if (runType === 'api') {
+          console.log(`[API_PATH] Count results - queued_only: ${queued_only}, queued_plus_active: ${queued_plus_active}`);
+        }
         // Compute active_only directly from cloud In Progress tasks (exclude orchestrators)
         let active_only = 0;
         try {
-          const { count: activeCloudNonOrchestrator } = await supabaseAdmin
+          let query = supabaseAdmin
             .from('tasks')
             .select('id', { count: 'exact', head: true })
             .eq('status', 'In Progress')
             .not('worker_id', 'is', null);
+          
+          // Apply run_type filter if specified
+          if (runType) {
+            // We need to filter by tasks that match the run_type
+            // Since we can't join directly in the count query, we'll use a subquery approach
+            const { data: taskTypesForRunType } = await supabaseAdmin
+              .from('task_types')
+              .select('name')
+              .eq('run_type', runType)
+              .eq('is_active', true);
+            
+            if (taskTypesForRunType && taskTypesForRunType.length > 0) {
+              const taskTypeNames = taskTypesForRunType.map(tt => tt.name);
+              query = query.in('task_type', taskTypeNames);
+            } else {
+              // No task types for this run_type, so 0 tasks
+              active_only = 0;
+              throw new Error(`No active task types found for run_type: ${runType}`);
+            }
+          }
+          
+          const { count: activeCloudNonOrchestrator } = await query;
           active_only = activeCloudNonOrchestrator ?? 0;
         } catch (e) {
           console.log('[ClaimNextTask:CountDebug] Failed to compute active_only directly, falling back to diff method:', (e as any)?.message);
@@ -185,7 +224,7 @@ serve(async (req) => {
         try {
           console.log('[ClaimNextTask:CountDebug] Calling analyze_task_availability_service_role(include_active=true)');
           const { data: analysis } = await supabaseAdmin
-            .rpc('analyze_task_availability_service_role', { p_include_active: true });
+            .rpc('analyze_task_availability_service_role', { p_include_active: true, p_run_type: runType });
           if (analysis && Array.isArray(analysis.user_stats) && analysis.user_stats.length > 0) {
             user_stats = analysis.user_stats;
             console.log(`[ClaimNextTask:CountDebug] Analysis user_stats count=${user_stats.length}`);
@@ -217,13 +256,29 @@ serve(async (req) => {
           }
         }
 
-        // Additional debugging data
-        const { data: globalStats } = await supabaseAdmin
+        // Additional debugging data - filter by run_type if specified
+        let globalStatsQuery = supabaseAdmin
           .from('tasks')
           .select('status, task_type, worker_id, created_at')
           .in('status', ['Queued', 'In Progress'])
           .order('created_at', { ascending: false })
           .limit(20);
+
+        // Apply run_type filter if specified
+        if (runType) {
+          const { data: taskTypesForRunType } = await supabaseAdmin
+            .from('task_types')
+            .select('name')
+            .eq('run_type', runType)
+            .eq('is_active', true);
+          
+          if (taskTypesForRunType && taskTypesForRunType.length > 0) {
+            const taskTypeNames = taskTypesForRunType.map(tt => tt.name);
+            globalStatsQuery = globalStatsQuery.in('task_type', taskTypeNames);
+          }
+        }
+
+        const { data: globalStats } = await globalStatsQuery;
 
         const taskBreakdown = {
           queued_total: (globalStats || []).filter(t => t.status === 'Queued').length,
@@ -236,6 +291,7 @@ serve(async (req) => {
         return new Response(JSON.stringify({
           mode: 'count',
           timestamp: new Date().toISOString(),
+          run_type_filter: runType,
           totals: {
             queued_only,
             active_only,
@@ -255,10 +311,14 @@ serve(async (req) => {
         });
       } else {
         // Claim next eligible task
+        if (runType === 'api') {
+          console.log(`[API_PATH] Service role claim mode - attempting to claim task for worker: ${workerId}`);
+        }
         const { data: claimResult, error: claimError } = await supabaseAdmin
           .rpc('claim_next_task_service_role', {
             p_worker_id: workerId,
-            p_include_active: false
+            p_include_active: false,
+            p_run_type: runType
           });
 
         if (claimError) {
@@ -268,12 +328,16 @@ serve(async (req) => {
 
         if (!claimResult || claimResult.length === 0) {
           console.log("Service role: No eligible tasks available");
+          if (runType === 'api') {
+            console.log(`[API_PATH] No API tasks found for worker ${workerId}`);
+          }
           
           // Add detailed debugging analysis like original
                       try {
             const { data: analysis } = await supabaseAdmin
               .rpc('analyze_task_availability_service_role', {
-                p_include_active: false
+                p_include_active: false,
+                p_run_type: runType
               });
             
             if (analysis) {
@@ -307,6 +371,9 @@ serve(async (req) => {
 
         const task = claimResult[0];
         console.log(`Service role: Successfully claimed task ${task.task_id}`);
+        if (runType === 'api') {
+          console.log(`[API_PATH] Successfully claimed API task ${task.task_id} for worker ${workerId}, task_type: ${task.task_type}`);
+        }
         
         return new Response(JSON.stringify({
           task_id: task.task_id,
@@ -328,8 +395,8 @@ serve(async (req) => {
         // Aggregated counts and details for a single user
         console.log(`[ClaimNextTask:CountDebug] User ${callerId}: starting count computations`);
         const [countQueuedOnly, countQueuedPlusActive] = await Promise.all([
-          supabaseAdmin.rpc('count_eligible_tasks_user', { p_user_id: callerId, p_include_active: false }),
-          supabaseAdmin.rpc('count_eligible_tasks_user', { p_user_id: callerId, p_include_active: true })
+          supabaseAdmin.rpc('count_eligible_tasks_user', { p_user_id: callerId, p_include_active: false, p_run_type: runType }),
+          supabaseAdmin.rpc('count_eligible_tasks_user', { p_user_id: callerId, p_include_active: true, p_run_type: runType })
         ]);
 
         if (countQueuedOnly.error) {
@@ -352,7 +419,7 @@ serve(async (req) => {
         try {
           console.log(`[ClaimNextTask:CountDebug] User ${callerId}: calling analyze_task_availability_user(include_active=true)`);
           const { data: analysis } = await supabaseAdmin
-            .rpc('analyze_task_availability_user', { p_user_id: callerId, p_include_active: true });
+            .rpc('analyze_task_availability_user', { p_user_id: callerId, p_include_active: true, p_run_type: runType });
           if (analysis) {
             eligible_queued = analysis.eligible_count ?? 0;
             user_info = analysis.user_info ?? {};
@@ -413,6 +480,7 @@ serve(async (req) => {
           mode: 'count',
           timestamp: new Date().toISOString(),
           user_id: callerId,
+          run_type_filter: runType,
           totals: {
             queued_only_capacity,
             active_only_capacity,
@@ -440,7 +508,8 @@ serve(async (req) => {
         const { data: claimResult, error: claimError } = await supabaseAdmin
           .rpc('claim_next_task_user', {
             p_user_id: callerId,
-            p_include_active: false
+            p_include_active: false,
+            p_run_type: runType
           });
 
         if (claimError) {
@@ -456,7 +525,8 @@ serve(async (req) => {
             const { data: analysis } = await supabaseAdmin
               .rpc('analyze_task_availability_user', {
                 p_user_id: callerId,
-                p_include_active: false
+                p_include_active: false,
+                p_run_type: runType
               });
             
             if (analysis) {

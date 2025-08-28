@@ -13,7 +13,6 @@ import { Label } from "@/shared/components/ui/label";
 import { Separator } from "@/shared/components/ui/separator";
 import { Alert, AlertDescription } from "@/shared/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/components/ui/tabs";
-import { Checkbox } from "@/shared/components/ui/checkbox";
 import { toast } from "sonner";
 import { useApiKeys } from "@/shared/hooks/useApiKeys";
 import { useApiTokens } from "@/shared/hooks/useApiTokens";
@@ -387,7 +386,7 @@ python worker.py --db-type supabase \\
         </DialogHeader>
         
         {/* Generation Method Selection */}
-        <div className="mb-6">
+        <div className="mb-2">
           {/* Mobile header with sign out */}
           {isMobile && (
             <div className="flex items-center justify-between mb-4">
@@ -419,33 +418,34 @@ python worker.py --db-type supabase \\
                   </div>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="in-cloud"
-                      checked={inCloudChecked}
-                      onCheckedChange={(checked) => updateGenerationMethodsWithNotification({ inCloud: checked === true })}
-                    />
-                    <label
-                      htmlFor="in-cloud"
-                      className="text-sm font-light leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                    >
-                      In the cloud
-                    </label>
-                  </div>
-                  
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="on-computer"
-                      checked={onComputerChecked}
-                      onCheckedChange={(checked) => updateGenerationMethodsWithNotification({ onComputer: checked === true })}
-                    />
-                    <label
-                      htmlFor="on-computer"
-                      className="text-sm font-light leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                    >
-                      On my computer
-                    </label>
+                <div className="flex items-center justify-start">
+                  <div className="relative inline-flex items-center bg-gray-200 rounded-full p-1 shadow-inner">
+                    {/* Toggle track */}
+                    <div className="flex">
+                      {/* In the cloud button */}
+                      <button
+                        onClick={() => updateGenerationMethodsWithNotification({ inCloud: true, onComputer: false })}
+                        className={`px-4 py-2 font-light rounded-full transition-all duration-200 ${
+                          inCloudChecked && !onComputerChecked
+                            ? 'bg-white text-blue-600 shadow-sm text-base'
+                            : 'text-gray-600 hover:text-gray-800 text-sm'
+                        }`}
+                      >
+                        In the cloud
+                      </button>
+                      
+                      {/* On my computer button */}
+                      <button
+                        onClick={() => updateGenerationMethodsWithNotification({ onComputer: true, inCloud: false })}
+                        className={`px-4 py-2 font-light rounded-full transition-all duration-200 ${
+                          onComputerChecked && !inCloudChecked
+                            ? 'bg-white text-green-600 shadow-sm text-base'
+                            : 'text-gray-600 hover:text-gray-800 text-sm'
+                        }`}
+                      >
+                        On my computer
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -476,10 +476,6 @@ python worker.py --db-type supabase \\
           {/* Credits Management Section */}
           {!isLoadingGenerationMethods && inCloudChecked && (
             <div className="space-y-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Coins className="w-6 h-6 text-blue-600" />
-                <h3 className="text-xl font-normal text-gray-800">Credit Management</h3>
-              </div>
               <CreditsManagement initialTab={creditsTab} />
             </div>
           )}
@@ -487,11 +483,6 @@ python worker.py --db-type supabase \\
           {/* Local Generation Section */}
           {!isLoadingGenerationMethods && onComputerChecked && (
             <div className="space-y-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Monitor className="w-6 h-6 text-green-600" />
-                <h3 className="text-xl font-normal text-gray-800">Local Generation</h3>
-              </div>
-              
               {!hasValidToken ? (
                 <div className="space-y-4">
                   <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
@@ -858,7 +849,7 @@ python worker.py --db-type supabase \\
                              onClick={handleCopyInstallCommand}
                              variant="outline"
                              size="default"
-                             className="w-full"
+                             className="w-full border-2"
                            >
                             {copiedInstallCommand ? (
                               "Copied!"
@@ -965,7 +956,7 @@ python worker.py --db-type supabase \\
                             onClick={handleCopyRunCommand}
                             variant="outline"
                             size="default"
-                            className="w-full"
+                            className="w-full border-2"
                           >
                             {copiedRunCommand ? (
                               "Copied!"
