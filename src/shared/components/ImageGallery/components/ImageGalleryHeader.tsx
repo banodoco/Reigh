@@ -47,6 +47,11 @@ export interface ImageGalleryHeaderProps {
   // Media type filter props
   mediaTypeFilter: 'all' | 'image' | 'video';
   onMediaTypeFilterChange?: (mediaType: 'all' | 'image' | 'video') => void;
+  
+  // Tool type filter props
+  toolTypeFilterEnabled?: boolean;
+  onToolTypeFilterChange?: (enabled: boolean) => void;
+  currentToolTypeName?: string;
 }
 
 export const ImageGalleryHeader: React.FC<ImageGalleryHeaderProps> = ({
@@ -90,6 +95,11 @@ export const ImageGalleryHeader: React.FC<ImageGalleryHeaderProps> = ({
   // Media type filter props
   mediaTypeFilter,
   onMediaTypeFilterChange,
+  
+  // Tool type filter props
+  toolTypeFilterEnabled,
+  onToolTypeFilterChange,
+  currentToolTypeName,
 }) => {
   return (
     <div className={`${reducedSpacing ? 'mt-0' : 'mt-7'} space-y-3`}>
@@ -183,6 +193,9 @@ export const ImageGalleryHeader: React.FC<ImageGalleryHeaderProps> = ({
         hideTopFilters={hideTopFilters}
         mediaTypeFilter={mediaTypeFilter}
         onMediaTypeFilterChange={onMediaTypeFilterChange}
+        toolTypeFilterEnabled={toolTypeFilterEnabled}
+        onToolTypeFilterChange={onToolTypeFilterChange}
+        currentToolTypeName={currentToolTypeName}
       />
     </div>
   );

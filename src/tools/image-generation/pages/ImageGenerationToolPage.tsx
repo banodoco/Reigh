@@ -97,6 +97,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   const [isFilterChange, setIsFilterChange] = useState(false);
   const [mediaTypeFilter, setMediaTypeFilter] = useState<'all' | 'image' | 'video'>('all'); // Add media type filter state
   const [starredOnly, setStarredOnly] = useState<boolean>(false);
+  const [toolTypeFilterEnabled, setToolTypeFilterEnabled] = useState<boolean>(true); // Default to filtering by tool type
   const [formAssociatedShotId, setFormAssociatedShotId] = useState<string | null>(null); // Track the associated shot from the form
   // Optimistic initial state: read last known form state from sessionStorage for instant UI on revisit
   const [isFormExpanded, setIsFormExpanded] = useState<boolean | undefined>(() => {
@@ -222,13 +223,13 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   
   // Use stable object for filters to prevent recreating on every render
   const generationsFilters = useStableObject(() => ({
-    toolType: 'image-generation', // Always true
+    toolType: toolTypeFilterEnabled ? 'image-generation' : undefined, // Only filter by tool type when enabled
     mediaType: mediaTypeFilter, // Use dynamic mediaType instead of hardcoded 'image'
     shotId: selectedShotFilter === 'all' ? undefined : selectedShotFilter,
     excludePositioned: selectedShotFilter !== 'all' ? excludePositioned : undefined,
     starredOnly,
     searchTerm: searchTerm.trim() || undefined // Only pass if not empty
-  }), [mediaTypeFilter, selectedShotFilter, excludePositioned, starredOnly, searchTerm]);
+  }), [toolTypeFilterEnabled, mediaTypeFilter, selectedShotFilter, excludePositioned, starredOnly, searchTerm]);
   
   // Debug logging removed for performance
   
@@ -314,6 +315,12 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     setIsFilterChange(true);
     setCurrentPage(1);
   }, [searchTerm]);
+
+  // Reset to page 1 when tool type filter changes
+  useEffect(() => {
+    setIsFilterChange(true);
+    setCurrentPage(1);
+  }, [toolTypeFilterEnabled]);
 
   // Update last known total when we get valid data
   useEffect(() => {
@@ -672,6 +679,12 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   const handleMediaTypeFilterChange = useCallback((newMediaType: 'all' | 'image' | 'video') => {
     setMediaTypeFilter(newMediaType);
     // Page reset is now handled in the useEffect
+  }, []);
+
+  // Handle tool type filter change
+  const handleToolTypeFilterChange = useCallback((enabled: boolean) => {
+    setToolTypeFilterEnabled(enabled);
+    // Page reset is handled in useEffect
   }, []);
 
   // Handle switching to the associated shot from the form
@@ -1140,7 +1153,9 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
                 onMediaTypeFilterChange={handleMediaTypeFilterChange}
                 initialStarredFilter={starredOnly}
                 onStarredFilterChange={setStarredOnly}
-                onToolTypeFilterChange={() => {}}
+                onToolTypeFilterChange={handleToolTypeFilterChange}
+                initialToolTypeFilter={toolTypeFilterEnabled}
+                currentToolTypeName="Image Generation"
                 formAssociatedShotId={formAssociatedShotId}
                 onSwitchToAssociatedShot={handleSwitchToAssociatedShot}
                 onPrefetchAdjacentPages={handlePrefetchAdjacentPages}

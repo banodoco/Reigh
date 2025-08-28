@@ -10,6 +10,7 @@ import {
   SelectValue,
 } from "@/shared/components/ui/select";
 import { ShotFilter } from "@/shared/components/ShotFilter";
+import { ToolTypeFilter } from "./ToolTypeFilter";
 
 export interface ImageGalleryFiltersProps {
   // Shot filter props
@@ -34,6 +35,11 @@ export interface ImageGalleryFiltersProps {
   hideTopFilters?: boolean;
   mediaTypeFilter: 'all' | 'image' | 'video';
   onMediaTypeFilterChange?: (mediaType: 'all' | 'image' | 'video') => void;
+  
+  // Tool type filter props
+  toolTypeFilterEnabled?: boolean;
+  onToolTypeFilterChange?: (enabled: boolean) => void;
+  currentToolTypeName?: string;
 }
 
 export const ImageGalleryFilters: React.FC<ImageGalleryFiltersProps> = ({
@@ -54,6 +60,9 @@ export const ImageGalleryFilters: React.FC<ImageGalleryFiltersProps> = ({
   hideTopFilters = false,
   mediaTypeFilter,
   onMediaTypeFilterChange,
+  toolTypeFilterEnabled = true,
+  onToolTypeFilterChange,
+  currentToolTypeName,
 }) => {
   return (
     <div className="flex justify-between items-center flex-wrap gap-y-2">
@@ -112,6 +121,16 @@ export const ImageGalleryFilters: React.FC<ImageGalleryFiltersProps> = ({
               </div>
             )}
           </div>
+        )}
+
+        {/* Tool Type Filter - Show only when currentToolTypeName is provided */}
+        {currentToolTypeName && (
+          <ToolTypeFilter
+            enabled={toolTypeFilterEnabled}
+            onToggle={onToolTypeFilterChange || (() => {})}
+            toolTypeName={currentToolTypeName}
+            whiteText={whiteText}
+          />
         )}
       </div>
       

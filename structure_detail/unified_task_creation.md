@@ -42,7 +42,7 @@ Each task type has its own helper module:
 src/shared/lib/tasks/
 ├── travelBetweenImages.ts    ✅ (migrated)
 ├── imageGeneration.ts        ✅ (migrated)
-├── magicEdit.ts              ⏳ (future)
+├── magicEdit.ts              ✅ (migrated)
 └── replicateUpscale.ts       ⏳ (future)
 ```
 
@@ -264,10 +264,10 @@ Common error types:
 ### Completed Migrations
 1. **Travel Between Images** (`steerable-motion` → `travelBetweenImages.ts`) ✅
 2. **Image Generation** (`single-image-generate` → `imageGeneration.ts`) ✅
+3. **Magic Edit** (`magic-edit` → `magicEdit.ts`) ✅
 
 ### Planned Migrations
-1. **Magic Edit** (`magic-edit` → `magicEdit.ts`)
-2. **Replicate Upscale** (`replicate-upscale` → `replicateUpscale.ts`)
+1. **Replicate Upscale** (`replicate-upscale` → `replicateUpscale.ts`)
 
 ### Potential Improvements
 - **Batch task creation** for multiple tasks

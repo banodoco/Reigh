@@ -11,6 +11,7 @@ export interface UseImageGalleryFiltersProps {
   initialExcludePositioned?: boolean;
   initialSearchTerm?: string;
   initialStarredFilter?: boolean;
+  initialToolTypeFilter?: boolean;
   onServerPageChange?: (page: number, fromBottom?: boolean) => void;
   serverPage?: number;
   onShotFilterChange?: (shotId: string) => void;
@@ -33,6 +34,8 @@ export interface UseImageGalleryFiltersReturn {
   setExcludePositioned: (exclude: boolean) => void;
   showStarredOnly: boolean;
   setShowStarredOnly: (starredOnly: boolean) => void;
+  toolTypeFilterEnabled: boolean;
+  setToolTypeFilterEnabled: (enabled: boolean) => void;
   
   // Search state
   searchTerm: string;
@@ -63,6 +66,7 @@ export const useImageGalleryFilters = ({
   initialExcludePositioned = true,
   initialSearchTerm = '',
   initialStarredFilter = false,
+  initialToolTypeFilter = true,
   onServerPageChange,
   serverPage,
   onShotFilterChange,
@@ -79,6 +83,7 @@ export const useImageGalleryFilters = ({
   const [shotFilter, setShotFilter] = useState<string>(initialShotFilter);
   const [excludePositioned, setExcludePositioned] = useState<boolean>(initialExcludePositioned);
   const [showStarredOnly, setShowStarredOnly] = useState<boolean>(initialStarredFilter);
+  const [toolTypeFilterEnabled, setToolTypeFilterEnabled] = useState<boolean>(initialToolTypeFilter);
   
   // Search state
   const [searchTerm, setSearchTerm] = useState<string>(initialSearchTerm);
@@ -101,6 +106,10 @@ export const useImageGalleryFilters = ({
   useEffect(() => {
     setShowStarredOnly(initialStarredFilter);
   }, [initialStarredFilter]);
+
+  useEffect(() => {
+    setToolTypeFilterEnabled(initialToolTypeFilter);
+  }, [initialToolTypeFilter]);
 
   // Update search visibility based on search term
   useEffect(() => {
@@ -162,7 +171,7 @@ export const useImageGalleryFilters = ({
 
     // 1. Apply tool_type filter (only in client pagination mode)
     const isServerPagination = !!(onServerPageChange && serverPage);
-    if (!isServerPagination && filterByToolType && currentToolType) {
+    if (!isServerPagination && filterByToolType && toolTypeFilterEnabled && currentToolType) {
       currentFiltered = currentFiltered.filter(image => {
         const metadata = image.metadata;
         if (!metadata || !metadata.tool_type) return false;
@@ -213,7 +222,7 @@ export const useImageGalleryFilters = ({
     }
         
     return currentFiltered;
-  }, [images, filterByToolType, currentToolType, mediaTypeFilter, searchTerm, showStarredOnly, onServerPageChange, serverPage, optimisticDeletedIds]);
+  }, [images, filterByToolType, toolTypeFilterEnabled, currentToolType, mediaTypeFilter, searchTerm, showStarredOnly, onServerPageChange, serverPage, optimisticDeletedIds]);
 
   return {
     // Filter states
@@ -227,6 +236,8 @@ export const useImageGalleryFilters = ({
     setExcludePositioned,
     showStarredOnly,
     setShowStarredOnly,
+    toolTypeFilterEnabled,
+    setToolTypeFilterEnabled,
     
     // Search state
     searchTerm,

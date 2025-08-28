@@ -120,6 +120,8 @@ export interface ImageGalleryProps {
   initialStarredFilter?: boolean;
   onStarredFilterChange?: (starredOnly: boolean) => void;
   onToolTypeFilterChange?: (enabled: boolean) => void;
+  initialToolTypeFilter?: boolean;
+  currentToolTypeName?: string;
   formAssociatedShotId?: string | null;
   onSwitchToAssociatedShot?: (shotId: string) => void;
   reducedSpacing?: boolean;
@@ -149,14 +151,13 @@ export const ImageGallery: React.FC<ImageGalleryProps> = (props) => {
     timestamp: Date.now()
   });
 
-  // [DEEP DEBUG] Add debug logging after hooks to see data flow
+  // [DEEP DEBUG] Add debug logging after hooks to see data flow  
   React.useEffect(() => {
     console.log('[GalleryRenderDebug] 🔍 DATA FLOW DEBUG:', {
       originalImages: images.length,
       filteredImages: filtersHook.filteredImages.length,
       paginatedImages: paginationHook.paginatedImages.length,
       isServerPagination: !!onServerPageChange,
-      hasFilters: filtersHook.hasFilters,
       timestamp: Date.now()
     });
   });
@@ -195,6 +196,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = (props) => {
     onStarredFilterChange,
     onToolTypeFilterChange,
     initialStarredFilter = false,
+    initialToolTypeFilter = true,
+    currentToolTypeName,
     formAssociatedShotId,
     onSwitchToAssociatedShot,
     reducedSpacing = false,
@@ -284,6 +287,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = (props) => {
     initialExcludePositioned,
     initialSearchTerm,
     initialStarredFilter,
+    initialToolTypeFilter,
     onServerPageChange,
     serverPage,
     onShotFilterChange,
@@ -293,6 +297,9 @@ export const ImageGallery: React.FC<ImageGalleryProps> = (props) => {
     onStarredFilterChange,
     onToolTypeFilterChange,
   });
+
+  // Check if filters are active for empty state
+  const hasFilters = filtersHook.filterByToolType || filtersHook.mediaTypeFilter !== 'all' || !!filtersHook.searchTerm.trim() || filtersHook.showStarredOnly || !filtersHook.toolTypeFilterEnabled;
 
   // Pagination hook
   const paginationHook = useImageGalleryPagination({
@@ -493,9 +500,6 @@ export const ImageGallery: React.FC<ImageGalleryProps> = (props) => {
     }
   }, [stateHook.activeLightboxMedia, stateHook.setSelectedImageForDetails, stateHook.setShowTaskDetailsModal, stateHook.setActiveLightboxMedia]);
 
-  // Check if filters are active for empty state
-  const hasFilters = filtersHook.filterByToolType || filtersHook.mediaTypeFilter !== 'all' || !!filtersHook.searchTerm.trim() || filtersHook.showStarredOnly;
-
   return (
     <TooltipProvider>
       <div className={`${reducedSpacing ? 'space-y-3' : 'space-y-6'} ${reducedSpacing ? 'pb-2' : 'pb-8'}`}>
@@ -588,6 +592,20 @@ export const ImageGallery: React.FC<ImageGalleryProps> = (props) => {
               // Propagate to parent to trigger server-side refetch
               onMediaTypeFilterChange?.(value);
             }}
+            
+            // Tool type filter props
+            toolTypeFilterEnabled={filtersHook.toolTypeFilterEnabled}
+            onToolTypeFilterChange={(enabled) => {
+              // Update local filter state immediately to keep UI responsive
+              filtersHook.setToolTypeFilterEnabled(enabled);
+              // If server pagination is enabled, show a brief loading state while new data arrives
+              if (paginationHook.isServerPagination) {
+                paginationHook.setIsGalleryLoading(true);
+              }
+              // Propagate to parent to trigger server-side refetch
+              onToolTypeFilterChange?.(enabled);
+            }}
+            currentToolTypeName={currentToolTypeName}
           />
         </div>
 
