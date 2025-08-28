@@ -9,10 +9,10 @@ import { PlusCircle } from 'lucide-react';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 import { useListShots, useCreateShot } from '@/shared/hooks/useShots';
-import { useTaskQueueNotifier } from '@/shared/hooks/useTaskQueueNotifier';
 import CreateShotModal from '@/shared/components/CreateShotModal';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { createBatchMagicEditTasks, TaskValidationError } from '@/shared/lib/tasks/magicEdit';
 
 interface MagicEditFormProps {
   imageUrl: string;
@@ -31,18 +31,16 @@ export const MagicEditForm: React.FC<MagicEditFormProps> = ({
   const [magicEditShotId, setMagicEditShotId] = useState<string | null>(null);
   const [isCreateShotModalOpen, setIsCreateShotModalOpen] = useState(false);
 
-  // Project context and task queue functionality
+  // Project context functionality
   const { selectedProjectId } = useProject();
   const { currentShotId } = useCurrentShot();
   const { data: shots } = useListShots(selectedProjectId);
   const createShotMutation = useCreateShot();
   const queryClient = useQueryClient();
 
-  // Only use task queue notifier when modal is open
-  const { enqueueTasks, isEnqueuing, justQueued } = useTaskQueueNotifier({
-    projectId: selectedProjectId || undefined,
-    suppressPerTaskToast: true,
-  });
+  // State for task creation
+  const [isCreatingTasks, setIsCreatingTasks] = useState(false);
+  const [tasksCreated, setTasksCreated] = useState(false);
 
   const handleMagicEditGenerate = async () => {
     if (!selectedProjectId) {
@@ -55,26 +53,29 @@ export const MagicEditForm: React.FC<MagicEditFormProps> = ({
       return;
     }
 
-    try {
-      // Create multiple tasks - one for each image requested
-      const tasks = Array.from({ length: magicEditNumImages }, (_, index) => {
-        return {
-          functionName: 'magic-edit',
-          payload: {
-            project_id: selectedProjectId,
-            prompt: magicEditPrompt,
-            negative_prompt: "",
-            resolution: imageDimensions ? `${imageDimensions.width}x${imageDimensions.height}` : undefined,
-            model_name: "flux-kontext",
-            seed: 11111,
-            image_url: imageUrl, // Source image for magic edit
-            in_scene: magicEditInSceneBoost,
-            shot_id: currentShotId || magicEditShotId || undefined, // Associate with current shot if in shot context
-          }
-        };
-      });
+    setIsCreatingTasks(true);
+    setTasksCreated(false);
 
-      await enqueueTasks(tasks);
+    try {
+      // Create batch magic edit tasks using the unified system
+      const batchParams = {
+        project_id: selectedProjectId,
+        prompt: magicEditPrompt,
+        image_url: imageUrl, // Source image for magic edit
+        numImages: magicEditNumImages,
+        negative_prompt: "", // Empty negative prompt as default
+        resolution: imageDimensions ? `${imageDimensions.width}x${imageDimensions.height}` : undefined,
+        seed: 11111, // Base seed, will be incremented for each image
+        in_scene: magicEditInSceneBoost,
+        shot_id: currentShotId || magicEditShotId || undefined, // Associate with current shot if in shot context
+      };
+
+      const results = await createBatchMagicEditTasks(batchParams);
+      
+      console.log(`[MagicEditForm] Created ${results.length} magic edit tasks`);
+      toast.success(`Created ${results.length} magic edit task${results.length > 1 ? 's' : ''}`);
+      
+      setTasksCreated(true);
       
       // Don't close modal immediately - let success state show
       // Reset form only after success state is shown
@@ -84,10 +85,20 @@ export const MagicEditForm: React.FC<MagicEditFormProps> = ({
         setMagicEditNumImages(4);
         setMagicEditInSceneBoost(false);
         setMagicEditShotId(null);
+        setTasksCreated(false);
       }, 2000); // Wait 2 seconds to show success state
     } catch (error) {
-      console.error('Error creating magic-edit task:', error);
-      toast.error('Failed to create magic-edit task');
+      console.error('Error creating magic-edit tasks:', error);
+      
+      if (error instanceof TaskValidationError) {
+        toast.error(`Validation error: ${error.message}`);
+      } else {
+        toast.error(`Failed to create magic-edit tasks: ${error.message || 'Unknown error'}`);
+      }
+      
+      setTasksCreated(false);
+    } finally {
+      setIsCreatingTasks(false);
     }
   };
 
@@ -131,7 +142,17 @@ export const MagicEditForm: React.FC<MagicEditFormProps> = ({
 
   return (
     <>
-      <div className="space-y-4">
+      <div 
+        className="space-y-4"
+        onClick={(e) => {
+          // Prevent clicks inside the form from bubbling up to the backdrop
+          e.stopPropagation();
+        }}
+        onPointerDown={(e) => {
+          // Also prevent pointer events from bubbling
+          e.stopPropagation();
+        }}
+      >
         {/* Image Preview */}
         <div className="relative w-full">
           <Label>Image</Label>
@@ -215,14 +236,14 @@ export const MagicEditForm: React.FC<MagicEditFormProps> = ({
         {/* Generate Button */}
         <Button 
           onClick={handleMagicEditGenerate}
-          disabled={!magicEditPrompt.trim() || (isEnqueuing ?? false)}
+          disabled={!magicEditPrompt.trim() || isCreatingTasks}
           className="w-full"
-          variant={(justQueued ?? false) ? "success" : "default"}
+          variant={tasksCreated ? "success" : "default"}
         >
-          {(justQueued ?? false)
-            ? "Added to queue!"
-            : (isEnqueuing ?? false)
-              ? 'Creating Task...' 
+          {tasksCreated
+            ? "Tasks created!"
+            : isCreatingTasks
+              ? 'Creating tasks...' 
               : 'Generate'}
         </Button>
       </div>

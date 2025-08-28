@@ -39,7 +39,7 @@ const MagicEditLauncher: React.FC<MagicEditLauncherProps> = ({ imageUrl, imageDi
       {/* Dialog */}
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogContent 
-          className="sm:max-w-[500px]"
+          className="sm:max-w-[500px] z-[11000]"
           onOpenAutoFocus={(event) => {
             // Prevent auto-focus on mobile to avoid keyboard opening
             event.preventDefault();

@@ -175,6 +175,21 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       const path = (e as any).composedPath ? (e as any).composedPath() as any[] : undefined;
       const isInside = !!(contentEl && (path ? path.includes(contentEl) : (target && contentEl.contains(target))));
 
+      // NEW: Ignore interactions inside any Radix dialog content to avoid closing
+      // other dialogs like Magic Edit that appear above the lightbox.
+      const pathNodes: any[] = path || [];
+      const isInsideRadixDialog = pathNodes.some((n) => {
+        try {
+          return n instanceof Element && (n as Element).hasAttribute?.('data-radix-dialog-content');
+        } catch {
+          return false;
+        }
+      }) || (target instanceof Element && !!(target as Element).closest?.('[data-radix-dialog-content]'));
+
+      if (isInsideRadixDialog) {
+        return; // allow dialog interactions without closing lightbox
+      }
+
       // Allow all interactions inside the dialog content
       if (isInside) return;
 
