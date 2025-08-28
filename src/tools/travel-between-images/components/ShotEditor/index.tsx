@@ -33,6 +33,7 @@ import { getDimensions, DEFAULT_RESOLUTION } from './utils/dimension-utils';
 import { ASPECT_RATIO_TO_RESOLUTION, findClosestAspectRatio } from '@/shared/lib/aspectRatios';
 import { supabase } from '@/integrations/supabase/client';
 import { useAddImageToShot, useRemoveImageFromShot } from '@/shared/hooks/useShots';
+import { createTravelBetweenImagesTask, type TravelBetweenImagesTaskParams } from '@/shared/lib/tasks/travelBetweenImages';
 
 const ShotEditor: React.FC<ShotEditorProps> = ({
   selectedShotId,
@@ -1106,10 +1107,14 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     actions.setPendingFramePositions(newMap);
   }, [actions, state.pendingFramePositions]);
 
+  // Local state for steerable motion task creation
+  const [isSteerableMotionEnqueuing, setIsSteerableMotionEnqueuing] = useState(false);
+  const [steerableMotionJustQueued, setSteerableMotionJustQueued] = useState(false);
+
   // Check if generation should be disabled due to missing OpenAI API key for enhance prompt
   const openaiApiKey = getApiKey('openai_api_key');
   const isGenerationDisabledDueToApiKey = enhancePrompt && (!openaiApiKey || openaiApiKey.trim() === '');
-  const isGenerationDisabled = generationActions.isEnqueuing || isGenerationDisabledDueToApiKey;
+  const isGenerationDisabled = isSteerableMotionEnqueuing || isGenerationDisabledDueToApiKey;
 
   // Handle video generation
   const handleGenerateBatch = useCallback(async () => {
@@ -1225,15 +1230,24 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       requestBody.resolution = resolution;
     }
     
+    setIsSteerableMotionEnqueuing(true);
+    setSteerableMotionJustQueued(false);
+    
     try {
-      await generationActions.enqueueTasks([{
-        functionName: 'steerable-motion',
-        payload: requestBody,
-      }]);
+      // Use the new client-side travel between images task creation instead of calling the edge function
+      await createTravelBetweenImagesTask(requestBody as TravelBetweenImagesTaskParams);
       
-      // Success feedback is now handled by useTaskQueueNotifier
+      // Show success feedback and update state
+      setSteerableMotionJustQueued(true);
+      
+      // Reset success state after 2 seconds
+      setTimeout(() => setSteerableMotionJustQueued(false), 2000);
+      
     } catch (error) {
       console.error('Error creating video generation task:', error);
+      toast.error(`Failed to create video generation task: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsSteerableMotionEnqueuing(false);
     }
   }, [
     projectId,
@@ -1253,8 +1267,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     enhancePrompt,
     openaiApiKey,
     randomSeed,
-    loraManager.selectedLoras,
-    generationActions.enqueueTasks
+    loraManager.selectedLoras
   ]);
 
   // Opens the Generations pane focused on un-positioned images for the current shot
@@ -1463,13 +1476,13 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                             <Button 
                                 size="lg" 
                                 className="w-full" 
-                                variant={generationActions.justQueued ? "success" : "default"}
+                                variant={steerableMotionJustQueued ? "success" : "default"}
                                 onClick={handleGenerateBatch}
                                 disabled={isGenerationDisabled}
                             >
-                                {generationActions.justQueued
+                                {steerableMotionJustQueued
                                   ? "Added to queue!"
-                                  : generationActions.isEnqueuing 
+                                  : isSteerableMotionEnqueuing 
                                     ? 'Creating Tasks...' 
                                     : 'Generate Video'}
                             </Button>

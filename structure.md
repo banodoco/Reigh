@@ -39,6 +39,7 @@
 | **Database & Storage** | [db_and_storage.md](structure_detail/db_and_storage.md) | Schema map, migration workflow, storage buckets |
 | **Data Persistence** | [data_persistence.md](structure_detail/data_persistence.md) | State management patterns, hooks, storage layers |
 | **Task System** | [task_worker_lifecycle.md](structure_detail/task_worker_lifecycle.md) | Async task queue, worker polling, Edge Functions |
+| **Unified Task Creation** | [unified_task_creation.md](structure_detail/unified_task_creation.md) | Client-side task creation pattern, migration guide, authentication flow |
 | **Edge Functions** | [edge_functions.md](structure_detail/edge_functions.md) | Complete serverless function reference and API details |
 | **Adding Tools** | [adding_new_tool.md](structure_detail/adding_new_tool.md) | Step-by-step guide for new tool modules |
 | **Design Standards** | [design_motion_guidelines.md](structure_detail/design_motion_guidelines.md) | UI/UX patterns, motion, accessibility, mobile touch interactions |

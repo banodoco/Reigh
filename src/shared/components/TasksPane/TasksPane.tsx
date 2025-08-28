@@ -14,7 +14,6 @@ import { useToast } from '@/shared/hooks/use-toast';
 import { TasksPaneProcessingWarning } from '../ProcessingWarnings';
 import { TASK_STATUS, TaskStatus } from '@/types/database';
 import { useBottomOffset } from '@/shared/hooks/useBottomOffset';
-import { useLocation } from 'react-router-dom';
 
 const ITEMS_PER_PAGE = 50;
 
@@ -155,18 +154,43 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
 
   // Project context & task helpers
   const { selectedProjectId } = useProject();
-  const location = useLocation();
+  const shouldLoadTasks = !!selectedProjectId;
   
-  // Disable data loading when on video travel page to reduce mobile overhead
-  const isOnVideoTravelPage = location.pathname === '/tools/travel-between-images';
-  const shouldLoadTasks = !!selectedProjectId && !isOnVideoTravelPage;
+  // CRITICAL DEBUGGING: Track task loading conditions
+  console.log('[TasksPaneNotFetchingIssue]', {
+    selectedProjectId,
+    shouldLoadTasks,
+    selectedFilter,
+    currentPage,
+    timestamp: Date.now()
+  });
   
   // Get paginated tasks
-  const { data: paginatedData, isLoading: isPaginatedLoading } = usePaginatedTasks({
+  const { data: paginatedData, isLoading: isPaginatedLoading, error: paginatedError } = usePaginatedTasks({
     projectId: shouldLoadTasks ? selectedProjectId : null,
     status: STATUS_GROUPS[selectedFilter],
     limit: ITEMS_PER_PAGE,
     offset: (currentPage - 1) * ITEMS_PER_PAGE,
+  });
+  
+  // CRITICAL DEBUGGING: Track paginated tasks hook results
+  console.log('[TasksPaneNotFetchingIssue]', {
+    hookParams: {
+      projectId: shouldLoadTasks ? selectedProjectId : null,
+      status: STATUS_GROUPS[selectedFilter],
+      limit: ITEMS_PER_PAGE,
+      offset: (currentPage - 1) * ITEMS_PER_PAGE,
+    },
+    hookResults: {
+      isLoading: isPaginatedLoading,
+      hasData: !!paginatedData,
+      tasksCount: paginatedData?.tasks?.length || 0,
+      total: paginatedData?.total || 0,
+      totalPages: paginatedData?.totalPages || 0,
+      hasMore: paginatedData?.hasMore,
+      error: paginatedError,
+    },
+    timestamp: Date.now()
   });
   
   // Store previous pagination data to avoid flickering during loading
@@ -175,10 +199,20 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
   // Only update display data when we have new data (not during loading) or when initializing
   useEffect(() => {
     if ((!isPaginatedLoading && paginatedData) || (!displayPaginatedData && paginatedData)) {
+      console.log('[TasksPaneNotFetchingIssue] Updating display pagination data:', {
+        reason: !displayPaginatedData ? 'initial' : 'new_data',
+        previousTasksCount: displayPaginatedData?.tasks?.length || 0,
+        newTasksCount: paginatedData?.tasks?.length || 0,
+        isLoading: isPaginatedLoading,
+        selectedFilter,
+        currentPage,
+        timestamp: Date.now()
+      });
+      
       setDisplayPaginatedData(paginatedData);
       
       // CRITICAL DEBUGGING: Track pagination data in TasksPane
-      console.log('[TasksPaginationDebug] TasksPane received new pagination data:', {
+      console.log('[TasksPaneNotFetchingIssue] TasksPane received new pagination data:', {
         selectedFilter,
         currentPage,
         isLoading: isPaginatedLoading,
@@ -191,11 +225,34 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
         ISSUE_DETECTED: paginatedData?.tasks?.length === 0 && currentPage > 2 && (paginatedData?.total || 0) > 0,
         timestamp: Date.now()
       });
+    } else {
+      console.log('[TasksPaneNotFetchingIssue] Skipping display data update:', {
+        isLoading: isPaginatedLoading,
+        hasPaginatedData: !!paginatedData,
+        hasDisplayData: !!displayPaginatedData,
+        selectedFilter,
+        currentPage,
+        timestamp: Date.now()
+      });
     }
   }, [paginatedData, isPaginatedLoading, displayPaginatedData, selectedFilter, currentPage]);
   
   // Get status counts for indicators
-  const { data: statusCounts, isLoading: isStatusCountsLoading } = useTaskStatusCounts(shouldLoadTasks ? selectedProjectId : null);
+  const { data: statusCounts, isLoading: isStatusCountsLoading, error: statusCountsError } = useTaskStatusCounts(shouldLoadTasks ? selectedProjectId : null);
+  
+  // CRITICAL DEBUGGING: Track status counts hook results
+  console.log('[TasksPaneNotFetchingIssue]', {
+    hookParams: {
+      projectId: shouldLoadTasks ? selectedProjectId : null,
+    },
+    hookResults: {
+      isLoading: isStatusCountsLoading,
+      hasData: !!statusCounts,
+      statusCounts,
+      error: statusCountsError,
+    },
+    timestamp: Date.now()
+  });
   
   // Store previous status counts to avoid flickering during loading
   const [displayStatusCounts, setDisplayStatusCounts] = useState<typeof statusCounts>(statusCounts);
