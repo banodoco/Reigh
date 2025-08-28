@@ -150,13 +150,11 @@ serve(async (req) => {
         });
 
       if (claimError) {
-        const pathTag = runType === 'api' ? '[SERVICE_ROLE] [API_PATH]' : '[SERVICE_ROLE] [GPU_PATH]';
         console.error(`${pathTag} Claim error:`, claimError);
         throw claimError;
       }
 
       if (!claimResult || claimResult.length === 0) {
-        const pathTag = runType === 'api' ? '[SERVICE_ROLE] [API_PATH]' : '[SERVICE_ROLE] [GPU_PATH]';
         console.log(`${pathTag} No eligible tasks available`);
         
         // Add detailed debugging analysis
@@ -195,10 +193,9 @@ serve(async (req) => {
         
         return new Response(null, { status: 204 });
       }
-
-              const task = claimResult[0];
-        const pathTag = runType === 'api' ? '[SERVICE_ROLE] [API_PATH]' : '[SERVICE_ROLE] [GPU_PATH]';
-        console.log(`${pathTag} Successfully claimed task ${task.task_id}, task_type: ${task.task_type}, worker: ${workerId}`);
+      
+      const task = claimResult[0];
+      console.log(`${pathTag} Successfully claimed task ${task.task_id}, task_type: ${task.task_type}, worker: ${workerId}`);
       
       return new Response(JSON.stringify({
         task_id: task.task_id,
@@ -225,13 +222,11 @@ serve(async (req) => {
         });
 
       if (claimError) {
-        const pathTag = runType === 'api' ? '[PERSONAL_ACCESS_TOKEN] [API_PATH]' : '[PERSONAL_ACCESS_TOKEN] [GPU_PATH]';
         console.error(`${pathTag} Claim error:`, claimError);
         throw claimError;
       }
 
       if (!claimResult || claimResult.length === 0) {
-        const pathTag = runType === 'api' ? '[PERSONAL_ACCESS_TOKEN] [API_PATH]' : '[PERSONAL_ACCESS_TOKEN] [GPU_PATH]';
         console.log(`${pathTag} No eligible tasks available for user ${callerId}`);
         
         // Add detailed debugging analysis for user
@@ -266,10 +261,9 @@ serve(async (req) => {
         
         return new Response(null, { status: 204 });
       }
-
-              const task = claimResult[0];
-        const pathTag = runType === 'api' ? '[PERSONAL_ACCESS_TOKEN] [API_PATH]' : '[PERSONAL_ACCESS_TOKEN] [GPU_PATH]';
-        console.log(`${pathTag} Successfully claimed task ${task.task_id}, task_type: ${task.task_type}, user: ${callerId}`);
+      
+      const task = claimResult[0];
+      console.log(`${pathTag} Successfully claimed task ${task.task_id}, task_type: ${task.task_type}, user: ${callerId}`);
       
       return new Response(JSON.stringify({
         task_id: task.task_id,
