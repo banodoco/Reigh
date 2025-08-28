@@ -59,7 +59,7 @@ verify_jwt = false
 [functions.claim-next-task]
 verify_jwt = false
 
-[functions.create_task]
+[functions.create-task]
 verify_jwt = false
 
 [functions.generate-pat]
@@ -90,6 +90,9 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.stripe-webhook]
+verify_jwt = false
+
+[functions.task-counts]
 verify_jwt = false
 
 [functions.tasks-list]

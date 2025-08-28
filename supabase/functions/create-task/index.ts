@@ -20,7 +20,7 @@ function createCorsResponse(body: string, status: number = 200) {
  * 
  * POST /functions/v1/create-task
  * Headers: Authorization: Bearer <JWT or PAT>
- * Body: { task_id, params, task_type, project_id?, dependant_on? }
+ * Body: { task_id?, params, task_type, project_id?, dependant_on? } - task_id is optional, auto-generated if not provided
  * 
  * Returns:
  * - 200 OK with success message
@@ -49,7 +49,7 @@ function createCorsResponse(body: string, status: number = 200) {
   } catch  {
     return createCorsResponse("Invalid JSON body", 400);
   }
-  const { params, task_type, project_id, dependant_on } = body;
+  const { task_id, params, task_type, project_id, dependant_on } = body;
   if (!params || !task_type) {
     return createCorsResponse("params, task_type required", 400);
   }
@@ -157,20 +157,37 @@ function createCorsResponse(body: string, status: number = 200) {
   }
   // ─── 7. Insert row using admin client ───────────────────────────
   try {
-    const { data: insertedTask, error } = await supabaseAdmin.from("tasks").insert({
-      // Don't specify id - let database auto-generate UUID
+    if (task_id) {
+      console.log(`Creating task with client-provided ID: ${task_id}`);
+    } else {
+      console.log(`Creating task with auto-generated ID`);
+    }
+    
+    const insertObject = {
       params,
       task_type,
       project_id: finalProjectId,
       dependant_on: dependant_on ?? null,
       status: "Queued",
       created_at: new Date().toISOString()
-    }).select().single();
+    };
+    
+    // Only add id if client provided one
+    if (task_id) {
+      insertObject.id = task_id;
+    }
+    
+    const { data: insertedTask, error } = await supabaseAdmin.from("tasks").insert(insertObject).select().single();
     if (error) {
       console.error("create_task error:", error);
       return createCorsResponse(error.message, 500);
     }
     console.log(`Successfully created task ${insertedTask.id} for project ${finalProjectId} by ${isServiceRole ? 'service-role' : `user ${callerId}`}`);
+    
+    if (task_id) {
+      console.log(`Verification: Client sent task_id ${task_id}, database created ${insertedTask.id} - Match: ${task_id === insertedTask.id}`);
+    }
+    
     return createCorsResponse(JSON.stringify({ task_id: insertedTask.id, status: "Task queued" }), 200);
   } catch (error) {
     console.error("Unexpected error:", error);
