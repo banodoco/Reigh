@@ -58,13 +58,6 @@ serve(async (req) => {
   const runType = requestBody.run_type || null; // 'gpu', 'api', or null (no filtering)
 
   console.log("🧮 Task counts function enabled – returning queued, active, and per-user breakdown.");
-  
-  if (runType) {
-    console.log(`🎯 Run type filter enabled: ${runType}`);
-    if (runType === 'api') {
-      console.log(`[API_PATH] Starting API task counting`);
-    }
-  }
 
   // Create admin client for database operations
   const supabaseAdmin = createClient(supabaseUrl, serviceKey);
@@ -81,7 +74,7 @@ serve(async (req) => {
   
   if (token === serviceKey) {
     isServiceRole = true;
-    console.log("Direct service-role key match");
+    console.log("[SERVICE_ROLE] Direct service-role key match");
   }
 
   // 2) If not service key, try to decode as JWT and check role
@@ -98,18 +91,18 @@ serve(async (req) => {
         const role = payload.role || payload.app_metadata?.role;
         if (["service_role", "supabase_admin"].includes(role)) {
           isServiceRole = true;
-          console.log("JWT has service-role/admin role");
+          console.log("[SERVICE_ROLE] JWT has service-role/admin role");
         }
       }
     } catch (e) {
       // Not a valid JWT - will be treated as PAT
-      console.log("Token is not a valid JWT, treating as PAT");
+      console.log("[PERSONAL_ACCESS_TOKEN] Token is not a valid JWT, treating as PAT");
     }
   }
 
   // 3) USER TOKEN PATH - resolve callerId via user_api_token table
   if (!isServiceRole) {
-    console.log("Looking up token in user_api_token table...");
+    console.log("[PERSONAL_ACCESS_TOKEN] Looking up token in user_api_token table...");
     
     try {
       // Query user_api_tokens table to find user
@@ -125,7 +118,7 @@ serve(async (req) => {
       }
 
       callerId = data.user_id;
-      console.log(`Token resolved to user ID: ${callerId}`);
+      console.log(`[PERSONAL_ACCESS_TOKEN] Token resolved to user ID: ${callerId}`);
     } catch (e) {
       console.error("Error querying user_api_token:", e);
       return new Response("Token validation failed", { status: 403 });
@@ -137,16 +130,14 @@ serve(async (req) => {
       // ═══════════════════════════════════════════════════════════════
       // SERVICE ROLE PATH: Global task statistics across all users
       // ═══════════════════════════════════════════════════════════════
-      console.log("Service role: Computing global task statistics");
+      const pathTag = runType === 'api' ? '[SERVICE_ROLE] [API_PATH]' : '[SERVICE_ROLE] [GPU_PATH]';
+      console.log(`${pathTag} Computing global task statistics`);
       
       // Aggregated counts and per-user breakdown for service role
       // queued_only = count(include_active=false)
       // queued_plus_active = count(include_active=true)
       // active_only = diff (cloud-claimed, orchestrators excluded per migration)
-      console.log('[TaskCounts:CountDebug] Service-role: starting count computations');
-      if (runType === 'api') {
-        console.log(`[API_PATH] Service role count mode - calling count functions with run_type=${runType}`);
-      }
+      console.log(`${pathTag} [TaskCounts:CountDebug] Starting count computations`);
       const [countQueuedOnly, countQueuedPlusActive] = await Promise.all([
         supabaseAdmin.rpc('count_eligible_tasks_service_role', { p_include_active: false, p_run_type: runType }),
         supabaseAdmin.rpc('count_eligible_tasks_service_role', { p_include_active: true, p_run_type: runType })
@@ -164,9 +155,8 @@ serve(async (req) => {
       const queued_only = countQueuedOnly.data ?? 0;
       const queued_plus_active = countQueuedPlusActive.data ?? 0;
       
-      if (runType === 'api') {
-        console.log(`[API_PATH] Count results - queued_only: ${queued_only}, queued_plus_active: ${queued_plus_active}`);
-      }
+      const pathTag = runType === 'api' ? '[SERVICE_ROLE] [API_PATH]' : '[SERVICE_ROLE] [GPU_PATH]';
+      console.log(`${pathTag} Count results - queued_only: ${queued_only}, queued_plus_active: ${queued_plus_active}`);
       // Compute active_only directly from cloud In Progress tasks (exclude orchestrators)
       let active_only = 0;
       try {
@@ -174,7 +164,8 @@ serve(async (req) => {
           .from('tasks')
           .select('id', { count: 'exact', head: true })
           .eq('status', 'In Progress')
-          .not('worker_id', 'is', null);
+          .not('worker_id', 'is', null)
+          .not('task_type', 'ilike', '%orchestrator%');
         
         // Apply run_type filter if specified
         if (runType) {
@@ -199,27 +190,32 @@ serve(async (req) => {
         const { count: activeCloudNonOrchestrator } = await query;
         active_only = activeCloudNonOrchestrator ?? 0;
       } catch (e) {
-        console.log('[TaskCounts:CountDebug] Failed to compute active_only directly, falling back to diff method:', (e as any)?.message);
+        const pathTag = runType === 'api' ? '[SERVICE_ROLE] [API_PATH]' : '[SERVICE_ROLE] [GPU_PATH]';
+        console.log(`${pathTag} [TaskCounts:CountDebug] Failed to compute active_only directly, falling back to diff method:`, (e as any)?.message);
         active_only = Math.max(0, queued_plus_active - queued_only);
       }
-      console.log(`[TaskCounts:CountDebug] Service-role totals: queued_only=${queued_only}, active_only=${active_only}, queued_plus_active=${queued_plus_active}`);
+      const pathTag = runType === 'api' ? '[SERVICE_ROLE] [API_PATH]' : '[SERVICE_ROLE] [GPU_PATH]';
+      console.log(`${pathTag} [TaskCounts:CountDebug] Service-role totals: queued_only=${queued_only}, active_only=${active_only}, queued_plus_active=${queued_plus_active}`);
 
       // Per-user breakdown (cloud-claimed active only in function; may include orchestrators)
       let user_stats: any[] = [];
       try {
-        console.log('[TaskCounts:CountDebug] Calling analyze_task_availability_service_role(include_active=true)');
+        const pathTag = runType === 'api' ? '[SERVICE_ROLE] [API_PATH]' : '[SERVICE_ROLE] [GPU_PATH]';
+        console.log(`${pathTag} [TaskCounts:CountDebug] Calling analyze_task_availability_service_role(include_active=true)`);
         const { data: analysis } = await supabaseAdmin
           .rpc('analyze_task_availability_service_role', { p_include_active: true, p_run_type: runType });
         if (analysis && Array.isArray(analysis.user_stats) && analysis.user_stats.length > 0) {
           user_stats = analysis.user_stats;
-          console.log(`[TaskCounts:CountDebug] Analysis user_stats count=${user_stats.length}`);
+          console.log(`${pathTag} [TaskCounts:CountDebug] Analysis user_stats count=${user_stats.length}`);
         }
       } catch (e) {
-        console.log('Service role analyze_task_availability failed:', (e as any)?.message);
+        const pathTag = runType === 'api' ? '[SERVICE_ROLE] [API_PATH]' : '[SERVICE_ROLE] [GPU_PATH]';
+        console.log(`${pathTag} analyze_task_availability failed:`, (e as any)?.message);
       }
       // Fallback: always-on per-user capacity stats when analysis provides no breakdown
       if (user_stats.length === 0) {
-        console.log('[TaskCounts:CountDebug] Analysis returned no user_stats; using per_user_capacity_stats_service_role fallback');
+        const pathTag = runType === 'api' ? '[SERVICE_ROLE] [API_PATH]' : '[SERVICE_ROLE] [GPU_PATH]';
+        console.log(`${pathTag} [TaskCounts:CountDebug] Analysis returned no user_stats; using per_user_capacity_stats_service_role fallback`);
         try {
           const { data: perUser } = await supabaseAdmin
             .rpc('per_user_capacity_stats_service_role');
@@ -232,12 +228,12 @@ serve(async (req) => {
               allows_cloud: u.allows_cloud,
               at_limit: u.at_limit
             }));
-            console.log(`[TaskCounts:CountDebug] Fallback user_stats count=${user_stats.length}`);
+            console.log(`${pathTag} [TaskCounts:CountDebug] Fallback user_stats count=${user_stats.length}`);
             const preview = user_stats.slice(0, 5).map(u => `${u.user_id}: queued=${u.queued_tasks}, in_progress=${u.in_progress_tasks}, credits=${u.credits}, at_limit=${u.at_limit}`);
-            console.log('[TaskCounts:CountDebug] Fallback users preview:', preview);
+            console.log(`${pathTag} [TaskCounts:CountDebug] Fallback users preview:`, preview);
           }
         } catch (e) {
-          console.log('per_user_capacity_stats_service_role failed:', (e as any)?.message);
+          console.log(`${pathTag} per_user_capacity_stats_service_role failed:`, (e as any)?.message);
         }
       }
 
@@ -298,10 +294,11 @@ serve(async (req) => {
       // ═══════════════════════════════════════════════════════════════
       // USER TOKEN PATH: Task statistics for specific user
       // ═══════════════════════════════════════════════════════════════
-      console.log(`User token: Computing task statistics for user ${callerId}`);
+      const pathTag = runType === 'api' ? '[PERSONAL_ACCESS_TOKEN] [API_PATH]' : '[PERSONAL_ACCESS_TOKEN] [GPU_PATH]';
+      console.log(`${pathTag} Computing task statistics for user ${callerId}`);
       
       // Aggregated counts and details for a single user
-      console.log(`[TaskCounts:CountDebug] User ${callerId}: starting count computations`);
+      console.log(`${pathTag} [TaskCounts:CountDebug] User ${callerId}: starting count computations`);
       const [countQueuedOnly, countQueuedPlusActive] = await Promise.all([
         supabaseAdmin.rpc('count_eligible_tasks_user', { p_user_id: callerId, p_include_active: false, p_run_type: runType }),
         supabaseAdmin.rpc('count_eligible_tasks_user', { p_user_id: callerId, p_include_active: true, p_run_type: runType })
@@ -319,22 +316,25 @@ serve(async (req) => {
       const queued_only_capacity = countQueuedOnly.data ?? 0;
       const queued_plus_active_capacity = countQueuedPlusActive.data ?? 0;
       const active_only_capacity = Math.max(0, queued_plus_active_capacity - queued_only_capacity);
-      console.log(`[TaskCounts:CountDebug] User ${callerId} totals: queued_only_capacity=${queued_only_capacity}, active_only_capacity=${active_only_capacity}, queued_plus_active_capacity=${queued_plus_active_capacity}`);
+      const pathTag = runType === 'api' ? '[PERSONAL_ACCESS_TOKEN] [API_PATH]' : '[PERSONAL_ACCESS_TOKEN] [GPU_PATH]';
+      console.log(`${pathTag} [TaskCounts:CountDebug] User ${callerId} totals: queued_only_capacity=${queued_only_capacity}, active_only_capacity=${active_only_capacity}, queued_plus_active_capacity=${queued_plus_active_capacity}`);
 
       // Get eligible queued count and some context via analysis RPC
       let eligible_queued = 0;
       let user_info: any = {};
       try {
-        console.log(`[TaskCounts:CountDebug] User ${callerId}: calling analyze_task_availability_user(include_active=true)`);
+        const pathTag = runType === 'api' ? '[PERSONAL_ACCESS_TOKEN] [API_PATH]' : '[PERSONAL_ACCESS_TOKEN] [GPU_PATH]';
+        console.log(`${pathTag} [TaskCounts:CountDebug] User ${callerId}: calling analyze_task_availability_user(include_active=true)`);
         const { data: analysis } = await supabaseAdmin
           .rpc('analyze_task_availability_user', { p_user_id: callerId, p_include_active: true, p_run_type: runType });
         if (analysis) {
           eligible_queued = analysis.eligible_count ?? 0;
           user_info = analysis.user_info ?? {};
-          console.log(`[TaskCounts:CountDebug] User ${callerId}: eligible_queued=${eligible_queued}`);
+          console.log(`${pathTag} [TaskCounts:CountDebug] User ${callerId}: eligible_queued=${eligible_queued}`);
         }
       } catch (e) {
-        console.log('User analyze_task_availability failed:', (e as any)?.message);
+        const pathTag = runType === 'api' ? '[PERSONAL_ACCESS_TOKEN] [API_PATH]' : '[PERSONAL_ACCESS_TOKEN] [GPU_PATH]';
+        console.log(`${pathTag} User analyze_task_availability failed:`, (e as any)?.message);
       }
 
       // Compute live in-progress metrics for this user

@@ -233,7 +233,6 @@ export async function createTravelBetweenImagesTask(params: TravelBetweenImagesT
       task_type: "travel_orchestrator",
       params: {
         orchestrator_details: orchestratorPayload,
-        task_id: orchestratorTaskId, // Store the orchestrator ID in params, not as DB ID
       }
     });
 
