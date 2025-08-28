@@ -41,8 +41,8 @@ Each task type has its own helper module:
 ```
 src/shared/lib/tasks/
 ├── travelBetweenImages.ts    ✅ (migrated)
+├── imageGeneration.ts        ✅ (migrated)
 ├── magicEdit.ts              ⏳ (future)
-├── singleImage.ts            ⏳ (future)
 └── replicateUpscale.ts       ⏳ (future)
 ```
 
@@ -52,7 +52,48 @@ Single edge function that handles all task creation with dual authentication:
 - **JWT Authentication**: For frontend Supabase auth users
 - **PAT Authentication**: For API integrations (unchanged)
 
-## Migration Example: Travel Between Images
+## Migration Examples
+
+### Image Generation Migration
+
+The image generation tool was successfully migrated from the `single-image-generate` edge function to the unified approach, demonstrating the pattern for batch task creation.
+
+**Key Changes:**
+- Replaced `enqueueTasks` with `createBatchImageGenerationTasks`
+- Client-side parameter validation and processing
+- Preserved all original functionality including LoRA support
+- Added batch creation for efficiency
+- Maintained backward compatibility during transition
+
+**Before:**
+```typescript
+const taskPayloads = prompts.flatMap((prompt, idx) => {
+  return Array.from({ length: imagesPerPrompt }, () => ({
+    functionName: 'single-image-generate',
+    payload: {
+      project_id: selectedProjectId,
+      prompt: prompt.fullPrompt,
+      seed: Math.floor(Math.random() * 0x7fffffff),
+      loras: lorasMapped,
+    }
+  }));
+});
+await enqueueTasks(taskPayloads);
+```
+
+**After:**
+```typescript
+const batchParams: BatchImageGenerationTaskParams = {
+  project_id: selectedProjectId,
+  prompts: activePrompts,
+  imagesPerPrompt,
+  loras: lorasMapped,
+  shot_id: associatedShotId,
+};
+await createBatchImageGenerationTasks(batchParams);
+```
+
+### Travel Between Images Migration
 
 ### Step 1: Create Task-Specific Helper
 
@@ -220,10 +261,13 @@ Common error types:
 
 ## Future Enhancements
 
+### Completed Migrations
+1. **Travel Between Images** (`steerable-motion` → `travelBetweenImages.ts`) ✅
+2. **Image Generation** (`single-image-generate` → `imageGeneration.ts`) ✅
+
 ### Planned Migrations
 1. **Magic Edit** (`magic-edit` → `magicEdit.ts`)
-2. **Single Image Generation** (`single-image-generate` → `singleImage.ts`)
-3. **Replicate Upscale** (`replicate-upscale` → `replicateUpscale.ts`)
+2. **Replicate Upscale** (`replicate-upscale` → `replicateUpscale.ts`)
 
 ### Potential Improvements
 - **Batch task creation** for multiple tasks
@@ -236,30 +280,40 @@ Common error types:
 
 ### Simple Task Creation
 ```typescript
-import { createMagicEditTask } from '@/shared/lib/tasks/magicEdit';
+import { createImageGenerationTask } from '@/shared/lib/tasks/imageGeneration';
 
-const result = await createMagicEditTask({
+const result = await createImageGenerationTask({
   project_id: projectId,
-  prompt: "Transform this image",
-  image_url: sourceImage,
-  // ... other parameters
+  prompt: "A beautiful landscape with mountains",
+  seed: 12345,
+  loras: [{ path: "/models/lora1", strength: 0.8 }],
+  shot_id: shotId,
 });
 ```
 
 ### Batch Operations
 ```typescript
-const tasks = await Promise.all([
-  createSingleImageTask(params1),
-  createSingleImageTask(params2),
-  createSingleImageTask(params3),
-]);
+import { createBatchImageGenerationTasks } from '@/shared/lib/tasks/imageGeneration';
+
+// Efficient batch creation for multiple images
+const result = await createBatchImageGenerationTasks({
+  project_id: projectId,
+  prompts: [
+    { id: "1", fullPrompt: "A sunset over the ocean", shortPrompt: "Ocean sunset" },
+    { id: "2", fullPrompt: "Mountain landscape in winter", shortPrompt: "Winter mountains" },
+    { id: "3", fullPrompt: "City skyline at night", shortPrompt: "Night city" },
+  ],
+  imagesPerPrompt: 2,
+  loras: [{ path: "/models/lora1", strength: 0.8 }],
+  shot_id: shotId,
+});
 ```
 
 ### With Error Handling
 ```typescript
 try {
-  const result = await createTravelBetweenImagesTask(params);
-  setTaskId(result.task_id);
+  const result = await createBatchImageGenerationTasks(params);
+  console.log(`Created ${result.length} image generation tasks`);
   showSuccessState();
 } catch (error) {
   if (error.message.includes('Authentication')) {

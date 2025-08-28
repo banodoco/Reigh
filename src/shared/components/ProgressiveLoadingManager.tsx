@@ -23,7 +23,7 @@ interface ProgressiveLoadingManagerProps {
  * This component manages progressive loading and provides the showImageIndices
  * to its children via render prop pattern for clear data flow
  */
-export const ProgressiveLoadingManager: React.FC<ProgressiveLoadingManagerProps> = ({
+const ProgressiveLoadingManagerComponent: React.FC<ProgressiveLoadingManagerProps> = ({
   images,
   page,
   enabled = true,
@@ -61,3 +61,16 @@ export const ProgressiveLoadingManager: React.FC<ProgressiveLoadingManagerProps>
   // Render children with showImageIndices via render prop
   return <>{children(showImageIndices)}</>;
 };
+
+// Memoize with custom comparison for performance
+export const ProgressiveLoadingManager = React.memo(ProgressiveLoadingManagerComponent, (prevProps, nextProps) => {
+  return (
+    prevProps.images === nextProps.images &&
+    prevProps.page === nextProps.page &&
+    prevProps.enabled === nextProps.enabled &&
+    prevProps.isMobile === nextProps.isMobile &&
+    prevProps.isLightboxOpen === nextProps.isLightboxOpen &&
+    prevProps.instanceId === nextProps.instanceId &&
+    prevProps.onImagesReady === nextProps.onImagesReady
+  );
+});

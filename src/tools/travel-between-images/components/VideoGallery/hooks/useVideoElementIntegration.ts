@@ -26,6 +26,13 @@ export const useVideoElementIntegration = (
   useEffect(() => {
     if (!shouldLoad) return;
     
+    // Skip hover video integration on mobile devices
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    if (isMobile) {
+      console.log(`🎬 [VideoLifecycle] Video ${index + 1} - MOBILE_SKIP: Hover integration disabled on mobile`);
+      return;
+    }
+    
     const timeoutId = setTimeout(() => {
       const container = document.querySelector(`[data-video-id="${video.id}"]`);
       const videoElement = container?.querySelector('video') as HTMLVideoElement | null;

@@ -369,8 +369,14 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
       toast.error(`Failed to load projects: ${error.message}`);
       setProjects([]);
       setSelectedProjectIdState(null);
+    } finally {
+      // Clear timeout when fetch completes (success or error)
+      if (projectsTimeoutRef.current) {
+        clearTimeout(projectsTimeoutRef.current);
+        projectsTimeoutRef.current = undefined;
+      }
+      setIsLoadingProjects(false);
     }
-    setIsLoadingProjects(false);
   }, [updateUserPreferences]);
 
   const addNewProject = useCallback(async (projectData: { name: string; aspectRatio: string }) => {

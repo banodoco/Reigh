@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 
 import ImageGenerationForm, { ImageGenerationFormHandles, PromptEntry } from "../components/ImageGenerationForm";
+import { createBatchImageGenerationTasks, BatchImageGenerationTaskParams } from "@/shared/lib/tasks/imageGeneration";
 import { ImageGallery, GeneratedImageWithMetadata, DisplayableMetadata, MetadataLora } from "@/shared/components/ImageGallery";
 import SettingsModal from "@/shared/components/SettingsModal";
 import { toast } from "sonner";
@@ -439,6 +440,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
       generationMode: formData.generationMode,
       promptCount: formData.prompts?.length,
       imagesPerPrompt: formData.imagesPerPrompt,
+      hasBatchTaskParams: !!formData.batchTaskParams,
     });
 
     if (!selectedProjectId) {
@@ -446,7 +448,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
       return;
     }
 
-    const { generationMode, associatedShotId, ...restOfFormData } = formData;
+    const { generationMode, associatedShotId, batchTaskParams, ...restOfFormData } = formData;
 
     // Clear existing images but keep current page position
     if (restOfFormData.prompts.length * restOfFormData.imagesPerPrompt > 0) {
@@ -455,36 +457,36 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     }
 
     if (generationMode === 'wan-local') {
-      // Process all prompts for wan-local mode
-      const lorasMapped: Array<{ path: string; strength: number }> = (restOfFormData.loras || []).map((lora: any) => ({
-        path: lora.path,
-        strength: parseFloat(lora.scale ?? lora.strength) || 0.0,
-      }));
-
-      // Build an array of payloads – one per image task
-      const taskPayloads = restOfFormData.prompts.flatMap((promptEntry: PromptEntry, promptIdx: number) => {
-        return Array.from({ length: restOfFormData.imagesPerPrompt }, (_, imgIdx) => {
-          const globalIndex = promptIdx * restOfFormData.imagesPerPrompt + imgIdx;
-          return {
-            functionName: 'single-image-generate',
-            payload: {
-              project_id: selectedProjectId,
-              prompt: promptEntry.fullPrompt,
-              resolution: restOfFormData.determinedApiImageSize || undefined,
-              // Generate a random seed for each task to ensure diverse outputs (32-bit signed integer range)
-              seed: Math.floor(Math.random() * 0x7fffffff),
-              loras: lorasMapped,
-              shot_id: associatedShotId || undefined,
-            }
-          };
-        });
-      });
-
-      // Use the new unified task queue notifier
+      // Use the new unified task creation approach
       try {
-        await enqueueTasks(taskPayloads);
-        // Also invalidate generations to ensure they refresh when tasks complete
+        // Check if we have the new batch params, otherwise fallback to legacy format
+        if (batchTaskParams) {
+          console.log('[ImageGeneration] Using unified batch task creation');
+          await createBatchImageGenerationTasks(batchTaskParams);
+        } else {
+          // Legacy fallback - convert to unified format
+          console.warn('[ImageGeneration] Using legacy fallback - this should not happen in normal operation');
+          const lorasMapped: Array<{ path: string; strength: number }> = (restOfFormData.loras || []).map((lora: any) => ({
+            path: lora.path,
+            strength: parseFloat(lora.scale ?? lora.strength) || 0.0,
+          }));
+
+          const legacyBatchParams: BatchImageGenerationTaskParams = {
+            project_id: selectedProjectId,
+            prompts: restOfFormData.prompts || [],
+            imagesPerPrompt: restOfFormData.imagesPerPrompt || 1,
+            loras: lorasMapped,
+            shot_id: associatedShotId || undefined,
+            resolution: restOfFormData.determinedApiImageSize || undefined,
+          };
+
+          await createBatchImageGenerationTasks(legacyBatchParams);
+        }
+
+        // Invalidate generations to ensure they refresh when tasks complete
         queryClient.invalidateQueries({ queryKey: ['generations', selectedProjectId] });
+        
+        console.log('[ImageGeneration] Image generation tasks created successfully');
       } catch (error) {
         console.error('[ImageGeneration] Error creating tasks:', error);
         toast.error(error instanceof Error ? error.message : 'Failed to create tasks.');

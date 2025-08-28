@@ -29,6 +29,7 @@ import { useListShots, useCreateShot } from "@/shared/hooks/useShots";
 import CreateShotModal from "@/shared/components/CreateShotModal";
 import { useQueryClient } from '@tanstack/react-query';
 import { useShotNavigation } from "@/shared/hooks/useShotNavigation";
+import { BatchImageGenerationTaskParams } from "@/shared/lib/tasks/imageGeneration";
 
 // Lazy load modals to improve initial bundle size and performance
 const LazyLoraSelectorModal = React.lazy(() => 
@@ -726,7 +727,9 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         return;
     }
 
-    const generationData = {
+    // Build the unified task creation parameters
+    const batchTaskParams: BatchImageGenerationTaskParams = {
+      project_id: selectedProjectId!, // We know it's not null due to validation
       prompts: activePrompts.map(p => {
         const combinedFull = `${beforeEachPromptText ? `${beforeEachPromptText.trim()}, ` : ''}${p.fullPrompt.trim()}${afterEachPromptText ? `, ${afterEachPromptText.trim()}` : ''}`.trim();
         return {
@@ -736,13 +739,24 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         };
       }), 
       imagesPerPrompt, 
+      loras: lorasForApi,
+      shot_id: associatedShotId || undefined, // Convert null to undefined for the helper
+      // resolution and model_name will be resolved by the helper
+    };
+
+    // Legacy data structure for backward compatibility with existing onGenerate handler
+    const legacyGenerationData = {
+      prompts: batchTaskParams.prompts,
+      imagesPerPrompt, 
       loras: lorasForApi, 
       fullSelectedLoras: loraManager.selectedLoras,
       generationMode,
-      associatedShotId
+      associatedShotId,
+      // Add the new unified params for the updated handler
+      batchTaskParams
     };
     
-    onGenerate(generationData);
+    onGenerate(legacyGenerationData);
   };
   
   // Handle creating a new shot

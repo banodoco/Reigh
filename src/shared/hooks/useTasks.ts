@@ -273,8 +273,10 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
       }
       
       // GALLERY PATTERN: Get count and data separately, efficiently
+      // Skip expensive count during fast polling (when likely active tasks)
+      const shouldSkipCount = status?.some(s => s === TASK_STATUS.QUEUED || s === TASK_STATUS.IN_PROGRESS);
       
-      // 1. Get total count with lightweight query
+      // 1. Get total count with lightweight query (skip if fast polling likely)
       let countQuery = supabase
         .from('tasks')
         .select('*', { count: 'exact', head: true })
@@ -319,17 +321,20 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
         dataQuery = dataQuery.range(offset, offset + limit - 1);
       }
 
-      // Execute both queries
-      console.log('[TaskPollingDebug] Executing count and data queries...', {
+      // Execute queries (skip count for fast polling scenarios)
+      console.log('[TaskPollingDebug] Executing queries...', {
         projectId,
         page,
+        skipCount: shouldSkipCount,
         timestamp: Date.now()
       });
       
-      const [{ count, error: countError }, { data, error: dataError }] = await Promise.all([
-        countQuery,
+      const [countResult, { data, error: dataError }] = await Promise.all([
+        shouldSkipCount ? Promise.resolve({ count: null, error: null }) : countQuery,
         dataQuery
       ]);
+      
+      const { count, error: countError } = countResult;
       
       console.log('[TaskPollingDebug] Query results received:', {
         projectId,
@@ -423,9 +428,10 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
         });
       }
       
-      const total = count || 0;
+      // Use approximation when count is skipped during fast polling
+      const total = count !== null ? count : (paginatedTasks.length > 0 ? paginatedTasks.length * 10 : 0);
       const totalPages = Math.ceil(total / limit);
-      const hasMore = offset + limit < total;
+      const hasMore = count !== null ? offset + limit < total : paginatedTasks.length >= limit;
 
       const result = {
         tasks: paginatedTasks,

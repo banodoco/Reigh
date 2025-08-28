@@ -63,14 +63,14 @@ const getPreloadConfig = (): PreloadConfig => {
     return {
       maxCachedPages: 5, // Current + 2 adjacent pages each side
       preloadStrategy: 'moderate', 
-      maxConcurrentPreloads: 2,
+      maxConcurrentPreloads: 1, // Reduced from 2 to be safer on mobile
       thumbnailOnlyPreload: true,
       debounceTime: 800 // Increased from 600ms to reduce setTimeout violations
     };
   } else {
     return {
       maxCachedPages: 5, // Current + 2 adjacent pages each side
-      preloadStrategy: 'aggressive',
+      preloadStrategy: 'moderate', // Default to moderate instead of aggressive
       maxConcurrentPreloads: 2, // Reduced from 3 to prevent overwhelming the queue
       thumbnailOnlyPreload: false,
       debounceTime: 600 // Increased from 400ms to reduce setTimeout violations
@@ -621,8 +621,8 @@ export const smartPreloadImages = (
       thumbnailOnly: config.thumbnailOnlyPreload
     });
     
-    // Use setTimeout to create top-to-bottom loading effect with performance monitoring
-    performanceMonitoredTimeout(() => {
+    // Use requestIdleCallback for non-critical preloads (idx >= 3), setTimeout for critical ones
+    const schedulePreload = () => {
       const timeoutStartTime = performance.now();
       
       // Check if prefetch is still current before proceeding
@@ -649,12 +649,25 @@ export const smartPreloadImages = (
         }
       );
       
-      // Monitor setTimeout execution time
+      // Monitor execution time
       const timeoutDuration = performance.now() - timeoutStartTime;
       if (timeoutDuration > 16) {
-        console.warn(`[PerformanceMonitor] setTimeout in smartPreloadImages took ${timeoutDuration.toFixed(1)}ms (target: <16ms)`);
+        console.warn(`[PerformanceMonitor] preload execution took ${timeoutDuration.toFixed(1)}ms (target: <16ms)`);
       }
-    }, progressiveDelay, 'SmartPreloadImages progressive loading');
+    };
+
+    if (idx < 3) {
+      // Critical images - use setTimeout for immediate scheduling
+      performanceMonitoredTimeout(schedulePreload, progressiveDelay, 'SmartPreloadImages critical loading');
+    } else {
+      // Non-critical images - use requestIdleCallback when browser is idle
+      if (typeof requestIdleCallback !== 'undefined') {
+        requestIdleCallback(schedulePreload, { timeout: 5000 }); // 5s timeout fallback
+      } else {
+        // Fallback for browsers without requestIdleCallback
+        performanceMonitoredTimeout(schedulePreload, progressiveDelay + 100, 'SmartPreloadImages fallback loading');
+      }
+    }
     
     queuedCount++;
   });
