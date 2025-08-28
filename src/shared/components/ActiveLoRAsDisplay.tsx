@@ -37,11 +37,12 @@ const ActiveLoRAsDisplayComponent: React.FC<ActiveLoRAsDisplayProps> = ({
   renderHeaderActions,
 }) => {
   return (
-    <div className={`space-y-4 pt-2 ${className}`}>
-      <div className="flex items-center justify-between">
-        <Label>Active LoRAs:</Label>
-        {renderHeaderActions && renderHeaderActions()}
-      </div>
+    <div className={`space-y-4 ${className}`}>
+      {renderHeaderActions && (
+        <div className="flex items-center justify-start">
+          {renderHeaderActions()}
+        </div>
+      )}
       
       {selectedLoras.length === 0 ? (
         <div className="p-4 border rounded-md shadow-sm bg-slate-50/50 dark:bg-slate-800/30 text-center">
@@ -142,6 +143,7 @@ const ActiveLoRAsDisplayComponent: React.FC<ActiveLoRAsDisplayProps> = ({
                     max={2} 
                     step={0.05}
                     disabled={isGenerating}
+                    variant="secondary"
                   />
                 </div>
               </div>

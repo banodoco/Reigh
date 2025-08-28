@@ -163,6 +163,7 @@ export interface PromptInputRowProps {
   aiEditButtonIcon?: React.ReactNode;
   onSetActiveForFullView: (id: string | null) => void;
   isActiveForFullView: boolean;
+  forceExpanded?: boolean;
 }
 
 export const PromptInputRow: React.FC<PromptInputRowProps> = React.memo(({
@@ -171,6 +172,7 @@ export const PromptInputRow: React.FC<PromptInputRowProps> = React.memo(({
   aiEditButtonIcon,
   onSetActiveForFullView,
   isActiveForFullView,
+  forceExpanded = false,
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [isEditingFullPrompt, setIsEditingFullPrompt] = useState(false);
@@ -188,17 +190,17 @@ export const PromptInputRow: React.FC<PromptInputRowProps> = React.memo(({
   let currentPlaceholder = `Enter your detailed prompt #${index + 1}...`;
   let isShowingShort = !!effectiveShortPrompt;
 
-  if (isActiveForFullView || isEditingFullPrompt) {
+  if (isActiveForFullView || isEditingFullPrompt || forceExpanded) {
     displayText = isEditingFullPrompt ? localFullPrompt : promptEntry.fullPrompt;
     isShowingShort = false;
     if (isEditingFullPrompt) {
         currentPlaceholder = `Editing detailed prompt #${index + 1}...`;
-    } else if (isActiveForFullView && effectiveShortPrompt) {
-        currentPlaceholder = `Full prompt shown. (Summary: ${effectiveShortPrompt})`;
+    } else if ((isActiveForFullView || forceExpanded) && effectiveShortPrompt) {
+        currentPlaceholder = `Add text...`;
     } else {
-        currentPlaceholder = `Full prompt shown. Click to edit.`;
+        currentPlaceholder = `Add text...`;
     }
-  } else if (effectiveShortPrompt) {
+  } else if (effectiveShortPrompt && !forceExpanded) {
     displayText = effectiveShortPrompt;
     currentPlaceholder = `Click to see/edit full prompt... (Summary: ${effectiveShortPrompt})`;
     isShowingShort = true;
@@ -210,14 +212,14 @@ export const PromptInputRow: React.FC<PromptInputRowProps> = React.memo(({
       textareaRef.current.style.height = 'inherit';
       const scrollHeight = textareaRef.current.scrollHeight;
       let baseHeight = 60;
-      if (isShowingShort && !isActiveForFullView && !isEditingFullPrompt) {
+      if (isShowingShort && !isActiveForFullView && !isEditingFullPrompt && !forceExpanded) {
          baseHeight = Math.max(36, Math.min(scrollHeight, 60)); 
       } else { 
          baseHeight = Math.max(60, scrollHeight);
       }
       textareaRef.current.style.height = `${baseHeight}px`;
     }
-  }, [isShowingShort, isActiveForFullView, isEditingFullPrompt]);
+  }, [isShowingShort, isActiveForFullView, isEditingFullPrompt, forceExpanded]);
 
   useEffect(() => {
     autoResizeTextarea();
@@ -245,7 +247,7 @@ export const PromptInputRow: React.FC<PromptInputRowProps> = React.memo(({
 
   return (
     <div 
-      className="p-3 rounded-md shadow-sm bg-slate-50/30 dark:bg-slate-800/30"
+      className={`p-3 rounded-md shadow-sm bg-slate-50/30 dark:bg-slate-800/30 ${forceExpanded ? 'mt-0' : ''}`}
     >
       <div className="flex justify-between items-center">
         <Label htmlFor={`fullPrompt-${promptEntry.id}`} className="text-sm font-light">
@@ -307,7 +309,7 @@ export const PromptInputRow: React.FC<PromptInputRowProps> = React.memo(({
           onBlur={handleBlur}
           placeholder={currentPlaceholder}
           className={`mt-1 resize-none overflow-y-hidden ${
-            isShowingShort && !isActiveForFullView && !isEditingFullPrompt ? 'min-h-[36px] cursor-pointer' : 'min-h-[60px]'
+            isShowingShort && !isActiveForFullView && !isEditingFullPrompt && !forceExpanded ? 'min-h-[36px] cursor-pointer' : 'min-h-[60px]'
           }`}
           disabled={!hasApiKey || isGenerating}
           readOnly={!isEditingFullPrompt && isActiveForFullView && !!effectiveShortPrompt && !isShowingShort}
@@ -846,10 +848,13 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
             {/* Prompts Section */}
             <div className="space-y-4">
                 <div className="flex justify-between items-center mb-2">
-                  <Label className="text-lg font-light">Prompts</Label>
+                  <Label className="text-lg font-medium text-slate-700 dark:text-slate-200 border-l-8 border-blue-200/60 pl-3 py-1 relative">
+                    Prompts
+                    <span className="absolute top-1/2 left-full transform -translate-y-1/2 ml-2.5 w-12 h-2 bg-blue-200/60 rounded-full"></span>
+                  </Label>
                   <div className="flex items-center space-x-2">
-                    {/* Manage Prompts button (hidden when >3 prompts, but shown during skeleton based on last known count) */}
-                    {(!ready ? lastKnownPromptCount <= 3 : prompts.length <= 3) && (
+                    {/* Manage Prompts button (shown when >1 prompts) or Add Prompt button (shown when 1 prompt) */}
+                    {(!ready ? lastKnownPromptCount > 1 : prompts.length > 1) ? (
                       <TooltipProvider delayDuration={300}>
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -869,17 +874,37 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
-                    )}
+                    ) : ((!ready ? lastKnownPromptCount <= 1 : prompts.length <= 1) && (
+                      <TooltipProvider delayDuration={300}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => handleAddPrompt('form')}
+                              disabled={!hasApiKey || isGenerating || !ready}
+                              aria-label="Add Prompt"
+                            >
+                              <PlusCircle className="h-4 w-4 mr-0 sm:mr-2" />
+                              <span className="hidden sm:inline">Add Prompt</span>
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top">
+                            Add Prompt
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    ))}
                   </div>
                 </div>
 
-                <div className="space-y-3">
+                <div className={(!ready ? lastKnownPromptCount <= 1 : prompts.length <= 1) ? "" : "space-y-3"}>
                   {!ready ? (
                     // Use stored prompt count to show actual UI structure instead of skeleton
-                    lastKnownPromptCount <= 3 ? (
-                      // Show individual loading prompt boxes for small counts
-                      <div className="space-y-3">
-                        {Array.from({ length: Math.min(lastKnownPromptCount, 3) }, (_, i) => (
+                    lastKnownPromptCount <= 1 ? (
+                      // Show individual loading prompt boxes for single prompt (reduced spacing)
+                      <div className="-mt-4">
+                        {Array.from({ length: 1 }, (_, i) => (
                           <div key={i} className="p-3 rounded-md shadow-sm bg-slate-50/30 dark:bg-slate-800/30">
                             <div className="flex justify-between items-center mb-2">
                               <div className="text-sm font-light text-muted-foreground">Prompt #{i + 1}</div>
@@ -890,141 +915,85 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
                         ))}
                       </div>
                     ) : (
-                      // Show summary box with stored count
-                      <div className="p-3 border rounded-md text-center bg-slate-50/50">
+                      // Show summary box with stored count for multiple prompts (normal spacing)
+                      <div className="mt-2 p-3 border rounded-md text-center bg-slate-50/50 hover:border-primary/50 cursor-pointer flex items-center justify-center min-h-[60px] opacity-60" onClick={() => setIsPromptModalOpen(true)}>
                         <p className="text-sm text-muted-foreground">
                           <span className="font-light text-primary">{lastKnownPromptCount} prompts</span> currently active.
                         </p>
-                        <p className="text-xs text-primary">(Loading...)</p>
                       </div>
                     )
-                  ) : prompts.length <= 3 ? (
-                    prompts.map((promptEntry, index) => (
-                      <PromptInputRow
-                        key={promptEntry.id}
-                        promptEntry={promptEntry}
-                        onUpdate={handleUpdatePrompt}
-                        onRemove={handleRemovePrompt}
-                        canRemove={prompts.length > 1}
-                        isGenerating={isGenerating}
-                        hasApiKey={hasApiKey}
-                        index={index}
-                        onEditWithAI={() => { /* Placeholder for direct form AI edit */ }}
-                        aiEditButtonIcon={null} 
-                        onSetActiveForFullView={setDirectFormActivePromptId}
-                        isActiveForFullView={directFormActivePromptId === promptEntry.id}
-                      />
-                    ))
+                  ) : prompts.length <= 1 ? (
+                    // Single prompt case (reduced spacing)
+                    <div className="-mt-4">
+                      {prompts.map((promptEntry, index) => (
+                        <PromptInputRow
+                          key={promptEntry.id}
+                          promptEntry={promptEntry}
+                          onUpdate={handleUpdatePrompt}
+                          onRemove={handleRemovePrompt}
+                          canRemove={prompts.length > 1}
+                          isGenerating={isGenerating}
+                          hasApiKey={hasApiKey}
+                          index={index}
+                          onEditWithAI={() => { /* Placeholder for direct form AI edit */ }}
+                          aiEditButtonIcon={null} 
+                          onSetActiveForFullView={setDirectFormActivePromptId}
+                          isActiveForFullView={directFormActivePromptId === promptEntry.id}
+                          forceExpanded={prompts.length <= 1}
+                        />
+                      ))}
+                    </div>
                   ) : (
-                    <div className="p-3 border rounded-md text-center bg-slate-50/50 hover:border-primary/50 cursor-pointer" onClick={() => setIsPromptModalOpen(true)}>
+                    // Multiple prompts case (normal spacing)
+                    <div className="mt-2 p-3 border rounded-md text-center bg-slate-50/50 hover:border-primary/50 cursor-pointer flex items-center justify-center min-h-[60px]" onClick={() => setIsPromptModalOpen(true)}>
                         <p className="text-sm text-muted-foreground"><span className="font-light text-primary">{prompts.length} prompts</span> currently active.</p>
-                        <p className="text-xs text-primary">(Click to Edit)</p>
                     </div>
                   )}
                 </div>
 
-                                {/* Add Prompt button below list, larger, left-aligned - show when appropriate based on count */}
-                {(!ready ? lastKnownPromptCount <= 3 : ready && prompts.length <= 3) && (
-                  <div className="mt-3">
-                    <TooltipProvider delayDuration={300}>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => handleAddPrompt('form')}
-                            disabled={!hasApiKey || isGenerating || !ready}
-                            aria-label="Add Prompt"
-                          >
-                            <PlusCircle className="h-4 w-4 mr-2" />
-                            <span>Add Prompt</span>
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent side="top">
-                          Add Prompt
-                        </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </div>
-                )}
+
 
               {/* Before / After prompt modifiers */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="beforeEachPromptText">Before each prompt</Label>
+                  <Label htmlFor="beforeEachPromptText">
+                    {prompts.length <= 1 ? "Before prompt" : "Before each prompt"}
+                  </Label>
                   <Textarea
                     id="beforeEachPromptText"
                     value={beforeEachPromptText}
                     onChange={handleTextChange(setBeforeEachPromptText)}
                     placeholder="Text to prepend"
                     disabled={!hasApiKey || isGenerating}
-                    className="mt-1"
+                    className="mt-1 h-16 resize-none"
+                    rows={2}
                   />
                 </div>
                 <div>
-                  <Label htmlFor="afterEachPromptText">After each prompt</Label>
+                  <Label htmlFor="afterEachPromptText">
+                    {prompts.length <= 1 ? "After prompt" : "After each prompt"}
+                  </Label>
                   <Textarea
                     id="afterEachPromptText"
                     value={afterEachPromptText}
                     onChange={handleTextChange(setAfterEachPromptText)}
                     placeholder="Text to append"
                     disabled={!hasApiKey || isGenerating}
-                    className="mt-1"
+                    className="mt-1 h-16 resize-none"
+                    rows={2}
                   />
                 </div>
               </div>
 
-              {/* Images per Prompt Slider */}
-              <div className="mt-4">
-                <SliderWithValue
-                  label="Images per Prompt"
-                  value={imagesPerPrompt}
-                  onChange={handleSliderChange(setImagesPerPrompt)}
-                  min={1}
-                  max={16}
-                  step={1}
-                  disabled={!hasApiKey || isGenerating}
-                />
-              </div>
-            </div>
-          </div>
-          
-          {/* Right Column */}
-          <div className="flex-1">
-            {/* LoRA Section - Combined Header and Active List */}
-            <div className="space-y-4">
-            {/* LoRA Header (label + manage button) */}
-            <div className="space-y-2">
-              <Label className="text-lg font-light">LoRA Models</Label>
-              <div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => loraManager.setIsLoraModalOpen(true)}
-                  disabled={isGenerating}
-                >
-                  Add or Manage LoRA Models
-                </Button>
-              </div>
-            </div>
-
-            {/* Active LoRAs Display */}
-            <ActiveLoRAsDisplay
-              selectedLoras={loraManager.selectedLoras}
-              onRemoveLora={handleRemoveLora}
-              onLoraStrengthChange={handleLoraStrengthChange}
-              isGenerating={isGenerating}
-              availableLoras={availableLoras}
-              className=""
-              onAddTriggerWord={loraManager.handleAddTriggerWord}
-              renderHeaderActions={() => loraManager.renderHeaderActions?.(handleLoadProjectLoras)}
-            />
             </div>
 
             {/* Associated Shot Selector */}
-            <div className="space-y-4 mt-6">
+            <div className="space-y-2 mt-6">
             <div className="flex items-center gap-2">
-              <Label htmlFor="associatedShot" className="text-lg font-light">Associated with Shot</Label>
+              <Label htmlFor="associatedShot" className="text-lg font-medium text-slate-700 dark:text-slate-200 border-l-8 border-green-200/60 pl-3 py-1 relative">
+                Shot
+                <span className="absolute top-1/2 left-full transform -translate-y-1/2 ml-2.5 w-12 h-2 bg-green-200/60 rounded-full"></span>
+              </Label>
               {associatedShotId && (
                 <TooltipProvider>
                   <Tooltip>
@@ -1050,6 +1019,19 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
                   </Tooltip>
                 </TooltipProvider>
               )}
+                {/* Jump to animate shot link - positioned right after the X button */}
+                {associatedShotId && shots && (() => {
+                  const selectedShot = shots.find(shot => shot.id === associatedShotId);
+                  return selectedShot ? (
+                    <button
+                      type="button"
+                      onClick={() => navigateToShot(selectedShot)}
+                      className="text-xs font-light text-gray-500 hover:text-gray-700 hover:underline transition-colors duration-200 px-2 py-1 rounded-md hover:bg-gray-50 ml-2"
+                    >
+                      Jump to animate '{selectedShot.name}' →
+                    </button>
+                  ) : null;
+                })()}
             </div>
             {/* Select dropdown and create button */}
             <div className="flex items-center gap-2">
@@ -1099,22 +1081,81 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
               <span className="hidden sm:inline">Create New Shot</span>
             </Button>
             </div>
-            {/* Jump to animate shot link */}
-            {associatedShotId && shots && (() => {
-              const selectedShot = shots.find(shot => shot.id === associatedShotId);
-              return selectedShot ? (
-                <div className="flex justify-start">
-                  <button
-                    type="button"
-                    onClick={() => navigateToShot(selectedShot)}
-                    className="text-xs font-light text-gray-500 hover:text-gray-700 hover:underline transition-colors duration-200 px-2 py-1 rounded-md hover:bg-gray-50"
-                  >
-                    Jump to animate '{selectedShot.name}' →
-                  </button>
-                </div>
-              ) : null;
-            })()}
           </div>
+          </div>
+          
+          {/* Right Column */}
+          <div className="flex-1">
+            {/* Model Section */}
+            <div className="space-y-4 mb-6">
+              <div className="space-y-2">
+                <Label htmlFor="model" className="text-lg font-medium text-slate-700 dark:text-slate-200 border-l-8 border-orange-200/60 pl-3 py-1 relative">
+                  Model
+                  <span className="absolute top-1/2 left-full transform -translate-y-1/2 ml-2.5 w-12 h-2 bg-orange-200/60 rounded-full"></span>
+                </Label>
+                <Select
+                  value="wan-2.2"
+                  onValueChange={() => {}} // No-op since it's locked
+                  disabled={true} // Lock the dropdown
+                >
+                  <SelectTrigger id="model" className="opacity-75">
+                    <SelectValue placeholder="Select model..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="wan-2.2">Wan 2.2</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* LoRA Section - Combined Header and Active List */}
+            <div className="space-y-2">
+            <div className="space-y-1">
+              <Label className="text-lg font-medium text-slate-700 dark:text-slate-200 border-l-8 border-purple-200/60 pl-3 py-1 relative">
+                LoRAs
+                <span className="absolute top-1/2 left-full transform -translate-y-1/2 ml-2.5 w-12 h-2 bg-purple-200/60 rounded-full"></span>
+              </Label>
+            </div>
+
+            {/* Active LoRAs Display */}
+            <ActiveLoRAsDisplay
+              selectedLoras={loraManager.selectedLoras}
+              onRemoveLora={handleRemoveLora}
+              onLoraStrengthChange={handleLoraStrengthChange}
+              isGenerating={isGenerating}
+              availableLoras={availableLoras}
+              className=""
+              onAddTriggerWord={loraManager.handleAddTriggerWord}
+              renderHeaderActions={() => (
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => loraManager.setIsLoraModalOpen(true)}
+                    disabled={isGenerating}
+                  >
+                    Add or Manage LoRAs
+                  </Button>
+                  {loraManager.renderHeaderActions?.(handleLoadProjectLoras)}
+                </div>
+              )}
+            />
+            </div>
+          </div>
+        </div>
+
+        {/* Images per Prompt Slider - Center aligned above button */}
+        <div className="flex justify-center mt-6">
+          <div className="w-full md:w-1/2">
+            <SliderWithValue
+              label={actionablePromptsCount <= 1 ? "Images" : "Images per Prompt"}
+              value={imagesPerPrompt}
+              onChange={handleSliderChange(setImagesPerPrompt)}
+              min={1}
+              max={16}
+              step={1}
+              disabled={!hasApiKey || isGenerating}
+            />
           </div>
         </div>
 

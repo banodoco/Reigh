@@ -9,6 +9,7 @@ interface SliderWithValueProps {
   max?: number;
   step?: number;
   disabled?: boolean;
+  variant?: "primary" | "secondary";
 }
 
 const SliderWithValue = ({
@@ -19,6 +20,7 @@ const SliderWithValue = ({
   max = 100,
   step = 1,
   disabled = false,
+  variant = "primary",
 }: SliderWithValueProps) => {
   const handleValueChange = (values: number[]) => {
     onChange(values[0]);
@@ -41,6 +43,7 @@ const SliderWithValue = ({
           onValueChange={handleValueChange}
           className="flex-1"
           disabled={disabled}
+          variant={variant}
         />
       </div>
     </div>
