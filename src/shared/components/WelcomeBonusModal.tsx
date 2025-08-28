@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/shared/components/ui/dialog';
 import { Button } from '@/shared/components/ui/button';
 import { Gift, Sparkles, Smartphone, Download, ChevronRight, X, ChevronLeft, Palette, Users, Monitor, Coins, Settings, Check } from 'lucide-react';
-import { Checkbox } from '@/shared/components/ui/checkbox';
+
 import usePersistentState from '@/shared/hooks/usePersistentState';
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
 
@@ -315,54 +315,60 @@ const GenerationMethodStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
           Choose where you'd like to run AI generation. You can change this later in settings.
         </p>
 
-                 <div className="space-y-4">
-           <div 
-             className="p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
-             onClick={() => updateGenerationMethods({ inCloud: !inCloudChecked })}
-           >
-             <div className="flex items-center space-x-3">
-               <Checkbox
-                 id="in-cloud"
-                 checked={inCloudChecked}
-                 className="pointer-events-none"
-               />
-               <div className="flex-1">
-                 <label htmlFor="in-cloud" className="text-sm font-light leading-none cursor-pointer">
-                   In the cloud ☁️
-                 </label>
-                 <p className="text-xs text-muted-foreground mt-1">
-                   Easy setup, pay-per-use, works on any device
-                 </p>
-               </div>
-             </div>
-           </div>
-           
-           <div 
-             className="p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer relative"
-             onClick={() => updateGenerationMethods({ onComputer: !onComputerChecked })}
-           >
-             <div className="absolute top-2 right-2">
-               <span className="bg-green-500 text-white text-xs font-light px-2 py-1 rounded-full">
-                 Free
-               </span>
-             </div>
-             <div className="flex items-center space-x-3">
-               <Checkbox
-                 id="on-computer"
-                 checked={onComputerChecked}
-                 className="pointer-events-none"
-               />
-               <div className="flex-1">
-                 <label htmlFor="on-computer" className="text-sm font-light leading-none cursor-pointer">
-                   On my computer 💻
-                 </label>
-                 <p className="text-xs text-muted-foreground mt-1">
-                   Free to use, requires setup, need a good GPU
-                 </p>
-               </div>
-             </div>
-           </div>
-         </div>
+        <div className="flex justify-center">
+          <div className="relative inline-flex items-center bg-gray-200 rounded-full p-1 shadow-inner">
+            {/* Toggle track */}
+            <div className="flex">
+              {/* In the cloud button */}
+              <button
+                onClick={() => updateGenerationMethods({ inCloud: true, onComputer: false })}
+                className={`px-6 py-2 font-light rounded-full transition-all duration-200 whitespace-nowrap ${
+                  inCloudChecked && !onComputerChecked
+                    ? 'bg-white text-blue-600 shadow-sm text-base'
+                    : 'text-gray-600 hover:text-gray-800 text-sm'
+                }`}
+              >
+                In the cloud ☁️
+              </button>
+              
+              {/* On my computer button */}
+              <button
+                onClick={() => updateGenerationMethods({ onComputer: true, inCloud: false })}
+                className={`px-6 py-2 font-light rounded-full transition-all duration-200 whitespace-nowrap ${
+                  onComputerChecked && !inCloudChecked
+                    ? 'bg-white text-green-600 shadow-sm text-base'
+                    : 'text-gray-600 hover:text-gray-800 text-sm'
+                }`}
+              >
+                On my computer 💻
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Additional info below toggle */}
+        <div className="text-center space-y-3">
+          {inCloudChecked && !onComputerChecked && (
+            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+              <p className="text-sm text-blue-800 dark:text-blue-200 font-light">
+                ☁️ Easy setup, pay-per-use, works on any device
+              </p>
+            </div>
+          )}
+          
+          {onComputerChecked && !inCloudChecked && (
+            <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg relative">
+              <div className="absolute top-2 right-2">
+                <span className="bg-green-500 text-white text-xs font-light px-2 py-1 rounded-full">
+                  Free
+                </span>
+              </div>
+              <p className="text-sm text-green-800 dark:text-green-200 font-light">
+                💻 Free to use, requires setup, need a good GPU
+              </p>
+            </div>
+          )}
+        </div>
 
         {!onComputerChecked && !inCloudChecked && (
           <div className="text-center">

@@ -49,11 +49,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   initialTab = "generate-locally",
   creditsTab = "purchase",
 }) => {
-  // Use a fixed maxHeight so the modal always floats above panes without shrinking.
-  const modalStyle = useMemo(() => ({
-    // 64px gives a bit of breathing room above and below the viewport
-    maxHeight: `calc(100vh - 64px)`,
-  }), []);
+  // Let the modal use default centering behavior
+  const modalStyle = useMemo(() => ({}), []);
   const isMobile = useIsMobile();
   const { apiKeys, isLoading: isLoadingKeys, saveApiKeys, isUpdating } = useApiKeys();
   const { 
@@ -367,7 +364,7 @@ python worker.py --db-type supabase \\
       <DialogContent 
         style={modalStyle}
         className={`sm:max-w-2xl overflow-y-auto ${
-          isMobile ? 'my-5 max-h-[calc(100vh-2.5rem)]' : ''
+          isMobile ? 'max-h-[calc(100vh-4rem)] [&>button]:right-7' : ''
         }`}
       >
         <DialogHeader className="relative">
@@ -383,23 +380,26 @@ python worker.py --db-type supabase \\
               Sign out
             </Button>
           )}
+          {isMobile && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleSignOut}
+              className="absolute -top-3 -left-3 flex items-center gap-2 text-muted-foreground hover:text-foreground"
+              style={{ transform: 'translate(-8px, -8px)' }}
+            >
+              <LogOut className="h-4 w-4" />
+              Sign out
+            </Button>
+          )}
         </DialogHeader>
         
         {/* Generation Method Selection */}
         <div className="mb-2">
-          {/* Mobile header with sign out */}
+          {/* Mobile header */}
           {isMobile && (
-            <div className="flex items-center justify-between mb-4">
+            <div className="mb-4">
               <h3 className="font-light">How would you like to generate?</h3>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleSignOut}
-                className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
-              >
-                <LogOut className="h-4 w-4" />
-                Sign out
-              </Button>
             </div>
           )}
           
@@ -425,7 +425,7 @@ python worker.py --db-type supabase \\
                       {/* In the cloud button */}
                       <button
                         onClick={() => updateGenerationMethodsWithNotification({ inCloud: true, onComputer: false })}
-                        className={`px-4 py-2 font-light rounded-full transition-all duration-200 ${
+                        className={`px-6 py-2 font-light rounded-full transition-all duration-200 whitespace-nowrap ${
                           inCloudChecked && !onComputerChecked
                             ? 'bg-white text-blue-600 shadow-sm text-base'
                             : 'text-gray-600 hover:text-gray-800 text-sm'
@@ -437,7 +437,7 @@ python worker.py --db-type supabase \\
                       {/* On my computer button */}
                       <button
                         onClick={() => updateGenerationMethodsWithNotification({ onComputer: true, inCloud: false })}
-                        className={`px-4 py-2 font-light rounded-full transition-all duration-200 ${
+                        className={`px-6 py-2 font-light rounded-full transition-all duration-200 whitespace-nowrap ${
                           onComputerChecked && !inCloudChecked
                             ? 'bg-white text-green-600 shadow-sm text-base'
                             : 'text-gray-600 hover:text-gray-800 text-sm'
@@ -849,7 +849,7 @@ python worker.py --db-type supabase \\
                              onClick={handleCopyInstallCommand}
                              variant="outline"
                              size="default"
-                             className="w-full border-2"
+                             className="w-full border border-current"
                            >
                             {copiedInstallCommand ? (
                               "Copied!"
@@ -956,7 +956,7 @@ python worker.py --db-type supabase \\
                             onClick={handleCopyRunCommand}
                             variant="outline"
                             size="default"
-                            className="w-full border-2"
+                            className="w-full border border-current"
                           >
                             {copiedRunCommand ? (
                               "Copied!"
