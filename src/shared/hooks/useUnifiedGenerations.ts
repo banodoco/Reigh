@@ -379,18 +379,20 @@ export function useUnifiedGenerations(options: UseUnifiedGenerationsOptions) {
   const lastSuccessSigRef = React.useRef<string>("");
   const lastStateSigRef = React.useRef<string>("");
 
-  // [GalleryPollingDebug] Add comprehensive logging for useUnifiedGenerations
-  console.log('[GalleryPollingDebug:useUnifiedGenerations] Hook called with:', {
-    instanceId: hookInstanceIdRef.current,
-    mode: options.mode,
-    projectId: options.projectId,
-    shotId: options.shotId,
-    page: options.page,
-    limit: options.limit,
-    filters: options.filters,
-    enabled: options.enabled,
-    timestamp: Date.now()
-  });
+  // [GalleryPollingDebug] Add comprehensive logging for useUnifiedGenerations (gated to prevent spam)
+  if (options.enabled && options.projectId && (options.mode !== 'shot-specific' || options.shotId)) {
+    console.log('[GalleryPollingDebug:useUnifiedGenerations] Hook called with:', {
+      instanceId: hookInstanceIdRef.current,
+      mode: options.mode,
+      projectId: options.projectId,
+      shotId: options.shotId,
+      page: options.page,
+      limit: options.limit,
+      filters: options.filters,
+      enabled: options.enabled,
+      timestamp: Date.now()
+    });
+  }
   
   const {
     enabled = true,
@@ -403,7 +405,7 @@ export function useUnifiedGenerations(options: UseUnifiedGenerationsOptions) {
   
   {
     const cacheKeyStr = cacheKey.join(':');
-    if (prevCacheKeyRef.current !== cacheKeyStr) {
+    if (options.enabled && options.projectId && (options.mode !== 'shot-specific' || options.shotId) && prevCacheKeyRef.current !== cacheKeyStr) {
       prevCacheKeyRef.current = cacheKeyStr;
       console.log('[VideoGenMissing] useUnifiedGenerations hook called:', {
         instanceId: hookInstanceIdRef.current,
@@ -444,14 +446,16 @@ export function useUnifiedGenerations(options: UseUnifiedGenerationsOptions) {
   const query = useQuery({
     queryKey: cacheKey,
     queryFn: () => {
-      console.log('[VideoGenMissing] Executing unified generations query:', {
-        instanceId: hookInstanceIdRef.current,
-        mode: options.mode,
-        projectId: options.projectId,
-        shotId: options.shotId,
-        cacheKey: cacheKey.join(':'),
-        timestamp: Date.now()
-      });
+      if (options.enabled && options.projectId && (options.mode !== 'shot-specific' || options.shotId)) {
+        console.log('[VideoGenMissing] Executing unified generations query:', {
+          instanceId: hookInstanceIdRef.current,
+          mode: options.mode,
+          projectId: options.projectId,
+          shotId: options.shotId,
+          cacheKey: cacheKey.join(':'),
+          timestamp: Date.now()
+        });
+      }
       return fetchUnifiedGenerations(options);
     },
     enabled: enabled && !!options.projectId,
@@ -481,7 +485,7 @@ export function useUnifiedGenerations(options: UseUnifiedGenerationsOptions) {
   
   // Log query results (original logging preserved)
   React.useEffect(() => {
-    if (query.data) {
+    if (query.data && options.enabled && options.projectId && (options.mode !== 'shot-specific' || options.shotId)) {
       const cacheKeyStr = cacheKey.join(':');
       const sig = `${cacheKeyStr}:${(query.data.items as any[])?.length || 0}:${query.data.total || 0}:${query.data.hasMore ? 1 : 0}`;
       if (lastSuccessSigRef.current !== sig) {
@@ -505,7 +509,7 @@ export function useUnifiedGenerations(options: UseUnifiedGenerationsOptions) {
   React.useEffect(() => {
     const cacheKeyStr = cacheKey.join(':');
     const stateSig = `${cacheKeyStr}:${query.status}:${query.fetchStatus}:${query.isFetching ? 1 : 0}:${query.isStale ? 1 : 0}`;
-    if (lastStateSigRef.current !== stateSig) {
+    if (options.enabled && options.projectId && (options.mode !== 'shot-specific' || options.shotId) && lastStateSigRef.current !== stateSig) {
       lastStateSigRef.current = stateSig;
       console.log('[VideoGenMissing] Query state:', {
         instanceId: hookInstanceIdRef.current,
@@ -520,7 +524,7 @@ export function useUnifiedGenerations(options: UseUnifiedGenerationsOptions) {
   }, [cacheKey, query.status, query.fetchStatus, query.isFetching, query.isStale]);
 
   React.useEffect(() => {
-    if (query.error) {
+    if (query.error && options.enabled && options.projectId && (options.mode !== 'shot-specific' || options.shotId)) {
       console.error('[VideoGenMissing] Unified generations query error:', {
         mode: options.mode,
         projectId: options.projectId,

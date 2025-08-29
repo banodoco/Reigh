@@ -1,7 +1,7 @@
 // Full updated file
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useCreateTask, usePaginatedTasks } from './useTasks';
+import { useCreateTask, usePaginatedTasks, useTaskStatusCounts } from './useTasks';
 import { useQueuedFeedback } from './useQueuedFeedback';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -22,14 +22,9 @@ export const useTaskQueueNotifier = ({
 }: UseTaskQueueNotifierOptions) => {
   const queryClient = useQueryClient();
   const { mutateAsync: createTaskAsync } = useCreateTask({ showToast: !suppressPerTaskToast });
-  // Use paginated tasks count instead of loading all tasks
-  const { data: tasksData } = usePaginatedTasks({ 
-    projectId, 
-    status: undefined, 
-    page: 1, 
-    limit: 1 // Only need count, not actual data
-  });
-  const currentTaskCount = tasksData?.total ?? 0;
+  // Use task status counts instead to avoid cache collision with TasksPane usePaginatedTasks
+  const { data: statusCounts } = useTaskStatusCounts(projectId);
+  const currentTaskCount = (statusCounts?.pending || 0) + (statusCounts?.processing || 0) + (statusCounts?.completed || 0) + (statusCounts?.failed || 0);
   const { justQueued, triggerQueued } = useQueuedFeedback();
 
   const [isEnqueuing, setIsEnqueuing] = useState(false);
@@ -285,15 +280,15 @@ export const useTaskQueueNotifier = ({
       isEnqueuing,
       targetTotal,
       currentTaskCount,
-      tasksDataLoaded: !!tasksData,
+      statusCountsLoaded: !!statusCounts,
     });
 
     if (!isEnqueuing || targetTotal === null) {
       console.log(`[${Date.now()}] [TaskQueueNotifier] Watcher: Not enqueuing or no target, skipping`);
       return;
     }
-    if (!tasksData) {
-      console.log(`[${Date.now()}] [TaskQueueNotifier] Watcher: Tasks still loading`);
+    if (!statusCounts) {
+      console.log(`[${Date.now()}] [TaskQueueNotifier] Watcher: Status counts still loading`);
       return;
     }
 
@@ -307,7 +302,7 @@ export const useTaskQueueNotifier = ({
       console.log(`[${Date.now()}] [TaskQueueNotifier] 🎉 Target reached via fallback watcher`);
       handleSuccess(); // Use same success handler
     }
-  }, [tasksData, currentTaskCount, isEnqueuing, targetTotal, handleSuccess]);
+  }, [statusCounts, currentTaskCount, isEnqueuing, targetTotal, handleSuccess]);
 
   return { enqueueTasks, isEnqueuing, justQueued } as const;
 };

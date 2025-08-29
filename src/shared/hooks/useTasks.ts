@@ -98,23 +98,32 @@ export const useCreateTask = (options?: { showToast?: boolean }) => {
       
       // Show per-task success toast only if not suppressed
       if (showToast) {
-  
+        toast.success('Task created successfully');
       }
       
       // GALLERY PATTERN: Only invalidate first page where new tasks appear
       if (selectedProjectId) {
-        console.log('[PollingBreakageIssue] [useCreateTask] Using GALLERY PATTERN invalidation:', {
+        console.log('[TasksPaneCountMismatch] [useCreateTask] TASK CREATED - Triggering invalidations:', {
           projectId: selectedProjectId,
+          functionName: variables.functionName,
+          data,
           timestamp: Date.now()
         });
         
-        // Only invalidate the lightweight status counts
+        // Invalidate the lightweight status counts (badge updates immediately)
         queryClient.invalidateQueries({ queryKey: ['task-status-counts', selectedProjectId] });
         
-        // GALLERY PATTERN: Only invalidate first page (where new tasks appear)
-        queryClient.invalidateQueries({ queryKey: ['tasks', 'paginated', selectedProjectId, 1, 50, undefined] });
+        // CRITICAL: Invalidate ALL page-1 paginated queries for this project regardless of status/limit
+        // so the visible list refetches immediately (Processing, Succeeded, etc.)
+        queryClient.invalidateQueries({ queryKey: ['tasks', 'paginated', selectedProjectId, 1] });
         
-        // Do NOT invalidate other pages - they'll update via realtime
+        console.log('[TasksPaneCountMismatch] [useCreateTask] Invalidations triggered for:', {
+          statusCountsKey: ['task-status-counts', selectedProjectId],
+          paginatedKey: ['tasks', 'paginated', selectedProjectId, 1],
+          timestamp: Date.now()
+        });
+        
+        // Do NOT invalidate other pages - they'll update via realtime/polling
       } else {
         // Fallback: invalidate generic queries (should rarely happen)
         console.log('[useCreateTask] Invalidating generic tasks query');
@@ -250,10 +259,38 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
   const { projectId, status, limit = 50, offset = 0 } = params;
   const page = Math.floor(offset / limit) + 1;
   
+  // [TasksPaneCountMismatch] Debug unexpected limit values
+  if (limit < 10) {
+    console.warn('[TasksPaneCountMismatch]', {
+      context: 'usePaginatedTasks:UNEXPECTED_SMALL_LIMIT',
+      receivedParams: params,
+      limit,
+      offset,
+      page,
+      status,
+      projectId,
+      WARNING: 'Limit too small for processing view - check for cache collision',
+      timestamp: Date.now()
+    });
+  }
+  
   return useQuery<PaginatedTasksResponse, Error>({
     // CRITICAL: Use page-based cache keys like gallery
     queryKey: [TASKS_QUERY_KEY, 'paginated', projectId, page, limit, status],
     queryFn: async () => {
+      // [TasksPaneCountMismatch] Log function entry params to catch limit corruption
+      console.log('[TasksPaneCountMismatch]', {
+        context: 'usePaginatedTasks:queryFn-entry',
+        projectId,
+        page,
+        limit,
+        offset,
+        status,
+        WARNING: limit < 10 ? 'CORRUPTED_LIMIT_DETECTED' : null,
+        cacheKey: [TASKS_QUERY_KEY, 'paginated', projectId, page, limit, status].join(':'),
+        timestamp: Date.now()
+      });
+      
       console.log('[TaskPollingDebug] Starting paginated tasks query - GALLERY PATTERN:', {
         projectId,
         page,
@@ -314,7 +351,21 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
 
       if (needsCustomSorting) {
         // For Processing tasks: fetch more records to allow correct client-side sorting
-        const fetchLimit = Math.min(limit * PAGINATION_CONFIG.PROCESSING_FETCH_MULTIPLIER, PAGINATION_CONFIG.PROCESSING_MAX_FETCH);
+        // Defensive override: ensure we never under-fetch due to an unexpectedly small limit
+        const effectiveBaseLimit = Math.max(limit, PAGINATION_CONFIG.DEFAULT_LIMIT);
+        const fetchLimit = Math.min(effectiveBaseLimit * PAGINATION_CONFIG.PROCESSING_FETCH_MULTIPLIER, PAGINATION_CONFIG.PROCESSING_MAX_FETCH);
+        if (effectiveBaseLimit !== limit) {
+          console.warn('[TasksPaneCountMismatch]', {
+            context: 'usePaginatedTasks:limit-override-for-processing',
+            projectId,
+            page,
+            receivedLimit: limit,
+            effectiveBaseLimit,
+            fetchLimit,
+            reason: 'Processing view requires adequate sample size for client-side sort',
+            timestamp: Date.now()
+          });
+        }
         dataQuery = dataQuery.limit(fetchLimit);
       } else {
         // For Succeeded/Failed: use proper database pagination - no client sorting needed
@@ -792,7 +843,7 @@ export const useTaskStatusCounts = (projectId: string | null) => {
         projectId,
         countingRules: {
           parentOnly: true,
-          excludeTaskTypesLike: '%orchestrator%',
+          excludeTaskTypesLike: null,
           processingStatuses: ['Queued', 'In Progress'],
           recentWindowMs: 60 * 60 * 1000
         },
@@ -821,8 +872,7 @@ export const useTaskStatusCounts = (projectId: string | null) => {
           .select('id', { count: 'exact', head: true })
           .eq('project_id', projectId)
           .in('status', ['Queued', 'In Progress'])
-          .is('params->orchestrator_task_id_ref', null) // Only parent tasks
-          .not('task_type', 'like', '%orchestrator%'), // Exclude orchestrator tasks
+          .is('params->orchestrator_task_id_ref', null), // Only parent tasks; include orchestrators
           
         // Query for recent successes (last hour)
         supabase

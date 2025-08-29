@@ -176,11 +176,15 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
   
   // [TasksPaneCountMismatch] Track paginated tasks hook results
   console.log('[TasksPaneCountMismatch]', {
+    context: 'TasksPane:paginated-hook-params-and-results',
     hookParams: {
       projectId: shouldLoadTasks ? selectedProjectId : null,
       status: STATUS_GROUPS[selectedFilter],
       limit: ITEMS_PER_PAGE,
       offset: (currentPage - 1) * ITEMS_PER_PAGE,
+      ITEMS_PER_PAGE_CONSTANT: ITEMS_PER_PAGE,
+      currentPage,
+      selectedFilter,
     },
     hookResults: {
       isLoading: isPaginatedLoading,

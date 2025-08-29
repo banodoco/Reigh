@@ -27,7 +27,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { useTaskGenerationMapping } from '@/shared/lib/generationTaskBridge';
 import { SharedTaskDetails } from '@/tools/travel-between-images/components/SharedTaskDetails';
 import SharedMetadataDetails from '@/shared/components/SharedMetadataDetails';
-import { useUnifiedGenerations } from '@/shared/hooks/useUnifiedGenerations';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 
 // Function to create abbreviated task names for tight spaces
@@ -453,34 +452,10 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
 
 
   
-  // Fetch video outputs for completed travel tasks
-  const { data: videoGenerationsData } = useUnifiedGenerations({
-    projectId: selectedProjectId,
-    mode: 'shot-specific',
-    shotId: shotId || undefined,
-    page: 1,
-    limit: 1000,
-    filters: { mediaType: 'video' },
-    includeTaskData: false,
-    enabled: !!(taskInfo.isCompletedTravelTask && shotId && selectedProjectId),
-  });
-  
-  // Transform video outputs for lightbox
+  // Fetch video outputs for completed travel tasks - DISABLED to avoid per-item query spam in Tasks pane
   const videoOutputs: GenerationRow[] = React.useMemo(() => {
-    if (!videoGenerationsData?.items) return [];
-    return videoGenerationsData.items.map((item: any) => ({
-      id: item.id,
-      imageUrl: item.url,
-      location: item.url,
-      thumbUrl: item.thumbUrl,
-      type: 'video_travel_output',
-      created_at: item.createdAt,
-      metadata: item.metadata || {},
-      params: item.metadata || {},
-      project_id: selectedProjectId,
-      tasks: item.taskId ? [item.taskId] : [],
-    })) as GenerationRow[];
-  }, [videoGenerationsData?.items, selectedProjectId]);
+    return travelData.videoOutputs || [];
+  }, [travelData.videoOutputs]);
 
   // Handler for mobile tap - directly open content
   const handleMobileTap = (e: React.MouseEvent) => {
