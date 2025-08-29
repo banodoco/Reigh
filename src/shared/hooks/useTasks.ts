@@ -115,11 +115,19 @@ export const useCreateTask = (options?: { showToast?: boolean }) => {
         
         // CRITICAL: Invalidate ALL page-1 paginated queries for this project regardless of status/limit
         // so the visible list refetches immediately (Processing, Succeeded, etc.)
-        queryClient.invalidateQueries({ queryKey: ['tasks', 'paginated', selectedProjectId, 1] });
+        const invalidationResult1 = queryClient.invalidateQueries({ queryKey: ['tasks', 'paginated', selectedProjectId, 1] });
+        
+        // Also try more specific invalidation for Processing view
+        const processingKey = ['tasks', 'paginated', selectedProjectId, 1, 50, ['Queued', 'In Progress']];
+        const invalidationResult2 = queryClient.invalidateQueries({ queryKey: processingKey });
         
         console.log('[TasksPaneCountMismatch] [useCreateTask] Invalidations triggered for:', {
           statusCountsKey: ['task-status-counts', selectedProjectId],
           paginatedKey: ['tasks', 'paginated', selectedProjectId, 1],
+          processingSpecificKey: processingKey,
+          invalidationResult1,
+          invalidationResult2,
+          allQueriesInCache: Array.from(queryClient.getQueryCache().getAll().map(q => q.queryKey)),
           timestamp: Date.now()
         });
         
@@ -274,7 +282,7 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
     });
   }
   
-  return useQuery<PaginatedTasksResponse, Error>({
+  const query = useQuery<PaginatedTasksResponse, Error>({
     // CRITICAL: Use page-based cache keys like gallery
     queryKey: [TASKS_QUERY_KEY, 'paginated', projectId, page, limit, status],
     queryFn: async () => {
@@ -652,6 +660,48 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
     },
     refetchIntervalInBackground: true, // CRITICAL: Continue polling when tab is not visible
   });
+  
+  // [TasksPaneCountMismatch] CRITICAL DEBUG: Log the actual query state to catch cache/stale issues
+  const queryDebugInfo = {
+    context: 'usePaginatedTasks:query-state-debug',
+    projectId,
+    page,
+    limit,
+    status,
+    queryEnabled: !!projectId,
+    queryStatus: query.status,
+    queryFetchStatus: query.fetchStatus,
+    isLoading: query.isLoading,
+    isFetching: query.isFetching,
+    isStale: query.isStale,
+    isError: query.isError,
+    hasData: !!query.data,
+    dataTasksCount: query.data?.tasks?.length || 0,
+    dataAge: query.dataUpdatedAt ? Math.round((Date.now() - query.dataUpdatedAt) / 1000) + 's' : 'never',
+    errorMessage: query.error?.message,
+    cacheKey: [TASKS_QUERY_KEY, 'paginated', projectId, page, limit, status].join(':'),
+    timestamp: Date.now()
+  };
+  
+  console.log('[TasksPaneCountMismatch]', queryDebugInfo);
+  
+  // NUCLEAR OPTION: Force refetch if query has data but no tasks for Processing view
+  const isProcessingFilter = status && status.includes('Queued') && status.includes('In Progress');
+  const hasStaleEmptyData = query.data && query.data.tasks.length === 0 && !query.isFetching;
+  
+  if (isProcessingFilter && hasStaleEmptyData && query.status === 'success') {
+    console.error('[TasksPaneCountMismatch] NUCLEAR REFETCH: Processing query has empty data but is marked success!', {
+      queryDebugInfo,
+      forcingRefetch: true,
+      reason: 'Processing filter with empty data should refetch',
+      timestamp: Date.now()
+    });
+    
+    // Force immediate refetch
+    query.refetch();
+  }
+  
+  return query;
 };
 
 /**
