@@ -16,7 +16,7 @@ import {
 } from "@/shared/components/ui/select";
 import { DraggableImage } from "@/shared/components/DraggableImage";
 import { getDisplayUrl } from "@/shared/lib/utils";
-import { isImageCached } from "@/shared/lib/imageCacheManager";
+import { isImageCached, setImageCacheStatus } from "@/shared/lib/imageCacheManager";
 import { getImageLoadingStrategy } from '@/shared/lib/imageLoadingPriority';
 import { TimeStamp } from "@/shared/components/TimeStamp";
 import { useToast } from "@/shared/hooks/use-toast";
@@ -162,6 +162,10 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
     });
     setImageLoaded(true);
     setImageLoading(false);
+    // Mark this image as cached in the centralized cache to avoid future skeletons
+    try {
+      setImageCacheStatus(image, true);
+    } catch (_) {}
   }, [index, image.id, isPreloadedAndCached]);
   const MAX_RETRIES = 2;
   

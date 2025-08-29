@@ -891,28 +891,16 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
 
                 <div className={(!ready ? lastKnownPromptCount <= 1 : prompts.length <= 1) ? "" : "space-y-3"}>
                   {!ready ? (
-                    // Use stored prompt count to show actual UI structure instead of skeleton
-                    lastKnownPromptCount <= 1 ? (
-                      // Show individual loading prompt boxes for single prompt (normal spacing)
-                      <div className="mt-2">
-                        {Array.from({ length: 1 }, (_, i) => (
-                          <div key={i} className="p-3 rounded-md shadow-sm bg-slate-50/30 dark:bg-slate-800/30">
-                            <div className="flex justify-between items-center mb-2">
-                              <div className="text-sm font-light text-muted-foreground">Prompt #{i + 1}</div>
-                              <div className="h-6 w-6 bg-muted rounded animate-pulse" />
-                            </div>
-                            <div className="mt-1 min-h-[60px] bg-muted rounded animate-pulse" />
-                          </div>
-                        ))}
+                    // Simple skeleton loading state - one prompt field
+                    <div className="mt-2">
+                      <div className="p-3 rounded-md shadow-sm bg-slate-50/30 dark:bg-slate-800/30">
+                        <div className="flex justify-between items-center mb-2">
+                          <div className="h-4 w-16 bg-muted rounded animate-pulse"></div>
+                          <div className="h-6 w-6 bg-muted rounded animate-pulse"></div>
+                        </div>
+                        <div className="mt-1 min-h-[60px] bg-muted rounded animate-pulse"></div>
                       </div>
-                    ) : (
-                      // Show summary box with stored count for multiple prompts (normal spacing)
-                      <div className="mt-2 p-3 border rounded-md text-center bg-slate-50/50 hover:border-primary/50 cursor-pointer flex items-center justify-center min-h-[60px] opacity-60" onClick={() => setIsPromptModalOpen(true)}>
-                        <p className="text-sm text-muted-foreground">
-                          <span className="font-light text-primary">{lastKnownPromptCount} prompts</span> currently active.
-                        </p>
-                      </div>
-                    )
+                    </div>
                   ) : prompts.length <= 1 ? (
                     // Single prompt case (normal spacing)
                     <div className="mt-2">

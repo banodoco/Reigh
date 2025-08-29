@@ -15,15 +15,23 @@ export const ToolTypeFilter: React.FC<ToolTypeFilterProps> = ({
 }) => {
   return (
     <div className="flex items-center justify-center">
-      <div className="relative inline-flex items-center bg-gray-200 rounded-md p-1 shadow-inner">
+      <div className={`relative inline-flex items-center rounded-md p-1 shadow-inner ${
+        whiteText ? 'bg-zinc-700' : 'bg-gray-200'
+      }`}>
         {/* Toggle track */}
         <div className="flex">
           {/* Show specific tool button */}
           <button
             onClick={() => onToggle(true)}
-            className={`px-3 py-1 font-light rounded-sm transition-all duration-200 text-xs whitespace-nowrap text-gray-600 hover:text-gray-800 ${
+            className={`px-3 py-1 font-light rounded-sm transition-all duration-200 text-xs whitespace-nowrap ${
+              whiteText 
+                ? 'text-zinc-300 hover:text-white'
+                : 'text-gray-600 hover:text-gray-800'
+            } ${
               enabled
-                ? 'bg-white shadow-sm'
+                ? whiteText 
+                  ? 'bg-zinc-600 shadow-sm'
+                  : 'bg-white shadow-sm'
                 : ''
             }`}
           >
@@ -33,9 +41,15 @@ export const ToolTypeFilter: React.FC<ToolTypeFilterProps> = ({
           {/* Show all button */}
           <button
             onClick={() => onToggle(false)}
-            className={`px-3 py-1 font-light rounded-sm transition-all duration-200 text-xs whitespace-nowrap text-gray-600 hover:text-gray-800 ${
+            className={`px-3 py-1 font-light rounded-sm transition-all duration-200 text-xs whitespace-nowrap ${
+              whiteText 
+                ? 'text-zinc-300 hover:text-white'
+                : 'text-gray-600 hover:text-gray-800'
+            } ${
               !enabled
-                ? 'bg-white shadow-sm'
+                ? whiteText 
+                  ? 'bg-zinc-600 shadow-sm'
+                  : 'bg-white shadow-sm'
                 : ''
             }`}
           >

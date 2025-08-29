@@ -1,3 +1,4 @@
+import React from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Task, TaskStatus, TASK_STATUS } from '@/types/tasks';
 import { toast } from 'sonner';
@@ -686,17 +687,28 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
   console.log('[TasksPaneCountMismatch]', queryDebugInfo);
   
   // NUCLEAR OPTION: Force refetch if query has data but no tasks for Processing view
+  // SAFETY: Only trigger if data is genuinely stale (older than 30 seconds) to prevent infinite loops
   const isProcessingFilter = status && status.includes('Queued') && status.includes('In Progress');
   const hasStaleEmptyData = query.data && query.data.tasks.length === 0 && !query.isFetching;
+  const dataAge = query.dataUpdatedAt ? Date.now() - query.dataUpdatedAt : Infinity;
+  const isDataStale = dataAge > 30000; // 30 seconds
   
-  if (isProcessingFilter && hasStaleEmptyData && query.status === 'success') {
+  // Use React ref to prevent rapid refetches
+  const lastRefetchRef = React.useRef<number>(0);
+  const timeSinceLastRefetch = Date.now() - lastRefetchRef.current;
+  const canRefetch = timeSinceLastRefetch > 10000; // 10 seconds minimum between refetches
+  
+  if (isProcessingFilter && hasStaleEmptyData && query.status === 'success' && isDataStale && canRefetch) {
     console.error('[TasksPaneCountMismatch] NUCLEAR REFETCH: Processing query has empty data but is marked success!', {
       queryDebugInfo,
       forcingRefetch: true,
       reason: 'Processing filter with empty data should refetch',
+      dataAge: Math.round(dataAge / 1000) + 's',
+      timeSinceLastRefetch: Math.round(timeSinceLastRefetch / 1000) + 's',
       timestamp: Date.now()
     });
     
+    lastRefetchRef.current = Date.now();
     // Force immediate refetch
     query.refetch();
   }
