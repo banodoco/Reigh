@@ -848,9 +848,9 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
             {/* Prompts Section */}
             <div className="space-y-4">
                 <div className="flex justify-between items-center mb-2">
-                  <Label className="text-lg font-medium text-slate-700 dark:text-slate-200 border-l-8 border-blue-200/60 pl-3 py-1 relative">
+                  <Label className="text-lg font-medium text-slate-700 dark:text-slate-200 border-l-8 border-orange-200/60 pl-3 py-1 relative">
                     Prompts
-                    <span className="absolute top-1/2 left-full transform -translate-y-1/2 ml-2.5 w-12 h-2 bg-blue-200/60 rounded-full"></span>
+                    <span className="absolute top-1/2 left-full transform -translate-y-1/2 ml-2.5 w-12 h-2 bg-orange-200/60 rounded-full"></span>
                   </Label>
                   <div className="flex items-center space-x-2">
                     {/* Manage Prompts button (shown when >1 prompts) or Add Prompt button (shown when 1 prompt) */}
@@ -893,8 +893,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
                   {!ready ? (
                     // Use stored prompt count to show actual UI structure instead of skeleton
                     lastKnownPromptCount <= 1 ? (
-                      // Show individual loading prompt boxes for single prompt (reduced spacing)
-                      <div className="-mt-4">
+                      // Show individual loading prompt boxes for single prompt (normal spacing)
+                      <div className="mt-2">
                         {Array.from({ length: 1 }, (_, i) => (
                           <div key={i} className="p-3 rounded-md shadow-sm bg-slate-50/30 dark:bg-slate-800/30">
                             <div className="flex justify-between items-center mb-2">
@@ -914,8 +914,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
                       </div>
                     )
                   ) : prompts.length <= 1 ? (
-                    // Single prompt case (reduced spacing)
-                    <div className="-mt-4">
+                    // Single prompt case (normal spacing)
+                    <div className="mt-2">
                       {prompts.map((promptEntry, index) => (
                         <PromptInputRow
                           key={promptEntry.id}
@@ -1091,9 +1091,9 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
             {/* Model Section */}
             <div className="space-y-4 mb-6">
               <div className="space-y-2">
-                <Label htmlFor="model" className="text-lg font-medium text-slate-700 dark:text-slate-200 border-l-8 border-orange-200/60 pl-3 py-1 relative">
+                <Label htmlFor="model" className="text-lg font-medium text-slate-700 dark:text-slate-200 border-l-8 border-blue-200/60 pl-3 py-1 relative">
                   Model
-                  <span className="absolute top-1/2 left-full transform -translate-y-1/2 ml-2.5 w-12 h-2 bg-orange-200/60 rounded-full"></span>
+                  <span className="absolute top-1/2 left-full transform -translate-y-1/2 ml-2.5 w-12 h-2 bg-blue-200/60 rounded-full"></span>
                 </Label>
                 <div className="w-1/3">
                   <Select
@@ -1148,34 +1148,36 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
           </div>
         </div>
 
-        {/* Images per Prompt Slider - Center aligned above button */}
-        <div className="flex justify-center mt-6">
-          <div className="w-full md:w-1/2">
-            <SliderWithValue
-              label={actionablePromptsCount <= 1 ? "Images" : "Images per Prompt"}
-              value={imagesPerPrompt}
-              onChange={handleSliderChange(setImagesPerPrompt)}
-              min={1}
-              max={16}
-              step={1}
-              disabled={!hasApiKey || isGenerating}
-            />
+        {/* Generation Control Station - Distinct visual section */}
+        <div className="mt-8 p-6 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800/50 dark:to-slate-900/50 rounded-xl border border-slate-200 dark:border-slate-700 shadow-lg">
+          <div className="flex justify-center">
+            <div className="w-full md:w-2/3">
+              <SliderWithValue
+                label={actionablePromptsCount <= 1 ? "Images" : "Images per Prompt"}
+                value={imagesPerPrompt}
+                onChange={handleSliderChange(setImagesPerPrompt)}
+                min={1}
+                max={16}
+                step={1}
+                disabled={!hasApiKey || isGenerating}
+              />
+            </div>
           </div>
-        </div>
 
-        <div className="flex justify-center mt-4">
-          <Button
-            type="submit"
-            className="w-full md:w-1/2"
-            variant={justQueued ? "success" : "default"}
-            disabled={isGenerating || !hasApiKey || actionablePromptsCount === 0}
-          >
-            {justQueued
-              ? "Added to queue!"
-              : isGenerating
-                ? "Creating tasks..."
-                : `Generate ${imagesPerPrompt * actionablePromptsCount} ${imagesPerPrompt * actionablePromptsCount === 1 ? 'Image' : 'Images'}`}
-          </Button>
+          <div className="flex justify-center mt-4">
+            <Button
+              type="submit"
+              className="w-full md:w-1/2 transition-none disabled:opacity-100 disabled:saturate-100 disabled:brightness-100"
+              variant={justQueued ? "success" : "default"}
+              disabled={isGenerating || !hasApiKey || actionablePromptsCount === 0}
+            >
+              {justQueued
+                ? "Added to queue!"
+                : isGenerating
+                  ? "Creating tasks..."
+                  : `Generate ${imagesPerPrompt * actionablePromptsCount} ${imagesPerPrompt * actionablePromptsCount === 1 ? 'Image' : 'Images'}`}
+            </Button>
+          </div>
         </div>
       </form>
 

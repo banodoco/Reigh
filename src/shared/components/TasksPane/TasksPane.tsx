@@ -14,6 +14,7 @@ import { useToast } from '@/shared/hooks/use-toast';
 import { TasksPaneProcessingWarning } from '../ProcessingWarnings';
 import { TASK_STATUS, TaskStatus } from '@/types/database';
 import { useBottomOffset } from '@/shared/hooks/useBottomOffset';
+import { filterVisibleTasks, isTaskVisible } from '@/shared/lib/taskConfig';
 
 const ITEMS_PER_PAGE = 50;
 
@@ -156,8 +157,8 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
   const { selectedProjectId } = useProject();
   const shouldLoadTasks = !!selectedProjectId;
   
-  // CRITICAL DEBUGGING: Track task loading conditions
-  console.log('[TasksPaneNotFetchingIssue]', {
+  // [TasksPaneCountMismatch] Track task loading conditions
+  console.log('[TasksPaneCountMismatch]', {
     selectedProjectId,
     shouldLoadTasks,
     selectedFilter,
@@ -173,8 +174,8 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
     offset: (currentPage - 1) * ITEMS_PER_PAGE,
   });
   
-  // CRITICAL DEBUGGING: Track paginated tasks hook results
-  console.log('[TasksPaneNotFetchingIssue]', {
+  // [TasksPaneCountMismatch] Track paginated tasks hook results
+  console.log('[TasksPaneCountMismatch]', {
     hookParams: {
       projectId: shouldLoadTasks ? selectedProjectId : null,
       status: STATUS_GROUPS[selectedFilter],
@@ -199,7 +200,8 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
   // Only update display data when we have new data (not during loading) or when initializing
   useEffect(() => {
     if ((!isPaginatedLoading && paginatedData) || (!displayPaginatedData && paginatedData)) {
-      console.log('[TasksPaneNotFetchingIssue] Updating display pagination data:', {
+      console.log('[TasksPaneCountMismatch]', {
+        context: 'TasksPane:update-display-paginated-data',
         reason: !displayPaginatedData ? 'initial' : 'new_data',
         previousTasksCount: displayPaginatedData?.tasks?.length || 0,
         newTasksCount: paginatedData?.tasks?.length || 0,
@@ -211,8 +213,9 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
       
       setDisplayPaginatedData(paginatedData);
       
-      // CRITICAL DEBUGGING: Track pagination data in TasksPane
-      console.log('[TasksPaneNotFetchingIssue] TasksPane received new pagination data:', {
+      // [TasksPaneCountMismatch] Track pagination data in TasksPane
+      console.log('[TasksPaneCountMismatch]', {
+        context: 'TasksPane:new-paginated-data',
         selectedFilter,
         currentPage,
         isLoading: isPaginatedLoading,
@@ -225,8 +228,31 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
         ISSUE_DETECTED: paginatedData?.tasks?.length === 0 && currentPage > 2 && (paginatedData?.total || 0) > 0,
         timestamp: Date.now()
       });
+
+      // [TasksPaneCountMismatch] Mismatch detector between counts and visible items on page
+      try {
+        const tasks = paginatedData?.tasks || [];
+        const visibleTasks = filterVisibleTasks(tasks);
+        const hiddenTasks = tasks.filter(t => !isTaskVisible((t as any).taskType));
+        const processingOnPage = visibleTasks.filter(t => (t as any).status === 'Queued' || (t as any).status === 'In Progress');
+        console.log('[TasksPaneCountMismatch]', {
+          context: 'TasksPane:page-visibility-breakdown',
+          selectedFilter,
+          currentPage,
+          pageTasksCount: tasks.length,
+          visibleOnPage: visibleTasks.length,
+          hiddenOnPage: hiddenTasks.length,
+          hiddenTypesSample: hiddenTasks.slice(0, 5).map(t => ({ id: (t as any).id, taskType: (t as any).taskType, status: (t as any).status })),
+          processingOnPage: processingOnPage.length,
+          processingSample: processingOnPage.slice(0, 5).map(t => ({ id: (t as any).id, taskType: (t as any).taskType })),
+          timestamp: Date.now()
+        });
+      } catch (e) {
+        console.warn('[TasksPaneCountMismatch]', { context: 'TasksPane:page-visibility-breakdown:log-error', message: (e as Error)?.message });
+      }
     } else {
-      console.log('[TasksPaneNotFetchingIssue] Skipping display data update:', {
+      console.log('[TasksPaneCountMismatch]', {
+        context: 'TasksPane:skip-display-update',
         isLoading: isPaginatedLoading,
         hasPaginatedData: !!paginatedData,
         hasDisplayData: !!displayPaginatedData,
@@ -240,8 +266,9 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
   // Get status counts for indicators
   const { data: statusCounts, isLoading: isStatusCountsLoading, error: statusCountsError } = useTaskStatusCounts(shouldLoadTasks ? selectedProjectId : null);
   
-  // CRITICAL DEBUGGING: Track status counts hook results
-  console.log('[TasksPaneNotFetchingIssue]', {
+  // [TasksPaneCountMismatch] Track status counts hook results
+  console.log('[TasksPaneCountMismatch]', {
+    context: 'TasksPane:status-counts-hook-results',
     hookParams: {
       projectId: shouldLoadTasks ? selectedProjectId : null,
     },
@@ -266,6 +293,23 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
   
   // Use processing count from status counts as the single source of truth
   const cancellableTaskCount = displayStatusCounts?.processing || 0;
+
+  // [TasksPaneCountMismatch] Compare processing count badge to visible processing tasks on current page
+  try {
+    const pageTasks = displayPaginatedData?.tasks || [];
+    const visiblePageTasks = filterVisibleTasks(pageTasks);
+    const processingOnPage = visiblePageTasks.filter(t => (t as any).status === 'Queued' || (t as any).status === 'In Progress');
+    console.log('[TasksPaneCountMismatch]', {
+      context: 'TasksPane:processing-badge-vs-page',
+      selectedFilter,
+      currentPage,
+      processingBadgeCount: cancellableTaskCount,
+      processingOnPageCount: processingOnPage.length,
+      possibleCause: 'Counts exclude orchestrators; list includes them',
+      pageProcessingTypesSample: processingOnPage.slice(0, 3).map(t => ({ id: (t as any).id, taskType: (t as any).taskType })),
+      timestamp: Date.now()
+    });
+  } catch {}
 
   const cancelAllPendingMutation = useCancelAllPendingTasks();
   const { toast } = useToast();

@@ -158,7 +158,7 @@ export async function createImageGenerationTask(params: ImageGenerationTaskParam
     );
 
     // 3. Generate task ID for orchestrator payload (stored in params, not as DB ID)
-    const taskId = generateTaskId("single_image");
+    const taskId = generateTaskId("wan_2_2_t2i");
 
     // 4. Build orchestrator payload (preserve original logic exactly)
     const orchestratorPayload = buildImageGenerationPayload(
@@ -170,7 +170,7 @@ export async function createImageGenerationTask(params: ImageGenerationTaskParam
     // 5. Create task using unified create-task function (let DB auto-generate UUID)
     const result = await createTask({
       project_id: params.project_id,
-      task_type: "single_image",
+      task_type: "wan_2_2_t2i",
       params: {
         orchestrator_details: orchestratorPayload,
         task_id: taskId, // Store the orchestrator ID in params, not as DB ID

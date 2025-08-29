@@ -5,7 +5,7 @@ import TaskItem from './TaskItem';
 import { TaskStatus, Task } from '@/types/tasks';
 import { Button } from '@/shared/components/ui/button';
 import { ScrollArea } from "@/shared/components/ui/scroll-area"
-import { filterVisibleTasks } from '@/shared/lib/taskConfig';
+import { filterVisibleTasks, isTaskVisible } from '@/shared/lib/taskConfig';
 import { RefreshCw } from 'lucide-react';
 import { Skeleton } from '@/shared/components/ui/skeleton';
 import { FilterGroup } from './TasksPane';
@@ -90,7 +90,23 @@ const TaskList: React.FC<TaskListProps> = ({
   // NOTE: Sorting is now done at the query level in usePaginatedTasks for better performance
   const filteredTasks = useMemo(() => {
     if (!tasks) return [] as Task[];
-    return filterVisibleTasks(tasks);
+    const visible = filterVisibleTasks(tasks);
+    // [TasksPaneCountMismatch] Log when local filtering hides tasks that might be counted
+    try {
+      const hidden = tasks.filter(t => !isTaskVisible(t.taskType));
+      const processingVisible = visible.filter(t => t.status === 'Queued' || t.status === 'In Progress');
+      console.log('[TasksPaneCountMismatch]', {
+        context: 'TaskList:filter-visible-tasks',
+        activeFilter,
+        tasksCount: tasks.length,
+        visibleCount: visible.length,
+        hiddenCount: hidden.length,
+        hiddenTypesSample: hidden.slice(0, 5).map(t => ({ id: t.id, taskType: t.taskType, status: t.status })),
+        processingVisibleCount: processingVisible.length,
+        timestamp: Date.now()
+      });
+    } catch {}
+    return visible;
   }, [tasks]);
 
   const summaryMessage = useMemo(() => {

@@ -143,6 +143,9 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   }), [selectedProjectId]);
   
   const { enqueueTasks, isEnqueuing, justQueued } = useTaskQueueNotifier(taskQueueOptions);
+  const [localIsGenerating, setLocalIsGenerating] = useState(false);
+  const [localJustQueued, setLocalJustQueued] = useState(false);
+  const localQueuedTimeoutRef = useRef<number | null>(null);
   
   console.log(`${DEBUG_TAG} Render #${renderCount.current} - taskQueueNotifier states:`, {
     isEnqueuing,
@@ -464,6 +467,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     }
 
     if (generationMode === 'wan-local') {
+      setLocalIsGenerating(true);
       // Use the new unified task creation approach
       try {
         // Check if we have the new batch params, otherwise fallback to legacy format
@@ -494,9 +498,19 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
         queryClient.invalidateQueries({ queryKey: ['generations', selectedProjectId] });
         
         console.log('[ImageGeneration] Image generation tasks created successfully');
+        setLocalJustQueued(true);
+        if (localQueuedTimeoutRef.current) {
+          clearTimeout(localQueuedTimeoutRef.current);
+        }
+        localQueuedTimeoutRef.current = window.setTimeout(() => {
+          setLocalJustQueued(false);
+          localQueuedTimeoutRef.current = null;
+        }, 3000);
       } catch (error) {
         console.error('[ImageGeneration] Error creating tasks:', error);
         toast.error(error instanceof Error ? error.message : 'Failed to create tasks.');
+      } finally {
+        setLocalIsGenerating(false);
       }
 
     } else {
@@ -659,7 +673,9 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     }
   }, [targetShotInfo.targetShotIdForButton, selectedProjectId, addImageToShotWithoutPositionMutation, setLastAffectedShotId, queryClient]);
 
-  const isGenerating = isEnqueuing;
+  // Since the current mode is always 'wan-local', drive UI strictly from local state
+  const isGenerating = localIsGenerating;
+  const combinedJustQueued = localJustQueued;
 
   const scrollPosRef = useRef<number>(0);
 
@@ -953,6 +969,15 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     }
   }, [generationsResponse, isPageChange, isPageChangeFromBottom]);
 
+  useEffect(() => {
+    return () => {
+      if (localQueuedTimeoutRef.current) {
+        clearTimeout(localQueuedTimeoutRef.current);
+        localQueuedTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
   // [Strategic Debug] Final render decision summary
   console.log(`${DEBUG_TAG} === RENDER END #${renderCount.current} ===`, {
     finalDecision: {
@@ -1053,7 +1078,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
                     hasApiKey={hasValidFalApiKey}
                     apiKey={falApiKey}
                     openaiApiKey={openaiApiKey}
-                    justQueued={justQueued}
+                    justQueued={combinedJustQueued}
                   />
                 </div>
               </CollapsibleContent>

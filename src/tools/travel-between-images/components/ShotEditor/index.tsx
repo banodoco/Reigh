@@ -718,33 +718,19 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     }
   }, [accelerated, steerableMotionSettings.model_name, getRecommendedSteps, onBatchVideoStepsChange, actions]);
 
-  // Handle model changes with automatic settings adjustment
-  const handleModelChange = useCallback((modelName: string) => {
-    if (modelName === 'vace_14B_fake_cocktail_2_2') {
-      // Wan 2.2 specific settings - select vace_14B_fake_cocktail_2_2 as the actual model_name
-      onSteerableMotionSettingsChange({ 
-        model_name: 'vace_14B_fake_cocktail_2_2',
-        apply_causvid: false // Disable causvid for Wan 2.2
-      });
-      
-      // Disable accelerated mode for Wan 2.2 (which controls lighti2x LoRA)
-      setAccelerated(false);
-    } else {
-      // Wan 2.1 (default settings)
-      onSteerableMotionSettingsChange({ 
-        model_name: modelName,
-        apply_causvid: false // Keep causvid disabled for Wan 2.1 as well
-      });
-      
-      // Restore accelerated mode to default (true) for Wan 2.1 (which controls lighti2x LoRA)
-      setAccelerated(true);
-    }
+  // Handle model changes - temporarily restricted to Wan 2.1 only
+  const handleModelChange = useCallback((_modelName: string) => {
+    onSteerableMotionSettingsChange({ 
+      model_name: 'vace_14B',
+      apply_causvid: false
+    });
+    setAccelerated(true);
     // Note: Steps are automatically handled by the unified system when model changes
   }, [onSteerableMotionSettingsChange, setAccelerated]);
 
   // Ensure a valid model is always selected - default to Wan 2.1 if invalid/missing
   useEffect(() => {
-    const validModels = ['vace_14B', 'vace_14B_fake_cocktail_2_2'];
+    const validModels = ['vace_14B'];
     if (!validModels.includes(steerableMotionSettings.model_name)) {
       console.log(`[ShotEditor] Invalid model name "${steerableMotionSettings.model_name}", defaulting to Wan 2.1`);
       handleModelChange('vace_14B');
@@ -1420,7 +1406,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                             imageCount={simpleFilteredImages.length}
                         />
                         
-                        {/* Model Selection (Mobile) */}
+                        {/* Model Selection (Mobile) - restricted to Wan 2.1 */}
                         <div className="block lg:hidden mt-4">
                             <div className="space-y-4 p-4 border rounded-lg bg-card mb-4">
                                 <h3 className="font-light text-sm">Which model would you like to use:</h3>
@@ -1430,22 +1416,11 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                                             type="radio"
                                             name="model-mobile"
                                             value="vace_14B"
-                                            checked={steerableMotionSettings.model_name === 'vace_14B' || !['vace_14B', 'vace_14B_fake_cocktail_2_2'].includes(steerableMotionSettings.model_name)}
+                                            checked={steerableMotionSettings.model_name === 'vace_14B'}
                                             onChange={() => handleModelChange('vace_14B')}
                                             className="w-4 h-4 text-primary"
                                         />
                                         <span className="text-sm">Wan 2.1</span>
-                                    </label>
-                                    <label className="flex items-center space-x-2 cursor-pointer">
-                                        <input
-                                            type="radio"
-                                            name="model-mobile"
-                                            value="vace_14B_fake_cocktail_2_2"
-                                            checked={steerableMotionSettings.model_name === 'vace_14B_fake_cocktail_2_2'}
-                                            onChange={() => handleModelChange('vace_14B_fake_cocktail_2_2')}
-                                            className="w-4 h-4 text-primary"
-                                        />
-                                        <span className="text-sm">Wan 2.2</span>
                                     </label>
                                 </div>
                             </div>
@@ -1502,7 +1477,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
                     {/* Right Column: Model & LoRA Settings (Desktop) */}
                     <div className="hidden lg:block lg:w-80 order-1 lg:order-2">
-                        {/* Model Selection */}
+                        {/* Model Selection - restricted to Wan 2.1 */}
                         <div className="space-y-4 p-4 border rounded-lg bg-card mb-4">
                             <h3 className="font-light text-sm">Which model would you like to use:</h3>
                             <div className="space-y-2">
@@ -1511,36 +1486,13 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                                         type="radio"
                                         name="model"
                                         value="vace_14B"
-                                        checked={steerableMotionSettings.model_name === 'vace_14B' || !['vace_14B', 'vace_14B_fake_cocktail_2_2'].includes(steerableMotionSettings.model_name)}
+                                        checked={steerableMotionSettings.model_name === 'vace_14B'}
                                         onChange={() => handleModelChange('vace_14B')}
                                         className="w-4 h-4 text-primary"
                                     />
                                     <span className="text-sm">Wan 2.1</span>
                                 </label>
-                                <label className="flex items-center space-x-2 cursor-pointer">
-                                    <input
-                                        type="radio"
-                                        name="model"
-                                        value="vace_14B_fake_cocktail_2_2"
-                                        checked={steerableMotionSettings.model_name === 'vace_14B_fake_cocktail_2_2'}
-                                        onChange={() => handleModelChange('vace_14B_fake_cocktail_2_2')}
-                                        className="w-4 h-4 text-primary"
-                                    />
-                                    <span className="text-sm">Wan 2.2</span>
-                                </label>
                             </div>
-                            
-                            {/* Wan 2.2 Warning */}
-                            {steerableMotionSettings.model_name === 'vace_14B_fake_cocktail_2_2' && (
-                              <div className="p-3 border border-yellow-200 bg-yellow-50 dark:bg-yellow-900/20 dark:border-yellow-800 rounded-md">
-                                <div className="flex items-start">
-                                  <Info className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mr-2 mt-0.5 flex-shrink-0" />
-                                  <p className="text-sm text-yellow-700 dark:text-yellow-300">
-                                    <strong>Wan 2.2 is a work in progress.</strong> It currently has better motion and resolution but inferior image adherence.
-                                  </p>
-                                </div>
-                              </div>
-                            )}
                         </div>
                         
                         {/* LoRA Settings */}
@@ -1592,7 +1544,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             }}
           >
             {/* Center-aligned compact design with slightly transparent background */}
-            <div className={`relative overflow-hidden flex items-center justify-center space-x-2 ${isMobile ? 'p-3' : 'p-3'} bg-background/60 backdrop-blur-md shadow-xl transition-all duration-500 ease-out rounded-lg border border-border`}>
+            <div className={`relative overflow-hidden flex items-center justify-center space-x-2 ${isMobile ? 'p-3' : 'p-3'} bg-background/80 backdrop-blur-md shadow-xl transition-all duration-500 ease-out rounded-lg border border-border`}>
               {/* Subtle grain overlay to match GlobalHeader vibe */}
               <div className="pointer-events-none absolute inset-0 bg-film-grain opacity-10 animate-film-grain"></div>
               <Button 

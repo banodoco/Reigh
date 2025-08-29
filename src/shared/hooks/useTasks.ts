@@ -3,7 +3,7 @@ import { Task, TaskStatus, TASK_STATUS } from '@/types/tasks';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useProject } from '../contexts/ProjectContext';
-import { filterVisibleTasks } from '@/shared/lib/taskConfig';
+import { filterVisibleTasks, isTaskVisible } from '@/shared/lib/taskConfig';
 
 const TASKS_QUERY_KEY = 'tasks';
 
@@ -368,6 +368,31 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
       // Apply client-side filtering and sorting
       const allTasks = (data || []).map(mapDbTaskToTask);
       const visibleTasks = filterVisibleTasks(allTasks);
+      // [TasksPaneCountMismatch] Visibility breakdown to detect mismatches between counts and list
+      try {
+        const hiddenTasks = allTasks.filter(t => !isTaskVisible(t.taskType));
+        const processingVisible = visibleTasks.filter(t => t.status === TASK_STATUS.QUEUED || t.status === TASK_STATUS.IN_PROGRESS);
+        const processingVisibleOrchestrators = processingVisible.filter(t => t.taskType.includes('orchestrator'));
+        const processingVisibleNonOrchestrators = processingVisible.filter(t => !t.taskType.includes('orchestrator'));
+        console.log('[TasksPaneCountMismatch]', {
+          context: 'usePaginatedTasks:visibility-breakdown',
+          projectId,
+          page,
+          limit,
+          offset,
+          filterStatus: status,
+          rawFetchedCount: allTasks.length,
+          visibleCount: visibleTasks.length,
+          hiddenCount: hiddenTasks.length,
+          hiddenTaskTypesSample: hiddenTasks.slice(0, 5).map(t => ({ id: t.id, taskType: t.taskType, status: t.status })),
+          processingVisibleCount: processingVisible.length,
+          processingVisibleOrchestratorsCount: processingVisibleOrchestrators.length,
+          processingVisibleNonOrchestratorsCount: processingVisibleNonOrchestrators.length,
+          timestamp: Date.now()
+        });
+      } catch (e) {
+        console.warn('[TasksPaneCountMismatch]', { context: 'usePaginatedTasks:visibility-breakdown:log-error', message: (e as Error)?.message });
+      }
       
       let paginatedTasks: typeof allTasks;
       
@@ -439,6 +464,24 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
         hasMore,
         totalPages,
       };
+
+      // [TasksPaneCountMismatch] Final payload summary for potential mismatch detection
+      try {
+        console.log('[TasksPaneCountMismatch]', {
+          context: 'usePaginatedTasks:result-summary',
+          projectId,
+          page,
+          total,
+          totalPages,
+          tasksReturned: result.tasks.length,
+          processingReturned: result.tasks.filter(t => t.status === TASK_STATUS.QUEUED || t.status === TASK_STATUS.IN_PROGRESS).length,
+          processingReturnedTypesSample: result.tasks
+            .filter(t => t.status === TASK_STATUS.QUEUED || t.status === TASK_STATUS.IN_PROGRESS)
+            .slice(0, 5)
+            .map(t => ({ id: t.id, taskType: t.taskType })),
+          timestamp: Date.now()
+        });
+      } catch {}
 
       console.log('[TaskPollingDebug] Query completed successfully:', {
         projectId,
@@ -743,6 +786,18 @@ export const useTaskStatusCounts = (projectId: string | null) => {
   return useQuery({
     queryKey: ['task-status-counts', projectId],
     queryFn: async () => {
+      // [TasksPaneCountMismatch] Note on counting rules for correlation with list visibility
+      console.log('[TasksPaneCountMismatch]', {
+        context: 'useTaskStatusCounts:query-start',
+        projectId,
+        countingRules: {
+          parentOnly: true,
+          excludeTaskTypesLike: '%orchestrator%',
+          processingStatuses: ['Queued', 'In Progress'],
+          recentWindowMs: 60 * 60 * 1000
+        },
+        timestamp: Date.now()
+      });
       console.log('[PollingBreakageIssue] useTaskStatusCounts query executing - backup polling active:', {
         projectId,
         visibilityState: document.visibilityState,
@@ -869,6 +924,14 @@ export const useTaskStatusCounts = (projectId: string | null) => {
         recentFailures: failureCount,
       };
       
+      // [TasksPaneCountMismatch] Result snapshot to compare with list view
+      console.log('[TasksPaneCountMismatch]', {
+        context: 'useTaskStatusCounts:result',
+        projectId,
+        result,
+        timestamp: Date.now()
+      });
+
       console.log('[PollingBreakageIssue] useTaskStatusCounts query completed:', {
         projectId,
         result,
