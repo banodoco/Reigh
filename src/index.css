@@ -2230,3 +2230,35 @@
   }
 }
 
+/* Custom override for modal inputs */
+[data-radix-dialog-content] input,
+[data-radix-dialog-content] textarea,
+[data-radix-dialog-content] [data-radix-select-trigger] {
+  --input: #faf9f7;
+  --ring: var(--theme-cat-secondary);
+  border-color: #f5f3f0;
+}
+
+.dark [data-radix-dialog-content] input,
+.dark [data-radix-dialog-content] textarea,
+.dark [data-radix-dialog-content] [data-radix-select-trigger] {
+  --input: #4a453f;
+  --ring: var(--theme-cat-secondary);
+  border-color: #3d3831;
+}
+
+/* Special styling for main prompt text fields in PromptInputRow */
+[data-radix-dialog-content] textarea[id^="fullPrompt-"] {
+  --input: #f0f8ff !important;
+  --ring: var(--theme-cat-secondary) !important;
+  border-color: #e6f3ff !important;
+  background-color: #f0f8ff !important;
+}
+
+.dark [data-radix-dialog-content] textarea[id^="fullPrompt-"] {
+  --input: #2a3441 !important;
+  --ring: var(--theme-cat-secondary) !important;
+  border-color: #1e2834 !important;
+  background-color: #2a3441 !important;
+}
+

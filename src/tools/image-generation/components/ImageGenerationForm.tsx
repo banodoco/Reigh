@@ -855,25 +855,16 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
                   <div className="flex items-center space-x-2">
                     {/* Manage Prompts button (shown when >1 prompts) or Add Prompt button (shown when 1 prompt) */}
                     {(!ready ? lastKnownPromptCount > 1 : prompts.length > 1) ? (
-                      <TooltipProvider delayDuration={300}>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              onClick={() => setIsPromptModalOpen(true)}
-                              disabled={!hasApiKey || isGenerating || !ready}
-                              aria-label="Manage Prompts"
-                            >
-                              <Edit3 className="h-4 w-4 mr-0 sm:mr-2" />
-                              <span className="hidden sm:inline">Manage Prompts</span>
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent side="top">
-                            Manage Prompts
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setIsPromptModalOpen(true)}
+                        disabled={!hasApiKey || isGenerating || !ready}
+                        aria-label="Manage Prompts"
+                      >
+                        <Edit3 className="h-4 w-4 mr-0 sm:mr-2" />
+                        <span className="hidden sm:inline">Manage Prompts</span>
+                      </Button>
                     ) : ((!ready ? lastKnownPromptCount <= 1 : prompts.length <= 1) && (
                       <TooltipProvider delayDuration={300}>
                         <Tooltip>
@@ -946,7 +937,15 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
                   ) : (
                     // Multiple prompts case (normal spacing)
                     <div className="mt-2 p-3 border rounded-md text-center bg-slate-50/50 hover:border-primary/50 cursor-pointer flex items-center justify-center min-h-[60px]" onClick={() => setIsPromptModalOpen(true)}>
-                        <p className="text-sm text-muted-foreground"><span className="font-light text-primary">{prompts.length} prompts</span> currently active.</p>
+                      {actionablePromptsCount === prompts.length ? (
+                        <p className="text-sm text-muted-foreground">
+                          <span className="font-light text-primary">{prompts.length} prompts</span> currently active.
+                        </p>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">
+                          {prompts.length} prompts, <span className="font-light text-primary">{actionablePromptsCount} currently active</span>
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
@@ -994,6 +993,59 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
                 Shot
                 <span className="absolute top-1/2 left-full transform -translate-y-1/2 ml-2.5 w-12 h-2 bg-green-200/60 rounded-full"></span>
               </Label>
+            </div>
+            {/* Select dropdown and create button with aligned jump link */}
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <Select
+                  value={associatedShotId || "none"}
+                  onValueChange={(value) => {
+                    console.log('[ImageGenerationForm] Changing shot from', associatedShotId, 'to', value);
+                    markAsInteracted();
+                    const newShotId = value === "none" ? null : value;
+                    setAssociatedShotId(newShotId);
+                    
+                    // Initialize prompts for the new shot if they don't exist
+                    const newEffectiveShotId = newShotId || 'none';
+                    if (!promptsByShot[newEffectiveShotId]) {
+                      console.log('[ImageGenerationForm] Initializing prompts for shot:', newEffectiveShotId);
+                      setPromptsByShot(prev => ({
+                        ...prev,
+                        [newEffectiveShotId]: [{ id: generatePromptId(), fullPrompt: "", shortPrompt: "" }]
+                      }));
+                    } else {
+                      console.log('[ImageGenerationForm] Shot', newEffectiveShotId, 'already has', promptsByShot[newEffectiveShotId]?.length, 'prompts');
+                    }
+                  }}
+                  disabled={!hasApiKey || isGenerating}
+                >
+                  <SelectTrigger id="associatedShot" className="inline-flex w-full min-w-[200px]">
+                    <SelectValue placeholder="None" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {shots?.map((shot) => (
+                      <SelectItem key={shot.id} value={shot.id}>
+                        {shot.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {/* Jump to animate shot link - positioned at top right of Select dropdown */}
+                {associatedShotId && shots && (() => {
+                  const selectedShot = shots.find(shot => shot.id === associatedShotId);
+                  return selectedShot ? (
+                    <button
+                      type="button"
+                      onClick={() => navigateToShot(selectedShot)}
+                      className="absolute top-0 right-[35px] text-xs font-light text-gray-500 hover:text-gray-700 hover:underline transition-colors duration-200 px-2 py-1 rounded-md hover:bg-gray-50 -translate-y-1/2"
+                      style={{ top: '50%' }}
+                    >
+                      Jump to animate →
+                    </button>
+                  ) : null;
+                })()}
+              </div>
               {associatedShotId && (
                 <TooltipProvider>
                   <Tooltip>
@@ -1007,10 +1059,10 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
                           setAssociatedShotId(null);
                         }}
                         disabled={!hasApiKey || isGenerating}
-                        className="h-6 w-6 p-0 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                        className="h-8 w-8 p-0 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
                         aria-label="Clear shot selection"
                       >
-                        <X className="h-3 w-3" />
+                        <X className="h-4 w-4" />
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent side="top">
@@ -1019,67 +1071,17 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
                   </Tooltip>
                 </TooltipProvider>
               )}
-                {/* Jump to animate shot link - positioned right after the X button */}
-                {associatedShotId && shots && (() => {
-                  const selectedShot = shots.find(shot => shot.id === associatedShotId);
-                  return selectedShot ? (
-                    <button
-                      type="button"
-                      onClick={() => navigateToShot(selectedShot)}
-                      className="text-xs font-light text-gray-500 hover:text-gray-700 hover:underline transition-colors duration-200 px-2 py-1 rounded-md hover:bg-gray-50 ml-2"
-                    >
-                      Jump to animate '{selectedShot.name}' →
-                    </button>
-                  ) : null;
-                })()}
-            </div>
-            {/* Select dropdown and create button */}
-            <div className="flex items-center gap-2">
-            <Select
-              value={associatedShotId || "none"}
-              onValueChange={(value) => {
-                console.log('[ImageGenerationForm] Changing shot from', associatedShotId, 'to', value);
-                markAsInteracted();
-                const newShotId = value === "none" ? null : value;
-                setAssociatedShotId(newShotId);
-                
-                // Initialize prompts for the new shot if they don't exist
-                const newEffectiveShotId = newShotId || 'none';
-                if (!promptsByShot[newEffectiveShotId]) {
-                  console.log('[ImageGenerationForm] Initializing prompts for shot:', newEffectiveShotId);
-                  setPromptsByShot(prev => ({
-                    ...prev,
-                    [newEffectiveShotId]: [{ id: generatePromptId(), fullPrompt: "", shortPrompt: "" }]
-                  }));
-                } else {
-                  console.log('[ImageGenerationForm] Shot', newEffectiveShotId, 'already has', promptsByShot[newEffectiveShotId]?.length, 'prompts');
-                }
-              }}
-              disabled={!hasApiKey || isGenerating}
-            >
-              <SelectTrigger id="associatedShot" className="inline-flex flex-1 min-w-[200px]">
-                <SelectValue placeholder="None" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">None</SelectItem>
-                {shots?.map((shot) => (
-                  <SelectItem key={shot.id} value={shot.id}>
-                    {shot.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setIsCreateShotModalOpen(true)}
-              disabled={!hasApiKey || isGenerating}
-              className="gap-1"
-            >
-              <PlusCircle className="h-4 w-4" />
-              <span className="hidden sm:inline">Create New Shot</span>
-            </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsCreateShotModalOpen(true)}
+                disabled={!hasApiKey || isGenerating}
+                className="gap-1"
+              >
+                <PlusCircle className="h-4 w-4" />
+                <span className="hidden sm:inline">New Shot</span>
+              </Button>
             </div>
           </div>
           </div>
@@ -1093,18 +1095,20 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
                   Model
                   <span className="absolute top-1/2 left-full transform -translate-y-1/2 ml-2.5 w-12 h-2 bg-orange-200/60 rounded-full"></span>
                 </Label>
-                <Select
-                  value="wan-2.2"
-                  onValueChange={() => {}} // No-op since it's locked
-                  disabled={true} // Lock the dropdown
-                >
-                  <SelectTrigger id="model" className="opacity-75">
-                    <SelectValue placeholder="Select model..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="wan-2.2">Wan 2.2</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="w-1/3">
+                  <Select
+                    value="wan-2.2"
+                    onValueChange={() => {}} // No-op since it's locked
+                    disabled={true} // Lock the dropdown
+                  >
+                    <SelectTrigger id="model" className="opacity-75">
+                      <SelectValue placeholder="Select model..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="wan-2.2">Wan 2.2</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
 

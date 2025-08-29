@@ -56,9 +56,9 @@ const CreateShotModal: React.FC<CreateShotModalProps> = ({
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
+    <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent
-        className="sm:max-w-[425px]"
+        className="sm:max-w-[425px] bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800"
         onOpenAutoFocus={(event) => {
           if (isMobile) {
             event.preventDefault();

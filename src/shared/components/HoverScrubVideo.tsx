@@ -55,6 +55,10 @@ interface HoverScrubVideoProps extends Omit<React.HTMLAttributes<HTMLDivElement>
    * uses preload="none" for minimal overhead. Ideal for small previews.
    */
   thumbnailMode?: boolean;
+  /**
+   * Autoplays video on hover, disabling scrubbing (defaults to false).
+   */
+  autoplayOnHover?: boolean;
 }
 
 /**
@@ -76,6 +80,7 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
   disableScrubbing = false,
   loadOnDemand = false,
   thumbnailMode = false,
+  autoplayOnHover = false,
   ...rest
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -115,19 +120,15 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
   }, [isMobile, src, poster, disableScrubbing, thumbnailMode]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    // Skip mouse interactions on mobile devices or when scrubbing is disabled
-    if (isMobile || disableScrubbing) {
-      if (isMobile) {
-        if (process.env.NODE_ENV === 'development') {
-          console.log('[MobileVideoAutoplay] Mouse move detected on mobile (should be ignored)', {
-            src,
-            timestamp: Date.now(),
-            eventType: e.type
-          });
-        }
-      }
+    
+    // Skip hover interactions on mobile devices or when scrubbing is disabled
+    if (isMobile || thumbnailMode || disableScrubbing || autoplayOnHover) return;
+
+    if (loadOnDemand && !hasLoadedOnDemand) {
+      setHasLoadedOnDemand(true);
       return;
     }
+
     if (!videoRef.current || !containerRef.current || duration === 0) return;
 
     const rect = containerRef.current.getBoundingClientRect();
@@ -159,7 +160,7 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
         });
       }
     }, 150); // Start playing 150ms after mouse stops moving
-  }, [duration, isMobile, disableScrubbing]);
+  }, [duration, isMobile, thumbnailMode, disableScrubbing, loadOnDemand, hasLoadedOnDemand, autoplayOnHover]);
 
   const handleMouseEnter = useCallback(() => {
     // Skip hover interactions on mobile devices or when scrubbing is disabled
@@ -174,13 +175,18 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
       }
       return;
     }
+
+    if (autoplayOnHover) {
+      videoRef.current?.play();
+      return;
+    }
     
     isHoveringRef.current = true;
     if (videoRef.current) {
       // Don't start playing immediately, wait for mouse movement or timeout
       videoRef.current.pause();
     }
-  }, [isMobile, disableScrubbing]);
+  }, [isMobile, disableScrubbing, autoplayOnHover]);
 
   const handleMouseLeave = useCallback(() => {
     // Skip hover interactions on mobile devices or when scrubbing is disabled
@@ -192,6 +198,14 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
             timestamp: Date.now()
           });
         }
+      }
+      return;
+    }
+
+    if (autoplayOnHover) {
+      if (videoRef.current) {
+        videoRef.current.pause();
+        videoRef.current.currentTime = 0; // Reset to beginning
       }
       return;
     }
@@ -207,7 +221,7 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
       videoRef.current.pause();
       videoRef.current.currentTime = 0; // Reset to beginning
     }
-  }, [isMobile, disableScrubbing]);
+  }, [isMobile, disableScrubbing, autoplayOnHover]);
 
   const handleSpeedChange = (speed: number) => {
     if (videoRef.current) {

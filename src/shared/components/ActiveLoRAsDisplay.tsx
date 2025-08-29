@@ -66,7 +66,7 @@ const ActiveLoRAsDisplayComponent: React.FC<ActiveLoRAsDisplayProps> = ({
                         src={lora.previewImageUrl}
                         className="h-16 w-16 object-cover rounded-md border"
                         videoClassName="object-cover"
-                        
+                        autoplayOnHover
                         loop
                         muted
                       />
@@ -82,16 +82,9 @@ const ActiveLoRAsDisplayComponent: React.FC<ActiveLoRAsDisplayProps> = ({
                 <div className="flex-grow min-w-0">
                   <div className="flex justify-between items-start mb-1">
                     <div className="flex-grow min-w-0">
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Label htmlFor={`lora-strength-${lora.id}`} className="text-sm font-light truncate pr-2 cursor-help block">
-                            {lora.name}
-                          </Label>
-                        </TooltipTrigger>
-                        <TooltipContent side="top">
-                          <p>{lora.name}</p>
-                        </TooltipContent>
-                      </Tooltip>
+                      <Label htmlFor={`lora-strength-${lora.id}`} className="text-sm font-light truncate pr-2 block">
+                        {lora.name}
+                      </Label>
                       {(() => {
                         // Get trigger word from lora object or from availableLoras
                         const triggerWord = lora.trigger_word || 

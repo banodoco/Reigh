@@ -428,9 +428,8 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & { onClose: () => void
                                 src={image.url}
                                 className="h-28 w-auto rounded border p-0.5 hover:opacity-80 transition-opacity cursor-pointer"
                                 videoClassName="object-contain"
-                                thumbnailMode
-                                disableScrubbing
-                                preload="none"
+                                autoplayOnHover
+                                preload="metadata"
                                 loop
                                 muted
                               />
@@ -1125,7 +1124,7 @@ export const LoraSelectorModal: React.FC<LoraSelectorModalProps> = ({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent
-        className={`max-w-4xl flex flex-col max-h-[90vh] overflow-hidden ${
+        className={`max-w-4xl flex flex-col max-h-[90vh] overflow-hidden bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800 ${
           isMobile ? 'mx-2 my-5 max-h-[calc(100vh-2.5rem)]' : ''
         }`}
       >

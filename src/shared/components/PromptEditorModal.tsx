@@ -339,7 +339,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleFinalSaveAndClose()}>
       <DialogContent 
-        className={`max-w-4xl max-h-[90vh] ${
+        className={`max-w-4xl max-h-[90vh] bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800 ${
           isMobile ? 'my-5 flex flex-col justify-between p-0' : 'flex flex-col p-0'
         }`}
         onOpenAutoFocus={(event) => {
@@ -497,7 +497,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
         )}
 
         <div className={`${isMobile ? 'flex-shrink-0' : ''}`}>
-          <DialogFooter className={`p-6 pt-2 border-t ${isMobile ? 'pb-16' : ''}`}>
+          <DialogFooter className={`p-6 pt-6 border-t ${isMobile ? 'pb-16' : ''}`}>
            <Button variant="outline" onClick={handleInternalAddBlankPrompt} className="mr-auto">
             <PackagePlus className="mr-2 h-4 w-4" /> Add Blank Prompt
           </Button>
