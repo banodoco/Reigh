@@ -160,6 +160,13 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
       console.log(`[PromptEditorModal] Blank prompt added (manual). New prompt ID: ${newPromptEntry.id}. New list count: ${newPrompts.length}`);
       return newPrompts;
     });
+    
+    // Scroll to bottom after adding the prompt
+    setTimeout(() => {
+      if (scrollRef.current) {
+        scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
+      }
+    }, 100); // Small delay to ensure the new prompt has been rendered
   };
 
   const handleRemoveAllPrompts = () => {
@@ -498,9 +505,9 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
         )}
 
         <div className={`${isMobile ? 'flex-shrink-0' : ''}`}>
-          <DialogFooter className={`p-6 pt-6 border-t ${isMobile ? 'pb-16' : ''}`}>
-           <Button variant="outline" onClick={handleInternalAddBlankPrompt} className="mr-auto">
-            <PackagePlus className="mr-2 h-4 w-4" /> Add Blank Prompt
+          <DialogFooter className={`p-6 pt-6 border-t ${isMobile ? 'pb-16 flex-row justify-between' : ''}`}>
+           <Button variant="outline" onClick={handleInternalAddBlankPrompt} className={isMobile ? '' : 'mr-auto'}>
+            <PackagePlus className="mr-2 h-4 w-4" /> Blank Prompt
           </Button>
                       <Button onClick={handleFinalSaveAndClose}>Close</Button>
           </DialogFooter>
