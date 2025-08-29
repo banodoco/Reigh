@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from "react"
 import { Info, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/components/ui/select";
 import { useProject } from "@/shared/contexts/ProjectContext";
 import { toast } from "sonner";
 import { useUpdateShotImageOrder } from "@/shared/hooks/useShots";
@@ -1410,18 +1411,19 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                         <div className="block lg:hidden mt-4">
                             <div className="space-y-4 p-4 border rounded-lg bg-card mb-4">
                                 <h3 className="font-light text-sm">Which model would you like to use:</h3>
-                                <div className="space-y-2">
-                                    <label className="flex items-center space-x-2 cursor-pointer">
-                                        <input
-                                            type="radio"
-                                            name="model-mobile"
-                                            value="vace_14B"
-                                            checked={steerableMotionSettings.model_name === 'vace_14B'}
-                                            onChange={() => handleModelChange('vace_14B')}
-                                            className="w-4 h-4 text-primary"
-                                        />
-                                        <span className="text-sm">Wan 2.1</span>
-                                    </label>
+                                <div className="w-1/2">
+                                    <Select
+                                        value="wan-2.1"
+                                        onValueChange={() => {}} // No-op since it's locked
+                                        disabled={true} // Lock the dropdown
+                                    >
+                                        <SelectTrigger id="model-mobile" className="opacity-75">
+                                            <SelectValue placeholder="Select model..." />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="wan-2.1">Wan 2.1</SelectItem>
+                                        </SelectContent>
+                                    </Select>
                                 </div>
                             </div>
                         </div>
@@ -1480,18 +1482,19 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                         {/* Model Selection - restricted to Wan 2.1 */}
                         <div className="space-y-4 p-4 border rounded-lg bg-card mb-4">
                             <h3 className="font-light text-sm">Which model would you like to use:</h3>
-                            <div className="space-y-2">
-                                <label className="flex items-center space-x-2 cursor-pointer">
-                                    <input
-                                        type="radio"
-                                        name="model"
-                                        value="vace_14B"
-                                        checked={steerableMotionSettings.model_name === 'vace_14B'}
-                                        onChange={() => handleModelChange('vace_14B')}
-                                        className="w-4 h-4 text-primary"
-                                    />
-                                    <span className="text-sm">Wan 2.1</span>
-                                </label>
+                            <div className="w-1/2">
+                                <Select
+                                    value="wan-2.1"
+                                    onValueChange={() => {}} // No-op since it's locked
+                                    disabled={true} // Lock the dropdown
+                                >
+                                    <SelectTrigger id="model" className="opacity-75">
+                                        <SelectValue placeholder="Select model..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="wan-2.1">Wan 2.1</SelectItem>
+                                    </SelectContent>
+                                </Select>
                             </div>
                         </div>
                         
