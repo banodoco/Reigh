@@ -516,9 +516,9 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & { onClose: () => void
           
           {/* Main floating control panel with vintage styling */}
           <div className="wes-vintage-card mx-0 relative overflow-visible border-2 border-wes-vintage-gold/50 backdrop-blur-xl pointer-events-auto">
-            {/* Vintage film overlay pattern */}
-            <div className="absolute inset-0 wes-texture opacity-20" />
-            <div className="absolute inset-0 bg-gradient-to-r from-wes-cream/90 via-wes-pink/20 to-wes-lavender/30 animate-gradient-shift" />
+            {/* Vintage film overlay pattern (hidden on mobile to avoid masking) */}
+            <div className="absolute inset-0 wes-texture opacity-20 hidden sm:block" />
+            <div className="absolute inset-0 bg-gradient-to-r from-wes-cream/90 via-wes-pink/20 to-wes-lavender/30 animate-gradient-shift hidden sm:block" />
             
             <div className="relative z-10 p-4">
               <div className="flex flex-col gap-3">
@@ -626,10 +626,10 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & { onClose: () => void
                   </div>
 
                   {/* Row 3: Status text (always bottom row) */}
-                  <div className="flex justify-center pb-2 px-4">
-                    <div className="flex items-center gap-2 px-6 py-2 rounded-full bg-gradient-to-r from-wes-cream/80 to-wes-pink/20 border border-wes-vintage-gold/30 min-w-0 max-w-full">
+                  <div className="flex justify-center pb-2 px-3 overflow-visible">
+                    <div className="flex items-center justify-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-wes-cream/80 to-wes-pink/20 border border-wes-vintage-gold/30 w-full sm:w-auto overflow-visible">
                       <div className="w-1.5 h-1.5 rounded-full bg-wes-vintage-gold animate-pulse flex-shrink-0" />
-                      <span className="text-sm font-medium text-primary whitespace-nowrap">
+                      <span className="text-sm font-medium text-primary text-center break-words">
                         {showMyLorasOnly && showAddedLorasOnly ? (
                           <span className="text-wes-burgundy">Showing {processedLoras.length} of your added LoRAs</span>
                         ) : showMyLorasOnly ? (

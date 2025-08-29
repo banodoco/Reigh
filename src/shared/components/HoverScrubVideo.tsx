@@ -97,7 +97,7 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
   const [scrubberPosition, setScrubberPosition] = useState<number | null>(null);
   const [scrubberVisible, setScrubberVisible] = useState(true);
   const [hasLoadedOnDemand, setHasLoadedOnDemand] = useState(false);
-  // When posterOnlyUntilClick is true, defer setting src until activation
+  // When posterOnlyUntilClick is enabled, defer activation until interaction
   const [isActivated, setIsActivated] = useState<boolean>(() => !posterOnlyUntilClick);
   const speedOptions = [0.25, 0.5, 1, 1.5, 2];
   const isMobile = useIsMobile();
@@ -130,12 +130,6 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
     
     // Skip hover interactions on mobile devices or when scrubbing is disabled
     if (isMobile || thumbnailMode || disableScrubbing || autoplayOnHover) return;
-
-    // If we are deferring src, activate on first hover intent
-    if (posterOnlyUntilClick && !isActivated) {
-      setIsActivated(true);
-      return;
-    }
 
     if (loadOnDemand && !hasLoadedOnDemand) {
       setHasLoadedOnDemand(true);
@@ -173,7 +167,7 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
         });
       }
     }, 150); // Start playing 150ms after mouse stops moving
-  }, [duration, isMobile, thumbnailMode, disableScrubbing, loadOnDemand, hasLoadedOnDemand, autoplayOnHover, posterOnlyUntilClick, isActivated]);
+  }, [duration, isMobile, thumbnailMode, disableScrubbing, loadOnDemand, hasLoadedOnDemand, autoplayOnHover]);
 
   const handleMouseEnter = useCallback(() => {
     // Skip hover interactions on mobile devices or when scrubbing is disabled
@@ -194,18 +188,12 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
       return;
     }
     
-    // If we are deferring src, activate on first hover
-    if (posterOnlyUntilClick && !isActivated) {
-      setIsActivated(true);
-      return;
-    }
-    
     isHoveringRef.current = true;
     if (videoRef.current) {
       // Don't start playing immediately, wait for mouse movement or timeout
       videoRef.current.pause();
     }
-  }, [isMobile, disableScrubbing, autoplayOnHover, posterOnlyUntilClick, isActivated]);
+  }, [isMobile, disableScrubbing, autoplayOnHover]);
 
   const handleMouseLeave = useCallback(() => {
     // Skip hover interactions on mobile devices or when scrubbing is disabled
@@ -250,8 +238,6 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
   };
 
   const handleLoadedMetadata = useCallback(() => {
-    // Ignore while not activated when deferring src
-    if (posterOnlyUntilClick && !isActivated) return;
     if (videoRef.current) {
       if (process.env.NODE_ENV === 'development' && !thumbnailMode) {
         console.log('[MobileVideoAutoplay] handleLoadedMetadata called', {
@@ -301,10 +287,10 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
         }
       }
     }
-  }, [isMobile, disableScrubbing, posterOnlyUntilClick, isActivated]);
+  }, [isMobile, disableScrubbing]);
 
   useEffect(() => {
-    if (thumbnailMode || (posterOnlyUntilClick && !isActivated)) {
+    if (thumbnailMode) {
       // Skip attaching event listeners entirely in thumbnail mode
       return;
     }
@@ -434,12 +420,12 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
         mouseMoveTimeoutRef.current = null;
       }
     };
-  }, [src, isMobile, disableScrubbing, thumbnailMode, posterOnlyUntilClick, isActivated]);
+  }, [src, isMobile, disableScrubbing, thumbnailMode]);
 
   // Additional mobile protection - use Intersection Observer to detect when video becomes visible
   // Only for gallery thumbnails, not lightbox
   useEffect(() => {
-    if (!isMobile || !videoRef.current || disableScrubbing || thumbnailMode || (posterOnlyUntilClick && !isActivated)) return;
+    if (!isMobile || !videoRef.current || disableScrubbing || thumbnailMode) return;
 
     const video = videoRef.current;
     
@@ -474,11 +460,11 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
     return () => {
       observer.disconnect();
     };
-  }, [isMobile, src, disableScrubbing, thumbnailMode, posterOnlyUntilClick, isActivated]);
+  }, [isMobile, src, disableScrubbing]);
 
   // Periodic mobile check to catch any unexpected play states - but only for gallery thumbnails
   useEffect(() => {
-    if (!isMobile || disableScrubbing || thumbnailMode || (posterOnlyUntilClick && !isActivated)) return;
+    if (!isMobile || disableScrubbing || thumbnailMode) return;
 
     const intervalId = setInterval(() => {
       if (videoRef.current && !videoRef.current.paused) {
@@ -495,7 +481,7 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
     return () => {
       clearInterval(intervalId);
     };
-  }, [isMobile, src, disableScrubbing, thumbnailMode, posterOnlyUntilClick, isActivated]);
+  }, [isMobile, src, disableScrubbing]);
 
   return (
     <div
@@ -508,9 +494,9 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
     >
       <video
         ref={videoRef}
-        src={isActivated ? getDisplayUrl(src) : undefined}
+        src={getDisplayUrl(src)}
         poster={poster ? getDisplayUrl(poster) : undefined}
-        preload={!isActivated ? 'none' : (thumbnailMode ? 'none' : (isMobile ? 'metadata' : preloadProp))}
+        preload={thumbnailMode ? 'none' : (isMobile ? 'metadata' : preloadProp)}
         controls={showNativeControls}
         onLoadedMetadata={handleLoadedMetadata}
         loop={loop}
@@ -561,9 +547,7 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
               timestamp: Date.now()
             });
           }
-          if (posterOnlyUntilClick && !isActivated) {
-            setIsActivated(true);
-          }
+
         }}
         onLoadStart={() => {
           if (process.env.NODE_ENV === 'development' && !thumbnailMode) {
