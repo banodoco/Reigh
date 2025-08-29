@@ -49,7 +49,8 @@ const ActiveLoRAsDisplayComponent: React.FC<ActiveLoRAsDisplayProps> = ({
           <p className="text-sm text-muted-foreground">None selected</p>
         </div>
       ) : (
-        selectedLoras.map((lora) => {
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          {selectedLoras.map((lora) => {
           // Check if preview is a video based on file extension or type
           const isVideo = lora.previewImageUrl && (
             lora.previewImageUrl.match(/\.(mp4|webm|mov|avi)(\?|$)/i) ||
@@ -58,7 +59,7 @@ const ActiveLoRAsDisplayComponent: React.FC<ActiveLoRAsDisplayProps> = ({
 
           return (
             <div key={lora.id} className="p-3 border rounded-md shadow-sm bg-slate-50/50 dark:bg-slate-800/30">
-              <div className="flex items-start gap-3">
+              <div className="flex items-start gap-3 mb-3">
                 {lora.previewImageUrl && (
                   <div className="h-16 w-16 flex-shrink-0">
                     {isVideo ? (
@@ -91,29 +92,29 @@ const ActiveLoRAsDisplayComponent: React.FC<ActiveLoRAsDisplayProps> = ({
                           availableLoras.find(l => l["Model ID"] === lora.id)?.trigger_word;
                         
                         return triggerWord ? (
-                          <div className="flex items-center gap-2 mt-0.5">
+                          <div className="flex items-center mt-0.5">
                             <p className="text-xs text-muted-foreground">
                               Trigger words: <span className="font-mono text-foreground">"{triggerWord}"</span>
+                              {onAddTriggerWord && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => onAddTriggerWord(triggerWord)}
+                                      className="h-4 w-4 p-0 text-muted-foreground hover:text-foreground ml-1 inline-flex translate-y-0.5"
+                                      disabled={isGenerating}
+                                    >
+                                      <Plus className="h-3 w-3" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>Add after prompt</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              )}
                             </p>
-                            {onAddTriggerWord && (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                                                <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => onAddTriggerWord(triggerWord)}
-                                className="h-4 w-4 p-0 text-muted-foreground hover:text-foreground"
-                                disabled={isGenerating}
-                              >
-                                    <Plus className="h-3 w-3" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>Add after prompt</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            )}
                           </div>
                         ) : null;
                       })()}
@@ -128,21 +129,25 @@ const ActiveLoRAsDisplayComponent: React.FC<ActiveLoRAsDisplayProps> = ({
                       <X className="h-4 w-4" />
                     </Button>
                   </div>
-                  <SliderWithValue 
-                    label={`Strength`}
-                    value={lora.strength}
-                    onChange={(newStrength) => onLoraStrengthChange(lora.id, newStrength)}
-                    min={0} 
-                    max={2} 
-                    step={0.05}
-                    disabled={isGenerating}
-                    variant="secondary"
-                  />
                 </div>
               </div>
+              
+              {/* Strength slider at the bottom spanning full width */}
+              <SliderWithValue 
+                label={`Strength`}
+                value={lora.strength}
+                onChange={(newStrength) => onLoraStrengthChange(lora.id, newStrength)}
+                min={0} 
+                max={2} 
+                step={0.05}
+                disabled={isGenerating}
+                variant="secondary"
+                hideLabel={true}
+              />
             </div>
           );
-        })
+          })}
+        </div>
       )}
     </div>
   );

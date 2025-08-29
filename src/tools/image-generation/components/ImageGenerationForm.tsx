@@ -1140,7 +1140,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
                   >
                     Add or Manage LoRAs
                   </Button>
-                  {loraManager.renderHeaderActions?.(handleLoadProjectLoras)}
+                  {loraManager.renderHeaderActions?.()}
                 </div>
               )}
             />

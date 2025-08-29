@@ -1,5 +1,6 @@
 import React from "react";
 import { Slider } from "./slider";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./tooltip";
 
 interface SliderWithValueProps {
   label: string;
@@ -10,6 +11,7 @@ interface SliderWithValueProps {
   step?: number;
   disabled?: boolean;
   variant?: "primary" | "secondary";
+  hideLabel?: boolean;
 }
 
 const SliderWithValue = ({
@@ -21,16 +23,19 @@ const SliderWithValue = ({
   step = 1,
   disabled = false,
   variant = "primary",
+  hideLabel = false,
 }: SliderWithValueProps) => {
   const handleValueChange = (values: number[]) => {
     onChange(values[0]);
   };
 
-  return (
+  const sliderContent = (
     <div className="space-y-2">
-      <div className="flex justify-between items-center">
-        <label className="text-sm font-light">{label}</label>
-      </div>
+      {!hideLabel && (
+        <div className="flex justify-between items-center">
+          <label className="text-sm font-light">{label}</label>
+        </div>
+      )}
       <div className="flex gap-4">
         <div className="border rounded w-16 h-10 flex items-center justify-center bg-white">
           {Number.isInteger(value) ? value : value.toFixed(2)}
@@ -48,6 +53,23 @@ const SliderWithValue = ({
       </div>
     </div>
   );
+
+  if (hideLabel) {
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            {sliderContent}
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>{label}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
+
+  return sliderContent;
 };
 
 export { SliderWithValue };
