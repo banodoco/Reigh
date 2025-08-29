@@ -163,9 +163,10 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
   };
 
   const handleRemoveAllPrompts = () => {
-    console.log(`[PromptEditorModal] Removing all prompts. Current count: ${internalPrompts.length}`);
-    setInternalPrompts([]);
-    toast.info("All prompts have been deleted.");
+    console.log(`[PromptEditorModal] Clearing all prompts and leaving one empty. Current count: ${internalPrompts.length}`);
+    const emptyPrompt: PromptEntry = { id: generatePromptId(), fullPrompt: '', shortPrompt: '' };
+    setInternalPrompts([emptyPrompt]);
+    toast.info("All prompts cleared. One empty prompt remains.");
   };
 
   const handleGenerateAndAddPrompts = async (params: GeneratePromptsParams) => {
@@ -438,7 +439,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
                 </div>
               )}
               {internalPrompts.map((prompt, index) => (
-                <div key={prompt.id} className="mb-3 p-3 border rounded-md shadow-sm bg-background hover:shadow-md transition-shadow duration-150 ease-in-out relative group">
+                <div key={prompt.id} className="mb-4">
                   <PromptInputRow
                     promptEntry={prompt}
                     index={index}

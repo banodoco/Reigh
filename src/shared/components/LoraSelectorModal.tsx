@@ -293,9 +293,9 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & { onClose: () => void
           </SelectContent>
         </Select>
       </div>
-      {/* Scrollable content area with floating controls */}
-      <div className="flex-1 min-h-0 overflow-y-auto pr-4 relative">
-        <div className="space-y-3 p-1 pb-6">
+              {/* Scrollable content area with floating controls */}
+        <div className="flex-1 min-h-0 overflow-y-auto pr-4 relative">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 p-1 pb-6">
           {paginatedLoras.length > 0 ? (
             paginatedLoras.map((lora) => {
               const isSelectedOnGenerator = selectedLoraMap.has(lora["Model ID"]);
@@ -311,10 +311,10 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & { onClose: () => void
               return (
                 <Card 
                   key={lora["Model ID"]} 
-                  className={`w-full transition-all duration-200 ${
+                  className={`w-full transition-all duration-200 shadow-none ${
                     isSelectedOnGenerator 
-                      ? 'border-green-500 bg-green-50 dark:bg-green-950/20 shadow-sm' 
-                      : 'hover:border-gray-400 hover:shadow-sm'
+                      ? 'border-green-500' 
+                      : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
                   }`}
                 >
                   <div className="flex flex-col">
@@ -326,12 +326,12 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & { onClose: () => void
                                       {lora.Name !== "N/A" ? lora.Name : lora["Model ID"]}
                                   </CardTitle>
                                   {isSelectedOnGenerator && (
-                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-light bg-green-600 text-white">
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">
                                       Added
                                     </span>
                                   )}
                                   {isMyLora && (
-                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-light bg-blue-100 text-blue-800">
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
                                       {isLocalLora ? 'Local' : 'Mine'}
                                     </span>
                                   )}
@@ -379,21 +379,6 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & { onClose: () => void
                               </div>
                             </div>
                         </div>
-                        {isSelectedOnGenerator && (
-                          <div className="w-full lg:w-48 lg:ml-auto space-y-1 mt-2" onClick={(e) => e.stopPropagation()}>
-                            <div className="flex justify-between items-center">
-                              <Label htmlFor={`lora-strength-${lora['Model ID']}`} className="text-xs">Strength</Label>
-                              <span className="text-xs font-light">{strength?.toFixed(2)}</span>
-                            </div>
-                            <Slider
-                              id={`lora-strength-${lora['Model ID']}`}
-                              value={[strength ?? 1]}
-                              onValueChange={(value) => onUpdateLoraStrength(lora['Model ID'], value[0])}
-                              min={0} max={2} step={0.05}
-                              className="w-full"
-                            />
-                          </div>
-                        )}
                         <div className="text-xs text-muted-foreground pt-1">
                           {lora.Downloads && <span>Downloads: {lora.Downloads.toLocaleString()} | </span>}
                           {lora.Likes && <span>Likes: {lora.Likes.toLocaleString()} | </span>}
@@ -448,6 +433,21 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & { onClose: () => void
                       ) : (
                         <p className="text-xs text-muted-foreground">No sample images available.</p>
                       )}
+                      {isSelectedOnGenerator && (
+                        <div className="px-6 pb-3" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex justify-between items-center mb-1">
+                            <Label htmlFor={`lora-strength-${lora['Model ID']}`} className="text-xs">Strength</Label>
+                            <span className="text-xs font-light">{strength?.toFixed(2)}</span>
+                          </div>
+                          <Slider
+                            id={`lora-strength-${lora['Model ID']}`}
+                            value={[strength ?? 1]}
+                            onValueChange={(value) => onUpdateLoraStrength(lora['Model ID'], value[0])}
+                            min={0} max={2} step={0.05}
+                            className="w-full"
+                          />
+                        </div>
+                      )}
                     </CardContent>
                   </div>
                 </Card>
@@ -494,10 +494,9 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & { onClose: () => void
         {/* Sticky Floating Control Panel - Follows scroll with vintage aesthetic */}
         <div className="sticky bottom-4 left-0 right-0 pointer-events-none z-20 mt-6">
           {/* Vintage fade overlay with film grain effect - covers full panel height */}
-          <div className="absolute inset-x-0 -top-12 bottom-0 bg-gradient-to-t from-background/95 via-background/70 to-transparent pointer-events-none" />
           
           {/* Main floating control panel with vintage styling */}
-          <div className="wes-vintage-card mx-4 relative overflow-hidden border-2 border-wes-vintage-gold/50 shadow-wes-deep backdrop-blur-xl pointer-events-auto">
+          <div className="wes-vintage-card mx-4 relative overflow-hidden border-2 border-wes-vintage-gold/50 backdrop-blur-xl pointer-events-auto">
             {/* Vintage film overlay pattern */}
             <div className="absolute inset-0 wes-texture opacity-20" />
             <div className="absolute inset-0 bg-gradient-to-r from-wes-cream/90 via-wes-pink/20 to-wes-lavender/30 animate-gradient-shift" />
@@ -512,8 +511,8 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & { onClose: () => void
                     <div 
                       className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all duration-300 cursor-pointer ${
                         showAddedLorasOnly 
-                          ? 'bg-gradient-to-r from-wes-mint to-wes-mint-dark border-2 border-wes-mint-dark text-wes-forest shadow-wes hover:from-wes-mint-dark hover:to-wes-mint' 
-                          : 'bg-gradient-to-r from-wes-cream/90 to-wes-pink/30 border-2 border-wes-vintage-gold/30 text-primary hover:from-wes-pink/40 hover:to-wes-lavender/40 hover:border-wes-vintage-gold/60 shadow-sm'
+                          ? 'bg-gradient-to-r from-wes-mint to-wes-mint-dark border-2 border-wes-mint-dark text-wes-forest hover:from-wes-mint-dark hover:to-wes-mint' 
+                          : 'bg-gradient-to-r from-wes-cream/90 to-wes-pink/30 border-2 border-wes-vintage-gold/30 text-primary hover:from-wes-pink/40 hover:to-wes-lavender/40 hover:border-wes-vintage-gold/60'
                       }`}
                       onClick={() => setShowAddedLorasOnly(!showAddedLorasOnly)}
                     >
@@ -521,11 +520,11 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & { onClose: () => void
                         id="show-added-loras-only-sticky" 
                         checked={showAddedLorasOnly}
                         onCheckedChange={(checked) => setShowAddedLorasOnly(!!checked)}
-                        className="data-[state=checked]:bg-wes-mint data-[state=checked]:border-wes-mint-dark border-primary/40 pointer-events-none"
+                        className="data-[state=checked]:bg-wes-mint data-[state=checked]:border-wes-mint-dark border-primary/40 pointer-events-none h-5 w-5"
                       />
                       <Label htmlFor="show-added-loras-only-sticky" className="text-sm font-medium cursor-pointer select-none tracking-normal pointer-events-none">
-                        <span className="hidden sm:inline">Show added LoRAs</span>
-                        <span className="sm:hidden">Added</span>
+                        <span className="hidden sm:inline">Show selected LoRAs</span>
+                        <span className="sm:hidden">Selected</span>
                       </Label>
                     </div>
 
@@ -533,8 +532,8 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & { onClose: () => void
                     <div 
                       className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all duration-300 cursor-pointer ${
                         showMyLorasOnly 
-                          ? 'bg-gradient-to-r from-wes-dusty-blue to-wes-lavender border-2 border-wes-dusty-blue text-primary shadow-wes hover:from-wes-lavender hover:to-wes-dusty-blue' 
-                          : 'bg-gradient-to-r from-wes-cream/90 to-wes-pink/30 border-2 border-wes-vintage-gold/30 text-primary hover:from-wes-pink/40 hover:to-wes-lavender/40 hover:border-wes-vintage-gold/60 shadow-sm'
+                          ? 'bg-gradient-to-r from-wes-dusty-blue to-wes-lavender border-2 border-wes-dusty-blue text-primary hover:from-wes-lavender hover:to-wes-dusty-blue' 
+                          : 'bg-gradient-to-r from-wes-cream/90 to-wes-pink/30 border-2 border-wes-vintage-gold/30 text-primary hover:from-wes-pink/40 hover:to-wes-lavender/40 hover:border-wes-vintage-gold/60'
                       }`}
                       onClick={() => setShowMyLorasOnly(!showMyLorasOnly)}
                     >
@@ -586,7 +585,7 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & { onClose: () => void
 
                 {/* Bottom row - Status text with vintage styling */}
                 <div className="text-center">
-                  <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-wes-cream/80 to-wes-pink/20 border border-wes-vintage-gold/30 shadow-inner-vintage">
+                  <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-wes-cream/80 to-wes-pink/20 border border-wes-vintage-gold/30">
                     <div className="w-1.5 h-1.5 rounded-full bg-wes-vintage-gold animate-pulse" />
                     <span className="text-sm font-medium text-primary">
                       {showMyLorasOnly && showAddedLorasOnly ? (
@@ -1011,9 +1010,9 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
                                     {sampleFiles.map((file, index) => (
                                         <div key={index} className="relative group">
                                             <div 
-                                                className={`relative rounded-lg border-2 overflow-hidden cursor-pointer transition-all hover:shadow-md ${
+                                                className={`relative rounded-lg border-2 overflow-hidden cursor-pointer transition-all ${
                                                     mainGenerationIndex === index 
-                                                        ? 'border-blue-500 bg-blue-50 shadow-md' 
+                                                        ? 'border-blue-500 bg-blue-50' 
                                                         : 'border-gray-200 hover:border-gray-300'
                                                 }`}
                                                 onClick={() => setMainGenerationIndex(index)}

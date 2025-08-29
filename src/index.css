@@ -743,7 +743,6 @@
       linear-gradient(135deg, hsl(var(--lala-cream)) 0%, hsl(var(--lala-medium-purple) / 0.3) 100%),
       radial-gradient(circle at top right, hsl(var(--lala-golden-yellow) / 0.2), transparent 50%),
       radial-gradient(circle at bottom left, hsl(var(--lala-light-blue) / 0.2), transparent 50%);
-    border: 3px solid hsl(var(--lala-golden-yellow) / 0.4);
     position: relative;
   }
 

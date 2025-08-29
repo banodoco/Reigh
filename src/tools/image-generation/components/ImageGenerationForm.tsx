@@ -247,10 +247,10 @@ export const PromptInputRow: React.FC<PromptInputRowProps> = React.memo(({
 
   return (
     <div 
-      className={`p-3 rounded-md shadow-sm bg-slate-50/30 dark:bg-slate-800/30 ${forceExpanded ? 'mt-0' : ''}`}
+      className={`p-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600 transition-colors ${forceExpanded ? 'mt-0' : ''}`}
     >
-      <div className="flex justify-between items-center">
-        <Label htmlFor={`fullPrompt-${promptEntry.id}`} className="text-sm font-light">
+      <div className="flex justify-between items-center mb-2">
+        <Label htmlFor={`fullPrompt-${promptEntry.id}`} className="text-xs font-medium text-muted-foreground">
           Prompt #{index + 1}
         </Label>
         <div className="flex items-center space-x-1">
