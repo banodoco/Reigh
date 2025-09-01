@@ -90,7 +90,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
   // Update local state when preferences load for the first time
   React.useEffect(() => {
     if (autoTopupPreferences && !hasInitialized) {
-      console.log('Initializing auto-top-up state from preferences:', autoTopupPreferences);
+      console.log('[AutoTopup:Init] Initializing auto-top-up state from preferences:', autoTopupPreferences);
       setLocalAutoTopupEnabled(autoTopupPreferences.enabled);
       setLocalAutoTopupThreshold(autoTopupPreferences.threshold || 10);
       setHasInitialized(true);
@@ -154,7 +154,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
 
   // Handle auto-top-up preference changes
   const handleAutoTopupToggle = (enabled: boolean) => {
-    console.log('Auto-top-up toggle clicked:', { enabled, currentLocal: localAutoTopupEnabled });
+    console.log('[AutoTopup:Toggle] Checkbox clicked:', { enabled, currentLocal: localAutoTopupEnabled });
     setLocalAutoTopupEnabled(enabled);
     
     // Immediately save preference changes
@@ -163,7 +163,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
       amount: purchaseAmount, // Use the purchase amount from the slider above
       threshold: localAutoTopupThreshold,
     };
-    console.log('Saving auto-top-up preferences:', saveData);
+    console.log('[AutoTopup:Save] Saving preferences:', saveData);
     updateAutoTopup(saveData);
   };
 
@@ -184,7 +184,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
     const { enabled, setupCompleted } = autoTopupPreferences;
     
     // Debug logging
-    console.log('AutoTopup Debug:', {
+    console.log('[AutoTopup:State] State computation:', {
       enabled,
       setupCompleted,
       localAutoTopupEnabled,
@@ -522,7 +522,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
               >
                 {(() => {
                   // Debug the button condition
-                  console.log('Button Debug:', {
+                  console.log('[AutoTopup:Button] Button render logic:', {
                     isCreatingCheckout,
                     purchaseAmount,
                     localAutoTopupEnabled,
