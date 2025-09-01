@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
 
 export interface AutoTopupPreferences {
   enabled: boolean;
@@ -134,11 +133,11 @@ export function useAutoTopup() {
       console.log('[AutoTopup:Hook] Save successful:', variables);
       queryClient.invalidateQueries({ queryKey: ['autoTopup', 'preferences'] });
       queryClient.invalidateQueries({ queryKey: ['credits'] }); // Refresh credits info
-      toast.success('Auto-top-up preferences updated');
+      // Removed toast notification for smoother UX
     },
     onError: (error, variables) => {
       console.error('[AutoTopup:Hook] Save failed:', error, variables);
-      toast.error(error.message || 'Failed to update auto-top-up preferences');
+      // Only log errors, don't show toast for save failures
     },
   });
 
@@ -148,10 +147,11 @@ export function useAutoTopup() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['autoTopup', 'preferences'] });
       queryClient.invalidateQueries({ queryKey: ['credits'] }); // Refresh credits info
-      toast.success('Auto-top-up disabled');
+      // Removed toast notification for smoother UX
     },
     onError: (error) => {
-      toast.error(error.message || 'Failed to disable auto-top-up');
+      console.error('[AutoTopup:Hook] Disable failed:', error);
+      // Only log errors, don't show toast for disable failures
     },
   });
 
