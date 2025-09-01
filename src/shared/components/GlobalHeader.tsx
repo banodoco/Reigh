@@ -330,9 +330,9 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
             </div>
 
             {/* Right side - Referral text and App Settings */}
-            <div className="flex items-end gap-2 relative z-50">
+            <div className="flex items-center gap-2 relative z-50">
               <button 
-                className="text-xs text-gray-400 underline cursor-pointer font-thin mb-0.5 hover:text-gray-600 transition-colors duration-200 text-right touch-manipulation active:text-gray-500 min-h-[44px] px-2 py-2 relative z-50 max-w-[80px] leading-tight"
+                className="text-xs text-gray-400 underline cursor-pointer font-thin hover:text-gray-600 transition-colors duration-200 text-right touch-manipulation active:text-gray-500 min-h-[44px] px-2 py-2 relative z-50 max-w-[96px] leading-tight"
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -352,7 +352,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                 variant="ghost"
                 size="icon"
                 onClick={onOpenSettings}
-                className="h-10 w-10 wes-button bg-gradient-to-br from-wes-dusty-blue to-wes-lavender border-2 border-wes-vintage-gold/40 hover:from-wes-dusty-blue-dark hover:to-wes-lavender-dark shadow-wes-vintage hover:shadow-wes-hover group relative overflow-hidden [&::before]:bg-gradient-to-b [&::before]:from-transparent [&::before]:via-white/20 [&::before]:to-transparent [&::before]:translate-y-[-100%] [&::before]:translate-x-0 [&::before]:transition-transform [&::before]:duration-0 [&:hover::before]:translate-y-[100%] [&:hover::before]:translate-x-0 [&:hover::before]:duration-700"
+                className="h-11 w-11 wes-button bg-gradient-to-br from-wes-dusty-blue to-wes-lavender border-2 border-wes-vintage-gold/40 hover:from-wes-dusty-blue-dark hover:to-wes-lavender-dark shadow-wes-vintage hover:shadow-wes-hover group relative overflow-hidden [&::before]:bg-gradient-to-b [&::before]:from-transparent [&::before]:via-white/20 [&::before]:to-transparent [&::before]:translate-y-[-100%] [&::before]:translate-x-0 [&::before]:transition-transform [&::before]:duration-0 [&:hover::before]:translate-y-[100%] [&:hover::before]:translate-x-0 [&:hover::before]:duration-700"
                 title="App Settings"
               >
                 <div className="absolute inset-0 bg-film-grain opacity-20 animate-film-grain"></div>

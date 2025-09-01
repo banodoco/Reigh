@@ -154,25 +154,11 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({ isOpen, onOpenChan
               </p>
               
               <p>
-                However, for those who prefer the convenience of running on the cloud, we charge roughly twice our compute costs. Because we run on consumer GPUs, this is still significantly cheaper than other providers.
+                However, for those who prefer the convenience of running on the cloud, we charge twice compute costs. Because we run on consumer GPUs, this is still significantly cheaper than other providers.
               </p>
               
               <p>
-                Of this, after costs, we offer <strong>16% of our lifetime profits</strong> from referred users to those who refer them.
-              </p>
-              
-              <p>
-                Additionally, we share another 50% of profits with those who contribute tech, and for initiatives for artists/engineers - our goal is to become a very positively impactful part of the open ecosystem:
-              </p>
-
-              {/* Profit split bar illustration */}
-              <ProfitSplitBar className="mt-2 mb-1" />
-            </div>
-
-            {/* Special Inspirational Message */}
-            <div className="my-4">
-              <p className="text-base font-medium text-primary leading-relaxed italic">
-                We hope that this motivates artists to create art that in turn inspires others to create with AI.
+                Of this, after costs, we offer <strong>16% of our lifetime profits</strong> from referred users to those who refer them via a link:
               </p>
             </div>
 
@@ -210,30 +196,50 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({ isOpen, onOpenChan
               </div>
             ) : null}
 
+            {/* Profit Sharing Section */}
+            <div className="space-y-3 text-sm leading-relaxed">
+              <p>
+                Additionally, we share another 50% of profits with those who contribute tech, and for initiatives for artists/engineers - our goal is to become a very positively impactful part of the open ecosystem:
+              </p>
+
+              {/* Profit split bar illustration */}
+              <ProfitSplitBar className="mt-2 mb-1" />
+              
+              {/* Special Inspirational Message */}
+              <div className="my-4">
+                <p className="text-base font-medium text-primary leading-relaxed italic text-left">
+                  We hope that this motivates artists to create art that in turn inspires others to create with AI.
+                </p>
+              </div>
+            </div>
+
             {/* Statistics */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">Statistics</label>
+              <label className="text-sm font-medium">You can see your statistics on referred users here:</label>
               <div className="border rounded-lg overflow-hidden">
                 <div className="bg-gray-50 dark:bg-gray-800 px-4 py-2 border-b">
-                  <div className="grid grid-cols-2 gap-4 text-sm font-medium">
+                  <div className="grid grid-cols-3 gap-4 text-sm font-medium">
                     <div>Visitors</div>
                     <div>Successful Sign-ups</div>
+                    <div>Referral bonuses earned:</div>
                   </div>
                 </div>
                 <div className="px-4 py-3">
                   {isLoadingStats ? (
-                    <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div className="grid grid-cols-3 gap-4 text-sm">
+                      <div className="animate-pulse">...</div>
                       <div className="animate-pulse">...</div>
                       <div className="animate-pulse">...</div>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div className="grid grid-cols-3 gap-4 text-sm">
                       <div className="font-mono text-lg">
                         {stats?.total_visits ?? 0}
                       </div>
                       <div className="font-mono text-lg">
                         {stats?.successful_referrals ?? 0}
                       </div>
+                      <div className="font-mono text-lg">$0</div>
                     </div>
                   )}
                 </div>

@@ -8,7 +8,7 @@ const MOBILE_SPACING = {
 } as const;
 
 const MODAL_BASE_CLASSES = {
-  common: 'bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800 rounded-lg',
+  common: 'bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800 rounded-lg z-[11000]',
   layout: 'flex flex-col',
   closeButton: '[&>button:last-child]:right-7',
   // Special cases for existing modals
@@ -104,13 +104,13 @@ const createMobileLayoutStrategy = (layout: MobileLayout, isMobile: boolean) => 
     
     'edge-buffered': () => ({
       classes: `left-${MOBILE_SPACING.edge} right-${MOBILE_SPACING.edge} w-auto`,
-      centeringOverrides: ['translate-x-0', MODAL_BASE_CLASSES.closeButton],
+      centeringOverrides: ['translate-x-0', MODAL_BASE_CLASSES.closeButton, 'transform-none'],
       customStyles: undefined,
     }),
     
     fullscreen: () => ({
       classes: `left-${MOBILE_SPACING.edge} right-${MOBILE_SPACING.edge} w-auto max-h-none`,
-      centeringOverrides: ['translate-x-0', 'translate-y-0', MODAL_BASE_CLASSES.closeButton],
+      centeringOverrides: ['translate-x-0', 'translate-y-0', 'transform-none', MODAL_BASE_CLASSES.closeButton],
       // Use CSS custom properties for safe positioning
       customStyles: {
         position: 'fixed',
