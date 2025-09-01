@@ -477,14 +477,14 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
               <div className="flex flex-col md:flex-row md:items-center gap-6">
                 {/* Left column: Top-up amount (3/5 width on desktop) */}
                 <div className="w-full md:w-3/5 space-y-1.5">
-                  <div className="text-center mt-2">
+                  <div className="text-left mt-2">
                     <label className="text-lg font-light text-gray-900">
                       Top-up amount:
                     </label>
                   </div>
                 
                   <div className="space-y-4">
-                    <div className="text-center">
+                    <div className="text-left">
                       <div className="text-3xl font-bold text-gray-900">
                         {formatDollarAmount(purchaseAmount)}
                       </div>

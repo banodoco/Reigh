@@ -204,18 +204,35 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({ isOpen, onOpenChan
               <div className="overflow-visible">
                 <ProfitSplitBar className="mt-2 mb-1" />
               </div>
-              
+            </div>
+            
+            {/* Spacer for minimal separation */}
+            <div style={{ height: '1.5px' }}></div>
+            
+            {/* Combined: Inspirational Message + Statistics */}
+            <div className="space-y-1">
               {/* Special Inspirational Message */}
-              <div className="mt-6 mb-4">
-                <p className="text-base font-medium text-primary leading-relaxed italic text-left">
-                  We hope that this motivates artists to create art that in turn inspires others to create with AI.
+              <div>
+                <p className="text-sm font-medium text-primary leading-relaxed italic text-left">
+                  We hope that this motivates artists to create beautiful work, which in turn inspire others to create with AI.
+                </p>
+                <p className="text-sm text-primary leading-relaxed text-left mt-2">
+                  Additionally, artists who create with Reigh will share{' '}
+                  <a 
+                    href="https://banodoco.ai/pages/ownership.html" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="underline hover:text-primary/80 transition-colors"
+                  >
+                    ownership
+                  </a>{' '}
+                  in Banodoco, our parent company, proportionate to the number of people they refer.
                 </p>
               </div>
-            </div>
 
-            {/* Statistics */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">You can see your statistics on referred users here:</label>
+              {/* Statistics */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">You can see your statistics on referred users here:</label>
               <div className="border rounded-lg overflow-hidden">
                 <div className="bg-gray-50 dark:bg-gray-800 px-4 py-2 border-b">
                   <div className="grid grid-cols-3 gap-4 text-sm font-medium">
@@ -263,7 +280,8 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({ isOpen, onOpenChan
                 </Button>
               </div>
             )}
-          </div>
+              </div>
+            </div>
         </div>
       </DialogContent>
     </Dialog>
