@@ -20,6 +20,7 @@ import usePersistentState from "@/shared/hooks/usePersistentState";
 import { useCredits } from "@/shared/hooks/useCredits";
 import { supabase } from "@/integrations/supabase/client";
 import { useIsMobile } from "@/shared/hooks/use-mobile";
+import { useMobileModalStyling, createMobileModalProps, mergeMobileModalClasses } from '@/shared/hooks/useMobileModalStyling';
 import { 
   Select,
   SelectContent,
@@ -33,6 +34,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/shared/components/ui/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "@/shared/components/ui/popover";
+import { DialogFooter } from "@/shared/components/ui/dialog";
 import { useUserUIState } from "@/shared/hooks/useUserUIState";
 import CreditsManagement from "./CreditsManagement";
 
@@ -49,9 +52,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   initialTab = "generate-locally",
   creditsTab = "purchase",
 }) => {
-  // Let the modal use default centering behavior
-  const modalStyle = useMemo(() => ({}), []);
   const isMobile = useIsMobile();
+  
+  // Mobile modal styling
+  const mobileModalStyling = useMobileModalStyling({
+    enableMobileFullscreen: true,
+    disableCenteringOnMobile: true,
+  });
   const { apiKeys, isLoading: isLoadingKeys, saveApiKeys, isUpdating } = useApiKeys();
   const { 
     tokens, 
@@ -207,16 +214,42 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   // Handle copying commands and provide inline visual feedback instead of a toast
-  const handleCopyInstallCommand = () => {
-    navigator.clipboard.writeText(getInstallationCommand());
-    setCopiedInstallCommand(true);
-    setTimeout(() => setCopiedInstallCommand(false), 3000);
+  const safeCopy = async (text: string) => {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch (e) {}
+    try {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.left = '-9999px';
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+      return true;
+    } catch (e) {
+      return false;
+    }
   };
 
-  const handleCopyRunCommand = () => {
-    navigator.clipboard.writeText(getRunCommand());
-    setCopiedRunCommand(true);
-    setTimeout(() => setCopiedRunCommand(false), 3000);
+  const handleCopyInstallCommand = async () => {
+    const ok = await safeCopy(getInstallationCommand());
+    if (ok) {
+      setCopiedInstallCommand(true);
+      setTimeout(() => setCopiedInstallCommand(false), 3000);
+    }
+  };
+
+  const handleCopyRunCommand = async () => {
+    const ok = await safeCopy(getRunCommand());
+    if (ok) {
+      setCopiedRunCommand(true);
+      setTimeout(() => setCopiedRunCommand(false), 3000);
+    }
   };
 
   const generateAIInstructions = () => {
@@ -295,10 +328,12 @@ After understanding my system specs, please guide me step-by-step through this p
 Please be very specific with file paths, command syntax, and verification steps since I'm on ${computerType === "windows" ? "Windows" : computerType}.`;
   };
 
-  const handleCopyAIInstructions = () => {
-    navigator.clipboard.writeText(generateAIInstructions());
-    setCopiedAIInstructions(true);
-    setTimeout(() => setCopiedAIInstructions(false), 3000);
+  const handleCopyAIInstructions = async () => {
+    const ok = await safeCopy(generateAIInstructions());
+    if (ok) {
+      setCopiedAIInstructions(true);
+      setTimeout(() => setCopiedAIInstructions(false), 3000);
+    }
   };
 
   const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndjenlzcXp4bHdkbmRneGl0cnZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE1MDI4NjgsImV4cCI6MjA2NzA3ODg2OH0.r-4RyHZiDibUjgdgDDM2Vo6x3YpgIO5-BTwfkB2qyYA";
@@ -362,16 +397,13 @@ python worker.py --db-type supabase \\
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent 
-        style={modalStyle}
-        className={`sm:max-w-2xl max-h-[90vh] flex flex-col rounded-lg [&>button:last-child]:top-[1.625rem] ${
-          isMobile ? 'left-4 right-4 top-8 bottom-8 w-auto translate-x-0 translate-y-0 max-h-none [&>button:last-child]:right-7' : ''
-        }`}
-        onOpenAutoFocus={(event) => {
-          // Prevent auto-focus on mobile devices to avoid triggering focus styles
-          if (isMobile) {
-            event.preventDefault();
-          }
-        }}
+        className={mergeMobileModalClasses(
+          'sm:max-w-2xl max-h-[90vh] bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800 flex flex-col rounded-lg [&>button:last-child]:top-[1.5rem]',
+          mobileModalStyling.dialogContentClassName,
+          mobileModalStyling.isMobile
+        )}
+        style={mobileModalStyling.dialogContentStyle}
+        {...createMobileModalProps(mobileModalStyling.isMobile)}
       >
         {/* Top button container - positioned relative to DialogContent */}
         {isMobile && (
@@ -386,23 +418,25 @@ python worker.py --db-type supabase \\
           </Button>
         )}
         
-        <DialogHeader className="relative">
-          <DialogTitle className="text-2xl">App Settings</DialogTitle>
-          {!isMobile && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleSignOut}
-              className="absolute top-0 right-0 flex items-center gap-2 text-muted-foreground hover:text-foreground"
-            >
-              <LogOut className="h-4 w-4" />
-              Sign out
-            </Button>
-          )}
-        </DialogHeader>
+        <div className={mobileModalStyling.headerContainerClassName}>
+          <DialogHeader className={`${mobileModalStyling.isMobile ? 'px-1 pt-2 pb-1' : 'px-2 pt-2 pb-1'} flex-shrink-0 relative`}>
+            <DialogTitle className="text-2xl">App Settings</DialogTitle>
+            {!isMobile && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleSignOut}
+                className="absolute top-0 right-0 flex items-center gap-2 text-muted-foreground hover:text-foreground"
+              >
+                <LogOut className="h-4 w-4" />
+                Sign out
+              </Button>
+            )}
+          </DialogHeader>
+        </div>
         
         {/* Scrollable content container */}
-        <div className="flex-1 overflow-y-auto min-h-0 [scrollbar-gutter:stable_both-edges] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] sm:[&::-webkit-scrollbar]:block sm:[-ms-overflow-style:auto] sm:[scrollbar-width:auto]">
+        <div className={`${mobileModalStyling.scrollContainerClassName} ${mobileModalStyling.isMobile ? 'px-1' : 'px-2'} [scrollbar-gutter:stable_both-edges] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] sm:[&::-webkit-scrollbar]:block sm:[-ms-overflow-style:auto] sm:[scrollbar-width:auto]`}>
           {/* Generation Method Selection */}
           <div className="mb-5">
           {/* Mobile header */}
@@ -858,7 +892,7 @@ python worker.py --db-type supabase \\
                              onClick={handleCopyInstallCommand}
                              variant="outline"
                              size="default"
-                             className="w-full border border-current"
+                             className="w-full border border-current min-h-[44px] touch-manipulation"
                            >
                             {copiedInstallCommand ? (
                               "Copied!"
@@ -871,15 +905,15 @@ python worker.py --db-type supabase \\
                                                      </Button>
                            
                            <div className="flex justify-center">
-                             <TooltipProvider>
-                               <Tooltip>
-                                 <TooltipTrigger asChild>
-                                   <Button variant="link" className="text-sm text-blue-600 hover:text-blue-800 p-0 h-auto">
+                             {isMobile ? (
+                               <Popover>
+                                 <PopoverTrigger asChild>
+                                   <Button variant="link" className="text-sm text-blue-600 hover:text-blue-800 p-2 h-auto min-h-[44px] touch-manipulation">
                                      <HelpCircle className="h-4 w-4 mr-1" />
                                      Need help?
                                    </Button>
-                                 </TooltipTrigger>
-                                 <TooltipContent className="max-w-sm">
+                                 </PopoverTrigger>
+                                 <PopoverContent className="max-w-sm z-50">
                                    <div className="py-3 space-y-3">
                                      <p className="font-light">Troubleshooting steps:</p>
                                      <ol className="text-sm space-y-2 list-decimal list-inside">
@@ -892,7 +926,7 @@ python worker.py --db-type supabase \\
                                          variant="outline"
                                          size="sm"
                                          onClick={handleCopyAIInstructions}
-                                         className="text-xs"
+                                         className="text-xs min-h-[40px] touch-manipulation"
                                        >
                                          {copiedAIInstructions ? (
                                            "Copied!"
@@ -905,9 +939,47 @@ python worker.py --db-type supabase \\
                                        </Button>
                                      </div>
                                    </div>
-                                 </TooltipContent>
-                               </Tooltip>
-                             </TooltipProvider>
+                                 </PopoverContent>
+                               </Popover>
+                             ) : (
+                               <TooltipProvider>
+                                 <Tooltip>
+                                   <TooltipTrigger asChild>
+                                     <Button variant="link" className="text-sm text-blue-600 hover:text-blue-800 p-2 h-auto min-h-[44px] touch-manipulation">
+                                       <HelpCircle className="h-4 w-4 mr-1" />
+                                       Need help?
+                                     </Button>
+                                   </TooltipTrigger>
+                                   <TooltipContent className="max-w-sm z-50">
+                                     <div className="py-3 space-y-3">
+                                       <p className="font-light">Troubleshooting steps:</p>
+                                       <ol className="text-sm space-y-2 list-decimal list-inside">
+                                         <li>Try running each line of the commands one-at-a-time</li>
+                                         <li>Feed the command-line log into ChatGPT or your LLM of choice</li>
+                                         <li>Drop into the <a href="https://discord.gg/WXrdkbkj" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 underline">help channel</a> of the Reigh discord</li>
+                                       </ol>
+                                       <div className="flex justify-center pt-2">
+                                         <Button
+                                           variant="outline"
+                                           size="sm"
+                                           onClick={handleCopyAIInstructions}
+                                           className="text-xs min-h-[40px] touch-manipulation"
+                                         >
+                                           {copiedAIInstructions ? (
+                                             "Copied!"
+                                           ) : (
+                                             <>
+                                               <Copy className="h-3 w-3 mr-1" />
+                                               Copy instructions to get help from AI
+                                             </>
+                                           )}
+                                         </Button>
+                                       </div>
+                                     </div>
+                                   </TooltipContent>
+                                 </Tooltip>
+                               </TooltipProvider>
+                             )}
                            </div>
                         </div>
                       </TabsContent>
@@ -965,7 +1037,7 @@ python worker.py --db-type supabase \\
                             onClick={handleCopyRunCommand}
                             variant="outline"
                             size="default"
-                            className="w-full border border-current"
+                            className="w-full border border-current min-h-[44px] touch-manipulation"
                           >
                             {copiedRunCommand ? (
                               "Copied!"
@@ -981,12 +1053,12 @@ python worker.py --db-type supabase \\
                              <TooltipProvider>
                                <Tooltip>
                                  <TooltipTrigger asChild>
-                                   <Button variant="link" className="text-sm text-blue-600 hover:text-blue-800 p-0 h-auto">
+                                   <Button variant="link" className="text-sm text-blue-600 hover:text-blue-800 p-2 h-auto min-h-[44px] touch-manipulation">
                                      <HelpCircle className="h-4 w-4 mr-1" />
                                      Need help?
                                    </Button>
                                  </TooltipTrigger>
-                                 <TooltipContent className="max-w-sm">
+                                 <TooltipContent className="max-w-sm z-50">
                                    <div className="py-3 space-y-3">
                                      <p className="font-light">Troubleshooting steps:</p>
                                      <ol className="text-sm space-y-2 list-decimal list-inside">
@@ -999,7 +1071,7 @@ python worker.py --db-type supabase \\
                                          variant="outline"
                                          size="sm"
                                          onClick={handleCopyAIInstructions}
-                                         className="text-xs"
+                                         className="text-xs min-h-[40px] touch-manipulation"
                                        >
                                          {copiedAIInstructions ? (
                                            "Copied!"
@@ -1026,6 +1098,15 @@ python worker.py --db-type supabase \\
             </div>
           )}
           </div>
+        </div>
+        
+        {/* Footer */}
+        <div className={mobileModalStyling.footerContainerClassName}>
+          <DialogFooter className={`${mobileModalStyling.isMobile ? 'px-1 pt-6 pb-1' : 'px-2 pt-7 pb-2'} border-t`}>
+            <Button variant="outline" onClick={() => onOpenChange(false)} className="w-full">
+              Close
+            </Button>
+          </DialogFooter>
         </div>
       </DialogContent>
     </Dialog>

@@ -1,501 +1,374 @@
-# Auto-Top-Up System
+# Payment & Credit System
 
-> **Overview**: Comprehensive credit purchase and automatic top-up system with Stripe integration, database triggers, and real-time UI updates.
+> **Current State**: Description of how Reigh's payment and credit management system works today, including manual purchases and automatic top-up functionality.
 
 ## Table of Contents
 
-- [1. System Overview](#1-system-overview)
-- [2. Architecture Components](#2-architecture-components)
-- [3. Database Schema](#3-database-schema)
-- [4. UI Components & States](#4-ui-components--states)
-- [5. Edge Functions](#5-edge-functions)
-- [6. User Experience Flow](#6-user-experience-flow)
-- [7. Implementation Details](#7-implementation-details)
-- [8. Troubleshooting](#8-troubleshooting)
+- [1. Payment System Overview](#1-payment-system-overview)
+- [2. Credit Management](#2-credit-management)
+- [3. User Purchase Experience](#3-user-purchase-experience)
+- [4. Auto-Top-Up System](#4-auto-top-up-system)
+- [5. System Behavior & Rules](#5-system-behavior--rules)
+- [6. User Interface States](#6-user-interface-states)
+- [7. Integration & Processing](#7-integration--processing)
+- [8. Current Limitations](#8-current-limitations)
 
 ---
 
-## 1. System Overview
+## 1. Payment System Overview
 
-The auto-top-up system provides seamless credit management with both manual purchases and automatic top-ups when credits run low. It integrates Stripe for payments, database triggers for monitoring, and real-time UI updates.
+Reigh operates on a credit-based payment system where users purchase credits upfront to use AI features. The system supports both manual credit purchases and automatic top-ups to ensure uninterrupted service.
 
-### Key Features
+### What Credits Are Used For
 
-- ✅ **One-time credit purchases** - Manual credit additions via Stripe Checkout
-- ✅ **Auto-top-up setup** - Save payment method during first purchase for future automation
-- ✅ **Real-time monitoring** - Database triggers detect low credit balances
-- ✅ **Automatic charging** - Off-session payments when balance drops below threshold
-- ✅ **Smart UI states** - Context-aware messaging based on setup and enabled status
-- ✅ **Mobile responsive** - Optimized for all screen sizes
-- ✅ **Error handling** - Graceful failure modes and user notifications
+- **Image Generation**: AI-powered image creation and editing
+- **Task Processing**: Various AI operations and transformations
+- **Advanced Features**: Premium AI capabilities and processing
 
----
+### Current Pricing Structure
 
-## 2. Architecture Components
+- **Purchase Range**: $5 - $100 in $5 increments via slider interface
+- **Real-time Balance**: Credits displayed in dollars with immediate updates
+- **Pay-per-use**: Credits deducted only when AI features are actually used
 
-### Frontend Components
-```
-src/shared/components/CreditsManagement.tsx    # Main UI component
-src/shared/hooks/useCredits.ts                # Credit balance & purchase logic
-src/shared/hooks/useAutoTopup.ts              # Auto-top-up preferences management
-```
+### Key Capabilities
 
-### Backend Services
-```
-supabase/functions/stripe-checkout/           # Initial payment & setup
-supabase/functions/stripe-webhook/            # Stripe event handling
-supabase/functions/setup-auto-topup/          # Preference updates
-supabase/functions/process-auto-topup/        # Automatic charging
-supabase/functions/trigger-auto-topup/        # Background trigger handler
-```
-
-### Database Components
-```sql
--- Core tables
-users                    # User profiles with auto-top-up preferences
-credits_ledger          # Credit transaction history
-
--- Triggers & Functions
-check_auto_topup_trigger()    # Monitors credit balance changes
-auto_topup_trigger           # Fires on credit updates
-```
+- ✅ **Instant Credit Purchases** - One-click buying through Stripe Checkout
+- ✅ **Automatic Top-ups** - Optional hands-free credit replenishment
+- ✅ **Real-time Balance Tracking** - Live credit balance monitoring
+- ✅ **Smart Threshold Management** - Customizable low-balance triggers
+- ✅ **Mobile-Optimized Interface** - Seamless experience across all devices
+- ✅ **Secure Payment Processing** - Industry-standard Stripe integration
 
 ---
 
-## 3. Database Schema
+## 2. Credit Management
 
-### Users Table Extensions
+### Current Balance Display
 
-```sql
--- Auto-top-up preferences
-ALTER TABLE users ADD COLUMN auto_topup_enabled boolean NOT NULL DEFAULT false;
-ALTER TABLE users ADD COLUMN auto_topup_setup_completed boolean NOT NULL DEFAULT false;
-ALTER TABLE users ADD COLUMN auto_topup_amount integer; -- in cents
-ALTER TABLE users ADD COLUMN auto_topup_threshold integer; -- in cents
-ALTER TABLE users ADD COLUMN auto_topup_last_triggered timestamptz;
+Users see their credit balance prominently displayed at the top of the Credits interface in a clean, simplified format:
+- **Real-time Updates**: Balance refreshes immediately after purchases or usage
+- **Dollar Format**: Credits shown as currency ($10.50) rather than points or tokens
+- **Loading States**: Smooth animation while balance is being fetched
 
--- Stripe integration
-ALTER TABLE users ADD COLUMN stripe_customer_id text;
-ALTER TABLE users ADD COLUMN stripe_payment_method_id text;
-```
+### Transaction History
 
-### State Definitions
+The system maintains a complete transaction history showing:
+- **Purchase Records**: All credit additions with timestamps
+- **Usage Tracking**: Detailed log of when and how credits were spent
+- **Transaction Types**: Clear categorization (Purchase, Auto-top-up, Spend)
+- **Export Capability**: Users can download complete transaction history as CSV
 
-| Field | Purpose | Example |
-|-------|---------|---------|
-| `auto_topup_enabled` | User preference toggle | `true`/`false` |
-| `auto_topup_setup_completed` | Stripe payment method saved | `true`/`false` |
-| `auto_topup_amount` | Top-up amount in cents | `5000` ($50) |
-| `auto_topup_threshold` | Trigger balance in cents | `1000` ($10) |
-| `stripe_customer_id` | Stripe customer reference | `cus_...` |
-| `stripe_payment_method_id` | Saved payment method | `pm_...` |
+### Task Log Integration
 
-### Credit Ledger Types
-
-```sql
--- Extended enum for auto-top-up transactions
-ALTER TYPE credit_ledger_type ADD VALUE 'auto_topup';
-```
+A comprehensive task log shows:
+- **AI Usage**: Every image generation, processing task, and AI operation
+- **Cost Breakdown**: Exact credit cost for each operation (or "Free" for no-cost tasks)
+- **Duration Tracking**: Processing time for completed tasks
+- **Project Organization**: Tasks grouped by user projects
+- **Filtering Options**: Filter by cost (free/paid), status, task type, and project
 
 ---
 
-## 4. UI Components & States
+## 3. User Purchase Experience
 
-### Main Component: CreditsManagement
+### Purchase Interface
 
-Located in `src/shared/components/CreditsManagement.tsx`, this component handles the complete credit purchase and auto-top-up interface.
+The credit purchase flow is designed for simplicity and transparency:
 
-#### Auto-Top-Up UI States
+**Amount Selection**
+- **Slider Interface**: Smooth slider from $5 to $100 in $5 increments
+- **Large Display**: Purchase amount shown prominently in large, bold text
+- **Real-time Updates**: All related settings update immediately as user adjusts amount
 
-The system displays different messages and controls based on user's setup and preference state:
+**Purchase Process**
+- **One-Click Purchase**: Single button to initiate payment
+- **Stripe Checkout**: Secure, industry-standard payment processing
+- **Mobile Optimized**: Streamlined experience on all device sizes
+- **Immediate Confirmation**: Credits appear in account immediately after successful payment
 
-| State | Condition | UI Color | Message | Button Text |
-|-------|-----------|----------|---------|-------------|
-| **🔵 enabled-but-not-setup** | ✅ Enabled + ❌ Not setup | Blue | "You've enabled auto-top-up, but it's not set up..." | "Add $50 and set-up auto-top-up" |
-| **🟢 active** | ✅ Enabled + ✅ Setup complete | Green | "You've enabled and activated auto-top-up..." | "Add $50" |
-| **🟡 setup-but-disabled** | ❌ Disabled + ✅ Setup complete | Yellow | "You have auto-top-up set up but it's currently deactivated..." | "Add $50" |
-| **⚪ not-setup** | ❌ Disabled + ❌ Not setup | Gray | "Auto-top-up summary: We'll automatically charge..." | "Add $50" |
-| **🚫 hidden** | ❌ Disabled (any setup state) | - | No summary displayed | "Add $50" |
+### Button Behavior
 
-#### Key UI Features
-
-- **Default enabled**: Checkbox starts checked for new users (opt-out vs opt-in)
-- **Dynamic threshold**: Auto-calculates to 1/5 of purchase amount
-- **Smart max limits**: Threshold slider max = purchase amount - 1
-- **Real-time sync**: Purchase slider changes auto-update auto-top-up amount
-- **Immediate feedback**: Local state updates before server confirmation
-- **No toast spam**: Silent saves for smooth UX
-
-### Hooks Integration
-
-#### useCredits Hook
-```typescript
-// Credit balance and purchase functionality
-const {
-  balance,
-  isLoadingBalance,
-  createCheckout,
-  formatCurrency
-} = useCredits();
-```
-
-#### useAutoTopup Hook
-```typescript
-// Auto-top-up preferences management
-const {
-  preferences,
-  isLoadingPreferences,
-  updatePreferences,
-  isEnabled,
-  isSetupCompleted,
-  isFullyConfigured
-} = useAutoTopup();
-```
+The purchase button adapts intelligently based on user state:
+- **Standard Purchase**: "Add $50" for regular credit additions
+- **Auto-top-up Setup**: "Add $50 and set-up auto-top-up" when configuring automation
+- **Loading State**: Animated spinner during payment processing
+- **Disabled State**: Grayed out when amount is $0 or during processing
 
 ---
 
-## 5. Edge Functions
+## 4. Auto-Top-Up System
 
-### stripe-checkout
-**Purpose**: Handle initial credit purchases and auto-top-up setup
+### How Auto-Top-Up Works
 
-**Flow**:
-1. Creates Stripe Checkout Session
-2. Sets `setup_future_usage: "off_session"` if auto-top-up enabled
-3. Passes auto-top-up metadata to webhook
+Auto-top-up is an optional feature that automatically purchases credits when a user's balance drops below a specified threshold. This ensures uninterrupted access to AI features without manual intervention.
 
-**Key Code**:
-```typescript
-// Auto-top-up setup during checkout
-if (autoTopupEnabled) {
-  sessionConfig.payment_intent_data = {
-    setup_future_usage: "off_session"
-  };
-  sessionConfig.customer_creation = "if_required";
-}
-```
+**Basic Operation**
+- **Threshold Monitoring**: System continuously monitors credit balance
+- **Automatic Triggering**: When balance drops below threshold, auto-purchase initiates
+- **Saved Payment Method**: Uses securely stored payment information from first purchase
+- **Immediate Processing**: Credits added to account within moments of trigger
 
-### stripe-webhook
-**Purpose**: Process Stripe events and complete setup
+### User Setup Process
 
-**Events Handled**:
-- `checkout.session.completed` → Complete credit purchase + auto-top-up setup
-- `payment_intent.succeeded` → Add credits from auto-top-up
-- `payment_intent.payment_failed` → Handle auto-top-up failures
+**Opt-in During First Purchase**
+1. User visits credit purchase interface
+2. Auto-top-up checkbox is **enabled by default** (opt-out approach)
+3. User adjusts purchase amount (e.g., $70)
+4. Threshold auto-calculates to 1/5 of amount (e.g., $14)
+5. User can manually adjust threshold if desired
+6. Purchase button shows "Add $70 and set-up auto-top-up"
+7. Stripe securely saves payment method during transaction
+8. Auto-top-up becomes active immediately
 
-**Key Code**:
-```typescript
-case 'checkout.session.completed':
-  // Add credits for purchase
-  await addCreditsToUser(userId, dollarAmount);
-  
-  // Setup auto-top-up if enabled
-  if (autoTopupEnabled === 'true') {
-    await supabaseAdmin.from('users').update({
-      auto_topup_enabled: true,
-      auto_topup_setup_completed: true,
-      auto_topup_amount: Math.round(parseFloat(autoTopupAmount) * 100),
-      auto_topup_threshold: Math.round(parseFloat(autoTopupThreshold) * 100),
-      stripe_customer_id: session.customer
-    }).eq('id', userId);
-  }
-```
+**Configuration Options**
+- **Top-up Amount**: How much to charge when triggered (mirrors purchase amount slider)
+- **Threshold**: Balance level that triggers auto-top-up (adjustable slider)
+- **Enable/Disable**: Simple checkbox to activate or deactivate feature
+- **Smart Defaults**: Threshold automatically calculates as 20% of top-up amount
 
-### setup-auto-topup
-**Purpose**: Update user's auto-top-up preferences
+### Auto-Top-Up States
 
-**Parameters**:
-```typescript
-{
-  autoTopupEnabled: boolean,
-  autoTopupAmount: number,    // in dollars
-  autoTopupThreshold: number  // in dollars
-}
-```
+The system displays different interfaces based on user's current auto-top-up status:
 
-### process-auto-topup
-**Purpose**: Execute automatic top-up payment
+**🟢 Active State** (Enabled + Setup Complete)
+- Green summary box with confirmation message
+- Shows exact amounts: "We'll automatically charge $70 when balance drops below $14"
+- Standard purchase button: "Add $70"
 
-**Flow**:
-1. Validate user eligibility
-2. Create off-session Payment Intent
-3. Charge saved payment method
-4. Add credits on success
+**🔵 Enabled but Not Setup** (Enabled + No Payment Method)
+- Blue summary box explaining setup needed
+- Special setup button: "Add $70 and set-up auto-top-up"
+- First purchase will save payment method and activate auto-top-up
 
-### trigger-auto-topup
-**Purpose**: Background handler called by database trigger
+**🟡 Setup but Disabled** (Disabled + Payment Method Saved)
+- Yellow summary box indicating deactivated state
+- User can re-enable anytime with checkbox toggle
+- Payment method remains securely stored
 
-**Flow**:
-1. Rate limiting checks (max once per hour)
-2. Validate user setup and preferences
-3. Call `process-auto-topup` for eligible users
+**⚪ Not Setup** (Disabled + No Payment Method)
+- Gray preview showing how auto-top-up would work
+- Standard purchase experience
+- No setup occurs unless checkbox is enabled
 
 ---
 
-## 6. User Experience Flow
+## 5. System Behavior & Rules
 
-### First-Time Setup Flow
+### Auto-Top-Up Triggering
 
-```mermaid
-graph TD
-    A[User opens Credits] --> B[Checkbox: ✅ Enabled by default]
-    B --> C[Adjust amount: $50 → $70]
-    C --> D[Threshold auto-updates: $10 → $14]
-    D --> E[Blue summary: "enabled-but-not-setup"]
-    E --> F[Button: "Add $70 and set-up auto-top-up"]
-    F --> G[Click button]
-    G --> H[Stripe Checkout with setup_future_usage]
-    H --> I[Payment succeeds]
-    I --> J[Webhook saves customer + payment method]
-    J --> K[setup_completed = true]
-    K --> L[Green summary: "active"]
-    L --> M[Auto-top-up ready!]
-```
+**When Auto-Top-Up Activates**
+- User's credit balance drops below their configured threshold
+- System checks every time credits are deducted from account
+- Only triggers for users who have both enabled auto-top-up AND completed setup
+- Rate limited to prevent multiple charges (maximum once per hour)
 
-### Auto-Top-Up Trigger Flow
+**Processing Timeline**
+1. **Immediate Detection**: Balance drop detected instantly when credits are spent
+2. **Validation**: System confirms user has active auto-top-up and valid payment method
+3. **Charge Processing**: Stripe processes off-session payment using saved payment method
+4. **Credit Addition**: Credits appear in user account within moments of successful charge
+5. **Notification**: Transaction appears in user's transaction history
 
-```mermaid
-graph TD
-    A[User spends credits] --> B[Balance drops to $9]
-    B --> C[Database trigger fires]
-    C --> D[check_auto_topup_trigger()]
-    D --> E{Balance < $14 threshold?}
-    E -->|Yes| F[trigger-auto-topup Edge Function]
-    E -->|No| G[No action]
-    F --> H[process-auto-topup]
-    H --> I[Stripe off-session charge]
-    I --> J[Add $70 credits]
-    J --> K[Update last_triggered]
-```
+### Smart Default Behavior
 
-### State Transitions
+**New User Experience**
+- Auto-top-up checkbox starts **checked** (opt-out rather than opt-in)
+- Threshold automatically calculates as 20% of purchase amount
+- When user adjusts purchase slider, threshold updates proportionally
+- Settings save automatically without confirmation dialogs
 
-```mermaid
-stateDiagram-v2
-    [*] --> not_setup: Default (checkbox unchecked)
-    [*] --> enabled_but_not_setup: Default (checkbox checked)
-    
-    enabled_but_not_setup --> active: Complete first purchase
-    active --> setup_but_disabled: Uncheck checkbox
-    setup_but_disabled --> active: Check checkbox
-    
-    not_setup --> enabled_but_not_setup: Check checkbox
-    enabled_but_not_setup --> not_setup: Uncheck checkbox
-```
+**Returning User Experience**
+- Previous auto-top-up preferences are remembered and restored
+- Purchase amount defaults to user's last auto-top-up amount (if configured)
+- Threshold remains at user's custom setting (doesn't auto-update for existing configurations)
 
----
+### Safety Mechanisms
 
-## 7. Implementation Details
+**Rate Limiting**
+- Maximum one auto-top-up charge per hour per user
+- Prevents rapid successive charges if balance quickly depletes
+- Timestamp tracking ensures proper intervals between charges
 
-### Database Trigger Implementation
+**Validation Checks**
+- Verifies user has valid saved payment method before attempting charge
+- Confirms user preferences are still enabled
+- Checks that current balance is actually below threshold
+- Validates charge amount is within reasonable limits
 
-```sql
-CREATE OR REPLACE FUNCTION check_auto_topup_trigger()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-DECLARE
-  user_record RECORD;
-BEGIN
-  -- Only check when credits decrease
-  IF NEW.credits >= OLD.credits THEN
-    RETURN NEW;
-  END IF;
+**Failure Handling**
+- Failed payments are logged but don't disable auto-top-up
+- User receives notification of failed charges
+- System retries may occur for temporary failures
+- Persistent failures require user intervention to update payment method
 
-  -- Get user auto-top-up settings
-  SELECT 
-    auto_topup_enabled,
-    auto_topup_setup_completed,
-    auto_topup_threshold,
-    auto_topup_amount,
-    stripe_customer_id,
-    stripe_payment_method_id
-  INTO user_record
-  FROM users 
-  WHERE id = NEW.id;
+### Configuration Flexibility
 
-  -- Exit if not both enabled AND setup
-  IF NOT user_record.auto_topup_enabled 
-     OR NOT user_record.auto_topup_setup_completed
-     OR user_record.auto_topup_threshold IS NULL 
-     OR NEW.credits > user_record.auto_topup_threshold THEN
-    RETURN NEW;
-  END IF;
+**Threshold Management**
+- Minimum threshold: $1
+- Maximum threshold: $1 less than top-up amount (prevents immediate re-triggering)
+- Real-time validation ensures threshold never exceeds top-up amount
+- Slider interface with immediate visual feedback
 
-  -- Call trigger-auto-topup Edge Function
-  PERFORM net.http_post(
-    url := 'https://[project].supabase.co/functions/v1/trigger-auto-topup',
-    headers := jsonb_build_object(
-      'Content-Type', 'application/json',
-      'Authorization', 'Bearer ' || current_setting('supabase.service_role_key', true)
-    ),
-    body := jsonb_build_object('userId', NEW.id)
-  );
-
-  RETURN NEW;
-END;
-$$;
-```
-
-### Frontend State Management
-
-#### Local vs Server State
-```typescript
-// Local state for immediate UI responsiveness
-const [localAutoTopupEnabled, setLocalAutoTopupEnabled] = useState(true);
-const [localAutoTopupThreshold, setLocalAutoTopupThreshold] = useState(10);
-
-// Server state from database
-const { preferences: autoTopupPreferences } = useAutoTopup();
-
-// State computation uses local state for immediate feedback
-const autoTopupState = useMemo(() => {
-  if (!autoTopupPreferences) return 'loading';
-  
-  const { setupCompleted } = autoTopupPreferences;
-  const enabled = localAutoTopupEnabled; // Use local for immediate updates
-  
-  if (enabled && setupCompleted) return 'active';
-  if (!enabled && setupCompleted) return 'setup-but-disabled';
-  if (enabled && !setupCompleted) return 'enabled-but-not-setup';
-  return 'not-setup';
-}, [autoTopupPreferences, localAutoTopupEnabled]);
-```
-
-#### Auto-Save Pattern
-```typescript
-const handlePurchaseAmountChange = (amount: number) => {
-  setPurchaseAmount(amount);
-  
-  if (localAutoTopupEnabled) {
-    // Auto-calculate new threshold (1/5 of amount)
-    const newThreshold = Math.max(1, Math.floor(amount / 5));
-    
-    // Update local state immediately
-    setLocalAutoTopupThreshold(newThreshold);
-    
-    // Save to database
-    updateAutoTopup({
-      enabled: localAutoTopupEnabled,
-      amount: amount,
-      threshold: newThreshold,
-    });
-  }
-};
-```
-
-### Error Handling Patterns
-
-#### Graceful Degradation
-- Missing database fields → Fallback queries without new columns
-- Failed saves → Console logging without UI interruption
-- Stripe errors → Disable auto-top-up to prevent retry loops
-
-#### Debug Logging
-```typescript
-// Comprehensive debug logging with consistent tags
-console.log('[AutoTopup:Init] Initializing from preferences:', preferences);
-console.log('[AutoTopup:Save] Saving preferences:', saveData);
-console.log('[AutoTopup:State] State computation:', { enabled, setupCompleted });
-```
+**Amount Synchronization**
+- Auto-top-up amount automatically mirrors purchase amount slider
+- Changes to purchase amount update auto-top-up amount if enabled
+- Ensures consistency between manual purchases and automatic top-ups
 
 ---
 
-## 8. Troubleshooting
+## 6. User Interface States
 
-### Common Issues
+### Visual Design System
 
-#### "Auto-top-up not triggering"
-**Symptoms**: Credits drop below threshold but no automatic charge
-**Debug Steps**:
-1. Check user state: `SELECT auto_topup_enabled, auto_topup_setup_completed FROM users WHERE id = ?`
-2. Verify trigger exists: `\df check_auto_topup_trigger`
-3. Check Edge Function logs in Supabase dashboard
-4. Confirm Stripe customer/payment method IDs are saved
+The credit management interface uses a clean, color-coded system to communicate auto-top-up status at a glance:
 
-#### "Button text not updating"
-**Symptoms**: Button shows "Add $50" instead of "Add $50 and set-up auto-top-up"
-**Debug Steps**:
-1. Check console logs for `[AutoTopup:State]` and `[AutoTopup:Button]`
-2. Verify `autoTopupState` computation
-3. Confirm `localAutoTopupEnabled` vs server state sync
+**🟢 Green (Active)**
+- Auto-top-up is enabled and fully configured
+- User sees confirmation of current settings
+- Standard purchase experience
 
-#### "Settings not persisting"
-**Symptoms**: Changes reset on page refresh
-**Debug Steps**:
-1. Check `[AutoTopup:Save]` logs for save operations
-2. Verify Edge Function response in Network tab
-3. Check `useAutoTopup` hook for query invalidation
-4. Confirm initialization logic in `hasInitialized` effect
+**🔵 Blue (Setup Needed)**
+- Auto-top-up is enabled but requires first purchase to save payment method
+- Special button text guides user through setup
+- Clear explanation of next steps
 
-#### "Threshold keeps resetting"
-**Symptoms**: Custom threshold values get overwritten
-**Debug Steps**:
-1. Check threshold auto-update effect conditions
-2. Verify `hasInitialized` flag prevents overwrites during init
-3. Look for competing effects that modify `localAutoTopupThreshold`
+**🟡 Yellow (Deactivated)**
+- Auto-top-up is configured but temporarily disabled
+- User can easily re-enable with checkbox toggle
+- Payment method remains securely saved
 
-### Database Queries for Debugging
+**⚪ Gray (Preview Mode)**
+- Shows how auto-top-up would work if enabled
+- No special messaging or setup prompts
+- Standard purchase experience
 
-```sql
--- Check user's auto-top-up configuration
-SELECT 
-  id,
-  credits,
-  auto_topup_enabled,
-  auto_topup_setup_completed,
-  auto_topup_amount,
-  auto_topup_threshold,
-  auto_topup_last_triggered,
-  stripe_customer_id,
-  stripe_payment_method_id
-FROM users 
-WHERE id = 'user-id-here';
+### Responsive Design
 
--- Check recent auto-top-up transactions
-SELECT *
-FROM credits_ledger 
-WHERE user_id = 'user-id-here' 
-  AND type = 'auto_topup'
-ORDER BY created_at DESC
-LIMIT 10;
+**Mobile Experience**
+- Simplified three-tab interface (Add Credits, Transaction History, Task Log)
+- Large, touch-friendly controls and sliders
+- Stacked layout for auto-top-up configuration
+- Essential information prioritized, details available on desktop
 
--- Check trigger function exists
-SELECT proname, prosrc 
-FROM pg_proc 
-WHERE proname = 'check_auto_topup_trigger';
-```
+**Desktop Experience**
+- Full feature access including detailed task log with filtering
+- Expanded transaction history with more columns
+- Advanced filtering options for task analysis
+- Complete auto-top-up configuration interface
 
-### Edge Function Testing
+### Real-Time Feedback
 
-```bash
-# Test auto-top-up setup
-curl -X POST https://[project].supabase.co/functions/v1/setup-auto-topup \
-  -H "Authorization: Bearer [jwt-token]" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "autoTopupEnabled": true,
-    "autoTopupAmount": 50,
-    "autoTopupThreshold": 10
-  }'
+**Immediate Visual Updates**
+- All sliders and controls update related values instantly
+- Local state changes reflected immediately in UI
+- No loading states for simple preference toggles
+- Smooth transitions between different auto-top-up states
 
-# Test auto-top-up processing
-curl -X POST https://[project].supabase.co/functions/v1/process-auto-topup \
-  -H "Authorization: Bearer [service-role-key]" \
-  -H "Content-Type: application/json" \
-  -d '{"userId": "user-id-here"}'
-```
+**Silent Background Saves**
+- Preference changes save automatically without confirmation dialogs
+- No toast notifications for routine updates
+- Console logging for debugging without interrupting user experience
+
+---
+
+## 7. Integration & Processing
+
+### Payment Processing
+
+**Stripe Integration**
+- Industry-standard payment processing with PCI compliance
+- Secure storage of payment methods for auto-top-up functionality
+- Off-session charging capability for automatic transactions
+- Real-time webhook processing for immediate credit delivery
+
+**Transaction Flow**
+1. **Initial Setup**: First purchase with auto-top-up enabled saves payment method to Stripe
+2. **Manual Purchases**: Standard Stripe Checkout flow for immediate credit additions
+3. **Automatic Charges**: Background processing using saved payment method when threshold reached
+4. **Transaction Recording**: All purchases logged in credits ledger with full audit trail
+
+### Real-Time Balance Updates
+
+**Immediate Synchronization**
+- Credit balance updates instantly after successful payments
+- Real-time deduction as AI features consume credits
+- Live balance display refreshes automatically
+- No manual refresh required for current credit status
+
+**Cross-Session Consistency**
+- Balance changes reflected across all open browser tabs
+- Mobile and desktop interfaces stay synchronized
+- Multi-device usage shows consistent credit information
+
+### Data Management
+
+**Transaction History**
+- Complete audit trail of all credit transactions
+- Detailed task log showing exact credit usage per AI operation
+- Exportable data for user analysis and record-keeping
+- Filtering and search capabilities for transaction analysis
+
+---
+
+## 8. Current Limitations
+
+### Payment Method Management
+
+**Single Payment Method**
+- Currently supports one saved payment method per user
+- No interface for updating or changing saved payment methods
+- Payment method changes require contacting support
+
+**Currency Support**
+- USD only at this time
+- No multi-currency support or international payment methods
+- Pricing displayed and processed in US dollars
+
+### Auto-Top-Up Constraints
+
+**Threshold Limitations**
+- Fixed relationship between top-up amount and maximum threshold
+- No support for multiple threshold levels or tiered auto-top-up
+- Minimum threshold of $1 may be too high for light usage patterns
+
+**Scheduling Restrictions**
+- No time-based controls (e.g., only charge during business hours)
+- No spending limits or daily/monthly caps on auto-top-up
+- No pause/vacation mode for temporary auto-top-up suspension
+
+### Advanced Features Not Yet Implemented
+
+**Analytics & Insights**
+- No usage pattern analysis or spending insights
+- No cost optimization recommendations
+- No integration with external accounting systems
+
+**Enterprise Features**
+- No team billing or shared payment methods
+- No department-level cost allocation
+- No bulk credit purchasing with volume discounts
+
+**Notification System**
+- No email notifications for auto-top-up transactions
+- No low balance warnings before auto-top-up triggers
+- No spending alerts or budget management tools
+
+### Known Technical Limitations
+
+**Rate Limiting**
+- One auto-top-up per hour maximum may cause gaps in heavy usage periods
+- No smart rate limiting based on usage patterns
+
+**Mobile Experience**
+- Some advanced filtering features only available on desktop
+- Task log detail view optimized for larger screens
+- CSV export functionality may have mobile browser limitations
 
 ---
 
 ## Summary
 
-The auto-top-up system provides a comprehensive solution for credit management with:
+Reigh's payment and credit system provides a robust foundation for AI feature usage with seamless credit management. The auto-top-up functionality ensures uninterrupted service while maintaining user control and transparency. The system balances simplicity for casual users with detailed tracking for power users, all built on secure, industry-standard payment processing infrastructure.
 
-- **Seamless UX**: Defaults to enabled, immediate feedback, no toast interruptions
-- **Robust Backend**: Database triggers, Edge Functions, Stripe integration
-- **Smart State Management**: Local + server state sync, graceful degradation
-- **Comprehensive Monitoring**: Debug logging, error handling, troubleshooting tools
-
-The system is designed for both developer maintainability and excellent user experience, with clear separation of concerns and extensive debugging capabilities.
+The current implementation successfully handles the core use cases while providing a clear path for future enhancements in payment method management, advanced analytics, and enterprise features.

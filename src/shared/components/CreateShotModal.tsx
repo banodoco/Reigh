@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
+import { useMobileModalStyling, createMobileModalProps, mergeMobileModalClasses } from '@/shared/hooks/useMobileModalStyling';
 import {
   Dialog,
   DialogContent,
@@ -31,6 +32,12 @@ const CreateShotModal: React.FC<CreateShotModalProps> = ({
   const [shotName, setShotName] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const isMobile = useIsMobile();
+  
+  // Mobile modal styling
+  const mobileModalStyling = useMobileModalStyling({
+    enableMobileEdgeBuffers: true,
+    disableCenteringOnMobile: true,
+  });
 
   const handleSubmit = async () => {
     let finalShotName = shotName.trim();
@@ -58,48 +65,54 @@ const CreateShotModal: React.FC<CreateShotModalProps> = ({
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent
-        className="sm:max-w-[425px] bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800"
-        onOpenAutoFocus={(event) => {
-          if (isMobile) {
-            event.preventDefault();
-          }
-        }}
+        className={mergeMobileModalClasses(
+          'sm:max-w-[425px] bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800 flex flex-col rounded-lg',
+          mobileModalStyling.dialogContentClassName,
+          mobileModalStyling.isMobile
+        )}
+        style={mobileModalStyling.dialogContentStyle}
+        {...createMobileModalProps(mobileModalStyling.isMobile)}
       >
-        <DialogHeader>
-          <DialogTitle>New Shot</DialogTitle>
-          <DialogDescription>
-            Enter a name for your new shot. You can also add starting images.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="shot-name" className="text-right">
-              Name
-            </Label>
-            <Input 
-              id="shot-name" 
-              value={shotName} 
-              onChange={(e) => setShotName(e.target.value)} 
-              className="col-span-3" 
-              placeholder={defaultShotName || "e.g., My Awesome Shot"}
-              maxLength={30}
+        <div className={mobileModalStyling.headerContainerClassName}>
+          <DialogHeader className={`${mobileModalStyling.isMobile ? 'px-4 pt-3 pb-1' : 'px-6 pt-3 pb-1'} flex-shrink-0`}>
+            <DialogTitle>New Shot</DialogTitle>
+          </DialogHeader>
+        </div>
+        
+        <div className={`flex-shrink-0 ${mobileModalStyling.isMobile ? 'px-4' : 'px-6'}`}>
+          <div className="grid gap-3 py-3">
+            <div className={`${mobileModalStyling.isMobile ? 'space-y-2' : 'grid grid-cols-4 items-center gap-4'}`}>
+              <Label htmlFor="shot-name" className={mobileModalStyling.isMobile ? 'text-left' : 'text-right'}>
+                Name
+              </Label>
+              <Input 
+                id="shot-name" 
+                value={shotName} 
+                onChange={(e) => setShotName(e.target.value)} 
+                className={mobileModalStyling.isMobile ? 'w-full' : 'col-span-3'} 
+                placeholder={defaultShotName || "e.g., My Awesome Shot"}
+                maxLength={30}
+              />
+            </div>
+            <FileInput 
+              onFileChange={setFiles}
+              multiple
+              acceptTypes={['image']}
+              label="Starting Images (Optional)"
             />
           </div>
-          <FileInput 
-            onFileChange={setFiles}
-            multiple
-            acceptTypes={['image']}
-            label="Starting Images (Optional)"
-          />
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={handleClose} disabled={isLoading}>
-            Cancel
-          </Button>
-          <Button type="submit" onClick={handleSubmit} disabled={isLoading}>
-            {isLoading ? 'Creating...' : 'New Shot'}
-          </Button>
-        </DialogFooter>
+        
+        <div className={mobileModalStyling.footerContainerClassName}>
+          <DialogFooter className={`${mobileModalStyling.isMobile ? 'px-4 pt-4 pb-1 flex-row justify-between' : 'px-6 pt-5 pb-2'} border-t`}>
+            <Button variant="outline" onClick={handleClose} disabled={isLoading} className={mobileModalStyling.isMobile ? '' : 'mr-auto'}>
+              Cancel
+            </Button>
+            <Button type="submit" onClick={handleSubmit} disabled={isLoading}>
+              {isLoading ? 'Creating...' : 'New Shot'}
+            </Button>
+          </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );

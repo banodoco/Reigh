@@ -25,6 +25,8 @@ import { Checkbox } from '@/shared/components/ui/checkbox';
 import { useToolSettings } from '@/shared/hooks/useToolSettings';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/shared/components/ui/collapsible';
 import { ChevronDown, AlertTriangle } from 'lucide-react';
+import { useIsMobile } from '@/shared/hooks/use-mobile';
+import { useMobileModalStyling, createMobileModalProps, mergeMobileModalClasses } from '@/shared/hooks/useMobileModalStyling';
 
 // Create the aspect ratio options from the centralized object
 const ASPECT_RATIOS = Object.keys(ASPECT_RATIO_TO_RESOLUTION)
@@ -41,6 +43,8 @@ interface ProjectSettingsModalProps {
 }
 
 export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({ isOpen, onOpenChange, project }) => {
+  const isMobile = useIsMobile();
+  const mobileModalStyling = useMobileModalStyling({ enableMobileEdgeBuffers: true, disableCenteringOnMobile: true });
   const [projectName, setProjectName] = useState('');
   const [aspectRatio, setAspectRatio] = useState<string>('');
   // Persistent project-level upload settings
@@ -122,115 +126,116 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({ isOp
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent 
-        className="sm:max-w-[425px]"
-        onOpenAutoFocus={(event) => {
-          // Prevent auto-focus on mobile devices to avoid triggering the keyboard
-          if ('ontouchstart' in window) {
-            event.preventDefault();
-          }
-        }}
+        className={mergeMobileModalClasses(
+          'sm:max-w-[425px] bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800 flex flex-col rounded-lg',
+          mobileModalStyling.dialogContentClassName,
+          mobileModalStyling.isMobile
+        )}
+        style={mobileModalStyling.dialogContentStyle}
+        {...createMobileModalProps(mobileModalStyling.isMobile)}
       >
-        <DialogHeader>
-          <DialogTitle>Project Settings: {project.name}</DialogTitle>
-          <DialogDescription>
-            Update the name and aspect ratio for your project. Click save when you're done.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="project-name-settings" className="text-right">
-              Name
-            </Label>
-            <Input
-              id="project-name-settings"
-              value={projectName}
-              onChange={(e) => setProjectName(e.target.value)}
-              className="col-span-3"
-              disabled={isUpdatingProject}
-              maxLength={30}
-            />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="aspect-ratio-settings" className="text-right">
-              Aspect Ratio
-            </Label>
-            <Select value={aspectRatio} onValueChange={setAspectRatio} disabled={isUpdatingProject}>
-              <SelectTrigger className="col-span-3" id="aspect-ratio-settings">
-                <SelectValue placeholder="Select aspect ratio" />
-              </SelectTrigger>
-              <SelectContent>
-                {ASPECT_RATIOS.map((ratio) => (
-                  <SelectItem key={ratio.value} value={ratio.value}>
-                    {ratio.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label className="text-right">
-              Image Upload
-            </Label>
-            <div className="col-span-3 flex items-center space-x-2">
-              <Checkbox 
-                id="crop-to-project-size-settings"
-                checked={cropToProjectSize}
-                onCheckedChange={(checked) => handleCropToProjectSizeChange(checked === true)}
-                disabled={isUpdatingProject}
-              />
-              <Label htmlFor="crop-to-project-size-settings" className="text-sm">
-                Crop to project size when uploading images
-              </Label>
-            </div>
-          </div>
-          {/* Danger Zone */}
-          <Collapsible open={isDangerZoneOpen} onOpenChange={setIsDangerZoneOpen}>
-            <div className="mt-6 border-t pt-4">
-              <CollapsibleTrigger asChild>
-                <Button
-                  variant="ghost"
-                  className="w-full justify-between p-0 h-auto text-left hover:bg-transparent"
-                  type="button"
-                >
-                  <div className="flex items-center gap-2">
-                    <AlertTriangle className="h-4 w-4 text-red-500" />
-                    <span className="text-red-600 font-light">Delete Project</span>
-                  </div>
-                  <ChevronDown className={`h-4 w-4 text-red-500 transition-transform ${isDangerZoneOpen ? 'rotate-180' : ''}`} />
-                </Button>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="mt-4">
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4 space-y-4">
-                  <div className="space-y-3">
-                    <div>
-                      <Label htmlFor="delete-confirm-input" className="text-sm font-light text-red-900">
-                        Type "confirm" to make it clear you wish to delete the project and all associated data.
-                      </Label>
-                      <Input
-                        id="delete-confirm-input"
-                        placeholder='Type "confirm" to enable'
-                        value={deleteConfirmText}
-                        onChange={(e) => setDeleteConfirmText(e.target.value)}
-                        disabled={isDeletingProject}
-                        className="mt-1 border-red-300 focus:border-red-500 focus:ring-red-500"
-                      />
-                    </div>
-                    <Button
-                      variant="destructive"
-                      onClick={handleDeleteProject}
-                      disabled={deleteConfirmText !== 'confirm' || isDeletingProject}
-                      className="w-full"
-                    >
-                      {isDeletingProject ? 'Deleting...' : 'Delete Project Forever'}
-                    </Button>
-                  </div>
-                </div>
-              </CollapsibleContent>
-            </div>
-          </Collapsible>
+        <div className={mobileModalStyling.headerContainerClassName}>
+          <DialogHeader className={`${mobileModalStyling.isMobile ? 'px-4 pt-4 pb-2' : 'px-6 pt-4 pb-2'} flex-shrink-0`}>
+            <DialogTitle>Project Settings: {project.name}</DialogTitle>
+          </DialogHeader>
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isUpdatingProject}>
+        <div className={`${mobileModalStyling.isMobile ? 'px-4' : 'px-6'} flex-1 overflow-y-auto min-h-0`}>
+          <div className="grid gap-3 py-3">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="project-name-settings" className="text-right">
+                Name
+              </Label>
+              <Input
+                id="project-name-settings"
+                value={projectName}
+                onChange={(e) => setProjectName(e.target.value)}
+                className="col-span-3"
+                disabled={isUpdatingProject}
+                maxLength={30}
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="aspect-ratio-settings" className="text-right">
+                Aspect Ratio
+              </Label>
+              <Select value={aspectRatio} onValueChange={setAspectRatio} disabled={isUpdatingProject}>
+                <SelectTrigger className="col-span-3" id="aspect-ratio-settings">
+                  <SelectValue placeholder="Select aspect ratio" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ASPECT_RATIOS.map((ratio) => (
+                    <SelectItem key={ratio.value} value={ratio.value}>
+                      {ratio.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">
+                Image Upload
+              </Label>
+              <div className="col-span-3 flex items-center space-x-2">
+                <Checkbox 
+                  id="crop-to-project-size-settings"
+                  checked={cropToProjectSize}
+                  onCheckedChange={(checked) => handleCropToProjectSizeChange(checked === true)}
+                  disabled={isUpdatingProject}
+                />
+                <Label htmlFor="crop-to-project-size-settings" className="text-sm">
+                  Crop to project size when uploading images
+                </Label>
+              </div>
+            </div>
+            {/* Danger Zone */}
+            <Collapsible open={isDangerZoneOpen} onOpenChange={setIsDangerZoneOpen}>
+              <div className="mt-6 border-t pt-4">
+                <CollapsibleTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-between p-0 h-auto text-left hover:bg-transparent"
+                    type="button"
+                  >
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4 text-red-500" />
+                      <span className="text-red-600 font-light">Delete Project</span>
+                    </div>
+                    <ChevronDown className={`h-4 w-4 text-red-500 transition-transform ${isDangerZoneOpen ? 'rotate-180' : ''}`} />
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="mt-4">
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4 space-y-4">
+                    <div className="space-y-3">
+                      <div>
+                        <Label htmlFor="delete-confirm-input" className="text-sm font-light text-red-900">
+                          Type "confirm" to make it clear you wish to delete the project and all associated data.
+                        </Label>
+                        <Input
+                          id="delete-confirm-input"
+                          placeholder='Type "confirm" to enable'
+                          value={deleteConfirmText}
+                          onChange={(e) => setDeleteConfirmText(e.target.value)}
+                          disabled={isDeletingProject}
+                          className="mt-1 border-red-300 focus:border-red-500 focus:ring-red-500"
+                        />
+                      </div>
+                      <Button
+                        variant="destructive"
+                        onClick={handleDeleteProject}
+                        disabled={deleteConfirmText !== 'confirm' || isDeletingProject}
+                        className="w-full"
+                      >
+                        {isDeletingProject ? 'Deleting...' : 'Delete Project Forever'}
+                      </Button>
+                    </div>
+                  </div>
+                </CollapsibleContent>
+              </div>
+            </Collapsible>
+          </div>
+        </div>
+        <DialogFooter className={`${mobileModalStyling.isMobile ? 'px-4 pt-4 pb-1 flex-row justify-between' : 'px-6 pt-5 pb-2'} border-t`}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isUpdatingProject} className={mobileModalStyling.isMobile ? '' : 'mr-auto'}>
             Cancel
           </Button>
           <Button 

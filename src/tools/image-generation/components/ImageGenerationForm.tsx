@@ -23,6 +23,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { SliderWithValue } from "@/shared/components/ui/slider-with-value";
 import { useProject } from "@/shared/contexts/ProjectContext";
 import { usePersistentToolState } from "@/shared/hooks/usePersistentToolState";
+import { useIsMobile } from "@/shared/hooks/use-mobile";
 import { ImageGenerationSettings } from "../settings";
 import { useListPublicResources } from '@/shared/hooks/useResources';
 import { useListShots, useCreateShot } from "@/shared/hooks/useShots";
@@ -175,8 +176,13 @@ export const PromptInputRow: React.FC<PromptInputRowProps> = React.memo(({
   forceExpanded = false,
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const promptContainerRef = useRef<HTMLDivElement>(null);
   const [isEditingFullPrompt, setIsEditingFullPrompt] = useState(false);
   const [localFullPrompt, setLocalFullPrompt] = useState(promptEntry.fullPrompt);
+  const isMobile = useIsMobile();
+  // When switching from another prompt, defer entering edit mode
+  // until this row is marked active to avoid immediate auto-close.
+  const [pendingEnterEdit, setPendingEnterEdit] = useState(false);
 
   useEffect(() => {
     if (!isEditingFullPrompt) {
@@ -184,48 +190,82 @@ export const PromptInputRow: React.FC<PromptInputRowProps> = React.memo(({
     }
   }, [promptEntry.fullPrompt, isEditingFullPrompt]);
 
+  // Close edit mode when another prompt becomes active
+  useEffect(() => {
+    if (!isActiveForFullView && isEditingFullPrompt) {
+      setIsEditingFullPrompt(false);
+    }
+  }, [isActiveForFullView, isEditingFullPrompt]);
+
+  // If we requested to enter edit, do so once this row becomes active
+  useEffect(() => {
+    if (isMobile && pendingEnterEdit && isActiveForFullView) {
+      setIsEditingFullPrompt(true);
+      setPendingEnterEdit(false);
+    }
+  }, [isMobile, pendingEnterEdit, isActiveForFullView]);
+
   const effectiveShortPrompt = promptEntry.shortPrompt?.trim();
   
-  let displayText = effectiveShortPrompt || promptEntry.fullPrompt;
+  // Always show full prompt by default (user wants to see full text, not summary)
+  let displayText = isEditingFullPrompt ? localFullPrompt : promptEntry.fullPrompt;
   let currentPlaceholder = `Enter your detailed prompt #${index + 1}...`;
-  let isShowingShort = !!effectiveShortPrompt;
+  let isShowingShort = false;
 
-  if (isActiveForFullView || isEditingFullPrompt || forceExpanded) {
-    displayText = isEditingFullPrompt ? localFullPrompt : promptEntry.fullPrompt;
-    isShowingShort = false;
-    if (isEditingFullPrompt) {
-        currentPlaceholder = `Editing detailed prompt #${index + 1}...`;
-    } else if ((isActiveForFullView || forceExpanded) && effectiveShortPrompt) {
-        currentPlaceholder = `Add text...`;
-    } else {
-        currentPlaceholder = `Add text...`;
-    }
-  } else if (effectiveShortPrompt && !forceExpanded) {
-    displayText = effectiveShortPrompt;
-    currentPlaceholder = `Click to see/edit full prompt... (Summary: ${effectiveShortPrompt})`;
-    isShowingShort = true;
+  if (isEditingFullPrompt) {
+    currentPlaceholder = `Editing detailed prompt #${index + 1}...`;
+  } else {
+    currentPlaceholder = `Enter your detailed prompt #${index + 1}...`;
   }
 
   // Debounced auto-resize function to prevent excessive reflows
   const autoResizeTextarea = useCallback(() => {
     if (textareaRef.current) {
-      textareaRef.current.style.height = 'inherit';
+      textareaRef.current.style.height = 'auto';
       const scrollHeight = textareaRef.current.scrollHeight;
-      let baseHeight = 60;
-      if (isShowingShort && !isActiveForFullView && !isEditingFullPrompt && !forceExpanded) {
-         baseHeight = Math.max(36, Math.min(scrollHeight, 60)); 
-      } else { 
-         baseHeight = Math.max(60, scrollHeight);
+      
+      if (isActiveForFullView || isEditingFullPrompt || forceExpanded) {
+        // For expanded/edit view: allow natural height with reasonable minimums
+        const minHeight = isMobile ? 96 : 72;
+        const baseHeight = Math.max(minHeight, scrollHeight);
+        textareaRef.current.style.height = `${baseHeight}px`;
+      } else {
+        // For collapsed view: exactly 2 rows mobile, 1 row desktop
+        const fixedHeight = isMobile ? 56 : 32; // ~2 lines mobile, ~1 line desktop
+        textareaRef.current.style.height = `${fixedHeight}px`;
       }
-      textareaRef.current.style.height = `${baseHeight}px`;
     }
-  }, [isShowingShort, isActiveForFullView, isEditingFullPrompt, forceExpanded]);
+  }, [isActiveForFullView, isEditingFullPrompt, forceExpanded, isMobile]);
 
   useEffect(() => {
     autoResizeTextarea();
   }, [displayText, autoResizeTextarea]);
 
-  useEffect(() => { autoResizeTextarea(); }, [autoResizeTextarea]);
+  // Focus textarea when entering edit mode on mobile
+  useEffect(() => {
+    if (isMobile && isEditingFullPrompt && textareaRef.current) {
+      // Small delay to ensure the textarea has rendered
+      setTimeout(() => {
+        textareaRef.current?.focus();
+      }, 50);
+    }
+  }, [isMobile, isEditingFullPrompt]);
+
+  // Scroll to center when prompt becomes active on mobile
+  useEffect(() => {
+    if (isMobile && isActiveForFullView && promptContainerRef.current) {
+      // Small delay to ensure any height changes have completed
+      setTimeout(() => {
+        if (promptContainerRef.current) {
+          promptContainerRef.current.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center',
+            inline: 'nearest'
+          });
+        }
+      }, 100);
+    }
+  }, [isMobile, isActiveForFullView]);
 
   const handleFullPromptChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newText = e.target.value;
@@ -234,19 +274,53 @@ export const PromptInputRow: React.FC<PromptInputRowProps> = React.memo(({
   };
 
   const handleFocus = () => {
-    setIsEditingFullPrompt(true);
-    onSetActiveForFullView(promptEntry.id);
+    if (!isMobile) {
+      // Desktop: enter edit mode immediately as before
+      setIsEditingFullPrompt(true);
+      onSetActiveForFullView(promptEntry.id);
+    }
+    // Mobile: do nothing on focus to prevent keyboard opening
+  };
+
+  const handleClick = () => {
+    if (isMobile) {
+      // Request activation first, then enter edit when active to ensure single-tap switch works
+      setPendingEnterEdit(true);
+      onSetActiveForFullView(promptEntry.id);
+    }
+  };
+
+  // Capture intent before blur dismisses keyboard on mobile Safari
+  const handlePointerDown = (e: React.PointerEvent) => {
+    if (isMobile) {
+      // Prevent default to avoid unintended focus changes before we activate this row
+      // but allow scrolling (only prevent for touch/pen primary pointers)
+      if (e.isPrimary && (e.pointerType === 'touch' || e.pointerType === 'pen')) {
+        e.preventDefault();
+      }
+      setPendingEnterEdit(true);
+      onSetActiveForFullView(promptEntry.id);
+    }
   };
 
   const handleBlur = () => {
     setIsEditingFullPrompt(false);
+    // Save changes when leaving edit mode
     if (localFullPrompt !== promptEntry.fullPrompt) {
       onUpdate(promptEntry.id, 'fullPrompt', localFullPrompt);
     }
   };
 
+  // Save changes when edit mode is closed (e.g., when another prompt becomes active)
+  useEffect(() => {
+    if (!isEditingFullPrompt && localFullPrompt !== promptEntry.fullPrompt) {
+      onUpdate(promptEntry.id, 'fullPrompt', localFullPrompt);
+    }
+  }, [isEditingFullPrompt, localFullPrompt, promptEntry.fullPrompt, onUpdate]);
+
   return (
     <div 
+      ref={promptContainerRef}
       className={`p-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600 transition-colors ${forceExpanded ? 'mt-0' : ''}`}
     >
       <div className="flex justify-between items-center mb-2">
@@ -300,21 +374,45 @@ export const PromptInputRow: React.FC<PromptInputRowProps> = React.memo(({
       </div>
       
       <div>
-        <Textarea
-          ref={textareaRef}
-          id={`fullPrompt-${promptEntry.id}`}
-          value={displayText}
-          onChange={handleFullPromptChange}
-          onFocus={handleFocus}
-          onBlur={handleBlur}
-          placeholder={currentPlaceholder}
-          className={`mt-1 resize-none overflow-y-hidden ${
-            isShowingShort && !isActiveForFullView && !isEditingFullPrompt && !forceExpanded ? 'min-h-[36px] cursor-pointer' : 'min-h-[60px]'
-          }`}
-          disabled={!hasApiKey || isGenerating}
-          readOnly={!isEditingFullPrompt && isActiveForFullView && !!effectiveShortPrompt && !isShowingShort}
-          rows={1} 
-        />
+        {(!isMobile || isEditingFullPrompt) ? (
+          // Desktop or mobile in edit mode: use actual textarea
+          <Textarea
+            ref={textareaRef}
+            id={`fullPrompt-${promptEntry.id}`}
+            value={displayText}
+            onChange={handleFullPromptChange}
+            onFocus={handleFocus}
+            onBlur={handleBlur}
+            placeholder={currentPlaceholder}
+            className={`mt-1 resize-none ${
+              isActiveForFullView || isEditingFullPrompt || forceExpanded
+                ? `overflow-y-auto ${isMobile ? 'min-h-[96px]' : 'min-h-[72px]'}`
+                : `overflow-hidden ${isMobile ? 'h-[56px]' : 'h-[32px]'} cursor-pointer`
+            }`}
+            disabled={!hasApiKey || isGenerating}
+            rows={isMobile ? 2 : 1} 
+          />
+        ) : (
+          // Mobile not in edit mode: use div that looks like textarea
+          <div
+            onPointerDown={handlePointerDown}
+            onClick={handleClick}
+            className={`mt-1 resize-none border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
+              isActiveForFullView || forceExpanded
+                ? `overflow-y-auto ${isMobile ? 'min-h-[96px]' : 'min-h-[72px]'}`
+                : `overflow-hidden ${isMobile ? 'h-[56px]' : 'h-[32px]'} cursor-pointer`
+            } rounded-md`}
+            style={{
+              whiteSpace: 'pre-wrap',
+              wordWrap: 'break-word',
+              fontFamily: 'inherit',
+            }}
+          >
+            {displayText || (
+              <span className="text-muted-foreground">{currentPlaceholder}</span>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

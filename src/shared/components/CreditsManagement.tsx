@@ -434,9 +434,10 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
           </div>
         </div>
 
-        <div className="px-6">
+        <div className="px-1">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-          <TabsList className="grid w-full grid-cols-3 bg-gray-100 border border-gray-200 h-auto p-3 sm:h-10 sm:p-1 mb-3">
+          <div className="-mx-1 sm:mx-0">
+          <TabsList className="grid w-full grid-cols-3 bg-gray-100 border border-gray-200 h-auto p-3 sm:h-10 sm:p-1 mb-3 px-1 rounded-none sm:px-1 sm:rounded-md">
             <TabsTrigger 
               value="purchase"
               className="data-[state=active]:bg-white data-[state=active]:shadow-sm flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-0.5 py-2 sm:py-1.5 px-2 sm:px-3 text-xs sm:text-sm"
@@ -468,9 +469,10 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
               </span>
             </TabsTrigger>
           </TabsList>
+          </div>
 
-          <TabsContent value="purchase" className="flex-1 pb-6 pt-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] sm:[&::-webkit-scrollbar]:block sm:[-ms-overflow-style:auto] sm:[scrollbar-width:auto]">
-            <div className="space-y-4">
+          <TabsContent value="purchase" className="flex-1 pb-2 pt-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] sm:[&::-webkit-scrollbar]:block sm:[-ms-overflow-style:auto] sm:[scrollbar-width:auto]">
+            <div className="space-y-4 px-1">
               <div className="space-y-1.5">
                                   <div className="text-center mt-2">
                     <label className="text-lg font-light text-gray-900">
@@ -485,7 +487,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                     </div>
                   </div>
                   
-                  <div className="px-4">
+                  <div className="-mx-1 px-0">
                     <Slider
                       value={[purchaseAmount]}
                       onValueChange={(value) => handlePurchaseAmountChange(value[0])}
@@ -494,7 +496,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                       step={5}
                       className="w-full"
                     />
-                    <div className="flex justify-between text-sm text-gray-500 mt-2">
+                    <div className="flex justify-between text-sm text-gray-500 mt-2 px-1">
                       <span>$0</span>
                       <span>$100</span>
                     </div>
@@ -604,7 +606,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
             </div>
           </TabsContent>
 
-          <TabsContent value="history" className="flex-1 pb-6 pt-0 space-y-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] sm:[&::-webkit-scrollbar]:block sm:[-ms-overflow-style:auto] sm:[scrollbar-width:auto]">
+          <TabsContent value="history" className="flex-1 pb-2 pt-0 space-y-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] sm:[&::-webkit-scrollbar]:block sm:[-ms-overflow-style:auto] sm:[scrollbar-width:auto] -mx-6 px-0 sm:mx-0 sm:px-0">
             <div className="border border-gray-200 rounded-lg overflow-hidden">
               {isLoadingLedger ? (
                 <div className="p-8 text-center">
@@ -658,7 +660,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
             </div>
           </TabsContent>
 
-          <TabsContent value="task-log" className="flex-1 pb-6 pt-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] sm:[&::-webkit-scrollbar]:block sm:[-ms-overflow-style:auto] sm:[scrollbar-width:auto]">
+          <TabsContent value="task-log" className="flex-1 pb-2 pt-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] sm:[&::-webkit-scrollbar]:block sm:[-ms-overflow-style:auto] sm:[scrollbar-width:auto] -mx-6 px-0 sm:mx-0 sm:px-0">
             {/* Mobile notice */}
             <div className="sm:hidden p-3 bg-blue-50 border border-blue-200 rounded-lg text-center">
               <p className="text-sm text-blue-700">More details are available on desktop</p>

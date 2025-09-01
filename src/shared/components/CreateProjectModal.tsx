@@ -22,6 +22,8 @@ import { useProject } from '@/shared/contexts/ProjectContext';
 import { toast } from 'sonner';
 import { ASPECT_RATIO_TO_RESOLUTION } from '@/shared/lib/aspectRatios';
 import { getRandomDummyName } from '../lib/dummyNames';
+import { useIsMobile } from '@/shared/hooks/use-mobile';
+import { useMobileModalStyling, createMobileModalProps, mergeMobileModalClasses } from '@/shared/hooks/useMobileModalStyling';
 
 interface CreateProjectModalProps {
   isOpen: boolean;
@@ -39,6 +41,13 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, 
   const [projectName, setProjectName] = useState('');
   const [aspectRatio, setAspectRatio] = useState<string>('16:9');
   const { addNewProject, isCreatingProject, projects, selectedProjectId } = useProject();
+  const isMobile = useIsMobile();
+  
+  // Mobile modal styling
+  const mobileModalStyling = useMobileModalStyling({
+    enableMobileEdgeBuffers: true,
+    disableCenteringOnMobile: true,
+  });
 
   // Get current project to use its aspect ratio as default
   const currentProject = projects.find(p => p.id === selectedProjectId);
@@ -95,66 +104,71 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, 
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent 
-        className="sm:max-w-[425px]"
-        onOpenAutoFocus={(event) => {
-          // Prevent auto-focus on mobile devices to avoid triggering the keyboard
-          if ('ontouchstart' in window) {
-            event.preventDefault();
-          }
-        }}
+      <DialogContent
+        className={mergeMobileModalClasses(
+          'sm:max-w-[425px] bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800 flex flex-col rounded-lg',
+          mobileModalStyling.dialogContentClassName,
+          mobileModalStyling.isMobile
+        )}
+        style={mobileModalStyling.dialogContentStyle}
+        {...createMobileModalProps(mobileModalStyling.isMobile)}
       >
-        <DialogHeader>
-          <DialogTitle>Create New Project</DialogTitle>
-          <DialogDescription>
-            Enter a name and select an aspect ratio for your new project. Click create when you're done.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="project-name" className="text-right">
-              Name
-            </Label>
-            <Input
-              id="project-name"
-              value={projectName}
-              onChange={(e) => setProjectName(e.target.value)}
-              className="col-span-3"
-              disabled={isCreatingProject}
-              maxLength={30}
-              placeholder="Enter project name..."
-            />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="aspect-ratio" className="text-right">
-              Aspect Ratio
-            </Label>
-            <Select value={aspectRatio} onValueChange={setAspectRatio} disabled={isCreatingProject}>
-              <SelectTrigger className="col-span-3" id="aspect-ratio">
-                <SelectValue placeholder="Select aspect ratio" />
-              </SelectTrigger>
-              <SelectContent>
-                {ASPECT_RATIOS.map((ratio) => (
-                  <SelectItem key={ratio.value} value={ratio.value}>
-                    {ratio.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        <div className={mobileModalStyling.headerContainerClassName}>
+          <DialogHeader className={`${mobileModalStyling.isMobile ? 'px-4 pt-4 pb-2' : 'px-6 pt-4 pb-2'} flex-shrink-0`}>
+            <DialogTitle>Create New Project</DialogTitle>
+          </DialogHeader>
+        </div>
+        
+        <div className={`flex-shrink-0 ${mobileModalStyling.isMobile ? 'px-4' : 'px-6'}`}>
+          <div className="grid gap-3 py-3">
+            <div className={`${mobileModalStyling.isMobile ? 'space-y-2' : 'grid grid-cols-4 items-center gap-4'}`}>
+              <Label htmlFor="project-name" className={mobileModalStyling.isMobile ? 'text-left' : 'text-right'}>
+                Name
+              </Label>
+              <Input
+                id="project-name"
+                value={projectName}
+                onChange={(e) => setProjectName(e.target.value)}
+                className={mobileModalStyling.isMobile ? 'w-full' : 'col-span-3'}
+                disabled={isCreatingProject}
+                maxLength={30}
+                placeholder="Enter project name..."
+              />
+            </div>
+            <div className={`${mobileModalStyling.isMobile ? 'space-y-2' : 'grid grid-cols-4 items-center gap-4'}`}>
+              <Label htmlFor="aspect-ratio" className={mobileModalStyling.isMobile ? 'text-left' : 'text-right'}>
+                Aspect Ratio
+              </Label>
+              <Select value={aspectRatio} onValueChange={setAspectRatio} disabled={isCreatingProject}>
+                <SelectTrigger className={mobileModalStyling.isMobile ? 'w-full' : 'col-span-3'} id="aspect-ratio">
+                  <SelectValue placeholder="Select aspect ratio" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ASPECT_RATIOS.map((ratio) => (
+                    <SelectItem key={ratio.value} value={ratio.value}>
+                      {ratio.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isCreatingProject}>
-            Cancel
-          </Button>
-          <Button 
-            type="submit" 
-            onClick={handleCreateProject} 
-            disabled={isCreatingProject || !aspectRatio}
-          >
-            {isCreatingProject ? "Creating..." : "Create Project"}
-          </Button>
-        </DialogFooter>
+        
+        <div className={mobileModalStyling.footerContainerClassName}>
+          <DialogFooter className={`${mobileModalStyling.isMobile ? 'px-4 pt-4 pb-1 flex-row justify-between' : 'px-6 pt-5 pb-2'} border-t`}>
+            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isCreatingProject} className={mobileModalStyling.isMobile ? '' : 'mr-auto'}>
+              Cancel
+            </Button>
+            <Button 
+              type="submit" 
+              onClick={handleCreateProject} 
+              disabled={isCreatingProject || !aspectRatio}
+            >
+              {isCreatingProject ? "Creating..." : "Create Project"}
+            </Button>
+          </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );

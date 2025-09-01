@@ -5,6 +5,8 @@ export interface MobileModalConfig {
   enableMobileFullscreen?: boolean;
   /** Whether to disable default desktop centering on mobile */
   disableCenteringOnMobile?: boolean;
+  /** Enable only left/right edge buffers without forcing full height */
+  enableMobileEdgeBuffers?: boolean;
 }
 
 export interface MobileModalStyling {
@@ -21,9 +23,10 @@ export const useMobileModalStyling = (config: MobileModalConfig = {}): MobileMod
   const {
     enableMobileFullscreen = false,
     disableCenteringOnMobile = false,
+    enableMobileEdgeBuffers = false,
   } = config;
 
-  if (!isMobile || !enableMobileFullscreen) {
+  if (!isMobile) {
     return {
       dialogContentClassName: '',
       dialogContentStyle: {},
@@ -34,27 +37,65 @@ export const useMobileModalStyling = (config: MobileModalConfig = {}): MobileMod
     };
   }
 
+  // Mobile edge buffers only - left/right positioning without forcing height
+  if (enableMobileEdgeBuffers && !enableMobileFullscreen) {
+    const edgeBufferPositioning = [
+      'left-4',   // 16px - left buffer
+      'right-4',  // 16px - right buffer
+      'w-auto',
+      'rounded-lg', // Add rounded corners
+    ];
+
+    const centeringOverrides = disableCenteringOnMobile ? [
+      'translate-x-0',
+      '[&>button:last-child]:right-7', // Close button adjustment
+    ] : [];
+
+    const dialogContentClassName = [...edgeBufferPositioning, ...centeringOverrides].join(' ');
+
+    return {
+      dialogContentClassName,
+      dialogContentStyle: {},
+      headerContainerClassName: 'flex-shrink-0',
+      footerContainerClassName: 'flex-shrink-0',
+      scrollContainerClassName: 'flex-1 overflow-y-auto min-h-0',
+      isMobile,
+    };
+  }
+
   // Mobile near-fullscreen positioning using safe Tailwind classes (matching SettingsModal)
-  const mobilePositioning = [
-    'left-4',   // 16px - matching SettingsModal for proper visual buffer
-    'right-4',  // 16px - matching SettingsModal for proper visual buffer
-    'top-8',    // 32px - matching SettingsModal for status bar clearance
-    'bottom-8', // 32px - matching SettingsModal for navigation clearance
-    'w-auto',
-    'max-h-none',
-    'rounded-lg', // Add rounded corners like SettingsModal
-  ];
+  if (enableMobileFullscreen) {
+    const mobilePositioning = [
+      'left-4',   // 16px - matching SettingsModal for proper visual buffer
+      'right-4',  // 16px - matching SettingsModal for proper visual buffer
+      'top-8',    // 32px - matching SettingsModal for status bar clearance
+      'bottom-8', // 32px - matching SettingsModal for navigation clearance
+      'w-auto',
+      'max-h-none',
+      'rounded-lg', // Add rounded corners like SettingsModal
+    ];
 
-  const centeringOverrides = disableCenteringOnMobile ? [
-    'translate-x-0',
-    'translate-y-0',
-    '[&>button:last-child]:right-7', // Close button adjustment
-  ] : [];
+    const centeringOverrides = disableCenteringOnMobile ? [
+      'translate-x-0',
+      'translate-y-0',
+      '[&>button:last-child]:right-7', // Close button adjustment
+    ] : [];
 
-  const dialogContentClassName = [...mobilePositioning, ...centeringOverrides].join(' ');
+    const dialogContentClassName = [...mobilePositioning, ...centeringOverrides].join(' ');
 
+    return {
+      dialogContentClassName,
+      dialogContentStyle: {},
+      headerContainerClassName: 'flex-shrink-0',
+      footerContainerClassName: 'flex-shrink-0',
+      scrollContainerClassName: 'flex-1 overflow-y-auto min-h-0',
+      isMobile,
+    };
+  }
+
+  // Default mobile behavior (no special positioning)
   return {
-    dialogContentClassName,
+    dialogContentClassName: '',
     dialogContentStyle: {},
     headerContainerClassName: 'flex-shrink-0',
     footerContainerClassName: 'flex-shrink-0',
