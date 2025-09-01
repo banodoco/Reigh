@@ -201,7 +201,9 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({ isOpen, onOpenChan
               </p>
 
               {/* Profit split bar illustration */}
-              <ProfitSplitBar className="mt-2 mb-1" />
+              <div className="overflow-visible">
+                <ProfitSplitBar className="mt-2 mb-1" />
+              </div>
               
               {/* Special Inspirational Message */}
               <div className="mt-6 mb-4">

@@ -104,7 +104,7 @@ const createMobileLayoutStrategy = (layout: MobileLayout, isMobile: boolean) => 
     
     'edge-buffered': () => ({
       classes: `left-${MOBILE_SPACING.edge} right-${MOBILE_SPACING.edge} w-auto`,
-      centeringOverrides: ['translate-x-0', MODAL_BASE_CLASSES.closeButton, 'transform-none'],
+      centeringOverrides: ['translate-x-0', MODAL_BASE_CLASSES.closeButton],
       customStyles: undefined,
     }),
     

@@ -39,7 +39,7 @@ export const ProfitSplitBar: React.FC<ProfitSplitBarProps> = ({ className }) => 
                       onClick={() => { if (isMobile) setEngLeftOpen((v) => !v); }}
                     />
                   </TooltipTrigger>
-                  <TooltipContent side="bottom" align="center" className="px-2 py-1 whitespace-nowrap text-center text-[11px] leading-tight">
+                  <TooltipContent side="bottom" align="center" className="px-2 py-1 whitespace-nowrap text-center text-[11px] leading-tight z-[11100]">
                     Technical contributors to workflows and LoRAs
                   </TooltipContent>
                 </Tooltip>
@@ -55,7 +55,7 @@ export const ProfitSplitBar: React.FC<ProfitSplitBarProps> = ({ className }) => 
                       onClick={() => { if (isMobile) setEngRightOpen((v) => !v); }}
                     />
                   </TooltipTrigger>
-                  <TooltipContent side="bottom" align="center" className="px-2 py-1 whitespace-nowrap text-center text-[11px] leading-tight">
+                  <TooltipContent side="bottom" align="center" className="px-2 py-1 whitespace-nowrap text-center text-[11px] leading-tight z-[11100]">
                     Fund to train models and build extensions
                   </TooltipContent>
                 </Tooltip>
@@ -76,7 +76,7 @@ export const ProfitSplitBar: React.FC<ProfitSplitBarProps> = ({ className }) => 
                       onClick={() => { if (isMobile) setArtLeftOpen((v) => !v); }}
                     />
                   </TooltipTrigger>
-                  <TooltipContent side="bottom" align="center" className="px-2 py-1 whitespace-nowrap text-center text-[11px] leading-tight">
+                  <TooltipContent side="bottom" align="center" className="px-2 py-1 whitespace-nowrap text-center text-[11px] leading-tight z-[11100]">
                     Artists who refer people will receive a share of their lifetime spend
                   </TooltipContent>
                 </Tooltip>
@@ -92,7 +92,7 @@ export const ProfitSplitBar: React.FC<ProfitSplitBarProps> = ({ className }) => 
                       onClick={() => { if (isMobile) setArtRightOpen((v) => !v); }}
                     />
                   </TooltipTrigger>
-                  <TooltipContent side="bottom" align="center" className="px-2 py-1 whitespace-nowrap text-center text-[11px] leading-tight">
+                  <TooltipContent side="bottom" align="center" className="px-2 py-1 whitespace-nowrap text-center text-[11px] leading-tight z-[11100]">
                     We will fund art competitions with our profits
                   </TooltipContent>
                 </Tooltip>
@@ -111,7 +111,7 @@ export const ProfitSplitBar: React.FC<ProfitSplitBarProps> = ({ className }) => 
                   onClick={() => { if (isMobile) setBanoOpen((v) => !v); }}
                 />
               </TooltipTrigger>
-              <TooltipContent side="bottom" align="center" className="px-2 py-1 whitespace-nowrap text-center text-[11px] leading-tight">
+              <TooltipContent side="bottom" align="center" className="px-2 py-1 whitespace-nowrap text-center text-[11px] leading-tight z-[11100]">
                 Yeah, we like money too
               </TooltipContent>
             </Tooltip>
