@@ -173,7 +173,7 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({ isOpen, onOpenChan
             </div>
 
             {/* Special Inspirational Message */}
-            <div className="my-4 text-center">
+            <div className="my-4">
               <p className="text-base font-medium text-primary leading-relaxed italic">
                 "We hope that this motivates artists to create art that in turn inspires others to create with AI."
               </p>
