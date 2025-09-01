@@ -405,6 +405,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                           max={purchaseAmount - 1}
                           step={1}
                           variant="secondary"
+                          formatValue={(value) => `$${value}`}
                         />
                       </div>
                     )}

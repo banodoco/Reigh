@@ -12,6 +12,7 @@ interface SliderWithValueProps {
   disabled?: boolean;
   variant?: "primary" | "secondary";
   hideLabel?: boolean;
+  formatValue?: (value: number) => string;
 }
 
 const SliderWithValue = ({
@@ -24,6 +25,7 @@ const SliderWithValue = ({
   disabled = false,
   variant = "primary",
   hideLabel = false,
+  formatValue,
 }: SliderWithValueProps) => {
   const handleValueChange = (values: number[]) => {
     onChange(values[0]);
@@ -38,7 +40,7 @@ const SliderWithValue = ({
       )}
       <div className="flex gap-4">
         <div className="border rounded w-16 h-10 flex items-center justify-center bg-white">
-          {Number.isInteger(value) ? value : value.toFixed(2)}
+          {formatValue ? formatValue(value) : (Number.isInteger(value) ? value : value.toFixed(2))}
         </div>
         <Slider
           value={[value]}
