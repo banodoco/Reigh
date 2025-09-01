@@ -26,7 +26,7 @@ import { useToolSettings } from '@/shared/hooks/useToolSettings';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/shared/components/ui/collapsible';
 import { ChevronDown, AlertTriangle } from 'lucide-react';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
-import { useMobileModalStyling, createMobileModalProps, mergeMobileModalClasses } from '@/shared/hooks/useMobileModalStyling';
+import { useMediumModal, createMobileModalProps } from '@/shared/hooks/useMobileModalStyling';
 
 // Create the aspect ratio options from the centralized object
 const ASPECT_RATIOS = Object.keys(ASPECT_RATIO_TO_RESOLUTION)
@@ -44,7 +44,7 @@ interface ProjectSettingsModalProps {
 
 export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({ isOpen, onOpenChange, project }) => {
   const isMobile = useIsMobile();
-  const mobileModalStyling = useMobileModalStyling({ enableMobileEdgeBuffers: true, disableCenteringOnMobile: true });
+  const mobileModalStyling = useMediumModal();
   const [projectName, setProjectName] = useState('');
   const [aspectRatio, setAspectRatio] = useState<string>('');
   // Persistent project-level upload settings
@@ -126,11 +126,7 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({ isOp
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent 
-        className={mergeMobileModalClasses(
-          'sm:max-w-[425px] bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800 flex flex-col rounded-lg',
-          mobileModalStyling.dialogContentClassName,
-          mobileModalStyling.isMobile
-        )}
+        className={mobileModalStyling.fullClassName}
         style={mobileModalStyling.dialogContentStyle}
         {...createMobileModalProps(mobileModalStyling.isMobile)}
       >

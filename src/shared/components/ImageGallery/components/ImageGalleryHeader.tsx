@@ -52,6 +52,9 @@ export interface ImageGalleryHeaderProps {
   toolTypeFilterEnabled?: boolean;
   onToolTypeFilterChange?: (enabled: boolean) => void;
   currentToolTypeName?: string;
+  
+  // Mobile props
+  isMobile?: boolean;
 }
 
 export const ImageGalleryHeader: React.FC<ImageGalleryHeaderProps> = ({
@@ -100,6 +103,9 @@ export const ImageGalleryHeader: React.FC<ImageGalleryHeaderProps> = ({
   toolTypeFilterEnabled,
   onToolTypeFilterChange,
   currentToolTypeName,
+  
+  // Mobile props
+  isMobile = false,
 }) => {
   return (
     <div className={`${reducedSpacing ? 'mt-0' : 'mt-7'} space-y-3`}>
@@ -196,6 +202,7 @@ export const ImageGalleryHeader: React.FC<ImageGalleryHeaderProps> = ({
         toolTypeFilterEnabled={toolTypeFilterEnabled}
         onToolTypeFilterChange={onToolTypeFilterChange}
         currentToolTypeName={currentToolTypeName}
+        isMobile={isMobile}
       />
     </div>
   );

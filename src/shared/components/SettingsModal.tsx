@@ -20,7 +20,7 @@ import usePersistentState from "@/shared/hooks/usePersistentState";
 import { useCredits } from "@/shared/hooks/useCredits";
 import { supabase } from "@/integrations/supabase/client";
 import { useIsMobile } from "@/shared/hooks/use-mobile";
-import { useMobileModalStyling, createMobileModalProps, mergeMobileModalClasses } from '@/shared/hooks/useMobileModalStyling';
+import { useLargeModal, createMobileModalProps } from '@/shared/hooks/useMobileModalStyling';
 import { 
   Select,
   SelectContent,
@@ -55,10 +55,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const isMobile = useIsMobile();
   
   // Mobile modal styling
-  const mobileModalStyling = useMobileModalStyling({
-    enableMobileFullscreen: true,
-    disableCenteringOnMobile: true,
-  });
+  const mobileModalStyling = useLargeModal();
   const { apiKeys, isLoading: isLoadingKeys, saveApiKeys, isUpdating } = useApiKeys();
   const { 
     tokens, 
@@ -397,11 +394,7 @@ python worker.py --db-type supabase \\
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent 
-        className={mergeMobileModalClasses(
-          'sm:max-w-2xl max-h-[90vh] bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800 flex flex-col rounded-lg [&>button:last-child]:top-[1.5rem]',
-          mobileModalStyling.dialogContentClassName,
-          mobileModalStyling.isMobile
-        )}
+        className={mobileModalStyling.fullClassName}
         style={mobileModalStyling.dialogContentStyle}
         {...createMobileModalProps(mobileModalStyling.isMobile)}
       >

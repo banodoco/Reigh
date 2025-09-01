@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardFooter as ItemCardFooter, CardH
 import { Input } from "@/shared/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/components/ui/select";
 import { useIsMobile } from '@/shared/hooks/use-mobile';
-import { useMobileModalStyling, createMobileModalProps, mergeMobileModalClasses } from '@/shared/hooks/useMobileModalStyling';
+import { useExtraLargeModal, createMobileModalProps } from '@/shared/hooks/useMobileModalStyling';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/components/ui/tabs";
 import { useListResources, useCreateResource, useDeleteResource, Resource } from '@/shared/hooks/useResources';
 import { Textarea } from '@/shared/components/ui/textarea';
@@ -444,16 +444,42 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & {
                           {lora.Images.slice(0, 5).map((image, index) => {
                             const isVideo = image.type?.startsWith('video');
                             return isVideo ? (
-                              <HoverScrubVideo
+                              <div
                                 key={index}
-                                src={image.url}
-                                className="h-28 w-auto min-w-20 sm:min-w-0 rounded border p-0.5 hover:opacity-80 transition-opacity cursor-pointer"
-                                videoClassName="object-contain"
-                                autoplayOnHover
-                                preload="metadata"
-                                loop
-                                muted
-                              />
+                                className="relative h-28 w-auto min-w-20 sm:min-w-0 rounded border p-0.5 hover:opacity-80 transition-opacity cursor-pointer"
+                                onClickCapture={(e) => {
+                                  if (!isMobile) return;
+                                  const container = e.currentTarget as HTMLElement;
+                                  const video = container.querySelector('video') as HTMLVideoElement | null;
+                                  if (!video) return;
+                                  if (video.paused) {
+                                    video.play().catch(() => {});
+                                  } else {
+                                    video.pause();
+                                  }
+                                }}
+                                onTouchEndCapture={(e) => {
+                                  if (!isMobile) return;
+                                  const container = e.currentTarget as HTMLElement;
+                                  const video = container.querySelector('video') as HTMLVideoElement | null;
+                                  if (!video) return;
+                                  if (video.paused) {
+                                    video.play().catch(() => {});
+                                  } else {
+                                    video.pause();
+                                  }
+                                }}
+                              >
+                                <HoverScrubVideo
+                                  src={image.url}
+                                  className="h-full w-auto"
+                                  videoClassName="object-contain"
+                                  autoplayOnHover={!isMobile}
+                                  preload="metadata"
+                                  loop
+                                  muted
+                                />
+                              </div>
                             ) : (
                               <img
                                 key={index}
@@ -1046,10 +1072,7 @@ export const LoraSelectorModal: React.FC<LoraSelectorModalProps> = ({
   const [processedLorasLength, setProcessedLorasLength] = useState(0);
   
   // Mobile modal styling
-  const mobileModalStyling = useMobileModalStyling({
-    enableMobileFullscreen: true,
-    disableCenteringOnMobile: true,
-  });
+  const mobileModalStyling = useExtraLargeModal('loraSelector');
 
   if (!isOpen) {
     return null;
@@ -1058,11 +1081,7 @@ export const LoraSelectorModal: React.FC<LoraSelectorModalProps> = ({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent
-        className={mergeMobileModalClasses(
-          'max-w-4xl flex flex-col max-h-[90vh] overflow-hidden bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800 rounded-lg',
-          mobileModalStyling.dialogContentClassName,
-          mobileModalStyling.isMobile
-        )}
+        className={mobileModalStyling.fullClassName}
         style={mobileModalStyling.dialogContentStyle}
         {...createMobileModalProps(mobileModalStyling.isMobile)}
       >
@@ -1072,11 +1091,18 @@ export const LoraSelectorModal: React.FC<LoraSelectorModalProps> = ({
           </DialogHeader>
         </div>
         <div className={mobileModalStyling.scrollContainerClassName}>
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex flex-col flex-1 overflow-hidden">
-              <TabsList className={`grid w-full grid-cols-2 flex-shrink-0 ${mobileModalStyling.isMobile ? 'mx-0 mb-2' : 'mx-6 mb-4'}`}>
+          <div className={`${mobileModalStyling.isMobile ? 'px-2' : 'px-6'} py-2 flex-shrink-0`}>
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex flex-col flex-1 overflow-hidden">
+              <TabsList className="grid w-full grid-cols-2 mb-2">
                   <TabsTrigger value="browse" className="w-full">Browse LoRAs</TabsTrigger>
                   <TabsTrigger value="add-new" className="w-full">Add LoRA</TabsTrigger>
               </TabsList>
+            </Tabs>
+          </div>
+          
+          {/* Tab Content */}
+          <div className="flex-1 flex flex-col min-h-0">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex flex-col flex-1 overflow-hidden">
               <TabsContent value="browse" className="flex-1 flex flex-col min-h-0">
                 <CommunityLorasTab 
                     loras={loras} 
@@ -1095,20 +1121,21 @@ export const LoraSelectorModal: React.FC<LoraSelectorModalProps> = ({
                     setShowAddedLorasOnly={setShowAddedLorasOnly}
                     onProcessedLorasLengthChange={setProcessedLorasLength}
                 />
-            </TabsContent>
-            <TabsContent value="add-new" className="flex-1 min-h-0 overflow-auto">
-                <MyLorasTab 
-                    myLorasResource={myLorasResource}
-                    onAddLora={onAddLora}
-                    onRemoveLora={onRemoveLora}
-                    selectedLoraIds={selectedLoras.map(l => l['Model ID'])}
-                    deleteResource={deleteResource}
-                    createResource={createResource}
-                    lora_type={lora_type}
-                    onSwitchToBrowse={() => setActiveTab('browse')}
-                />
               </TabsContent>
-          </Tabs>
+              <TabsContent value="add-new" className="flex-1 min-h-0 overflow-auto">
+                  <MyLorasTab 
+                      myLorasResource={myLorasResource}
+                      onAddLora={onAddLora}
+                      onRemoveLora={onRemoveLora}
+                      selectedLoraIds={selectedLoras.map(l => l['Model ID'])}
+                      deleteResource={deleteResource}
+                      createResource={createResource}
+                      lora_type={lora_type}
+                      onSwitchToBrowse={() => setActiveTab('browse')}
+                  />
+                </TabsContent>
+            </Tabs>
+          </div>
         </div>
         
         {/* Control Panel Footer - Always sticks to bottom like PromptEditorModal */}

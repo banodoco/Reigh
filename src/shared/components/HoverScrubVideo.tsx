@@ -63,6 +63,10 @@ interface HoverScrubVideoProps extends Omit<React.HTMLAttributes<HTMLDivElement>
    * If true, do not set video src until user interaction. Only the poster is shown.
    */
   posterOnlyUntilClick?: boolean;
+  /**
+   * When true, toggle play/pause on click (helpful on mobile where hover is absent)
+   */
+  playOnClick?: boolean;
 }
 
 /**
@@ -86,12 +90,15 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
   thumbnailMode = false,
   autoplayOnHover = false,
   posterOnlyUntilClick = false,
+  playOnClick = false,
   ...rest
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const mouseMoveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isHoveringRef = useRef(false);
+  // Track whether a play was explicitly initiated by the user
+  const userInitiatedPlayRef = useRef(false);
   const [playbackRate, setPlaybackRate] = useState(1);
   const [duration, setDuration] = useState(0);
   const [scrubberPosition, setScrubberPosition] = useState<number | null>(null);
@@ -345,7 +352,8 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
       }
       
       // Only enforce anti-autoplay on mobile thumbnails (scrubbing enabled)
-      if (!disableScrubbing && isMobile && !isHoveringRef.current) {
+      // but allow if explicitly user-initiated (click/touch)
+      if (!disableScrubbing && isMobile && !isHoveringRef.current && !userInitiatedPlayRef.current) {
         if (process.env.NODE_ENV === 'development') {
           console.warn('[AutoplayDebugger:GALLERY] 🚫 BLOCKED mobile autoplay', {
             videoSrc: video.src?.substring(video.src.lastIndexOf('/') + 1) || 'no-src',
@@ -378,6 +386,8 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
           timestamp: Date.now()
         });
       }
+      // Reset user-initiated flag on pause so future autoplays are blocked again
+      userInitiatedPlayRef.current = false;
     };
 
     const handleSeeked = () => {
@@ -392,8 +402,8 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
         });
       }
       
-      // Only enforce pause-after-seek on mobile thumbnails
-      if (!disableScrubbing && isMobile && !video.paused) {
+      // Only enforce pause-after-seek on mobile thumbnails, unless user initiated
+      if (!disableScrubbing && isMobile && !userInitiatedPlayRef.current && !video.paused) {
         if (process.env.NODE_ENV === 'development') {
           console.warn('[MobileVideoAutoplay] Video started playing after seek on mobile thumbnail, pausing', {
             src: video.src,

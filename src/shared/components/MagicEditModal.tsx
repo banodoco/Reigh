@@ -14,7 +14,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { createBatchMagicEditTasks, TaskValidationError } from '@/shared/lib/tasks/magicEdit';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
-import { useMobileModalStyling, createMobileModalProps, mergeMobileModalClasses } from '@/shared/hooks/useMobileModalStyling';
+import { useModalStyling, createMobileModalProps } from '@/shared/hooks/useMobileModalStyling';
 import {
   Dialog,
   DialogContent,
@@ -39,10 +39,7 @@ export const MagicEditModal: React.FC<MagicEditModalProps> = ({
   const isMobile = useIsMobile();
   
   // Mobile modal styling
-  const mobileModalStyling = useMobileModalStyling({
-    enableMobileEdgeBuffers: true,
-    disableCenteringOnMobile: true,
-  });
+  const mobileModalStyling = useModalStyling('medium-wide');
   const [magicEditPrompt, setMagicEditPrompt] = useState('');
   const [magicEditNumImages, setMagicEditNumImages] = useState(4);
   const [magicEditInSceneBoost, setMagicEditInSceneBoost] = useState(false);
@@ -162,11 +159,7 @@ export const MagicEditModal: React.FC<MagicEditModalProps> = ({
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent
-          className={mergeMobileModalClasses(
-            'sm:max-w-[500px] bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800 flex flex-col rounded-lg',
-            mobileModalStyling.dialogContentClassName,
-            mobileModalStyling.isMobile
-          )}
+          className={mobileModalStyling.fullClassName}
           style={mobileModalStyling.dialogContentStyle}
           {...createMobileModalProps(mobileModalStyling.isMobile)}
         >

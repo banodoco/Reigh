@@ -606,6 +606,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = (props) => {
               onToolTypeFilterChange?.(enabled);
             }}
             currentToolTypeName={currentToolTypeName}
+            isMobile={isMobile}
           />
         </div>
 

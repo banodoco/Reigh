@@ -40,6 +40,9 @@ export interface ImageGalleryFiltersProps {
   toolTypeFilterEnabled?: boolean;
   onToolTypeFilterChange?: (enabled: boolean) => void;
   currentToolTypeName?: string;
+  
+  // Mobile props
+  isMobile?: boolean;
 }
 
 export const ImageGalleryFilters: React.FC<ImageGalleryFiltersProps> = ({
@@ -63,11 +66,12 @@ export const ImageGalleryFilters: React.FC<ImageGalleryFiltersProps> = ({
   toolTypeFilterEnabled = true,
   onToolTypeFilterChange,
   currentToolTypeName,
+  isMobile = false,
 }) => {
   return (
     <div className="flex justify-between items-center flex-wrap gap-y-2">
       {/* Left side filters */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-1">
         {/* Shot Filter */}
         {showShotFilter && (
           <ShotFilter
@@ -130,6 +134,7 @@ export const ImageGalleryFilters: React.FC<ImageGalleryFiltersProps> = ({
             onToggle={onToolTypeFilterChange || (() => {})}
             toolTypeName={currentToolTypeName}
             whiteText={whiteText}
+            isMobile={isMobile}
           />
         )}
       </div>

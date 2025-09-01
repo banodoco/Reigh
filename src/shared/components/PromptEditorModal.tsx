@@ -16,7 +16,7 @@ import { useProject } from '@/shared/contexts/ProjectContext';
 import { usePersistentToolState } from '@/shared/hooks/usePersistentToolState';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/shared/components/ui/collapsible';
 import { useIsMobile } from "@/shared/hooks/use-mobile";
-import { useMobileModalStyling, createMobileModalProps, mergeMobileModalClasses } from "@/shared/hooks/useMobileModalStyling";
+import { useExtraLargeModal, useMediumModal, createMobileModalProps } from "@/shared/hooks/useMobileModalStyling";
 
 // Use aliased types for internal state if they were named the same
 interface GenerationControlValues extends PGC_GenerationControlValues {}
@@ -51,6 +51,9 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
   generatePromptId,
   apiKey,
 }) => {
+  // Debug: Log when component is called
+  console.log(`[PromptEditorModal:COMPONENT_ENTRY] Component called with isOpen: ${isOpen}, initialPrompts.length: ${initialPrompts.length}`);
+  
   const [internalPrompts, setInternalPrompts] = useState<PromptEntry[]>([]);
   
   // Debug: Log whenever internalPrompts changes
@@ -64,17 +67,28 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
   const isMobile = useIsMobile();
   const [isAIPromptSectionExpanded, setIsAIPromptSectionExpanded] = useState(false);
   
-  // Mobile modal styling
-  const mobileModalStyling = useMobileModalStyling({
-    enableMobileFullscreen: true,
-    disableCenteringOnMobile: true,
+  // Drag detection for collapsible trigger
+  const dragStartPos = useRef<{ x: number; y: number } | null>(null);
+  const isDragging = useRef(false);
+  
+  // Modal content ref for outside click detection
+  const modalContentRef = useRef<HTMLDivElement>(null);
+  
+  // Mobile modal styling - back to extra large but with mobile fixes
+  const mobileModalStyling = useExtraLargeModal('promptEditor');
+  
+  // Debug mobile modal styling hook result
+  console.log(`[PromptEditorModal:MOBILE_STYLING_DEBUG] useExtraLargeModal result:`, {
+    isMobile: mobileModalStyling.isMobile,
+    fullClassName: mobileModalStyling.fullClassName,
+    dialogContentStyle: mobileModalStyling.dialogContentStyle,
+    headerContainerClassName: mobileModalStyling.headerContainerClassName,
+    scrollContainerClassName: mobileModalStyling.scrollContainerClassName,
+    footerContainerClassName: mobileModalStyling.footerContainerClassName
   });
   
   // Nested dialog mobile styling - match medium modals like CreateProject/ProjectSettings
-  const nestedModalStyling = useMobileModalStyling({
-    enableMobileEdgeBuffers: true,
-    disableCenteringOnMobile: true,
-  });
+  const nestedModalStyling = useMediumModal();
   
   // Scroll state and ref
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -382,8 +396,98 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
     markAsInteracted();
   }, [markAsInteracted]);
 
-  const handleToggleAIPromptSection = useCallback(() => {
-    setIsAIPromptSectionExpanded(prev => !prev);
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    dragStartPos.current = { x: touch.clientX, y: touch.clientY };
+    isDragging.current = false;
+    console.log(`[PromptEditorModal:DRAG_DEBUG] Touch start on button. Recording position: ${touch.clientX}, ${touch.clientY}`);
+  };
+
+  // Use global touch move listener to track drag without interfering with scroll
+  useEffect(() => {
+    const handleGlobalTouchMove = (e: TouchEvent) => {
+      if (dragStartPos.current && e.touches.length > 0) {
+        const touch = e.touches[0];
+        const deltaX = Math.abs(touch.clientX - dragStartPos.current.x);
+        const deltaY = Math.abs(touch.clientY - dragStartPos.current.y);
+        // Only log if we're actually tracking a potential button press
+        if (dragStartPos.current) {
+          console.log(`[PromptEditorModal:DRAG_DEBUG] Global touch move. deltaX: ${deltaX}, deltaY: ${deltaY}, isDragging: ${isDragging.current}`);
+        }
+        // Consider it a drag if moved more than 5px in any direction
+        if (deltaX > 5 || deltaY > 5) {
+          isDragging.current = true;
+          console.log(`[PromptEditorModal:DRAG_DEBUG] Setting isDragging to true (global touch)`);
+        }
+      }
+    };
+
+    const handleGlobalTouchEnd = () => {
+      // Reset drag tracking when touch ends
+      setTimeout(() => {
+        dragStartPos.current = null;
+        isDragging.current = false;
+      }, 50); // Small delay to allow click handler to check isDragging
+    };
+
+    if (isOpen) {
+      document.addEventListener('touchmove', handleGlobalTouchMove, { passive: true });
+      document.addEventListener('touchend', handleGlobalTouchEnd);
+    }
+
+    return () => {
+      document.removeEventListener('touchmove', handleGlobalTouchMove);
+      document.removeEventListener('touchend', handleGlobalTouchEnd);
+    };
+  }, [isOpen]);
+
+  // Outside click/drag detection for modal and field management
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleOutsideInteraction = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as Element;
+      
+      // Check if click/touch is outside the modal content entirely
+      if (modalContentRef.current && !modalContentRef.current.contains(target)) {
+        console.log(`[PromptEditorModal:OUTSIDE_CLICK] Detected outside modal, closing modal`);
+        handleFinalSaveAndClose();
+        return;
+      }
+
+      // If click is inside modal but outside any prompt field, collapse expanded fields
+      if (activePromptIdForFullView && modalContentRef.current?.contains(target)) {
+        // Check if clicked element is not within any prompt input area
+        const clickedPromptField = target.closest('[data-prompt-field]');
+        const clickedActiveField = target.closest(`[data-prompt-id="${activePromptIdForFullView}"]`);
+        
+        // If clicked outside the currently active field, collapse it
+        if (!clickedActiveField) {
+          console.log(`[PromptEditorModal:FIELD_COLLAPSE] Clicked outside active field, collapsing field ${activePromptIdForFullView}`);
+          setActivePromptIdForFullView(null);
+        }
+      }
+    };
+
+    // Add event listeners for both mouse and touch
+    document.addEventListener('mousedown', handleOutsideInteraction);
+    document.addEventListener('touchstart', handleOutsideInteraction);
+
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideInteraction);
+      document.removeEventListener('touchstart', handleOutsideInteraction);
+    };
+  }, [isOpen, activePromptIdForFullView, handleFinalSaveAndClose]);
+
+  const handleToggleAIPromptSection = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
+    // Only trigger if it wasn't a drag
+    if (!isDragging.current) {
+      setIsAIPromptSectionExpanded(prev => !prev);
+    }
+    // Reset for next interaction
+    dragStartPos.current = null;
+    isDragging.current = false;
   }, []);
 
   const handleModalClose = useCallback((open: boolean) => {
@@ -394,16 +498,64 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
     }
   }, [isOpen, handleFinalSaveAndClose]);
 
+  // Debug modal rendering
+  console.log(`[PromptEditorModal:RENDER_DEBUG] Rendering modal. isOpen: ${isOpen}, isMobile: ${isMobile}, mobileModalStyling:`, {
+    fullClassName: mobileModalStyling.fullClassName,
+    dialogContentStyle: mobileModalStyling.dialogContentStyle,
+    isMobile: mobileModalStyling.isMobile
+  });
+
+  // More debug info before rendering
+  const mobileProps = createMobileModalProps(mobileModalStyling.isMobile);
+  console.log(`[PromptEditorModal:DIALOG_DEBUG] About to render Dialog with:`, {
+    open: isOpen,
+    isMobile,
+    'mobileModalStyling.isMobile': mobileModalStyling.isMobile,
+    createMobileModalPropsResult: mobileProps
+  });
+  
+  // Log individual mobile props
+  console.log(`[PromptEditorModal:MOBILE_PROPS_DEBUG] createMobileModalProps detailed:`, mobileProps);
+
   return (
     <Dialog open={isOpen} onOpenChange={handleModalClose}>
-      <DialogContent 
-        className={mergeMobileModalClasses(
-          'max-w-4xl max-h-[90vh] bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800 flex flex-col p-0 rounded-lg',
-          mobileModalStyling.dialogContentClassName,
-          mobileModalStyling.isMobile
-        )}
-        style={mobileModalStyling.dialogContentStyle}
-        {...createMobileModalProps(mobileModalStyling.isMobile)}
+      <DialogContent
+        className={mobileModalStyling.fullClassName}
+        style={{
+          ...mobileModalStyling.dialogContentStyle,
+          // Force proper mobile positioning
+          ...(isMobile && {
+            position: 'fixed',
+            top: 'env(safe-area-inset-top, 20px)',
+            left: '16px',
+            right: '16px',
+            bottom: 'env(safe-area-inset-bottom, 20px)',
+            transform: 'none',
+            maxHeight: 'calc(100vh - env(safe-area-inset-top, 20px) - env(safe-area-inset-bottom, 20px) - 40px)',
+            width: 'auto',
+            margin: '0'
+          })
+        }}
+        {...mobileProps}
+        ref={(el) => {
+          modalContentRef.current = el;
+          if (el && isOpen) {
+            console.log(`[PromptEditorModal:DOM_DEBUG] DialogContent element when open:`, {
+              element: el,
+              computedStyle: window.getComputedStyle(el),
+              boundingRect: el.getBoundingClientRect(),
+              visibility: window.getComputedStyle(el).visibility,
+              display: window.getComputedStyle(el).display,
+              opacity: window.getComputedStyle(el).opacity,
+              transform: window.getComputedStyle(el).transform,
+              zIndex: window.getComputedStyle(el).zIndex,
+              top: window.getComputedStyle(el).top,
+              left: window.getComputedStyle(el).left,
+              right: window.getComputedStyle(el).right,
+              bottom: window.getComputedStyle(el).bottom
+            });
+          }
+        }}
       >
         <div className={mobileModalStyling.headerContainerClassName}>
           <DialogHeader className={`${mobileModalStyling.isMobile ? 'px-4 pt-6 pb-2' : 'px-6 pt-8 pb-2'} flex-shrink-0`}>
@@ -425,6 +577,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
               <Button
                 variant="ghost"
                 className={`${isAIPromptSectionExpanded ? 'w-full justify-between p-4 mb-4 hover:bg-accent/50' : 'w-full justify-between p-4 mb-4 bg-gradient-to-r from-purple-500/20 via-pink-500/20 to-red-500/20 border border-pink-400/40 hover:from-purple-500/30 hover:to-red-500/30'} transition-colors duration-300`}
+                onTouchStart={handleTouchStart}
                 onClick={handleToggleAIPromptSection}
               >
                 <div className="flex items-center gap-2">
@@ -491,7 +644,12 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
                 </div>
               )}
               {internalPrompts.map((prompt, index) => (
-                <div key={prompt.id} className="mb-4">
+                <div 
+                  key={prompt.id} 
+                  className="mb-4"
+                  data-prompt-field
+                  data-prompt-id={prompt.id}
+                >
                   <PromptInputRow
                     promptEntry={prompt}
                     index={index}
@@ -514,11 +672,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
         {promptToEdit && (
           <Dialog open={!!promptToEdit} onOpenChange={(open) => !open && setPromptToEdit(null)}>
             <DialogContent 
-              className={mergeMobileModalClasses(
-                'sm:max-w-[425px] bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800 rounded-lg',
-                nestedModalStyling.dialogContentClassName,
-                nestedModalStyling.isMobile
-              )}
+              className={nestedModalStyling.fullClassName}
               style={nestedModalStyling.dialogContentStyle}
               {...createMobileModalProps(nestedModalStyling.isMobile)}
             >

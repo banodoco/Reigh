@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
-import { useMobileModalStyling, createMobileModalProps, mergeMobileModalClasses } from '@/shared/hooks/useMobileModalStyling';
+import { useMediumModal, createMobileModalProps } from '@/shared/hooks/useMobileModalStyling';
 import {
   Dialog,
   DialogContent,
@@ -34,10 +34,7 @@ const CreateShotModal: React.FC<CreateShotModalProps> = ({
   const isMobile = useIsMobile();
   
   // Mobile modal styling
-  const mobileModalStyling = useMobileModalStyling({
-    enableMobileEdgeBuffers: true,
-    disableCenteringOnMobile: true,
-  });
+  const mobileModalStyling = useMediumModal();
 
   const handleSubmit = async () => {
     let finalShotName = shotName.trim();
@@ -65,11 +62,7 @@ const CreateShotModal: React.FC<CreateShotModalProps> = ({
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent
-        className={mergeMobileModalClasses(
-          'sm:max-w-[425px] bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800 flex flex-col rounded-lg',
-          mobileModalStyling.dialogContentClassName,
-          mobileModalStyling.isMobile
-        )}
+        className={mobileModalStyling.fullClassName}
         style={mobileModalStyling.dialogContentStyle}
         {...createMobileModalProps(mobileModalStyling.isMobile)}
       >

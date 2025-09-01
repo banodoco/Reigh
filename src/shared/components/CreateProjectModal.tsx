@@ -23,7 +23,7 @@ import { toast } from 'sonner';
 import { ASPECT_RATIO_TO_RESOLUTION } from '@/shared/lib/aspectRatios';
 import { getRandomDummyName } from '../lib/dummyNames';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
-import { useMobileModalStyling, createMobileModalProps, mergeMobileModalClasses } from '@/shared/hooks/useMobileModalStyling';
+import { useMediumModal, createMobileModalProps } from '@/shared/hooks/useMobileModalStyling';
 
 interface CreateProjectModalProps {
   isOpen: boolean;
@@ -44,10 +44,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, 
   const isMobile = useIsMobile();
   
   // Mobile modal styling
-  const mobileModalStyling = useMobileModalStyling({
-    enableMobileEdgeBuffers: true,
-    disableCenteringOnMobile: true,
-  });
+  const mobileModalStyling = useMediumModal();
 
   // Get current project to use its aspect ratio as default
   const currentProject = projects.find(p => p.id === selectedProjectId);
@@ -105,11 +102,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent
-        className={mergeMobileModalClasses(
-          'sm:max-w-[425px] bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800 flex flex-col rounded-lg',
-          mobileModalStyling.dialogContentClassName,
-          mobileModalStyling.isMobile
-        )}
+        className={mobileModalStyling.fullClassName}
         style={mobileModalStyling.dialogContentStyle}
         {...createMobileModalProps(mobileModalStyling.isMobile)}
       >
