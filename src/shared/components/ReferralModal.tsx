@@ -232,11 +232,12 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({ isOpen, onOpenChan
 
               {/* Statistics */}
               <div className="space-y-2">
+                <hr className="border-t border-gray-200 my-4" />
                 <label className="text-sm font-medium">You can see your statistics on referred users here:</label>
               <div className="border rounded-lg overflow-hidden">
                 <div className="bg-gray-50 dark:bg-gray-800 px-4 py-2 border-b">
                   <div className="grid grid-cols-3 gap-4 text-sm font-medium">
-                    <div>Visitors</div>
+                    <div>Visitors from link</div>
                     <div>Successful Sign-ups</div>
                     <div>Referral bonuses earned:</div>
                   </div>
@@ -263,23 +264,22 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({ isOpen, onOpenChan
               </div>
             </div>
 
-            {/* Link to detailed stats - future enhancement */}
-            {stats && (stats.total_visits > 0 || stats.successful_referrals > 0) && (
-              <div className="pt-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-xs text-muted-foreground hover:text-primary"
-                  onClick={() => {
-                    // Future: navigate to detailed referral analytics page
-                    console.info('Detailed analytics coming soon!');
-                  }}
+            {/* Discord link */}
+            <div className="pt-4 text-center">
+              <p className="text-sm text-muted-foreground">
+                Please share any questions on{' '}
+                <a 
+                  href="https://discord.gg/wv6MymFEE3" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-primary underline hover:text-primary/80 transition-colors"
                 >
-                  View detailed analytics
-                  <ExternalLink className="h-3 w-3 ml-1" />
-                </Button>
-              </div>
-            )}
+                  our discord
+                </a>
+                .
+              </p>
+            </div>
+
               </div>
             </div>
         </div>
