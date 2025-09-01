@@ -178,11 +178,19 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
     
     const { enabled, setupCompleted } = autoTopupPreferences;
     
+    // Debug logging
+    console.log('AutoTopup Debug:', {
+      enabled,
+      setupCompleted,
+      localAutoTopupEnabled,
+      autoTopupPreferences
+    });
+    
     if (enabled && setupCompleted) return 'active';
     if (!enabled && setupCompleted) return 'setup-but-disabled';
     if (enabled && !setupCompleted) return 'enabled-but-not-setup';
     return 'not-setup';
-  }, [autoTopupPreferences]);
+  }, [autoTopupPreferences, localAutoTopupEnabled]);
 
   // Get the auto-top-up summary message
   const getAutoTopupSummary = () => {
@@ -507,23 +515,44 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                 disabled={isCreatingCheckout || purchaseAmount === 0}
                 className="w-full"
               >
-                {isCreatingCheckout ? (
-                  <div className="animate-spin">
-                    <DollarSign className="w-4 h-4" />
-                  </div>
-                ) : purchaseAmount === 0 ? (
-                  "Select an amount to add"
-                ) : localAutoTopupEnabled && autoTopupState === 'enabled-but-not-setup' ? (
-                  <>
-                    <CreditCard className="w-4 h-4 mr-2" />
-                    Add {formatDollarAmount(purchaseAmount)} and set-up auto-top-up
-                  </>
-                ) : (
-                  <>
-                    <CreditCard className="w-4 h-4 mr-2" />
-                    Add {formatDollarAmount(purchaseAmount)}
-                  </>
-                )}
+                {(() => {
+                  // Debug the button condition
+                  console.log('Button Debug:', {
+                    isCreatingCheckout,
+                    purchaseAmount,
+                    localAutoTopupEnabled,
+                    autoTopupState,
+                    condition: localAutoTopupEnabled && autoTopupState === 'enabled-but-not-setup'
+                  });
+                  
+                  if (isCreatingCheckout) {
+                    return (
+                      <div className="animate-spin">
+                        <DollarSign className="w-4 h-4" />
+                      </div>
+                    );
+                  }
+                  
+                  if (purchaseAmount === 0) {
+                    return "Select an amount to add";
+                  }
+                  
+                  if (localAutoTopupEnabled && autoTopupState === 'enabled-but-not-setup') {
+                    return (
+                      <>
+                        <CreditCard className="w-4 h-4 mr-2" />
+                        Add {formatDollarAmount(purchaseAmount)} and set-up auto-top-up
+                      </>
+                    );
+                  }
+                  
+                  return (
+                    <>
+                      <CreditCard className="w-4 h-4 mr-2" />
+                      Add {formatDollarAmount(purchaseAmount)}
+                    </>
+                  );
+                })()}
               </Button>
             </div>
           </TabsContent>
