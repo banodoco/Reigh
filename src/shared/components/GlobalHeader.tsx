@@ -78,7 +78,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
     <>
       <header 
         className={cn(
-          "wes-header z-50 w-full relative overflow-hidden lg:p-0",
+          "wes-header z-50 w-full relative overflow-hidden md:p-0",
           isMobile ? "" : "sticky top-0"
         )} 
       >
@@ -98,7 +98,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
         
         {/* Desktop Layout (lg and up) */}
         <div 
-          className="hidden lg:flex container items-center justify-between transition-all duration-300 ease-smooth relative z-10 h-24"
+          className="hidden md:flex container items-center justify-between transition-all duration-300 ease-smooth relative z-10 h-24"
           style={{
             paddingRight: `${contentOffsetRight}px`,
             paddingLeft: `${contentOffsetLeft}px`,
@@ -245,7 +245,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
 
         {/* Mobile Layout (below lg) */}
         <div 
-          className="lg:hidden w-full pt-1"
+          className="md:hidden w-full pt-1"
           style={(() => {
             const symmetricOffset = Math.max(contentOffsetLeft || 0, contentOffsetRight || 0);
             // Reduce mobile padding to 60% of the calculated offset for tighter spacing

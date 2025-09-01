@@ -15,6 +15,7 @@ export const users = pgTable('users', {
   id: uuid('id').primaryKey(),
   name: text('name'),
   email: text('email'),
+  username: text('username').unique(), // Sanitized username from Discord handle
   apiKeys: jsonb('api_keys'), // Store API keys as JSONB
   settings: jsonb('settings'), // Store tool settings as JSONB
   onboarding: jsonb('onboarding').default('{}').notNull(), // Store onboarding progress as JSONB

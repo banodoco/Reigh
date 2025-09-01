@@ -26,6 +26,7 @@ export interface User {
   id: string;
   name?: string;
   email?: string;
+  username?: string;
   api_keys?: Record<string, unknown>;
   settings?: Record<string, unknown>;
   credits: number;

@@ -9,6 +9,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shar
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { toast } from '@/shared/components/ui/use-toast';
 import { PageFadeIn } from '@/shared/components/transitions';
+import { useReferralTracking } from '@/shared/hooks/useReferralTracking';
 import { FadeInSection } from '@/shared/components/transitions/FadeInSection';
 import { PaintParticles } from '@/shared/components/PaintParticles';
 import { PaletteIcon } from '@/shared/components/PaletteIcon';
@@ -45,6 +46,8 @@ export default function HomePage() {
   const [artLeftOpen, setArtLeftOpen] = useState(false);
   const [artRightOpen, setArtRightOpen] = useState(false);
   const [banoOpen, setBanoOpen] = useState(false);
+  // Track referrals from URL (?from=...)
+  useReferralTracking();
 
   // Tooltip state: "for exploring"
   const [exploringTipOpen, setExploringTipOpen] = useState(false);
@@ -205,6 +208,33 @@ export default function HomePage() {
         const isHomePath = location.pathname === '/home' || location.pathname === '/';
         const oauthInProgress = localStorage.getItem('oauthInProgress') === 'true';
         if (oauthInProgress) {
+          // Attempt referral conversion before navigating
+          try {
+            const referralCode = localStorage.getItem('referralCode');
+            const referralSessionId = localStorage.getItem('referralSessionId');
+            const referralFingerprint = localStorage.getItem('referralFingerprint');
+            if (referralCode) {
+              (async () => {
+                try {
+                  await supabase.rpc('create_referral_from_session', {
+                    p_session_id: referralSessionId,
+                    p_fingerprint: referralFingerprint,
+                  });
+                } catch (err) {
+                  console.warn('[Referral] RPC error creating referral', err);
+                } finally {
+                  try {
+                    localStorage.removeItem('referralCode');
+                    localStorage.removeItem('referralSessionId');
+                    localStorage.removeItem('referralFingerprint');
+                    localStorage.removeItem('referralTimestamp');
+                  } catch {}
+                }
+              })();
+            }
+          } catch (e) {
+            console.warn('[Referral] Failed to create referral on SIGNED_IN', e);
+          }
           // Clear flag and proceed to tools
           localStorage.removeItem('oauthInProgress');
           console.log('[AuthDebug] OAuth flow completed, navigating to /tools');
