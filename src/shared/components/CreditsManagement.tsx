@@ -151,13 +151,14 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
     ).join(' ');
   };
 
-  // Update auto-top-up threshold when purchase amount changes (for new setups)
+  // Update auto-top-up threshold when purchase amount changes (for new setups only, not during initialization)
   React.useEffect(() => {
-    if (!autoTopupPreferences?.setupCompleted) {
+    if (!autoTopupPreferences?.setupCompleted && hasInitialized) {
       const defaultThreshold = Math.max(1, Math.floor(purchaseAmount / 5));
+      console.log('[AutoTopup:Threshold] Auto-updating threshold for new setup:', { purchaseAmount, defaultThreshold });
       setLocalAutoTopupThreshold(defaultThreshold);
     }
-  }, [purchaseAmount, autoTopupPreferences?.setupCompleted]);
+  }, [purchaseAmount, autoTopupPreferences?.setupCompleted, hasInitialized]);
 
   // Handle auto-top-up preference changes
   const handleAutoTopupToggle = (enabled: boolean) => {
