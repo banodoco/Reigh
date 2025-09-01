@@ -708,7 +708,17 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
           <Dialog open={!!promptToEdit} onOpenChange={(open) => !open && setPromptToEdit(null)}>
             <DialogContent 
               className={nestedModalStyling.fullClassName}
-              style={{ ...nestedModalStyling.dialogContentStyle, pointerEvents: 'auto' }}
+              style={{ 
+                ...nestedModalStyling.dialogContentStyle, 
+                pointerEvents: 'auto',
+                // Mobile-specific positioning for this nested AI edit dialog only
+                ...(isMobile ? {
+                  position: 'fixed',
+                  top: 'env(safe-area-inset-top, 20px)',
+                  transform: 'translateX(-50%)',
+                  maxHeight: 'calc(100vh - env(safe-area-inset-top, 20px) - 40px)',
+                } : {})
+              }}
               {...createMobileModalProps(nestedModalStyling.isMobile)}
               onOpenAutoFocus={() => {
                 // Try to focus synchronously so iOS treats it as part of the gesture
