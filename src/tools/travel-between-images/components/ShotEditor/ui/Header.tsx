@@ -114,13 +114,14 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Shot name with navigation buttons centered */}
         <div className="flex justify-center px-3">
           {isEditingName ? (
-            // Hide navigation buttons when editing on mobile too
-            <div className="flex items-center space-x-2 w-full max-w-xs">
+            // Hide navigation buttons when editing on mobile too - centered editing controls
+            <div className="flex items-center justify-center space-x-2 w-full">
               <Button 
                 size="sm" 
                 variant="ghost" 
                 onClick={(e) => onNameCancel(e)}
                 onMouseDown={(e) => e.preventDefault()}
+                className="flex-shrink-0"
               >
                 Cancel
               </Button>
@@ -129,11 +130,11 @@ export const Header: React.FC<HeaderProps> = ({
                 onChange={(e) => onEditingNameChange(e.target.value)}
                 onKeyDown={onNameKeyDown}
                 onBlur={onNameSave}
-                className="!text-xl font-semibold text-primary h-auto py-0.5 px-2 w-[135px] text-center"
+                className="!text-xl font-semibold text-primary h-auto py-0.5 px-2 flex-1 max-w-[135px] text-center"
                 autoFocus
                 maxLength={30}
               />
-              <Button size="sm" variant="outline" onClick={onNameSave}>
+              <Button size="sm" variant="outline" onClick={onNameSave} className="flex-shrink-0">
                 Save
               </Button>
             </div>
