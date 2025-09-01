@@ -66,6 +66,9 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
   const [activePromptIdForFullView, setActivePromptIdForFullView] = useState<string | null>(null);
   const isMobile = useIsMobile();
   const [isAIPromptSectionExpanded, setIsAIPromptSectionExpanded] = useState(false);
+  const editInstructionsRef = useRef<HTMLTextAreaElement>(null);
+  const shouldFocusAITextareaRef = useRef(false);
+  const tempFocusInputRef = useRef<HTMLInputElement>(null);
   
   // Drag detection for collapsible trigger
   const dragStartPos = useRef<{ x: number; y: number } | null>(null);
@@ -89,6 +92,32 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
   
   // Nested dialog mobile styling - match medium modals like CreateProject/ProjectSettings
   const nestedModalStyling = useMediumModal();
+  const attemptFocusAITextarea = useCallback(() => {
+    const start = Date.now();
+    const tryFocus = () => {
+      if (!shouldFocusAITextareaRef.current) return;
+      if (editInstructionsRef.current) {
+        const el = editInstructionsRef.current;
+        el.focus();
+        try {
+          const len = el.value?.length ?? 0;
+          el.setSelectionRange?.(len, len);
+        } catch {}
+        // Nudge into view similar to native tap behavior
+        setTimeout(() => {
+          try { el.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' }); } catch {}
+        }, 50);
+        shouldFocusAITextareaRef.current = false;
+        return;
+      }
+      if (Date.now() - start < 800) {
+        setTimeout(tryFocus, 16);
+      } else {
+        shouldFocusAITextareaRef.current = false;
+      }
+    };
+    tryFocus();
+  }, []);
   
   // Scroll state and ref
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -330,7 +359,17 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
   };
 
   const openEditWithAIForm = (promptId: string, currentText: string) => {
+    shouldFocusAITextareaRef.current = isMobile;
+    // iOS: prime the keyboard by focusing a temporary input in the same gesture
+    if (isMobile && tempFocusInputRef.current) {
+      try { tempFocusInputRef.current.focus({ preventScroll: true } as any); } catch {}
+    }
     setPromptToEdit({ id: promptId, originalText: currentText, instructions: '', modelType: 'smart' });
+    if (isMobile) {
+      setTimeout(() => {
+        attemptFocusAITextarea();
+      }, 0);
+    }
   };
 
   const handleConfirmEditWithAI = async () => {
@@ -441,43 +480,28 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
     };
   }, [isOpen]);
 
-  // Outside click/drag detection for modal and field management
+  // Focus the nested AI edit textarea on open (especially for mobile)
   useEffect(() => {
-    if (!isOpen) return;
+    if (promptToEdit && isMobile) {
+      setTimeout(() => {
+        editInstructionsRef.current?.focus();
+      }, 0);
+    }
+  }, [promptToEdit, isMobile]);
 
-    const handleOutsideInteraction = (e: MouseEvent | TouchEvent) => {
-      const target = e.target as Element;
-      
-      // Check if click/touch is outside the modal content entirely
-      if (modalContentRef.current && !modalContentRef.current.contains(target)) {
-        console.log(`[PromptEditorModal:OUTSIDE_CLICK] Detected outside modal, closing modal`);
-        handleFinalSaveAndClose();
-        return;
+  // Handle inside interactions to collapse active field without closing modal
+  const handleInsideInteraction = useCallback((event: React.MouseEvent | React.TouchEvent) => {
+    if (!activePromptIdForFullView) return;
+    const target = event.target as Element;
+    // If click/touch is inside modal but outside the active prompt field, collapse it
+    if (modalContentRef.current && modalContentRef.current.contains(target)) {
+      const clickedActiveField = target.closest(`[data-prompt-id="${activePromptIdForFullView}"]`);
+      if (!clickedActiveField) {
+        console.log(`[PromptEditorModal:FIELD_COLLAPSE] Inside interaction outside active field, collapsing ${activePromptIdForFullView}`);
+        setActivePromptIdForFullView(null);
       }
-
-      // If click is inside modal but outside any prompt field, collapse expanded fields
-      if (activePromptIdForFullView && modalContentRef.current?.contains(target)) {
-        // Check if clicked element is not within any prompt input area
-        const clickedPromptField = target.closest('[data-prompt-field]');
-        const clickedActiveField = target.closest(`[data-prompt-id="${activePromptIdForFullView}"]`);
-        
-        // If clicked outside the currently active field, collapse it
-        if (!clickedActiveField) {
-          console.log(`[PromptEditorModal:FIELD_COLLAPSE] Clicked outside active field, collapsing field ${activePromptIdForFullView}`);
-          setActivePromptIdForFullView(null);
-        }
-      }
-    };
-
-    // Add event listeners for both mouse and touch
-    document.addEventListener('mousedown', handleOutsideInteraction);
-    document.addEventListener('touchstart', handleOutsideInteraction);
-
-    return () => {
-      document.removeEventListener('mousedown', handleOutsideInteraction);
-      document.removeEventListener('touchstart', handleOutsideInteraction);
-    };
-  }, [isOpen, activePromptIdForFullView, handleFinalSaveAndClose]);
+    }
+  }, [activePromptIdForFullView]);
 
   const handleToggleAIPromptSection = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     e.preventDefault();
@@ -518,11 +542,33 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
   console.log(`[PromptEditorModal:MOBILE_PROPS_DEBUG] createMobileModalProps detailed:`, mobileProps);
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleModalClose}>
+    <Dialog 
+      open={isOpen} 
+      onOpenChange={handleModalClose}
+    >
       <DialogContent
         className={mobileModalStyling.fullClassName}
         style={mobileModalStyling.dialogContentStyle}
         {...mobileProps}
+        onInteractOutside={(e) => {
+          const target = e.target as Element;
+          const isInputElement = target.matches('input, textarea, [contenteditable="true"]') ||
+                                target.closest('input, textarea, [contenteditable="true"]');
+          if (isInputElement) {
+            console.log(`[PromptEditorModal:INTERACT_OUTSIDE_DEBUG] Prevented close due to input interaction.`);
+            e.preventDefault();
+          }
+        }}
+        onPointerDownOutside={(e) => {
+          // Prevent modal from closing when interacting with input fields
+          const target = e.target as Element;
+          const isInputElement = target.matches('input, textarea, [contenteditable="true"]') ||
+                                target.closest('input, textarea, [contenteditable="true"]');
+          if (isInputElement) {
+            console.log(`[PromptEditorModal:POINTER_DOWN_DEBUG] Preventing close on input element:`, target);
+            e.preventDefault();
+          }
+        }}
         ref={(el) => {
           modalContentRef.current = el;
           if (el && isOpen) {
@@ -552,6 +598,8 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
         <div
           ref={scrollRef}
           onScroll={handleScroll}
+          onClickCapture={handleInsideInteraction}
+          onTouchStartCapture={handleInsideInteraction}
           className={`${mobileModalStyling.scrollContainerClassName}`}
         >
           <Collapsible 
@@ -648,6 +696,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
                     aiEditButtonIcon={<Edit className="h-4 w-4" />}
                     onSetActiveForFullView={setActivePromptIdForFullView}
                     isActiveForFullView={activePromptIdForFullView === prompt.id}
+                    autoEnterEditWhenActive={isMobile}
                   />
                 </div>
               ))}
@@ -659,9 +708,44 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
           <Dialog open={!!promptToEdit} onOpenChange={(open) => !open && setPromptToEdit(null)}>
             <DialogContent 
               className={nestedModalStyling.fullClassName}
-              style={nestedModalStyling.dialogContentStyle}
+              style={{ ...nestedModalStyling.dialogContentStyle, pointerEvents: 'auto' }}
               {...createMobileModalProps(nestedModalStyling.isMobile)}
+              onOpenAutoFocus={() => {
+                // Try to focus synchronously so iOS treats it as part of the gesture
+                if (editInstructionsRef.current) {
+                  const el = editInstructionsRef.current;
+                  el.focus();
+                  // Place caret at end
+                  const len = el.value?.length ?? 0;
+                  try { el.setSelectionRange?.(len, len); } catch {}
+                  // Ensure it is visible above the keyboard
+                  setTimeout(() => {
+                    try { el.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' }); } catch {}
+                  }, 50);
+                }
+              }}
+              onInteractOutside={(e) => {
+                const target = e.target as Element;
+                const isInputElement = target.matches('input, textarea, [contenteditable="true"]') ||
+                                      target.closest('input, textarea, [contenteditable="true"]');
+                if (isInputElement) {
+                  e.preventDefault();
+                }
+              }}
+              onPointerDownOutside={(e) => {
+                // Prevent nested modal from closing when interacting with input fields
+                const target = e.target as Element;
+                const isInputElement = target.matches('input, textarea, [contenteditable="true"]') ||
+                                      target.closest('input, textarea, [contenteditable="true"]');
+                if (isInputElement) {
+                  e.preventDefault();
+                }
+              }}
             >
+                {/* Hidden input to prime the iOS keyboard focus in the same gesture */}
+                {isMobile && (
+                  <input ref={tempFocusInputRef} type="text" className="sr-only" aria-hidden="true" />
+                )}
                 <DialogHeader className={`${nestedModalStyling.isMobile ? 'px-4 pt-4 pb-2' : 'px-6 pt-4 pb-2'}`}>
                   <DialogTitle>
                     {promptToEdit.originalText.trim() === '' ? 'Create Prompt with AI' : 'Edit Prompt with AI'}
@@ -675,6 +759,8 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
                     </Label>
                     <Textarea
                       id="edit-instructions"
+                      ref={editInstructionsRef}
+                      autoFocus={isMobile}
                       value={promptToEdit.instructions}
                       onChange={(e) => setPromptToEdit(prev => prev ? { ...prev, instructions: e.target.value } : null)}
                       className="min-h-[100px]"

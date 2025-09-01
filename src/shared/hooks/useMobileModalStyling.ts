@@ -104,8 +104,14 @@ const createMobileLayoutStrategy = (layout: MobileLayout, isMobile: boolean) => 
     
     'edge-buffered': () => ({
       classes: `left-${MOBILE_SPACING.edge} right-${MOBILE_SPACING.edge} w-auto`,
-      centeringOverrides: ['translate-x-0', MODAL_BASE_CLASSES.closeButton],
-      customStyles: undefined,
+      centeringOverrides: ['translate-x-0', 'translate-y-0', MODAL_BASE_CLASSES.closeButton],
+      customStyles: {
+        position: 'fixed',
+        top: 'env(safe-area-inset-top, 20px)',
+        // Do NOT anchor bottom to avoid stretching to full height, which creates dead area
+        // Cap height instead so content can scroll and viewport can shift naturally
+        maxHeight: 'calc(100vh - env(safe-area-inset-top, 20px) - 40px)',
+      },
     }),
     
     fullscreen: () => ({

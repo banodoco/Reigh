@@ -165,6 +165,10 @@ export interface PromptInputRowProps {
   onSetActiveForFullView: (id: string | null) => void;
   isActiveForFullView: boolean;
   forceExpanded?: boolean;
+  /**
+   * When true on mobile, entering active full-view automatically switches into typing mode.
+   */
+  autoEnterEditWhenActive?: boolean;
 }
 
 export const PromptInputRow: React.FC<PromptInputRowProps> = React.memo(({
@@ -174,6 +178,7 @@ export const PromptInputRow: React.FC<PromptInputRowProps> = React.memo(({
   onSetActiveForFullView,
   isActiveForFullView,
   forceExpanded = false,
+  autoEnterEditWhenActive = false,
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const promptContainerRef = useRef<HTMLDivElement>(null);
@@ -215,6 +220,13 @@ export const PromptInputRow: React.FC<PromptInputRowProps> = React.memo(({
       setPendingEnterEdit(false);
     }
   }, [isMobile, pendingEnterEdit, isActiveForFullView]);
+
+  // If parent marks this row active, optionally auto-enter edit on mobile
+  useEffect(() => {
+    if (isMobile && autoEnterEditWhenActive && isActiveForFullView && !isEditingFullPrompt) {
+      setIsEditingFullPrompt(true);
+    }
+  }, [isMobile, autoEnterEditWhenActive, isActiveForFullView, isEditingFullPrompt]);
 
   const effectiveShortPrompt = promptEntry.shortPrompt?.trim();
   
