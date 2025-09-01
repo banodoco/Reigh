@@ -16,6 +16,7 @@ import { useProject } from '@/shared/contexts/ProjectContext';
 import { usePersistentToolState } from '@/shared/hooks/usePersistentToolState';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/shared/components/ui/collapsible';
 import { useIsMobile } from "@/shared/hooks/use-mobile";
+import { useMobileModalStyling, createMobileModalProps, mergeMobileModalClasses } from "@/shared/hooks/useMobileModalStyling";
 
 // Use aliased types for internal state if they were named the same
 interface GenerationControlValues extends PGC_GenerationControlValues {}
@@ -56,6 +57,12 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
   const [activePromptIdForFullView, setActivePromptIdForFullView] = useState<string | null>(null);
   const isMobile = useIsMobile();
   const [isAIPromptSectionExpanded, setIsAIPromptSectionExpanded] = useState(false);
+  
+  // Mobile modal styling
+  const mobileModalStyling = useMobileModalStyling({
+    enableMobileFullscreen: true,
+    disableCenteringOnMobile: true,
+  });
   
   // Scroll state and ref
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -347,34 +354,29 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleFinalSaveAndClose()}>
       <DialogContent 
-        className={`max-w-4xl max-h-[90vh] bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800 ${
-          isMobile ? 'my-5 flex flex-col justify-between p-0' : 'flex flex-col p-0'
-        }`}
-        onOpenAutoFocus={(event) => {
-          // Prevent auto-focus on mobile devices to avoid triggering the keyboard
-          if ('ontouchstart' in window) {
-            event.preventDefault();
-          }
-        }}
+        className={mergeMobileModalClasses(
+          'max-w-4xl max-h-[90vh] bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800 flex flex-col p-0 rounded-lg',
+          mobileModalStyling.dialogContentClassName,
+          mobileModalStyling.isMobile
+        )}
+        style={mobileModalStyling.dialogContentStyle}
+        {...createMobileModalProps(mobileModalStyling.isMobile)}
       >
-        <div className={`${isMobile ? 'flex-shrink-0' : ''}`}>
-          <DialogHeader className="p-6 pb-0 flex-shrink-0">
+        <div className={mobileModalStyling.headerContainerClassName}>
+          <DialogHeader className={`${mobileModalStyling.isMobile ? 'px-4 pt-6 pb-2' : 'px-6 pt-8 pb-2'} flex-shrink-0`}>
             <DialogTitle>Prompt Editor</DialogTitle>
-            <DialogDescription>
-              Manage your prompts. Use the 'Generate' tab to create new prompts with AI, or the 'Bulk Edit' tab to refine existing ones.
-            </DialogDescription>
           </DialogHeader>
         </div>
 
         <div
           ref={scrollRef}
           onScroll={handleScroll}
-          className={`${isMobile ? 'flex-1 overflow-y-auto' : 'flex-1 overflow-y-auto'} pt-4`}
+          className={`${mobileModalStyling.scrollContainerClassName}`}
         >
           <Collapsible 
             open={isAIPromptSectionExpanded} 
             onOpenChange={setIsAIPromptSectionExpanded}
-            className="px-6"
+            className={`${mobileModalStyling.isMobile ? 'px-4' : 'px-6'}`}
           >
             <CollapsibleTrigger asChild>
               <Button
@@ -429,7 +431,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
             </CollapsibleContent>
           </Collapsible>
           
-          <div className="px-6 text-sm text-muted-foreground mb-2 flex justify-between items-center">
+                      <div className={`${mobileModalStyling.isMobile ? 'px-4' : 'px-6'} text-sm text-muted-foreground mb-2 flex justify-between items-center`}>
             <span>Editing {internalPrompts.length} prompt(s). Changes are auto-saved.</span>
             {internalPrompts.length > 0 && (
               <Button variant="destructive" size="sm" onClick={handleRemoveAllPrompts} className="ml-auto">
@@ -438,8 +440,8 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
               </Button>
             )}
           </div>
-          <div className="border-t border-b">
-            <div className="p-6">
+          <div className="border-t">
+            <div className={`${mobileModalStyling.isMobile ? 'p-4 pb-1' : 'p-6 pb-2'}`}>
               {internalPrompts.length === 0 && (
                 <div className="text-center text-muted-foreground py-8">
                   No prompts yet. Add one manually or use AI generation.
@@ -504,9 +506,9 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
           </Dialog>
         )}
 
-        <div className={`${isMobile ? 'flex-shrink-0' : ''}`}>
-          <DialogFooter className={`p-6 pt-6 border-t ${isMobile ? 'pb-16 flex-row justify-between' : ''}`}>
-           <Button variant="outline" onClick={handleInternalAddBlankPrompt} className={isMobile ? '' : 'mr-auto'}>
+        <div className={mobileModalStyling.footerContainerClassName}>
+          <DialogFooter className={`${mobileModalStyling.isMobile ? 'p-4 pt-4 pb-4 flex-row justify-between' : 'p-6 pt-6'} border-t`}>
+           <Button variant="outline" onClick={handleInternalAddBlankPrompt} className={mobileModalStyling.isMobile ? '' : 'mr-auto'}>
             <PackagePlus className="mr-2 h-4 w-4" /> Blank Prompt
           </Button>
                       <Button onClick={handleFinalSaveAndClose}>Close</Button>

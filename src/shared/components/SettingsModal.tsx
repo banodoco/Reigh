@@ -397,9 +397,9 @@ python worker.py --db-type supabase \\
         </DialogHeader>
         
         {/* Scrollable content container */}
-        <div className="flex-1 overflow-y-auto min-h-0">
+        <div className="flex-1 overflow-y-auto min-h-0 [scrollbar-gutter:stable_both-edges] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] sm:[&::-webkit-scrollbar]:block sm:[-ms-overflow-style:auto] sm:[scrollbar-width:auto]">
           {/* Generation Method Selection */}
-          <div className="mb-2">
+          <div className="mb-5">
           {/* Mobile header */}
           {isMobile && (
             <div className="mb-4">
@@ -429,10 +429,10 @@ python worker.py --db-type supabase \\
                       {/* In the cloud button */}
                       <button
                         onClick={() => updateGenerationMethodsWithNotification({ inCloud: true, onComputer: false })}
-                        className={`px-6 py-2 font-light rounded-full transition-all duration-200 whitespace-nowrap ${
+                        className={`px-6 py-2 font-light rounded-full transition-all duration-200 whitespace-nowrap text-sm ${
                           inCloudChecked && !onComputerChecked
-                            ? 'bg-white text-blue-600 shadow-sm text-base'
-                            : 'text-gray-600 hover:text-gray-800 text-sm'
+                            ? 'bg-white text-blue-600 shadow-sm'
+                            : 'text-gray-600 hover:text-gray-800'
                         }`}
                       >
                         In the cloud
@@ -441,10 +441,10 @@ python worker.py --db-type supabase \\
                       {/* On my computer button */}
                       <button
                         onClick={() => updateGenerationMethodsWithNotification({ onComputer: true, inCloud: false })}
-                        className={`px-6 py-2 font-light rounded-full transition-all duration-200 whitespace-nowrap ${
+                        className={`px-6 py-2 font-light rounded-full transition-all duration-200 whitespace-nowrap text-sm ${
                           onComputerChecked && !inCloudChecked
-                            ? 'bg-white text-green-600 shadow-sm text-base'
-                            : 'text-gray-600 hover:text-gray-800 text-sm'
+                            ? 'bg-white text-green-600 shadow-sm'
+                            : 'text-gray-600 hover:text-gray-800'
                         }`}
                       >
                         On my computer
@@ -468,7 +468,7 @@ python worker.py --db-type supabase \\
           </div>
         </div>
 
-        <div className={`space-y-8 ${isMobile ? 'pb-8' : 'pb-4'}`}>
+        <div className={`space-y-8 ${isMobile ? 'pb-2' : 'pb-2'}`}>
           {/* Loading state for generation sections */}
           {isLoadingGenerationMethods && (
             <div className="text-center py-8">
@@ -564,9 +564,9 @@ python worker.py --db-type supabase \\
                       </div>
 
                       {/* Right: API Token Display */}
-                      <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
-                        <div className="flex items-center justify-between">
-                          <div>
+                      <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg mb-2">
+                        <div className={`${isMobile ? 'flex flex-col gap-3' : 'flex items-center justify-between'}`}>
+                          <div className={isMobile ? 'text-center' : ''}>
                             <p className="text-sm text-gray-600">
                               {formatTokenAge(getActiveToken()?.created_at || 0)}
                             </p>

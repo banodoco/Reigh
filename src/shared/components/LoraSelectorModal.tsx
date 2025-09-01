@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardFooter as ItemCardFooter, CardH
 import { Input } from "@/shared/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/components/ui/select";
 import { useIsMobile } from '@/shared/hooks/use-mobile';
+import { useMobileModalStyling, createMobileModalProps, mergeMobileModalClasses } from '@/shared/hooks/useMobileModalStyling';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/components/ui/tabs";
 import { useListResources, useCreateResource, useDeleteResource, Resource } from '@/shared/hooks/useResources';
 import { Textarea } from '@/shared/components/ui/textarea';
@@ -121,7 +122,14 @@ interface CommunityLorasTabProps {
   deleteResource: UseMutationResult<void, Error, { id: string; type: "lora"; }, unknown>;
 }
 
-const CommunityLorasTab: React.FC<CommunityLorasTabProps & { onClose: () => void }> = ({ 
+const CommunityLorasTab: React.FC<CommunityLorasTabProps & { 
+  onClose: () => void;
+  showMyLorasOnly: boolean;
+  setShowMyLorasOnly: (value: boolean) => void;
+  showAddedLorasOnly: boolean;
+  setShowAddedLorasOnly: (value: boolean) => void;
+  onProcessedLorasLengthChange: (length: number) => void;
+}> = ({ 
   loras, 
   onAddLora, 
   onRemoveLora, 
@@ -131,12 +139,16 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & { onClose: () => void
   myLorasResource, 
   createResource, 
   deleteResource,
-  onClose
+  onClose,
+  showMyLorasOnly,
+  setShowMyLorasOnly,
+  showAddedLorasOnly,
+  setShowAddedLorasOnly,
+  onProcessedLorasLengthChange
 }) => {
+  const isMobile = useIsMobile();
   const [searchTerm, setSearchTerm] = useState("");
   const [sortOption, setSortOption] = useState<SortOption>('downloads');
-  const [showMyLorasOnly, setShowMyLorasOnly] = useState(false);
-  const [showAddedLorasOnly, setShowAddedLorasOnly] = useState(false);
   const [page, setPage] = useState(0);
   const ITEMS_PER_PAGE = 20;
 
@@ -256,6 +268,11 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & { onClose: () => void
     return sorted;
   }, [allLoras, searchTerm, sortOption, showMyLorasOnly, showAddedLorasOnly, myLoraModelIds, selectedLoraMap]);
 
+  // Update parent with processed LoRAs length
+  React.useEffect(() => {
+    onProcessedLorasLengthChange(processedLoras.length);
+  }, [processedLoras.length, onProcessedLorasLengthChange]);
+
   // Reset page when filter/sort changes
   React.useEffect(() => { setPage(0); }, [searchTerm, sortOption, showMyLorasOnly, showAddedLorasOnly]);
 
@@ -270,7 +287,7 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & { onClose: () => void
   ).length;
 
   return (
-    <div className="relative flex flex-col h-full min-h-0 px-3 sm:px-6">
+    <div className="relative flex flex-col h-full min-h-0 px-0 sm:px-4">
 
       <div className="flex gap-2 mb-4">
         <Input
@@ -295,7 +312,7 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & { onClose: () => void
       </div>
               {/* Scrollable content area with floating controls */}
         <div className="flex-1 min-h-0 overflow-y-auto relative">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 pb-6">
+          <div className={`grid grid-cols-1 lg:grid-cols-2 gap-3 ${isMobile ? 'pb-3' : 'pb-6'}`}>
           {paginatedLoras.length > 0 ? (
             paginatedLoras.map((lora) => {
               const isSelectedOnGenerator = selectedLoraMap.has(lora["Model ID"]);
@@ -510,143 +527,7 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & { onClose: () => void
           )}
         </div>
 
-        {/* Sticky Floating Control Panel - Follows scroll with vintage aesthetic */}
-        <div className="sticky bottom-4 left-0 right-0 pointer-events-none z-20 mt-6">
-          {/* Vintage fade overlay with film grain effect - covers full panel height */}
-          
-          {/* Main floating control panel with vintage styling */}
-          <div className="wes-vintage-card mx-0 relative overflow-visible border-2 border-wes-vintage-gold/50 backdrop-blur-xl pointer-events-auto">
-            {/* Vintage film overlay pattern (hidden on mobile to avoid masking) */}
-            <div className="absolute inset-0 wes-texture opacity-20 hidden sm:block" />
-            <div className="absolute inset-0 bg-gradient-to-r from-wes-cream/90 via-wes-pink/20 to-wes-lavender/30 animate-gradient-shift hidden sm:block" />
-            
-            <div className="relative z-10 p-4">
-              <div className="flex flex-col gap-3">
-                {/* Mobile: 3 rows, Desktop: 2 rows with 3 columns in first row */}
-                <div className="flex flex-col gap-3 sm:gap-0">
-                  {/* Row 1: Filter Controls */}
-                  <div className="flex items-center justify-center gap-3 sm:grid sm:grid-cols-3 sm:items-center sm:gap-4">
-                    {/* Filter Controls */}
-                    <div className="flex items-center gap-3 lg:gap-4 sm:justify-self-start">
-                      {/* Added LoRAs Filter */}
-                      <div 
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all duration-300 cursor-pointer ${
-                          showAddedLorasOnly 
-                            ? 'bg-gradient-to-r from-wes-mint to-wes-mint-dark border-2 border-wes-mint-dark text-wes-forest hover:from-wes-mint-dark hover:to-wes-mint' 
-                            : 'bg-gradient-to-r from-wes-cream/90 to-wes-pink/30 border-2 border-wes-vintage-gold/30 text-primary hover:from-wes-pink/40 hover:to-wes-lavender/40 hover:border-wes-vintage-gold/60'
-                        }`}
-                        onClick={() => setShowAddedLorasOnly(!showAddedLorasOnly)}
-                      >
-                        <Checkbox 
-                          id="show-added-loras-only-sticky" 
-                          checked={showAddedLorasOnly}
-                          onCheckedChange={(checked) => setShowAddedLorasOnly(!!checked)}
-                          className="data-[state=checked]:bg-wes-mint data-[state=checked]:border-wes-mint-dark data-[state=checked]:text-wes-forest border-primary/40 text-transparent pointer-events-none h-5 w-5"
-                        />
-                        <Label htmlFor="show-added-loras-only-sticky" className="text-sm font-medium cursor-pointer select-none tracking-normal pointer-events-none">
-                          <span className="hidden sm:inline">Show selected LoRAs</span>
-                          <span className="sm:hidden">Selected</span>
-                        </Label>
-                      </div>
 
-                      {/* My LoRAs Filter */}
-                      <div 
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all duration-300 cursor-pointer ${
-                          showMyLorasOnly 
-                            ? 'bg-gradient-to-r from-wes-dusty-blue to-wes-lavender border-2 border-wes-dusty-blue text-primary hover:from-wes-lavender hover:to-wes-dusty-blue' 
-                            : 'bg-gradient-to-r from-wes-cream/90 to-wes-pink/30 border-2 border-wes-vintage-gold/30 text-primary hover:from-wes-pink/40 hover:to-wes-lavender/40 hover:border-wes-vintage-gold/60'
-                        }`}
-                        onClick={() => setShowMyLorasOnly(!showMyLorasOnly)}
-                      >
-                        <Checkbox 
-                          id="show-my-loras-only-sticky" 
-                          checked={showMyLorasOnly}
-                          onCheckedChange={(checked) => setShowMyLorasOnly(!!checked)}
-                          className="data-[state=checked]:bg-wes-dusty-blue data-[state=checked]:border-primary data-[state=checked]:text-primary-foreground border-primary/40 text-transparent pointer-events-none"
-                        />
-                        <Label htmlFor="show-my-loras-only-sticky" className="text-sm font-medium cursor-pointer select-none tracking-normal pointer-events-none">
-                          <span className="hidden sm:inline">Show my LoRAs</span>
-                          <span className="sm:hidden">My LoRAs</span>
-                        </Label>
-                      </div>
-                    </div>
-
-                    {/* Status Badges (desktop center, mobile row 2) */}
-                    <div className="hidden sm:flex items-center justify-center gap-2">
-                      {myLorasCount > 0 && (
-                        <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gradient-to-r from-wes-dusty-blue/20 to-wes-lavender/20 border border-wes-dusty-blue/30">
-                          <div className="w-1.5 h-1.5 rounded-full bg-wes-dusty-blue animate-pulse" />
-                          <span className="text-sm font-medium text-primary">
-                            {myLorasCount} saved
-                          </span>
-                        </div>
-                      )}
-                      {selectedLoraIds.length > 0 && (
-                        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gradient-to-r from-wes-mint/20 to-wes-sage/20 border border-wes-mint/30">
-                          <div className="w-1.5 h-1.5 rounded-full bg-wes-mint animate-pulse" />
-                          <span className="text-sm font-medium text-wes-forest">
-                            {selectedLoraIds.length} active
-                          </span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Close Button (desktop only) */}
-                    <div className="hidden sm:flex items-center justify-end">
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={onClose}
-                        className="flex items-center gap-1.5 text-sm font-normal"
-                      >
-                        <X className="h-4 w-4" />
-                        <span className="hidden sm:inline">Close</span>
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Row 2: Status Badges (mobile only) */}
-                  <div className="flex sm:hidden items-center justify-center gap-2">
-                    {myLorasCount > 0 && (
-                      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gradient-to-r from-wes-dusty-blue/20 to-wes-lavender/20 border border-wes-dusty-blue/30">
-                        <div className="w-1.5 h-1.5 rounded-full bg-wes-dusty-blue animate-pulse" />
-                        <span className="text-sm font-medium text-primary">
-                          {myLorasCount} saved
-                        </span>
-                      </div>
-                    )}
-                    {selectedLoraIds.length > 0 && (
-                      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gradient-to-r from-wes-mint/20 to-wes-sage/20 border border-wes-mint/30">
-                        <div className="w-1.5 h-1.5 rounded-full bg-wes-mint animate-pulse" />
-                        <span className="text-sm font-medium text-wes-forest">
-                          {selectedLoraIds.length} active
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Row 3: Status text (always bottom row) */}
-                  <div className="flex justify-center pb-2 px-3 overflow-visible">
-                    <div className="flex items-center justify-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-wes-cream/80 to-wes-pink/20 border border-wes-vintage-gold/30 w-full sm:w-auto overflow-visible">
-                      <div className="w-1.5 h-1.5 rounded-full bg-wes-vintage-gold animate-pulse flex-shrink-0" />
-                      <span className="text-sm font-medium text-primary text-center break-words">
-                        {showMyLorasOnly && showAddedLorasOnly ? (
-                          <span className="text-wes-burgundy">Showing {processedLoras.length} of your added LoRAs</span>
-                        ) : showMyLorasOnly ? (
-                          <span className="text-wes-burgundy">Showing {processedLoras.length} of your LoRAs</span>
-                        ) : showAddedLorasOnly ? (
-                          <span className="text-wes-forest">Showing {processedLoras.length} added LoRAs</span>
-                        ) : (
-                          <span className="text-muted-foreground">Showing all {processedLoras.length} LoRAs</span>
-                        )}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Description Modal */}
@@ -1158,6 +1039,17 @@ export const LoraSelectorModal: React.FC<LoraSelectorModalProps> = ({
   
   // Tab state management
   const [activeTab, setActiveTab] = useState<string>('browse');
+  
+  // Filter state for footer controls
+  const [showMyLorasOnly, setShowMyLorasOnly] = useState(false);
+  const [showAddedLorasOnly, setShowAddedLorasOnly] = useState(false);
+  const [processedLorasLength, setProcessedLorasLength] = useState(0);
+  
+  // Mobile modal styling
+  const mobileModalStyling = useMobileModalStyling({
+    enableMobileFullscreen: true,
+    disableCenteringOnMobile: true,
+  });
 
   if (!isOpen) {
     return null;
@@ -1166,22 +1058,26 @@ export const LoraSelectorModal: React.FC<LoraSelectorModalProps> = ({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent
-        className={`max-w-4xl flex flex-col max-h-[90vh] overflow-hidden bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800 ${
-          isMobile ? 'my-5 max-h-[calc(100vh-2.5rem)]' : ''
-        }`}
+        className={mergeMobileModalClasses(
+          'max-w-4xl flex flex-col max-h-[90vh] overflow-hidden bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800 rounded-lg',
+          mobileModalStyling.dialogContentClassName,
+          mobileModalStyling.isMobile
+        )}
+        style={mobileModalStyling.dialogContentStyle}
+        {...createMobileModalProps(mobileModalStyling.isMobile)}
       >
-        <DialogHeader>
-          <DialogTitle>LoRA Library</DialogTitle>
-          <DialogDescription>
-            Browse all LoRAs, filter by your collection, or add new ones.
-          </DialogDescription>
-        </DialogHeader>
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex flex-col flex-1 overflow-hidden">
-            <TabsList className="grid w-full grid-cols-2 flex-shrink-0">
-                <TabsTrigger value="browse">Browse All LoRAs</TabsTrigger>
-                <TabsTrigger value="add-new">Add New LoRA</TabsTrigger>
-            </TabsList>
-            <TabsContent value="browse" className="flex-1 flex flex-col min-h-0 overflow-hidden">
+        <div className={mobileModalStyling.headerContainerClassName}>
+          <DialogHeader className={`${mobileModalStyling.isMobile ? 'px-2 pt-2 pb-2' : 'px-6 pt-4 pb-2'} flex-shrink-0`}>
+            <DialogTitle>LoRA Library</DialogTitle>
+          </DialogHeader>
+        </div>
+        <div className={mobileModalStyling.scrollContainerClassName}>
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex flex-col flex-1 overflow-hidden">
+              <TabsList className={`grid w-full grid-cols-2 flex-shrink-0 ${mobileModalStyling.isMobile ? 'mx-0 mb-2' : 'mx-6 mb-4'}`}>
+                  <TabsTrigger value="browse" className="w-full">Browse LoRAs</TabsTrigger>
+                  <TabsTrigger value="add-new" className="w-full">Add LoRA</TabsTrigger>
+              </TabsList>
+              <TabsContent value="browse" className="flex-1 flex flex-col min-h-0">
                 <CommunityLorasTab 
                     loras={loras} 
                     onAddLora={onAddLora} 
@@ -1193,6 +1089,11 @@ export const LoraSelectorModal: React.FC<LoraSelectorModalProps> = ({
                     createResource={createResource}
                     deleteResource={deleteResource}
                     onClose={onClose}
+                    showMyLorasOnly={showMyLorasOnly}
+                    setShowMyLorasOnly={setShowMyLorasOnly}
+                    showAddedLorasOnly={showAddedLorasOnly}
+                    setShowAddedLorasOnly={setShowAddedLorasOnly}
+                    onProcessedLorasLengthChange={setProcessedLorasLength}
                 />
             </TabsContent>
             <TabsContent value="add-new" className="flex-1 min-h-0 overflow-auto">
@@ -1206,8 +1107,74 @@ export const LoraSelectorModal: React.FC<LoraSelectorModalProps> = ({
                     lora_type={lora_type}
                     onSwitchToBrowse={() => setActiveTab('browse')}
                 />
-            </TabsContent>
-        </Tabs>
+              </TabsContent>
+          </Tabs>
+        </div>
+        
+        {/* Control Panel Footer - Always sticks to bottom like PromptEditorModal */}
+        {activeTab === 'browse' && (
+          <div className={mobileModalStyling.footerContainerClassName}>
+            <div className={`${mobileModalStyling.isMobile ? 'p-4 pt-4 pb-1' : 'p-6 pt-6 pb-2'} border-t`}>
+              <div className="flex flex-col gap-3">
+                {/* Filter Controls Row */}
+                <div className="flex items-center gap-3 flex-wrap justify-center sm:justify-start">
+                  {/* Added LoRAs Filter */}
+                  <Button
+                    variant={showAddedLorasOnly ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setShowAddedLorasOnly(!showAddedLorasOnly)}
+                    className="flex items-center gap-2"
+                  >
+                    <Checkbox 
+                      checked={showAddedLorasOnly}
+                      className="pointer-events-none h-4 w-4"
+                    />
+                    <span className="hidden sm:inline">Show selected LoRAs</span>
+                    <span className="sm:hidden">Selected</span>
+                  </Button>
+
+                  {/* My LoRAs Filter */}
+                  <Button
+                    variant={showMyLorasOnly ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setShowMyLorasOnly(!showMyLorasOnly)}
+                    className="flex items-center gap-2"
+                  >
+                    <Checkbox 
+                      checked={showMyLorasOnly}
+                      className="pointer-events-none h-4 w-4"
+                    />
+                    <span className="hidden sm:inline">Show my LoRAs</span>
+                    <span className="sm:hidden">My LoRAs</span>
+                  </Button>
+
+                  {/* Status Text */}
+                  <span className="text-sm text-muted-foreground text-center flex-1 sm:flex-none">
+                    {showMyLorasOnly && showAddedLorasOnly ? (
+                      <>{processedLorasLength} added</>
+                    ) : showMyLorasOnly ? (
+                      <>{processedLorasLength} yours</>
+                    ) : showAddedLorasOnly ? (
+                      <>{processedLorasLength} added</>
+                    ) : (
+                      <>{processedLorasLength} total</>
+                    )}
+                  </span>
+
+                  {/* Close Button */}
+                  <Button 
+                    variant="outline" 
+                    onClick={onClose}
+                    className={`flex items-center gap-1.5 ${mobileModalStyling.isMobile ? 'w-full mt-2' : 'ml-auto'}`}
+                  >
+                    <X className="h-4 w-4" />
+                    Close
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

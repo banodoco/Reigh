@@ -417,8 +417,9 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
     <div className="space-y-4">
         {/* Balance Overview - Simplified */}
         <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="flex items-center gap-3">
+            <Coins className="h-6 w-6 text-gray-600" />
+            <div className="flex items-baseline gap-3">
               <h3 className="text-lg font-light text-gray-900">Remaining Credit</h3>
               <div className="text-2xl font-bold text-gray-900">
                 {isLoadingBalance ? (
@@ -430,19 +431,11 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                 )}
               </div>
             </div>
-            <div className="text-right text-sm text-gray-600">
-              {/* Placeholder aggregates – replace with real values when available */}
-              <div>Total Purchased: {formatCurrency(0)}</div>
-              <div>Total Spent: {formatCurrency(0)}</div>
-              {false && (
-                <div>Total Refunded: {formatCurrency(0)}</div>
-              )}
-            </div>
           </div>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-          <TabsList className="grid w-full grid-cols-3 bg-gray-100 border border-gray-200 h-auto p-3 sm:h-10 sm:p-1 mb-6">
+          <TabsList className="grid w-full grid-cols-3 bg-gray-100 border border-gray-200 h-auto p-3 sm:h-10 sm:p-1 mb-3">
             <TabsTrigger 
               value="purchase"
               className="data-[state=active]:bg-white data-[state=active]:shadow-sm flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-0.5 py-2 sm:py-1.5 px-2 sm:px-3 text-xs sm:text-sm"
@@ -475,12 +468,12 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="purchase" className="flex-1">
-            <div className="p-6 space-y-6">
-              <div className="space-y-4">
-                <div className="text-center">
+          <TabsContent value="purchase" className="flex-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] sm:[&::-webkit-scrollbar]:block sm:[-ms-overflow-style:auto] sm:[scrollbar-width:auto]">
+            <div className="px-6 pb-6 pt-0 space-y-4">
+              <div className="space-y-1.5">
+                <div className="text-center -mt-2">
                   <label className="text-lg font-light text-gray-900">
-                    How much would you like to add?
+                    Top-up amount:
                   </label>
                 </div>
                 
@@ -556,7 +549,13 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                         autoTopupState === 'enabled-but-not-setup' ? 'text-blue-800' :
                         'text-gray-700'
                       }`}>
-                        {getAutoTopupSummary()}
+                        {autoTopupState === 'enabled-but-not-setup' ? (
+                          <>
+                            You've enabled auto-top-up, but it's not set up. To auto-top-up <strong>{formatDollarAmount(purchaseAmount)}</strong> when the balance drops below <strong>{formatDollarAmount(localAutoTopupThreshold)}</strong>, click the button below.
+                          </>
+                        ) : (
+                          getAutoTopupSummary()
+                        )}
                       </p>
                     </div>
                   )}
@@ -604,7 +603,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
             </div>
           </TabsContent>
 
-          <TabsContent value="history" className="flex-1 space-y-4">
+          <TabsContent value="history" className="flex-1 space-y-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] sm:[&::-webkit-scrollbar]:block sm:[-ms-overflow-style:auto] sm:[scrollbar-width:auto]">
             <div className="border border-gray-200 rounded-lg overflow-hidden">
               {isLoadingLedger ? (
                 <div className="p-8 text-center">
@@ -658,7 +657,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
             </div>
           </TabsContent>
 
-          <TabsContent value="task-log" className="flex-1 space-y-4">
+          <TabsContent value="task-log" className="flex-1 space-y-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] sm:[&::-webkit-scrollbar]:block sm:[-ms-overflow-style:auto] sm:[scrollbar-width:auto]">
             {/* Mobile notice */}
             <div className="sm:hidden p-3 bg-blue-50 border border-blue-200 rounded-lg text-center">
               <p className="text-sm text-blue-700">More details are available on desktop</p>
@@ -690,7 +689,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-48" align="start">
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
                       <h4 className="font-light text-sm">Filter by Cost</h4>
                       {taskLogFilters.costFilter !== 'all' && (
@@ -704,7 +703,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                         </Button>
                       )}
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-1.5">
                       <div className="flex items-center space-x-2">
                         <input
                           type="radio"
@@ -763,7 +762,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-48" align="start">
-                    <div className="space-y-2">
+                    <div className="space-y-1.5">
                       <div className="flex items-center justify-between">
                         <h4 className="font-light text-sm">Filter by Status</h4>
                         {taskLogFilters.status.length > 0 && (
@@ -818,7 +817,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-56" align="start">
-                    <div className="space-y-2">
+                    <div className="space-y-1.5">
                       <div className="flex items-center justify-between">
                         <h4 className="font-light text-sm">Filter by Task Type</h4>
                         {taskLogFilters.taskTypes.length > 0 && (
@@ -873,7 +872,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-64" align="start">
-                    <div className="space-y-2">
+                    <div className="space-y-1.5">
                       <div className="flex items-center justify-between">
                         <h4 className="font-light text-sm">Filter by Project</h4>
                         {taskLogFilters.projectIds.length > 0 && (
