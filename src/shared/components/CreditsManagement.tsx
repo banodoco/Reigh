@@ -82,19 +82,20 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
   const { data: ledgerData, isLoading: isLoadingLedger } = useCreditLedger();
 
   // Auto-top-up state - use preferences from hook but allow local overrides for unsaved changes
-  // Default to enabled if no preferences are available yet
-  const [localAutoTopupEnabled, setLocalAutoTopupEnabled] = useState(
-    autoTopupPreferences?.enabled !== undefined ? autoTopupPreferences.enabled : true
-  );
-  const [localAutoTopupThreshold, setLocalAutoTopupThreshold] = useState(autoTopupPreferences?.threshold || 10);
+  // Initialize state more carefully - handle the loading state properly
+  const [localAutoTopupEnabled, setLocalAutoTopupEnabled] = useState(true); // Default to true
+  const [localAutoTopupThreshold, setLocalAutoTopupThreshold] = useState(10); // Default to $10
+  const [hasInitialized, setHasInitialized] = useState(false);
 
-  // Update local state when preferences load
+  // Update local state when preferences load for the first time
   React.useEffect(() => {
-    if (autoTopupPreferences) {
+    if (autoTopupPreferences && !hasInitialized) {
+      console.log('Initializing auto-top-up state from preferences:', autoTopupPreferences);
       setLocalAutoTopupEnabled(autoTopupPreferences.enabled);
-      setLocalAutoTopupThreshold(autoTopupPreferences.threshold);
+      setLocalAutoTopupThreshold(autoTopupPreferences.threshold || 10);
+      setHasInitialized(true);
     }
-  }, [autoTopupPreferences]);
+  }, [autoTopupPreferences, hasInitialized]);
 
   // Helper functions for filters
   const updateFilter = (filterType: keyof typeof taskLogFilters, value: any) => {
@@ -153,13 +154,17 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
 
   // Handle auto-top-up preference changes
   const handleAutoTopupToggle = (enabled: boolean) => {
+    console.log('Auto-top-up toggle clicked:', { enabled, currentLocal: localAutoTopupEnabled });
     setLocalAutoTopupEnabled(enabled);
+    
     // Immediately save preference changes
-    updateAutoTopup({
+    const saveData = {
       enabled,
       amount: purchaseAmount, // Use the purchase amount from the slider above
       threshold: localAutoTopupThreshold,
-    });
+    };
+    console.log('Saving auto-top-up preferences:', saveData);
+    updateAutoTopup(saveData);
   };
 
   const handleAutoTopupThresholdChange = (threshold: number) => {
