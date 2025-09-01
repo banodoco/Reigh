@@ -115,6 +115,33 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const [showFullInstallCommand, setShowFullInstallCommand] = useState(false);
   const [showFullRunCommand, setShowFullRunCommand] = useState(false);
   
+  // Refs for scrolling to commands
+  const installCommandRef = React.useRef<HTMLDivElement>(null);
+  const runCommandRef = React.useRef<HTMLDivElement>(null);
+  
+  // Functions to reveal commands and scroll to them
+  const handleRevealInstallCommand = () => {
+    setShowFullInstallCommand(true);
+    // Scroll to command after state update, showing content below too
+    setTimeout(() => {
+      installCommandRef.current?.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'start' 
+      });
+    }, 100);
+  };
+  
+  const handleRevealRunCommand = () => {
+    setShowFullRunCommand(true);
+    // Scroll to command after state update, showing content below too
+    setTimeout(() => {
+      runCommandRef.current?.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'start' 
+      });
+    }, 100);
+  };
+  
   // Load API keys from the database when they change
   useEffect(() => {
     if (apiKeys && isOpen) {
@@ -652,7 +679,7 @@ python worker.py --db-type supabase \\
 
                     {computerType !== "mac" && (
                       <Tabs value={activeInstallTab} onValueChange={setActiveInstallTab} className="w-full">
-                        <TabsList className="grid w-full grid-cols-2 bg-gray-100 border border-gray-200">
+                        <TabsList className="grid w-full grid-cols-2 bg-gray-100 border border-gray-200 mb-6">
                           <TabsTrigger 
                             value="need-install"
                             className="data-[state=active]:bg-white data-[state=active]:shadow-sm"
@@ -838,7 +865,7 @@ python worker.py --db-type supabase \\
                             </p>
                           </div>
 
-                          <div className="relative">
+                          <div className="relative" ref={installCommandRef}>
                             <div 
                               className={`bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm overflow-hidden ${
                                 showFullInstallCommand ? 'overflow-x-auto' : ''
@@ -858,7 +885,7 @@ python worker.py --db-type supabase \\
                                   <Button
                                     variant="secondary"
                                     size="sm"
-                                    onClick={() => setShowFullInstallCommand(true)}
+                                    onClick={handleRevealInstallCommand}
                                     className="pointer-events-auto text-xs px-3 py-1 bg-gray-700 hover:bg-gray-600 text-gray-200 border-gray-600"
                                   >
                                     Reveal full command
@@ -985,7 +1012,7 @@ python worker.py --db-type supabase \\
                             </p>
                           </div>
 
-                          <div className="relative">
+                          <div className="relative" ref={runCommandRef}>
                             <div 
                               className={`bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm overflow-hidden ${
                                 showFullRunCommand ? 'overflow-x-auto' : ''
@@ -1005,7 +1032,7 @@ python worker.py --db-type supabase \\
                                   <Button
                                     variant="secondary"
                                     size="sm"
-                                    onClick={() => setShowFullRunCommand(true)}
+                                    onClick={handleRevealRunCommand}
                                     className="pointer-events-auto text-xs px-3 py-1 bg-gray-700 hover:bg-gray-600 text-gray-200 border-gray-600"
                                   >
                                     Reveal full command
