@@ -186,7 +186,7 @@ export async function createMagicEditTask(params: MagicEditTaskParams): Promise<
 
 /**
  * Creates multiple magic edit tasks in parallel (batch generation)
- * This replaces the pattern used in MagicEditForm for creating multiple variations
+ * This replaces the pattern used in MagicEditModal for creating multiple variations
  * 
  * @param params - Batch magic edit parameters
  * @returns Promise resolving to array of created tasks

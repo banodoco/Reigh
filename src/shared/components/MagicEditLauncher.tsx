@@ -3,8 +3,7 @@ import { Sparkles } from 'lucide-react';
 
 import { Button } from '@/shared/components/ui/button';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/shared/components/ui/tooltip';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/shared/components/ui/dialog';
-import MagicEditForm from '@/shared/components/MagicEditForm';
+import MagicEditModal from '@/shared/components/MagicEditModal';
 
 interface MagicEditLauncherProps {
   imageUrl: string;
@@ -14,7 +13,7 @@ interface MagicEditLauncherProps {
 /**
  * MagicEditLauncher encapsulates the UI for opening the Magic-Edit flow:
  * 1. A sparkles button shown in the lightbox controls
- * 2. A Radix Dialog containing the <MagicEditForm />
+ * 2. The MagicEditModal component handles its own dialog
  */
 const MagicEditLauncher: React.FC<MagicEditLauncherProps> = ({ imageUrl, imageDimensions }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -36,31 +35,13 @@ const MagicEditLauncher: React.FC<MagicEditLauncherProps> = ({ imageUrl, imageDi
         <TooltipContent>Magic Edit</TooltipContent>
       </Tooltip>
 
-      {/* Dialog */}
-      <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent 
-          className="sm:max-w-[500px] z-[11000]"
-          onOpenAutoFocus={(event) => {
-            // Prevent auto-focus on mobile to avoid keyboard opening
-            event.preventDefault();
-          }}
-        >
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5" />
-              Magic Edit
-            </DialogTitle>
-          </DialogHeader>
-
-          <div className="mt-4">
-            <MagicEditForm
-              imageUrl={imageUrl}
-              imageDimensions={imageDimensions ?? undefined}
-              onClose={() => setIsOpen(false)}
-            />
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Modal */}
+      <MagicEditModal
+        isOpen={isOpen}
+        imageUrl={imageUrl}
+        imageDimensions={imageDimensions ?? undefined}
+        onClose={() => setIsOpen(false)}
+      />
     </>
   );
 };

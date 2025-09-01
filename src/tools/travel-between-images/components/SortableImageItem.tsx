@@ -99,8 +99,9 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
     return { aspectRatio: '1' };
   };
 
+  const sortableId = (image.shotImageEntryId as any) || (image.id as any);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: image.shotImageEntryId,
+    id: sortableId,
     disabled: isDragDisabled,
   });
   const [isConfirmDeleteDialogOpen, setIsConfirmDeleteDialogOpen] = useState(false);
@@ -175,18 +176,71 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
   const isFlippedImage = imageUrl && imageUrl.includes('flipped_');
   const displayUrl = getDisplayUrl(imageUrl, isFlippedImage);
 
+  const finalClassName = cn(
+    "group relative border rounded-lg overflow-hidden cursor-pointer bg-card hover:ring-2 hover:ring-primary/50 transition-colors",
+    isSelected && "ring-4 ring-orange-500 ring-offset-2 ring-offset-background bg-orange-500/15 border-orange-500",
+    isDragDisabled && "cursor-default"
+  );
+
+  console.log('[SelectionDebug:SortableImageItem] DEEP RENDER TRACE', {
+    imageId: ((image.shotImageEntryId as any) || (image.id as any) || '').toString().substring(0, 8),
+    isSelected,
+    isDragDisabled,
+    isMobile,
+    hasOnClick: !!onClick,
+    finalClassName,
+    classNameIncludes: {
+      hasRing4: finalClassName.includes('ring-4'),
+      hasRingOrange: finalClassName.includes('ring-orange-500'),
+      hasBgOrange: finalClassName.includes('bg-orange-500/15'),
+      hasBorderOrange: finalClassName.includes('border-orange-500'),
+    },
+    cnResult: isSelected ? "ring-4 ring-orange-500 ring-offset-2 ring-offset-background bg-orange-500/15 border-orange-500" : "NO_SELECTION_CLASSES",
+    timestamp: Date.now()
+  });
+
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className={cn(
-        "group relative border rounded-lg overflow-hidden cursor-pointer bg-card hover:ring-2 hover:ring-primary/50 transition-colors",
-        isSelected && "ring-4 ring-orange-500 ring-offset-2 ring-offset-background bg-orange-500/15 border-orange-500",
-        isDragDisabled && "cursor-default"
-      )}
+      className={finalClassName}
+      data-selected={isSelected}
+      data-image-id={((image.shotImageEntryId as any) || (image.id as any) || '').toString().substring(0, 8)}
       {...(!isDragDisabled ? attributes : {})}
       {...(!isDragDisabled ? listeners : {})}
-      onClick={onClick}
+      onClick={(e) => {
+        console.log('[SelectionDebug:SortableImageItem] onClick triggered', {
+          imageId: ((image.shotImageEntryId as any) || (image.id as any) || '').toString().substring(0, 8),
+          isSelected,
+          hasOnClickHandler: !!onClick,
+          eventTarget: e.target?.tagName || 'unknown',
+          actualDOMClasses: (e.currentTarget as HTMLElement)?.className || 'NO_CLASSES',
+          timestamp: Date.now()
+        });
+        onClick?.(e);
+      }}
+      onPointerDown={(e) => {
+        // Add DOM inspection after render
+        setTimeout(() => {
+          const element = e.currentTarget as HTMLElement;
+          console.log('[SelectionDebug:SortableImageItem] DOM INSPECTION POST-RENDER', {
+            imageId: ((image.shotImageEntryId as any) || (image.id as any) || '').toString().substring(0, 8),
+            isSelected,
+            actualDOMClasses: element.className,
+            computedStyles: {
+              borderColor: window.getComputedStyle(element).borderColor,
+              backgroundColor: window.getComputedStyle(element).backgroundColor,
+              boxShadow: window.getComputedStyle(element).boxShadow,
+              outline: window.getComputedStyle(element).outline,
+            },
+            dataAttributes: {
+              selected: element.getAttribute('data-selected'),
+              imageId: element.getAttribute('data-image-id'),
+            }
+          });
+        }, 100);
+        onPointerDown?.(e);
+      }}
       onPointerDown={onPointerDown}
       onDoubleClick={isMobile ? undefined : onDoubleClick}
     >

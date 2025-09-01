@@ -78,10 +78,57 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
       });
     }
   });
+
+  // Component mount tracker
+  React.useEffect(() => {
+    const componentId = Math.random().toString(36).substr(2, 9);
+    console.log(`[MOUNT_TRACE] ShotImageManager MOUNTED with id: ${componentId}`);
+    return () => {
+      console.log(`[MOUNT_TRACE] ShotImageManager UNMOUNTED with id: ${componentId}`);
+    };
+  }, []);
+
+  // Debug selection state on each render
+  React.useEffect(() => {
+    console.log('[SelectionDebug:ShotImageManager] FINAL_VERSION_WITH_EXTRA_LOGS Component render state', {
+      selectedIdsCount: selectedIds.length,
+      selectedIds: selectedIds.map(id => id.substring(0, 8)),
+      selectedIdsFullValues: selectedIds,
+      mobileSelectedIdsCount: mobileSelectedIds.length,
+      mobileSelectedIds: mobileSelectedIds.map(id => id.substring(0, 8)),
+      mobileSelectedIdsFullValues: mobileSelectedIds,
+      isMobile,
+      generationMode,
+      currentImages_length: currentImages.length,
+      images_length: images.length,
+      will_return_early: (!images || images.length === 0),
+      will_return_mobile: (isMobile && generationMode === 'batch'),
+      timestamp: Date.now()
+    });
+  });
   // State for drag and drop
   const [activeId, setActiveId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [mobileSelectedIds, setMobileSelectedIds] = useState<string[]>([]);
+  
+  // Force re-render tracker to debug render issues
+  const [renderCounter, setRenderCounter] = useState(0);
+  
+  // Wrap setSelectedIds to force re-render
+  const setSelectedIdsWithRerender = useCallback((newIds: string[] | ((prev: string[]) => string[])) => {
+    console.log(`[DEBUG] setSelectedIdsWithRerender called`);
+    setSelectedIds(newIds);
+    setRenderCounter(prev => prev + 1);
+  }, []);
+  
+  // Refs to always access latest state - fix for stale closure issues
+  const selectedIdsRef = useRef<string[]>([]);
+  const mobileSelectedIdsRef = useRef<string[]>([]);
+  
+  // Update refs synchronously during render - BEFORE mapping executes
+  selectedIdsRef.current = selectedIds;
+  mobileSelectedIdsRef.current = mobileSelectedIds;
+  
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [skipConfirmationNextTimeVisual, setSkipConfirmationNextTimeVisual] = useState(false);
@@ -93,6 +140,8 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
   // State for range selection (Command+click)
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
   const isMobile = useIsMobile();
+  
+  console.log(`[DEBUG] COMPONENT BODY EXECUTING - selectedIds.length=${selectedIds.length} renderCounter=${renderCounter} isMobile=${isMobile} generationMode=${generationMode} willReturnMobile=${isMobile && generationMode === 'batch'}`);
   const outerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
@@ -217,6 +266,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
       if (ids.length === 0) return;
       
       // Clear selection first for immediate UI feedback (both mobile and desktop)
+      console.log('[CLEAR_TRACE] Clearing selection in performBatchDelete');
       setMobileSelectedIds([]);
       setSelectedIds([]);
     setLastSelectedIndex(null);
@@ -394,6 +444,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
     if (!isModifierPressed && !selectedIds.includes(active.id as string)) {
       // Starting a regular drag on an un-selected item -> clear previous selection
       console.log('[DragDebug:ShotImageManager] Clearing selection during drag start');
+      console.log('[CLEAR_TRACE] Clearing selection in handleDragStart');
       setSelectedIds([]);
     setLastSelectedIndex(null);
     }
@@ -561,37 +612,98 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
     return rangeIds;
   }, [currentImages]);
 
-  const handleItemClick = useCallback((id: string, event: React.MouseEvent) => {
+  const handleItemClick = useCallback((imageKey: string, event: React.MouseEvent) => {
+    console.log('[SelectionDebug:ShotImageManager] handleItemClick called', {
+      imageKey: imageKey.substring(0, 8),
+      fullImageKey: imageKey,
+      isMobile,
+      generationMode,
+      currentSelectedIds: selectedIds.length,
+      currentMobileSelectedIds: mobileSelectedIds.length,
+      metaKey: event.metaKey,
+      ctrlKey: event.ctrlKey,
+      timestamp: Date.now()
+    });
+    
     event.preventDefault(); // Prevent any default behavior like navigation
     
     // Mobile behavior for batch mode
     if (isMobile && generationMode === 'batch') {
-      if (mobileSelectedIds.includes(id)) {
+      const wasSelected = mobileSelectedIds.includes(imageKey);
+      console.log('[SelectionDebug:ShotImageManager] Mobile batch mode selection', {
+        imageKey: imageKey.substring(0, 8),
+        wasSelected,
+        action: wasSelected ? 'deselect' : 'select'
+      });
+      
+      if (wasSelected) {
         // Clicking on selected image deselects it
-        setMobileSelectedIds(prev => prev.filter(selectedId => selectedId !== id));
+        setMobileSelectedIds(prev => {
+          const newSelection = prev.filter(selectedId => selectedId !== imageKey);
+          console.log('[SelectionDebug:ShotImageManager] Mobile deselection result', {
+            previousCount: prev.length,
+            newCount: newSelection.length,
+            removedId: imageKey.substring(0, 8)
+          });
+          return newSelection;
+        });
       } else {
         // Add to selection
-        setMobileSelectedIds(prev => [...prev, id]);
+        setMobileSelectedIds(prev => {
+          const newSelection = [...prev, imageKey];
+          console.log('[SelectionDebug:ShotImageManager] Mobile selection result', {
+            previousCount: prev.length,
+            newCount: newSelection.length,
+            addedId: imageKey.substring(0, 8)
+          });
+          return newSelection;
+        });
       }
       return;
     }
     
     // Find the current image index
-    const currentIndex = currentImages.findIndex(img => img.shotImageEntryId === id);
+    const currentIndex = currentImages.findIndex(img => ((img as any).shotImageEntryId ?? (img as any).id) === imageKey);
     
     // Desktop behavior
+    console.log('[SelectionDebug:ShotImageManager] Desktop behavior triggered', {
+      imageKey: imageKey.substring(0, 8),
+      currentIndex,
+      hasModifierKey: event.metaKey || event.ctrlKey,
+      lastSelectedIndex,
+      currentSelectedCount: selectedIds.length
+    });
+    
     if (event.metaKey || event.ctrlKey) {
       // Command+click behavior
-      const isCurrentlySelected = selectedIds.includes(id);
+      const isCurrentlySelected = selectedIds.includes(imageKey);
+      console.log('[SelectionDebug:ShotImageManager] Command/Ctrl+click behavior', {
+        imageKey: imageKey.substring(0, 8),
+        isCurrentlySelected,
+        hasLastSelectedIndex: lastSelectedIndex !== null,
+        willDoRangeOperation: lastSelectedIndex !== null && lastSelectedIndex !== currentIndex && selectedIds.length > 0
+      });
       
       if (lastSelectedIndex !== null && lastSelectedIndex !== currentIndex && selectedIds.length > 0) {
         // Range operation: select or deselect range between lastSelectedIndex and currentIndex
         const rangeIds = getImageRange(lastSelectedIndex, currentIndex);
+        console.log('[SelectionDebug:ShotImageManager] Range operation', {
+          fromIndex: lastSelectedIndex,
+          toIndex: currentIndex,
+          rangeSize: rangeIds.length,
+          isCurrentlySelected,
+          action: isCurrentlySelected ? 'deselect_range' : 'select_range'
+        });
         
         if (isCurrentlySelected) {
           // Deselect range: remove all images in the range from selection
           setSelectedIds((prev) => {
             const newSelection = prev.filter(selectedId => !rangeIds.includes(selectedId));
+            console.log('[SelectionDebug:ShotImageManager] Range deselection result', {
+              previousCount: prev.length,
+              newCount: newSelection.length,
+              deselectedCount: rangeIds.length
+            });
             // Clear lastSelectedIndex if we deselected everything
             if (newSelection.length === 0) {
               setLastSelectedIndex(null);
@@ -600,8 +712,13 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
           });
         } else {
           // Select range: add all images in the range to selection
-          setSelectedIds((prev) => {
+          setSelectedIdsWithRerender((prev) => {
             const newSelection = Array.from(new Set([...prev, ...rangeIds]));
+            console.log('[SelectionDebug:ShotImageManager] Range selection result', {
+              previousCount: prev.length,
+              newCount: newSelection.length,
+              addedCount: rangeIds.length
+            });
             return newSelection;
           });
           // Update last selected to current
@@ -609,10 +726,21 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
         }
       } else {
         // Regular Ctrl/Cmd+click: Toggle individual selection
+        console.log('[SelectionDebug:ShotImageManager] Individual toggle selection', {
+          imageKey: imageKey.substring(0, 8),
+          isCurrentlySelected,
+          action: isCurrentlySelected ? 'deselect' : 'select'
+        });
+        
         setSelectedIds((prev) => {
           if (isCurrentlySelected) {
             // Deselecting: remove from selection
-            const newSelection = prev.filter((selectedId) => selectedId !== id);
+            const newSelection = prev.filter((selectedId) => selectedId !== imageKey);
+            console.log('[SelectionDebug:ShotImageManager] Individual deselection result', {
+              previousCount: prev.length,
+              newCount: newSelection.length,
+              removedId: imageKey.substring(0, 8)
+            });
             // Clear lastSelectedIndex if this was the only selected item
             if (newSelection.length === 0) {
               setLastSelectedIndex(null);
@@ -621,17 +749,35 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
           } else {
             // Selecting: add to selection
             setLastSelectedIndex(currentIndex);
-            return [...prev, id];
+            const newSelection = [...prev, imageKey];
+            console.log('[SelectionDebug:ShotImageManager] Individual selection result', {
+              previousCount: prev.length,
+              newCount: newSelection.length,
+              addedId: imageKey.substring(0, 8),
+              newLastSelectedIndex: currentIndex
+            });
+            return newSelection;
           }
         });
       }
     } else {
       // Single click: Toggle individual selection (don't clear others)
-      setSelectedIds((prev) => {
-        const isSelected = prev.includes(id);
+      console.log('[SelectionDebug:ShotImageManager] Regular click behavior (no modifier)', {
+        imageKey: imageKey.substring(0, 8),
+        currentIndex,
+        currentlySelected: selectedIds.includes(imageKey)
+      });
+      
+      setSelectedIdsWithRerender((prev) => {
+        const isSelected = prev.includes(imageKey);
         if (isSelected) {
           // Deselecting: remove only this item
-          const newSelection = prev.filter((selectedId) => selectedId !== id);
+          const newSelection = prev.filter((selectedId) => selectedId !== imageKey);
+          console.log('[SelectionDebug:ShotImageManager] Regular click deselection result', {
+            previousCount: prev.length,
+            newCount: newSelection.length,
+            removedId: imageKey.substring(0, 8)
+          });
           // Clear lastSelectedIndex if this was the only selected item
           if (newSelection.length === 0) {
             setLastSelectedIndex(null);
@@ -640,11 +786,20 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
         } else {
           // Selecting: add to existing selection
           setLastSelectedIndex(currentIndex);
-          return [...prev, id];
+          const newSelection = [...prev, imageKey];
+          console.log('[SelectionDebug:ShotImageManager] Regular click selection result', {
+            previousCount: prev.length,
+            newCount: newSelection.length,
+            addedId: imageKey.substring(0, 8),
+            fullAddedId: imageKey,
+            newSelectionFullIds: newSelection,
+            newLastSelectedIndex: currentIndex
+          });
+          return newSelection;
         }
       });
     }
-  }, [isMobile, generationMode, mobileSelectedIds, currentImages, lastSelectedIndex, selectedIds.length, getImageRange]);
+  }, [isMobile, generationMode, mobileSelectedIds, currentImages, lastSelectedIndex, selectedIds, getImageRange]);
 
   const handleMobileDoubleClick = (index: number) => {
     if (isMobile && generationMode === 'batch') {
@@ -666,7 +821,9 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
 
   const activeImage = activeId ? currentImages.find((img) => img.shotImageEntryId === activeId) : null;
 
+  console.log(`[DEBUG] Checking images condition - images.length=${images?.length} selectedIds.length=${selectedIds.length}`);
   if (!images || images.length === 0) {
+    console.log(`[DEBUG] EARLY RETURN - No images`);
     return (
       <p className="text-sm text-muted-foreground">
         No images to display - <span 
@@ -691,8 +848,10 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
     12: 'grid-cols-12',
   }[columns] || 'grid-cols-4';
 
+  console.log(`[DEBUG] Checking mobile condition - isMobile=${isMobile} generationMode=${generationMode} selectedIds.length=${selectedIds.length}`);
   // Mobile batch mode with selection
   if (isMobile && generationMode === 'batch') {
+    console.log(`[DEBUG] EARLY RETURN - Mobile batch mode`);
     const mobileColumns = columns; // Use the columns prop for mobile
     const itemsPerRow = mobileColumns;
     
@@ -717,16 +876,14 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
             setMobileSelectedIds([]);
           }
         }}>
-        <ProgressiveLoadingManager
-          images={currentImages}
-          page={progressivePage}
-          enabled={false}
-          isMobile={isMobile}
-        >
-          {(showImageIndices) => (
+        {/* Temporarily bypass ProgressiveLoadingManager for mobile too */}
+        {(() => {
+          console.log(`[DEBUG] BYPASSING MOBILE PROGRESSIVE LOADING - mobileSelectedIds.length=${mobileSelectedIds.length}`);
+          return (
             <div className={cn("grid gap-3", `grid-cols-${mobileColumns}`)}>
               {currentImages.map((image, index) => {
-                const isSelected = mobileSelectedIds.includes(image.shotImageEntryId);
+                const imageKey = (image as any).shotImageEntryId ?? (image as any).id;
+                const isSelected = mobileSelectedIds.includes(imageKey as string);
                 const isLastItem = index === currentImages.length - 1;
                 const loadingStrategy = getImageLoadingStrategy(index, {
                   isMobile,
@@ -739,7 +896,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
                 const wouldActuallyMove = (targetIndex: number) => {
                   // Get indices of selected items
                   const selectedIndices = mobileSelectedIds
-                    .map(id => currentImages.findIndex(img => img.shotImageEntryId === id))
+                    .map(id => currentImages.findIndex(img => ((img as any).shotImageEntryId ?? (img as any).id) === id))
                     .filter(idx => idx !== -1)
                     .sort((a, b) => a - b);
                   
@@ -768,14 +925,22 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
                 const showRightArrow = mobileSelectedIds.length > 0 && isLastItem && !isSelected && wouldActuallyMove(index + 1);
                 
                 return (
-                  <React.Fragment key={image.shotImageEntryId}>
+                  <React.Fragment key={(image as any).shotImageEntryId ?? (image as any).id}>
                     <div className="relative">
                       <MobileImageItem
                          image={image}
                          isSelected={isSelected}
                          index={index}
-                         onMobileTap={() => handleMobileTap(image.shotImageEntryId, index)}
-                         onDelete={() => handleIndividualDelete(image.shotImageEntryId)}
+                         onMobileTap={() => {
+                           console.log('[SelectionDebug:ShotImageManager] Mobile tap triggered', {
+                             imageId: (imageKey || '').toString().substring(0, 8),
+                             currentlySelected: mobileSelectedIds.includes(imageKey as string),
+                             totalSelected: mobileSelectedIds.length,
+                             timestamp: Date.now()
+                           });
+                           handleMobileTap(imageKey as string, index);
+                         }}
+                         onDelete={() => handleIndividualDelete((image as any).shotImageEntryId)}
                          onDuplicate={onImageDuplicate}
                          hideDeleteButton={mobileSelectedIds.length > 0}
                          duplicatingImageId={duplicatingImageId}
@@ -820,8 +985,8 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
                 );
               })}
             </div>
-          )}
-        </ProgressiveLoadingManager>
+          );
+        })()}
 
         {/* Floating Action Bar for Multiple Selection (Mobile) */}
         {mobileSelectedIds.length >= 1 && (() => {
@@ -919,6 +1084,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
     );
   }
 
+  console.log(`[DEBUG] REACHED MAIN RETURN - selectedIds.length=${selectedIds.length}`);
   return (
     <DndContext
       sensors={sensors}
@@ -927,13 +1093,10 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
       onDragEnd={handleDragEnd}
     >
       <SortableContext items={currentImages.map((img) => img.shotImageEntryId)} strategy={rectSortingStrategy}>
-        <ProgressiveLoadingManager
-          images={currentImages}
-          page={progressivePage}
-          enabled={false}
-          isMobile={isMobile}
-        >
-          {(showImageIndices) => (
+        {/* Temporarily bypass ProgressiveLoadingManager to fix selection highlighting */}
+        {(() => {
+          console.log(`[DEBUG] BYPASSING PROGRESSIVE LOADING - selectedIds.length=${selectedIds.length}`);
+          return (
             <div 
               className={cn("grid gap-3", gridColsClass)}
               onDoubleClick={(e) => {
@@ -945,18 +1108,87 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
                 }
               }}
             >
-              {currentImages.map((image, index) => {
-                const shouldLoad = true; // Force load immediately to mirror ShotsPane behavior
+              {(() => {
+                console.log(`[DEBUG] ABOUT TO EXECUTE MAPPING - currentImages.length=${currentImages.length} selectedIds.length=${selectedIds.length}`);
+                return currentImages.map((image, index) => {
+                  console.log(`[DEBUG] MAPPING EXECUTING for image ${index} with selectedIds.length=${selectedIds.length}`);
+                  const shouldLoad = true; // Force load immediately to mirror ShotsPane behavior
+                const imageKey = ((image as any).shotImageEntryId ?? (image as any).id) as string;
+                
+                // FORCE FRESH STATE ACCESS - use refs to avoid stale closures
+                const freshSelectedIds = selectedIdsRef.current;
+                const freshMobileSelectedIds = mobileSelectedIdsRef.current;
+                
+                const desktopSelected = freshSelectedIds.includes(imageKey);
+                const mobileSelected = freshMobileSelectedIds.includes(imageKey);
+                const finalSelected = desktopSelected || mobileSelected;
+                
+                // DEEP CALCULATION TRACE - EVERY SINGLE RENDER
+                if (selectedIds.length > 0 || freshSelectedIds.length > 0) {
+                  console.log(`[DEBUG] SELECTION ACTIVE - Image ${imageKey.substring(0, 8)} selectedIds.length=${selectedIds.length} freshSelectedIds.length=${freshSelectedIds.length} finalSelected=${finalSelected}`);
+                }
+                if (selectedIds.length > 0 || mobileSelectedIds.length > 0) {
+                  console.log(`[DEEP_CALC_TRACE] Image ${imageKey.substring(0, 8)}:`, {
+                    imageKey_full: imageKey,
+                    imageKey_length: imageKey.length,
+                    selectedIds_array: selectedIds,
+                    selectedIds_count: selectedIds.length,
+                    mobileSelectedIds_array: mobileSelectedIds,
+                    includes_check_desktop: selectedIds.includes(imageKey),
+                    includes_check_mobile: mobileSelectedIds.includes(imageKey),
+                    desktopSelected,
+                    mobileSelected,
+                    finalSelected,
+                    typeof_imageKey: typeof imageKey,
+                    typeof_selectedIds_0: typeof selectedIds[0],
+                    strict_equality_check: selectedIds.map(id => ({ id, equals: id === imageKey, typeof: typeof id }))
+                  });
+                }
+                console.log('[SelectionDebug:Map/Desktop] DEEP DESKTOP TRACE', {
+                  imageId: (image.shotImageEntryId || '').toString().substring(0, 8),
+                  imageKey: ((image as any).shotImageEntryId ?? (image as any).id),
+                  desktopSelected,
+                  mobileSelected,
+                  finalSelected,
+                  selectedIds: selectedIds.map(id => id.substring(0, 8)),
+                  selectedIdsFullValues: selectedIds,
+                  selectedIdsStringified: JSON.stringify(selectedIds),
+                  selectedIdsLengths: selectedIds.map(id => id?.length ?? 0),
+                  imageKeyLength: (((image as any).shotImageEntryId ?? (image as any).id) as string)?.length ?? 0,
+                  equalityDiagnostics: selectedIds.map(sel => ({
+                    short: sel.substring(0,8),
+                    equals: sel === (((image as any).shotImageEntryId ?? (image as any).id) as string),
+                    localeCompare: sel.localeCompare(((image as any).shotImageEntryId ?? (image as any).id) as string),
+                  })),
+                  mobileSelectedIds: mobileSelectedIds.map(id => id.substring(0, 8)),
+                  selectedIdsIncludesImageKey: selectedIds.includes(((image as any).shotImageEntryId ?? (image as any).id)),
+                  mobileSelectedIdsIncludesImageKey: mobileSelectedIds.includes(((image as any).shotImageEntryId ?? (image as any).id)),
+                  rawImage: {
+                    shotImageEntryId: (image as any).shotImageEntryId,
+                    id: (image as any).id,
+                    hasIdField: 'id' in image,
+                    hasShotImageEntryIdField: 'shotImageEntryId' in image,
+                  }
+                });
                 return (
                   <SortableImageItem
                     key={image.shotImageEntryId}
                     image={image}
-                    isSelected={selectedIds.includes(image.shotImageEntryId) || mobileSelectedIds.includes(image.shotImageEntryId)}
+                    isSelected={finalSelected}
                     isDragDisabled={isMobile}
                     onPointerDown={(e) => {
                       if (isMobile) return;
                     }}
-                    onClick={isMobile ? undefined : (e) => handleItemClick(image.shotImageEntryId, e)}
+                    onClick={isMobile ? undefined : (e) => {
+                      console.log('[SelectionDebug:ShotImageManager] Passing click to SortableImageItem', {
+                        imageKey: imageKey.substring(0, 8),
+                        fullImageKey: imageKey,
+                        isMobile,
+                        generationMode,
+                        timestamp: Date.now()
+                      });
+                      handleItemClick(imageKey, e);
+                    }}
                     onDelete={() => handleIndividualDelete(image.shotImageEntryId)}
                     onDuplicate={onImageDuplicate}
                     position={(image as any).position ?? index}
@@ -970,10 +1202,11 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
                     projectAspectRatio={projectAspectRatio}
                   />
                 );
-              })}
+              });
+              })()}
             </div>
-          )}
-        </ProgressiveLoadingManager>
+          );
+        })()}
       </SortableContext>
       <DragOverlay>
         {activeId && activeImage ? (
@@ -1111,6 +1344,27 @@ const MobileImageItem: React.FC<MobileImageItemProps> = ({
   shouldLoad = true,
   projectAspectRatio,
 }) => {
+  const mobileClassName = cn(
+    'relative bg-muted/50 rounded border p-1 flex flex-col items-center justify-center overflow-hidden shadow-sm cursor-pointer',
+    { 'ring-4 ring-offset-2 ring-orange-500 border-orange-500 bg-orange-500/15': isSelected },
+  );
+
+  console.log('[SelectionDebug:MobileImageItem] DEEP MOBILE RENDER TRACE', {
+    imageId: ((image.shotImageEntryId as any) || (image.id as any) || '').toString().substring(0, 8),
+    isSelected,
+    index,
+    hideDeleteButton,
+    hasOnMobileTap: !!onMobileTap,
+    mobileClassName,
+    classNameIncludes: {
+      hasRing4: mobileClassName.includes('ring-4'),
+      hasRingOrange: mobileClassName.includes('ring-orange-500'),
+      hasBgOrange: mobileClassName.includes('bg-orange-500/15'),
+      hasBorderOrange: mobileClassName.includes('border-orange-500'),
+    },
+    conditionalResult: isSelected ? 'ring-4 ring-offset-2 ring-orange-500 border-orange-500 bg-orange-500/15' : 'NO_SELECTION_CLASSES',
+    timestamp: Date.now()
+  });
   const imageUrl = image.thumbUrl || image.imageUrl;
   const displayUrl = getDisplayUrl(imageUrl);
 
@@ -1201,14 +1455,13 @@ const MobileImageItem: React.FC<MobileImageItemProps> = ({
 
   return (
     <div
-      className={cn(
-        'relative bg-muted/50 rounded border p-1 flex flex-col items-center justify-center overflow-hidden shadow-sm cursor-pointer',
-        { 'ring-4 ring-offset-2 ring-orange-500 border-orange-500 bg-orange-500/15': isSelected },
-      )}
+      className={mobileClassName}
       style={aspectRatioStyle}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       data-mobile-item="true"
+      data-selected={isSelected}
+      data-image-id={((image.shotImageEntryId as any) || (image.id as any) || '').toString().substring(0, 8)}
     >
       {/* Show actual image when loaded and shouldLoad is true */}
       {imageLoaded && shouldLoad && !imageLoadError ? (
@@ -1317,31 +1570,7 @@ const MobileImageItem: React.FC<MobileImageItemProps> = ({
 };
 
 // Memoize ShotImageManager with custom comparison to prevent unnecessary re-renders
-const ShotImageManager = React.memo(ShotImageManagerComponent, (prevProps, nextProps) => {
-  // Compare images array thoroughly - check length first for early exit
-  if (prevProps.images.length !== nextProps.images.length) return false;
-  
-  // Compare each image ID to catch any changes, reorders, or replacements
-  for (let i = 0; i < prevProps.images.length; i++) {
-    if (prevProps.images[i]?.shotImageEntryId !== nextProps.images[i]?.shotImageEntryId) {
-      return false;
-    }
-  }
-  
-  // Compare other critical props
-  return (
-    prevProps.columns === nextProps.columns &&
-    prevProps.generationMode === nextProps.generationMode &&
-    prevProps.duplicatingImageId === nextProps.duplicatingImageId &&
-    prevProps.duplicateSuccessImageId === nextProps.duplicateSuccessImageId &&
-    prevProps.projectAspectRatio === nextProps.projectAspectRatio &&
-    // Functions should be stable if properly memoized in parent
-    prevProps.onImageDelete === nextProps.onImageDelete &&
-    prevProps.onImageDuplicate === nextProps.onImageDuplicate &&
-    prevProps.onImageReorder === nextProps.onImageReorder &&
-    prevProps.onImageSaved === nextProps.onImageSaved &&
-    prevProps.onMagicEdit === nextProps.onMagicEdit
-  );
-});
+// Temporarily remove React.memo to allow internal state re-renders
+const ShotImageManager = ShotImageManagerComponent;
 
 export default ShotImageManager; 

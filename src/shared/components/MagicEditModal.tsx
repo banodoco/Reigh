@@ -13,18 +13,36 @@ import CreateShotModal from '@/shared/components/CreateShotModal';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { createBatchMagicEditTasks, TaskValidationError } from '@/shared/lib/tasks/magicEdit';
+import { useIsMobile } from '@/shared/hooks/use-mobile';
+import { useMobileModalStyling, createMobileModalProps, mergeMobileModalClasses } from '@/shared/hooks/useMobileModalStyling';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/shared/components/ui/dialog';
 
-interface MagicEditFormProps {
+interface MagicEditModalProps {
+  isOpen: boolean;
   imageUrl: string;
   imageDimensions?: { width: number; height: number };
   onClose: () => void;
 }
 
-export const MagicEditForm: React.FC<MagicEditFormProps> = ({
+export const MagicEditModal: React.FC<MagicEditModalProps> = ({
+  isOpen,
   imageUrl,
   imageDimensions,
   onClose,
 }) => {
+  const isMobile = useIsMobile();
+  
+  // Mobile modal styling
+  const mobileModalStyling = useMobileModalStyling({
+    enableMobileEdgeBuffers: true,
+    disableCenteringOnMobile: true,
+  });
   const [magicEditPrompt, setMagicEditPrompt] = useState('');
   const [magicEditNumImages, setMagicEditNumImages] = useState(4);
   const [magicEditInSceneBoost, setMagicEditInSceneBoost] = useState(false);
@@ -142,17 +160,24 @@ export const MagicEditForm: React.FC<MagicEditFormProps> = ({
 
   return (
     <>
-      <div 
-        className="space-y-4"
-        onClick={(e) => {
-          // Prevent clicks inside the form from bubbling up to the backdrop
-          e.stopPropagation();
-        }}
-        onPointerDown={(e) => {
-          // Also prevent pointer events from bubbling
-          e.stopPropagation();
-        }}
-      >
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent
+          className={mergeMobileModalClasses(
+            'sm:max-w-[500px] bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800 flex flex-col rounded-lg',
+            mobileModalStyling.dialogContentClassName,
+            mobileModalStyling.isMobile
+          )}
+          style={mobileModalStyling.dialogContentStyle}
+          {...createMobileModalProps(mobileModalStyling.isMobile)}
+        >
+          <div className={mobileModalStyling.headerContainerClassName}>
+            <DialogHeader className={`${mobileModalStyling.isMobile ? 'px-4 pt-3 pb-1' : 'px-6 pt-3 pb-1'} flex-shrink-0`}>
+              <DialogTitle>Magic Edit</DialogTitle>
+            </DialogHeader>
+          </div>
+          
+          <div className={`${mobileModalStyling.isMobile ? 'px-4' : 'px-6'} flex-1 overflow-y-auto min-h-0`}>
+            <div className="space-y-4 py-3">
         {/* Image Preview */}
         <div className="relative w-full">
           <Label>Image</Label>
@@ -233,20 +258,29 @@ export const MagicEditForm: React.FC<MagicEditFormProps> = ({
           </Label>
         </div>
 
-        {/* Generate Button */}
-        <Button 
-          onClick={handleMagicEditGenerate}
-          disabled={!magicEditPrompt.trim() || isCreatingTasks}
-          className="w-full"
-          variant={tasksCreated ? "success" : "default"}
-        >
-          {tasksCreated
-            ? "Tasks created!"
-            : isCreatingTasks
-              ? 'Creating tasks...' 
-              : 'Generate'}
-        </Button>
-      </div>
+            </div>
+          </div>
+          
+          <div className={mobileModalStyling.footerContainerClassName}>
+            <DialogFooter className={`${mobileModalStyling.isMobile ? 'px-4 pt-4 pb-1 flex-row justify-between' : 'px-6 pt-5 pb-2'} border-t`}>
+              <Button variant="outline" onClick={onClose} disabled={isCreatingTasks} className={mobileModalStyling.isMobile ? '' : 'mr-auto'}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleMagicEditGenerate}
+                disabled={!magicEditPrompt.trim() || isCreatingTasks}
+                variant={tasksCreated ? "success" : "default"}
+              >
+                {tasksCreated
+                  ? "Tasks created!"
+                  : isCreatingTasks
+                    ? 'Creating...' 
+                    : 'Generate'}
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Create Shot Modal for Magic Edit */}
       <CreateShotModal
@@ -259,4 +293,4 @@ export const MagicEditForm: React.FC<MagicEditFormProps> = ({
   );
 };
 
-export default MagicEditForm; 
+export default MagicEditModal; 
