@@ -49,6 +49,7 @@
 | **Tool: Video Travel** | [tool_video_travel.md](structure_detail/tool_video_travel.md) | Frame-accurate video generation workflow, shot reordering, mobile video preloading |
 | **Tool: Edit Travel** | [tool_edit_travel.md](structure_detail/tool_edit_travel.md) | Text-guided image transformations |
 | **Tool: Training Data** | [tool_training_data_helper.md](structure_detail/tool_training_data_helper.md) | Training video upload & segmentation |
+| **Auto-Top-Up System** | [auto_topup_system.md](structure_detail/auto_topup_system.md) | Credit purchases, auto-top-up setup, Stripe integration, database triggers |
 | **Debug Logging** | [debug_logging.md](structure_detail/debug_logging.md) | PerfDebug log helpers & profiling |
 | **Component Modularization** | [component_modularization.md](structure_detail/component_modularization.md) | Guide for breaking down large components into maintainable modules |
 | **Image Loading System** | [image_loading_system.md](structure_detail/image_loading_system.md) | Progressive loading, adjacent page preloading, performance optimization |
