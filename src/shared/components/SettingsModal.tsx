@@ -363,8 +363,8 @@ python worker.py --db-type supabase \\
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent 
         style={modalStyle}
-        className={`sm:max-w-2xl overflow-y-auto ${
-          isMobile ? 'max-h-[calc(100vh-4rem)] [&>button]:right-7' : ''
+        className={`sm:max-w-2xl max-h-[90vh] flex flex-col ${
+          isMobile ? '[&>button]:right-7' : ''
         }`}
       >
         <DialogHeader className="relative">
@@ -394,8 +394,10 @@ python worker.py --db-type supabase \\
           )}
         </DialogHeader>
         
-        {/* Generation Method Selection */}
-        <div className="mb-2">
+        {/* Scrollable content container */}
+        <div className="flex-1 overflow-y-auto min-h-0">
+          {/* Generation Method Selection */}
+          <div className="mb-2">
           {/* Mobile header */}
           {isMobile && (
             <div className="mb-4">
@@ -1016,6 +1018,7 @@ python worker.py --db-type supabase \\
               )}
             </div>
           )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>
