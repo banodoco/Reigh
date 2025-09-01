@@ -606,7 +606,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
             </div>
           </TabsContent>
 
-          <TabsContent value="history" className="flex-1 pb-2 pt-0 space-y-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] sm:[&::-webkit-scrollbar]:block sm:[-ms-overflow-style:auto] sm:[scrollbar-width:auto] -mx-6 px-0 sm:mx-0 sm:px-0">
+          <TabsContent value="history" className="flex-1 pb-2 pt-0 space-y-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] sm:[&::-webkit-scrollbar]:block sm:[-ms-overflow-style:auto] sm:[scrollbar-width:auto] px-1">
             <div className="border border-gray-200 rounded-lg overflow-hidden">
               {isLoadingLedger ? (
                 <div className="p-8 text-center">
@@ -624,29 +624,31 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                   </p>
                 </div>
               ) : (
+                <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Amount</TableHead>
+                      <TableHead className="w-20 sm:w-auto">Date</TableHead>
+                      <TableHead className="w-16 sm:w-auto">Type</TableHead>
+                      <TableHead className="w-20 sm:w-auto">Amount</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {ledgerData?.entries?.filter(tx => tx.type !== 'spend').map((tx, index) => (
                       <TableRow key={index}>
-                        <TableCell>
+                        <TableCell className="text-xs sm:text-sm w-20 sm:w-auto">
                           <UpdatingTimeCell date={tx.created_at} />
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="w-16 sm:w-auto">
                           <Badge
                             variant={tx.type === 'purchase' ? 'default' : 'secondary'}
+                            className="text-xs px-2 py-1"
                           >
                             {formatTransactionType(tx.type)}
                           </Badge>
                         </TableCell>
                         <TableCell
-                          className={`font-light ${
+                          className={`font-light text-xs sm:text-sm w-20 sm:w-auto ${
                             tx.amount > 0 ? 'text-green-600' : 'text-red-600'
                           }`}
                         >
@@ -656,11 +658,12 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                     ))}
                   </TableBody>
                 </Table>
+                </div>
               )}
             </div>
           </TabsContent>
 
-          <TabsContent value="task-log" className="flex-1 pb-2 pt-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] sm:[&::-webkit-scrollbar]:block sm:[-ms-overflow-style:auto] sm:[scrollbar-width:auto] -mx-6 px-0 sm:mx-0 sm:px-0">
+          <TabsContent value="task-log" className="flex-1 pb-2 pt-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] sm:[&::-webkit-scrollbar]:block sm:[-ms-overflow-style:auto] sm:[scrollbar-width:auto] px-1">
             {/* Mobile notice */}
             <div className="sm:hidden p-3 bg-blue-50 border border-blue-200 rounded-lg text-center">
               <p className="text-sm text-blue-700">More details are available on desktop</p>
@@ -673,7 +676,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                 <span className="text-sm font-light text-gray-700">Filter by:</span>
               </div>
               
-              <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
+              <div className="flex flex-wrap items-center gap-2">
                 <div className="hidden sm:flex items-center gap-2">
                   <Filter className="w-4 h-4 text-gray-500" />
                   <span className="text-sm font-light text-gray-700">Filter by:</span>
@@ -691,7 +694,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                     )}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-48" align="start">
+                <PopoverContent className="w-48 mx-2" align="start">
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
                       <h4 className="font-light text-sm">Filter by Cost</h4>
@@ -764,7 +767,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                       )}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-48" align="start">
+                  <PopoverContent className="w-48 mx-2" align="start">
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between">
                         <h4 className="font-light text-sm">Filter by Status</h4>
@@ -819,7 +822,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                       )}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-56" align="start">
+                  <PopoverContent className="w-56 mx-2" align="start">
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between">
                         <h4 className="font-light text-sm">Filter by Task Type</h4>
@@ -874,7 +877,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                       )}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-64" align="start">
+                  <PopoverContent className="w-64 mx-2" align="start">
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between">
                         <h4 className="font-light text-sm">Filter by Project</h4>
@@ -992,25 +995,26 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                 </div>
               ) : (
                 <>
+                  <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Task Type</TableHead>
+                        <TableHead className="w-20 sm:w-auto">Date</TableHead>
+                        <TableHead className="w-24 sm:w-auto">Task Type</TableHead>
                         <TableHead className="hidden sm:table-cell">Project</TableHead>
                         <TableHead className="hidden sm:table-cell">Status</TableHead>
                         <TableHead className="hidden sm:table-cell">Duration</TableHead>
-                        <TableHead>Cost</TableHead>
+                        <TableHead className="w-16 sm:w-auto">Cost</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {taskLogData?.tasks?.map((task) => (
                         <TableRow key={task.id}>
-                          <TableCell className="text-sm">
+                          <TableCell className="text-xs sm:text-sm w-20 sm:w-auto">
                             <UpdatingTimeCell date={task.createdAt} />
                           </TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className="capitalize py-1.5 my-1 text-xs">
+                          <TableCell className="w-24 sm:w-auto">
+                            <Badge variant="outline" className="capitalize py-1 px-2 text-xs whitespace-nowrap">
                               {formatTaskType(task.taskType)}
                             </Badge>
                           </TableCell>
@@ -1032,7 +1036,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                             {task.duration ? `${task.duration}s` : '-'}
                           </TableCell>
                           <TableCell 
-                            className={`font-light text-sm ${
+                            className={`font-light text-xs sm:text-sm w-16 sm:w-auto ${
                               task.cost ? 'text-red-600' : 'text-gray-400'
                             }`}
                           >
@@ -1042,6 +1046,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                       ))}
                     </TableBody>
                   </Table>
+                  </div>
 
                   {/* Pagination */}
                   {taskLogData?.pagination && taskLogData.pagination.totalPages > 1 && (

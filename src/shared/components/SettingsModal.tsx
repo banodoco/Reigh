@@ -439,7 +439,7 @@ python worker.py --db-type supabase \\
         )}
         
         <div className={mobileModalStyling.headerContainerClassName}>
-          <DialogHeader className={`${mobileModalStyling.isMobile ? 'px-1 pt-2 pb-1' : 'px-2 pt-2 pb-1'} flex-shrink-0 relative`}>
+          <DialogHeader className={`${mobileModalStyling.isMobile ? 'px-2 pt-2 pb-1' : 'px-2 pt-2 pb-1'} flex-shrink-0 relative`}>
             <DialogTitle className="text-2xl">App Settings</DialogTitle>
             {!isMobile && (
               <Button
@@ -456,7 +456,7 @@ python worker.py --db-type supabase \\
         </div>
         
         {/* Scrollable content container */}
-        <div className={`${mobileModalStyling.scrollContainerClassName} ${mobileModalStyling.isMobile ? 'px-1' : 'px-2'} overflow-x-hidden [scrollbar-gutter:stable_both-edges] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] sm:[&::-webkit-scrollbar]:block sm:[-ms-overflow-style:auto] sm:[scrollbar-width:auto] sm:pr-4`}>
+        <div className={`${mobileModalStyling.scrollContainerClassName} ${mobileModalStyling.isMobile ? 'px-2' : 'px-2'} overflow-x-visible [scrollbar-gutter:stable_both-edges] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] sm:[&::-webkit-scrollbar]:block sm:[-ms-overflow-style:auto] sm:[scrollbar-width:auto] sm:pr-4`}>
           {/* Generation Method Selection */}
           <div className="mb-5">
           {/* Mobile header */}
@@ -466,9 +466,9 @@ python worker.py --db-type supabase \\
             </div>
           )}
           
-          <div className="grid grid-cols-2 gap-6 items-start">
+          <div className={`${isMobile ? 'flex flex-col gap-4' : 'grid grid-cols-2 gap-6'} items-start`}>
             {/* Left column: options */}
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               {!isMobile && (
                 <h3 className="font-light">How would you like to generate?</h3>
               )}
@@ -527,7 +527,7 @@ python worker.py --db-type supabase \\
           </div>
         </div>
 
-        <div className={`space-y-8 ${isMobile ? 'pb-2' : 'pb-2'}`}>
+        <div className={`space-y-6 sm:space-y-8 ${isMobile ? 'pb-2' : 'pb-2'}`}>
           {/* Loading state for generation sections */}
           {isLoadingGenerationMethods && (
             <div className="text-center py-8">
@@ -538,17 +538,17 @@ python worker.py --db-type supabase \\
 
           {/* Credits Management Section */}
           {!isLoadingGenerationMethods && inCloudChecked && (
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               <CreditsManagement initialTab={creditsTab} />
             </div>
           )}
 
           {/* Local Generation Section */}
           {!isLoadingGenerationMethods && onComputerChecked && (
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               {!hasValidToken ? (
-                <div className="space-y-4">
-                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="space-y-3 sm:space-y-4">
+                  <div className="p-3 sm:p-4 bg-blue-50 border border-blue-200 rounded-lg">
                     <div className="flex items-center gap-2 mb-2">
                       <Key className="h-5 w-5 text-blue-600" />
                       <h4 className="font-light text-blue-900">To process locally, you need an API Key</h4>
@@ -572,11 +572,11 @@ python worker.py --db-type supabase \\
                   {/* Installation section */}
                   <div className="space-y-4">
                     {/* Computer Type Selection and API Token Display */}
-                    <div className="grid grid-cols-2 gap-6 items-start">
+                    <div className={`${isMobile ? 'flex flex-col gap-4' : 'grid grid-cols-2 gap-6'} items-start`}>
                       {/* Left: Computer Type Selection */}
-                      <div className="space-y-3">
+                      <div className="space-y-2 sm:space-y-3">
                         <p className="text-sm font-light">What kind of computer do you have?</p>
-                        <div className="flex gap-4 flex-wrap">
+                        <div className={`flex ${isMobile ? 'flex-col gap-2' : 'gap-4 flex-wrap'}`}>
                           <div className="flex items-center space-x-2">
                             <input
                               type="radio"
@@ -623,7 +623,7 @@ python worker.py --db-type supabase \\
                       </div>
 
                       {/* Right: API Token Display */}
-                      <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg mb-2">
+                      <div className="p-3 sm:p-4 bg-gray-50 border border-gray-200 rounded-lg mb-2">
                         <div className={`${isMobile ? 'flex flex-col gap-3' : 'flex items-center justify-between'}`}>
                           <div className={isMobile ? 'text-center' : ''}>
                             <p className="text-sm text-gray-600">
@@ -713,7 +713,7 @@ python worker.py --db-type supabase \\
                                   <TooltipTrigger asChild>
                                     <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help" />
                                   </TooltipTrigger>
-                                  <TooltipContent className="max-w-sm">
+                                  <TooltipContent className="max-w-sm mx-2">
                                     <div className="py-2 space-y-2">
                                       <p className="font-medium">GPU Requirements:</p>
                                       <ul className="text-sm space-y-1 list-disc list-inside">
@@ -744,7 +744,7 @@ python worker.py --db-type supabase \\
                                   <TooltipTrigger asChild>
                                     <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help" />
                                   </TooltipTrigger>
-                                  <TooltipContent className="max-w-sm">
+                                  <TooltipContent className="max-w-sm mx-2">
                                     <div className="py-2 space-y-2">
                                       <p className="font-medium">NVIDIA Driver Installation:</p>
                                       <ol className="text-sm space-y-1 list-decimal list-inside">
@@ -775,7 +775,7 @@ python worker.py --db-type supabase \\
                                   <TooltipTrigger asChild>
                                     <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help" />
                                   </TooltipTrigger>
-                                  <TooltipContent className="max-w-sm">
+                                  <TooltipContent className="max-w-sm mx-2">
                                     <div className="py-2 space-y-2">
                                       <p className="font-medium">Python Installation:</p>
                                       <ol className="text-sm space-y-1 list-decimal list-inside">
@@ -867,14 +867,14 @@ python worker.py --db-type supabase \\
 
                           <div className="relative" ref={installCommandRef}>
                             <div 
-                              className={`bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm overflow-hidden ${
+                              className={`bg-gray-900 text-green-400 p-3 rounded-lg font-mono text-xs sm:text-sm overflow-hidden ${
                                 showFullInstallCommand ? 'overflow-x-auto' : ''
                               }`}
                               style={{
                                 height: showFullInstallCommand ? 'auto' : '100px'
                               }}
                             >
-                              <pre className="whitespace-pre-wrap break-all">
+                              <pre className="whitespace-pre-wrap break-all text-xs sm:text-sm leading-relaxed">
                                 {getInstallationCommand()}
                               </pre>
                             </div>
@@ -912,7 +912,7 @@ python worker.py --db-type supabase \\
                              onClick={handleCopyInstallCommand}
                              variant="outline"
                              size="default"
-                             className="w-full border border-current min-h-[44px] touch-manipulation"
+                             className="w-full border border-current min-h-[44px] touch-manipulation text-sm sm:text-base"
                            >
                             {copiedInstallCommand ? (
                               "Copied!"
@@ -1014,14 +1014,14 @@ python worker.py --db-type supabase \\
 
                           <div className="relative" ref={runCommandRef}>
                             <div 
-                              className={`bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm overflow-hidden ${
+                              className={`bg-gray-900 text-green-400 p-3 rounded-lg font-mono text-xs sm:text-sm overflow-hidden ${
                                 showFullRunCommand ? 'overflow-x-auto' : ''
                               }`}
                               style={{
                                 height: showFullRunCommand ? 'auto' : '100px'
                               }}
                             >
-                              <pre className="whitespace-pre-wrap break-all">
+                              <pre className="whitespace-pre-wrap break-all text-xs sm:text-sm leading-relaxed">
                                 {getRunCommand()}
                               </pre>
                             </div>
@@ -1057,7 +1057,7 @@ python worker.py --db-type supabase \\
                             onClick={handleCopyRunCommand}
                             variant="outline"
                             size="default"
-                            className="w-full border border-current min-h-[44px] touch-manipulation"
+                            className="w-full border border-current min-h-[44px] touch-manipulation text-sm sm:text-base"
                           >
                             {copiedRunCommand ? (
                               "Copied!"
@@ -1122,7 +1122,7 @@ python worker.py --db-type supabase \\
         
         {/* Footer */}
         <div className={mobileModalStyling.footerContainerClassName}>
-          <DialogFooter className={`${mobileModalStyling.isMobile ? 'px-1 pt-6 pb-1' : 'px-2 pt-7 pb-2'} border-t`}>
+          <DialogFooter className={`${mobileModalStyling.isMobile ? 'px-2 pt-6 pb-2' : 'px-2 pt-7 pb-2'} border-t`}>
             <Button variant="outline" onClick={() => onOpenChange(false)} className="w-full">
               Close
             </Button>
