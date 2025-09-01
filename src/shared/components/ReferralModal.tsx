@@ -30,6 +30,7 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({ isOpen, onOpenChan
   useEffect(() => {
     const getSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
+      console.log('[ReferralModal] Session:', !!session?.user?.id);
       setSession(session);
       
       if (session?.user?.id) {
@@ -40,8 +41,13 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({ isOpen, onOpenChan
           .eq('id', session.user.id)
           .single();
         
+        console.log('[ReferralModal] Username query result:', { userData, error });
+        
         if (userData?.username && !error) {
+          console.log('[ReferralModal] Setting username:', userData.username);
           setUsername(userData.username);
+        } else {
+          console.warn('[ReferralModal] No username found or error:', error);
         }
       }
     };
@@ -49,7 +55,13 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({ isOpen, onOpenChan
     getSession();
     
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      console.log('[ReferralModal] Auth state change:', _event, !!session?.user?.id);
       setSession(session);
+      
+      // Reset username when session changes
+      if (!session?.user?.id) {
+        setUsername(null);
+      }
     });
     
     return () => subscription.unsubscribe();
@@ -86,6 +98,13 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({ isOpen, onOpenChan
   }, [username, isOpen]);
 
   const referralLink = username ? `https://reigh.art?from=${username}` : '';
+  
+  console.log('[ReferralModal] Current state:', { 
+    hasSession: !!session, 
+    username, 
+    referralLink,
+    isOpen 
+  });
 
   const copyToClipboard = async () => {
     if (!referralLink) return;
@@ -175,12 +194,12 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({ isOpen, onOpenChan
             {/* Special Inspirational Message */}
             <div className="my-4">
               <p className="text-base font-medium text-primary leading-relaxed italic">
-                "We hope that this motivates artists to create art that in turn inspires others to create with AI."
+                We hope that this motivates artists to create art that in turn inspires others to create with AI.
               </p>
             </div>
 
             {/* Referral Link */}
-            {username ? (
+            {session && username ? (
               <div className="space-y-2">
                 <label className="text-sm font-medium">Referral Link</label>
                 <div className="flex items-center space-x-2">
@@ -201,10 +220,20 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({ isOpen, onOpenChan
                   </Button>
                 </div>
               </div>
+            ) : session ? (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Referral Link</label>
+                <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border">
+                  <div className="flex items-center space-x-2">
+                    <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full"></div>
+                    <span className="text-sm text-muted-foreground">Loading your referral link...</span>
+                  </div>
+                </div>
+              </div>
             ) : (
               <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
                 <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                  Setting up your referral link...
+                  Please sign in to generate your referral link.
                 </p>
               </div>
             )}
