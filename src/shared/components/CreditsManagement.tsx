@@ -189,6 +189,21 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
     });
   };
 
+  // Handle purchase amount changes - update auto-top-up amount if enabled
+  const handlePurchaseAmountChange = (amount: number) => {
+    setPurchaseAmount(amount);
+    
+    // If auto-top-up is enabled, update the auto-top-up amount to match
+    if (localAutoTopupEnabled) {
+      console.log('[AutoTopup:Purchase] Updating auto-top-up amount to match purchase amount:', amount);
+      updateAutoTopup({
+        enabled: localAutoTopupEnabled,
+        amount: amount,
+        threshold: localAutoTopupThreshold,
+      });
+    }
+  };
+
   // Auto-top-up state computation
   const autoTopupState = React.useMemo(() => {
     if (!autoTopupPreferences) return 'loading';
@@ -465,7 +480,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                   <div className="px-4">
                     <Slider
                       value={[purchaseAmount]}
-                      onValueChange={(value) => setPurchaseAmount(value[0])}
+                      onValueChange={(value) => handlePurchaseAmountChange(value[0])}
                       min={0}
                       max={100}
                       step={5}
