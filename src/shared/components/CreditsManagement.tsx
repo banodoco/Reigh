@@ -216,17 +216,19 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
     }
   };
 
-  // Auto-top-up state computation
+  // Auto-top-up state computation - use local state for immediate UI responsiveness
   const autoTopupState = React.useMemo(() => {
     if (!autoTopupPreferences) return 'loading';
     
-    const { enabled, setupCompleted } = autoTopupPreferences;
+    const { setupCompleted } = autoTopupPreferences;
+    // Use localAutoTopupEnabled for immediate state transitions
+    const enabled = localAutoTopupEnabled;
     
     // Debug logging (keeping for now)
     console.log('[AutoTopup:State] State computation:', {
-      enabled,
+      serverEnabled: autoTopupPreferences.enabled,
+      localEnabled: enabled,
       setupCompleted,
-      localAutoTopupEnabled,
       finalState: enabled && setupCompleted ? 'active' : 
                    !enabled && setupCompleted ? 'setup-but-disabled' : 
                    enabled && !setupCompleted ? 'enabled-but-not-setup' : 'not-setup'
