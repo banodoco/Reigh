@@ -199,6 +199,12 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
 
   // Get the auto-top-up summary message
   const getAutoTopupSummary = () => {
+    console.log('[AutoTopup:Summary] Computing summary:', { 
+      autoTopupPreferences, 
+      autoTopupState, 
+      localAutoTopupEnabled 
+    });
+    
     if (!autoTopupPreferences) return '';
     
     switch (autoTopupState) {
@@ -214,8 +220,11 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
       case 'not-setup':
         return `Auto-top-up summary: We'll automatically charge your card ${formatDollarAmount(purchaseAmount)} when your balance drops below ${formatDollarAmount(localAutoTopupThreshold)}.`;
       
+      case 'loading':
+        return 'Loading auto-top-up preferences...';
+      
       default:
-        return '';
+        return `Debug: Unknown state "${autoTopupState}"`;
     }
   };
 

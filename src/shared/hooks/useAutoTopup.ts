@@ -21,42 +21,23 @@ async function fetchAutoTopupPreferences(): Promise<AutoTopupPreferences> {
     throw new Error('Authentication required');
   }
 
-  // Try with the new field first, fallback if it doesn't exist
-  let data, error;
-  try {
-    const result = await supabase
-      .from('users')
-      .select(`
-        auto_topup_enabled,
-        auto_topup_setup_completed,
-        auto_topup_amount,
-        auto_topup_threshold,
-        auto_topup_last_triggered,
-        stripe_customer_id,
-        stripe_payment_method_id
-      `)
-      .eq('id', user.id)
-      .single();
-    data = result.data;
-    error = result.error;
-  } catch (e) {
-    // If the new field doesn't exist, try without it
-    console.log('[AutoTopup:Hook] Field auto_topup_setup_completed not found, falling back');
-    const result = await supabase
-      .from('users')
-      .select(`
-        auto_topup_enabled,
-        auto_topup_amount,
-        auto_topup_threshold,
-        auto_topup_last_triggered,
-        stripe_customer_id,
-        stripe_payment_method_id
-      `)
-      .eq('id', user.id)
-      .single();
-    data = result.data;
-    error = result.error;
-  }
+  // Try without the problematic field first, since we know it's causing 400 errors
+  console.log('[AutoTopup:Hook] Fetching auto-top-up preferences for user:', user.id);
+  
+  const { data, error } = await supabase
+    .from('users')
+    .select(`
+      auto_topup_enabled,
+      auto_topup_amount,
+      auto_topup_threshold,
+      auto_topup_last_triggered,
+      stripe_customer_id,
+      stripe_payment_method_id
+    `)
+    .eq('id', user.id)
+    .single();
+    
+  console.log('[AutoTopup:Hook] Query result:', { data, error });
 
   if (error) {
     throw new Error(`Failed to fetch auto-top-up preferences: ${error.message}`);
