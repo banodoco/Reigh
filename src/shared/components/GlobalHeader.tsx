@@ -6,6 +6,7 @@ import { Button } from '@/shared/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { CreateProjectModal } from '@/shared/components/CreateProjectModal';
+import { ReferralModal } from '@/shared/components/ReferralModal';
 import { PlusCircle, Settings, Palette, Sparkles, Crown, Star, Gem, Wrench, ChevronDown } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { ProjectSettingsModal } from '@/shared/components/ProjectSettingsModal';
@@ -46,6 +47,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
   }, []);
   const [isCreateProjectModalOpen, setIsCreateProjectModalOpen] = useState(false);
   const [isProjectSettingsModalOpen, setIsProjectSettingsModalOpen] = useState(false);
+  const [isReferralModalOpen, setIsReferralModalOpen] = useState(false);
 
   // [MobileStallFix] Add mobile-specific debug logging for stalling detection
   useEffect(() => {
@@ -225,8 +227,14 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
             </div>
           </div>
 
-          {/* Right side - App Settings */}
-          <div className="flex items-center">
+          {/* Right side - Referral text and App Settings */}
+          <div className="flex items-end gap-2">
+            <span 
+              className="text-xs text-gray-400 underline cursor-pointer font-thin mb-0.5 hover:text-gray-600 transition-colors duration-200"
+              onClick={() => setIsReferralModalOpen(true)}
+            >
+              Refer people to Reigh?
+            </span>
             <Button
               variant="ghost"
               size="icon"
@@ -314,17 +322,25 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
               </Button>
             </div>
 
-            {/* Right side - App Settings */}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onOpenSettings}
-              className="h-10 w-10 wes-button bg-gradient-to-br from-wes-dusty-blue to-wes-lavender border-2 border-wes-vintage-gold/40 hover:from-wes-dusty-blue-dark hover:to-wes-lavender-dark shadow-wes-vintage hover:shadow-wes-hover group relative overflow-hidden [&::before]:bg-gradient-to-b [&::before]:from-transparent [&::before]:via-white/20 [&::before]:to-transparent [&::before]:translate-y-[-100%] [&::before]:translate-x-0 [&::before]:transition-transform [&::before]:duration-0 [&:hover::before]:translate-y-[100%] [&:hover::before]:translate-x-0 [&:hover::before]:duration-700"
-              title="App Settings"
-            >
-              <div className="absolute inset-0 bg-film-grain opacity-20 animate-film-grain"></div>
-              <Settings className="h-4 w-4 text-white relative z-10 transition-transform duration-500 group-hover:[transform:rotate(360deg)] delay-100" />
-            </Button>
+            {/* Right side - Referral text and App Settings */}
+            <div className="flex items-end gap-2">
+              <span 
+                className="text-xs text-gray-400 underline cursor-pointer font-thin mb-0.5 hover:text-gray-600 transition-colors duration-200"
+                onClick={() => setIsReferralModalOpen(true)}
+              >
+                Refer people to Reigh?
+              </span>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onOpenSettings}
+                className="h-10 w-10 wes-button bg-gradient-to-br from-wes-dusty-blue to-wes-lavender border-2 border-wes-vintage-gold/40 hover:from-wes-dusty-blue-dark hover:to-wes-lavender-dark shadow-wes-vintage hover:shadow-wes-hover group relative overflow-hidden [&::before]:bg-gradient-to-b [&::before]:from-transparent [&::before]:via-white/20 [&::before]:to-transparent [&::before]:translate-y-[-100%] [&::before]:translate-x-0 [&::before]:transition-transform [&::before]:duration-0 [&:hover::before]:translate-y-[100%] [&:hover::before]:translate-x-0 [&:hover::before]:duration-700"
+                title="App Settings"
+              >
+                <div className="absolute inset-0 bg-film-grain opacity-20 animate-film-grain"></div>
+                <Settings className="h-4 w-4 text-white relative z-10 transition-transform duration-500 group-hover:[transform:rotate(360deg)] delay-100" />
+              </Button>
+            </div>
           </div>
 
           {/* Bottom row - Project Selector */}
@@ -416,6 +432,10 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
           project={selectedProject}
         />
       )}
+      <ReferralModal
+        isOpen={isReferralModalOpen}
+        onOpenChange={setIsReferralModalOpen}
+      />
     </>
   );
 }; 
