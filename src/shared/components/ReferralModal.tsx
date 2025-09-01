@@ -165,7 +165,6 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({ isOpen, onOpenChan
             {/* Referral Link */}
             {session && username ? (
               <div className="space-y-2">
-                <label className="text-sm font-medium">Referral Link</label>
                 <div className="flex items-center space-x-2">
                   <div className="flex-1 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border text-sm font-mono break-all">
                     {referralLink}
@@ -186,7 +185,6 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({ isOpen, onOpenChan
               </div>
             ) : session ? (
               <div className="space-y-2">
-                <label className="text-sm font-medium">Referral Link</label>
                 <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border">
                   <div className="flex items-center space-x-2">
                     <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full"></div>
@@ -206,7 +204,7 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({ isOpen, onOpenChan
               <ProfitSplitBar className="mt-2 mb-1" />
               
               {/* Special Inspirational Message */}
-              <div className="my-4">
+              <div className="mt-6 mb-4">
                 <p className="text-base font-medium text-primary leading-relaxed italic text-left">
                   We hope that this motivates artists to create art that in turn inspires others to create with AI.
                 </p>
