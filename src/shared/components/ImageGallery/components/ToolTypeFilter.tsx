@@ -63,9 +63,9 @@ export const ToolTypeFilter: React.FC<ToolTypeFilterProps> = ({
     isDragging.current = false;
   };
   return (
-    <div className={`flex items-center ${isMobile ? 'flex-1' : ''}`}>
-      <div className={`relative inline-flex items-center rounded-md border h-7 ${
-        isMobile ? 'w-full' : 'w-[180px]'
+    <div className={`flex items-center ${isMobile ? 'flex-none' : ''}`}>
+      <div className={`relative inline-flex items-center rounded-md border ${
+        isMobile ? 'h-12 w-[120px]' : 'h-7 w-[240px]'
       } ${
         whiteText ? 'bg-zinc-800 border-zinc-700' : 'bg-background border-border'
       }`}>
@@ -78,8 +78,8 @@ export const ToolTypeFilter: React.FC<ToolTypeFilterProps> = ({
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onClick={handleClick(true)}
-            className={`flex-1 px-2 h-full font-light rounded-l-md transition-all duration-200 text-xs border-r relative ${
-              isMobile ? 'text-center' : 'whitespace-nowrap'
+            className={`flex-1 px-2 h-full font-light rounded-l-md transition-all duration-200 text-xs border-r relative flex items-center justify-center ${
+              isMobile ? 'py-1' : 'whitespace-nowrap'
             } ${
               whiteText 
                 ? enabled
@@ -96,7 +96,13 @@ export const ToolTypeFilter: React.FC<ToolTypeFilterProps> = ({
             {enabled && whiteText && (
               <div className="absolute inset-0.5 bg-zinc-600 rounded-l-sm -z-10" />
             )}
-            Generated here
+            {isMobile ? (
+              <span className="text-center leading-tight">
+                Generated<br />here
+              </span>
+            ) : (
+              'Generated here'
+            )}
           </button>
           
           {/* Show all button */}
@@ -106,8 +112,8 @@ export const ToolTypeFilter: React.FC<ToolTypeFilterProps> = ({
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onClick={handleClick(false)}
-            className={`flex-1 px-2 h-full font-light rounded-r-md transition-all duration-200 text-xs relative ${
-              isMobile ? 'text-center' : 'whitespace-nowrap'
+            className={`flex-1 px-2 h-full font-light rounded-r-md transition-all duration-200 text-xs relative flex items-center justify-center ${
+              isMobile ? 'py-1' : 'whitespace-nowrap'
             } ${
               whiteText 
                 ? !enabled
@@ -124,7 +130,13 @@ export const ToolTypeFilter: React.FC<ToolTypeFilterProps> = ({
             {!enabled && whiteText && (
               <div className="absolute inset-0.5 bg-zinc-600 rounded-r-sm -z-10" />
             )}
-            All media
+            {isMobile ? (
+              <span className="text-center leading-tight">
+                All<br />media
+              </span>
+            ) : (
+              'All media'
+            )}
           </button>
         </div>
       </div>

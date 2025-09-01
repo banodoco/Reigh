@@ -143,8 +143,7 @@ export const ImageGalleryFilters: React.FC<ImageGalleryFiltersProps> = ({
       <div className="flex items-center gap-3">
         {/* Media Type Filter */}
         {!hideTopFilters && (
-          <div className="flex items-center space-x-2">
-            <Label htmlFor="media-type-filter" className={`text-xs ${whiteText ? 'text-zinc-400' : 'text-muted-foreground'}`}>Type:</Label>
+          <div className="flex items-center">
             <Select value={mediaTypeFilter} onValueChange={(value: 'all' | 'image' | 'video') => {
               onMediaTypeFilterChange?.(value);
             }}>

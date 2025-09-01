@@ -41,7 +41,7 @@ export const MagicEditModal: React.FC<MagicEditModalProps> = ({
   // Mobile modal styling
   const mobileModalStyling = useModalStyling('medium-wide');
   const [magicEditPrompt, setMagicEditPrompt] = useState('');
-  const [magicEditNumImages, setMagicEditNumImages] = useState(4);
+  const [magicEditNumImages, setMagicEditNumImages] = useState(1);
   const [magicEditInSceneBoost, setMagicEditInSceneBoost] = useState(false);
   const [magicEditShotId, setMagicEditShotId] = useState<string | null>(null);
   const [isCreateShotModalOpen, setIsCreateShotModalOpen] = useState(false);
@@ -88,7 +88,6 @@ export const MagicEditModal: React.FC<MagicEditModalProps> = ({
       const results = await createBatchMagicEditTasks(batchParams);
       
       console.log(`[MagicEditForm] Created ${results.length} magic edit tasks`);
-      toast.success(`Created ${results.length} magic edit task${results.length > 1 ? 's' : ''}`);
       
       setTasksCreated(true);
       
@@ -97,7 +96,7 @@ export const MagicEditModal: React.FC<MagicEditModalProps> = ({
       setTimeout(() => {
         onClose();
         setMagicEditPrompt('');
-        setMagicEditNumImages(4);
+        setMagicEditNumImages(1);
         setMagicEditInSceneBoost(false);
         setMagicEditShotId(null);
         setTasksCreated(false);
