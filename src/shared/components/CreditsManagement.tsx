@@ -473,97 +473,101 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
 
           <TabsContent value="purchase" className="flex-1 pb-2 pt-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] sm:[&::-webkit-scrollbar]:block sm:[-ms-overflow-style:auto] sm:[scrollbar-width:auto]">
             <div className="space-y-4 px-1">
-              <div className="space-y-1.5">
-                                  <div className="text-center mt-2">
+              {/* Main content area with 3/5 - 2/5 split on desktop, stacked on mobile */}
+              <div className="flex flex-col md:flex-row md:items-center gap-6">
+                {/* Left column: Top-up amount (3/5 width on desktop) */}
+                <div className="w-full md:w-3/5 space-y-1.5">
+                  <div className="text-center mt-2">
                     <label className="text-lg font-light text-gray-900">
                       Top-up amount:
                     </label>
                   </div>
                 
-                <div className="space-y-4">
-                  <div className="text-center">
-                    <div className="text-3xl font-bold text-gray-900">
-                      {formatDollarAmount(purchaseAmount)}
+                  <div className="space-y-4">
+                    <div className="text-center">
+                      <div className="text-3xl font-bold text-gray-900">
+                        {formatDollarAmount(purchaseAmount)}
+                      </div>
                     </div>
-                  </div>
-                  
-                  <div className="-mx-1 px-0">
-                    <Slider
-                      value={[purchaseAmount]}
-                      onValueChange={(value) => handlePurchaseAmountChange(value[0])}
-                      min={0}
-                      max={100}
-                      step={5}
-                      className="w-full"
-                    />
-                    <div className="flex justify-between text-sm text-gray-500 mt-2 px-1">
-                      <span>$0</span>
-                      <span>$100</span>
+                    
+                    <div className="-mx-1 px-0">
+                      <Slider
+                        value={[purchaseAmount]}
+                        onValueChange={(value) => handlePurchaseAmountChange(value[0])}
+                        min={0}
+                        max={100}
+                        step={5}
+                        className="w-full"
+                      />
+                      <div className="flex justify-between text-sm text-gray-500 mt-2 px-1">
+                        <span>$0</span>
+                        <span>$100</span>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Auto-top-up section */}
-              <div className="space-y-4 pt-4 border-t border-gray-200">
-                <div>
-                  {/* Auto-top-up toggle */}
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="auto-topup"
-                      checked={localAutoTopupEnabled}
-                      onCheckedChange={(checked) => handleAutoTopupToggle(checked === true)}
-                      disabled={isUpdatingAutoTopup}
-                    />
-                    <label htmlFor="auto-topup" className="text-sm font-light cursor-pointer flex items-center space-x-2">
-                      <Settings className="w-4 h-4 text-gray-500" />
-                      <span>Enable auto-top-up</span>
-                    </label>
-                  </div>
-
-                  {/* Auto-top-up threshold setting - show when enabled or when setup is complete */}
-                  {(localAutoTopupEnabled || autoTopupPreferences?.setupCompleted) && (
-                    <div className="space-y-3 mt-4 mb-4">
-                      <SliderWithValue
-                        label="Trigger when balance drops below:"
-                        value={localAutoTopupThreshold}
-                        onChange={handleAutoTopupThresholdChange}
-                        min={1}
-                        max={Math.max(1, purchaseAmount - 1)}
-                        step={1}
-                        variant="secondary"
-                        formatValue={(value) => `$${value}`}
+                {/* Right column: Auto-top-up section (2/5 width on desktop) */}
+                <div className="w-full md:w-2/5 space-y-4 md:pt-0 md:border-t-0 border-t border-gray-200 pt-4 md:border-l md:border-gray-200 md:pl-6">
+                  <div>
+                    {/* Auto-top-up toggle */}
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="auto-topup"
+                        checked={localAutoTopupEnabled}
+                        onCheckedChange={(checked) => handleAutoTopupToggle(checked === true)}
                         disabled={isUpdatingAutoTopup}
                       />
+                      <label htmlFor="auto-topup" className="text-sm font-light cursor-pointer flex items-center space-x-2">
+                        <Settings className="w-4 h-4 text-gray-500" />
+                        <span>Enable auto-top-up</span>
+                      </label>
                     </div>
-                  )}
 
-                  {/* Summary message based on state - only show when auto-top-up is enabled */}
-                  {localAutoTopupEnabled && (
-                    <div className={`rounded-lg p-3 w-full ${
-                      autoTopupState === 'active' ? 'bg-green-50 border border-green-200' :
-                      autoTopupState === 'setup-but-disabled' ? 'bg-yellow-50 border border-yellow-200' :
-                      autoTopupState === 'enabled-but-not-setup' ? 'bg-blue-50 border border-blue-200' :
-                      'bg-gray-50 border border-gray-200'
-                    }`}>
-                      <p className={`text-sm ${
-                        autoTopupState === 'active' ? 'text-green-800' :
-                        autoTopupState === 'setup-but-disabled' ? 'text-yellow-800' :
-                        autoTopupState === 'enabled-but-not-setup' ? 'text-blue-800' :
-                        'text-gray-700'
-                      }`}>
-                        {autoTopupState === 'enabled-but-not-setup' ? (
-                          <>
-                            You've enabled auto-top-up, but it's not set up. To auto-top-up <strong>{formatDollarAmount(purchaseAmount)}</strong> when the balance drops below <strong>{formatDollarAmount(localAutoTopupThreshold)}</strong>, click the button below.
-                          </>
-                        ) : (
-                          getAutoTopupSummary()
-                        )}
-                      </p>
-                    </div>
-                  )}
+                    {/* Auto-top-up threshold setting - show when enabled or when setup is complete */}
+                    {(localAutoTopupEnabled || autoTopupPreferences?.setupCompleted) && (
+                      <div className="space-y-3 mt-4 mb-4">
+                        <SliderWithValue
+                          label="Trigger when balance drops below:"
+                          value={localAutoTopupThreshold}
+                          onChange={handleAutoTopupThresholdChange}
+                          min={1}
+                          max={Math.max(1, purchaseAmount - 1)}
+                          step={1}
+                          variant="secondary"
+                          formatValue={(value) => `$${value}`}
+                          disabled={isUpdatingAutoTopup}
+                        />
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
+
+              {/* Auto-top-up info section - below both columns */}
+              {localAutoTopupEnabled && (
+                <div className={`rounded-lg p-3 w-full ${
+                  autoTopupState === 'active' ? 'bg-green-50 border border-green-200' :
+                  autoTopupState === 'setup-but-disabled' ? 'bg-yellow-50 border border-yellow-200' :
+                  autoTopupState === 'enabled-but-not-setup' ? 'bg-blue-50 border border-blue-200' :
+                  'bg-gray-50 border border-gray-200'
+                }`}>
+                  <p className={`text-sm ${
+                    autoTopupState === 'active' ? 'text-green-800' :
+                    autoTopupState === 'setup-but-disabled' ? 'text-yellow-800' :
+                    autoTopupState === 'enabled-but-not-setup' ? 'text-blue-800' :
+                    'text-gray-700'
+                  }`}>
+                    {autoTopupState === 'enabled-but-not-setup' ? (
+                      <>
+                        You've enabled auto-top-up, but it's not set up. To auto-top-up <strong>{formatDollarAmount(purchaseAmount)}</strong> when the balance drops below <strong>{formatDollarAmount(localAutoTopupThreshold)}</strong>, click the button below.
+                      </>
+                    ) : (
+                      getAutoTopupSummary()
+                    )}
+                  </p>
+                </div>
+              )}
 
               <Button
                 onClick={handlePurchase}
