@@ -892,13 +892,9 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
                 <div className={(!ready ? lastKnownPromptCount <= 1 : prompts.length <= 1) ? "" : "space-y-3"}>
                   {!ready ? (
                     // Simple skeleton loading state - one prompt field
-                    <div className="mt-2">
+                    <div>
                       <div className="p-3 rounded-md shadow-sm bg-slate-50/30 dark:bg-slate-800/30">
-                        <div className="flex justify-between items-center mb-2">
-                          <div className="h-4 w-16 bg-muted rounded animate-pulse"></div>
-                          <div className="h-6 w-6 bg-muted rounded animate-pulse"></div>
-                        </div>
-                        <div className="mt-1 min-h-[60px] bg-muted rounded animate-pulse"></div>
+                        <div className="min-h-[60px] bg-muted rounded animate-pulse"></div>
                       </div>
                     </div>
                   ) : prompts.length <= 1 ? (

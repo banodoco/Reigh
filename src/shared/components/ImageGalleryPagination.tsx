@@ -49,11 +49,7 @@ export const ImageGalleryPagination: React.FC<ImageGalleryPaginationProps> = ({
   rightContent,
   isBottom = false,
 }) => {
-  // Don't render if conditions not met - MUST be before any hooks
-  if (totalPages <= 1 || reducedSpacing || hidePagination) {
-    return null;
-  }
-
+  // All hooks must be called before any early returns
   const [showStickyPagination, setShowStickyPagination] = useState(false);
   const topPaginationRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
@@ -91,6 +87,11 @@ export const ImageGalleryPagination: React.FC<ImageGalleryPaginationProps> = ({
       clearTimeout(timeout);
     };
   }, [isBottom]);
+
+  // Don't render if conditions not met - AFTER all hooks
+  if (totalPages <= 1 || reducedSpacing || hidePagination) {
+    return null;
+  }
 
   const handlePrevPage = (e: React.MouseEvent, preventScroll = false) => {
     e.preventDefault(); // Prevent any default scroll behavior
