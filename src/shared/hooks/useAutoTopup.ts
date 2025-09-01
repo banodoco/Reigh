@@ -67,31 +67,44 @@ interface UpdateAutoTopupParams {
 }
 
 async function updateAutoTopupPreferences(params: UpdateAutoTopupParams): Promise<void> {
+  console.log('[AutoTopup:Hook] Starting save operation:', params);
+  
   const { data: { session }, error: authError } = await supabase.auth.getSession();
   
   if (authError || !session) {
+    console.error('[AutoTopup:Hook] Auth error:', authError);
     throw new Error('Authentication required');
   }
 
+  const requestBody = {
+    autoTopupEnabled: params.enabled,
+    autoTopupAmount: params.amount,
+    autoTopupThreshold: params.threshold,
+  };
+  
+  console.log('[AutoTopup:Hook] Calling setup-auto-topup with:', requestBody);
+
   // Call the setup-auto-topup edge function
   const { data, error } = await supabase.functions.invoke('setup-auto-topup', {
-    body: {
-      autoTopupEnabled: params.enabled,
-      autoTopupAmount: params.amount,
-      autoTopupThreshold: params.threshold,
-    },
+    body: requestBody,
     headers: {
       Authorization: `Bearer ${session.access_token}`,
     },
   });
   
+  console.log('[AutoTopup:Hook] Edge function response:', { data, error });
+  
   if (error) {
+    console.error('[AutoTopup:Hook] Edge function error:', error);
     throw new Error(error.message || 'Failed to update auto-top-up preferences');
   }
   
   if (data?.error) {
+    console.error('[AutoTopup:Hook] Edge function returned error:', data);
     throw new Error(data.message || 'Failed to update auto-top-up preferences');
   }
+  
+  console.log('[AutoTopup:Hook] Save operation completed successfully');
 }
 
 // Disable auto-top-up (convenience function)
@@ -117,12 +130,14 @@ export function useAutoTopup() {
   // Update preferences mutation
   const updatePreferencesMutation = useMutation<void, Error, UpdateAutoTopupParams>({
     mutationFn: updateAutoTopupPreferences,
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
+      console.log('[AutoTopup:Hook] Save successful:', variables);
       queryClient.invalidateQueries({ queryKey: ['autoTopup', 'preferences'] });
       queryClient.invalidateQueries({ queryKey: ['credits'] }); // Refresh credits info
       toast.success('Auto-top-up preferences updated');
     },
-    onError: (error) => {
+    onError: (error, variables) => {
+      console.error('[AutoTopup:Hook] Save failed:', error, variables);
       toast.error(error.message || 'Failed to update auto-top-up preferences');
     },
   });

@@ -93,6 +93,13 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
       console.log('[AutoTopup:Init] Initializing auto-top-up state from preferences:', autoTopupPreferences);
       setLocalAutoTopupEnabled(autoTopupPreferences.enabled);
       setLocalAutoTopupThreshold(autoTopupPreferences.threshold || 10);
+      
+      // If user has a saved auto-top-up amount, use that as the purchase amount
+      if (autoTopupPreferences.amount && autoTopupPreferences.amount !== 50) {
+        console.log('[AutoTopup:Init] Setting purchase amount from saved auto-top-up amount:', autoTopupPreferences.amount);
+        setPurchaseAmount(autoTopupPreferences.amount);
+      }
+      
       setHasInitialized(true);
     }
   }, [autoTopupPreferences, hasInitialized]);
@@ -183,12 +190,14 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
     
     const { enabled, setupCompleted } = autoTopupPreferences;
     
-    // Debug logging
+    // Debug logging (keeping for now)
     console.log('[AutoTopup:State] State computation:', {
       enabled,
       setupCompleted,
       localAutoTopupEnabled,
-      autoTopupPreferences
+      finalState: enabled && setupCompleted ? 'active' : 
+                   !enabled && setupCompleted ? 'setup-but-disabled' : 
+                   enabled && !setupCompleted ? 'enabled-but-not-setup' : 'not-setup'
     });
     
     if (enabled && setupCompleted) return 'active';
@@ -199,12 +208,6 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
 
   // Get the auto-top-up summary message
   const getAutoTopupSummary = () => {
-    console.log('[AutoTopup:Summary] Computing summary:', { 
-      autoTopupPreferences, 
-      autoTopupState, 
-      localAutoTopupEnabled 
-    });
-    
     if (!autoTopupPreferences) return '';
     
     switch (autoTopupState) {
@@ -530,14 +533,8 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                 className="w-full"
               >
                 {(() => {
-                  // Debug the button condition
-                  console.log('[AutoTopup:Button] Button render logic:', {
-                    isCreatingCheckout,
-                    purchaseAmount,
-                    localAutoTopupEnabled,
-                    autoTopupState,
-                    condition: localAutoTopupEnabled && autoTopupState === 'enabled-but-not-setup'
-                  });
+                  // Show set-up button when enabled but not setup
+                  const showSetupButton = localAutoTopupEnabled && autoTopupState === 'enabled-but-not-setup';
                   
                   if (isCreatingCheckout) {
                     return (
@@ -551,7 +548,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                     return "Select an amount to add";
                   }
                   
-                  if (localAutoTopupEnabled && autoTopupState === 'enabled-but-not-setup') {
+                  if (showSetupButton) {
                     return (
                       <>
                         <CreditCard className="w-4 h-4 mr-2" />
