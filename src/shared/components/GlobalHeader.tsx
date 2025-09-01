@@ -246,10 +246,14 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
         {/* Mobile Layout (below lg) */}
         <div 
           className="lg:hidden w-full pt-1"
-          style={{
-            paddingRight: contentOffsetRight ? `${contentOffsetRight}px` : undefined,
-            paddingLeft: contentOffsetLeft ? `${contentOffsetLeft}px` : undefined,
-          }}
+          style={(() => {
+            const symmetricOffset = Math.max(contentOffsetLeft || 0, contentOffsetRight || 0);
+            // Reduce mobile padding to 60% of the calculated offset for tighter spacing
+            const mobilePadding = Math.floor(symmetricOffset * 0.6);
+            return symmetricOffset
+              ? { paddingLeft: `${mobilePadding}px`, paddingRight: `${mobilePadding}px` }
+              : undefined;
+          })()}
         >
           {/* Top row - Brand + Project Buttons + App Settings */}
           <div className="flex items-center justify-between h-16 w-full px-4">

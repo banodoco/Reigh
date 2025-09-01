@@ -431,7 +431,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
             </CollapsibleContent>
           </Collapsible>
           
-                      <div className={`${mobileModalStyling.isMobile ? 'px-4' : 'px-6'} text-sm text-muted-foreground mb-2 flex justify-between items-center`}>
+                      <div className={`${mobileModalStyling.isMobile ? 'px-4' : 'px-6'} text-sm text-muted-foreground mb-6 flex justify-between items-center`}>
             <span>Editing {internalPrompts.length} prompt(s). Changes are auto-saved.</span>
             {internalPrompts.length > 0 && (
               <Button variant="destructive" size="sm" onClick={handleRemoveAllPrompts} className="ml-auto">
