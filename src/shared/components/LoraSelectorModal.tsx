@@ -328,7 +328,7 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & {
               return (
                 <Card 
                   key={lora["Model ID"]} 
-                  className={`w-full transition-all duration-200 shadow-none ${
+                  className={`w-full transition-all duration-200 shadow-none relative ${
                     isSelectedOnGenerator 
                       ? 'border-green-500' 
                       : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
@@ -338,24 +338,61 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & {
                     <CardHeader className="pb-2">
                         <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-2">
                             <div className="flex-grow">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <CardTitle className="text-xl" title={lora.Name !== "N/A" ? lora.Name : lora["Model ID"]}>
-                                      {lora.Name !== "N/A" ? lora.Name : lora["Model ID"]}
-                                  </CardTitle>
-                                  {isSelectedOnGenerator && (
-                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">
-                                      Added
-                                    </span>
-                                  )}
-                                  {isMyLora && (
-                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
-                                      {isLocalLora ? 'Local' : 'Mine'}
-                                    </span>
-                                  )}
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="flex items-center gap-2 flex-wrap flex-1">
+                                    <CardTitle className="text-xl" title={lora.Name !== "N/A" ? lora.Name : lora["Model ID"]}>
+                                        {lora.Name !== "N/A" ? lora.Name : lora["Model ID"]}
+                                    </CardTitle>
+                                    {isMyLora && (
+                                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                                        {isLocalLora ? 'Local' : 'Mine'}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {/* Mobile buttons - top right */}
+                                  <div className={`flex gap-2 flex-shrink-0 ${isMobile ? 'lg:hidden' : 'hidden'}`}>
+                                    {isSelectedOnGenerator ? (
+                                      <Button
+                                        variant="destructive"
+                                        size="sm"
+                                        onClick={() => {
+                                          console.log('[LoraRemovalDebug] Remove button clicked in LoraSelectorModal for LoRA:', { id: lora["Model ID"], name: lora.Name });
+                                          onRemoveLora(lora["Model ID"]);
+                                        }}
+                                      >
+                                        Remove
+                                      </Button>
+                                    ) : (
+                                      <Button
+                                        variant="default"
+                                        size="sm"
+                                        onClick={() => {
+                                          if (lora["Model Files"] && lora["Model Files"].length > 0) {
+                                            onAddLora(lora);
+                                          }
+                                        }}
+                                        disabled={!lora["Model Files"] || lora["Model Files"].length === 0}
+                                        className="bg-green-600 hover:bg-green-700"
+                                      >
+                                        Add
+                                      </Button>
+                                    )}
+                                    {!isMyLora && (
+                                      <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => createResource.mutate({ type: 'lora', metadata: lora })}
+                                          disabled={isInSavedLoras || createResource.isPending}
+                                      >
+                                          {isInSavedLoras ? 'Saved' : 'Save'}
+                                      </Button>
+                                    )}
+                                  </div>
                                 </div>
                                 <p className="text-sm text-muted-foreground" title={lora.Author}>By: {lora.Author}</p>
                             </div>
-                            <div className="flex flex-col lg:items-end gap-2 flex-shrink-0">
+                            {/* Desktop buttons - right side */}
+                            <div className={`flex flex-col lg:items-end gap-2 flex-shrink-0 ${isMobile ? 'hidden' : 'hidden lg:flex'}`}>
                               <div className="flex gap-2">
                                 {isSelectedOnGenerator ? (
                                   <Button
@@ -397,45 +434,27 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & {
                             </div>
                         </div>
                         <div className="text-xs text-muted-foreground pt-1">
-                          {lora.Downloads && <span>Downloads: {lora.Downloads.toLocaleString()} | </span>}
-                          {lora.Likes && <span>Likes: {lora.Likes.toLocaleString()} | </span>}
-                          {lora["Last Modified"] && <span>Updated: {new Date(lora["Last Modified"]).toLocaleDateString()}</span>}
+                          {lora.Downloads && <span>Downloads: {lora.Downloads.toLocaleString()}</span>}
+                          {lora.Downloads && lora.Likes && <span> | </span>}
+                          {lora.Likes && <span>Likes: {lora.Likes.toLocaleString()}</span>}
                         </div>
                     </CardHeader>
                     <CardContent className="space-y-3 pt-0">
                       {lora.Description && (
-                        <div className="space-y-2">
-                          <div className="relative">
-                            <p 
-                              ref={(el) => {
-                                if (el) {
-                                  // Check if text is overflowing by comparing scroll height to client height
-                                  const isOverflowing = el.scrollHeight > el.clientHeight;
-                                  const fadeElement = el.nextElementSibling as HTMLElement;
-                                  const buttonContainer = el.parentElement?.nextElementSibling as HTMLElement;
-                                  
-                                  if (fadeElement && fadeElement.classList.contains('absolute')) {
-                                    fadeElement.style.display = isOverflowing ? 'block' : 'none';
-                                  }
-                                  if (buttonContainer && buttonContainer.tagName === 'BUTTON') {
-                                    buttonContainer.style.display = isOverflowing ? 'block' : 'none';
-                                  }
-                                }
-                              }}
-                              className="text-xs text-muted-foreground max-h-10 overflow-hidden" 
-                              title={lora.Description}
-                            >
-                              {lora.Description}
-                            </p>
-                            <div className="absolute bottom-0 left-0 right-0 h-4 bg-gradient-to-t from-white dark:from-gray-950 to-transparent pointer-events-none" />
-                          </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <p 
+                            className="text-xs text-muted-foreground truncate flex-1" 
+                            title={lora.Description}
+                          >
+                            {lora.Description}
+                          </p>
                           <Button
                             variant="link"
                             size="sm"
-                            className="p-0 h-auto text-xs"
+                            className="p-0 h-auto text-xs flex-shrink-0"
                             onClick={() => handleShowFullDescription(lora.Name, lora.Description)}
                           >
-                            Read all
+                            Read more
                           </Button>
                         </div>
                       )}
@@ -495,23 +514,33 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & {
                       ) : (
                         <p className="text-xs text-muted-foreground">No sample images available.</p>
                       )}
-                      {isSelectedOnGenerator && (
-                        <div className="px-6 pb-3" onClick={(e) => e.stopPropagation()}>
-                          <div className="flex justify-between items-center mb-1">
-                            <Label htmlFor={`lora-strength-${lora['Model ID']}`} className="text-xs">Strength</Label>
-                            <span className="text-xs font-light">{strength?.toFixed(2)}</span>
-                          </div>
-                          <Slider
-                            id={`lora-strength-${lora['Model ID']}`}
-                            value={[strength ?? 1]}
-                            onValueChange={(value) => onUpdateLoraStrength(lora['Model ID'], value[0])}
-                            min={0} max={2} step={0.05}
-                            className="w-full"
-                          />
-                        </div>
-                      )}
                     </CardContent>
                   </div>
+                  
+                  {/* Strength overlay at bottom */}
+                  {isSelectedOnGenerator && (
+                    <div 
+                      className="absolute bottom-0 left-0 right-0 bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm border-t rounded-b p-3" 
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="flex justify-between items-center mb-2">
+                        <Label htmlFor={`lora-strength-${lora['Model ID']}`} className="text-xs">Strength</Label>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-light">{strength?.toFixed(2)}</span>
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">
+                            Added
+                          </span>
+                        </div>
+                      </div>
+                      <Slider
+                        id={`lora-strength-${lora['Model ID']}`}
+                        value={[strength ?? 1]}
+                        onValueChange={(value) => onUpdateLoraStrength(lora['Model ID'], value[0])}
+                        min={0} max={2} step={0.05}
+                        className="w-full"
+                      />
+                    </div>
+                  )}
                 </Card>
               );
             })
@@ -728,6 +757,16 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
             return;
         }
         
+        if (!addForm.description.trim() || addForm.description.trim().length < 50) {
+            toast.error("Description must be at least 50 characters");
+            return;
+        }
+        
+        if (sampleFiles.length === 0) {
+            toast.error("At least one sample image or video is required");
+            return;
+        }
+        
         const urlValidation = validateHuggingFaceUrl(addForm.huggingface_url);
         if (!urlValidation.isValid) {
             toast.error(`Invalid HuggingFace URL: ${urlValidation.message}`);
@@ -851,14 +890,20 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
                     </div>
                     
                     <div className="space-y-1">
-                        <Label htmlFor="lora-description">Description</Label>
+                        <Label htmlFor="lora-description">Description *</Label>
                         <Textarea 
                             id="lora-description" 
-                            placeholder="Describe what this LoRA does..." 
+                            placeholder="Describe what this LoRA does... (minimum 50 characters)" 
                             value={addForm.description} 
                             onChange={e => handleFormChange('description', e.target.value)} 
                             rows={2}
+                            className={addForm.description.trim().length > 0 && addForm.description.trim().length < 50 ? 'border-red-500' : ''}
                         />
+                        <div className="flex justify-between items-center text-xs">
+                            <span className={`${addForm.description.trim().length < 50 ? 'text-red-600' : 'text-muted-foreground'}`}>
+                                {addForm.description.trim().length}/50 characters minimum
+                            </span>
+                        </div>
                     </div>
 
                     <div className="space-y-1">
@@ -949,8 +994,13 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
                             }}
                             acceptTypes={['image', 'video']}
                             multiple={true}
-                            label="Upload sample images/videos"
+                            label="Upload sample images/videos *"
                         />
+                        {sampleFiles.length === 0 && (
+                            <p className="text-xs text-red-600">
+                                At least one sample image or video is required
+                            </p>
+                        )}
                         
                         {/* Display uploaded files */}
                         {sampleFiles.length > 0 && (
@@ -1037,7 +1087,14 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
                 <ItemCardFooter>
                     <Button 
                         onClick={handleAddLoraFromForm}
-                        disabled={isSubmitting || !addForm.name.trim() || !validateHuggingFaceUrl(addForm.huggingface_url).isValid}
+                        disabled={
+                            isSubmitting || 
+                            !addForm.name.trim() || 
+                            !addForm.description.trim() || 
+                            addForm.description.trim().length < 50 ||
+                            sampleFiles.length === 0 ||
+                            !validateHuggingFaceUrl(addForm.huggingface_url).isValid
+                        }
                     >
                         {isSubmitting ? 'Adding LoRA...' : 'Add LoRA'}
                     </Button>
