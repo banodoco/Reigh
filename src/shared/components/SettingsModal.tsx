@@ -366,6 +366,12 @@ python worker.py --db-type supabase \\
         className={`sm:max-w-2xl max-h-[90vh] flex flex-col rounded-lg [&>button:last-child]:top-[1.625rem] ${
           isMobile ? 'left-4 right-4 top-8 bottom-8 w-auto translate-x-0 translate-y-0 max-h-none [&>button:last-child]:right-7' : ''
         }`}
+        onOpenAutoFocus={(event) => {
+          // Prevent auto-focus on mobile devices to avoid triggering focus styles
+          if (isMobile) {
+            event.preventDefault();
+          }
+        }}
       >
         {/* Top button container - positioned relative to DialogContent */}
         {isMobile && (
@@ -373,7 +379,6 @@ python worker.py --db-type supabase \\
             variant="ghost"
             size="sm"
             onClick={handleSignOut}
-            autoFocus={false}
             className="absolute left-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
           >
             <LogOut className="h-4 w-4" />

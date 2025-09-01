@@ -434,7 +434,8 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
           </div>
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
+        <div className="px-6">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
           <TabsList className="grid w-full grid-cols-3 bg-gray-100 border border-gray-200 h-auto p-3 sm:h-10 sm:p-1 mb-3">
             <TabsTrigger 
               value="purchase"
@@ -468,14 +469,14 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="purchase" className="flex-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] sm:[&::-webkit-scrollbar]:block sm:[-ms-overflow-style:auto] sm:[scrollbar-width:auto]">
-            <div className="px-6 pb-6 pt-0 space-y-4">
+          <TabsContent value="purchase" className="flex-1 pb-6 pt-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] sm:[&::-webkit-scrollbar]:block sm:[-ms-overflow-style:auto] sm:[scrollbar-width:auto]">
+            <div className="space-y-4">
               <div className="space-y-1.5">
-                <div className="text-center -mt-2">
-                  <label className="text-lg font-light text-gray-900">
-                    Top-up amount:
-                  </label>
-                </div>
+                                  <div className="text-center mt-2">
+                    <label className="text-lg font-light text-gray-900">
+                      Top-up amount:
+                    </label>
+                  </div>
                 
                 <div className="space-y-4">
                   <div className="text-center">
@@ -503,7 +504,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
 
               {/* Auto-top-up section */}
               <div className="space-y-4 pt-4 border-t border-gray-200">
-                <div className="space-y-3">
+                <div>
                   {/* Auto-top-up toggle */}
                   <div className="flex items-center space-x-2">
                     <Checkbox
@@ -520,7 +521,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
 
                   {/* Auto-top-up threshold setting - show when enabled or when setup is complete */}
                   {(localAutoTopupEnabled || autoTopupPreferences?.setupCompleted) && (
-                    <div className="space-y-3">
+                    <div className="space-y-3 mt-4 mb-4">
                       <SliderWithValue
                         label="Trigger when balance drops below:"
                         value={localAutoTopupThreshold}
@@ -603,7 +604,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
             </div>
           </TabsContent>
 
-          <TabsContent value="history" className="flex-1 space-y-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] sm:[&::-webkit-scrollbar]:block sm:[-ms-overflow-style:auto] sm:[scrollbar-width:auto]">
+          <TabsContent value="history" className="flex-1 pb-6 pt-0 space-y-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] sm:[&::-webkit-scrollbar]:block sm:[-ms-overflow-style:auto] sm:[scrollbar-width:auto]">
             <div className="border border-gray-200 rounded-lg overflow-hidden">
               {isLoadingLedger ? (
                 <div className="p-8 text-center">
@@ -657,14 +658,14 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
             </div>
           </TabsContent>
 
-          <TabsContent value="task-log" className="flex-1 space-y-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] sm:[&::-webkit-scrollbar]:block sm:[-ms-overflow-style:auto] sm:[scrollbar-width:auto]">
+          <TabsContent value="task-log" className="flex-1 pb-6 pt-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] sm:[&::-webkit-scrollbar]:block sm:[-ms-overflow-style:auto] sm:[scrollbar-width:auto]">
             {/* Mobile notice */}
             <div className="sm:hidden p-3 bg-blue-50 border border-blue-200 rounded-lg text-center">
               <p className="text-sm text-blue-700">More details are available on desktop</p>
             </div>
             
             {/* Filters Bar */}
-            <div className="p-4 bg-gray-50 rounded-lg border space-y-3 sm:space-y-0">
+            <div className="p-4 bg-gray-50 rounded-lg border space-y-3 sm:space-y-0 mt-1 mb-6">
               <div className="flex items-center gap-2 sm:hidden">
                 <Filter className="w-4 h-4 text-gray-500" />
                 <span className="text-sm font-light text-gray-700">Filter by:</span>
@@ -923,7 +924,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
             </div>
 
             {/* Download Button Section */}
-            <div className="flex justify-end items-center gap-2">
+            <div className="flex justify-end items-center gap-2 mb-4">
               <span className="text-sm text-gray-500">
                 {taskLogData?.pagination.total || 0} task{(taskLogData?.pagination.total || 0) !== 1 ? 's' : ''}
               </span>
@@ -1075,6 +1076,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
             </div>
           </TabsContent>
         </Tabs>
+        </div>
     </div>
   );
 };
