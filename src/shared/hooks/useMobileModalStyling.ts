@@ -91,6 +91,7 @@ const createMobileLayoutStrategy = (layout: MobileLayout, isMobile: boolean) => 
     return {
       classes: '',
       centeringOverrides: [],
+      customStyles: undefined,
     };
   }
 
@@ -98,16 +99,25 @@ const createMobileLayoutStrategy = (layout: MobileLayout, isMobile: boolean) => 
     centered: () => ({
       classes: '',
       centeringOverrides: [],
+      customStyles: undefined,
     }),
     
     'edge-buffered': () => ({
       classes: `left-${MOBILE_SPACING.edge} right-${MOBILE_SPACING.edge} w-auto`,
       centeringOverrides: ['translate-x-0', MODAL_BASE_CLASSES.closeButton],
+      customStyles: undefined,
     }),
     
     fullscreen: () => ({
-      classes: `left-${MOBILE_SPACING.edge} right-${MOBILE_SPACING.edge} top-${MOBILE_SPACING.top} bottom-${MOBILE_SPACING.bottom} w-auto max-h-none`,
+      classes: `left-${MOBILE_SPACING.edge} right-${MOBILE_SPACING.edge} w-auto max-h-none`,
       centeringOverrides: ['translate-x-0', 'translate-y-0', MODAL_BASE_CLASSES.closeButton],
+      // Use CSS custom properties for safe positioning
+      customStyles: {
+        position: 'fixed',
+        top: 'env(safe-area-inset-top, 20px)',
+        bottom: 'env(safe-area-inset-bottom, 20px)',
+        maxHeight: 'calc(100vh - env(safe-area-inset-top, 20px) - env(safe-area-inset-bottom, 20px) - 40px)',
+      },
     }),
   };
 
@@ -161,7 +171,7 @@ export const useMobileModalStyling = (config: MobileModalConfig = {}): MobileMod
   }
 
   // Get mobile-specific classes
-  const { classes: mobileClasses, centeringOverrides } = createMobileLayoutStrategy(finalMobileLayout, isMobile);
+  const { classes: mobileClasses, centeringOverrides, customStyles } = createMobileLayoutStrategy(finalMobileLayout, isMobile);
   
   const dialogContentClassName = [
     mobileClasses,
@@ -181,7 +191,7 @@ export const useMobileModalStyling = (config: MobileModalConfig = {}): MobileMod
 
   return {
     dialogContentClassName,
-    dialogContentStyle: {},
+    dialogContentStyle: (isMobile && customStyles) ? customStyles : {},
     ...containerClasses,
     isMobile,
     baseClasses,

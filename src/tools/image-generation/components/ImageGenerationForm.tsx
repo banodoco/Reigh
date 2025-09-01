@@ -184,6 +184,10 @@ export const PromptInputRow: React.FC<PromptInputRowProps> = React.memo(({
   // until this row is marked active to avoid immediate auto-close.
   const [pendingEnterEdit, setPendingEnterEdit] = useState(false);
 
+  // Drag detection for prompt field clicks
+  const dragStartPos = useRef<{ x: number; y: number } | null>(null);
+  const isDragging = useRef(false);
+
   // Track if the change came from parent (like AI edit) to prevent feedback loops
   const [lastParentUpdate, setLastParentUpdate] = useState(promptEntry.fullPrompt);
   
@@ -289,11 +293,59 @@ export const PromptInputRow: React.FC<PromptInputRowProps> = React.memo(({
     // Mobile: do nothing on focus to prevent keyboard opening
   };
 
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    dragStartPos.current = { x: touch.clientX, y: touch.clientY };
+    isDragging.current = false;
+    console.log(`[PromptInputRow:DRAG_DEBUG] Touch start on field ${promptEntry.id}. Recording position: ${touch.clientX}, ${touch.clientY}`);
+  };
+
+  // Global touch move listener for drag detection
+  useEffect(() => {
+    const handleGlobalTouchMove = (e: TouchEvent) => {
+      if (dragStartPos.current && e.touches.length > 0) {
+        const touch = e.touches[0];
+        const deltaX = Math.abs(touch.clientX - dragStartPos.current.x);
+        const deltaY = Math.abs(touch.clientY - dragStartPos.current.y);
+        // Consider it a drag if moved more than 5px in any direction
+        if (deltaX > 5 || deltaY > 5) {
+          isDragging.current = true;
+          console.log(`[PromptInputRow:DRAG_DEBUG] Field ${promptEntry.id} - Setting isDragging to true (global touch)`);
+        }
+      }
+    };
+
+    const handleGlobalTouchEnd = () => {
+      // Reset drag tracking when touch ends
+      setTimeout(() => {
+        dragStartPos.current = null;
+        isDragging.current = false;
+      }, 50); // Small delay to allow click handler to check isDragging
+    };
+
+    document.addEventListener('touchmove', handleGlobalTouchMove, { passive: true });
+    document.addEventListener('touchend', handleGlobalTouchEnd);
+
+    return () => {
+      document.removeEventListener('touchmove', handleGlobalTouchMove);
+      document.removeEventListener('touchend', handleGlobalTouchEnd);
+    };
+  }, [promptEntry.id]);
+
   const handleClick = () => {
     if (isMobile) {
-      // Request activation first, then enter edit when active to ensure single-tap switch works
-      setPendingEnterEdit(true);
-      onSetActiveForFullView(promptEntry.id);
+      // Only activate if it wasn't a drag
+      if (!isDragging.current) {
+        console.log(`[PromptInputRow:CLICK_DEBUG] Field ${promptEntry.id} - Valid click, activating field`);
+        // Request activation first, then enter edit when active to ensure single-tap switch works
+        setPendingEnterEdit(true);
+        onSetActiveForFullView(promptEntry.id);
+      } else {
+        console.log(`[PromptInputRow:CLICK_DEBUG] Field ${promptEntry.id} - Ignoring click due to drag`);
+      }
+      // Reset drag state
+      dragStartPos.current = null;
+      isDragging.current = false;
     }
   };
 
@@ -305,8 +357,7 @@ export const PromptInputRow: React.FC<PromptInputRowProps> = React.memo(({
       if (e.isPrimary && (e.pointerType === 'touch' || e.pointerType === 'pen')) {
         e.preventDefault();
       }
-      setPendingEnterEdit(true);
-      onSetActiveForFullView(promptEntry.id);
+      // Don't immediately activate - let the click handler with drag detection handle it
     }
   };
 
@@ -404,6 +455,7 @@ export const PromptInputRow: React.FC<PromptInputRowProps> = React.memo(({
         ) : (
           // Mobile not in edit mode: use div that looks like textarea
           <div
+            onTouchStart={handleTouchStart}
             onPointerDown={handlePointerDown}
             onClick={handleClick}
             className={`mt-1 resize-none border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${

@@ -53,6 +53,7 @@
 | **Debug Logging** | [debug_logging.md](structure_detail/debug_logging.md) | PerfDebug log helpers & profiling |
 | **Component Modularization** | [component_modularization.md](structure_detail/component_modularization.md) | Guide for breaking down large components into maintainable modules |
 | **Image Loading System** | [image_loading_system.md](structure_detail/image_loading_system.md) | Progressive loading, adjacent page preloading, performance optimization |
+| **Mobile Modal Styling** | [mobile_modal_styling_system.md](structure_detail/mobile_modal_styling_system.md) | Unified mobile modal positioning, safe area handling, responsive modal layouts |
 | **Mobile Video Toggle** | - | Mobile UI toggle functionality between MediaLightbox video playback and TaskDetailsModal for viewing generation parameters |
 | **Railway Deployment** | [DEPLOY_RAILWAY.md](DEPLOY_RAILWAY.md) | Complete Railway.com deployment guide |
 

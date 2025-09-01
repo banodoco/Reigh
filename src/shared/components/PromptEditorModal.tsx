@@ -74,7 +74,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
   // Modal content ref for outside click detection
   const modalContentRef = useRef<HTMLDivElement>(null);
   
-  // Mobile modal styling - back to extra large but with mobile fixes
+  // Mobile modal styling - using fixed useExtraLargeModal
   const mobileModalStyling = useExtraLargeModal('promptEditor');
   
   // Debug mobile modal styling hook result
@@ -521,21 +521,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
     <Dialog open={isOpen} onOpenChange={handleModalClose}>
       <DialogContent
         className={mobileModalStyling.fullClassName}
-        style={{
-          ...mobileModalStyling.dialogContentStyle,
-          // Force proper mobile positioning
-          ...(isMobile && {
-            position: 'fixed',
-            top: 'env(safe-area-inset-top, 20px)',
-            left: '16px',
-            right: '16px',
-            bottom: 'env(safe-area-inset-bottom, 20px)',
-            transform: 'none',
-            maxHeight: 'calc(100vh - env(safe-area-inset-top, 20px) - env(safe-area-inset-bottom, 20px) - 40px)',
-            width: 'auto',
-            margin: '0'
-          })
-        }}
+        style={mobileModalStyling.dialogContentStyle}
         {...mobileProps}
         ref={(el) => {
           modalContentRef.current = el;
