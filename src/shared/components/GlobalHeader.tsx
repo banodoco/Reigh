@@ -49,10 +49,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
   const [isProjectSettingsModalOpen, setIsProjectSettingsModalOpen] = useState(false);
   const [isReferralModalOpen, setIsReferralModalOpen] = useState(false);
 
-  // Debug modal state changes
-  useEffect(() => {
-    console.log('[GlobalHeader] Referral modal state changed:', isReferralModalOpen);
-  }, [isReferralModalOpen]);
+
 
   // [MobileStallFix] Add mobile-specific debug logging for stalling detection
   useEffect(() => {
@@ -236,12 +233,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
           <div className="flex items-end gap-2">
             <button 
               className="text-xs text-gray-400 underline cursor-pointer font-thin mb-0.5 hover:text-gray-600 transition-colors duration-200 text-right touch-manipulation active:text-gray-500"
-              onClick={() => {
-                console.log('[GlobalHeader:Desktop] Referral button clicked');
-                setIsReferralModalOpen(true);
-              }}
-              onTouchStart={() => console.log('[GlobalHeader:Desktop] Touch start on referral button')}
-              onTouchEnd={() => console.log('[GlobalHeader:Desktop] Touch end on referral button')}
+              onClick={() => setIsReferralModalOpen(true)}
               type="button"
             >
               Refer people to Reigh?
@@ -336,15 +328,13 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
             {/* Right side - Referral text and App Settings */}
             <div className="flex items-end gap-2">
               <button 
-                className="text-xs text-gray-400 underline cursor-pointer font-thin mb-0.5 hover:text-gray-600 transition-colors duration-200 text-right touch-manipulation active:text-gray-500 min-h-[44px] px-2 py-2"
-                onClick={() => {
-                  console.log('[GlobalHeader:Mobile] Referral button clicked');
+                className="text-xs text-gray-400 underline cursor-pointer font-thin mb-0.5 hover:text-gray-600 transition-colors duration-200 text-right touch-manipulation active:text-gray-500 min-h-[44px] px-2 py-2 whitespace-nowrap"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
                   setIsReferralModalOpen(true);
                 }}
-                onTouchStart={() => console.log('[GlobalHeader:Mobile] Touch start on referral button')}
-                onTouchEnd={() => console.log('[GlobalHeader:Mobile] Touch end on referral button')}
                 type="button"
-                style={{ background: 'rgba(255,0,0,0.1)' /* Temporary debug background */ }}
               >
                 Refer people to Reigh?
               </button>
