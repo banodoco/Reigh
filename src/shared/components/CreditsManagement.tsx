@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Coins, CreditCard, History, Gift, DollarSign, Activity, Filter, ChevronLeft, ChevronRight, Download } from 'lucide-react';
+import { Coins, CreditCard, History, Gift, DollarSign, Activity, Filter, ChevronLeft, ChevronRight, Download, Settings } from 'lucide-react';
 import { Button } from '@/shared/components/ui/button';
 import { Badge } from '@/shared/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
@@ -26,9 +26,11 @@ import {
 } from '@/shared/components/ui/popover';
 import { Checkbox } from '@/shared/components/ui/checkbox';
 import { useCredits } from '@/shared/hooks/useCredits';
+import { useAutoTopup } from '@/shared/hooks/useAutoTopup';
 import { useTaskLog } from '@/shared/hooks/useTaskLog';
 import { formatDistanceToNow } from 'date-fns';
 import { UpdatingTimeCell } from '@/shared/components/UpdatingTimeCell';
+import { SliderWithValue } from '@/shared/components/ui/slider-with-value';
 
 interface CreditsManagementProps {
   initialTab?: 'purchase' | 'history' | 'task-log';
@@ -43,6 +45,13 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
     formatCurrency,
     useCreditLedger,
   } = useCredits();
+
+  const {
+    preferences: autoTopupPreferences,
+    isLoadingPreferences: isLoadingAutoTopup,
+    updatePreferences: updateAutoTopup,
+    isUpdatingPreferences: isUpdatingAutoTopup,
+  } = useAutoTopup();
 
   // Task Log state
   const [taskLogPage, setTaskLogPage] = useState(1);
@@ -71,6 +80,10 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
   const [activeTab, setActiveTab] = useState<string>(initialTab);
   const [purchaseAmount, setPurchaseAmount] = useState(50); // Default to $50
   const { data: ledgerData, isLoading: isLoadingLedger } = useCreditLedger();
+
+  // Auto-top-up state
+  const [autoTopupEnabled, setAutoTopupEnabled] = useState(true); // Default enabled as per plan
+  const [autoTopupThreshold, setAutoTopupThreshold] = useState(10); // Default to $10
 
   // Helper functions for filters
   const updateFilter = (filterType: keyof typeof taskLogFilters, value: any) => {
@@ -119,9 +132,24 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
     ).join(' ');
   };
 
+  // Update auto-top-up threshold when purchase amount changes
+  React.useEffect(() => {
+    const defaultThreshold = Math.max(1, Math.floor(purchaseAmount / 5));
+    setAutoTopupThreshold(defaultThreshold);
+  }, [purchaseAmount]);
+
   const handlePurchase = () => {
     if (purchaseAmount > 0) {
-      createCheckout(purchaseAmount);
+      if (autoTopupEnabled) {
+        createCheckout({
+          amount: purchaseAmount,
+          autoTopupEnabled: true,
+          autoTopupAmount: purchaseAmount,
+          autoTopupThreshold: autoTopupThreshold,
+        });
+      } else {
+        createCheckout({ amount: purchaseAmount });
+      }
     }
   };
 
@@ -351,6 +379,49 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                 </div>
               </div>
 
+              {/* Auto-top-up section */}
+              <div className="space-y-4 pt-4 border-t border-gray-200">
+                <div className="space-y-3">
+                  <div className="flex items-start space-x-3">
+                    <div className="flex items-center space-x-2 w-1/5">
+                      <Checkbox
+                        id="auto-topup"
+                        checked={autoTopupEnabled}
+                        onCheckedChange={(checked) => setAutoTopupEnabled(checked === true)}
+                      />
+                      <label htmlFor="auto-topup" className="text-sm font-light cursor-pointer flex items-center space-x-2">
+                        <Settings className="w-4 h-4 text-gray-500" />
+                        <span>Enable auto-top-up</span>
+                      </label>
+                    </div>
+
+                    {autoTopupEnabled && (
+                      <div className="w-4/5 min-w-0">
+                        <SliderWithValue
+                          label="Auto-top-up when balance drops below:"
+                          value={autoTopupThreshold}
+                          onChange={(value) => setAutoTopupThreshold(value)}
+                          min={1}
+                          max={purchaseAmount - 1}
+                          step={1}
+                          variant="secondary"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {autoTopupEnabled && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 w-full">
+                      <p className="text-sm text-blue-800">
+                        <strong>Auto-top-up summary:</strong> We'll automatically charge your card 
+                        ${formatDollarAmount(purchaseAmount).replace('$', '')} when your balance 
+                        drops below ${formatDollarAmount(autoTopupThreshold).replace('$', '')}.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <Button
                 onClick={handlePurchase}
                 disabled={isCreatingCheckout || purchaseAmount === 0}
@@ -362,6 +433,11 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                   </div>
                 ) : purchaseAmount === 0 ? (
                   "Select an amount to add"
+                ) : autoTopupEnabled ? (
+                  <>
+                    <CreditCard className="w-4 h-4 mr-2" />
+                    Add {formatDollarAmount(purchaseAmount)} and enable auto-top-up
+                  </>
                 ) : (
                   <>
                     <CreditCard className="w-4 h-4 mr-2" />

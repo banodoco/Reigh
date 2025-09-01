@@ -22,7 +22,12 @@ function jsonResponse(body: any, status = 200) {
  * 
  * POST /functions/v1/stripe-checkout
  * Headers: Authorization: Bearer <JWT>
- * Body: { amount: number } // Dollar amount
+ * Body: { 
+ *   amount: number, // Dollar amount
+ *   autoTopupEnabled?: boolean,
+ *   autoTopupAmount?: number, // Dollar amount for auto-top-up
+ *   autoTopupThreshold?: number // Dollar amount threshold
+ * }
  * 
  * Returns:
  * - 200 OK with checkout URL
@@ -48,9 +53,22 @@ serve(async (req) => {
     return jsonResponse({ error: "Invalid JSON body" }, 400);
   }
   
-  const { amount } = body;
+  const { amount, autoTopupEnabled, autoTopupAmount, autoTopupThreshold } = body;
   if (!amount || typeof amount !== 'number' || amount < 5 || amount > 100) {
     return jsonResponse({ error: "Amount must be a number between $5 and $100" }, 400);
+  }
+
+  // Validate auto-top-up parameters if provided
+  if (autoTopupEnabled) {
+    if (!autoTopupAmount || typeof autoTopupAmount !== 'number' || autoTopupAmount < 5 || autoTopupAmount > 100) {
+      return jsonResponse({ error: "autoTopupAmount must be a number between $5 and $100" }, 400);
+    }
+    if (!autoTopupThreshold || typeof autoTopupThreshold !== 'number' || autoTopupThreshold < 1) {
+      return jsonResponse({ error: "autoTopupThreshold must be a positive number" }, 400);
+    }
+    if (autoTopupThreshold >= autoTopupAmount) {
+      return jsonResponse({ error: "autoTopupThreshold must be less than autoTopupAmount" }, 400);
+    }
   }
 
   // ─── 2. Extract authorization header ────────────────────────────
@@ -100,7 +118,8 @@ serve(async (req) => {
       apiVersion: "2024-06-20",
     });
 
-    const session = await stripe.checkout.sessions.create({
+    // Prepare session configuration
+    const sessionConfig: any = {
       mode: "payment",
       payment_method_types: ["card"],
       line_items: [
@@ -109,7 +128,9 @@ serve(async (req) => {
             currency: "usd",
             product_data: { 
               name: "Reigh Credits",
-              description: `${amount} credits for AI generation tasks`
+              description: autoTopupEnabled 
+                ? `${amount} credits + auto-top-up enabled`
+                : `${amount} credits for AI generation tasks`
             },
             unit_amount: amount * 100, // Convert dollars to cents
           },
@@ -118,12 +139,25 @@ serve(async (req) => {
       ],
       metadata: { 
         userId: user.id, 
-        amount: amount.toString() 
+        amount: amount.toString(),
+        autoTopupEnabled: autoTopupEnabled ? 'true' : 'false'
       },
       success_url: `${frontendUrl}/payments/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${frontendUrl}/payments/cancel`,
       customer_email: user.email || undefined,
-    });
+    };
+
+    // If auto-top-up enabled, configure payment method saving
+    if (autoTopupEnabled) {
+      sessionConfig.customer_creation = "if_required";
+      sessionConfig.payment_intent_data = {
+        setup_future_usage: "off_session"
+      };
+      sessionConfig.metadata.autoTopupAmount = autoTopupAmount.toString();
+      sessionConfig.metadata.autoTopupThreshold = autoTopupThreshold.toString();
+    }
+
+    const session = await stripe.checkout.sessions.create(sessionConfig);
 
     console.log(`Stripe checkout session created for user ${user.id}: $${amount} (session: ${session.id})`);
     

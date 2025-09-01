@@ -96,7 +96,7 @@ serve(async (req) => {
         const session = event.data.object;
         
         // Extract metadata from the session
-        const { userId, amount } = session.metadata || {};
+        const { userId, amount, autoTopupEnabled, autoTopupAmount, autoTopupThreshold } = session.metadata || {};
         
         if (!userId || !amount) {
           console.error('Missing required metadata in checkout session:', session.metadata);
@@ -112,6 +112,45 @@ serve(async (req) => {
           return jsonResponse({ error: 'Amount mismatch' }, 400);
         }
 
+        // Handle auto-top-up setup if enabled
+        if (autoTopupEnabled === 'true' && autoTopupAmount && autoTopupThreshold) {
+          // Get payment intent to extract customer and payment method
+          const paymentIntentId = session.payment_intent;
+          if (paymentIntentId) {
+            try {
+              // This requires importing Stripe in webhook - let's use a simple approach
+              // We'll fetch the payment intent details using Stripe API
+              const stripeSecretKey = Deno.env.get("STRIPE_SECRET_KEY");
+              if (stripeSecretKey) {
+                // For now, we'll store the session data and let a background job handle Stripe API calls
+                // This avoids complex Stripe SDK imports in the webhook
+                const { error: autoTopupError } = await supabaseAdmin
+                  .from('users')
+                  .update({
+                    auto_topup_enabled: true,
+                    auto_topup_amount: Math.round(parseFloat(autoTopupAmount) * 100), // Convert to cents
+                    auto_topup_threshold: Math.round(parseFloat(autoTopupThreshold) * 100), // Convert to cents
+                    stripe_customer_id: session.customer, // Customer ID from session
+                  })
+                  .eq('id', userId);
+
+                if (autoTopupError) {
+                  console.error('Error setting up auto-top-up:', autoTopupError);
+                } else {
+                  console.log('Auto-top-up enabled for user:', {
+                    userId,
+                    autoTopupAmount: parseFloat(autoTopupAmount),
+                    autoTopupThreshold: parseFloat(autoTopupThreshold),
+                    customerId: session.customer
+                  });
+                }
+              }
+            } catch (error) {
+              console.error('Error processing auto-top-up setup:', error);
+            }
+          }
+        }
+
         // Insert budget purchase into ledger
         const { data: ledgerEntry, error: ledgerError } = await supabaseAdmin
           .from('credits_ledger')
@@ -124,6 +163,7 @@ serve(async (req) => {
               amount_paid: session.amount_total,
               currency: session.currency,
               dollar_amount: dollarAmount,
+              auto_topup_enabled: autoTopupEnabled === 'true',
             },
           })
           .select()
@@ -139,8 +179,83 @@ serve(async (req) => {
           amountCents: session.amount_total,
           dollarAmount,
           sessionId: session.id,
+          autoTopupEnabled: autoTopupEnabled === 'true',
         });
 
+        break;
+
+      case 'payment_intent.succeeded':
+        // Handle successful auto-top-up payments
+        const paymentIntent = event.data.object;
+        const metadata = paymentIntent.metadata || {};
+        
+        if (metadata.autoTopup === 'true') {
+          const { userId, originalBalance, topupAmount } = metadata;
+          
+          if (userId && topupAmount) {
+            // Insert auto-top-up credit into ledger
+            const { error: autoTopupLedgerError } = await supabaseAdmin
+              .from('credits_ledger')
+              .insert({
+                user_id: userId,
+                amount: parseInt(topupAmount), // Already in cents
+                type: 'auto_topup',
+                metadata: {
+                  stripe_payment_intent_id: paymentIntent.id,
+                  amount_paid: paymentIntent.amount_received,
+                  currency: paymentIntent.currency,
+                  dollar_amount: parseInt(topupAmount) / 100,
+                  original_balance: parseInt(originalBalance || '0'),
+                  auto_topup_trigger: true,
+                },
+              });
+
+            if (autoTopupLedgerError) {
+              console.error('Error creating auto-top-up ledger entry:', autoTopupLedgerError);
+            } else {
+              console.log('Auto-top-up payment processed:', {
+                userId,
+                paymentIntentId: paymentIntent.id,
+                topupAmount: parseInt(topupAmount),
+                dollarAmount: parseInt(topupAmount) / 100,
+              });
+            }
+          }
+        }
+        break;
+
+      case 'payment_intent.payment_failed':
+        // Handle failed auto-top-up payments
+        const failedPaymentIntent = event.data.object;
+        const failedMetadata = failedPaymentIntent.metadata || {};
+        
+        if (failedMetadata.autoTopup === 'true') {
+          const { userId } = failedMetadata;
+          
+          if (userId) {
+            console.log('Auto-top-up payment failed:', {
+              userId,
+              paymentIntentId: failedPaymentIntent.id,
+              errorCode: failedPaymentIntent.last_payment_error?.code,
+              errorMessage: failedPaymentIntent.last_payment_error?.message,
+            });
+
+            // On certain failure types, disable auto-top-up to prevent repeated failures
+            const errorCode = failedPaymentIntent.last_payment_error?.code;
+            if (errorCode === 'card_declined' || errorCode === 'expired_card') {
+              const { error: disableError } = await supabaseAdmin
+                .from('users')
+                .update({ auto_topup_enabled: false })
+                .eq('id', userId);
+
+              if (disableError) {
+                console.error('Error disabling auto-top-up after payment failure:', disableError);
+              } else {
+                console.log(`Auto-top-up disabled for user ${userId} due to payment failure: ${errorCode}`);
+              }
+            }
+          }
+        }
         break;
 
       case 'invoice.payment_succeeded':

@@ -32,6 +32,13 @@ interface CheckoutResponse {
   message?: string;
 }
 
+interface CheckoutParams {
+  amount: number;
+  autoTopupEnabled?: boolean;
+  autoTopupAmount?: number;
+  autoTopupThreshold?: number;
+}
+
 /**
  * Get credit balance using direct Supabase call
  */
@@ -138,9 +145,9 @@ export function useCredits() {
     });
   };
 
-  // Create checkout session - this still needs to use Supabase Edge Function
-  const createCheckoutMutation = useMutation<CheckoutResponse, Error, number>({
-    mutationFn: async (dollarAmount: number) => {
+  // Create checkout session with optional auto-top-up support
+  const createCheckoutMutation = useMutation<CheckoutResponse, Error, CheckoutParams>({
+    mutationFn: async (params: CheckoutParams) => {
       const { data: { session }, error } = await supabase.auth.getSession();
       
       if (error || !session) {
@@ -149,7 +156,12 @@ export function useCredits() {
 
       // Call Supabase Edge Function for Stripe checkout
       const { data, error: functionError } = await supabase.functions.invoke('stripe-checkout', {
-        body: { amount: dollarAmount },
+        body: {
+          amount: params.amount,
+          autoTopupEnabled: params.autoTopupEnabled,
+          autoTopupAmount: params.autoTopupAmount,
+          autoTopupThreshold: params.autoTopupThreshold,
+        },
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },
@@ -222,6 +234,8 @@ export function useCredits() {
     balanceError,
     useCreditLedger,
     createCheckout: createCheckoutMutation.mutate,
+    // Convenience method for simple checkout without auto-top-up
+    createSimpleCheckout: (amount: number) => createCheckoutMutation.mutate({ amount }),
     isCreatingCheckout: createCheckoutMutation.isPending,
     grantCredits: grantCreditsMutation.mutate,
     isGrantingCredits: grantCreditsMutation.isPending,
