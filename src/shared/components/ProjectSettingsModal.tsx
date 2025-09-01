@@ -132,7 +132,7 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({ isOp
       >
         <div className={mobileModalStyling.headerContainerClassName}>
           <DialogHeader className={`${mobileModalStyling.isMobile ? 'px-4 pt-4 pb-2' : 'px-6 pt-4 pb-2'} flex-shrink-0`}>
-            <DialogTitle>Project Settings: {project.name}</DialogTitle>
+            <DialogTitle>Project Settings</DialogTitle>
           </DialogHeader>
         </div>
         <div className={`${mobileModalStyling.isMobile ? 'px-4' : 'px-6'} flex-1 overflow-y-auto min-h-0`}>
