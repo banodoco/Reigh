@@ -193,13 +193,25 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
   const handlePurchaseAmountChange = (amount: number) => {
     setPurchaseAmount(amount);
     
-    // If auto-top-up is enabled, update the auto-top-up amount to match
+    // If auto-top-up is enabled, update both amount and threshold
     if (localAutoTopupEnabled) {
-      console.log('[AutoTopup:Purchase] Updating auto-top-up amount to match purchase amount:', amount);
+      // Auto-calculate new threshold as 1/5 of purchase amount (minimum 1)
+      const newThreshold = Math.max(1, Math.floor(amount / 5));
+      
+      console.log('[AutoTopup:Purchase] Updating auto-top-up amount and threshold:', { 
+        amount, 
+        newThreshold, 
+        previousThreshold: localAutoTopupThreshold 
+      });
+      
+      // Update local state immediately for UI responsiveness
+      setLocalAutoTopupThreshold(newThreshold);
+      
+      // Save both amount and new threshold
       updateAutoTopup({
         enabled: localAutoTopupEnabled,
         amount: amount,
-        threshold: localAutoTopupThreshold,
+        threshold: newThreshold,
       });
     }
   };
@@ -519,7 +531,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                         value={localAutoTopupThreshold}
                         onChange={handleAutoTopupThresholdChange}
                         min={1}
-                        max={Math.max(100, purchaseAmount - 1)}
+                        max={Math.max(1, purchaseAmount - 1)}
                         step={1}
                         variant="secondary"
                         formatValue={(value) => `$${value}`}
