@@ -64,8 +64,7 @@ export const Header: React.FC<HeaderProps> = ({
                 onChange={(e) => onEditingNameChange(e.target.value)}
                 onKeyDown={onNameKeyDown}
                 onBlur={onNameSave}
-                className="text-2xl font-bold text-primary h-auto py-1.5 px-2.5 min-w-[135px] border-2 text-center"
-                style={{ fontSize: '1.5rem', fontWeight: '700', lineHeight: '2rem' }}
+                className="!text-xl font-semibold text-primary h-auto py-2 px-4 w-[200px] border-2 text-center"
                 autoFocus
                 maxLength={30}
               />
@@ -130,7 +129,7 @@ export const Header: React.FC<HeaderProps> = ({
                 onChange={(e) => onEditingNameChange(e.target.value)}
                 onKeyDown={onNameKeyDown}
                 onBlur={onNameSave}
-                className="text-lg font-normal text-primary h-auto py-0.5 px-1.5 flex-1 text-center"
+                className="!text-xl font-semibold text-primary h-auto py-0.5 px-2 w-[135px] text-center"
                 autoFocus
                 maxLength={30}
               />

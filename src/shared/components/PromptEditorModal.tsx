@@ -52,6 +52,12 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
   apiKey,
 }) => {
   const [internalPrompts, setInternalPrompts] = useState<PromptEntry[]>([]);
+  
+  // Debug: Log whenever internalPrompts changes
+  useEffect(() => {
+    console.log(`[PromptEditorModal:STATE_CHANGE] internalPrompts changed. Count: ${internalPrompts.length}`, 
+      internalPrompts.map(p => ({id: p.id, text: p.fullPrompt.substring(0,30)+'...'})));
+  }, [internalPrompts]);
   const [promptToEdit, setPromptToEdit] = useState<PromptToEditState | null>(null);
   const [activeTab, setActiveTab] = useState<EditorMode>('generate');
   const [activePromptIdForFullView, setActivePromptIdForFullView] = useState<string | null>(null);
@@ -61,6 +67,12 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
   // Mobile modal styling
   const mobileModalStyling = useMobileModalStyling({
     enableMobileFullscreen: true,
+    disableCenteringOnMobile: true,
+  });
+  
+  // Nested dialog mobile styling - match medium modals like CreateProject/ProjectSettings
+  const nestedModalStyling = useMobileModalStyling({
+    enableMobileEdgeBuffers: true,
     disableCenteringOnMobile: true,
   });
   
@@ -109,7 +121,9 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
 
   // Effect to initialize modal state (prompts) on open – persistence handled by hook
   useEffect(() => {
+    console.log(`[PromptEditorModal:INIT_EFFECT] Effect running. isOpen: ${isOpen}, initialPrompts.length: ${initialPrompts.length}`);
     if (isOpen) {
+      console.log(`[PromptEditorModal:INIT_EFFECT] Initializing modal state. Setting prompts from initialPrompts.`);
       setShowScrollToTop(false);
       if (scrollRef.current) {
         scrollRef.current.scrollTop = 0;
@@ -119,7 +133,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
       setActivePromptIdForFullView(null);
       setIsAIPromptSectionExpanded(false); // Always start with AI section closed
     }
-  }, [isOpen, initialPrompts]);
+  }, [isOpen]); // Only reinitialize when modal opens, not when initialPrompts change
 
   const {
     generatePrompts: aiGeneratePrompts,
@@ -134,7 +148,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
     generatePromptId,
   });
 
-  const handleFinalSaveAndClose = () => {
+  const handleFinalSaveAndClose = useCallback(() => {
     console.log(`[PromptEditorModal] 'Close' button clicked. Saving prompts. Count: ${internalPrompts.length}`, JSON.stringify(internalPrompts.map(p => ({id: p.id, text: p.fullPrompt.substring(0,30)+'...'}))));
     onSave(internalPrompts);
     if (scrollRef.current) {
@@ -142,15 +156,24 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
     }
     setShowScrollToTop(false);
     onClose();
-  };
+  }, [internalPrompts, onSave, onClose]);
 
   const handleInternalUpdatePrompt = useCallback((id: string, updates: Partial<Omit<PromptEntry, 'id'>>) => {
+    console.log(`[PromptEditorModal:MANUAL_UPDATE] About to update prompt ID: ${id}, Updates: ${JSON.stringify(updates)}`);
     setInternalPrompts(currentPrompts => {
       const newPrompts = currentPrompts.map(p => (p.id === id ? { ...p, ...updates } : p));
-      console.log(`[PromptEditorModal] Prompt updated (manual edit). ID: ${id}, Updates: ${JSON.stringify(updates)}. New list count: ${newPrompts.length}`);
+      console.log(`[PromptEditorModal:MANUAL_UPDATE] Prompt updated (manual edit). ID: ${id}, Updates: ${JSON.stringify(updates)}. New list count: ${newPrompts.length}`);
       return newPrompts;
     });
-  }, [isOpen]);
+  }, []);
+
+  // Stable callback for PromptInputRow onUpdate interface
+  const handlePromptFieldUpdate = useCallback((id: string, field: 'fullPrompt' | 'shortPrompt', value: string) => {
+    const updatePayload: Partial<Omit<PromptEntry, 'id'>> = {};
+    if (field === 'fullPrompt') updatePayload.fullPrompt = value;
+    if (field === 'shortPrompt') updatePayload.shortPrompt = value;
+    handleInternalUpdatePrompt(id, updatePayload);
+  }, [handleInternalUpdatePrompt]);
   
   const handleInternalRemovePrompt = (id: string) => {
     setInternalPrompts(currentPrompts => {
@@ -177,10 +200,9 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
   };
 
   const handleRemoveAllPrompts = () => {
-    console.log(`[PromptEditorModal] Clearing all prompts and leaving one empty. Current count: ${internalPrompts.length}`);
+    console.log(`[PromptEditorModal:REMOVE_ALL] Clearing all prompts and leaving one empty. Current count: ${internalPrompts.length}`);
     const emptyPrompt: PromptEntry = { id: generatePromptId(), fullPrompt: '', shortPrompt: '' };
-    setInternalPrompts([emptyPrompt]);
-    toast.info("All prompts cleared. One empty prompt remains.");
+    setInternalPrompts([emptyPrompt]);    
   };
 
   const handleGenerateAndAddPrompts = async (params: GeneratePromptsParams) => {
@@ -202,10 +224,11 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
     
     // Add new prompts to the state first
     let newlyAddedPromptIds: string[] = [];
+    console.log(`[PromptEditorModal:AI_GENERATION] About to add ${newEntries.length} AI-generated prompts`);
     setInternalPrompts(currentPrompts => {
       const updatedPrompts = [...currentPrompts, ...newEntries];
       newlyAddedPromptIds = newEntries.map(e => e.id); // Capture IDs of newly added prompts
-      console.log(`[PromptEditorModal] AI Generation: Added ${newEntries.length} prompts to internal list. New total: ${updatedPrompts.length}`);
+      console.log(`[PromptEditorModal:AI_GENERATION] Added ${newEntries.length} prompts to internal list. New total: ${updatedPrompts.length}`);
       return updatedPrompts;
     });
 
@@ -301,21 +324,33 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
       toast.error("Cannot perform AI edit. Missing data.");
       return;
     }
-    console.log(`[PromptEditorModal] AI Individual Edit: Attempting to edit prompt ID: ${promptToEdit.id}. Instructions: "${promptToEdit.instructions}"`);
+    
+    const isEmptyPrompt = promptToEdit.originalText.trim() === '';
+    const actualInstructions = isEmptyPrompt 
+      ? `Write a new detailed image generation prompt based on this request: ${promptToEdit.instructions}`
+      : promptToEdit.instructions;
+    const actualOriginalText = isEmptyPrompt 
+      ? "Write a new prompt" 
+      : promptToEdit.originalText;
+    
+    console.log(`[PromptEditorModal] AI Individual Edit: Attempting to ${isEmptyPrompt ? 'create new prompt' : 'edit prompt'} for ID: ${promptToEdit.id}. Instructions: "${actualInstructions}"`);
     
     try {
       const result = await aiEditPrompt({
-        originalPromptText: promptToEdit.originalText,
-        editInstructions: promptToEdit.instructions,
+        originalPromptText: actualOriginalText,
+        editInstructions: actualInstructions,
         modelType: promptToEdit.modelType,
       });
 
       if (result.success && result.newText) {
-        console.log(`[PromptEditorModal] AI Individual Edit: Successfully edited prompt ID: ${promptToEdit.id}. New text (start): "${result.newText.substring(0,50)}..."`);
+        console.log(`[PromptEditorModal:AI_EDIT_SUCCESS] Successfully edited prompt ID: ${promptToEdit.id}. New text (start): "${result.newText.substring(0,50)}..."`);
+        console.log(`[PromptEditorModal:AI_EDIT_SUCCESS] About to update internal prompts with AI result`);
         setInternalPrompts(currentPrompts => {
+          console.log(`[PromptEditorModal:AI_EDIT_SUCCESS] Current prompts before update:`, currentPrompts.map(p => ({id: p.id, text: p.fullPrompt.substring(0,30)+'...'})));
           const updatedPrompts = currentPrompts.map(p =>
             p.id === promptToEdit.id ? { ...p, fullPrompt: result.newText!, shortPrompt: result.newShortText || '' } : p
           );
+          console.log(`[PromptEditorModal:AI_EDIT_SUCCESS] Updated prompts after AI edit:`, updatedPrompts.map(p => ({id: p.id, text: p.fullPrompt.substring(0,30)+'...'})));
           return updatedPrompts;
         });
 
@@ -351,8 +386,16 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
     setIsAIPromptSectionExpanded(prev => !prev);
   }, []);
 
+  const handleModalClose = useCallback((open: boolean) => {
+    console.log(`[PromptEditorModal:CLOSE_EVENT] onOpenChange triggered. open: ${open}, isOpen: ${isOpen}`);
+    if (!open) {
+      console.log(`[PromptEditorModal:CLOSE_EVENT] Modal closing - calling handleFinalSaveAndClose`);
+      handleFinalSaveAndClose();
+    }
+  }, [isOpen, handleFinalSaveAndClose]);
+
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && handleFinalSaveAndClose()}>
+    <Dialog open={isOpen} onOpenChange={handleModalClose}>
       <DialogContent 
         className={mergeMobileModalClasses(
           'max-w-4xl max-h-[90vh] bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800 flex flex-col p-0 rounded-lg',
@@ -452,17 +495,13 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
                   <PromptInputRow
                     promptEntry={prompt}
                     index={index}
-                    onUpdate={(id, field, value) => {
-                      const updatePayload: Partial<Omit<PromptEntry, 'id'>> = {};
-                      if (field === 'fullPrompt') updatePayload.fullPrompt = value;
-                      if (field === 'shortPrompt') updatePayload.shortPrompt = value;
-                      handleInternalUpdatePrompt(id, updatePayload);
-                    }}
+                    onUpdate={handlePromptFieldUpdate}
                     onRemove={() => handleInternalRemovePrompt(prompt.id)}
                     canRemove={internalPrompts.length > 1}
                     isGenerating={isAILoading}
                     hasApiKey={true}
                     onEditWithAI={() => openEditWithAIForm(prompt.id, prompt.fullPrompt)}
+                    aiEditButtonIcon={<Edit className="h-4 w-4" />}
                     onSetActiveForFullView={setActivePromptIdForFullView}
                     isActiveForFullView={activePromptIdForFullView === prompt.id}
                   />
@@ -474,34 +513,48 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
 
         {promptToEdit && (
           <Dialog open={!!promptToEdit} onOpenChange={(open) => !open && setPromptToEdit(null)}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Edit Prompt with AI</DialogTitle>
-                <DialogDescription>Refine the prompt using AI. Provide instructions below.</DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="original-text" className="text-right">Original</Label>
-                  <Textarea id="original-text" value={promptToEdit.originalText} readOnly className="col-span-3 max-h-32" />
+            <DialogContent 
+              className={mergeMobileModalClasses(
+                'sm:max-w-[425px] bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800 rounded-lg',
+                nestedModalStyling.dialogContentClassName,
+                nestedModalStyling.isMobile
+              )}
+              style={nestedModalStyling.dialogContentStyle}
+              {...createMobileModalProps(nestedModalStyling.isMobile)}
+            >
+                <DialogHeader className={`${nestedModalStyling.isMobile ? 'px-4 pt-4 pb-2' : 'px-6 pt-4 pb-2'}`}>
+                  <DialogTitle>
+                    {promptToEdit.originalText.trim() === '' ? 'Create Prompt with AI' : 'Edit Prompt with AI'}
+                  </DialogTitle>
+                </DialogHeader>
+                
+                <div className={`${nestedModalStyling.isMobile ? 'px-4' : 'px-6'} space-y-4 py-4`}>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-instructions">
+                      {promptToEdit.originalText.trim() === '' ? 'Describe what you want' : 'Edit Instructions'}
+                    </Label>
+                    <Textarea
+                      id="edit-instructions"
+                      value={promptToEdit.instructions}
+                      onChange={(e) => setPromptToEdit(prev => prev ? { ...prev, instructions: e.target.value } : null)}
+                      className="min-h-[100px]"
+                      placeholder={promptToEdit.originalText.trim() === '' 
+                        ? "e.g., a magical forest with glowing mushrooms, a portrait of a cyberpunk warrior, a cozy coffee shop in winter..."
+                        : "e.g., make it more poetic, add details about lighting, change the subject to a cat, make it shorter..."
+                      }
+                    />
+                  </div>
                 </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="edit-instructions" className="text-right">Instructions</Label>
-                  <Textarea
-                    id="edit-instructions"
-                    value={promptToEdit.instructions}
-                    onChange={(e) => setPromptToEdit(prev => prev ? { ...prev, instructions: e.target.value } : null)}
-                    className="col-span-3"
-                    placeholder="e.g., make it more poetic, add details about lighting, change subject to..."
-                  />
-                </div>
-                {/* Model type selection could be added here if needed */}
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setPromptToEdit(null)}>Cancel</Button>
-                <Button onClick={handleConfirmEditWithAI} disabled={isAIEditing || !promptToEdit.instructions}>
-                  {isAIEditing ? "Editing..." : "Confirm Edit"}
-                </Button>
-              </DialogFooter>
+                
+                <DialogFooter className={`${nestedModalStyling.isMobile ? 'px-4 pb-3 pt-4 flex-row justify-between' : 'px-6 pt-6 pb-4'} border-t`}>
+                  <Button variant="outline" onClick={() => setPromptToEdit(null)}>Cancel</Button>
+                  <Button onClick={handleConfirmEditWithAI} disabled={isAIEditing || !promptToEdit.instructions.trim()}>
+                    {isAIEditing 
+                      ? (promptToEdit.originalText.trim() === '' ? "Creating..." : "Editing...") 
+                      : (promptToEdit.originalText.trim() === '' ? "Create Prompt" : "Apply Changes")
+                    }
+                  </Button>
+                </DialogFooter>
             </DialogContent>
           </Dialog>
         )}

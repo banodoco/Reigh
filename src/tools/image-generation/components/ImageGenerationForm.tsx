@@ -184,11 +184,18 @@ export const PromptInputRow: React.FC<PromptInputRowProps> = React.memo(({
   // until this row is marked active to avoid immediate auto-close.
   const [pendingEnterEdit, setPendingEnterEdit] = useState(false);
 
+  // Track if the change came from parent (like AI edit) to prevent feedback loops
+  const [lastParentUpdate, setLastParentUpdate] = useState(promptEntry.fullPrompt);
+  
   useEffect(() => {
     if (!isEditingFullPrompt) {
-      setLocalFullPrompt(promptEntry.fullPrompt);
+      // If parent changed the prompt (like from AI edit), sync local state
+      if (promptEntry.fullPrompt !== lastParentUpdate) {
+        setLocalFullPrompt(promptEntry.fullPrompt);
+        setLastParentUpdate(promptEntry.fullPrompt);
+      }
     }
-  }, [promptEntry.fullPrompt, isEditingFullPrompt]);
+  }, [promptEntry.fullPrompt, isEditingFullPrompt, lastParentUpdate]);
 
   // Close edit mode when another prompt becomes active
   useEffect(() => {
@@ -313,10 +320,12 @@ export const PromptInputRow: React.FC<PromptInputRowProps> = React.memo(({
 
   // Save changes when edit mode is closed (e.g., when another prompt becomes active)
   useEffect(() => {
-    if (!isEditingFullPrompt && localFullPrompt !== promptEntry.fullPrompt) {
+    if (!isEditingFullPrompt && localFullPrompt !== promptEntry.fullPrompt && localFullPrompt !== lastParentUpdate) {
+      // Only save if the local prompt is different from both parent and last parent update
+      // This prevents feedback loops when parent updates (like from AI edit)
       onUpdate(promptEntry.id, 'fullPrompt', localFullPrompt);
     }
-  }, [isEditingFullPrompt, localFullPrompt, promptEntry.fullPrompt, onUpdate]);
+  }, [isEditingFullPrompt, localFullPrompt, promptEntry.fullPrompt, lastParentUpdate]);
 
   return (
     <div 
@@ -344,7 +353,7 @@ export const PromptInputRow: React.FC<PromptInputRowProps> = React.memo(({
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="top">
-                  <p>Edit with AI</p>
+                  <p>{promptEntry.fullPrompt.trim() === '' ? 'Create with AI' : 'Edit with AI'}</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
