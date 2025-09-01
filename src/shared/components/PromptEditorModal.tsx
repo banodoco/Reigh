@@ -715,7 +715,9 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
                 ...(isMobile ? {
                   position: 'fixed',
                   top: 'env(safe-area-inset-top, 20px)',
-                  transform: 'translateX(-50%)',
+                  left: '16px',
+                  right: '16px',
+                  transform: 'none',
                   maxHeight: 'calc(100vh - env(safe-area-inset-top, 20px) - 40px)',
                 } : {})
               }}
