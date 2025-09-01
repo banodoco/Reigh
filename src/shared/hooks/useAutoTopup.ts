@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 
 export interface AutoTopupPreferences {
   enabled: boolean;
+  setupCompleted: boolean;
   amount: number; // in dollars
   threshold: number; // in dollars
   hasPaymentMethod: boolean;
@@ -24,6 +25,7 @@ async function fetchAutoTopupPreferences(): Promise<AutoTopupPreferences> {
     .from('users')
     .select(`
       auto_topup_enabled,
+      auto_topup_setup_completed,
       auto_topup_amount,
       auto_topup_threshold,
       auto_topup_last_triggered,
@@ -39,6 +41,7 @@ async function fetchAutoTopupPreferences(): Promise<AutoTopupPreferences> {
 
   return {
     enabled: data.auto_topup_enabled || false,
+    setupCompleted: data.auto_topup_setup_completed || false,
     amount: data.auto_topup_amount ? data.auto_topup_amount / 100 : 50, // Convert cents to dollars
     threshold: data.auto_topup_threshold ? data.auto_topup_threshold / 100 : 10, // Convert cents to dollars
     hasPaymentMethod: !!(data.stripe_customer_id && data.stripe_payment_method_id),
@@ -144,7 +147,8 @@ export function useAutoTopup() {
     
     // Computed values
     isEnabled: preferences?.enabled || false,
+    isSetupCompleted: preferences?.setupCompleted || false,
     hasPaymentMethod: preferences?.hasPaymentMethod || false,
-    isFullyConfigured: (preferences?.enabled && preferences?.hasPaymentMethod) || false,
+    isFullyConfigured: (preferences?.enabled && preferences?.setupCompleted && preferences?.hasPaymentMethod) || false,
   };
 }

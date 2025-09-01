@@ -363,10 +363,24 @@ python worker.py --db-type supabase \\
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent 
         style={modalStyle}
-        className={`sm:max-w-2xl max-h-[90vh] flex flex-col rounded-lg ${
-          isMobile ? 'left-4 right-4 top-8 bottom-8 w-auto translate-x-0 translate-y-0 max-h-none [&>*:last-child]:right-7 [&>*:last-child]:top-[1.25rem]' : ''
+        className={`sm:max-w-2xl max-h-[90vh] flex flex-col rounded-lg [&>button:last-child]:top-[1.625rem] ${
+          isMobile ? 'left-4 right-4 top-8 bottom-8 w-auto translate-x-0 translate-y-0 max-h-none [&>button:last-child]:right-7' : ''
         }`}
       >
+        {/* Top button container - positioned relative to DialogContent */}
+        {isMobile && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleSignOut}
+            autoFocus={false}
+            className="absolute left-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+          >
+            <LogOut className="h-4 w-4" />
+            <span className="sr-only">Sign out</span>
+          </Button>
+        )}
+        
         <DialogHeader className="relative">
           <DialogTitle className="text-2xl">App Settings</DialogTitle>
           {!isMobile && (
@@ -378,17 +392,6 @@ python worker.py --db-type supabase \\
             >
               <LogOut className="h-4 w-4" />
               Sign out
-            </Button>
-          )}
-          {isMobile && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleSignOut}
-              autoFocus={false}
-              className="absolute left-4 top-4 flex items-center justify-center text-muted-foreground hover:text-foreground opacity-70 hover:opacity-100"
-            >
-              <LogOut className="h-4 w-4" />
             </Button>
           )}
         </DialogHeader>

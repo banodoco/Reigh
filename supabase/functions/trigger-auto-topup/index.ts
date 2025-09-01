@@ -84,6 +84,7 @@ serve(async (req) => {
           id,
           credits,
           auto_topup_enabled,
+          auto_topup_setup_completed,
           auto_topup_amount,
           auto_topup_threshold,
           auto_topup_last_triggered,
@@ -109,6 +110,7 @@ serve(async (req) => {
           id,
           credits,
           auto_topup_enabled,
+          auto_topup_setup_completed,
           auto_topup_amount,
           auto_topup_threshold,
           auto_topup_last_triggered,
@@ -116,6 +118,7 @@ serve(async (req) => {
           stripe_payment_method_id
         `)
         .eq('auto_topup_enabled', true)
+        .eq('auto_topup_setup_completed', true)
         .not('stripe_customer_id', 'is', null)
         .not('stripe_payment_method_id', 'is', null)
         .not('auto_topup_threshold', 'is', null);

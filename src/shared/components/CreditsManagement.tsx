@@ -81,9 +81,19 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
   const [purchaseAmount, setPurchaseAmount] = useState(50); // Default to $50
   const { data: ledgerData, isLoading: isLoadingLedger } = useCreditLedger();
 
-  // Auto-top-up state
-  const [autoTopupEnabled, setAutoTopupEnabled] = useState(true); // Default enabled as per plan
-  const [autoTopupThreshold, setAutoTopupThreshold] = useState(10); // Default to $10
+  // Auto-top-up state - use preferences from hook but allow local overrides for unsaved changes
+  const [localAutoTopupEnabled, setLocalAutoTopupEnabled] = useState(autoTopupPreferences?.enabled || false);
+  const [localAutoTopupAmount, setLocalAutoTopupAmount] = useState(autoTopupPreferences?.amount || 50);
+  const [localAutoTopupThreshold, setLocalAutoTopupThreshold] = useState(autoTopupPreferences?.threshold || 10);
+
+  // Update local state when preferences load
+  React.useEffect(() => {
+    if (autoTopupPreferences) {
+      setLocalAutoTopupEnabled(autoTopupPreferences.enabled);
+      setLocalAutoTopupAmount(autoTopupPreferences.amount);
+      setLocalAutoTopupThreshold(autoTopupPreferences.threshold);
+    }
+  }, [autoTopupPreferences]);
 
   // Helper functions for filters
   const updateFilter = (filterType: keyof typeof taskLogFilters, value: any) => {
@@ -132,22 +142,91 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
     ).join(' ');
   };
 
-  // Update auto-top-up threshold when purchase amount changes
+  // Update auto-top-up threshold when purchase amount changes (for new setups)
   React.useEffect(() => {
-    const defaultThreshold = Math.max(1, Math.floor(purchaseAmount / 5));
-    setAutoTopupThreshold(defaultThreshold);
-  }, [purchaseAmount]);
+    if (!autoTopupPreferences?.setupCompleted) {
+      const defaultThreshold = Math.max(1, Math.floor(purchaseAmount / 5));
+      setLocalAutoTopupThreshold(defaultThreshold);
+    }
+  }, [purchaseAmount, autoTopupPreferences?.setupCompleted]);
+
+  // Handle auto-top-up preference changes
+  const handleAutoTopupToggle = (enabled: boolean) => {
+    setLocalAutoTopupEnabled(enabled);
+    // Immediately save preference changes
+    updateAutoTopup({
+      enabled,
+      amount: localAutoTopupAmount,
+      threshold: localAutoTopupThreshold,
+    });
+  };
+
+  const handleAutoTopupAmountChange = (amount: number) => {
+    setLocalAutoTopupAmount(amount);
+    // Save immediately
+    updateAutoTopup({
+      enabled: localAutoTopupEnabled,
+      amount,
+      threshold: localAutoTopupThreshold,
+    });
+  };
+
+  const handleAutoTopupThresholdChange = (threshold: number) => {
+    setLocalAutoTopupThreshold(threshold);
+    // Save immediately
+    updateAutoTopup({
+      enabled: localAutoTopupEnabled,
+      amount: localAutoTopupAmount,
+      threshold,
+    });
+  };
+
+  // Auto-top-up state computation
+  const autoTopupState = React.useMemo(() => {
+    if (!autoTopupPreferences) return 'loading';
+    
+    const { enabled, setupCompleted } = autoTopupPreferences;
+    
+    if (enabled && setupCompleted) return 'active';
+    if (!enabled && setupCompleted) return 'setup-but-disabled';
+    if (enabled && !setupCompleted) return 'enabled-but-not-setup';
+    return 'not-setup';
+  }, [autoTopupPreferences]);
+
+  // Get the auto-top-up summary message
+  const getAutoTopupSummary = () => {
+    if (!autoTopupPreferences) return '';
+    
+    switch (autoTopupState) {
+      case 'active':
+        return `You've enabled and activated auto-top-up. We'll automatically charge your card $${localAutoTopupAmount.toFixed(2)} when your balance drops below $${localAutoTopupThreshold.toFixed(2)}.`;
+      
+      case 'setup-but-disabled':
+        return `You have auto-top-up set up but it's currently *deactivated*. To activate it, toggle the setting above on.`;
+      
+      case 'enabled-but-not-setup':
+        return `You've enabled auto-top-up, but it's not set up. To set it up, click the button below to make your first transaction.`;
+      
+      case 'not-setup':
+        return `Auto-top-up summary: We'll automatically charge your card $${localAutoTopupAmount.toFixed(2)} when your balance drops below $${localAutoTopupThreshold.toFixed(2)}.`;
+      
+      default:
+        return '';
+    }
+  };
 
   const handlePurchase = () => {
     if (purchaseAmount > 0) {
-      if (autoTopupEnabled) {
+      if (localAutoTopupEnabled && autoTopupState === 'enabled-but-not-setup') {
+        // Setting up auto-top-up for the first time
         createCheckout({
           amount: purchaseAmount,
           autoTopupEnabled: true,
-          autoTopupAmount: purchaseAmount,
-          autoTopupThreshold: autoTopupThreshold,
+          autoTopupAmount: localAutoTopupAmount,
+          autoTopupThreshold: localAutoTopupThreshold,
         });
       } else {
+        // Regular purchase without auto-top-up setup
         createCheckout({ amount: purchaseAmount });
       }
     }
@@ -382,45 +461,68 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
               {/* Auto-top-up section */}
               <div className="space-y-4 pt-4 border-t border-gray-200">
                 <div className="space-y-3">
-                  {/* Mobile: Stack vertically, Desktop: Side by side */}
-                  <div className="flex flex-col sm:flex-row sm:items-start space-y-3 sm:space-y-0 sm:space-x-3">
-                    <div className="flex items-center space-x-2 sm:w-1/5">
-                      <Checkbox
-                        id="auto-topup"
-                        checked={autoTopupEnabled}
-                        onCheckedChange={(checked) => setAutoTopupEnabled(checked === true)}
-                      />
-                      <label htmlFor="auto-topup" className="text-sm font-light cursor-pointer flex items-center space-x-2">
-                        <Settings className="w-4 h-4 text-gray-500" />
-                        <span>Enable auto-top-up</span>
-                      </label>
-                    </div>
+                  {/* Auto-top-up toggle */}
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="auto-topup"
+                      checked={localAutoTopupEnabled}
+                      onCheckedChange={(checked) => handleAutoTopupToggle(checked === true)}
+                      disabled={isUpdatingAutoTopup}
+                    />
+                    <label htmlFor="auto-topup" className="text-sm font-light cursor-pointer flex items-center space-x-2">
+                      <Settings className="w-4 h-4 text-gray-500" />
+                      <span>Enable auto-top-up</span>
+                    </label>
+                  </div>
 
-                    {autoTopupEnabled && (
-                      <div className="flex-1 sm:w-4/5 min-w-0">
+                  {/* Auto-top-up settings - show when enabled or when setup is complete */}
+                  {(localAutoTopupEnabled || autoTopupPreferences?.setupCompleted) && (
+                    <div className="space-y-3">
+                      {/* Amount and threshold sliders */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <SliderWithValue
-                          label="Auto-top-up when balance drops below:"
-                          value={autoTopupThreshold}
-                          onChange={(value) => setAutoTopupThreshold(value)}
+                          label="Auto-top-up amount:"
+                          value={localAutoTopupAmount}
+                          onChange={handleAutoTopupAmountChange}
+                          min={10}
+                          max={1000}
+                          step={5}
+                          variant="primary"
+                          formatValue={(value) => `$${value}`}
+                          disabled={isUpdatingAutoTopup}
+                        />
+                        
+                        <SliderWithValue
+                          label="Trigger when balance drops below:"
+                          value={localAutoTopupThreshold}
+                          onChange={handleAutoTopupThresholdChange}
                           min={1}
-                          max={purchaseAmount - 1}
+                          max={Math.max(100, localAutoTopupAmount - 1)}
                           step={1}
                           variant="secondary"
                           formatValue={(value) => `$${value}`}
+                          disabled={isUpdatingAutoTopup}
                         />
                       </div>
-                    )}
-                  </div>
-
-                  {autoTopupEnabled && (
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 w-full">
-                      <p className="text-sm text-blue-800">
-                        <strong>Auto-top-up summary:</strong> We'll automatically charge your card 
-                        ${formatDollarAmount(purchaseAmount).replace('$', '')} when your balance 
-                        drops below ${formatDollarAmount(autoTopupThreshold).replace('$', '')}.
-                      </p>
                     </div>
                   )}
+
+                  {/* Summary message based on state */}
+                  <div className={`rounded-lg p-3 w-full ${
+                    autoTopupState === 'active' ? 'bg-green-50 border border-green-200' :
+                    autoTopupState === 'setup-but-disabled' ? 'bg-yellow-50 border border-yellow-200' :
+                    autoTopupState === 'enabled-but-not-setup' ? 'bg-blue-50 border border-blue-200' :
+                    'bg-gray-50 border border-gray-200'
+                  }`}>
+                    <p className={`text-sm ${
+                      autoTopupState === 'active' ? 'text-green-800' :
+                      autoTopupState === 'setup-but-disabled' ? 'text-yellow-800' :
+                      autoTopupState === 'enabled-but-not-setup' ? 'text-blue-800' :
+                      'text-gray-700'
+                    }`}>
+                      {getAutoTopupSummary()}
+                    </p>
+                  </div>
                 </div>
               </div>
 
@@ -435,10 +537,10 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                   </div>
                 ) : purchaseAmount === 0 ? (
                   "Select an amount to add"
-                ) : autoTopupEnabled ? (
+                ) : localAutoTopupEnabled && autoTopupState === 'enabled-but-not-setup' ? (
                   <>
                     <CreditCard className="w-4 h-4 mr-2" />
-                    Add {formatDollarAmount(purchaseAmount)} and enable auto-top-up
+                    Add {formatDollarAmount(purchaseAmount)} and set up auto-top-up
                   </>
                 ) : (
                   <>

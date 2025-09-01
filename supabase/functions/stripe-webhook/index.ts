@@ -128,6 +128,7 @@ serve(async (req) => {
                   .from('users')
                   .update({
                     auto_topup_enabled: true,
+                    auto_topup_setup_completed: true, // Mark as setup completed when Stripe setup finishes
                     auto_topup_amount: Math.round(parseFloat(autoTopupAmount) * 100), // Convert to cents
                     auto_topup_threshold: Math.round(parseFloat(autoTopupThreshold) * 100), // Convert to cents
                     stripe_customer_id: session.customer, // Customer ID from session
