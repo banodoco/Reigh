@@ -386,14 +386,10 @@ python worker.py --db-type supabase \\
               size="sm"
               onClick={handleSignOut}
               autoFocus={false}
-              className="absolute -top-3 -left-3 flex flex-col items-center gap-1 text-muted-foreground hover:text-foreground leading-tight"
+              className="absolute -top-3 -left-3 flex items-center justify-center text-muted-foreground hover:text-foreground"
               style={{ transform: 'translate(-8px, -8px)' }}
             >
-              <LogOut className="h-3 w-3" />
-              <div className="text-xs">
-                <div>Sign</div>
-                <div>out</div>
-              </div>
+              <LogOut className="h-4 w-4" />
             </Button>
           )}
         </DialogHeader>
