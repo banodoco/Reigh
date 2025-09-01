@@ -382,8 +382,9 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
               {/* Auto-top-up section */}
               <div className="space-y-4 pt-4 border-t border-gray-200">
                 <div className="space-y-3">
-                  <div className="flex items-start space-x-3">
-                    <div className="flex items-center space-x-2 w-1/5">
+                  {/* Mobile: Stack vertically, Desktop: Side by side */}
+                  <div className="flex flex-col sm:flex-row sm:items-start space-y-3 sm:space-y-0 sm:space-x-3">
+                    <div className="flex items-center space-x-2 sm:w-1/5">
                       <Checkbox
                         id="auto-topup"
                         checked={autoTopupEnabled}
@@ -396,7 +397,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                     </div>
 
                     {autoTopupEnabled && (
-                      <div className="w-4/5 min-w-0">
+                      <div className="flex-1 sm:w-4/5 min-w-0">
                         <SliderWithValue
                           label="Auto-top-up when balance drops below:"
                           value={autoTopupThreshold}

@@ -364,7 +364,7 @@ python worker.py --db-type supabase \\
       <DialogContent 
         style={modalStyle}
         className={`sm:max-w-2xl max-h-[90vh] flex flex-col ${
-          isMobile ? '[&>button]:right-7' : ''
+          isMobile ? 'mx-4 my-8 max-h-[calc(100vh-4rem)] [&>button]:right-7' : ''
         }`}
       >
         <DialogHeader className="relative">
