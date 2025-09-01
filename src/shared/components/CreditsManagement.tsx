@@ -540,22 +540,24 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                     </div>
                   )}
 
-                  {/* Summary message based on state */}
-                  <div className={`rounded-lg p-3 w-full ${
-                    autoTopupState === 'active' ? 'bg-green-50 border border-green-200' :
-                    autoTopupState === 'setup-but-disabled' ? 'bg-yellow-50 border border-yellow-200' :
-                    autoTopupState === 'enabled-but-not-setup' ? 'bg-blue-50 border border-blue-200' :
-                    'bg-gray-50 border border-gray-200'
-                  }`}>
-                    <p className={`text-sm ${
-                      autoTopupState === 'active' ? 'text-green-800' :
-                      autoTopupState === 'setup-but-disabled' ? 'text-yellow-800' :
-                      autoTopupState === 'enabled-but-not-setup' ? 'text-blue-800' :
-                      'text-gray-700'
+                  {/* Summary message based on state - only show when auto-top-up is enabled */}
+                  {localAutoTopupEnabled && (
+                    <div className={`rounded-lg p-3 w-full ${
+                      autoTopupState === 'active' ? 'bg-green-50 border border-green-200' :
+                      autoTopupState === 'setup-but-disabled' ? 'bg-yellow-50 border border-yellow-200' :
+                      autoTopupState === 'enabled-but-not-setup' ? 'bg-blue-50 border border-blue-200' :
+                      'bg-gray-50 border border-gray-200'
                     }`}>
-                      {getAutoTopupSummary()}
-                    </p>
-                  </div>
+                      <p className={`text-sm ${
+                        autoTopupState === 'active' ? 'text-green-800' :
+                        autoTopupState === 'setup-but-disabled' ? 'text-yellow-800' :
+                        autoTopupState === 'enabled-but-not-setup' ? 'text-blue-800' :
+                        'text-gray-700'
+                      }`}>
+                        {getAutoTopupSummary()}
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
 
