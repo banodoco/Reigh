@@ -160,24 +160,25 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({ isOpen, onOpenChan
               </p>
               
               <p>
-                However, for those who prefer the convenience of running on the cloud, we charge roughly twice our compute costs.
+                However, for those who prefer the convenience of running on the cloud, we charge roughly twice our compute costs. Because we run on consumer GPUs, this is still significantly cheaper than other providers.
               </p>
               
               <p>
-                Because we run on consumer GPUs and with open models, this is still significantly cheaper than other providers.
-              </p>
-              
-              <p>
-                Of this, after costs to deliver this, we offer <strong>16% of our lifetime profits</strong> from referred users to those who refer them.
-              </p>
-              
-              <p className="italic text-primary">
-                We hope that this inspires artists to create art that inspires them.
+                Of this, after costs, we offer <strong>16% of our lifetime profits</strong> from referred users to those who refer them.
               </p>
               
               <p>
                 Those referred can of course run Reigh for free, but if they do pay, the referral will share in this.
               </p>
+            </div>
+
+            {/* Special Inspirational Message */}
+            <div className="my-6 p-6 bg-gradient-to-r from-wes-pink/10 via-wes-lavender/10 to-wes-dusty-blue/10 border-2 border-wes-vintage-gold/30 rounded-xl shadow-wes-vintage">
+              <div className="text-center">
+                <p className="text-lg font-cocogoose text-primary leading-relaxed italic">
+                  "We hope that this motivates artists to create art that in turn inspires others to create with AI."
+                </p>
+              </div>
             </div>
 
             {/* Referral Link */}
