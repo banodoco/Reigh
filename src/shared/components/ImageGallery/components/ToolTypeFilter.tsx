@@ -86,15 +86,15 @@ export const ToolTypeFilter: React.FC<ToolTypeFilterProps> = ({
                   ? 'text-white border-zinc-600'
                   : 'text-zinc-300 hover:text-white hover:bg-zinc-700 border-zinc-600'
                 : enabled
-                  ? 'text-red-900 border-primary'
+                  ? 'text-primary border-border'
                   : 'text-muted-foreground hover:text-foreground hover:bg-accent border-border'
             }`}
           >
             {enabled && !whiteText && (
-              <div className="absolute inset-0.5 bg-primary rounded-l-sm -z-10" />
+              <div className="absolute top-0.5 bottom-0.5 left-0.5 right-[1px] bg-primary rounded-l-sm -z-10" />
             )}
             {enabled && whiteText && (
-              <div className="absolute inset-0.5 bg-zinc-600 rounded-l-sm -z-10" />
+              <div className="absolute top-0.5 bottom-0.5 left-0.5 right-[1px] bg-zinc-600 rounded-l-sm -z-10" />
             )}
             {isMobile ? (
               <span className="text-center leading-tight">
@@ -120,15 +120,15 @@ export const ToolTypeFilter: React.FC<ToolTypeFilterProps> = ({
                   ? 'text-white border-zinc-600'
                   : 'text-zinc-300 hover:text-white hover:bg-zinc-700'
                 : !enabled
-                  ? 'text-red-900 border-primary'
+                  ? 'text-primary border-border'
                   : 'text-muted-foreground hover:text-foreground hover:bg-accent'
             }`}
           >
             {!enabled && !whiteText && (
-              <div className="absolute inset-0.5 bg-primary rounded-r-sm -z-10" />
+              <div className="absolute top-0.5 bottom-0.5 right-0.5 left-[1px] bg-primary rounded-r-sm -z-10" />
             )}
             {!enabled && whiteText && (
-              <div className="absolute inset-0.5 bg-zinc-600 rounded-r-sm -z-10" />
+              <div className="absolute top-0.5 bottom-0.5 right-0.5 left-[1px] bg-zinc-600 rounded-r-sm -z-10" />
             )}
             {isMobile ? (
               <span className="text-center leading-tight">
