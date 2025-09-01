@@ -2,10 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/shared/components/ui/dialog';
 import { Button } from '@/shared/components/ui/button';
 import { Copy, Check, ExternalLink } from 'lucide-react';
-import { useMediumModal, createMobileModalProps } from '@/shared/hooks/useMobileModalStyling';
+import { useLargeModal, createMobileModalProps } from '@/shared/hooks/useMobileModalStyling';
 import { supabase } from '@/integrations/supabase/client';
 import type { Session } from '@supabase/supabase-js';
-
+import ProfitSplitBar from '@/shared/components/ProfitSplitBar';
 
 interface ReferralModalProps {
   isOpen: boolean;
@@ -18,7 +18,7 @@ interface ReferralStats {
 }
 
 export const ReferralModal: React.FC<ReferralModalProps> = ({ isOpen, onOpenChange }) => {
-  const mobileModalStyling = useMediumModal();
+  const mobileModalStyling = useLargeModal();
   const [copied, setCopied] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
   const [username, setUsername] = useState<string | null>(null);
@@ -29,7 +29,6 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({ isOpen, onOpenChan
   useEffect(() => {
     const getSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      console.log('[ReferralModal] Session:', !!session?.user?.id);
       setSession(session);
       
       if (session?.user?.id) {
@@ -40,13 +39,8 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({ isOpen, onOpenChan
           .eq('id', session.user.id)
           .single();
         
-        console.log('[ReferralModal] Username query result:', { userData, error });
-        
         if (userData?.username && !error) {
-          console.log('[ReferralModal] Setting username:', userData.username);
           setUsername(userData.username);
-        } else {
-          console.warn('[ReferralModal] No username found or error:', error);
         }
       }
     };
@@ -54,7 +48,6 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({ isOpen, onOpenChan
     getSession();
     
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      console.log('[ReferralModal] Auth state change:', _event, !!session?.user?.id);
       setSession(session);
       
       // Reset username when session changes
@@ -86,7 +79,6 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({ isOpen, onOpenChan
           setStats({ total_visits: 0, successful_referrals: 0 });
         }
       } catch (err) {
-        console.error('Error fetching referral stats:', err);
         setStats({ total_visits: 0, successful_referrals: 0 });
       } finally {
         setIsLoadingStats(false);
@@ -97,13 +89,6 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({ isOpen, onOpenChan
   }, [username, isOpen]);
 
   const referralLink = username ? `https://reigh.art?from=${username}` : '';
-  
-  console.log('[ReferralModal] Current state:', { 
-    hasSession: !!session, 
-    username, 
-    referralLink,
-    isOpen 
-  });
 
   const copyToClipboard = async () => {
     if (!referralLink) return;
@@ -177,8 +162,11 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({ isOpen, onOpenChan
               </p>
               
               <p>
-                Those referred can of course run Reigh for free, but if they do pay, the referral will share in this.
+                Additionally, we share another 50% of profits with those who contribute tech, and for initiatives for artists/engineers - our goal is to become a very positively impactful part of the open ecosystem:
               </p>
+
+              {/* Profit split bar illustration */}
+              <ProfitSplitBar className="mt-2 mb-1" />
             </div>
 
             {/* Special Inspirational Message */}
@@ -220,13 +208,7 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({ isOpen, onOpenChan
                   </div>
                 </div>
               </div>
-            ) : (
-              <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
-                <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                  Please sign in to generate your referral link.
-                </p>
-              </div>
-            )}
+            ) : null}
 
             {/* Statistics */}
             <div className="space-y-2">
@@ -267,7 +249,7 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({ isOpen, onOpenChan
                   className="text-xs text-muted-foreground hover:text-primary"
                   onClick={() => {
                     // Future: navigate to detailed referral analytics page
-                    toast.info('Detailed analytics coming soon!');
+                    console.info('Detailed analytics coming soon!');
                   }}
                 >
                   View detailed analytics
