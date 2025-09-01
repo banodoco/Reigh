@@ -82,7 +82,10 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
   const { data: ledgerData, isLoading: isLoadingLedger } = useCreditLedger();
 
   // Auto-top-up state - use preferences from hook but allow local overrides for unsaved changes
-  const [localAutoTopupEnabled, setLocalAutoTopupEnabled] = useState(autoTopupPreferences?.enabled || false);
+  // Default to enabled if no preferences are available yet
+  const [localAutoTopupEnabled, setLocalAutoTopupEnabled] = useState(
+    autoTopupPreferences?.enabled !== undefined ? autoTopupPreferences.enabled : true
+  );
   const [localAutoTopupThreshold, setLocalAutoTopupThreshold] = useState(autoTopupPreferences?.threshold || 10);
 
   // Update local state when preferences load
@@ -513,7 +516,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                 ) : localAutoTopupEnabled && autoTopupState === 'enabled-but-not-setup' ? (
                   <>
                     <CreditCard className="w-4 h-4 mr-2" />
-                    Add {formatDollarAmount(purchaseAmount)} and set up auto-top-up
+                    Add {formatDollarAmount(purchaseAmount)} and set-up auto-top-up
                   </>
                 ) : (
                   <>
