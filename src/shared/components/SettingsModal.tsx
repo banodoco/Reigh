@@ -363,7 +363,7 @@ python worker.py --db-type supabase \\
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent 
         style={modalStyle}
-        className={`sm:max-w-2xl max-h-[90vh] flex flex-col ${
+        className={`sm:max-w-2xl max-h-[90vh] flex flex-col rounded-lg ${
           isMobile ? 'left-4 right-4 top-8 bottom-8 w-auto translate-x-0 translate-y-0 max-h-none [&>button]:right-7' : ''
         }`}
       >
@@ -385,11 +385,15 @@ python worker.py --db-type supabase \\
               variant="ghost"
               size="sm"
               onClick={handleSignOut}
-              className="absolute -top-3 -left-3 flex items-center gap-2 text-muted-foreground hover:text-foreground"
+              autoFocus={false}
+              className="absolute -top-3 -left-3 flex flex-col items-center gap-1 text-muted-foreground hover:text-foreground leading-tight"
               style={{ transform: 'translate(-8px, -8px)' }}
             >
-              <LogOut className="h-4 w-4" />
-              Sign out
+              <LogOut className="h-3 w-3" />
+              <div className="text-xs">
+                <div>Sign</div>
+                <div>out</div>
+              </div>
             </Button>
           )}
         </DialogHeader>
