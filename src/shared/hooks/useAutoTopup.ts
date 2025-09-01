@@ -21,19 +21,42 @@ async function fetchAutoTopupPreferences(): Promise<AutoTopupPreferences> {
     throw new Error('Authentication required');
   }
 
-  const { data, error } = await supabase
-    .from('users')
-    .select(`
-      auto_topup_enabled,
-      auto_topup_setup_completed,
-      auto_topup_amount,
-      auto_topup_threshold,
-      auto_topup_last_triggered,
-      stripe_customer_id,
-      stripe_payment_method_id
-    `)
-    .eq('id', user.id)
-    .single();
+  // Try with the new field first, fallback if it doesn't exist
+  let data, error;
+  try {
+    const result = await supabase
+      .from('users')
+      .select(`
+        auto_topup_enabled,
+        auto_topup_setup_completed,
+        auto_topup_amount,
+        auto_topup_threshold,
+        auto_topup_last_triggered,
+        stripe_customer_id,
+        stripe_payment_method_id
+      `)
+      .eq('id', user.id)
+      .single();
+    data = result.data;
+    error = result.error;
+  } catch (e) {
+    // If the new field doesn't exist, try without it
+    console.log('[AutoTopup:Hook] Field auto_topup_setup_completed not found, falling back');
+    const result = await supabase
+      .from('users')
+      .select(`
+        auto_topup_enabled,
+        auto_topup_amount,
+        auto_topup_threshold,
+        auto_topup_last_triggered,
+        stripe_customer_id,
+        stripe_payment_method_id
+      `)
+      .eq('id', user.id)
+      .single();
+    data = result.data;
+    error = result.error;
+  }
 
   if (error) {
     throw new Error(`Failed to fetch auto-top-up preferences: ${error.message}`);
@@ -41,7 +64,11 @@ async function fetchAutoTopupPreferences(): Promise<AutoTopupPreferences> {
 
   return {
     enabled: data.auto_topup_enabled || false,
-    setupCompleted: data.auto_topup_setup_completed || false,
+    // For now, consider setup completed if user has both Stripe customer and payment method
+    // This handles the case where the auto_topup_setup_completed field doesn't exist yet
+    setupCompleted: data.auto_topup_setup_completed !== undefined 
+      ? data.auto_topup_setup_completed 
+      : !!(data.stripe_customer_id && data.stripe_payment_method_id),
     amount: data.auto_topup_amount ? data.auto_topup_amount / 100 : 50, // Convert cents to dollars
     threshold: data.auto_topup_threshold ? data.auto_topup_threshold / 100 : 10, // Convert cents to dollars
     hasPaymentMethod: !!(data.stripe_customer_id && data.stripe_payment_method_id),
