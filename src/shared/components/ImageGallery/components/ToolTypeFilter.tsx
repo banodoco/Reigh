@@ -64,8 +64,8 @@ export const ToolTypeFilter: React.FC<ToolTypeFilterProps> = ({
   };
   return (
     <div className={`flex items-center ${isMobile ? 'flex-1' : ''}`}>
-      <div className={`relative inline-flex items-center rounded-md border h-8 ${
-        isMobile ? 'w-full' : 'w-[220px]'
+      <div className={`relative inline-flex items-center rounded-md border h-7 ${
+        isMobile ? 'w-full' : 'w-[180px]'
       } ${
         whiteText ? 'bg-zinc-800 border-zinc-700' : 'bg-background border-border'
       }`}>
@@ -78,18 +78,24 @@ export const ToolTypeFilter: React.FC<ToolTypeFilterProps> = ({
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onClick={handleClick(true)}
-            className={`flex-1 px-3 h-full font-light rounded-l-md transition-all duration-200 text-xs border-r ${
+            className={`flex-1 px-2 h-full font-light rounded-l-md transition-all duration-200 text-xs border-r relative ${
               isMobile ? 'text-center' : 'whitespace-nowrap'
             } ${
               whiteText 
                 ? enabled
-                  ? 'bg-zinc-600 text-white border-zinc-600'
+                  ? 'text-white border-zinc-600'
                   : 'text-zinc-300 hover:text-white hover:bg-zinc-700 border-zinc-600'
                 : enabled
-                  ? 'bg-primary text-primary-foreground border-primary'
+                  ? 'text-red-900 border-primary'
                   : 'text-muted-foreground hover:text-foreground hover:bg-accent border-border'
             }`}
           >
+            {enabled && !whiteText && (
+              <div className="absolute inset-0.5 bg-primary rounded-l-sm -z-10" />
+            )}
+            {enabled && whiteText && (
+              <div className="absolute inset-0.5 bg-zinc-600 rounded-l-sm -z-10" />
+            )}
             Generated here
           </button>
           
@@ -100,18 +106,24 @@ export const ToolTypeFilter: React.FC<ToolTypeFilterProps> = ({
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onClick={handleClick(false)}
-            className={`flex-1 px-3 h-full font-light rounded-r-md transition-all duration-200 text-xs ${
+            className={`flex-1 px-2 h-full font-light rounded-r-md transition-all duration-200 text-xs relative ${
               isMobile ? 'text-center' : 'whitespace-nowrap'
             } ${
               whiteText 
                 ? !enabled
-                  ? 'bg-zinc-600 text-white'
+                  ? 'text-white border-zinc-600'
                   : 'text-zinc-300 hover:text-white hover:bg-zinc-700'
                 : !enabled
-                  ? 'bg-primary text-primary-foreground'
+                  ? 'text-red-900 border-primary'
                   : 'text-muted-foreground hover:text-foreground hover:bg-accent'
             }`}
           >
+            {!enabled && !whiteText && (
+              <div className="absolute inset-0.5 bg-primary rounded-r-sm -z-10" />
+            )}
+            {!enabled && whiteText && (
+              <div className="absolute inset-0.5 bg-zinc-600 rounded-r-sm -z-10" />
+            )}
             All media
           </button>
         </div>
