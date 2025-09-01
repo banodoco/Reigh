@@ -229,12 +229,13 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
 
           {/* Right side - Referral text and App Settings */}
           <div className="flex items-end gap-2">
-            <span 
-              className="text-xs text-gray-400 underline cursor-pointer font-thin mb-0.5 hover:text-gray-600 transition-colors duration-200 text-right"
+            <button 
+              className="text-xs text-gray-400 underline cursor-pointer font-thin mb-0.5 hover:text-gray-600 transition-colors duration-200 text-right touch-manipulation active:text-gray-500"
               onClick={() => setIsReferralModalOpen(true)}
+              type="button"
             >
               Refer people to Reigh?
-            </span>
+            </button>
             <Button
               variant="ghost"
               size="icon"
@@ -324,12 +325,13 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
 
             {/* Right side - Referral text and App Settings */}
             <div className="flex items-end gap-2">
-              <span 
-                className="text-xs text-gray-400 underline cursor-pointer font-thin mb-0.5 hover:text-gray-600 transition-colors duration-200 text-right"
+              <button 
+                className="text-xs text-gray-400 underline cursor-pointer font-thin mb-0.5 hover:text-gray-600 transition-colors duration-200 text-right touch-manipulation active:text-gray-500"
                 onClick={() => setIsReferralModalOpen(true)}
+                type="button"
               >
                 Refer people to Reigh?
-              </span>
+              </button>
               <Button
                 variant="ghost"
                 size="icon"

@@ -112,10 +112,9 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({ isOpen, onOpenChan
     try {
       await navigator.clipboard.writeText(referralLink);
       setCopied(true);
-      toast.success('Referral link copied to clipboard!');
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
-      toast.error('Failed to copy link');
+      console.error('Failed to copy referral link:', err);
     }
   };
 
