@@ -222,6 +222,7 @@ xl: '1280px'  // Wide desktop
 2. **Use composition** - combine existing primitives
 3. **Follow naming conventions** - PascalCase for components
 4. **Document props** - TypeScript interfaces + JSDoc
+5. **Follow Rules of Hooks** - all hooks MUST be called before any early returns or conditional logic
 
 ### Example Component
 
@@ -247,6 +248,35 @@ export function MyComponent({
       </CardHeader>
     </Card>
   );
+}
+```
+
+### ⚠️ Critical: Rules of Hooks
+
+**ALWAYS call all hooks before any early returns or conditional logic.** This prevents React's "Expected static flag was missing" warnings and ensures consistent component behavior.
+
+```typescript
+// ❌ WRONG - hooks called conditionally
+function BadComponent({ shouldRender, data }) {
+  if (!shouldRender) return null; // ❌ Early return before hooks
+  
+  const [state, setState] = useState(false); // ❌ Hook called conditionally
+  const ref = useRef(null);
+  
+  return <div>...</div>;
+}
+
+// ✅ CORRECT - all hooks before early returns
+function GoodComponent({ shouldRender, data }) {
+  // ✅ ALL hooks called first, unconditionally
+  const [state, setState] = useState(false);
+  const ref = useRef(null);
+  const { value } = useCustomHook();
+  
+  // ✅ Early returns AFTER all hooks
+  if (!shouldRender) return null;
+  
+  return <div>...</div>;
 }
 ```
 
