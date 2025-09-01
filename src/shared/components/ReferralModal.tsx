@@ -2,11 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/shared/components/ui/dialog';
 import { Button } from '@/shared/components/ui/button';
 import { Copy, Check, ExternalLink } from 'lucide-react';
-import { useMediumModal } from '@/shared/hooks/useMobileModalStyling';
-import { mergeMobileModalClasses, createMobileModalProps } from '@/shared/hooks/useMobileModalStyling';
+import { useMediumModal, createMobileModalProps } from '@/shared/hooks/useMobileModalStyling';
 import { supabase } from '@/integrations/supabase/client';
 import type { Session } from '@supabase/supabase-js';
-import { toast } from 'sonner';
+
 
 interface ReferralModalProps {
   isOpen: boolean;
@@ -19,7 +18,7 @@ interface ReferralStats {
 }
 
 export const ReferralModal: React.FC<ReferralModalProps> = ({ isOpen, onOpenChange }) => {
-  const modalStyling = useMediumModal();
+  const mobileModalStyling = useMediumModal();
   const [copied, setCopied] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
   const [username, setUsername] = useState<string | null>(null);
@@ -122,24 +121,20 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({ isOpen, onOpenChan
     return (
       <Dialog open={isOpen} onOpenChange={onOpenChange}>
         <DialogContent 
-          className={mergeMobileModalClasses(
-            'sm:max-w-[500px] bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800 flex flex-col rounded-lg',
-            modalStyling.dialogContentClassName,
-            modalStyling.isMobile
-          )}
-          style={modalStyling.dialogContentStyle}
-          {...createMobileModalProps(modalStyling.isMobile)}
+          className={mobileModalStyling.fullClassName}
+          style={mobileModalStyling.dialogContentStyle}
+          {...createMobileModalProps(mobileModalStyling.isMobile)}
         >
-          <div className={modalStyling.headerContainerClassName}>
-            <DialogHeader className={`${modalStyling.isMobile ? 'px-4 pt-4 pb-2' : 'px-6 pt-4 pb-2'}`}>
+          <div className={mobileModalStyling.headerContainerClassName}>
+            <DialogHeader className={`${mobileModalStyling.isMobile ? 'px-4 pt-4 pb-2' : 'px-6 pt-4 pb-2'} flex-shrink-0`}>
               <DialogTitle className="text-xl font-cocogoose text-primary">
                 Refer artists to create with Reigh
               </DialogTitle>
             </DialogHeader>
           </div>
           
-          <div className={modalStyling.scrollContainerClassName}>
-            <div className={`${modalStyling.isMobile ? 'px-4 pb-4' : 'px-6 pb-6'} text-center`}>
+          <div className={`${mobileModalStyling.scrollContainerClassName} ${mobileModalStyling.isMobile ? 'px-4' : 'px-6'} overflow-x-visible [scrollbar-gutter:stable_both-edges] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] sm:[&::-webkit-scrollbar]:block sm:[-ms-overflow-style:auto] sm:[scrollbar-width:auto] sm:pr-4`}>
+            <div className="text-center pb-6">
               <p className="text-muted-foreground">
                 Please sign in to access your referral link and statistics.
               </p>
@@ -153,24 +148,20 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({ isOpen, onOpenChan
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent 
-        className={mergeMobileModalClasses(
-          'sm:max-w-[500px] bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800 flex flex-col rounded-lg',
-          modalStyling.dialogContentClassName,
-          modalStyling.isMobile
-        )}
-        style={modalStyling.dialogContentStyle}
-        {...createMobileModalProps(modalStyling.isMobile)}
+        className={mobileModalStyling.fullClassName}
+        style={mobileModalStyling.dialogContentStyle}
+        {...createMobileModalProps(mobileModalStyling.isMobile)}
       >
-        <div className={modalStyling.headerContainerClassName}>
-          <DialogHeader className={`${modalStyling.isMobile ? 'px-4 pt-4 pb-2' : 'px-6 pt-4 pb-2'}`}>
+        <div className={mobileModalStyling.headerContainerClassName}>
+          <DialogHeader className={`${mobileModalStyling.isMobile ? 'px-4 pt-4 pb-2' : 'px-6 pt-4 pb-2'} flex-shrink-0`}>
             <DialogTitle className="text-xl font-cocogoose text-primary">
               Refer artists to create with Reigh
             </DialogTitle>
           </DialogHeader>
         </div>
         
-        <div className={modalStyling.scrollContainerClassName}>
-          <div className={`${modalStyling.isMobile ? 'px-4 pb-4' : 'px-6 pb-6'} space-y-4`}>
+        <div className={`${mobileModalStyling.scrollContainerClassName} ${mobileModalStyling.isMobile ? 'px-4' : 'px-6'} overflow-x-visible [scrollbar-gutter:stable_both-edges] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] sm:[&::-webkit-scrollbar]:block sm:[-ms-overflow-style:auto] sm:[scrollbar-width:auto] sm:pr-4`}>
+          <div className="space-y-4 pb-6">
             {/* Main Description */}
             <div className="space-y-3 text-sm leading-relaxed">
               <p>

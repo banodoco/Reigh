@@ -332,7 +332,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
             {/* Right side - Referral text and App Settings */}
             <div className="flex items-end gap-2 relative z-50">
               <button 
-                className="text-xs text-gray-400 underline cursor-pointer font-thin mb-0.5 hover:text-gray-600 transition-colors duration-200 text-right touch-manipulation active:text-gray-500 min-h-[44px] px-2 py-2 whitespace-nowrap relative z-50"
+                className="text-xs text-gray-400 underline cursor-pointer font-thin mb-0.5 hover:text-gray-600 transition-colors duration-200 text-right touch-manipulation active:text-gray-500 min-h-[44px] px-2 py-2 relative z-50 max-w-[80px] leading-tight"
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
