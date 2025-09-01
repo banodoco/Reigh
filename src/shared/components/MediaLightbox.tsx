@@ -269,6 +269,22 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   const isVideo = media.type === 'video' || media.type === 'video_travel_output' || media.location?.endsWith('.mp4');
   const displayUrl = getDisplayUrl(media.location || media.imageUrl);
 
+  // Debug logging for media properties and download state
+  React.useEffect(() => {
+    console.log('[VideoDownloadIssue] MediaLightbox opened with media:', {
+      mediaId: media.id,
+      mediaType: media.type,
+      isVideo,
+      showDownload,
+      displayUrl,
+      location: media.location,
+      imageUrl: media.imageUrl,
+      thumbUrl: media.thumbUrl,
+      allMediaKeys: Object.keys(media),
+      timestamp: Date.now()
+    });
+  }, [media.id, media.type, isVideo, showDownload, displayUrl, media.location, media.imageUrl]);
+
   // This useEffect is no longer needed as the finally block in handleSave is more reliable.
   // useEffect(() => {
   //   if (isSaving) {
@@ -377,30 +393,229 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   };
 
   const handleDownload = async () => {
+    console.log('[VideoDownloadIssue] Download button clicked - START', {
+      mediaId: media.id,
+      mediaType: media.type,
+      isVideo,
+      displayUrl,
+      location: media.location,
+      imageUrl: media.imageUrl,
+      timestamp: Date.now()
+    });
+
     try {
+      console.log('[VideoDownloadIssue] Starting fetch request', {
+        url: displayUrl,
+        timestamp: Date.now()
+      });
+
       const response = await fetch(displayUrl);
+      
+      console.log('[VideoDownloadIssue] Fetch response received', {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries()),
+        contentType: response.headers.get('content-type'),
+        contentLength: response.headers.get('content-length'),
+        timestamp: Date.now()
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
       const blob = await response.blob();
+      
+      console.log('[VideoDownloadIssue] Blob created', {
+        blobSize: blob.size,
+        blobType: blob.type,
+        timestamp: Date.now()
+      });
+
       const url = URL.createObjectURL(blob);
+      
+      const filename = `media_${media.id}.${isVideo ? 'mp4' : 'png'}`;
+      console.log('[VideoDownloadIssue] Creating download link', {
+        filename,
+        blobUrl: url.substring(0, 50) + '...',
+        timestamp: Date.now()
+      });
       
       const link = document.createElement('a');
       link.href = url;
-      link.download = `media_${media.id}.${isVideo ? 'mp4' : 'png'}`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      link.download = filename;
       
-      // Clean up the object URL
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Error downloading file:', error);
-      // Fallback to direct link
-      const link = document.createElement('a');
-      link.href = displayUrl;
-      link.download = `media_${media.id}.${isVideo ? 'mp4' : 'png'}`;
-      link.target = '_blank';
+      // Add additional browser-specific logging
+      console.log('[VideoDownloadIssue] Pre-download browser state', {
+        userAgent: navigator.userAgent,
+        browserSupportsDownload: 'download' in link,
+        linkElement: {
+          href: link.href.substring(0, 50) + '...',
+          download: link.download,
+          style: link.style.cssText,
+          target: link.target
+        },
+        timestamp: Date.now()
+      });
+      
       document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      
+      console.log('[VideoDownloadIssue] Triggering download click', {
+        linkHref: link.href.substring(0, 50) + '...',
+        linkDownload: link.download,
+        linkInDOM: document.body.contains(link),
+        timestamp: Date.now()
+      });
+      
+      // Try multiple download approaches
+      try {
+        // Approach 1: Standard click
+        link.click();
+        console.log('[VideoDownloadIssue] Standard click() executed');
+        
+        // Approach 2: Dispatch click event (fallback)
+        const clickEvent = new MouseEvent('click', {
+          view: window,
+          bubbles: true,
+          cancelable: true
+        });
+        const eventDispatched = link.dispatchEvent(clickEvent);
+        console.log('[VideoDownloadIssue] Click event dispatched', { eventDispatched });
+        
+        // Approach 3: Force focus and click (for some browsers)
+        link.focus();
+        setTimeout(() => {
+          console.log('[VideoDownloadIssue] Delayed click attempt');
+          link.click();
+        }, 100);
+        
+      } catch (clickError) {
+        console.error('[VideoDownloadIssue] Error during click attempts', clickError);
+      }
+      
+      // Keep link in DOM briefly to allow download to initiate
+      setTimeout(() => {
+        if (document.body.contains(link)) {
+          document.body.removeChild(link);
+          console.log('[VideoDownloadIssue] Link removed from DOM after delay');
+        }
+      }, 1000);
+      
+      // Delay object URL cleanup to avoid interrupting download
+      setTimeout(() => {
+        try {
+          URL.revokeObjectURL(url);
+          console.log('[VideoDownloadIssue] Blob URL revoked after delay');
+        } catch (revokeError) {
+          console.warn('[VideoDownloadIssue] Error revoking blob URL', revokeError);
+        }
+      }, 5000);
+      
+      // Check for common download blocking scenarios
+      setTimeout(() => {
+        console.log('[VideoDownloadIssue] Post-download browser checks', {
+          filename,
+          windowFocused: document.hasFocus(),
+          documentVisible: !document.hidden,
+          downloadsBlocked: window.navigator.userAgent.includes('Chrome') && 
+            window.location.protocol !== 'https:' && 
+            window.location.hostname !== 'localhost',
+          timestamp: Date.now()
+        });
+      }, 500);
+      
+      console.log('[VideoDownloadIssue] Download completed successfully', {
+        filename,
+        timestamp: Date.now()
+      });
+      
+    } catch (error) {
+      console.error('[VideoDownloadIssue] Download failed, using fallback method', {
+        error: error instanceof Error ? error.message : String(error),
+        errorStack: error instanceof Error ? error.stack : undefined,
+        timestamp: Date.now()
+      });
+      
+      // Enhanced fallback methods
+      const filename = `media_${media.id}.${isVideo ? 'mp4' : 'png'}`;
+      
+      console.log('[VideoDownloadIssue] Trying enhanced fallback methods', {
+        originalError: error instanceof Error ? error.message : String(error),
+        timestamp: Date.now()
+      });
+      
+      // Method 1: Direct link with proper attributes
+      try {
+        const link = document.createElement('a');
+        link.href = displayUrl;
+        link.download = filename;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        
+        // Make link visible for debugging
+        link.style.display = 'block';
+        link.style.position = 'fixed';
+        link.style.top = '10px';
+        link.style.left = '10px';
+        link.style.zIndex = '99999';
+        link.style.background = 'red';
+        link.style.color = 'white';
+        link.style.padding = '10px';
+        link.textContent = 'DOWNLOAD LINK (debugging)';
+        
+        console.log('[VideoDownloadIssue] Creating visible fallback download link', {
+          fallbackHref: link.href,
+          fallbackDownload: link.download,
+          fallbackTarget: link.target,
+          timestamp: Date.now()
+        });
+        
+        document.body.appendChild(link);
+        
+        // Try immediate click
+        link.click();
+        
+        // Also try with user interaction simulation
+        setTimeout(() => {
+          const event = new MouseEvent('click', {
+            view: window,
+            bubbles: true,
+            cancelable: true,
+            button: 0
+          });
+          link.dispatchEvent(event);
+        }, 100);
+        
+        // Remove after 5 seconds
+        setTimeout(() => {
+          if (document.body.contains(link)) {
+            document.body.removeChild(link);
+          }
+        }, 5000);
+        
+        console.log('[VideoDownloadIssue] Fallback method 1 executed');
+        
+      } catch (fallbackError) {
+        console.error('[VideoDownloadIssue] Fallback method 1 failed', fallbackError);
+        
+        // Method 2: Window.open approach
+        try {
+          console.log('[VideoDownloadIssue] Trying window.open method');
+          const newWindow = window.open(displayUrl, '_blank');
+          if (newWindow) {
+            console.log('[VideoDownloadIssue] Window.open succeeded');
+          } else {
+            console.log('[VideoDownloadIssue] Window.open was blocked');
+          }
+        } catch (windowOpenError) {
+          console.error('[VideoDownloadIssue] Window.open failed', windowOpenError);
+        }
+      }
+      
+      console.log('[VideoDownloadIssue] All fallback methods attempted', {
+        filename,
+        timestamp: Date.now()
+      });
     }
   };
 
@@ -799,13 +1014,29 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         </>
                       )}
 
-                      {showDownload && (
+                      {showDownload && (() => {
+                        console.log('[VideoDownloadIssue] Rendering download button (desktop task details view)', {
+                          showDownload,
+                          mediaId: media.id,
+                          timestamp: Date.now()
+                        });
+                        return true;
+                      })() && (
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button
                               variant="secondary"
                               size="sm"
-                              onClick={handleDownload}
+                              onClick={(e) => {
+                                console.log('[VideoDownloadIssue] Download button onClick triggered (desktop task details view)', {
+                                  mediaId: media.id,
+                                  target: e.target,
+                                  currentTarget: e.currentTarget,
+                                  timestamp: Date.now()
+                                });
+                                e.stopPropagation();
+                                handleDownload();
+                              }}
                               className="bg-black/50 hover:bg-black/70 text-white"
                             >
                               <Download className="h-4 w-4" />
@@ -1277,13 +1508,29 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     </>
                   )}
 
-                  {showDownload && (
+                  {showDownload && (() => {
+                    console.log('[VideoDownloadIssue] Rendering download button (main lightbox view)', {
+                      showDownload,
+                      mediaId: media.id,
+                      timestamp: Date.now()
+                    });
+                    return true;
+                  })() && (
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button
                           variant="secondary"
                           size="sm"
-                          onClick={handleDownload}
+                          onClick={(e) => {
+                            console.log('[VideoDownloadIssue] Download button onClick triggered (main lightbox view)', {
+                              mediaId: media.id,
+                              target: e.target,
+                              currentTarget: e.currentTarget,
+                              timestamp: Date.now()
+                            });
+                            e.stopPropagation();
+                            handleDownload();
+                          }}
                           className="bg-black/50 hover:bg-black/70 text-white"
                         >
                           <Download className="h-4 w-4" />
