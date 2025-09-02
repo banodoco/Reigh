@@ -6,27 +6,16 @@ import { UserPreferences } from '@/shared/settings/userPreferences';
 import { usePrefetchToolSettings } from '@/shared/hooks/usePrefetchToolSettings';
 import { log, time, timeEnd } from '@/shared/lib/logger';
 
-// Create a stable cache object that survives hot reloads
-const createAuthCache = () => {
-  if (typeof window !== 'undefined') {
-    // Use window object to persist across hot reloads
-    if (!window.__projectAuthCache) {
-      window.__projectAuthCache = { cache: null, ttl: 30000 };
-    }
-    return window.__projectAuthCache;
-  }
-  // Fallback for SSR
-  return { cache: null, ttl: 30000 };
-};
+// Shared auth cache with useToolSettings to prevent duplicate calls
+let projectAuthCache: { user: any; timestamp: number } | null = null;
+const PROJECT_AUTH_CACHE_TTL = 30000; // 30 seconds
 
-// Helper function to get user with timeout and caching (hot-reload friendly)
+// Helper function to get user with timeout and caching (same as useToolSettings)
 async function getProjectUserWithTimeout(timeoutMs = 15000) {
-  const authCacheManager = createAuthCache();
-  
   // Check cache first to avoid duplicate auth calls
-  if (authCacheManager.cache && Date.now() - authCacheManager.cache.timestamp < authCacheManager.ttl) {
+  if (projectAuthCache && Date.now() - projectAuthCache.timestamp < PROJECT_AUTH_CACHE_TTL) {
     log('PerfDebug:ProjectContext', 'Auth cache hit - avoiding duplicate call');
-    return { data: { user: authCacheManager.cache.user }, error: null };
+    return { data: { user: projectAuthCache.user }, error: null };
   }
   
   time('PerfDebug:ProjectContext', 'auth:getUser');
@@ -50,7 +39,7 @@ async function getProjectUserWithTimeout(timeoutMs = 15000) {
     
     // Cache successful auth result
     if (result.data?.user) {
-      authCacheManager.cache = {
+      projectAuthCache = {
         user: result.data.user,
         timestamp: Date.now()
       };
@@ -66,13 +55,6 @@ async function getProjectUserWithTimeout(timeoutMs = 15000) {
       throw new Error('Auth request was cancelled - please try again');
     }
     throw error;
-  }
-}
-
-// Declare global type for TypeScript
-declare global {
-  interface Window {
-    __projectAuthCache?: { cache: { user: any; timestamp: number } | null; ttl: number };
   }
 }
 
@@ -204,8 +186,7 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
       console.log(`[ProjectContext:MobileDebug] Processing auth change: ${event}, userId: ${!!currentUserId}`);
       
       // Clear auth cache on meaningful auth changes
-      const authCacheManager = createAuthCache();
-      authCacheManager.cache = null;
+      projectAuthCache = null;
       log('PerfDebug:ProjectContext', 'Auth cache cleared due to auth state change');
       
       // Update user ID
