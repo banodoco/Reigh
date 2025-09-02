@@ -331,6 +331,11 @@ ORDER BY r.created_at DESC;
 ## Files
 
 - **Database**: `/supabase/migrations/` (applied via `minimal_referral_system.sql`)
-- **Frontend Hook**: `/src/shared/hooks/useReferralTracking.ts`
+- **Frontend Hooks**: 
+  - `/src/shared/hooks/useReferralTracking.ts` (URL parameter tracking and conversion)
+  - `/src/shared/hooks/useReferralStats.ts` (stats display and session management)
 - **Integration**: `/src/pages/HomePage.tsx` (Discord OAuth handler)
+- **UI Components**: 
+  - `/src/shared/components/ReferralModal.tsx` (referral stats and link sharing)
+  - `/src/shared/components/GlobalHeader.tsx` (referral button with dynamic stats)
 - **Documentation**: `/structure_detail/referral_system.md` (this file)

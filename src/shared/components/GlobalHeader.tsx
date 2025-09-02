@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
-import type { Session } from '@supabase/supabase-js';
 import { Button } from '@/shared/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
 import { useProject } from '@/shared/contexts/ProjectContext';
@@ -12,6 +10,7 @@ import { cn } from '@/shared/lib/utils';
 import { ProjectSettingsModal } from '@/shared/components/ProjectSettingsModal';
 import { toast } from "sonner";
 import { useProjectContextDebug } from '@/shared/hooks/useProjectContextDebug';
+import { useReferralStats } from '@/shared/hooks/useReferralStats';
 
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 
@@ -19,11 +18,6 @@ interface GlobalHeaderProps {
   contentOffsetRight?: number;
   contentOffsetLeft?: number;
   onOpenSettings?: () => void;
-}
-
-interface ReferralStats {
-  total_visits: number;
-  successful_referrals: number;
 }
 
 export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight = 0, contentOffsetLeft = 0, onOpenSettings }) => {
@@ -34,87 +28,10 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
   // [MobileStallFix] Enable debug monitoring
   useProjectContextDebug();
 
-  // Track authentication state to conditionally change the logo destination
-  const [session, setSession] = useState<Session | null>(null);
-  const [username, setUsername] = useState<string | null>(null);
-  const [referralStats, setReferralStats] = useState<ReferralStats | null>(null);
+  // Use shared referral stats hook
+  const { session, stats: referralStats } = useReferralStats();
 
-  useEffect(() => {
-    // Get current session on mount and fetch user data
-    const getSessionAndUserData = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setSession(session);
-      
-      if (session?.user?.id) {
-        // Get username from users table
-        const { data: userData, error } = await supabase
-          .from('users')
-          .select('username')
-          .eq('id', session.user.id)
-          .single();
-        
-        if (userData?.username && !error) {
-          setUsername(userData.username);
-        }
-      }
-    };
-    
-    getSessionAndUserData();
 
-    // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setSession(session);
-      
-      // Reset username when session changes
-      if (!session?.user?.id) {
-        setUsername(null);
-        setReferralStats(null);
-      } else {
-        // Get username for new session
-        const { data: userData, error } = await supabase
-          .from('users')
-          .select('username')
-          .eq('id', session.user.id)
-          .single();
-        
-        if (userData?.username && !error) {
-          setUsername(userData.username);
-        }
-      }
-    });
-
-    return () => {
-      subscription?.unsubscribe();
-    };
-  }, []);
-  // Get referral stats when username is available
-  useEffect(() => {
-    const getReferralStats = async () => {
-      if (!username) {
-        setReferralStats(null);
-        return;
-      }
-      
-      try {
-        const { data, error } = await supabase
-          .from('referral_stats')
-          .select('total_visits, successful_referrals')
-          .eq('username', username)
-          .single();
-        
-        if (data && !error) {
-          setReferralStats(data);
-        } else {
-          // No stats yet, show zeros
-          setReferralStats({ total_visits: 0, successful_referrals: 0 });
-        }
-      } catch (err) {
-        setReferralStats({ total_visits: 0, successful_referrals: 0 });
-      }
-    };
-    
-    getReferralStats();
-  }, [username]);
 
   const [isCreateProjectModalOpen, setIsCreateProjectModalOpen] = useState(false);
   const [isProjectSettingsModalOpen, setIsProjectSettingsModalOpen] = useState(false);
