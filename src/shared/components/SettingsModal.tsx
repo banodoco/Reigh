@@ -421,7 +421,7 @@ python worker.py --db-type supabase \\
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent 
-        className={mobileModalStyling.fullClassName}
+        className={`${mobileModalStyling.fullClassName} data-[state=open]:slide-in-from-right data-[state=closed]:slide-out-to-right`}
         style={mobileModalStyling.dialogContentStyle}
         {...createMobileModalProps(mobileModalStyling.isMobile)}
       >

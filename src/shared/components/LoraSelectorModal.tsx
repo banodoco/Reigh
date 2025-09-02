@@ -1138,7 +1138,7 @@ export const LoraSelectorModal: React.FC<LoraSelectorModalProps> = ({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent
-        className={mobileModalStyling.fullClassName}
+        className={`${mobileModalStyling.fullClassName} data-[state=open]:!slide-in-from-top-1/4 data-[state=open]:!slide-in-from-left data-[state=closed]:!slide-out-to-top-1/4 data-[state=closed]:!slide-out-to-left`}
         style={mobileModalStyling.dialogContentStyle}
         {...createMobileModalProps(mobileModalStyling.isMobile)}
       >
