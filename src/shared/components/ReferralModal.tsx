@@ -125,6 +125,21 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({ isOpen, onOpenChan
               </p>
             </div>
           </div>
+          
+          {/* Footer with Close Button for non-authenticated state */}
+          <div className={mobileModalStyling.footerContainerClassName}>
+            <div className={`${mobileModalStyling.isMobile ? 'p-3 pt-3 pb-2' : 'p-4 pt-4 pb-2'} border-t`}>
+              <div className="flex justify-end">
+                <Button 
+                  variant="outline" 
+                  onClick={() => onOpenChange(false)}
+                  className="h-12 px-4 text-sm font-medium"
+                >
+                  Close
+                </Button>
+              </div>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     );
@@ -209,9 +224,8 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({ isOpen, onOpenChan
             {/* Spacer for minimal separation */}
             <div style={{ height: '1.5px' }}></div>
             
-            {/* Combined: Inspirational Message + Statistics */}
+            {/* Inspirational Message */}
             <div className="space-y-1">
-              {/* Special Inspirational Message */}
               <div>
                 <p className="text-sm font-medium text-primary leading-relaxed italic text-left">
                   We hope that this motivates artists to create beautiful work, which in turn inspire others to create with AI.
@@ -228,39 +242,6 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({ isOpen, onOpenChan
                   </a>{' '}
                   in Banodoco, our parent company, proportionate to the number of people they refer.
                 </p>
-              </div>
-
-              {/* Statistics */}
-              <div className="space-y-2">
-                <hr className="border-t border-gray-200 my-4" />
-                <label className="text-sm font-medium">You can see your statistics on referred users here:</label>
-              <div className="border rounded-lg overflow-hidden">
-                <div className="bg-gray-50 dark:bg-gray-800 px-4 py-2 border-b">
-                  <div className="grid grid-cols-3 gap-4 text-sm font-medium">
-                    <div>Visitors from link</div>
-                    <div>Successful Sign-ups</div>
-                    <div>Referral bonuses earned:</div>
-                  </div>
-                </div>
-                <div className="px-4 py-3">
-                  {isLoadingStats ? (
-                    <div className="grid grid-cols-3 gap-4 text-sm">
-                      <div className="animate-pulse">...</div>
-                      <div className="animate-pulse">...</div>
-                      <div className="animate-pulse">...</div>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-3 gap-4 text-sm">
-                      <div className="font-mono text-lg">
-                        {stats?.total_visits ?? 0}
-                      </div>
-                      <div className="font-mono text-lg">
-                        {stats?.successful_referrals ?? 0}
-                      </div>
-                      <div className="font-mono text-lg">$0</div>
-                    </div>
-                  )}
-                </div>
               </div>
             </div>
 
@@ -279,9 +260,50 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({ isOpen, onOpenChan
                 .
               </p>
             </div>
-
+          </div>
+        </div>
+        
+        {/* Statistics Footer */}
+        <div className={mobileModalStyling.footerContainerClassName}>
+          <div className={`${mobileModalStyling.isMobile ? 'p-3 pt-3 pb-2' : 'p-4 pt-4 pb-2'} border-t`}>
+            <div className="flex gap-3 items-center">
+              {/* Statistics Section - 3/5 width */}
+              <div className="w-3/5 space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Your referral statistics:</label>
+                <div className="space-y-1">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-muted-foreground">Visitors</span>
+                    <span className="font-mono text-sm font-semibold">
+                      {isLoadingStats ? "..." : (stats?.total_visits ?? 0)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-muted-foreground">Sign-ups</span>
+                    <span className="font-mono text-sm font-semibold">
+                      {isLoadingStats ? "..." : (stats?.successful_referrals ?? 0)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-muted-foreground">Bonuses</span>
+                    <span className="font-mono text-sm font-semibold">
+                      {isLoadingStats ? "..." : "$0"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Close Button - 2/5 width */}
+              <div className="w-2/5 flex justify-end">
+                <Button 
+                  variant="outline" 
+                  onClick={() => onOpenChange(false)}
+                  className="h-12 px-4 text-sm font-medium"
+                >
+                  Close
+                </Button>
               </div>
             </div>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
