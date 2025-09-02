@@ -622,7 +622,7 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
 
       return () => clearTimeout(emergencyTimer);
     }
-  }, [userId, isLoadingPreferences, fetchProjects, isLoadingProjects]); // Refetch when user changes or preferences finish loading
+  }, [userId, isLoadingPreferences, isLoadingProjects]); // Refetch when user changes or preferences finish loading
 
   const handleSetSelectedProjectId = useCallback((projectId: string | null) => {
     setSelectedProjectIdState(projectId);
