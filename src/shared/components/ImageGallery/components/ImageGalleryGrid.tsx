@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React from "react";
 import { Filter, Sparkles } from "lucide-react";
 import { ProgressiveLoadingManager } from "@/shared/components/ProgressiveLoadingManager";
 import { ImagePreloadManager } from "@/shared/components/ImagePreloadManager";
@@ -88,24 +88,6 @@ export const ImageGalleryGrid: React.FC<ImageGalleryGridProps> = ({
   ...itemProps
 }) => {
   
-  // Stable callback to avoid triggering progressive loading effect unnecessarily
-  const handleImagesReady = useCallback(() => {
-    console.log(`🎯 [PAGELOADINGDEBUG] [GALLERY] Images ready - clearing gallery loading state`);
-    setIsGalleryLoading(false);
-    
-    // Only clear button loading for server pagination - client pagination handles this separately
-    if (isServerPagination) {
-      console.log(`🔘 [PAGELOADINGDEBUG] [GALLERY] Server pagination - also clearing button loading`);
-      setLoadingButton(null);
-    }
-    
-    // Clear the gallery safety timeout since loading completed successfully
-    if (safetyTimeoutRef.current) {
-      clearTimeout(safetyTimeoutRef.current);
-      safetyTimeoutRef.current = null;
-    }
-  }, [setIsGalleryLoading, isServerPagination, setLoadingButton, safetyTimeoutRef]);
-  
   return (
     <>
       {/* Adjacent Page Preloading Manager - handles preloading in background */}
@@ -138,7 +120,7 @@ export const ImageGalleryGrid: React.FC<ImageGalleryGridProps> = ({
         )}
 
         {/* No images generated yet message */}
-        {images.length === 0 && !isGalleryLoading && (
+        {images.length === 0 && !isGalleryLoading && !isServerPagination && (
            <div className={`text-center py-12 mt-8 rounded-lg ${
              whiteText 
                ? "text-zinc-400 border-zinc-700 bg-zinc-800/50" 
@@ -159,7 +141,22 @@ export const ImageGalleryGrid: React.FC<ImageGalleryGridProps> = ({
             isMobile={isMobile}
             isLightboxOpen={isLightboxOpen}
             instanceId={`gallery-${isServerPagination ? (serverPage || 1) : page}`}
-            onImagesReady={handleImagesReady}
+            onImagesReady={() => {
+              console.log(`🎯 [PAGELOADINGDEBUG] [GALLERY] Images ready - clearing gallery loading state`);
+              setIsGalleryLoading(false);
+              
+              // Only clear button loading for server pagination - client pagination handles this separately
+              if (isServerPagination) {
+                console.log(`🔘 [PAGELOADINGDEBUG] [GALLERY] Server pagination - also clearing button loading`);
+                setLoadingButton(null);
+              }
+              
+              // Clear the gallery safety timeout since loading completed successfully
+              if (safetyTimeoutRef.current) {
+                clearTimeout(safetyTimeoutRef.current);
+                safetyTimeoutRef.current = null;
+              }
+            }}
           >
             {(showImageIndices) => (
               <div>
