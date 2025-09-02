@@ -44,7 +44,7 @@
 | **Adding Tools** | [adding_new_tool.md](structure_detail/adding_new_tool.md) | Step-by-step guide for new tool modules |
 | **Design Standards** | [design_motion_guidelines.md](structure_detail/design_motion_guidelines.md) | UI/UX patterns, motion, accessibility, mobile touch interactions |
 | **Shared Code** | [shared_hooks_contexts.md](structure_detail/shared_hooks_contexts.md) | Reusable hooks, contexts, components catalog |
-| **Realtime Architecture** | [realtime_simplification_plan.md](structure_detail/realtime_simplification_plan.md) | Centralized realtime system with unified invalidation routing |
+| **Realtime Architecture** | [realtime_system.md](structure_detail/realtime_system.md) | Implemented unified realtime system and usage guide |
 | **Component Modularity** | [component_modularization.md](structure_detail/component_modularization.md) | Reusable UI component patterns and shared details |
 | **Tool: Image Gen** | [tool_image_generation.md](structure_detail/tool_image_generation.md) | Multi-model image generation (Wan 2.2, Qwen.Image), LoRA support, style reference system |
 | **Tool: Video Travel** | [tool_video_travel.md](structure_detail/tool_video_travel.md) | Frame-accurate video generation workflow, shot reordering, mobile video preloading |
