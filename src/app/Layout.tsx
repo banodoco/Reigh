@@ -74,9 +74,26 @@ const Layout: React.FC = () => {
     }
   }, [location.state, handleOpenSettings]);
 
-  // Initialize session and subscribe to changes
+  // Initialize session and subscribe to changes with timeout protection
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
+    const initializeAuth = async () => {
+      try {
+        // Add timeout protection for auth session loading
+        const sessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Auth session timeout')), 8000)
+        );
+        
+        const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]) as any;
+        setSession(session);
+      } catch (error) {
+        console.warn('[Layout] Auth session loading failed/timeout, continuing with null session:', error);
+        // Set session to null (not undefined) to unblock the UI
+        setSession(null);
+      }
+    };
+
+    initializeAuth();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
