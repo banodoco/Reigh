@@ -36,13 +36,6 @@
 | **`useAIInteractionService`** | AI service wrapper | Unified AI API interface |
 | **`useTaskQueueNotifier`** | Centralized task creation | Unified task enqueueing with realtime feedback |
 
-### 🔗 Referrals & Social
-
-| Hook | Purpose | Returns |
-|------|---------|---------|
-| **`useReferralStats`** | Centralized referral data | `session`, `username`, `stats`, `isLoadingStats`, `referralLink` |
-| **`useReferralTracking`** | URL parameter tracking | Automatic referral session creation |
-
 ### 🔑 Authentication & API
 
 | Hook | Purpose | Returns |
