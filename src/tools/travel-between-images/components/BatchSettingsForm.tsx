@@ -51,6 +51,8 @@ interface BatchSettingsFormProps {
   
   // Image count for conditional UI
   imageCount?: number;
+  // Selected model for conditional UI
+  selectedModel?: 'wan-2.1' | 'wan-2.2';
 }
 
 const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
@@ -81,6 +83,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
   randomSeed,
   onRandomSeedChange,
   imageCount = 0,
+  selectedModel,
 }) => {
     const [showAdvanced, setShowAdvanced] = React.useState(false);
 
@@ -136,11 +139,11 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
             
 
             
-            <div className={`grid grid-cols-1 gap-4 ${!isTimelineMode && imageCount > 2 ? 'md:grid-cols-2' : ''}`}>
+            <div className={`grid grid-cols-1 gap-4 ${!isTimelineMode && imageCount > 2 && selectedModel !== 'wan-2.2' ? 'md:grid-cols-2' : ''}`}>
                 {!isTimelineMode && (
                   <div className="relative">
                     <Label htmlFor="batchVideoFrames" className="text-sm font-light block mb-1">
-                      {imageCount === 1 ? 'Frames to generate' : 'Frames per pair'}: {batchVideoFrames}
+                      {imageCount === 1 ? 'Frames to generate' : 'Frames per pair'}: {selectedModel === 'wan-2.2' ? '81 (Fixed for Wan 2.2)' : batchVideoFrames}
                     </Label>
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -149,7 +152,11 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                         </span>
                       </TooltipTrigger>
                       <TooltipContent>
-                        <p>Determines the duration of the video segment{imageCount === 1 ? '' : ' for each image'}. <br /> More frames result in a longer segment.</p>
+                        {selectedModel === 'wan-2.2' ? (
+                          <p>Wan 2.2 generates exactly 81 frames for optimal quality and motion.</p>
+                        ) : (
+                          <p>Determines the duration of the video segment{imageCount === 1 ? '' : ' for each image'}. <br /> More frames result in a longer segment.</p>
+                        )}
                       </TooltipContent>
                     </Tooltip>
                     <Slider
@@ -157,12 +164,14 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                       min={10}
                       max={81} 
                       step={1}
-                      value={[batchVideoFrames]}
+                      value={[selectedModel === 'wan-2.2' ? 81 : batchVideoFrames]}
                       onValueChange={(value) => onBatchVideoFramesChange(value[0])}
+                      disabled={selectedModel === 'wan-2.2'}
+                      className={selectedModel === 'wan-2.2' ? 'opacity-50' : ''}
                     />
                   </div>
                 )}
-                {!isTimelineMode && imageCount > 2 && (
+                {!isTimelineMode && imageCount > 2 && selectedModel !== 'wan-2.2' && (
                   <div className="relative">
                     <Label htmlFor="batchVideoContext" className="text-sm font-light block mb-1">Number of Context Frames: {batchVideoContext}</Label>
                     <Tooltip>
@@ -187,6 +196,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                 )}
             </div>
 
+            {selectedModel !== 'wan-2.2' && (<>
             {/* Toggles row */}
             <div className="flex flex-wrap gap-4 items-center">
               {/* Only show Accelerated Mode toggle if not using Wan 2.2 */}
@@ -361,6 +371,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                 </div>
               </CollapsibleContent>
             </Collapsible>
+            </>)}
           </div>
         </div>
     );

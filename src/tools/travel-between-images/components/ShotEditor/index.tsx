@@ -67,6 +67,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   onEnhancePromptChange,
   generationMode,
   onGenerationModeChange,
+  selectedModel,
+  onModelChange,
   onPreviousShot,
   onNextShot,
   onPreviousShotNoScroll,
@@ -720,18 +722,26 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   }, [accelerated, steerableMotionSettings.model_name, getRecommendedSteps, onBatchVideoStepsChange, actions]);
 
   // Handle model changes - temporarily restricted to Wan 2.1 only
-  const handleModelChange = useCallback((_modelName: string) => {
+  const handleModelChange = useCallback((newModelName: string) => {
+    // Accept either internal model_name or UI model ids
+    const resolvedModelName =
+      newModelName === 'wan-2.2' || newModelName === 'vace_14B_fake_cocktail_2_2'
+        ? 'vace_14B_fake_cocktail_2_2'
+        : 'vace_14B';
+
     onSteerableMotionSettingsChange({ 
-      model_name: 'vace_14B',
+      model_name: resolvedModelName,
       apply_causvid: false
     });
-    setAccelerated(true);
-    // Note: Steps are automatically handled by the unified system when model changes
+
+    // Keep accelerated enabled for Wan 2.1; disable for Wan 2.2
+    setAccelerated(resolvedModelName !== 'vace_14B_fake_cocktail_2_2');
+    // Steps are auto-handled elsewhere
   }, [onSteerableMotionSettingsChange, setAccelerated]);
 
-  // Ensure a valid model is always selected - default to Wan 2.1 if invalid/missing
+  // Ensure a valid model is always selected - allow both Wan 2.1 and 2.2
   useEffect(() => {
-    const validModels = ['vace_14B'];
+    const validModels = ['vace_14B', 'vace_14B_fake_cocktail_2_2'];
     if (!validModels.includes(steerableMotionSettings.model_name)) {
       console.log(`[ShotEditor] Invalid model name "${steerableMotionSettings.model_name}", defaulting to Wan 2.1`);
       handleModelChange('vace_14B');
@@ -878,6 +888,118 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       onBatchVideoContextChange(8);
     }
   }, [simpleFilteredImages.length, batchVideoContext, onBatchVideoContextChange]);
+
+  // Model availability based on image count
+  const modelOptions = useMemo(() => {
+    const imageCount = simpleFilteredImages.length;
+    const canUseWan22 = imageCount <= 2;
+    if (canUseWan22) {
+      return {
+        availableModels: ['wan-2.1', 'wan-2.2'] as const,
+        defaultModel: 'wan-2.2' as const,
+        note: null
+      };
+    }
+    return {
+      availableModels: ['wan-2.1'] as const,
+      defaultModel: 'wan-2.1' as const,
+      note: 'Wan 2.2 is only available for shots with 2 or fewer images'
+    };
+  }, [simpleFilteredImages.length]);
+
+  // Auto-correct model when image count changes (debounced to avoid flicker)
+  const correctModelTimeoutRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!onModelChange) return;
+    if (correctModelTimeoutRef.current) {
+      window.clearTimeout(correctModelTimeoutRef.current);
+      correctModelTimeoutRef.current = null;
+    }
+    correctModelTimeoutRef.current = window.setTimeout(() => {
+      if (selectedModel === 'wan-2.2' && simpleFilteredImages.length > 2) {
+        onModelChange('wan-2.1');
+      }
+    }, 150);
+    return () => {
+      if (correctModelTimeoutRef.current) {
+        window.clearTimeout(correctModelTimeoutRef.current);
+        correctModelTimeoutRef.current = null;
+      }
+    };
+  }, [selectedModel, simpleFilteredImages.length, onModelChange]);
+
+  // Auto-set frames to 81 for Wan 2.2
+  useEffect(() => {
+    if (selectedModel === 'wan-2.2' && batchVideoFrames !== 81) {
+      onBatchVideoFramesChange(81);
+    }
+  }, [selectedModel, batchVideoFrames, onBatchVideoFramesChange]);
+
+  // Auto-switch timeline to batch for Wan 2.2
+  useEffect(() => {
+    if (selectedModel === 'wan-2.2' && generationMode === 'timeline') {
+      onGenerationModeChange('batch');
+    }
+  }, [selectedModel, generationMode, onGenerationModeChange]);
+
+  // Consolidated model sync to prevent circular updates causing flicker
+  const modelSyncRef = useRef<{ lastSelectedModel?: string; lastModelName?: string }>({});
+  useEffect(() => {
+    if (!onModelChange) return;
+    
+    const currentSelectedModel = selectedModel;
+    const currentModelName = steerableMotionSettings.model_name;
+    
+    // Skip if no actual change
+    if (modelSyncRef.current.lastSelectedModel === currentSelectedModel && 
+        modelSyncRef.current.lastModelName === currentModelName) {
+      return;
+    }
+    
+    console.log(`[ModelFlickerDebug] Model sync check: selectedModel(${currentSelectedModel}) vs model_name(${currentModelName})`);
+    
+    const expectedUIModel = currentModelName === 'vace_14B_fake_cocktail_2_2' ? 'wan-2.2' : 'wan-2.1';
+    const expectedModelName = currentSelectedModel === 'wan-2.2' ? 'vace_14B_fake_cocktail_2_2' : 'vace_14B';
+    
+    // Determine which value changed by comparing to last known state
+    const selectedModelChanged = modelSyncRef.current.lastSelectedModel !== currentSelectedModel;
+    const modelNameChanged = modelSyncRef.current.lastModelName !== currentModelName;
+    
+    console.log(`[ModelFlickerDebug] Change detection: selectedModel changed(${selectedModelChanged}), model_name changed(${modelNameChanged})`);
+    
+    // Priority 1: If selectedModel changed (user interaction), update model_name to match
+    if (selectedModelChanged && currentModelName !== expectedModelName) {
+      console.log(`[ModelFlickerDebug] User changed selectedModel, updating model_name: ${currentModelName} -> ${expectedModelName}`);
+      modelSyncRef.current = { lastSelectedModel: currentSelectedModel, lastModelName: expectedModelName };
+      onSteerableMotionSettingsChange({ 
+        model_name: expectedModelName,
+        apply_causvid: false
+      });
+      return;
+    }
+    
+    // Priority 2: If model_name changed (loading from settings), update selectedModel to match
+    if (modelNameChanged && currentSelectedModel !== expectedUIModel) {
+      console.log(`[ModelFlickerDebug] Settings loaded, updating selectedModel: ${currentSelectedModel} -> ${expectedUIModel}`);
+      modelSyncRef.current = { lastSelectedModel: expectedUIModel, lastModelName: currentModelName };
+      onModelChange(expectedUIModel);
+      return;
+    }
+    
+    // Fallback: If they're just out of sync and we can't determine priority, prefer selectedModel (user intent)
+    if (currentSelectedModel !== expectedUIModel && currentModelName !== expectedModelName) {
+      console.log(`[ModelFlickerDebug] Fallback sync - prioritizing selectedModel, updating model_name: ${currentModelName} -> ${expectedModelName}`);
+      modelSyncRef.current = { lastSelectedModel: currentSelectedModel, lastModelName: expectedModelName };
+      onSteerableMotionSettingsChange({ 
+        model_name: expectedModelName,
+        apply_causvid: false
+      });
+      return;
+    }
+    
+    // Update ref for next comparison
+    modelSyncRef.current = { lastSelectedModel: currentSelectedModel, lastModelName: currentModelName };
+  }, [selectedModel, steerableMotionSettings.model_name, onSteerableMotionSettingsChange, onModelChange]);
   
   const videoOutputs = useMemo(() => {
     return getVideoOutputs(orderedShotImages);
@@ -1174,6 +1296,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       negativePrompts = [steerableMotionSettings.negative_prompt];
     }
 
+    // Map selectedModel to actual model_name for task creation
+    const actualModelName = selectedModel === 'wan-2.2' ? 'vace_14B_fake_cocktail_2_2' : 'vace_14B';
+    
     const requestBody: any = {
       project_id: projectId,
       shot_id: selectedShot.id,
@@ -1182,7 +1307,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       segment_frames: segmentFrames,
       frame_overlap: frameOverlap,
       negative_prompts: negativePrompts,
-      model_name: steerableMotionSettings.model_name,
+      model_name: actualModelName,
       seed: steerableMotionSettings.seed,
       steps: batchVideoSteps,
       debug: steerableMotionSettings.debug ?? DEFAULT_STEERABLE_MOTION_SETTINGS.debug,
@@ -1204,6 +1329,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       generation_mode: generationMode,
       accelerated_mode: accelerated,
       random_seed: randomSeed,
+      selected_model: selectedModel,
     };
 
     if (loraManager.selectedLoras && loraManager.selectedLoras.length > 0) {
@@ -1254,6 +1380,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     enhancePrompt,
     openaiApiKey,
     randomSeed,
+    selectedModel,
     loraManager.selectedLoras
   ]);
 
@@ -1363,6 +1490,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             duplicatingImageId={state.duplicatingImageId}
             duplicateSuccessImageId={state.duplicateSuccessImageId}
             projectAspectRatio={projects.find(p => p.id === projectId)?.aspectRatio}
+            selectedModel={selectedModel}
           />
         </div>
 
@@ -1376,7 +1504,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             <CardContent>
                 <div className="flex flex-col lg:flex-row gap-6">
                     {/* Left Column: Main Settings */}
-                    <div className="flex-1 order-2 lg:order-1">
+                    <div className="lg:w-1/2 order-2 lg:order-1">
                         <BatchSettingsForm
                             batchVideoPrompt={batchVideoPrompt}
                             onBatchVideoPromptChange={onBatchVideoPromptChange}
@@ -1405,26 +1533,39 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                             randomSeed={randomSeed}
                             onRandomSeedChange={handleRandomSeedChange}
                             imageCount={simpleFilteredImages.length}
+                            selectedModel={selectedModel}
                         />
                         
-                        {/* Model Selection (Mobile) - restricted to Wan 2.1 */}
+                        {/* Model Selection (Mobile) */}
                         <div className="block lg:hidden mt-4">
                             <div className="space-y-4 p-4 border rounded-lg bg-card mb-4">
                                 <h3 className="font-light text-sm">Which model would you like to use:</h3>
                                 <div className="w-1/2">
                                     <Select
-                                        value="wan-2.1"
-                                        onValueChange={() => {}} // No-op since it's locked
-                                        disabled={true} // Lock the dropdown
+                                        value={selectedModel || 'wan-2.1'}
+                                        onValueChange={(value) => {
+                                          console.log(`[ModelFlickerDebug] USER MOBILE SELECTION: ${value}`);
+                                          onModelChange?.(value as 'wan-2.1' | 'wan-2.2');
+                                        }}
+                                        disabled={modelOptions.availableModels.length === 1}
                                     >
-                                        <SelectTrigger id="model-mobile" className="opacity-75">
+                                        <SelectTrigger id="model-mobile" className={modelOptions.availableModels.length === 1 ? "opacity-75" : ""}>
                                             <SelectValue placeholder="Select model..." />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="wan-2.1">Wan 2.1</SelectItem>
+                                            {modelOptions.availableModels.map(model => (
+                                                <SelectItem key={model} value={model}>
+                                                    {model === 'wan-2.1' ? 'Wan 2.1' : 'Wan 2.2'}
+                                                </SelectItem>
+                                            ))}
                                         </SelectContent>
                                     </Select>
                                 </div>
+                                {modelOptions.note && (
+                                    <p className="text-xs text-muted-foreground">
+                                        {modelOptions.note}
+                                    </p>
+                                )}
                             </div>
                         </div>
                         
@@ -1478,24 +1619,36 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                     </div>
 
                     {/* Right Column: Model & LoRA Settings (Desktop) */}
-                    <div className="hidden lg:block lg:w-80 order-1 lg:order-2">
-                        {/* Model Selection - restricted to Wan 2.1 */}
+                    <div className="hidden lg:block lg:w-1/2 order-1 lg:order-2">
+                        {/* Model Selection */}
                         <div className="space-y-4 p-4 border rounded-lg bg-card mb-4">
                             <h3 className="font-light text-sm">Which model would you like to use:</h3>
                             <div className="w-1/2">
                                 <Select
-                                    value="wan-2.1"
-                                    onValueChange={() => {}} // No-op since it's locked
-                                    disabled={true} // Lock the dropdown
+                                    value={selectedModel || 'wan-2.1'}
+                                    onValueChange={(value) => {
+                                      console.log(`[ModelFlickerDebug] USER DESKTOP SELECTION: ${value}`);
+                                      onModelChange?.(value as 'wan-2.1' | 'wan-2.2');
+                                    }}
+                                    disabled={modelOptions.availableModels.length === 1}
                                 >
-                                    <SelectTrigger id="model" className="opacity-75">
+                                    <SelectTrigger id="model" className={modelOptions.availableModels.length === 1 ? "opacity-75" : ""}>
                                         <SelectValue placeholder="Select model..." />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="wan-2.1">Wan 2.1</SelectItem>
+                                        {modelOptions.availableModels.map(model => (
+                                            <SelectItem key={model} value={model}>
+                                                {model === 'wan-2.1' ? 'Wan 2.1' : 'Wan 2.2'}
+                                            </SelectItem>
+                                        ))}
                                     </SelectContent>
                                 </Select>
                             </div>
+                            {modelOptions.note && (
+                                <p className="text-xs text-muted-foreground">
+                                    {modelOptions.note}
+                                </p>
+                            )}
                         </div>
                         
                         {/* LoRA Settings */}

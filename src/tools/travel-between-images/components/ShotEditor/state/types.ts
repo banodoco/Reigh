@@ -121,6 +121,9 @@ export interface ShotEditorProps {
   onGenerationModeChange: (mode: 'batch' | 'timeline') => void;
   enhancePrompt: boolean;
   onEnhancePromptChange: (enhance: boolean) => void;
+  // Model selection
+  selectedModel?: 'wan-2.1' | 'wan-2.2';
+  onModelChange?: (model: 'wan-2.1' | 'wan-2.2') => void;
   // Navigation props
   onPreviousShot?: () => void;
   onNextShot?: () => void;

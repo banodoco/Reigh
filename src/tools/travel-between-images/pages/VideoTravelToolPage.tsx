@@ -382,6 +382,7 @@ const VideoTravelToolPage: React.FC = () => {
   const [videoPairConfigs, setVideoPairConfigs] = useState<any[]>([]);
   const [generationMode, setGenerationMode] = useState<'batch' | 'timeline'>('batch');
   const [pairConfigs, setPairConfigs] = useState<any[]>([]);
+  const [selectedModel, setSelectedModel] = useState<'wan-2.1' | 'wan-2.2'>('wan-2.1');
   // const [afterEachPromptText, setAfterEachPromptText] = useState<string>(''); // Removed - not used in ShotEditor
   
   // Memoize expensive computations
@@ -583,6 +584,7 @@ const VideoTravelToolPage: React.FC = () => {
       setVideoPairConfigs(settingsToApply.pairConfigs || []);
       setGenerationMode(settingsToApply.generationMode === 'by-pair' ? 'batch' : (settingsToApply.generationMode || 'batch'));
       setPairConfigs(settingsToApply.pairConfigs || []);
+      setSelectedModel(settingsToApply.selectedModel || 'wan-2.1');
       setSteerableMotionSettings({
         ...(settingsToApply.steerableMotionSettings || DEFAULT_STEERABLE_MOTION_SETTINGS),
         apply_causvid: false // Force apply_causvid to false regardless of saved settings
@@ -898,6 +900,16 @@ const VideoTravelToolPage: React.FC = () => {
     }));
   }, []);
 
+  const handleModelChange = useCallback((model: 'wan-2.1' | 'wan-2.2') => {
+    if (isLoadingSettingsRef.current) {
+      console.log(`[ModelFlickerDebug] BLOCKED handleModelChange during loading: ${model}`);
+      return;
+    }
+    console.log(`[ModelFlickerDebug] VideoTravelToolPage.handleModelChange: ${selectedModel} -> ${model}`);
+    userHasInteracted.current = true;
+    setSelectedModel(model);
+  }, [selectedModel]);
+
   // Memoize current settings to reduce effect runs
   const currentSettings = useMemo<VideoTravelSettings>(() => ({
     videoControlMode,
@@ -912,6 +924,7 @@ const VideoTravelToolPage: React.FC = () => {
     enhancePrompt,
     generationMode,
     pairConfigs,
+    selectedModel,
     // selectedLoras removed - now managed directly in ShotEditor
   }), [
           videoControlMode,
@@ -926,6 +939,7 @@ const VideoTravelToolPage: React.FC = () => {
           enhancePrompt,
           generationMode,
           pairConfigs,
+          selectedModel,
           // selectedLoras removed - now managed directly in ShotEditor
   ]);
 
@@ -1166,6 +1180,8 @@ const VideoTravelToolPage: React.FC = () => {
               onEnhancePromptChange={handleEnhancePromptChange}
               generationMode={isLoadingSettings ? 'batch' : generationMode}
               onGenerationModeChange={handleGenerationModeChange}
+              selectedModel={isLoadingSettings ? 'wan-2.1' : selectedModel}
+              onModelChange={handleModelChange}
 
               onPreviousShot={handlePreviousShot}
               onNextShot={handleNextShot}

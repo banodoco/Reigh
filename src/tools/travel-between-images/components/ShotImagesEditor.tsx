@@ -46,6 +46,8 @@ interface ShotImagesEditorProps {
   onImageDuplicate: (shotImageEntryId: string, position: number) => void;
   /** Number of columns for ShotImageManager grid */
   columns: 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
+  /** Selected model for conditional UI */
+  selectedModel?: 'wan-2.1' | 'wan-2.2';
   /** Skeleton shown while data is loading */
   skeleton?: React.ReactNode;
   /** Count of generations without position – if >0 we’ll show the helper message */
@@ -86,6 +88,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   onImageDelete,
   onImageDuplicate,
   columns,
+  selectedModel,
   skeleton,
   unpositionedGenerationsCount = 0,
   onOpenUnpositionedPane,
@@ -128,7 +131,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
         <div className="flex items-center justify-between">
           <CardTitle>Manage Shot Images</CardTitle>
           {!isMobile && (
-            <div className="flex items-center space-x-2">
+            <div className="flex flex-col items-end space-y-1">
               <ToggleGroup
                 type="single"
                 value={generationMode}
@@ -139,10 +142,13 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 <ToggleGroupItem value="batch" aria-label="Toggle batch">
                   Batch
                 </ToggleGroupItem>
-                <ToggleGroupItem value="timeline" aria-label="Toggle timeline">
+                <ToggleGroupItem value="timeline" aria-label="Toggle timeline" disabled={selectedModel === 'wan-2.2'}>
                   Timeline
                 </ToggleGroupItem>
               </ToggleGroup>
+              {selectedModel === 'wan-2.2' && (
+                <p className="text-xs text-muted-foreground">Timeline mode only available with Wan 2.1</p>
+              )}
             </div>
           )}
         </div>

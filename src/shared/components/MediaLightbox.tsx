@@ -170,6 +170,12 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     let closedFromOutside = false;
 
     const intercept = (e: Event) => {
+      // Ignore synthetic/programmatic events (e.g., programmatic clicks used for downloads)
+      // so they don't trigger lightbox close logic.
+      if (e.isTrusted === false) {
+        return;
+      }
+
       const contentEl = contentRef.current;
       const target = e.target as Node | null;
       const path = (e as any).composedPath ? (e as any).composedPath() as any[] : undefined;
@@ -395,16 +401,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       link.download = filename;
       document.body.appendChild(link);
       
-      // Attempt 1: standard programmatic click
+      // Programmatic click to trigger download
       link.click();
-
-      // Attempt 2: dispatch a click event on the next tick
-      setTimeout(() => {
-        try {
-          const evt = new MouseEvent('click', { view: window, bubbles: true, cancelable: true });
-          link.dispatchEvent(evt);
-        } catch {}
-      }, 50);
 
       // Keep link in DOM briefly to allow download to initiate
       setTimeout(() => {

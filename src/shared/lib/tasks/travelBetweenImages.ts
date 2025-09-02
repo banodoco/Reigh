@@ -227,10 +227,20 @@ export async function createTravelBetweenImagesTask(params: TravelBetweenImagesT
       runId
     );
 
-    // 5. Create task using unified create-task function (no task_id - let DB auto-generate)
+    // 5. Determine task type based on selected model name
+    const isWan22 = params.model_name === 'vace_14B_fake_cocktail_2_2';
+    const taskType = isWan22 ? 'wan_2_2_i2v' : 'travel_orchestrator';
+    
+    console.log("[createTravelBetweenImagesTask] Task type determination:", {
+      modelName: params.model_name,
+      isWan22,
+      taskType
+    });
+
+    // Create task using unified create-task function (no task_id - let DB auto-generate)
     const result = await createTask({
       project_id: params.project_id,
-      task_type: "travel_orchestrator",
+      task_type: taskType,
       params: {
         orchestrator_details: orchestratorPayload,
       }

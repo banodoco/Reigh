@@ -13,6 +13,7 @@ export interface VideoTravelSettings {
   steerableMotionSettings: SteerableMotionSettings;
   enhancePrompt: boolean;
   generationMode: 'batch' | 'by-pair' | 'timeline';
+  selectedModel?: 'wan-2.1' | 'wan-2.2';
   pairConfigs?: Array<{
     id: string;
     prompt: string;
@@ -37,6 +38,7 @@ export const videoTravelSettings = {
     dimensionSource: 'firstImage' as const,
     generationMode: 'batch' as const,
     enhancePrompt: false,
+    selectedModel: 'wan-2.1' as const,
     steerableMotionSettings: DEFAULT_STEERABLE_MOTION_SETTINGS,
   },
 }; 
