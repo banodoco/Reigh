@@ -245,21 +245,7 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({ isOpen, onOpenChan
               </div>
             </div>
 
-            {/* Discord link */}
-            <div className="pt-4 text-center">
-              <p className="text-sm text-muted-foreground">
-                Please share any questions on{' '}
-                <a 
-                  href="https://discord.gg/wv6MymFEE3" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-primary underline hover:text-primary/80 transition-colors"
-                >
-                  our discord
-                </a>
-                .
-              </p>
-            </div>
+
           </div>
         </div>
         
@@ -293,11 +279,22 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({ isOpen, onOpenChan
               </div>
               
               {/* Close Button - 2/5 width */}
-              <div className="w-2/5 flex justify-end">
+              <div className="w-2/5 flex flex-col items-end gap-3">
+                <p className="text-xs text-muted-foreground text-right">
+                  Please share any questions on{' '}
+                  <a 
+                    href="https://discord.gg/wv6MymFEE3" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-primary underline hover:text-primary/80 transition-colors"
+                  >
+                    our discord
+                  </a>
+                </p>
                 <Button 
                   variant="outline" 
                   onClick={() => onOpenChange(false)}
-                  className="h-12 px-4 text-sm font-medium"
+                  className="h-12 px-4 text-sm font-medium mt-1"
                 >
                   Close
                 </Button>
