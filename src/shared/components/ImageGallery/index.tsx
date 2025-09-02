@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect, useCallback, useRef } from "react";
+import React, { useMemo, useEffect, useCallback } from "react";
 import { useToast } from "@/shared/hooks/use-toast";
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 import { useProject } from '@/shared/contexts/ProjectContext';
@@ -215,26 +215,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = (props) => {
   const rawIsMobile = useIsMobile();
   const { toast } = useToast();
   
-  // Stable mobile detection with ref to prevent config flipping
-  const isMobileRef = useRef<boolean | null>(null);
-  const isMobile = useMemo(() => {
-    // Once we have a definitive mobile state, stick with it for the session
-    if (isMobileRef.current !== null) {
-      return isMobileRef.current;
-    }
-    
-    // Determine mobile state with fallback
-    const detectedMobile = rawIsMobile ?? (typeof window !== 'undefined' && window.innerWidth < 768);
-    isMobileRef.current = detectedMobile;
-    
-    console.log('[ImageGallery:MobileDebug] Mobile detection locked in:', {
-      rawIsMobile,
-      detectedMobile,
-      windowWidth: typeof window !== 'undefined' ? window.innerWidth : 'undefined'
-    });
-    
-    return detectedMobile;
-  }, [rawIsMobile]);
+  // Fallback mobile detection in case useIsMobile fails
+  const isMobile = rawIsMobile ?? (typeof window !== 'undefined' && window.innerWidth < 768);
   
   // Debug mobile detection (reduced frequency)
   React.useEffect(() => {
