@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toolsManifest } from '@/tools';
+import { log, time, timeEnd } from '@/shared/lib/logger';
 
 export type SettingsScope = 'user' | 'project' | 'shot';
 
@@ -51,8 +52,20 @@ interface UpdateToolSettingsParams {
  * Fetch and merge tool settings from all scopes using direct Supabase calls
  * This replaces the Express API approach for better mobile reliability
  */
-// Helper function to add timeout to auth calls - aligned with Supabase global timeout
-async function getUserWithTimeout(timeoutMs = 7000) {
+// Shared auth cache to reduce duplicate calls
+let authCache: { user: any; timestamp: number } | null = null;
+const AUTH_CACHE_TTL = 30000; // 30 seconds
+
+// Helper function to add timeout to auth calls - more reasonable timeout for mobile
+async function getUserWithTimeout(timeoutMs = 15000) {
+  // Check cache first to avoid duplicate auth calls
+  if (authCache && Date.now() - authCache.timestamp < AUTH_CACHE_TTL) {
+    log('PerfDebug:ToolSettings', 'Auth cache hit - avoiding duplicate call');
+    return { data: { user: authCache.user }, error: null };
+  }
+  
+  time('PerfDebug:ToolSettings', 'auth:getUser');
+  
   const controller = new AbortController();
   
   const timeoutId = setTimeout(() => {
@@ -68,9 +81,22 @@ async function getUserWithTimeout(timeoutMs = 7000) {
     ]);
     
     clearTimeout(timeoutId);
+    timeEnd('PerfDebug:ToolSettings', 'auth:getUser');
+    
+    // Cache successful auth result
+    if (result.data?.user) {
+      authCache = {
+        user: result.data.user,
+        timestamp: Date.now()
+      };
+      log('PerfDebug:ToolSettings', 'Auth result cached for 30s');
+    }
+    
     return result;
   } catch (error) {
     clearTimeout(timeoutId);
+    timeEnd('PerfDebug:ToolSettings', 'auth:getUser');
+    log('PerfDebug:ToolSettings', 'Auth error:', error?.message);
     if (error?.name === 'AbortError') {
       throw new Error('Auth request was cancelled - please try again');
     }
@@ -86,8 +112,8 @@ async function fetchToolSettingsSupabase(toolId: string, ctx: ToolSettingsContex
     }
     
     // Mobile optimization: Cache user info to avoid repeated auth calls
-    // Add timeout to prevent hanging on mobile connections (aligned with Supabase global timeout)
-    const { data: { user }, error: authError } = await getUserWithTimeout(7000);
+    // Add timeout to prevent hanging on mobile connections (increased for better reliability)
+    const { data: { user }, error: authError } = await getUserWithTimeout(15000);
     if (authError || !user) {
       throw new Error('Authentication required');
     }
@@ -164,7 +190,8 @@ async function fetchToolSettingsSupabase(toolId: string, ctx: ToolSettingsContex
     }
     if (error?.message?.includes('Auth timeout') || error?.message?.includes('Auth request was cancelled')) {
       console.warn('[fetchToolSettingsSupabase] Auth timeout - continuing with defaults');
-      throw new Error('Authentication timeout - using default settings');
+      // Return defaults instead of throwing to prevent cascading failures
+      return toolDefaults[toolId] ?? {};
     }
     throw error;
   }
