@@ -4,7 +4,6 @@ import { toast } from 'sonner';
 import { Project } from '@/types/project'; // Added import
 import { UserPreferences } from '@/shared/settings/userPreferences';
 import { usePrefetchToolSettings } from '@/shared/hooks/usePrefetchToolSettings';
-import { log, time, timeEnd } from '@/shared/lib/logger';
 
 // Type for updating projects
 interface ProjectUpdate {
@@ -92,7 +91,6 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
   const isMobileRef = useRef(/iPhone|iPad|iPod|Android/i.test(navigator.userAgent));
   const preferencesTimeoutRef = useRef<NodeJS.Timeout>();
   const projectsTimeoutRef = useRef<NodeJS.Timeout>();
-  const projectLoadCheckCountRef = useRef<number>(0);
 
   // Prefetch all tool settings for the currently selected project so that
   // tool pages hydrate instantly without an extra round-trip.
@@ -199,7 +197,6 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
     if (!userId) return;
 
     console.log(`[ProjectContext:MobileDebug] Starting preferences fetch for user: ${userId}`);
-    time('ProjectContext:Perf', 'preferences:fetch');
     setIsLoadingPreferences(true);
 
     // [MobileStallFix] Set a safety timeout for mobile networks
@@ -215,14 +212,12 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
     }, isMobileRef.current ? 10000 : 5000); // Longer timeout for mobile
 
     try {
-      time('ProjectContext:Perf', 'preferences:db');
       // Read the settings JSON for the current user
       const { data, error } = await supabase
         .from('users')
         .select('settings')
         .eq('id', userId)
         .single();
-      timeEnd('ProjectContext:Perf', 'preferences:db');
 
       if (error) throw error;
 
@@ -242,7 +237,6 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
       }
       setIsLoadingPreferences(false);
       console.log(`[ProjectContext:MobileDebug] Preferences loading completed`);
-      timeEnd('ProjectContext:Perf', 'preferences:fetch');
     }
   }, [userId]);
 
@@ -301,29 +295,22 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
 
   const fetchProjects = useCallback(async () => {
     console.log(`[ProjectContext:MobileDebug] Starting projects fetch`);
-    time('ProjectContext:Perf', 'projects:fetch');
     try {
       // Get current user
-      time('ProjectContext:Perf', 'auth:getUser');
       const { data: { user } } = await supabase.auth.getUser();
-      timeEnd('ProjectContext:Perf', 'auth:getUser');
       if (!user) throw new Error('Not authenticated');
 
       // Ensure user exists in our users table first
-      time('ProjectContext:Perf', 'users:exists');
       const { data: existingUser } = await supabase
         .from('users')
         .select('id')
         .eq('id', user.id)
         .single();
-      timeEnd('ProjectContext:Perf', 'users:exists');
 
       if (!existingUser) {
         // Create user record using the secure function
-        time('ProjectContext:Perf', 'users:create_if_needed');
         const { error: userError } = await supabase
           .rpc('create_user_record_if_not_exists');
-        timeEnd('ProjectContext:Perf', 'users:create_if_needed');
         
         if (userError) {
           console.error('Failed to create user:', userError);
@@ -332,19 +319,16 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
       }
 
       // Fetch projects for the user
-      time('ProjectContext:Perf', 'projects:db');
       const { data: projectsData, error } = await supabase
         .from('projects')
         .select('*')
         .eq('user_id', user.id)
         .order('name', { ascending: true });
-      timeEnd('ProjectContext:Perf', 'projects:db');
 
       if (error) throw error;
 
       // Create default project if none exist
       if (!projectsData || projectsData.length === 0) {
-        time('ProjectContext:Perf', 'projects:default_create');
         const { data: newProject, error: createError } = await supabase
           .from('projects')
           .insert({
@@ -354,22 +338,17 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
           })
           .select()
           .single();
-        timeEnd('ProjectContext:Perf', 'projects:default_create');
 
         if (createError) throw createError;
         
         // Create default shot for the new project
-        time('ProjectContext:Perf', 'shots:default_create');
         await createDefaultShot(newProject.id);
-        timeEnd('ProjectContext:Perf', 'shots:default_create');
         
         const mappedProject = mapDbProjectToProject(newProject);
         setProjects([mappedProject]);
         setSelectedProjectIdState(mappedProject.id);
         // Save the default project as last opened
-        time('ProjectContext:Perf', 'preferences:update:lastOpenedProjectId');
         updateUserPreferences('user', { lastOpenedProjectId: mappedProject.id });
-        timeEnd('ProjectContext:Perf', 'preferences:update:lastOpenedProjectId');
       } else {
         const mappedProjects = projectsData.map(mapDbProjectToProject);
         setProjects(mappedProjects);
@@ -381,9 +360,7 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
         
         // Save the selected project if it's different from what was stored
         if (projectIdToSelect && projectIdToSelect !== lastOpenedProjectId) {
-          time('ProjectContext:Perf', 'preferences:update:lastOpenedProjectId');
           updateUserPreferences('user', { lastOpenedProjectId: projectIdToSelect });
-          timeEnd('ProjectContext:Perf', 'preferences:update:lastOpenedProjectId');
         }
       }
       console.log(`[ProjectContext:MobileDebug] Projects loaded successfully`);
@@ -399,7 +376,6 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
         projectsTimeoutRef.current = undefined;
       }
       setIsLoadingProjects(false);
-      timeEnd('ProjectContext:Perf', 'projects:fetch');
     }
   }, [updateUserPreferences]);
 
@@ -603,36 +579,25 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
 
   // [MobileStallFix] Enhanced project loading with fallback recovery
   useEffect(() => {
-    projectLoadCheckCountRef.current += 1;
-    log('PerfDebug:ProjectLoadCheck', {
-      count: projectLoadCheckCountRef.current,
-      userIdPresent: !!userId,
-      isLoadingPreferences,
-      isLoadingProjects
-    });
     console.log(`[ProjectContext:MobileDebug] Project loading check - userId: ${!!userId}, isLoadingPreferences: ${isLoadingPreferences}`);
     
     // Wait for auth and user preferences to be ready before fetching projects
-    if (userId && !isLoadingPreferences && isLoadingProjects) {
+    if (userId && !isLoadingPreferences) {
       console.log(`[ProjectContext:MobileDebug] Starting project fetch with 100ms delay`);
-      
-      // Clear any existing timers to prevent overlap
-      if (projectsTimeoutRef.current) {
-        clearTimeout(projectsTimeoutRef.current);
-        projectsTimeoutRef.current = undefined;
-      }
-      
       const timer = setTimeout(() => {
         fetchProjects();
       }, 100); // Small delay to ensure everything is ready
 
       // [MobileStallFix] Set a fallback timeout for projects loading
+      if (projectsTimeoutRef.current) {
+        clearTimeout(projectsTimeoutRef.current);
+      }
+
       projectsTimeoutRef.current = setTimeout(() => {
         console.warn(`[ProjectContext:MobileDebug] Projects fetch timeout, forcing recovery attempt`);
         if (isLoadingProjects) {
           // Force retry the fetch without waiting for preferences
           console.log(`[ProjectContext:MobileDebug] Forcing projects fetch retry`);
-          log('PerfDebug:ProjectRecovery', 'Retrying fetchProjects due to timeout');
           fetchProjects();
         }
       }, isMobileRef.current ? 15000 : 10000); // Longer timeout for mobile
@@ -648,7 +613,6 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
       // [MobileStallFix] Add emergency fallback if preferences get stuck
       const emergencyTimer = setTimeout(() => {
         console.warn(`[ProjectContext:MobileDebug] Emergency fallback: preferences stuck, forcing projects load`);
-        log('PerfDebug:ProjectRecovery', 'Emergency fallback triggered: preferences stuck');
         if (isLoadingPreferences) {
           setIsLoadingPreferences(false);
           setUserPreferences({});
@@ -658,7 +622,7 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
 
       return () => clearTimeout(emergencyTimer);
     }
-  }, [userId, isLoadingPreferences]); // Remove isLoadingProjects from deps to prevent loops
+  }, [userId, isLoadingPreferences, isLoadingProjects]); // Refetch when user changes or preferences finish loading
 
   const handleSetSelectedProjectId = useCallback((projectId: string | null) => {
     setSelectedProjectIdState(projectId);

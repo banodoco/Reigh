@@ -7,5 +7,4 @@ restartPolicyType = "on_failure"
 startCommand = "npm run start:railway"
 
 [environments.production.variables]
-NODE_ENV = "production"
-VITE_DEBUG_LOGS = "true" 
+NODE_ENV = "production" 
