@@ -38,32 +38,15 @@ function isObject(item: any): boolean {
   return item && typeof item === 'object' && !Array.isArray(item);
 }
 
-// Shared auth cache to reduce duplicate calls (same as useToolSettings)
-let prefetchAuthCache: { user: any; timestamp: number } | null = null;
-const PREFETCH_AUTH_CACHE_TTL = 30000; // 30 seconds
-
 /**
  * Fetch tool settings using Supabase (for prefetching)
  */
 async function fetchToolSettingsSupabase(toolId: string, ctx: { projectId?: string; shotId?: string }): Promise<unknown> {
   try {
-    // Check cache first to avoid duplicate auth calls during prefetch
-    let user: any;
-    if (prefetchAuthCache && Date.now() - prefetchAuthCache.timestamp < PREFETCH_AUTH_CACHE_TTL) {
-      user = prefetchAuthCache.user;
-    } else {
-      // Get current user with shorter timeout for prefetch
-      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
-      if (authError || !authUser) {
-        throw new Error('Authentication required');
-      }
-      user = authUser;
-      
-      // Cache the result
-      prefetchAuthCache = {
-        user: authUser,
-        timestamp: Date.now()
-      };
+    // Get current user
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      throw new Error('Authentication required');
     }
 
     // Fetch all needed data in parallel using Supabase client
