@@ -245,6 +245,64 @@ function App() {
     };
   }, []);
 
+  // Foreground recovery: when tab becomes visible, aggressively recover from dead mode
+  React.useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        try {
+          const now = Date.now();
+          const qc: any = (window as any).__REACT_QUERY_CLIENT__;
+          const projectId = (window as any)?.selectedProjectId || undefined;
+          console.log('[DeadModeRecovery] Tab visible - starting foreground recovery', {
+            timestamp: now,
+            projectId,
+            hasQueryClient: !!qc
+          });
+          // Add DeadModeInvestigation marker for correlation
+          try {
+            const socket: any = (window as any)?.supabase?.realtime?.socket;
+            console.warn('[DeadModeInvestigation] Visibility change -> recovery start', {
+              timestamp: now,
+              visibility: document.visibilityState,
+              connected: socket && socket.isConnected ? socket.isConnected() : undefined,
+              state: socket?.connectionState,
+            });
+          } catch {}
+
+          // 1) Try realtime recovery hint via custom event
+          try {
+            window.dispatchEvent(new CustomEvent('realtime:visibility-recover'));
+          } catch {}
+
+          // 2) Invalidate critical task/gen queries immediately
+          if (qc) {
+            try {
+              qc.invalidateQueries({ queryKey: ['task-status-counts'] });
+              qc.invalidateQueries({ queryKey: ['tasks', 'paginated'] });
+              qc.invalidateQueries({ queryKey: ['generations'] });
+              qc.invalidateQueries({ queryKey: ['unified-generations'] });
+            } catch (e) {
+              console.warn('[DeadModeRecovery] Invalidation error', e);
+            }
+          }
+
+          // 3) Last-resort recovery to cancel stuck queries/mutations
+          try {
+            (window as any).deadMode?.recover?.();
+          } catch (e) {
+            console.warn('[DeadModeRecovery] deadMode.recover failed', e);
+          }
+
+          console.log('[DeadModeRecovery] Foreground recovery scheduled');
+        } catch (e) {
+          console.warn('[DeadModeRecovery] Foreground recovery handler error', e);
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <ProjectProvider>

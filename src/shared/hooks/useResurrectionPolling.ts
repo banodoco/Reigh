@@ -240,10 +240,30 @@ export function useResurrectionPollingConfig(
     ...customConfig
   }), [debugTag, context, customConfig]);
 
-  const refetchInterval = React.useMemo(
-    () => createResurrectionPollingFunction(config),
-    [config]
-  );
+  const refetchInterval = React.useMemo(() => {
+    const baseFn = createResurrectionPollingFunction(config);
+    return (query: any) => {
+      try {
+        const socket: any = (typeof window !== 'undefined') ? (window as any)?.supabase?.realtime?.socket : undefined;
+        const realtimeConnected = !!socket?.isConnected?.();
+        if (!realtimeConnected) {
+          // Boost polling when realtime is down
+          const boosted = createResurrectionPollingFunction({
+            ...config,
+            fastInterval: Math.min(config.fastInterval ?? 15000, 10000),
+            resurrectionInterval: Math.min(config.resurrectionInterval ?? 45000, 30000),
+            initialInterval: Math.min(config.initialInterval ?? 30000, 15000)
+          });
+          console.warn('[DeadModeInvestigation] Polling boosted due to realtime=down', {
+            debugTag,
+            context
+          });
+          return boosted(query);
+        }
+      } catch {}
+      return baseFn(query);
+    };
+  }, [config, debugTag, context]);
 
   return { refetchInterval, debugConfig: config };
 }

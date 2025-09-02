@@ -118,23 +118,88 @@ export async function createTask(taskParams: BaseTaskParams): Promise<any> {
     throw new Error('Authentication required to create task');
   }
 
-  const { data, error } = await supabase.functions.invoke('create-task', {
-    body: {
-      params: taskParams.params,
-      task_type: taskParams.task_type,
-      project_id: taskParams.project_id,
-      dependant_on: null
-    },
-    headers: {
-      Authorization: `Bearer ${session.access_token}`,
-    },
+  const startTime = Date.now();
+  const requestId = `${startTime}-${Math.random().toString(36).slice(2, 8)}`;
+  const timeoutMs = 20000; // 20s safety timeout to avoid indefinite UI stall
+  const controller = new AbortController();
+  const timeout = setTimeout(() => {
+    console.warn('[PollingBreakageIssue] [createTask] Aborting invoke due to timeout', {
+      requestId,
+      timeoutMs,
+      taskType: taskParams.task_type,
+      projectId: taskParams.project_id,
+      timestamp: Date.now(),
+    });
+    controller.abort();
+  }, timeoutMs);
+
+  console.log('[PollingBreakageIssue] [createTask] Invoking edge function', {
+    requestId,
+    taskType: taskParams.task_type,
+    projectId: taskParams.project_id,
+    hasParams: !!taskParams.params,
+    timestamp: startTime,
   });
 
-  if (error) {
-    throw new Error(error.message || 'Failed to create task');
-  }
+  try {
+    const { data, error } = await supabase.functions.invoke('create-task', {
+      body: {
+        params: taskParams.params,
+        task_type: taskParams.task_type,
+        project_id: taskParams.project_id,
+        dependant_on: null
+      },
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      signal: controller.signal,
+    });
 
-  return data;
+    const durationMs = Date.now() - startTime;
+    console.log('[PollingBreakageIssue] [createTask] Invoke completed', {
+      requestId,
+      durationMs,
+      slow: durationMs > 5000,
+      taskType: taskParams.task_type,
+      projectId: taskParams.project_id,
+      hasError: !!error,
+      timestamp: Date.now(),
+    });
+
+    if (error) {
+      throw new Error(error.message || 'Failed to create task');
+    }
+
+    // Broadcast a lightweight event so interested UIs can invalidate queries immediately
+    try {
+      if (typeof window !== 'undefined') {
+        const detail = {
+          projectId: taskParams.project_id,
+          taskType: taskParams.task_type,
+          createdAt: Date.now(),
+        };
+        window.dispatchEvent(new CustomEvent('task-created', { detail }));
+        console.log('[PollingBreakageIssue] [createTask] Dispatched task-created event', detail);
+      }
+    } catch {}
+
+    return data;
+  } catch (err: any) {
+    // Normalize abort errors for better UX
+    if (err?.name === 'AbortError') {
+      throw new Error('Task creation timed out. Please try again.');
+    }
+    console.error('[PollingBreakageIssue] [createTask] Invoke failed', {
+      requestId,
+      taskType: taskParams.task_type,
+      projectId: taskParams.project_id,
+      errorMessage: err?.message,
+      timestamp: Date.now(),
+    });
+    throw err;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 /**

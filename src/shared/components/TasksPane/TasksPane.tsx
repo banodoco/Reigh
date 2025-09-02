@@ -138,6 +138,13 @@ interface TasksPaneProps {
 
 const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
   const queryClient = useQueryClient();
+  
+  // Expose queryClient globally for diagnostics
+  useEffect(() => {
+    if (typeof window !== 'undefined' && queryClient) {
+      (window as any).__REACT_QUERY_CLIENT__ = queryClient;
+    }
+  }, [queryClient]);
   const {
     isGenerationsPaneLocked,
     isGenerationsPaneOpen,
@@ -167,12 +174,32 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
   });
   
   // Get paginated tasks
-  const { data: paginatedData, isLoading: isPaginatedLoading, error: paginatedError } = usePaginatedTasks({
+  const { data: paginatedData, isLoading: isPaginatedLoading, error: paginatedError, refetch: refetchPaginatedTasks } = usePaginatedTasks({
     projectId: shouldLoadTasks ? selectedProjectId : null,
     status: STATUS_GROUPS[selectedFilter],
     limit: ITEMS_PER_PAGE,
     offset: (currentPage - 1) * ITEMS_PER_PAGE,
   });
+
+  // Immediate refresh listener: when a task is created, invalidate and refetch page 1 instantly
+  useEffect(() => {
+    if (!selectedProjectId) return;
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail || {};
+      if (detail.projectId && detail.projectId !== selectedProjectId) return;
+      console.log('[PollingBreakageIssue] [TasksPane] task-created event received, forcing refresh', {
+        selectedProjectId,
+        currentPage,
+        selectedFilter,
+        timestamp: Date.now()
+      });
+      // Always go refresh the first page where new tasks appear
+      queryClient.invalidateQueries({ queryKey: ['tasks', 'paginated', selectedProjectId, 1] });
+      refetchPaginatedTasks();
+    };
+    window.addEventListener('task-created', handler as EventListener);
+    return () => window.removeEventListener('task-created', handler as EventListener);
+  }, [selectedProjectId, currentPage, selectedFilter, queryClient, refetchPaginatedTasks]);
   
   // [TasksPaneCountMismatch] Track paginated tasks hook results
   console.log('[TasksPaneCountMismatch]', {
@@ -201,10 +228,16 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
   // Store previous pagination data to avoid flickering during loading
   const [displayPaginatedData, setDisplayPaginatedData] = useState<typeof paginatedData>(paginatedData);
   
-  // Only update display data when we have new data (not during loading) or when initializing
+  // Update display data more aggressively - don't wait for loading to complete if we have new tasks
   useEffect(() => {
-    if ((!isPaginatedLoading && paginatedData) || (!displayPaginatedData && paginatedData)) {
-      console.log('[TasksPaneCountMismatch]', {
+    const shouldUpdate = (!isPaginatedLoading && paginatedData) || 
+                        (!displayPaginatedData && paginatedData) ||
+                        // IMMEDIATE UPDATE: If we have new data with more tasks, update immediately
+                        (paginatedData && displayPaginatedData && 
+                         paginatedData.tasks.length > displayPaginatedData.tasks.length);
+    
+    if (shouldUpdate) {
+      console.log('[PollingBreakageIssue] [TasksPane] Updating display data', {
         context: 'TasksPane:update-display-paginated-data',
         reason: !displayPaginatedData ? 'initial' : 'new_data',
         previousTasksCount: displayPaginatedData?.tasks?.length || 0,
@@ -255,13 +288,16 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
         console.warn('[TasksPaneCountMismatch]', { context: 'TasksPane:page-visibility-breakdown:log-error', message: (e as Error)?.message });
       }
     } else {
-      console.log('[TasksPaneCountMismatch]', {
+      console.log('[PollingBreakageIssue] [TasksPane] Skipping display update', {
         context: 'TasksPane:skip-display-update',
         isLoading: isPaginatedLoading,
         hasPaginatedData: !!paginatedData,
         hasDisplayData: !!displayPaginatedData,
         selectedFilter,
         currentPage,
+        reason: isPaginatedLoading ? 'still_loading' : 'no_new_data',
+        paginatedDataTasksCount: paginatedData?.tasks?.length || 0,
+        displayDataTasksCount: displayPaginatedData?.tasks?.length || 0,
         timestamp: Date.now()
       });
     }
@@ -297,6 +333,38 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
   
   // Use processing count from status counts as the single source of truth
   const cancellableTaskCount = displayStatusCounts?.processing || 0;
+  
+  // Track count vs task list mismatch
+  const currentTasksCount = displayPaginatedData?.tasks?.length || 0;
+  const isProcessingFilter = selectedFilter === 'Processing';
+  
+  const hasMismatch = isProcessingFilter && cancellableTaskCount > 0 && currentTasksCount === 0;
+  
+  console.log('[PollingBreakageIssue] [TasksPane] Count vs List mismatch check', {
+    cancellableTaskCount,
+    currentTasksCount,
+    isProcessingFilter,
+    selectedFilter,
+    currentPage,
+    mismatch: hasMismatch,
+    statusCountsData: displayStatusCounts,
+    paginatedDataExists: !!displayPaginatedData,
+    timestamp: Date.now()
+  });
+  
+  // Force refetch paginated tasks when there's a mismatch
+  useEffect(() => {
+    if (hasMismatch && !isPaginatedLoading && selectedProjectId) {
+      console.warn('[PollingBreakageIssue] [TasksPane] MISMATCH DETECTED - forcing paginated tasks refetch', {
+        cancellableTaskCount,
+        currentTasksCount,
+        selectedFilter,
+        currentPage,
+        timestamp: Date.now()
+      });
+      refetchPaginatedTasks();
+    }
+  }, [hasMismatch, isPaginatedLoading, selectedProjectId, refetchPaginatedTasks, cancellableTaskCount, currentTasksCount, selectedFilter, currentPage]);
 
   // [TasksPaneCountMismatch] Compare processing count badge to visible processing tasks on current page
   try {
@@ -440,22 +508,39 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
         >
           <div className="p-2 border-b border-zinc-800 flex items-center justify-between flex-shrink-0">
               <h2 className="text-xl font-light text-zinc-200 ml-2">Tasks</h2>
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={handleCancelAllPending}
-                disabled={cancelAllPendingMutation.isPending || cancellableTaskCount === 0}
-                className="flex items-center gap-2"
-              >
-                {cancelAllPendingMutation.isPending ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Cancel All
-                  </>
-                ) : (
-                  'Cancel All'
+              <div className="flex gap-2">
+                {/* Debug refresh button - only show when there's a mismatch */}
+                {hasMismatch && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      console.log('[PollingBreakageIssue] [TasksPane] Manual refresh triggered');
+                      refetchPaginatedTasks();
+                      queryClient.invalidateQueries({ queryKey: ['tasks', 'paginated', selectedProjectId] });
+                    }}
+                    className="text-xs"
+                  >
+                    Refresh
+                  </Button>
                 )}
-              </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleCancelAllPending}
+                  disabled={cancelAllPendingMutation.isPending || cancellableTaskCount === 0}
+                  className="flex items-center gap-2"
+                >
+                  {cancelAllPendingMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Cancel All
+                    </>
+                  ) : (
+                    'Cancel All'
+                  )}
+                </Button>
+              </div>
           </div>
           
           {/* Status Filter Toggle */}

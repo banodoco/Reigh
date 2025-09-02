@@ -303,6 +303,8 @@ export const useListShots = (projectId?: string | null, options: { maxImagesPerS
       return result;
     },
     enabled: !!projectId,
+    // If CancelledError occurs due to emergency recovery, keep showing last good data
+    placeholderData: (previousData) => previousData,
   });
 };
 

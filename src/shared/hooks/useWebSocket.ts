@@ -94,8 +94,67 @@ export function useWebSocket(projectId: string | null) {
   // --- END batching invalidations logic ---
   const channelRef = useRef<RealtimeChannel | null>(null);
   const setupTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const visibilityAdaptiveRef = useRef({ hiddenThrottle: 2000, visibleThrottle: 500 });
+  const isHiddenRef = useRef<boolean>(typeof document !== 'undefined' ? document.hidden : false);
+  const reconnectMonitorRef = useRef<NodeJS.Timeout | null>(null);
+  const disconnectedSinceRef = useRef<number | null>(null);
+  const lastRealtimeStateRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
+    // Visibility-driven throttling and reconnection hint
+    const onVisibility = () => {
+      const hidden = document.hidden;
+      isHiddenRef.current = hidden;
+      // Adapt throttle window to reduce invalidation storms while hidden
+      shouldThrottle.current = createOptimizedThrottling();
+      const newDelay = hidden ? visibilityAdaptiveRef.current.hiddenThrottle : visibilityAdaptiveRef.current.visibleThrottle;
+      DEBUG_MODE && console.log('[WebSocket] Visibility changed, adapting throttle', { hidden, newDelay });
+      // Hint to reconnect when becoming visible
+      if (!hidden) {
+        try {
+          // If channel is closed or null, re-setup quickly
+          if (!channelRef.current) {
+            DEBUG_MODE && console.log('[WebSocket] No channel on visibility, scheduling setup');
+            // Trigger re-setup by clearing timer (effect below will recreate)
+            if (setupTimerRef.current) clearTimeout(setupTimerRef.current);
+          }
+        } catch {}
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    // External recovery signal from App
+    const onRecover = () => {
+      DEBUG_MODE && console.log('[WebSocket] Received realtime:visibility-recover event');
+      try {
+        // Light nudge: invalidate status counts and page-1 tasks for active project
+        if (projectId) {
+          queryClient.invalidateQueries({ queryKey: ['task-status-counts', projectId] });
+          queryClient.invalidateQueries({ queryKey: ['tasks', 'paginated', projectId, 1] });
+        }
+        // Emit DeadModeInvestigation log for visibility-driven recovery
+        try {
+          const socket: any = (supabase as any)?.realtime?.socket;
+          console.warn('[DeadModeInvestigation] Realtime visibility recovery hint', {
+            timestamp: Date.now(),
+            connected: !!socket?.isConnected?.(),
+            state: socket?.connectionState,
+            projectId,
+          });
+          // If still disconnected, attempt a soft reconnect
+          if (socket && !socket.isConnected?.()) {
+            try {
+              (supabase as any)?.realtime?.connect?.();
+              console.warn('[DeadModeInvestigation] Realtime soft connect invoked');
+            } catch {}
+          }
+        } catch {}
+      } catch (e) {
+        console.warn('[WebSocket] Recover invalidation error', e);
+      }
+    };
+    window.addEventListener('realtime:visibility-recover', onRecover as EventListener);
+    // Backward compatibility with earlier event name used in logs/spec
+    window.addEventListener('deadMode:recover', onRecover as EventListener);
     // Don't create a channel if we don't have a projectId
     if (!projectId) {
       return;
@@ -233,6 +292,25 @@ export function useWebSocket(projectId: string | null) {
             }
           }
         )
+        // Also listen for new tasks to ensure first-page reflects creations
+        .on('postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'tasks',
+            filter: `project_id=eq.${projectId}`
+          },
+          (payload) => {
+            const newRecord = payload.new as any;
+            DEBUG_MODE && console.log('[WebSocket] Task INSERT:', {
+              taskId: newRecord?.id,
+              status: newRecord?.status,
+              taskType: newRecord?.task_type
+            });
+            scheduleInvalidation(['task-status-counts', projectId]);
+            scheduleInvalidation(['tasks', 'paginated', projectId, 1]);
+          }
+        )
         // Listen to database changes on generations table (primary real-time mechanism)
         .on('postgres_changes', 
           { 
@@ -307,6 +385,60 @@ export function useWebSocket(projectId: string | null) {
       channelRef.current = channel;
     }, 50); // 50ms delay to let any pending channel cleanup complete
 
+    // Background monitor: if realtime socket disconnected for >10s while visible, attempt reconnect
+    try {
+      if (reconnectMonitorRef.current) {
+        clearInterval(reconnectMonitorRef.current);
+      }
+      reconnectMonitorRef.current = setInterval(() => {
+        try {
+          const socket: any = (supabase as any)?.realtime?.socket;
+          const isConnected = !!socket?.isConnected?.();
+          const connState = socket?.connectionState;
+          const now = Date.now();
+          // Log realtime state transitions (for correlation with dead mode)
+          if (connState !== lastRealtimeStateRef.current) {
+            console.warn('[DeadModeInvestigation] Realtime transition', {
+              timestamp: now,
+              connected: isConnected,
+              connState,
+              channels: (supabase as any)?.getChannels?.()?.map((c: any) => ({ topic: c.topic, state: c.state })) || [],
+              projectId,
+            });
+            lastRealtimeStateRef.current = connState;
+          }
+          if (!isConnected) {
+            if (disconnectedSinceRef.current == null) disconnectedSinceRef.current = now;
+          } else {
+            disconnectedSinceRef.current = null;
+          }
+          const disconnectedForMs = disconnectedSinceRef.current ? now - disconnectedSinceRef.current : 0;
+          if (!isHiddenRef.current && !isConnected && disconnectedForMs > 10000) {
+            console.warn('[DeadModeInvestigation] Realtime disconnected >10s, attempting forced reconnect', {
+              timestamp: now,
+              disconnectedForMs,
+              state: connState,
+              projectId,
+            });
+            try {
+              (supabase as any)?.realtime?.disconnect?.();
+            } catch {}
+            try {
+              (supabase as any)?.realtime?.connect?.();
+            } catch {}
+
+            // After forcing reconnect, nudge critical queries to self-heal via polling
+            try {
+              if (projectId) {
+                queryClient.invalidateQueries({ queryKey: ['task-status-counts', projectId] });
+                queryClient.invalidateQueries({ queryKey: ['tasks', 'paginated', projectId, 1] });
+              }
+            } catch {}
+          }
+        } catch {}
+      }, 5000);
+    } catch {}
+
     return () => {
       // Clear any pending setup
       if (setupTimerRef.current) {
@@ -317,6 +449,13 @@ export function useWebSocket(projectId: string | null) {
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
         channelRef.current = null;
+      }
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('realtime:visibility-recover', onRecover as EventListener);
+      window.removeEventListener('deadMode:recover', onRecover as EventListener);
+      if (reconnectMonitorRef.current) {
+        clearInterval(reconnectMonitorRef.current);
+        reconnectMonitorRef.current = null;
       }
     };
   }, [queryClient, projectId]);

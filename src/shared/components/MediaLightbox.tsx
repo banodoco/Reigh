@@ -385,14 +385,45 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   };
 
   const handleDownload = async () => {
+    const downloadStartTime = Date.now();
+    console.log('[PollingBreakageIssue] [MediaLightbox] Download started', {
+      mediaId: media.id,
+      displayUrl,
+      isVideo,
+      timestamp: downloadStartTime
+    });
+
     try {
-      const response = await fetch(displayUrl);
+      // Add timeout to prevent hanging downloads
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        console.warn('[PollingBreakageIssue] [MediaLightbox] Download timeout, aborting', {
+          mediaId: media.id,
+          timeoutMs: 15000,
+          timestamp: Date.now()
+        });
+        controller.abort();
+      }, 15000); // 15 second timeout
+
+      const response = await fetch(displayUrl, {
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
       
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
       const blob = await response.blob();
+      const downloadDuration = Date.now() - downloadStartTime;
+      console.log('[PollingBreakageIssue] [MediaLightbox] Download blob received', {
+        mediaId: media.id,
+        blobSize: blob.size,
+        durationMs: downloadDuration,
+        timestamp: Date.now()
+      });
+
       const url = URL.createObjectURL(blob);
       const filename = `media_${media.id}.${isVideo ? 'mp4' : 'png'}`;
       
@@ -417,9 +448,30 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
           URL.revokeObjectURL(url);
         } catch {}
       }, 10000);
+
+      console.log('[PollingBreakageIssue] [MediaLightbox] Download completed successfully', {
+        mediaId: media.id,
+        totalDurationMs: Date.now() - downloadStartTime,
+        timestamp: Date.now()
+      });
       
-    } catch (error) {
-      // Minimal error logging
+    } catch (error: any) {
+      const errorDuration = Date.now() - downloadStartTime;
+      console.error('[PollingBreakageIssue] [MediaLightbox] Download failed', {
+        mediaId: media.id,
+        error: error.message,
+        errorName: error.name,
+        isAbortError: error.name === 'AbortError',
+        durationMs: errorDuration,
+        timestamp: Date.now()
+      });
+
+      if (error.name === 'AbortError') {
+        toast.error('Download timed out. Please try again.');
+        return; // Don't try fallback for timeout
+      }
+
+      // Minimal error logging for fallback
       console.error('Download failed, falling back to direct link:', error);
       
       // Fallback 1: direct link with download attribute

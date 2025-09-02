@@ -565,7 +565,9 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
     },
     enabled: !!projectId,
     // CRITICAL: Gallery cache settings - prevent background refetches
+    // Keep previous page's data visible during refetches to avoid UI blanks
     placeholderData: (previousData) => previousData,
+    keepPreviousData: true,
     staleTime: 10 * 1000, // FIXED: 10 seconds - allow refetchInterval to work properly
     gcTime: 5 * 60 * 1000, // 5 minutes  
     refetchOnWindowFocus: false,
@@ -580,9 +582,10 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
       const isError = query.state.isError;
       const error = query.state.error;
       const now = Date.now();
+      const processingFilterActive = Array.isArray(status) && status.includes(TASK_STATUS.QUEUED) && status.includes(TASK_STATUS.IN_PROGRESS);
       
       if (!data) {
-        // If no data yet, poll slowly to get initial data
+        // If no data yet: when Processing filter is active, use FAST polling to avoid 30–60s delays
         console.log('[TaskPollingDebug] No data yet, using slow polling (30s):', {
           projectId: params.projectId,
           page,
@@ -592,7 +595,7 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
           errorMessage: error?.message,
           timestamp: now
         });
-        return 30000; // 30 seconds
+        return processingFilterActive ? 5000 : 30000; // 5s for Processing, 30s otherwise
       }
       
       const hasActiveTasks = data.tasks?.some(task => 
@@ -616,7 +619,8 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
         timestamp: now
       });
       
-      if (hasActiveTasks) {
+      // When Processing filter is selected, always use FAST polling regardless of current page contents
+      if (processingFilterActive || hasActiveTasks) {
         const pollInterval = 10000; // 10 seconds for active tasks
         console.log('[TaskPollingDebug] Active tasks detected, using FAST polling:', {
           projectId: params.projectId,
@@ -698,13 +702,21 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
   const timeSinceLastRefetch = Date.now() - lastRefetchRef.current;
   const canRefetch = timeSinceLastRefetch > 10000; // 10 seconds minimum between refetches
   
-  if (isProcessingFilter && hasStaleEmptyData && query.status === 'success' && isDataStale && canRefetch) {
+  // When backgrounded, dampen nuclear refetches to avoid thrash under timer clamping
+  const isHidden = typeof document !== 'undefined' ? document.hidden : false;
+  const minBackoffMs = isHidden ? 60000 : 10000;
+  const hiddenStaleThresholdMs = isHidden ? 60000 : 30000;
+  const meetsStaleThreshold = dataAge > hiddenStaleThresholdMs;
+
+  if (isProcessingFilter && hasStaleEmptyData && query.status === 'success' && meetsStaleThreshold && timeSinceLastRefetch > minBackoffMs) {
     console.error('[TasksPaneCountMismatch] NUCLEAR REFETCH: Processing query has empty data but is marked success!', {
       queryDebugInfo,
       forcingRefetch: true,
       reason: 'Processing filter with empty data should refetch',
       dataAge: Math.round(dataAge / 1000) + 's',
       timeSinceLastRefetch: Math.round(timeSinceLastRefetch / 1000) + 's',
+      isHidden,
+      thresholds: { minBackoffMs, hiddenStaleThresholdMs },
       timestamp: Date.now()
     });
     

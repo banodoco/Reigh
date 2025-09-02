@@ -131,6 +131,11 @@ const ShotsPage: React.FC = () => {
   }
 
   if (shotsError) {
+    const isCancelled = shotsError?.message?.includes('CancelledError') || shotsError?.message?.includes('cancelled');
+    if (isCancelled) {
+      console.warn('[DeadModeInvestigation] Shots query cancelled; preserving previous data and retrying soon');
+      return <div className="container mx-auto p-4">Loading shots...</div>;
+    }
     return <div className="container mx-auto p-4">Error loading shots: {shotsError.message}</div>;
   }
 

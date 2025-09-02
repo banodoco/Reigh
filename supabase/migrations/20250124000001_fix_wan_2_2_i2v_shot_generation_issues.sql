@@ -242,3 +242,4 @@ WHERE name = 'wan_2_2_i2v';
 
 -- Log completion
 SELECT 'Fixed wan_2_2_i2v shot_generation issues - added flexible shot_id extraction and ensured proper video generation type' as status;
+

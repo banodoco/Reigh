@@ -54,3 +54,27 @@ if (import.meta.env.VITE_APP_ENV === 'dev') {
     });
   }
 }
+
+// Expose client globally for diagnostics and DeadMode investigation tooling
+try {
+  if (typeof window !== 'undefined') {
+    (window as any).supabase = supabase;
+  }
+} catch {}
+
+// Ensure Realtime socket always has a fresh auth token and nudge reconnects
+try {
+  supabase.auth.onAuthStateChange((event, session) => {
+    try {
+      (supabase as any)?.realtime?.setAuth?.(session?.access_token ?? null);
+      (supabase as any)?.realtime?.connect?.();
+      console.log('[DeadModeInvestigation] Realtime auth sync', {
+        event,
+        hasToken: !!session?.access_token,
+        timestamp: Date.now()
+      });
+    } catch (e) {
+      console.warn('[DeadModeInvestigation] Realtime auth sync failed', e);
+    }
+  });
+} catch {}

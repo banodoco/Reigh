@@ -60,6 +60,14 @@ async function getUserWithTimeout(timeoutMs = 7000) {
   }, timeoutMs);
   
   try {
+    // Fast path: use local session (no network) to avoid auth network call in background
+    const { data: sessionData } = await supabase.auth.getSession();
+    const sessionUser = sessionData?.session?.user || null;
+    if (sessionUser) {
+      clearTimeout(timeoutId);
+      return { data: { user: sessionUser }, error: null } as any;
+    }
+
     const result = await Promise.race([
       supabase.auth.getUser(),
       new Promise<{ data: { user: null }, error: Error }>((_, reject) =>
@@ -156,15 +164,36 @@ async function fetchToolSettingsSupabase(toolId: string, ctx: ToolSettingsContex
       // Don't log these as errors - they're expected during component unmounting
       throw new Error('Request was cancelled');
     }
-    
-    console.error('[fetchToolSettingsSupabase] Error:', error);
-    
-    if (error?.message?.includes('Failed to fetch')) {
-      throw new Error('Network connection issue. Please check your internet connection.');
-    }
-    if (error?.message?.includes('Auth timeout') || error?.message?.includes('Auth request was cancelled')) {
-      console.warn('[fetchToolSettingsSupabase] Auth timeout - continuing with defaults');
-      throw new Error('Authentication timeout - using default settings');
+    // Enrich logging with environment context
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      const contextInfo = {
+        visibilityState: typeof document !== 'undefined' ? document.visibilityState : 'unknown',
+        hidden: typeof document !== 'undefined' ? document.hidden : false,
+        online: typeof navigator !== 'undefined' ? navigator.onLine : true,
+        hasSession: !!sess?.session,
+      } as any;
+
+      if (error?.message?.includes('Auth timeout') || error?.message?.includes('Auth request was cancelled')) {
+        console.warn('[ToolSettingsAuth] Auth unavailable/timeout, falling back to defaults', {
+          toolId,
+          projectId: ctx.projectId,
+          shotId: ctx.shotId,
+          ...contextInfo,
+        });
+        // Return defaults rather than erroring, so UI remains usable
+        return deepMerge({}, toolDefaults[toolId] ?? {});
+      }
+
+      if (error?.message?.includes('Failed to fetch')) {
+        console.error('[ToolSettingsAuth] Network issue fetching settings', { error: error?.message, ...contextInfo });
+        throw new Error('Network connection issue. Please check your internet connection.');
+      }
+
+      console.error('[fetchToolSettingsSupabase] Error:', error, contextInfo);
+    } catch (e) {
+      // If context gathering fails, still rethrow the original error
+      console.error('[fetchToolSettingsSupabase] Error (context unavailable):', error);
     }
     throw error;
   }

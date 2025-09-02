@@ -144,12 +144,18 @@ const LightboxScrubVideo: React.FC<LightboxScrubVideoProps> = ({
       trackVideoStates();
       
       const playPromise = videoRef.current.play();
+      const videoSrc = videoRef.current.src; // Capture src before async operations
       
       playPromise.then(() => {
         setIsVideoPlaying(true); // Mark as playing when play succeeds
-        logAutoplayAttempt(autoplayContext, videoRef.current!.src, true);
+        logAutoplayAttempt(autoplayContext, videoSrc, true);
       }).catch((error) => {
-        logAutoplayAttempt(autoplayContext, videoRef.current!.src, false, error);
+        console.error('[PollingBreakageIssue] [LightboxScrubVideo] Play promise rejected', {
+          error: error.message,
+          videoSrc,
+          timestamp: Date.now()
+        });
+        logAutoplayAttempt(autoplayContext, videoSrc, false, error);
       });
     }
   }, [isMobile]);
