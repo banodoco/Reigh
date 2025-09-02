@@ -6,6 +6,58 @@ import { UserPreferences } from '@/shared/settings/userPreferences';
 import { usePrefetchToolSettings } from '@/shared/hooks/usePrefetchToolSettings';
 import { log, time, timeEnd } from '@/shared/lib/logger';
 
+// Shared auth cache with useToolSettings to prevent duplicate calls
+let projectAuthCache: { user: any; timestamp: number } | null = null;
+const PROJECT_AUTH_CACHE_TTL = 30000; // 30 seconds
+
+// Helper function to get user with timeout and caching (same as useToolSettings)
+async function getProjectUserWithTimeout(timeoutMs = 15000) {
+  // Check cache first to avoid duplicate auth calls
+  if (projectAuthCache && Date.now() - projectAuthCache.timestamp < PROJECT_AUTH_CACHE_TTL) {
+    log('PerfDebug:ProjectContext', 'Auth cache hit - avoiding duplicate call');
+    return { data: { user: projectAuthCache.user }, error: null };
+  }
+  
+  time('PerfDebug:ProjectContext', 'auth:getUser');
+  
+  const controller = new AbortController();
+  
+  const timeoutId = setTimeout(() => {
+    controller.abort();
+  }, timeoutMs);
+  
+  try {
+    const result = await Promise.race([
+      supabase.auth.getUser(),
+      new Promise<{ data: { user: null }, error: Error }>((_, reject) =>
+        setTimeout(() => reject(new Error('Auth timeout - please check your connection')), timeoutMs)
+      )
+    ]);
+    
+    clearTimeout(timeoutId);
+    timeEnd('PerfDebug:ProjectContext', 'auth:getUser');
+    
+    // Cache successful auth result
+    if (result.data?.user) {
+      projectAuthCache = {
+        user: result.data.user,
+        timestamp: Date.now()
+      };
+      log('PerfDebug:ProjectContext', 'Auth result cached for 30s');
+    }
+    
+    return result;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    timeEnd('PerfDebug:ProjectContext', 'auth:getUser');
+    log('PerfDebug:ProjectContext', 'Auth error:', error?.message);
+    if (error?.name === 'AbortError') {
+      throw new Error('Auth request was cancelled - please try again');
+    }
+    throw error;
+  }
+}
+
 // Type for updating projects
 interface ProjectUpdate {
   name?: string;
@@ -132,6 +184,10 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
       }
 
       console.log(`[ProjectContext:MobileDebug] Processing auth change: ${event}, userId: ${!!currentUserId}`);
+      
+      // Clear auth cache on meaningful auth changes
+      projectAuthCache = null;
+      log('PerfDebug:ProjectContext', 'Auth cache cleared due to auth state change');
       
       // Update user ID
       setUserId(currentUserId);
@@ -303,11 +359,9 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
     console.log(`[ProjectContext:MobileDebug] Starting projects fetch`);
     time('ProjectContext:Perf', 'projects:fetch');
     try {
-      // Get current user
-      time('ProjectContext:Perf', 'auth:getUser');
-      const { data: { user } } = await supabase.auth.getUser();
-      timeEnd('ProjectContext:Perf', 'auth:getUser');
-      if (!user) throw new Error('Not authenticated');
+      // Get current user with timeout and caching
+      const { data: { user }, error: authError } = await getProjectUserWithTimeout();
+      if (authError || !user) throw new Error('Not authenticated');
 
       // Ensure user exists in our users table first
       time('ProjectContext:Perf', 'users:exists');
@@ -414,8 +468,8 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
     }
     setIsCreatingProject(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
+      const { data: { user }, error: authError } = await getProjectUserWithTimeout();
+      if (authError || !user) throw new Error('Not authenticated');
 
       // Ensure user exists in our users table first
       const { data: existingUser } = await supabase
@@ -526,8 +580,8 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
     }
     setIsUpdatingProject(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
+      const { data: { user }, error: authError } = await getProjectUserWithTimeout();
+      if (authError || !user) throw new Error('Not authenticated');
 
       // Convert camelCase updates to snake_case for DB
       const dbUpdates: any = {};
@@ -563,8 +617,8 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
   const deleteProject = useCallback(async (projectId: string): Promise<boolean> => {
     setIsDeletingProject(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
+      const { data: { user }, error: authError } = await getProjectUserWithTimeout();
+      if (authError || !user) throw new Error('Not authenticated');
 
       const { error } = await supabase
         .from('projects')
