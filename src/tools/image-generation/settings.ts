@@ -1,4 +1,4 @@
-export type GenerationMode = 'wan-local' | 'flux-api' | 'hidream-api';
+export type GenerationMode = 'wan-local' | 'qwen-image';
 
 export interface PromptEntry {
   id: string;
@@ -36,8 +36,7 @@ export const defaultImageGenerationSettings: ImageGenerationSettings = {
   imagesPerPrompt: 1,
   selectedLorasByMode: {
     'wan-local': [],
-    'flux-api': [],
-    'hidream-api': [],
+    'qwen-image': [],
   },
   depthStrength: 50,
   softEdgeStrength: 20,

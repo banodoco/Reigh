@@ -23,6 +23,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { SliderWithValue } from "@/shared/components/ui/slider-with-value";
 import { useProject } from "@/shared/contexts/ProjectContext";
 import { usePersistentToolState } from "@/shared/hooks/usePersistentToolState";
+import { useToolSettings } from "@/shared/hooks/useToolSettings";
 import { useIsMobile } from "@/shared/hooks/use-mobile";
 import { ImageGenerationSettings } from "../settings";
 import { useListPublicResources } from '@/shared/hooks/useResources';
@@ -31,6 +32,9 @@ import CreateShotModal from "@/shared/components/CreateShotModal";
 import { useQueryClient } from '@tanstack/react-query';
 import { useShotNavigation } from "@/shared/hooks/useShotNavigation";
 import { BatchImageGenerationTaskParams } from "@/shared/lib/tasks/imageGeneration";
+import { processStyleReferenceForAspectRatioString } from "@/shared/lib/styleReferenceProcessor";
+import { resolveProjectResolution } from "@/shared/lib/taskCreation";
+import { uploadImageToStorage } from "@/shared/lib/imageUploader";
 
 // Lazy load modals to improve initial bundle size and performance
 const LazyLoraSelectorModal = React.lazy(() => 
@@ -81,7 +85,7 @@ class DynamicImportErrorBoundary extends React.Component<
   }
 }
 
-type GenerationMode = 'wan-local'; // Only wan-local is supported now
+type GenerationMode = 'wan-local' | 'qwen-image';
 
 export interface MetadataLora {
     id: string;
@@ -143,6 +147,13 @@ interface PersistedFormSettings {
   afterEachPromptText?: string;
   selectedLorasByMode?: Record<GenerationMode, ActiveLora[]>;
   associatedShotId?: string | null;
+}
+
+// Project-level settings for model and style reference
+interface ProjectImageSettings {
+  selectedModel?: GenerationMode;
+  styleReferenceImage?: string | null; // URL of uploaded style reference image
+  styleReferenceStrength?: number; // Strength slider value
 }
 
 const defaultLorasConfig = [
@@ -529,7 +540,79 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   const defaultsApplied = useRef(false);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [directFormActivePromptId, setDirectFormActivePromptId] = useState<string | null>(null);
-  const generationMode: GenerationMode = 'wan-local';
+  const [styleReferenceStrength, setStyleReferenceStrength] = useState<number>(1);
+  
+  const { selectedProjectId } = useProject();
+  
+  // Project-level settings for model and style reference (shared across tools)
+  const {
+    settings: projectImageSettings,
+    update: updateProjectImageSettings,
+    isUpdating: isSavingProjectSettings
+  } = useToolSettings<ProjectImageSettings>('project-image-settings', {
+    projectId: selectedProjectId,
+    enabled: !!selectedProjectId
+  });
+  
+  // Extract current values with defaults
+  const selectedModel = projectImageSettings?.selectedModel || 'wan-local';
+  const rawStyleReferenceImage = projectImageSettings?.styleReferenceImage || null;
+  const currentStyleStrength = projectImageSettings?.styleReferenceStrength || 1;
+  
+  // Check if we have base64 data that needs to be converted to URL
+  const styleReferenceImage = useMemo(() => {
+    if (!rawStyleReferenceImage) return null;
+    
+    // If it's already a URL, return as-is
+    if (rawStyleReferenceImage.startsWith('http')) {
+      return rawStyleReferenceImage;
+    }
+    
+    // If it's base64 data, we need to convert it
+    if (rawStyleReferenceImage.startsWith('data:image/')) {
+      console.warn('[ImageGenerationForm] Found legacy base64 style reference, needs conversion');
+      // Return null for now to trigger re-upload
+      return null;
+    }
+    
+    return rawStyleReferenceImage;
+  }, [rawStyleReferenceImage]);
+  
+  // Auto-migrate base64 data to URL when detected
+  useEffect(() => {
+    const migrateBase64ToUrl = async () => {
+      if (rawStyleReferenceImage && 
+          rawStyleReferenceImage.startsWith('data:image/') && 
+          selectedProjectId) {
+        console.log('[ImageGenerationForm] Migrating legacy base64 style reference to URL');
+        
+        try {
+          // Convert base64 to file
+          const file = dataURLtoFile(rawStyleReferenceImage, `migrated-style-reference-${Date.now()}.png`);
+          if (!file) {
+            console.error('[ImageGenerationForm] Failed to convert base64 to file for migration');
+            return;
+          }
+          
+          // Upload to storage
+          const uploadedUrl = await uploadImageToStorage(file);
+          
+          // Update project settings with URL
+          await updateProjectImageSettings('project', {
+            styleReferenceImage: uploadedUrl
+          });
+          
+          console.log('[ImageGenerationForm] Successfully migrated base64 style reference to URL:', uploadedUrl);
+          toast.success('Style reference image migrated to cloud storage');
+        } catch (error) {
+          console.error('[ImageGenerationForm] Failed to migrate base64 style reference:', error);
+          toast.error('Failed to migrate style reference image');
+        }
+      }
+    };
+    
+    migrateBase64ToUrl();
+  }, [rawStyleReferenceImage, selectedProjectId, updateProjectImageSettings]);
   
   // Mark that we've visited this page in the session
   React.useEffect(() => {
@@ -551,7 +634,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   const [associatedShotId, setAssociatedShotId] = useState<string | null>(null);
   const [isCreateShotModalOpen, setIsCreateShotModalOpen] = useState(false);
 
-  const { selectedProjectId } = useProject();
   // Removed unused currentShotId that was causing unnecessary re-renders
   const { data: shots } = useListShots(selectedProjectId);
   const createShotMutation = useCreateShot();
@@ -627,6 +709,13 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     }
     // Remove enabled: !!selectedProjectId - let persistence work even without project to preserve state
   );
+  
+  // Sync local style strength with project settings
+  useEffect(() => {
+    if (projectImageSettings?.styleReferenceStrength !== undefined) {
+      setStyleReferenceStrength(projectImageSettings.styleReferenceStrength);
+    }
+  }, [projectImageSettings?.styleReferenceStrength]);
 
   // Load shot-specific prompt count when shot changes
   React.useEffect(() => {
@@ -783,7 +872,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   // Apply default LoRAs using the new generalized approach
   useEffect(() => { 
     if (
-      generationMode === 'wan-local' && 
+      selectedModel === 'wan-local' && 
       ready &&
       !defaultsApplied.current && 
       availableLoras.length > 0 && 
@@ -810,7 +899,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         defaultsApplied.current = true;
       }
     } 
-  }, [generationMode, availableLoras, ready, loraManager.shouldApplyDefaults, markAsInteracted]);
+  }, [selectedModel, availableLoras, ready, loraManager.shouldApplyDefaults, markAsInteracted]);
 
   // Wrap loraManager handlers to maintain markAsInteracted behavior
   const handleAddLora = (loraToAdd: LoraModel) => { 
@@ -831,6 +920,96 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     await loraManager.handleLoadProjectLoras?.(); // markAsUserSet is now handled internally
     markAsInteracted();
   };
+
+  // Handle style reference image upload
+  const handleStyleReferenceUpload = useCallback(async (files: File[]) => {
+    if (files.length === 0) return;
+    
+    const file = files[0];
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please upload an image file');
+      return;
+    }
+
+    try {
+      const dataURL = await fileToDataURL(file);
+      
+      // Process the image to match project aspect ratio
+      let processedDataURL = dataURL;
+      if (selectedProjectId) {
+        const { aspectRatio } = await resolveProjectResolution(selectedProjectId);
+        const processed = await processStyleReferenceForAspectRatioString(dataURL, aspectRatio);
+        
+        if (processed) {
+          processedDataURL = processed;
+        } else {
+          throw new Error('Failed to process image for aspect ratio');
+        }
+      }
+      
+      // Convert processed data URL back to File for upload
+      const processedFile = dataURLtoFile(processedDataURL, `style-reference-${Date.now()}.png`);
+      if (!processedFile) {
+        throw new Error('Failed to convert processed image to file');
+      }
+      
+      // Upload to storage and get URL
+      toast.info('Uploading style reference image...');
+      const uploadedUrl = await uploadImageToStorage(processedFile);
+      
+      // Save the URL instead of base64 data
+      await updateProjectImageSettings('project', {
+        styleReferenceImage: uploadedUrl
+      });
+      markAsInteracted();
+      
+      if (selectedProjectId) {
+        toast.success('Style reference image uploaded and processed for project aspect ratio');
+      } else {
+        toast.success('Style reference image uploaded');
+      }
+    } catch (error) {
+      console.error('Error uploading style reference:', error);
+      toast.error('Failed to upload style reference image');
+    }
+  }, [updateProjectImageSettings, markAsInteracted, selectedProjectId]);
+
+  // Handle removing style reference image
+  const handleRemoveStyleReference = useCallback(async () => {
+    await updateProjectImageSettings('project', {
+      styleReferenceImage: null
+    });
+    markAsInteracted();
+    toast.success('Style reference image removed');
+  }, [updateProjectImageSettings, markAsInteracted]);
+
+  // Handle model change
+  const handleModelChange = useCallback(async (value: GenerationMode) => {
+    await updateProjectImageSettings('project', {
+      selectedModel: value
+    });
+    markAsInteracted();
+    
+    // Reset model-specific settings when switching
+    if (value === 'qwen-image') {
+      // Clear LoRAs when switching to Qwen.Image
+      loraManager.setSelectedLoras([]);
+    } else if (value === 'wan-local') {
+      // Clear style reference when switching to Wan 2.2
+      await updateProjectImageSettings('project', {
+        styleReferenceImage: null
+      });
+    }
+  }, [updateProjectImageSettings, markAsInteracted, loraManager]);
+  
+  // Handle style reference strength change
+  const handleStyleStrengthChange = useCallback(async (value: number) => {
+    setStyleReferenceStrength(value);
+    await updateProjectImageSettings('project', {
+      styleReferenceStrength: value
+    });
+    markAsInteracted();
+  }, [updateProjectImageSettings, markAsInteracted]);
 
   const handleAddPrompt = (source: 'form' | 'modal' = 'form') => {
     markAsInteracted();
@@ -887,12 +1066,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();    
 
-    // Map selected LoRAs to the format expected by the task creation
-    const lorasForApi = loraManager.selectedLoras.map(lora => ({
-      path: lora.path,
-      strength: parseFloat(lora.strength?.toString() ?? '0') || 0.0
-    }));
-    
     const activePrompts = prompts.filter(p => p.fullPrompt.trim() !== "");
     if (activePrompts.length === 0) {
         console.warn("[ImageGenerationForm] handleSubmit: No active prompts. Generation aborted.");
@@ -900,6 +1073,30 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         return;
     }
 
+    // Validate model-specific requirements
+    if (selectedModel === 'qwen-image' && !styleReferenceImage) {
+        toast.error("Please upload a style reference image for Qwen.Image model.");
+        return;
+    }
+
+    // Map selected LoRAs to the format expected by the task creation (only for wan-local)
+    const lorasForApi = selectedModel === 'wan-local' 
+      ? loraManager.selectedLoras.map(lora => ({
+          path: lora.path,
+          strength: parseFloat(lora.strength?.toString() ?? '0') || 0.0
+        }))
+      : [];
+
+    // Debug: Log what style reference we're about to send
+    if (selectedModel === 'qwen-image' && styleReferenceImage) {
+      console.log('[ImageGenerationForm] Style reference being sent to task:', {
+        isUrl: styleReferenceImage.startsWith('http'),
+        isBase64: styleReferenceImage.startsWith('data:'),
+        length: styleReferenceImage.length,
+        preview: styleReferenceImage.substring(0, 100) + '...'
+      });
+    }
+    
     // Build the unified task creation parameters
     const batchTaskParams: BatchImageGenerationTaskParams = {
       project_id: selectedProjectId!, // We know it's not null due to validation
@@ -914,7 +1111,13 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       imagesPerPrompt, 
       loras: lorasForApi,
       shot_id: associatedShotId || undefined, // Convert null to undefined for the helper
-      // resolution and model_name will be resolved by the helper
+      model_name: selectedModel === 'wan-local' ? 'wan-2.2' : 'qwen-image',
+      // Add style reference for Qwen.Image
+      ...(selectedModel === 'qwen-image' && styleReferenceImage && {
+        style_reference_image: styleReferenceImage,
+        style_reference_strength: currentStyleStrength
+      }),
+      // resolution will be resolved by the helper
     };
 
     // Legacy data structure for backward compatibility with existing onGenerate handler
@@ -923,8 +1126,11 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       imagesPerPrompt, 
       loras: lorasForApi, 
       fullSelectedLoras: loraManager.selectedLoras,
-      generationMode,
+      generationMode: selectedModel, // Use selectedModel instead of hardcoded generationMode
       associatedShotId,
+      styleReferenceImage: selectedModel === 'qwen-image' ? styleReferenceImage : null,
+      styleReferenceStrength: selectedModel === 'qwen-image' ? currentStyleStrength : undefined,
+      selectedModel,
       // Add the new unified params for the updated handler
       batchTaskParams
     };
@@ -1250,56 +1456,134 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
                   Model
                   <span className="absolute top-1/2 left-full transform -translate-y-1/2 ml-2.5 w-12 h-2 bg-blue-200/60 rounded-full"></span>
                 </Label>
-                <div className="w-1/3">
+                <div className="w-1/2">
                   <Select
-                    value="wan-2.2"
-                    onValueChange={() => {}} // No-op since it's locked
-                    disabled={true} // Lock the dropdown
+                    value={selectedModel}
+                    onValueChange={handleModelChange}
+                    disabled={isGenerating}
                   >
-                    <SelectTrigger id="model" className="opacity-75">
+                    <SelectTrigger id="model">
                       <SelectValue placeholder="Select model..." />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="wan-2.2">Wan 2.2</SelectItem>
+                      <SelectItem value="wan-local">Wan 2.2</SelectItem>
+                      <SelectItem value="qwen-image">Qwen.Image</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
             </div>
 
-            {/* LoRA Section - Combined Header and Active List */}
-            <div className="space-y-2">
-            <div className="space-y-1">
-              <Label className="text-lg font-medium text-slate-700 dark:text-slate-200 border-l-8 border-purple-200/60 pl-3 py-1 relative">
-                LoRAs
-                <span className="absolute top-1/2 left-full transform -translate-y-1/2 ml-2.5 w-12 h-2 bg-purple-200/60 rounded-full"></span>
-              </Label>
-            </div>
-
-            {/* Active LoRAs Display */}
-            <ActiveLoRAsDisplay
-              selectedLoras={loraManager.selectedLoras}
-              onRemoveLora={handleRemoveLora}
-              onLoraStrengthChange={handleLoraStrengthChange}
-              isGenerating={isGenerating}
-              availableLoras={availableLoras}
-              className=""
-              onAddTriggerWord={loraManager.handleAddTriggerWord}
-              renderHeaderActions={() => (
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => loraManager.setIsLoraModalOpen(true)}
-                    disabled={isGenerating}
-                  >
-                    Add or Manage LoRAs
-                  </Button>
-                  {loraManager.renderHeaderActions?.()}
+            {/* Conditional LoRA or Style Reference Section */}
+            {selectedModel === 'wan-local' ? (
+              /* LoRA Section - Combined Header and Active List */
+              <div className="space-y-2">
+                <div className="space-y-1">
+                  <Label className="text-lg font-medium text-slate-700 dark:text-slate-200 border-l-8 border-purple-200/60 pl-3 py-1 relative">
+                    LoRAs
+                    <span className="absolute top-1/2 left-full transform -translate-y-1/2 ml-2.5 w-12 h-2 bg-purple-200/60 rounded-full"></span>
+                  </Label>
                 </div>
-              )}
-            />
-            </div>
+
+                {/* Active LoRAs Display */}
+                <ActiveLoRAsDisplay
+                  selectedLoras={loraManager.selectedLoras}
+                  onRemoveLora={handleRemoveLora}
+                  onLoraStrengthChange={handleLoraStrengthChange}
+                  isGenerating={isGenerating}
+                  availableLoras={availableLoras}
+                  className=""
+                  onAddTriggerWord={loraManager.handleAddTriggerWord}
+                  renderHeaderActions={() => (
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => loraManager.setIsLoraModalOpen(true)}
+                        disabled={isGenerating}
+                      >
+                        Add or Manage LoRAs
+                      </Button>
+                      {loraManager.renderHeaderActions?.()}
+                    </div>
+                  )}
+                />
+              </div>
+            ) : (
+              /* Style Reference Section for Qwen.Image */
+              <div className="space-y-2">
+                <div className="space-y-1">
+                  <Label className="text-lg font-medium text-slate-700 dark:text-slate-200 border-l-8 border-purple-200/60 pl-3 py-1 relative">
+                    Style Reference
+                    <span className="absolute top-1/2 left-full transform -translate-y-1/2 ml-2.5 w-12 h-2 bg-purple-200/60 rounded-full"></span>
+                  </Label>
+                </div>
+
+                {/* Style Reference Upload */}
+                <div className="space-y-3">
+                  {styleReferenceImage ? (
+                    /* Display uploaded style reference */
+                    <div className="relative">
+                      <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-800/50">
+                        <div className="flex items-start gap-4">
+                          <div className="flex-shrink-0">
+                            <img
+                              src={styleReferenceImage}
+                              alt="Style Reference"
+                              className="w-24 h-24 object-cover rounded-lg border border-gray-200 dark:border-gray-700"
+                            />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+                              Style Reference Image
+                            </p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                              This image will guide the style of generated images
+                            </p>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={handleRemoveStyleReference}
+                              disabled={isGenerating}
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30"
+                            >
+                              <Trash2 className="h-4 w-4 mr-1" />
+                              Remove
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    /* Upload area for style reference */
+                    <FileInput
+                      onFileChange={handleStyleReferenceUpload}
+                      acceptTypes={['image']}
+                      multiple={false}
+                      disabled={isGenerating}
+                      label="Style Reference Image"
+                      className="w-full"
+                    />
+                  )}
+                  
+                  {/* Style Reference Strength Slider */}
+                  {styleReferenceImage && (
+                    <div className="mt-4">
+                      <SliderWithValue
+                        label="Style Reference Strength"
+                        value={styleReferenceStrength}
+                        onChange={handleStyleStrengthChange}
+                        min={0.1}
+                        max={2.0}
+                        step={0.1}
+                        disabled={isGenerating}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

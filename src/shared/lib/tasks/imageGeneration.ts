@@ -20,6 +20,8 @@ export interface ImageGenerationTaskParams {
   seed?: number;
   loras?: Array<{ path: string; strength: number }>;
   shot_id?: string; // Optional: associate generated image with a shot
+  style_reference_image?: string; // URL of uploaded style reference image for Qwen.Image model
+  style_reference_strength?: number; // Strength for style reference (0.1-2.0)
 }
 
 /**
@@ -37,6 +39,8 @@ export interface BatchImageGenerationTaskParams {
   shot_id?: string;
   resolution?: string;
   model_name?: string;
+  style_reference_image?: string; // URL of uploaded style reference image for Qwen.Image model
+  style_reference_strength?: number; // Strength for style reference (0.1-2.0)
 }
 
 /**
@@ -103,39 +107,7 @@ function validateBatchImageGenerationParams(params: BatchImageGenerationTaskPara
   }
 }
 
-/**
- * Builds the orchestrator payload for a single image generation task
- * This replicates the logic from the single-image-generate edge function
- */
-function buildImageGenerationPayload(
-  params: ImageGenerationTaskParams,
-  finalResolution: string,
-  taskId: string
-): Record<string, unknown> {
-  // Convert loras array to mapping expected by orchestrator (same as original edge function)
-  const additionalLoras: Record<string, number> | undefined = params.loras?.length
-    ? params.loras.reduce<Record<string, number>>((acc, lora) => {
-        acc[lora.path] = lora.strength;
-        return acc;
-      }, {})
-    : undefined;
-
-  // Build orchestrator payload (replicating original edge function logic)
-  const orchestratorPayload: Record<string, unknown> = {
-    task_id: taskId,
-    prompt: params.prompt,
-    model: params.model_name ?? "optimised-t2i",
-    resolution: finalResolution,
-    seed: params.seed ?? 11111,
-    negative_prompt: params.negative_prompt,
-  };
-
-  if (additionalLoras) {
-    orchestratorPayload.additional_loras = additionalLoras;
-  }
-
-  return orchestratorPayload;
-}
+// Removed buildImageGenerationPayload function - now storing all data at top level to avoid duplication
 
 /**
  * Creates a single image generation task using the unified approach
@@ -157,29 +129,47 @@ export async function createImageGenerationTask(params: ImageGenerationTaskParam
       params.resolution
     );
 
-    // 3. Generate task ID for orchestrator payload (stored in params, not as DB ID)
-    const taskId = generateTaskId("wan_2_2_t2i");
-
-    // 4. Build orchestrator payload (preserve original logic exactly)
-    const orchestratorPayload = buildImageGenerationPayload(
-      params,
-      finalResolution,
-      taskId
-    );
+    // 3. Determine task type based on model
+    const isQwenModel = params.model_name === 'qwen-image';
+    const taskType = isQwenModel ? "qwen_image_style" : "wan_2_2_t2i";
+    
+    // 4. Generate task ID for orchestrator payload (stored in params, not as DB ID)
+    const taskId = generateTaskId(taskType);
 
     // 5. Create task using unified create-task function (let DB auto-generate UUID)
+    const taskParamsToSend = {
+      // Store all task data at top level - no duplication
+      task_id: taskId,
+      model: params.model_name ?? "optimised-t2i",
+      prompt: params.prompt,
+      resolution: finalResolution,
+      seed: params.seed ?? 11111,
+      negative_prompt: params.negative_prompt,
+      // Include LoRAs if present
+      ...(params.loras?.length && {
+        additional_loras: params.loras.reduce<Record<string, number>>((acc, lora) => {
+          acc[lora.path] = lora.strength;
+          return acc;
+        }, {})
+      }),
+      // Include style reference for Qwen.Image
+      ...(isQwenModel && params.style_reference_image && {
+        style_reference_image: params.style_reference_image,
+        style_reference_strength: params.style_reference_strength ?? 1.0
+      }),
+      // Include shot association
+      ...(params.shot_id ? { shot_id: params.shot_id } : {}),
+    };
+    
+    console.log("[createImageGenerationTask] Sending clean params to backend:", JSON.stringify(taskParamsToSend, null, 2));
+    
     const result = await createTask({
       project_id: params.project_id,
-      task_type: "wan_2_2_t2i",
-      params: {
-        orchestrator_details: orchestratorPayload,
-        task_id: taskId, // Store the orchestrator ID in params, not as DB ID
-        model: params.model_name ?? "optimised-t2i",
-        prompt: params.prompt,
-        resolution: finalResolution,
-        ...(params.shot_id ? { shot_id: params.shot_id } : {}),
-      }
+      task_type: taskType,
+      params: taskParamsToSend
     });
+    
+    console.log("[createImageGenerationTask] Backend returned task with params:", JSON.stringify(result?.params, null, 2));
 
     console.log("[createImageGenerationTask] Task created successfully:", result);
     return result;
@@ -224,6 +214,11 @@ export async function createBatchImageGenerationTasks(params: BatchImageGenerati
           loras: params.loras,
           shot_id: params.shot_id,
           model_name: params.model_name,
+          // Include style reference for Qwen.Image model
+          ...(params.style_reference_image && {
+            style_reference_image: params.style_reference_image,
+            style_reference_strength: params.style_reference_strength
+          })
         } as ImageGenerationTaskParams;
       });
     });

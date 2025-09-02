@@ -142,7 +142,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     suppressPerTaskToast: true 
   }), [selectedProjectId]);
   
-  const { enqueueTasks, isEnqueuing, justQueued } = useTaskQueueNotifier(taskQueueOptions);
+  const { isEnqueuing, justQueued } = useTaskQueueNotifier(taskQueueOptions);
   const [localIsGenerating, setLocalIsGenerating] = useState(false);
   const [localJustQueued, setLocalJustQueued] = useState(false);
   const localQueuedTimeoutRef = useRef<number | null>(null);
@@ -466,74 +466,36 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
       // Don't reset page - let user stay where they are
     }
 
-    if (generationMode === 'wan-local') {
-      setLocalIsGenerating(true);
-      // Use the new unified task creation approach
-      try {
-        // Check if we have the new batch params, otherwise fallback to legacy format
-        if (batchTaskParams) {
-          console.log('[ImageGeneration] Using unified batch task creation');
-          await createBatchImageGenerationTasks(batchTaskParams);
-        } else {
-          // Legacy fallback - convert to unified format
-          console.warn('[ImageGeneration] Using legacy fallback - this should not happen in normal operation');
-          const lorasMapped: Array<{ path: string; strength: number }> = (restOfFormData.loras || []).map((lora: any) => ({
-            path: lora.path,
-            strength: parseFloat(lora.scale ?? lora.strength) || 0.0,
-          }));
-
-          const legacyBatchParams: BatchImageGenerationTaskParams = {
-            project_id: selectedProjectId,
-            prompts: restOfFormData.prompts || [],
-            imagesPerPrompt: restOfFormData.imagesPerPrompt || 1,
-            loras: lorasMapped,
-            shot_id: associatedShotId || undefined,
-            resolution: restOfFormData.determinedApiImageSize || undefined,
-          };
-
-          await createBatchImageGenerationTasks(legacyBatchParams);
-        }
-
-        // Invalidate generations to ensure they refresh when tasks complete
-        queryClient.invalidateQueries({ queryKey: ['generations', selectedProjectId] });
-        
-        console.log('[ImageGeneration] Image generation tasks created successfully');
-        setLocalJustQueued(true);
-        if (localQueuedTimeoutRef.current) {
-          clearTimeout(localQueuedTimeoutRef.current);
-        }
-        localQueuedTimeoutRef.current = window.setTimeout(() => {
-          setLocalJustQueued(false);
-          localQueuedTimeoutRef.current = null;
-        }, 3000);
-      } catch (error) {
-        console.error('[ImageGeneration] Error creating tasks:', error);
-        toast.error(error instanceof Error ? error.message : 'Failed to create tasks.');
-      } finally {
-        setLocalIsGenerating(false);
+    // Always use the unified task creation approach
+    setLocalIsGenerating(true);
+    try {
+      // Use the batch params from the form (should always be present now)
+      if (batchTaskParams) {
+        console.log('[ImageGeneration] Using unified batch task creation for model:', generationMode);
+        await createBatchImageGenerationTasks(batchTaskParams);
+      } else {
+        // This should not happen with the updated form, but provide a safety fallback
+        console.error('[ImageGeneration] Missing batchTaskParams - this indicates a form integration issue');
+        throw new Error('Missing batch task parameters');
       }
 
-    } else {
-      // Single task for API-based modes
-      try {
-        await enqueueTasks([{
-          functionName: 'single-image-generate',
-          payload: {
-            project_id: selectedProjectId,
-            prompts: restOfFormData.prompts.map((p: PromptEntry) => p.fullPrompt),
-            images_per_prompt: restOfFormData.imagesPerPrompt,
-            loras: restOfFormData.loras,
-            generation_mode: generationMode,
-          }
-        }]);
-
-        // Also invalidate generations to ensure they refresh when tasks complete
-        queryClient.invalidateQueries({ queryKey: ['generations', selectedProjectId] });
-
-      } catch (err) {
-        console.error('[ImageGeneration] Error creating task:', err);
-        toast.error(err instanceof Error ? err.message : 'Failed to create task.');
+      // Invalidate generations to ensure they refresh when tasks complete
+      queryClient.invalidateQueries({ queryKey: ['generations', selectedProjectId] });
+      
+      console.log('[ImageGeneration] Image generation tasks created successfully');
+      setLocalJustQueued(true);
+      if (localQueuedTimeoutRef.current) {
+        clearTimeout(localQueuedTimeoutRef.current);
       }
+      localQueuedTimeoutRef.current = window.setTimeout(() => {
+        setLocalJustQueued(false);
+        localQueuedTimeoutRef.current = null;
+      }, 3000);
+    } catch (error) {
+      console.error('[ImageGeneration] Error creating tasks:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to create tasks.');
+    } finally {
+      setLocalIsGenerating(false);
     }
   };
 
@@ -673,7 +635,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     }
   }, [targetShotInfo.targetShotIdForButton, selectedProjectId, addImageToShotWithoutPositionMutation, setLastAffectedShotId, queryClient]);
 
-  // Since the current mode is always 'wan-local', drive UI strictly from local state
+  // Drive UI from local state since we use unified task creation approach
   const isGenerating = localIsGenerating;
   const combinedJustQueued = localJustQueued;
 
