@@ -22,7 +22,6 @@ export interface UseImageGalleryPaginationReturn {
   setLoadingButton: (button: 'prev' | 'next' | null) => void;
   isGalleryLoading: boolean;
   setIsGalleryLoading: (loading: boolean) => void;
-  safetyTimeoutRef: React.MutableRefObject<NodeJS.Timeout | null>;
   
   // Computed values
   paginatedImages: GeneratedImageWithMetadata[];
@@ -50,8 +49,8 @@ export const useImageGalleryPagination = ({
   // Pagination state
   const [page, setPage] = useState(0);
   const [loadingButton, setLoadingButton] = useState<'prev' | 'next' | null>(null);
-  // Determine server-side pagination mode from presence of handler (stable)
-  const isServerPagination = !!onServerPageChange;
+  // Determine if we're in server-side pagination mode (available at init time)
+  const isServerPagination = !!(onServerPageChange && serverPage);
   // Start with loading when in server pagination to avoid initial empty flash
   const [isGalleryLoading, setIsGalleryLoading] = useState<boolean>(isServerPagination);
   
@@ -68,7 +67,7 @@ export const useImageGalleryPagination = ({
   
   // Calculate pagination values
   const totalFilteredItems = isServerPagination ? (totalCount ?? (offset + filteredImages.length)) : filteredImages.length;
-  const currentPageForCalc = isServerPagination ? ((serverPage || 1) - 1) : page;
+  const currentPageForCalc = isServerPagination ? (serverPage! - 1) : page;
   const totalPages = Math.max(1, Math.ceil(totalFilteredItems / itemsPerPage));
   
   const rangeStart = totalFilteredItems === 0 ? 0 : (isServerPagination ? offset : page * itemsPerPage) + 1;
@@ -207,16 +206,6 @@ export const useImageGalleryPagination = ({
       safetyTimeoutRef.current = null;
     }
   }, [isServerPagination, isGalleryLoading, setIsGalleryLoading, setLoadingButton]);
-
-  // Guard: clear a stuck loadingButton after 3s with diagnostics
-  useEffect(() => {
-    if (!loadingButton) return;
-    const stuckTimer = setTimeout(() => {
-      console.warn(`[GalleryStallDebug] loadingButton stuck as "${loadingButton}" for >3s; clearing.`);
-      setLoadingButton(null);
-    }, 3000);
-    return () => clearTimeout(stuckTimer);
-  }, [loadingButton]);
   
   return {
     // Pagination state
@@ -227,7 +216,6 @@ export const useImageGalleryPagination = ({
     setLoadingButton,
     isGalleryLoading,
     setIsGalleryLoading,
-    safetyTimeoutRef,
     
     // Computed values
     paginatedImages,

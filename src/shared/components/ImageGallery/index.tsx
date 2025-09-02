@@ -637,7 +637,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = (props) => {
           setIsGalleryLoading={paginationHook.setIsGalleryLoading}
           isServerPagination={paginationHook.isServerPagination}
           setLoadingButton={paginationHook.setLoadingButton}
-          safetyTimeoutRef={paginationHook.safetyTimeoutRef}
+          safetyTimeoutRef={stateHook.safetyTimeoutRef}
           
           // Progressive loading props
           effectivePage={effectivePage}
