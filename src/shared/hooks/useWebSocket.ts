@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { RealtimeChannel } from '@supabase/supabase-js';
+import { runtimeConfig } from '@/shared/lib/config';
 
 // Performance constants
 const THROTTLE_DELAY = 500; // Standard throttle delay
@@ -99,8 +100,14 @@ export function useWebSocket(projectId: string | null) {
   const reconnectMonitorRef = useRef<NodeJS.Timeout | null>(null);
   const disconnectedSinceRef = useRef<number | null>(null);
   const lastRealtimeStateRef = useRef<string | undefined>(undefined);
+  const lastReconnectAttemptAtRef = useRef<number>(0);
+  const reconnectAttemptsRef = useRef<number>(0);
 
   useEffect(() => {
+    // Kill switch: disable realtime entirely
+    if (runtimeConfig.REALTIME_ENABLED === false) {
+      return;
+    }
     // Visibility-driven throttling and reconnection hint
     const onVisibility = () => {
       const hidden = document.hidden;
@@ -139,6 +146,7 @@ export function useWebSocket(projectId: string | null) {
             connected: !!socket?.isConnected?.(),
             state: socket?.connectionState,
             projectId,
+            channels: (supabase as any)?.getChannels?.()?.map((c: any) => ({ topic: c.topic, state: c.state })) || []
           });
           // If still disconnected, attempt a soft reconnect
           if (socket && !socket.isConnected?.()) {
@@ -147,6 +155,12 @@ export function useWebSocket(projectId: string | null) {
               console.warn('[DeadModeInvestigation] Realtime soft connect invoked');
             } catch {}
           }
+          // Nudge unified generations so galleries recover immediately upon focus
+          try {
+            if (projectId) {
+              queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', projectId] });
+            }
+          } catch {}
         } catch {}
       } catch (e) {
         console.warn('[WebSocket] Recover invalidation error', e);
@@ -227,22 +241,13 @@ export function useWebSocket(projectId: string | null) {
                 });
                 break;
 
-              case 'GENERATIONS_UPDATED':
+              case 'GENERATIONS_UPDATED': {
                 const { shotId } = message.payload;
-                
-                // Direct invalidation without expensive cache scans
                 scheduleInvalidation(['shots', projectId]);
-                scheduleInvalidation(['generations', projectId]);
-                
-                if (shotId) {
-                  scheduleInvalidation(['all-shot-generations', shotId]);
-                  // Use targeted patterns instead of scanning
-                  scheduleInvalidation(['unified-generations', 'shot', shotId]);
-                }
-                
-                // Project-wide unified generations
                 scheduleInvalidation(['unified-generations', 'project', projectId]);
+                if (shotId) scheduleInvalidation(['unified-generations', 'shot', shotId]);
                 break;
+              }
 
               default:
                 DEBUG_MODE && console.warn('[WebSocket] Unknown message type:', message.type);
@@ -364,6 +369,12 @@ export function useWebSocket(projectId: string | null) {
             // Targeted invalidation for shot associations
             scheduleInvalidation(['shots', projectId]);
             scheduleInvalidation(['generations', projectId]);
+            // Ensure VideoOutputsGallery (shot-specific unified generations) updates instantly
+            if (shotId) {
+              scheduleInvalidation(['unified-generations', 'shot', shotId]);
+            }
+            // Also nudge project-wide unified cache for safety in cross-views
+            scheduleInvalidation(['unified-generations', 'project', projectId]);
             
             if (shotId) {
               scheduleInvalidation(['all-shot-generations', shotId]);
@@ -419,19 +430,56 @@ export function useWebSocket(projectId: string | null) {
               disconnectedForMs,
               state: connState,
               projectId,
+              channels: (supabase as any)?.getChannels?.()?.map((c: any) => ({ topic: c.topic, state: c.state })) || []
             });
-            try {
-              (supabase as any)?.realtime?.disconnect?.();
-            } catch {}
-            try {
-              (supabase as any)?.realtime?.connect?.();
-            } catch {}
+            // Exponential backoff to prevent reconnect storms
+            const lastAttemptAt = lastReconnectAttemptAtRef.current || 0;
+            const attempts = reconnectAttemptsRef.current || 0;
+            const backoffMs = Math.min(30000, 1000 * Math.pow(2, Math.min(attempts, 5))); // cap at 30s
+            if (now - lastAttemptAt >= backoffMs) {
+              lastReconnectAttemptAtRef.current = now;
+              reconnectAttemptsRef.current = attempts + 1;
+              try { (supabase as any)?.realtime?.disconnect?.(); } catch {}
+              try { (supabase as any)?.realtime?.connect?.(); } catch {}
+
+              // Try to re-subscribe channel if not joined
+              try {
+                const topic = projectId ? `task-updates:${projectId}` : null;
+                if (topic) {
+                  const channels = (supabase as any)?.getChannels?.() || [];
+                  const existing = channels.find((c: any) => c.topic === topic);
+                  if (existing && existing.state !== 'joined' && existing.state !== 'joining') {
+                    existing.subscribe((status: any, err: any) => {
+                      if (status === 'SUBSCRIBED') {
+                        reconnectAttemptsRef.current = 0;
+                        console.warn('[DeadModeInvestigation] Channel re-subscribed after reconnect', { topic });
+                      } else if (status === 'CHANNEL_ERROR') {
+                        console.error('[DeadModeInvestigation] Channel error on resubscribe', { topic, err });
+                      }
+                    });
+                    channelRef.current = existing;
+                  } else if (!existing) {
+                    // If channel missing, create a lightweight broadcast-only channel to trigger server reconnect
+                    const ch = (supabase as any).channel(topic);
+                    ch.subscribe((status: any) => {
+                      if (status === 'SUBSCRIBED') {
+                        reconnectAttemptsRef.current = 0;
+                        console.warn('[DeadModeInvestigation] Channel created and subscribed after reconnect', { topic });
+                      }
+                    });
+                    channelRef.current = ch as any;
+                  }
+                }
+              } catch {}
+            }
 
             // After forcing reconnect, nudge critical queries to self-heal via polling
             try {
               if (projectId) {
                 queryClient.invalidateQueries({ queryKey: ['task-status-counts', projectId] });
                 queryClient.invalidateQueries({ queryKey: ['tasks', 'paginated', projectId, 1] });
+                // Also nudge unified generations project scope
+                queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', projectId] });
               }
             } catch {}
           }

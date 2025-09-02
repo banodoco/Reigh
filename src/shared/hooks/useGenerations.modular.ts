@@ -112,7 +112,7 @@ export function useDeleteGenerationModular() {
     onSuccess: () => {
       toast.success('Generation deleted successfully');
       // Invalidate all generation queries
-      queryClient.invalidateQueries({ queryKey: ['generations'] });
+      queryClient.invalidateQueries({ queryKey: ['unified-generations'] });
     },
     onError: (error: Error) => {
       console.error('Delete generation error:', error);

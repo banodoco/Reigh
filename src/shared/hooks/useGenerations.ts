@@ -491,7 +491,7 @@ export function useDeleteGeneration() {
     },
     onSuccess: () => {
       // Invalidate all generations queries to refetch
-      queryClient.invalidateQueries({ queryKey: ['generations'] });      
+      queryClient.invalidateQueries({ queryKey: ['unified-generations'] });      
     },
     onError: (error: Error) => {
       console.error('Error deleting generation:', error);
@@ -509,7 +509,7 @@ export function useUpdateGenerationLocation() {
     },
     onSuccess: () => {
       // Invalidate all generations queries to refetch
-      queryClient.invalidateQueries({ queryKey: ['generations'] });
+      queryClient.invalidateQueries({ queryKey: ['unified-generations'] });
     },
     onError: (error: Error) => {
       console.error('Error updating generation location:', error);
@@ -528,7 +528,7 @@ export function useCreateGeneration() {
         mutationFn: createGeneration,
         onSuccess: () => {
       // Invalidate all generations queries to refetch
-            queryClient.invalidateQueries({ queryKey: ['generations'] });
+            queryClient.invalidateQueries({ queryKey: ['unified-generations'] });
         },
         onError: (error: Error) => {
       console.error('Error creating generation:', error);
@@ -631,7 +631,7 @@ export function useToggleGenerationStar() {
       console.log('[StarDebug:useToggleGenerationStar] onSettled called - invalidating caches');
       
       // Ensure both generations & shots caches are up-to-date after mutation
-      queryClient.invalidateQueries({ queryKey: ['generations'] });
+      queryClient.invalidateQueries({ queryKey: ['unified-generations'] });
       queryClient.invalidateQueries({ queryKey: ['shots'] });
     },
   });

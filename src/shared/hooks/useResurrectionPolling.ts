@@ -1,4 +1,6 @@
 import React from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { runtimeConfig, addJitter } from '@/shared/lib/config';
 
 /**
  * Common resurrection polling logic that can be reused across different data types.
@@ -244,9 +246,10 @@ export function useResurrectionPollingConfig(
     const baseFn = createResurrectionPollingFunction(config);
     return (query: any) => {
       try {
-        const socket: any = (typeof window !== 'undefined') ? (window as any)?.supabase?.realtime?.socket : undefined;
+        const socket: any = (supabase as any)?.realtime?.socket;
         const realtimeConnected = !!socket?.isConnected?.();
-        if (!realtimeConnected) {
+        const realtimeEnabled = runtimeConfig.REALTIME_ENABLED !== false;
+        if (!realtimeConnected || !realtimeEnabled) {
           // Boost polling when realtime is down
           const boosted = createResurrectionPollingFunction({
             ...config,
@@ -258,7 +261,19 @@ export function useResurrectionPollingConfig(
             debugTag,
             context
           });
-          return boosted(query);
+          const decided = boosted(query);
+          // When realtime is down, never return false (no polling). Force a minimum 5s poll.
+          if (decided === false) {
+            const base = runtimeConfig.DEADMODE_FORCE_POLLING_MS ?? 5000;
+            const visible = document.visibilityState === 'visible';
+            const clamped = visible ? Math.min(base, 15000) : Math.max(15000, base);
+            return addJitter(clamped, 1000);
+          }
+          // Also clamp to a reasonable cap to avoid very long waits in dead mode
+          const visible = document.visibilityState === 'visible';
+          const numeric = typeof decided === 'number' ? decided : 5000;
+          const clamped = visible ? Math.min(numeric, 15000) : Math.max(15000, numeric);
+          return addJitter(clamped, 1000);
         }
       } catch {}
       return baseFn(query);

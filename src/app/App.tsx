@@ -11,6 +11,7 @@ import { LastAffectedShotProvider, LastAffectedShotContext } from '@/shared/cont
 import { AppRoutes } from "./routes";
 import { ProjectProvider, useProject } from "@/shared/contexts/ProjectContext";
 import { useWebSocket } from '@/shared/hooks/useWebSocket';
+import { RealtimeProvider } from '@/shared/providers/RealtimeProvider';
 import { PanesProvider } from '@/shared/contexts/PanesContext';
 import { CurrentShotProvider } from '@/shared/contexts/CurrentShotContext';
 import { ToolPageHeaderProvider } from '@/shared/contexts/ToolPageHeaderContext';
@@ -59,8 +60,9 @@ const queryClient = new QueryClient({
 // New inner component that uses the context
 const AppInternalContent = () => {
   const { selectedProjectId } = useProject();
-  // Initialize WebSocket connection and listeners, scoped to the active project
-  useWebSocket(selectedProjectId);
+  // Initialize legacy WebSocket only if legacy listeners are enabled (temporary)
+  // Note: provider now owns channels; this is gated to prevent double-subscribe
+  // import at top remains; we keep this minimal for fallback
 
   const context = useContext(LastAffectedShotContext);
   if (!context) throw new Error("useLastAffectedShot must be used within a LastAffectedShotProvider");
@@ -279,7 +281,7 @@ function App() {
             try {
               qc.invalidateQueries({ queryKey: ['task-status-counts'] });
               qc.invalidateQueries({ queryKey: ['tasks', 'paginated'] });
-              qc.invalidateQueries({ queryKey: ['generations'] });
+              qc.invalidateQueries({ queryKey: ['unified-generations'] });
               qc.invalidateQueries({ queryKey: ['unified-generations'] });
             } catch (e) {
               console.warn('[DeadModeRecovery] Invalidation error', e);
@@ -306,19 +308,21 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ProjectProvider>
-        <ShotsProvider>
-          <GenerationTaskProvider>
-            <PanesProvider>
-              <LastAffectedShotProvider>
-                <CurrentShotProvider>
-                  <ToolPageHeaderProvider>
-                    <AppInternalContent />
-                  </ToolPageHeaderProvider>
-                </CurrentShotProvider>
-              </LastAffectedShotProvider>
-            </PanesProvider>
-          </GenerationTaskProvider>
-        </ShotsProvider>
+        <RealtimeProvider>
+          <ShotsProvider>
+            <GenerationTaskProvider>
+              <PanesProvider>
+                <LastAffectedShotProvider>
+                  <CurrentShotProvider>
+                    <ToolPageHeaderProvider>
+                      <AppInternalContent />
+                    </ToolPageHeaderProvider>
+                  </CurrentShotProvider>
+                </LastAffectedShotProvider>
+              </PanesProvider>
+            </GenerationTaskProvider>
+          </ShotsProvider>
+        </RealtimeProvider>
       </ProjectProvider>
     </QueryClientProvider>
   );

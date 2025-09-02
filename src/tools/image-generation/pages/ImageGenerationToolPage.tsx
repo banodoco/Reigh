@@ -480,7 +480,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
       }
 
       // Invalidate generations to ensure they refresh when tasks complete
-      queryClient.invalidateQueries({ queryKey: ['generations', selectedProjectId] });
+      queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', selectedProjectId] });
       
       console.log('[ImageGeneration] Image generation tasks created successfully');
       setLocalJustQueued(true);
@@ -519,7 +519,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
       });
 
       // Invalidate the generations query to ensure fresh data
-      queryClient.invalidateQueries({ queryKey: ['generations', selectedProjectId] });
+      queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', selectedProjectId] });
       
     } catch (error) {
       console.error("[ImageGeneration-HandleImageSaved] Error:", error);
@@ -588,7 +588,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
       setLastAffectedShotId(targetShotInfo.targetShotIdForButton);
       
       // Force refresh of generations data to show updated positioning
-      queryClient.invalidateQueries({ queryKey: ['generations', selectedProjectId] });
+      queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', selectedProjectId] });
       
       return true;
     } catch (error) {
@@ -625,7 +625,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
       setLastAffectedShotId(targetShotInfo.targetShotIdForButton);
       
       // Force refresh of generations data to show updated association
-      queryClient.invalidateQueries({ queryKey: ['generations', selectedProjectId] });
+      queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', selectedProjectId] });
       
       return true;
     } catch (error) {
