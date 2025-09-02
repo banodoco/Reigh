@@ -77,8 +77,10 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
     onValuesChange
   ]);
 
-  // Call handleValueChange whenever a relevant state updates
-  useEffect(() => { handleValueChange(); }, [handleValueChange]);
+  // Only call on initial mount and when initialValues change (hydration)
+  useEffect(() => { 
+    handleValueChange(); 
+  }, [initialValues]); // Remove handleValueChange dependency to prevent render loop
 
   const handleGenerateClick = async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
@@ -107,6 +109,7 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
       Math.abs(curr.value - newValue) < Math.abs(prev.value - newValue) ? curr : prev
     );
     setTemperature(closest.value);
+    handleValueChange();
   };
 
   return (
@@ -119,7 +122,10 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
           <Textarea
             id="gen_overallPromptText"
             value={overallPromptText}
-            onChange={(e) => setOverallPromptText(e.target.value)}
+            onChange={(e) => {
+              setOverallPromptText(e.target.value);
+              handleValueChange();
+            }}
           placeholder="e.g., A medieval fantasy adventure with dragons and magic..."
           rows={4}
             disabled={!hasApiKey || isGenerating}
@@ -130,7 +136,10 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
         <Textarea
           id="gen_rulesToRememberText"
           value={rulesToRememberText}
-          onChange={(e) => setRulesToRememberText(e.target.value)}
+          onChange={(e) => {
+            setRulesToRememberText(e.target.value);
+            handleValueChange();
+          }}
           placeholder="e.g., Prompts should be under 50 words. No mention of modern technology."
           rows={3}
           disabled={!hasApiKey || isGenerating}
@@ -143,7 +152,10 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
             id="gen_numberToGenerate"
             type="number"
             value={numberToGenerate}
-            onChange={(e) => setNumberToGenerate(Math.max(1, parseInt(e.target.value, 10) || 1))}
+            onChange={(e) => {
+              setNumberToGenerate(Math.max(1, parseInt(e.target.value, 10) || 1));
+              handleValueChange();
+            }}
             min="1"
             disabled={!hasApiKey || isGenerating}
             className="w-full"
@@ -187,7 +199,10 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
                 <Checkbox 
                     id="gen_includeExistingContext" 
                     checked={includeExistingContext} 
-                    onCheckedChange={(checked) => setIncludeExistingContext(Boolean(checked))} 
+                    onCheckedChange={(checked) => {
+                      setIncludeExistingContext(Boolean(checked));
+                      handleValueChange();
+                    }} 
                     disabled={!hasApiKey || isGenerating || existingPromptsForContext.length === 0}
                 />
                 <Label htmlFor="gen_includeExistingContext" className="font-normal">
@@ -198,7 +213,10 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
                 <Checkbox 
                     id="gen_addSummary" 
                     checked={addSummary} 
-                    onCheckedChange={(checked) => setAddSummary(Boolean(checked))} 
+                    onCheckedChange={(checked) => {
+                      setAddSummary(Boolean(checked));
+                      handleValueChange();
+                    }} 
                     disabled={!hasApiKey || isGenerating}
                 />
                 <Label htmlFor="gen_addSummary" className="font-normal">Add short summaries</Label>

@@ -46,7 +46,10 @@ export const BulkEditControls: React.FC<BulkEditControlsProps> = ({
     }
   }, [editInstructions, modelType, onValuesChange]);
 
-  useEffect(() => { handleValueChange(); }, [handleValueChange]);
+  // Only call on initial mount and when initialValues change (hydration)
+  useEffect(() => { 
+    handleValueChange(); 
+  }, [initialValues]); // Remove handleValueChange dependency to prevent render loop
 
   const handleBulkEditClick = async (e: React.MouseEvent<HTMLButtonElement>) => {
     if (!hasApiKey || !editInstructions.trim() || numberOfPromptsToEdit === 0) {
@@ -83,7 +86,10 @@ export const BulkEditControls: React.FC<BulkEditControlsProps> = ({
         <Textarea
           id="bulkEditInstructions_field"
           value={editInstructions}
-          onChange={(e) => setEditInstructions(e.target.value)}
+          onChange={(e) => {
+            setEditInstructions(e.target.value);
+            handleValueChange();
+          }}
           placeholder="e.g., Make all prompts more concise and add a call to action..."
           rows={3}
           disabled={!hasApiKey || isEditing || numberOfPromptsToEdit === 0}
@@ -96,7 +102,10 @@ export const BulkEditControls: React.FC<BulkEditControlsProps> = ({
             <Label htmlFor="bulkEditModelType_field">AI Model for Editing</Label>
             <Select 
                 value={modelType}
-                onValueChange={(value: string) => setModelType(value as AIModelType)}
+                onValueChange={(value: string) => {
+                  setModelType(value as AIModelType);
+                  handleValueChange();
+                }}
                 disabled={!hasApiKey || isEditing || numberOfPromptsToEdit === 0}
             >
                 <SelectTrigger id="bulkEditModelType_trigger" className="mt-1 w-full sm:w-[200px]">

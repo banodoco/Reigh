@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from '@/shared/components/ui/dialog';
 import { Button } from '@/shared/components/ui/button';
 import { PromptEntry, PromptInputRow, PromptInputRowProps } from '@/tools/image-generation/components/ImageGenerationForm';
@@ -426,13 +426,21 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
   };
 
   const handleGenerationValuesChange = useCallback((values: GenerationControlValues) => {
-    setGenerationControlValues(values);
-    markAsInteracted();
+    setGenerationControlValues(prev => {
+      // Only update if values actually changed to prevent unnecessary re-renders
+      if (JSON.stringify(prev) === JSON.stringify(values)) return prev;
+      markAsInteracted();
+      return values;
+    });
   }, [markAsInteracted]);
 
   const handleBulkEditValuesChange = useCallback((values: BulkEditControlValues) => {
-    setBulkEditControlValues(values);
-    markAsInteracted();
+    setBulkEditControlValues(prev => {
+      // Only update if values actually changed to prevent unnecessary re-renders
+      if (JSON.stringify(prev) === JSON.stringify(values)) return prev;
+      markAsInteracted();
+      return values;
+    });
   }, [markAsInteracted]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -529,8 +537,8 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
     isMobile: mobileModalStyling.isMobile
   });
 
-  // More debug info before rendering
-  const mobileProps = createMobileModalProps(mobileModalStyling.isMobile);
+  // More debug info before rendering - memoize mobile props to prevent recreation
+  const mobileProps = useMemo(() => createMobileModalProps(mobileModalStyling.isMobile), [mobileModalStyling.isMobile]);
   console.log(`[PromptEditorModal:DIALOG_DEBUG] About to render Dialog with:`, {
     open: isOpen,
     isMobile,
@@ -721,7 +729,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
                   maxHeight: 'calc(100vh - env(safe-area-inset-top, 20px) - 40px)',
                 } : {})
               }}
-              {...createMobileModalProps(nestedModalStyling.isMobile)}
+              {...useMemo(() => createMobileModalProps(nestedModalStyling.isMobile), [nestedModalStyling.isMobile])}
               onOpenAutoFocus={() => {
                 // Try to focus synchronously so iOS treats it as part of the gesture
                 if (editInstructionsRef.current) {
