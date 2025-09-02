@@ -120,7 +120,7 @@ export const ImageGalleryGrid: React.FC<ImageGalleryGridProps> = ({
         )}
 
         {/* No images generated yet message */}
-        {images.length === 0 && !isGalleryLoading && !isServerPagination && (
+        {images.length === 0 && !isGalleryLoading && (
            <div className={`text-center py-12 mt-8 rounded-lg ${
              whiteText 
                ? "text-zinc-400 border-zinc-700 bg-zinc-800/50" 

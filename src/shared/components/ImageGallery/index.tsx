@@ -257,8 +257,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = (props) => {
   const actualItemsPerPage = itemsPerPage ?? defaultItemsPerPage;
   
   const simplifiedShotOptions = React.useMemo(() => 
-    allShots
-      .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()) // Sort by created_at desc (most recent first)
+    [...allShots]
+      .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
       .map(s => ({ id: s.id, name: s.name })), 
     [allShots]
   );
