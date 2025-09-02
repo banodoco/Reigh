@@ -186,6 +186,26 @@ export const useImageGalleryPagination = ({
       }
     };
   }, []);
+
+  // Initial safety timeout for first-load scenarios (server pagination)
+  useEffect(() => {
+    if (!isServerPagination) return;
+    if (isGalleryLoading) {
+      // Reset any existing timeout
+      if (safetyTimeoutRef.current) {
+        clearTimeout(safetyTimeoutRef.current);
+      }
+      safetyTimeoutRef.current = setTimeout(() => {
+        console.log(`🚨 [PAGELOADINGDEBUG] [INIT] GALLERY SAFETY TIMEOUT - initial load exceeded timeout`);
+        setIsGalleryLoading(false);
+        setLoadingButton(null);
+        safetyTimeoutRef.current = null;
+      }, 2000);
+    } else if (safetyTimeoutRef.current) {
+      clearTimeout(safetyTimeoutRef.current);
+      safetyTimeoutRef.current = null;
+    }
+  }, [isServerPagination, isGalleryLoading, setIsGalleryLoading, setLoadingButton]);
   
   return {
     // Pagination state

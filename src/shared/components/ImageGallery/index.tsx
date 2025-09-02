@@ -257,7 +257,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = (props) => {
   const actualItemsPerPage = itemsPerPage ?? defaultItemsPerPage;
   
   const simplifiedShotOptions = React.useMemo(() => 
-    allShots
+    [...allShots] // Clone before sorting to avoid mutating props
       .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()) // Sort by created_at desc (most recent first)
       .map(s => ({ id: s.id, name: s.name })), 
     [allShots]
@@ -356,7 +356,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = (props) => {
   const inputImages: string[] = useMemo(() => deriveInputImages(task), [task]);
 
   // Calculate effective page for progressive loading
-  const effectivePage = paginationHook.isServerPagination ? 0 : paginationHook.page;
+  const effectivePage = paginationHook.isServerPagination ? ((serverPage || 1) - 1) : paginationHook.page;
   
   // Page state logging disabled for performance
   // console.log(`[GalleryDebug] 📊 Page state:`, {
