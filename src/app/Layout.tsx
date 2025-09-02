@@ -51,6 +51,7 @@ const Layout: React.FC = () => {
 
   // Auth guard state
   const [session, setSession] = useState<Session | null | undefined>(undefined);
+  const [authInitialized, setAuthInitialized] = useState(false);
   
   // Settings modal state
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
@@ -86,10 +87,12 @@ const Layout: React.FC = () => {
         
         const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]) as any;
         setSession(session);
+        setAuthInitialized(true);
       } catch (error) {
         console.warn('[Layout] Auth session loading failed/timeout, continuing with null session:', error);
         // Set session to null (not undefined) to unblock the UI
         setSession(null);
+        setAuthInitialized(true);
       }
     };
 
@@ -130,7 +133,7 @@ const Layout: React.FC = () => {
   }, []);
 
   // Show loading spinner while determining auth state
-  if (session === undefined) {
+  if (!authInitialized) {
     return (
       <ReighLoading />
     );
