@@ -21,6 +21,11 @@ interface GlobalHeaderProps {
   onOpenSettings?: () => void;
 }
 
+interface ReferralStats {
+  total_visits: number;
+  successful_referrals: number;
+}
+
 export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight = 0, contentOffsetLeft = 0, onOpenSettings }) => {
   const { projects, selectedProjectId, setSelectedProjectId, isLoadingProjects } = useProject();
   const navigate = useNavigate();
@@ -31,20 +36,86 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
 
   // Track authentication state to conditionally change the logo destination
   const [session, setSession] = useState<Session | null>(null);
+  const [username, setUsername] = useState<string | null>(null);
+  const [referralStats, setReferralStats] = useState<ReferralStats | null>(null);
 
   useEffect(() => {
-    // Get current session on mount
-    supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
+    // Get current session on mount and fetch user data
+    const getSessionAndUserData = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setSession(session);
+      
+      if (session?.user?.id) {
+        // Get username from users table
+        const { data: userData, error } = await supabase
+          .from('users')
+          .select('username')
+          .eq('id', session.user.id)
+          .single();
+        
+        if (userData?.username && !error) {
+          setUsername(userData.username);
+        }
+      }
+    };
+    
+    getSessionAndUserData();
 
     // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);
+      
+      // Reset username when session changes
+      if (!session?.user?.id) {
+        setUsername(null);
+        setReferralStats(null);
+      } else {
+        // Get username for new session
+        const { data: userData, error } = await supabase
+          .from('users')
+          .select('username')
+          .eq('id', session.user.id)
+          .single();
+        
+        if (userData?.username && !error) {
+          setUsername(userData.username);
+        }
+      }
     });
 
     return () => {
       subscription?.unsubscribe();
     };
   }, []);
+  // Get referral stats when username is available
+  useEffect(() => {
+    const getReferralStats = async () => {
+      if (!username) {
+        setReferralStats(null);
+        return;
+      }
+      
+      try {
+        const { data, error } = await supabase
+          .from('referral_stats')
+          .select('total_visits, successful_referrals')
+          .eq('username', username)
+          .single();
+        
+        if (data && !error) {
+          setReferralStats(data);
+        } else {
+          // No stats yet, show zeros
+          setReferralStats({ total_visits: 0, successful_referrals: 0 });
+        }
+      } catch (err) {
+        setReferralStats({ total_visits: 0, successful_referrals: 0 });
+      }
+    };
+    
+    getReferralStats();
+  }, [username]);
+
   const [isCreateProjectModalOpen, setIsCreateProjectModalOpen] = useState(false);
   const [isProjectSettingsModalOpen, setIsProjectSettingsModalOpen] = useState(false);
   const [isReferralModalOpen, setIsReferralModalOpen] = useState(false);
@@ -74,6 +145,31 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
       return;
     }
     setSelectedProjectId(projectId);
+  };
+
+  // Generate dynamic referral button text based on stats
+  const getReferralButtonText = () => {
+    if (!session || !referralStats) {
+      return "Refer people to Reigh?";
+    }
+
+    const { total_visits, successful_referrals } = referralStats;
+
+    // Prioritize signups over visitors
+    if (successful_referrals > 0) {
+      const signupText = successful_referrals === 1 ? "signup" : "signups";
+      const visitorText = total_visits === 1 ? "visitor" : "visitors";
+      return `${successful_referrals} ${signupText} & ${total_visits} ${visitorText} referred!`;
+    }
+
+    // Show visitors if any
+    if (total_visits > 0) {
+      const visitorText = total_visits === 1 ? "visitor" : "visitors";
+      return `You've referred ${total_visits} ${visitorText}!`;
+    }
+
+    // Default text when no stats
+    return "Refer people to Reigh?";
   };
 
   const selectedProject = projects.find(p => p.id === selectedProjectId);
@@ -240,7 +336,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
               }}
               type="button"
             >
-              Refer people to Reigh?
+              {getReferralButtonText()}
             </button>
             <Button
               variant="ghost"
@@ -346,7 +442,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                 }}
                 type="button"
               >
-                Refer people to Reigh?
+                {getReferralButtonText()}
               </button>
               <Button
                 variant="ghost"

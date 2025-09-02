@@ -252,35 +252,38 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({ isOpen, onOpenChan
         {/* Statistics Footer */}
         <div className={mobileModalStyling.footerContainerClassName}>
           <div className={`${mobileModalStyling.isMobile ? 'p-3 pt-3 pb-2' : 'p-4 pt-4 pb-2'} border-t`}>
-            <div className="flex gap-3 items-center">
+            <div className="flex gap-3 items-start">
               {/* Statistics Section - 3/5 width */}
               <div className="w-3/5 space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Your referral statistics:</label>
-                <div className="space-y-1">
-                  <div className="flex justify-between items-center">
+                <div className="space-y-1 pr-3">
+                  <div className="grid grid-cols-[1fr_auto] items-center">
                     <span className="text-xs text-muted-foreground">Visitors</span>
-                    <span className="font-mono text-sm font-semibold">
+                    <span className="font-mono text-sm font-semibold justify-self-end">
                       {isLoadingStats ? "..." : (stats?.total_visits ?? 0)}
                     </span>
                   </div>
-                  <div className="flex justify-between items-center">
+                  <div className="grid grid-cols-[1fr_auto] items-center">
                     <span className="text-xs text-muted-foreground">Sign-ups</span>
-                    <span className="font-mono text-sm font-semibold">
+                    <span className="font-mono text-sm font-semibold justify-self-end">
                       {isLoadingStats ? "..." : (stats?.successful_referrals ?? 0)}
                     </span>
                   </div>
-                  <div className="flex justify-between items-center">
+                  <div className="grid grid-cols-[1fr_auto] items-center">
                     <span className="text-xs text-muted-foreground">Bonuses</span>
-                    <span className="font-mono text-sm font-semibold">
+                    <span className="font-mono text-sm font-semibold justify-self-end">
                       {isLoadingStats ? "..." : "$0"}
                     </span>
                   </div>
                 </div>
               </div>
               
+              {/* Vertical Divider */}
+              <div className="w-px bg-gray-200 dark:bg-gray-700 self-stretch"></div>
+              
               {/* Close Button - 2/5 width */}
-              <div className="w-2/5 flex flex-col items-end gap-3">
-                <p className="text-xs text-muted-foreground text-right">
+              <div className="w-2/5 flex flex-col items-end">
+                <p className="text-xs text-muted-foreground text-right mt-0.5">
                   Please share any questions on{' '}
                   <a 
                     href="https://discord.gg/wv6MymFEE3" 
@@ -294,7 +297,7 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({ isOpen, onOpenChan
                 <Button 
                   variant="outline" 
                   onClick={() => onOpenChange(false)}
-                  className="h-12 px-4 text-sm font-medium mt-1"
+                  className="h-12 px-4 text-sm font-medium mt-8"
                 >
                   Close
                 </Button>
