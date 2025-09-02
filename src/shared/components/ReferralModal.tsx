@@ -163,7 +163,7 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({ isOpen, onOpenChan
         <div className={`${mobileModalStyling.scrollContainerClassName} ${mobileModalStyling.isMobile ? 'px-4' : 'px-6'} overflow-x-visible [scrollbar-gutter:stable_both-edges] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] sm:[&::-webkit-scrollbar]:block sm:[-ms-overflow-style:auto] sm:[scrollbar-width:auto] sm:pr-4`}>
           <div className="space-y-4 pb-6">
             {/* Main Description */}
-            <div className="space-y-3 text-sm leading-relaxed">
+            <div className="space-y-3 text-sm leading-relaxed text-muted-foreground">
               <p>
                 Artists can run Reigh for free on their computers.
               </p>
@@ -210,14 +210,14 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({ isOpen, onOpenChan
             ) : null}
 
             {/* Profit Sharing Section */}
-            <div className="space-y-3 text-sm leading-relaxed">
-              <p>
+            <div className="text-sm leading-relaxed text-muted-foreground">
+              <p className="mb-3">
                 Additionally, we share another 50% of profits with those who contribute tech, and for initiatives for artists/engineers - our goal is to become a very positively impactful part of the open ecosystem:
               </p>
 
               {/* Profit split bar illustration */}
-              <div className="overflow-visible">
-                <ProfitSplitBar className="mt-2 mb-1" />
+              <div className="overflow-visible mt-6">
+                <ProfitSplitBar className="space-y-2" />
               </div>
             </div>
             
@@ -227,16 +227,16 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({ isOpen, onOpenChan
             {/* Inspirational Message */}
             <div className="space-y-1">
               <div>
-                <p className="text-sm font-medium text-primary leading-relaxed italic text-left">
+                <p className="text-sm font-medium text-muted-foreground leading-relaxed italic text-left">
                   We hope that this motivates artists to create beautiful work, which in turn inspire others to create with AI.
                 </p>
-                <p className="text-sm text-primary leading-relaxed text-left mt-2">
+                <p className="text-sm text-muted-foreground leading-relaxed text-left mt-2">
                   Additionally, artists who create with Reigh will share{' '}
                   <a 
                     href="https://banodoco.ai/pages/ownership.html" 
                     target="_blank" 
                     rel="noopener noreferrer"
-                    className="underline hover:text-primary/80 transition-colors"
+                    className="underline hover:text-muted-foreground/80 transition-colors"
                   >
                     ownership
                   </a>{' '}
