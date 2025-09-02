@@ -14,14 +14,35 @@
 // Tag format guideline (keep short & consistent):
 //   [Area][Specific] e.g. [TaskPoller], [Render:GenerationsPane]
 
+// Runtime debug control - can be toggled from browser console
+let runtimeDebugEnabled = false;
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function shouldLog(): boolean {
+  // Check runtime override first
+  if (runtimeDebugEnabled) return true;
+  
   // Browser via Vite uses import.meta.env; Node uses process.env.
   // We defensively read from both to allow shared usage.
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-ignore
   const flag = (typeof import.meta !== 'undefined' && import.meta.env) ? (import.meta.env.VITE_DEBUG_LOGS as string | undefined) : process.env.VITE_DEBUG_LOGS;
   return flag === 'true' || flag === '1';
+}
+
+// Global functions for runtime control - exposed to window for console access
+export function enableDebugLogs(): void {
+  runtimeDebugEnabled = true;
+  console.log('🐛 Debug logs enabled! Filter console by "PerfDebug" to see structured logs.');
+}
+
+export function disableDebugLogs(): void {
+  runtimeDebugEnabled = false;
+  console.log('🔇 Debug logs disabled.');
+}
+
+export function isDebugEnabled(): boolean {
+  return shouldLog();
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -35,16 +56,34 @@ export function log(tag: string, ...args: any[]): void {
   console.log(`[${tag}]`, ...args);
 }
 
+// Track active timers to prevent duplicates
+const activeTimers = new Set<string>();
+
 export function time(tag: string, label: string): void {
   if (!shouldLog()) return;
+  const timerKey = `[${tag}] ${label}`;
+  
+  // Clear existing timer if it exists
+  if (activeTimers.has(timerKey)) {
+    // eslint-disable-next-line no-console
+    console.timeEnd(timerKey);
+    activeTimers.delete(timerKey);
+  }
+  
   // eslint-disable-next-line no-console
-  console.time(`[${tag}] ${label}`);
+  console.time(timerKey);
+  activeTimers.add(timerKey);
 }
 
 export function timeEnd(tag: string, label: string): void {
   if (!shouldLog()) return;
-  // eslint-disable-next-line no-console
-  console.timeEnd(`[${tag}] ${label}`);
+  const timerKey = `[${tag}] ${label}`;
+  
+  if (activeTimers.has(timerKey)) {
+    // eslint-disable-next-line no-console
+    console.timeEnd(timerKey);
+    activeTimers.delete(timerKey);
+  }
 }
 
 // Dedicated onRender callback for React Profiler so callers don't need to re-implement it.

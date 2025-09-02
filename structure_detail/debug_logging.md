@@ -8,7 +8,24 @@
 
 ## 1. Enabling Logs
 
-Logging is **opt-in** – nothing prints unless you set an env flag.
+### Method 1: Runtime Console Control (Recommended)
+
+**Enable logs instantly from browser console** (works in both dev and production):
+
+```javascript
+// Enable debug logs and restore full console output
+enableDebugLogs()
+
+// Disable debug logs and suppress console spam
+disableDebugLogs() 
+
+// Check current debug state
+isDebugEnabled()
+```
+
+### Method 2: Environment Variable
+
+Logging can be enabled at build time:
 
 ```bash
 # One-shot
