@@ -291,17 +291,12 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
 
     try {
       time('ProjectContext:Perf', 'preferences:db');
-      // Read the settings JSON for the current user with timeout
-      const { data, error } = await Promise.race([
-        supabase
-          .from('users')
-          .select('settings')
-          .eq('id', userId)
-          .single(),
-        new Promise<{ data: null; error: Error }>((_, reject) =>
-          setTimeout(() => reject(new Error('Preferences DB query timeout')), 8000)
-        )
-      ]);
+      // Read the settings JSON for the current user
+      const { data, error } = await supabase
+        .from('users')
+        .select('settings')
+        .eq('id', userId)
+        .single();
       timeEnd('ProjectContext:Perf', 'preferences:db');
 
       if (error) throw error;
@@ -311,13 +306,7 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
       setUserPreferences(preferences);
       userPreferencesRef.current = preferences;
     } catch (error) {
-      timeEnd('ProjectContext:Perf', 'preferences:db'); // Ensure timer is ended on error
-      if (error?.message?.includes('Preferences DB query timeout')) {
-        console.warn('[ProjectContext] Preferences DB query timed out - using defaults');
-        log('PerfDebug:ProjectContext', 'Preferences DB timeout - using defaults');
-      } else {
-        console.error('[ProjectContext] Failed to fetch user preferences:', error);
-      }
+      console.error('[ProjectContext] Failed to fetch user preferences:', error);
       // [MobileStallFix] Set empty preferences on error instead of leaving undefined
       setUserPreferences({});
       userPreferencesRef.current = {};
@@ -395,16 +384,11 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
 
       // Ensure user exists in our users table first
       time('ProjectContext:Perf', 'users:exists');
-      const { data: existingUser } = await Promise.race([
-        supabase
-          .from('users')
-          .select('id')
-          .eq('id', user.id)
-          .single(),
-        new Promise<{ data: null; error: Error }>((_, reject) =>
-          setTimeout(() => reject(new Error('Users exists query timeout')), 8000)
-        )
-      ]);
+      const { data: existingUser } = await supabase
+        .from('users')
+        .select('id')
+        .eq('id', user.id)
+        .single();
       timeEnd('ProjectContext:Perf', 'users:exists');
 
       if (!existingUser) {
@@ -422,16 +406,11 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
 
       // Fetch projects for the user
       time('ProjectContext:Perf', 'projects:db');
-      const { data: projectsData, error } = await Promise.race([
-        supabase
-          .from('projects')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('name', { ascending: true }),
-        new Promise<{ data: null; error: Error }>((_, reject) =>
-          setTimeout(() => reject(new Error('Projects query timeout')), 8000)
-        )
-      ]);
+      const { data: projectsData, error } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('name', { ascending: true });
       timeEnd('ProjectContext:Perf', 'projects:db');
 
       if (error) throw error;
