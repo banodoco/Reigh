@@ -244,12 +244,21 @@ export function useResurrectionPollingConfig(
 
   const refetchInterval = React.useMemo(() => {
     const baseFn = createResurrectionPollingFunction(config);
+    let lastRealtimeCheck = 0;
+    let cachedRealtimeState = true;
+    
     return (query: any) => {
       try {
-        const socket: any = (supabase as any)?.realtime?.socket;
-        const realtimeConnected = !!socket?.isConnected?.();
+        const now = Date.now();
+        // Throttle realtime checks to reduce overhead - only check every 5s
+        if (now - lastRealtimeCheck > 5000) {
+          const socket: any = (supabase as any)?.realtime?.socket;
+          cachedRealtimeState = !!socket?.isConnected?.();
+          lastRealtimeCheck = now;
+        }
+        
         const realtimeEnabled = runtimeConfig.REALTIME_ENABLED !== false;
-        if (!realtimeConnected || !realtimeEnabled) {
+        if (!cachedRealtimeState || !realtimeEnabled) {
           // Boost polling when realtime is down
           const boosted = createResurrectionPollingFunction({
             ...config,
@@ -257,10 +266,19 @@ export function useResurrectionPollingConfig(
             resurrectionInterval: Math.min(config.resurrectionInterval ?? 45000, 30000),
             initialInterval: Math.min(config.initialInterval ?? 30000, 15000)
           });
-          console.warn('[DeadModeInvestigation] Polling boosted due to realtime=down', {
-            debugTag,
-            context
-          });
+          
+          // Throttle the warning log to prevent spam (max once per 30s per debugTag)
+          const logKey = `realtime-down-${debugTag}`;
+          const lastLog = (window as any)[logKey] || 0;
+          if (now - lastLog > 30000) {
+            console.warn('[DeadModeInvestigation] Polling boosted due to realtime=down', {
+              debugTag,
+              context,
+              throttled: true
+            });
+            (window as any)[logKey] = now;
+          }
+          
           const decided = boosted(query);
           // When realtime is down, never return false (no polling). Force a minimum 5s poll.
           if (decided === false) {

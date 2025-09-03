@@ -247,62 +247,55 @@ function App() {
     };
   }, []);
 
-  // Foreground recovery: when tab becomes visible, aggressively recover from dead mode
+  // Foreground recovery: when tab becomes visible, recover from dead mode (throttled)
   React.useEffect(() => {
+    let debounceTimer: NodeJS.Timeout;
+    let lastRecovery = 0;
+    const RECOVERY_COOLDOWN = 10000; // 10s cooldown to prevent storms
+    
     const handleVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        try {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        if (document.visibilityState === 'visible') {
           const now = Date.now();
-          const qc: any = (window as any).__REACT_QUERY_CLIENT__;
-          const projectId = (window as any)?.selectedProjectId || undefined;
-          console.log('[DeadModeRecovery] Tab visible - starting foreground recovery', {
-            timestamp: now,
-            projectId,
-            hasQueryClient: !!qc
-          });
-          // Add DeadModeInvestigation marker for correlation
+          if (now - lastRecovery < RECOVERY_COOLDOWN) {
+            console.log('[DeadModeRecovery] Skipping - in cooldown');
+            return;
+          }
+          lastRecovery = now;
+          
+          console.log('[DeadModeRecovery] Tab visible - starting recovery');
+          
+          // TARGETED recovery: only invalidate if realtime is actually down
           try {
             const socket: any = (window as any)?.supabase?.realtime?.socket;
-            console.warn('[DeadModeInvestigation] Visibility change -> recovery start', {
-              timestamp: now,
-              visibility: document.visibilityState,
-              connected: socket && socket.isConnected ? socket.isConnected() : undefined,
-              state: socket?.connectionState,
-            });
-          } catch {}
-
-          // 1) Try realtime recovery hint via custom event
-          try {
-            window.dispatchEvent(new CustomEvent('realtime:visibility-recover'));
-          } catch {}
-
-          // 2) Invalidate critical task/gen queries immediately
-          if (qc) {
-            try {
-              qc.invalidateQueries({ queryKey: ['task-status-counts'] });
-              qc.invalidateQueries({ queryKey: ['tasks', 'paginated'] });
-              qc.invalidateQueries({ queryKey: ['unified-generations'] });
-              qc.invalidateQueries({ queryKey: ['unified-generations'] });
-            } catch (e) {
-              console.warn('[DeadModeRecovery] Invalidation error', e);
+            const isRealtimeDown = !socket?.isConnected?.();
+            
+            if (isRealtimeDown) {
+              const qc = (window as any).__REACT_QUERY_CLIENT__;
+              if (qc) {
+                // Only invalidate stale data, not everything
+                qc.invalidateQueries({ 
+                  queryKey: ['task-status-counts'],
+                  refetchType: 'inactive' // Only refetch if not currently fetching
+                });
+                console.log('[DeadModeRecovery] Invalidated task-status-counts only');
+              }
+            } else {
+              console.log('[DeadModeRecovery] Realtime connected - no recovery needed');
             }
-          }
-
-          // 3) Last-resort recovery to cancel stuck queries/mutations
-          try {
-            (window as any).deadMode?.recover?.();
           } catch (e) {
-            console.warn('[DeadModeRecovery] deadMode.recover failed', e);
+            console.warn('[DeadModeRecovery] Recovery error:', e);
           }
-
-          console.log('[DeadModeRecovery] Foreground recovery scheduled');
-        } catch (e) {
-          console.warn('[DeadModeRecovery] Foreground recovery handler error', e);
         }
-      }
+      }, 2000); // 2s debounce
     };
+    
     document.addEventListener('visibilitychange', handleVisibility);
-    return () => document.removeEventListener('visibilitychange', handleVisibility);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      if (debounceTimer) clearTimeout(debounceTimer);
+    };
   }, []);
 
   return (
