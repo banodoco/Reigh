@@ -1040,10 +1040,10 @@ export const useUpdateShotImageOrder = () => {
     onSettled: (data, error, { projectId, shotId }) => {
       if (projectId) {
         queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
-        // Also invalidate generations cache so GenerationsPane updates immediately
-        queryClient.invalidateQueries({ queryKey: ['generations', projectId] });
+        // Also invalidate unified generations cache so GenerationsPane updates immediately
+        queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', projectId] });
         // CRITICAL: Invalidate the per-shot generations list used by ShotEditor
-        queryClient.invalidateQueries({ queryKey: ['all-shot-generations', shotId] });
+        queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shotId] });
       }
     },
   });
