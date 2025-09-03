@@ -254,16 +254,8 @@ export function useResurrectionPollingConfig(
         const now = Date.now();
         // Throttle realtime checks to reduce overhead - only check every 5s
         if (now - lastRealtimeCheck > 5000) {
-          // Heuristic: connected if any channel is joined OR we saw a recent event (<30s)
-          let heuristicConnected = false;
-          try {
-            const channels = (typeof window !== 'undefined' && (window as any).__RT_CHANNELS__) || (supabase as any)?.getChannels?.() || [];
-            const hasJoined = channels.some((c: any) => c?.state === 'joined');
-            const lastEvt = (typeof window !== 'undefined') ? (window as any).__RT_LAST_EVENT_AT__ : 0;
-            const recentEvent = lastEvt ? (now - lastEvt) < 30000 : false;
-            heuristicConnected = hasJoined || recentEvent;
-          } catch {}
-          cachedRealtimeState = heuristicConnected;
+          const socket: any = (supabase as any)?.realtime?.socket;
+          cachedRealtimeState = !!socket?.isConnected?.();
           lastRealtimeCheck = now;
         }
         

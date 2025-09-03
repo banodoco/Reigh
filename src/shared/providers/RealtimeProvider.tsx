@@ -46,17 +46,13 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
         selectedProjectId
       });
 
-      // Force socket reset: disconnect then reconnect to clear suspended state
+      // Force socket reset via public API: disconnect then reconnect to clear suspended state
       try {
         const { data: { session } } = await supabase.auth.getSession();
         (supabase as any)?.realtime?.setAuth?.(session?.access_token ?? null);
-        
-        // Force disconnect then connect to reset socket state after tab suspension
-        if (socket) {
-          try { socket.disconnect?.(); } catch {}
-          await new Promise(resolve => setTimeout(resolve, 100)); // Brief pause
-          try { socket.connect?.(); } catch {}
-        }
+        try { (supabase as any)?.realtime?.disconnect?.(); } catch {}
+        await new Promise(resolve => setTimeout(resolve, 120)); // Brief pause
+        try { (supabase as any)?.realtime?.connect?.(); } catch {}
       } catch (e) {
         console.warn('[DeadModeInvestigation] Socket reset failed', { error: (e as any)?.message });
       }
@@ -85,15 +81,68 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
         try { if (channelRef.current) (supabase as any).removeChannel?.(channelRef.current); } catch {}
         channelRef.current = null;
         
-        // Force the main effect to recreate by clearing and triggering dependency change
-        // This ensures all handlers are properly attached
-        setTimeout(() => {
-          // Trigger effect re-run by temporarily clearing then restoring selectedProjectId in state
-          setState(prev => ({ ...prev, lastStateChangeAt: Date.now() }));
-        }, 100);
+        // Create a fresh channel with handlers and subscribe with status logging
+        const fresh = supabase
+          .channel(topic, { config: { broadcast: { self: false, ack: false } } })
+          .on('broadcast', { event: 'task-update' }, (payload) => {
+            try {
+              lastEventAtRef.current = Date.now();
+              const message = payload.payload || {};
+              if (message?.type === 'TASK_CREATED' || message?.type === 'TASKS_STATUS_UPDATE' || message?.type === 'TASK_COMPLETED') {
+                routeEvent(queryClient, { type: 'TASK_STATUS_CHANGE', payload: { projectId: selectedProjectId } });
+                if (message?.type === 'TASK_COMPLETED') {
+                  routeEvent(queryClient, { type: 'GENERATIONS_UPDATED', payload: { projectId: selectedProjectId } });
+                }
+              } else if (message?.type === 'GENERATIONS_UPDATED') {
+                const { shotId } = message.payload || {};
+                routeEvent(queryClient, { type: 'GENERATIONS_UPDATED', payload: { projectId: selectedProjectId, shotId } });
+              }
+            } catch {}
+          })
+          .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'tasks', filter: `project_id=eq.${selectedProjectId}` }, (payload) => {
+            try {
+              lastEventAtRef.current = Date.now();
+              const oldStatus = (payload.old as any)?.status;
+              const newStatus = (payload.new as any)?.status;
+              if (oldStatus !== newStatus) {
+                routeEvent(queryClient, { type: 'TASK_STATUS_CHANGE', payload: { projectId: selectedProjectId } });
+                if (newStatus === 'Complete') routeEvent(queryClient, { type: 'GENERATIONS_UPDATED', payload: { projectId: selectedProjectId } });
+              }
+            } catch {}
+          })
+          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'tasks', filter: `project_id=eq.${selectedProjectId}` }, () => {
+            lastEventAtRef.current = Date.now();
+            routeEvent(queryClient, { type: 'TASK_STATUS_CHANGE', payload: { projectId: selectedProjectId } });
+          })
+          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'generations', filter: `project_id=eq.${selectedProjectId}` }, (payload) => {
+            lastEventAtRef.current = Date.now();
+            const newRecord = payload.new as any;
+            const shotId = newRecord?.params?.shotId || newRecord?.params?.shot_id || newRecord?.metadata?.shotId || newRecord?.metadata?.shot_id;
+            routeEvent(queryClient, { type: 'GENERATION_INSERT', payload: { projectId: selectedProjectId, shotId } });
+          })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'shot_generations' }, (payload) => {
+            lastEventAtRef.current = Date.now();
+            const record = (payload.new || payload.old) as any;
+            const shotId = record?.shot_id;
+            routeEvent(queryClient, { type: 'SHOT_GENERATION_CHANGE', payload: { projectId: selectedProjectId, shotId } });
+          });
+        try {
+          await fresh.subscribe((status: any) => {
+            try {
+              console.warn('[DeadModeInvestigation] Channel subscribe status', { topic, status });
+            } catch {}
+            return status;
+          });
+        } catch {}
+        channelRef.current = fresh as any;
       } else if (channel?.state !== 'joined') {
         console.warn('[DeadModeInvestigation] Re-joining existing channel', { topic, state: channel?.state });
-        try { await channel.subscribe((status: any) => status); } catch {}
+        try {
+          await channel.subscribe((status: any) => {
+            try { console.warn('[DeadModeInvestigation] Channel subscribe status', { topic, status }); } catch {}
+            return status;
+          });
+        } catch {}
       }
 
       // Log final state
