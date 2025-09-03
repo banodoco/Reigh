@@ -71,6 +71,28 @@
 - src/app/App.tsx
   - visibilitychange logs and foreground recovery markers
   - WS instrumentation (redundant safeguard)
+- src/shared/hooks/useResurrectionPolling.ts
+  - Dead-mode aware refetchInterval generation, realtime-down boost, visibility grace window
+- src/shared/lib/cacheValidationDebugger.ts
+  - DeadModeDetector installation, long-task observer, periodic health checks; gated by VITE_ENABLE_DEADMODE_DIAGNOSTICS
+- src/shared/lib/InvalidationRouter.ts
+  - Routes Postgres/broadcast events to canonical React Query invalidations
+- src/shared/hooks/useUnifiedGenerations.ts
+  - Uses useResurrectionPollingConfig; main consumer for gallery updates
+- src/shared/hooks/useTasks.ts (useCreateTask)
+  - 20s client-side timeout safety for create-task mutations; targeted invalidations
+- src/shared/lib/taskCreation.ts
+  - 20s AbortController timeout around supabase.functions.invoke with detailed logs
+- src/shared/lib/invokeWithTimeout.ts
+  - Helper to call supabase.functions.invoke with a client-side timeout
+- src/shared/lib/config.ts
+  - Runtime flags: VITE_REALTIME_ENABLED, VITE_LEGACY_LISTENERS_ENABLED, VITE_DEADMODE_FORCE_POLLING_MS
+
+## Environment Flags
+- VITE_REALTIME_ENABLED: disable realtime entirely to rely on polling
+- VITE_DEADMODE_FORCE_POLLING_MS: base interval when forcing dead-mode polling
+- VITE_LEGACY_LISTENERS_ENABLED: optional legacy listeners (debug only)
+- VITE_ENABLE_DEADMODE_DIAGNOSTICS: enable DeadMode diagnostics (cacheValidationDebugger)
 
 ## Definition of Done for Realtime Recovery
 - On resume:
