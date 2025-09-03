@@ -243,6 +243,26 @@ function App() {
       console.error('[DebugHelpers] Failed to initialize debug helpers:', error);
     }
     
+    // Install WebSocket constructor probe once
+    try {
+      const key = '__WS_PROBE_INSTALLED__';
+      if (!(window as any)[key]) {
+        (window as any)[key] = true;
+        const OriginalWS = window.WebSocket;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (window as any).WebSocket = function(url: string, protocols?: string | string[]) {
+          try { console.warn('[DeadModeInvestigation] WS new', { url, protocols }); } catch {}
+          const ws = protocols ? new OriginalWS(url, protocols) : new OriginalWS(url);
+          try {
+            ws.addEventListener('open', () => console.warn('[DeadModeInvestigation] WS open', { url }));
+            ws.addEventListener('error', (e) => console.warn('[DeadModeInvestigation] WS error', { url }));
+            ws.addEventListener('close', (e) => console.warn('[DeadModeInvestigation] WS close', { url, code: (e as CloseEvent)?.code, reason: (e as CloseEvent)?.reason }));
+          } catch {}
+          return ws;
+        } as any;
+      }
+    } catch {}
+
     return () => {
     };
   }, []);
