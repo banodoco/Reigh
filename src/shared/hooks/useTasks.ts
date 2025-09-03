@@ -78,17 +78,28 @@ export const useCreateTask = (options?: { showToast?: boolean }) => {
   const { showToast = true } = options || {};
 
   return useMutation({
+    mutationKey: ['create-task'],
     mutationFn: async ({ functionName, payload }: { functionName: string, payload: object }) => {
-      const { data, error } = await supabase.functions.invoke(functionName, {
-        body: payload,
+      // Guard against indefinitely stuck mutations by enforcing a client-side timeout
+      const timeoutMs = 20000; // 20s hard cap to keep UI responsive
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        const id = setTimeout(() => {
+          clearTimeout(id);
+          reject(new Error(`[useCreateTask] Function ${functionName} timed out after ${timeoutMs}ms`));
+        }, timeoutMs);
       });
 
-      if (error) {
-        // Throw an error that react-query will catch in onError
-        throw new Error(error.message || `An unknown error occurred with function: ${functionName}`);
-      }
-      
-      return data;
+      const invokePromise = (async () => {
+        const { data, error } = await supabase.functions.invoke(functionName, {
+          body: payload,
+        });
+        if (error) {
+          throw new Error(error.message || `An unknown error occurred with function: ${functionName}`);
+        }
+        return data as any;
+      })();
+
+      return await Promise.race([invokePromise, timeoutPromise]);
     },
     onSuccess: (data, variables) => {
       console.log('[useCreateTask] Task created successfully:', {

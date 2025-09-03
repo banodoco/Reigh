@@ -47,6 +47,25 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     return () => clearInterval(interval);
   }, []);
 
+  // Safety: ensure single ownership of the project channel even if legacy listeners are accidentally enabled
+  React.useEffect(() => {
+    if (runtimeConfig.REALTIME_ENABLED === false) return;
+    // Remove any extra channels with same topic to avoid double-subscribe
+    try {
+      const topic = selectedProjectId ? `task-updates:${selectedProjectId}` : null;
+      const channels = (supabase as any)?.getChannels?.() || [];
+      if (topic) {
+        const dups = channels.filter((c: any) => c.topic === topic);
+        // Keep the first, remove the rest
+        if (dups.length > 1) {
+          dups.slice(1).forEach((ch: any) => {
+            try { (supabase as any).removeChannel?.(ch); } catch {}
+          });
+        }
+      }
+    } catch {}
+  }, [selectedProjectId]);
+
   // Manage project-scoped channel & event routing
   React.useEffect(() => {
     if (runtimeConfig.REALTIME_ENABLED === false) return;
