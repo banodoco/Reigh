@@ -644,12 +644,11 @@ class DeadModeDetector {
     
     console.log('[DeadModeInvestigation] Auto-installing diagnostics on page load');
 
-    // Gate diagnostics behind an environment flag in production to reduce overhead
+    // Gate diagnostics behind an environment flag in ALL environments to reduce overhead
     try {
-      const enabled = (import.meta as any)?.env?.VITE_ENABLE_DEADMODE_DIAGNOSTICS;
-      const isProd = (import.meta as any)?.env?.MODE === 'production';
-      if (isProd && !enabled) {
-        console.log('[DeadModeInvestigation] Diagnostics disabled in production (set VITE_ENABLE_DEADMODE_DIAGNOSTICS=true to enable)');
+      const enabled = ((import.meta as any)?.env?.VITE_ENABLE_DEADMODE_DIAGNOSTICS ?? 'false') === 'true';
+      if (!enabled) {
+        console.log('[DeadModeInvestigation] Diagnostics disabled (set VITE_ENABLE_DEADMODE_DIAGNOSTICS=true to enable)');
         return;
       }
     } catch {}

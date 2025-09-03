@@ -272,8 +272,9 @@ export function useResurrectionPollingConfig(
           // Also clamp to a reasonable cap to avoid very long waits in dead mode
           const visible = document.visibilityState === 'visible';
           const numeric = typeof decided === 'number' ? decided : 5000;
-          const clamped = visible ? Math.min(numeric, 15000) : Math.max(15000, numeric);
-          return addJitter(clamped, 1000);
+          // Slightly widen jitter to desynchronize concurrent queries across tabs/components
+          const clamped = visible ? Math.min(numeric, 12000) : Math.max(20000, numeric);
+          return addJitter(clamped, 1500);
         }
       } catch {}
       return baseFn(query);
