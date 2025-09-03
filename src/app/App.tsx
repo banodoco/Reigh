@@ -254,6 +254,7 @@ function App() {
     const RECOVERY_COOLDOWN = 10000; // 10s cooldown to prevent storms
     
     const handleVisibility = () => {
+      try { (window as any).__VIS_CHANGE_AT__ = Date.now(); } catch {}
       if (debounceTimer) clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => {
         if (document.visibilityState === 'visible') {

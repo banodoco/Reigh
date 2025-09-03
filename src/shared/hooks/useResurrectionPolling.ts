@@ -318,6 +318,8 @@ export function useResurrectionPollingConfig(
               };
               const state = query?.state || {};
               const dataAgeMs = state.dataUpdatedAt ? (now - state.dataUpdatedAt) : null;
+              const lastVisChange = (window as any).__VIS_CHANGE_AT__ || null;
+              const sinceVisChange = lastVisChange ? (now - lastVisChange) : null;
               console.warn('[DeadModeInvestigation] Polling boosted due to realtime=down', {
                 debugTag,
                 visibility: document.visibilityState,
@@ -334,6 +336,8 @@ export function useResurrectionPollingConfig(
                   dataAgeSec: dataAgeMs != null ? Math.round(dataAgeMs / 1000) : null,
                 },
                 realtime: snapshot,
+                lastVisibilityChangeAt: lastVisChange,
+                secondsSinceVisibilityChange: sinceVisChange != null ? Math.round(sinceVisChange / 1000) : null,
                 context,
                 counters: (typeof window !== 'undefined') ? ( (window as any).__RQ_BOOST_COUNTERS__?.counts || {} ) : {}
               });
