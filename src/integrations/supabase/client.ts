@@ -5,6 +5,28 @@ import type { Database } from './types';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://wczysqzxlwdndgxitrvc.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndjenlzcXp4bHdkbmRneGl0cnZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE1MDI4NjgsImV4cCI6MjA2NzA3ODg2OH0.r-4RyHZiDibUjgdgDDM2Vo6x3YpgIO5-BTwfkB2qyYA";
 
+// Install WebSocket instrumentation as early as possible
+try {
+  if (typeof window !== 'undefined') {
+    const key = '__WS_PROBE_INSTALLED__';
+    if (!(window as any)[key]) {
+      (window as any)[key] = true;
+      const OriginalWS = window.WebSocket;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any).WebSocket = function(url: string, protocols?: string | string[]) {
+        try { console.warn('[DeadModeInvestigation] WS new', { url, protocols }); } catch {}
+        const ws = protocols ? new OriginalWS(url, protocols) : new OriginalWS(url);
+        try {
+          ws.addEventListener('open', () => console.warn('[DeadModeInvestigation] WS open', { url }));
+          ws.addEventListener('error', () => console.warn('[DeadModeInvestigation] WS error', { url }));
+          ws.addEventListener('close', (e) => console.warn('[DeadModeInvestigation] WS close', { url, code: (e as CloseEvent)?.code, reason: (e as CloseEvent)?.reason }));
+        } catch {}
+        return ws;
+      } as any;
+    }
+  }
+} catch {}
+
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
