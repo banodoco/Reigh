@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { invokeWithTimeout } from '@/shared/lib/invokeWithTimeout';
 import {
   AIPromptItem,
   GeneratePromptsParams,
@@ -27,7 +28,7 @@ export const useAIInteractionService = ({
 
       try {
         // Invoke the new edge function. We pass the full params object so the server can replicate previous behaviour.
-        const { data, error } = await supabase.functions.invoke('ai-prompt', {
+        const data = await invokeWithTimeout<any>('ai-prompt', {
           body: {
             task: 'generate_prompts',
             overallPromptText: params.overallPromptText,
@@ -36,12 +37,8 @@ export const useAIInteractionService = ({
             existingPrompts: params.includeExistingContext ? params.existingPrompts ?? [] : [],
             temperature: params.temperature || 0.8,
           },
+          timeoutMs: 20000,
         });
-
-        if (error) {
-          console.error('AI Service: Edge function error generating prompts:', error);
-          return [];
-        }
 
         const generatedTexts: string[] = (data as any)?.prompts ?? [];
 
@@ -80,16 +77,12 @@ export const useAIInteractionService = ({
 
       try {
         // Invoke the new edge function
-        const { data, error } = await supabase.functions.invoke('ai-prompt', {
+        const data = await invokeWithTimeout<any>('ai-prompt', {
           body: {
             task: 'generate_summary',
             promptText },
+          timeoutMs: 20000,
         });
-
-        if (error) {
-          console.error('AI Service: Edge function error generating summary:', error);
-          return null;
-        }
 
         return (data as any)?.summary || null;
       } catch (error) {
@@ -108,21 +101,15 @@ export const useAIInteractionService = ({
       
       try {
         // Invoke the new edge function
-        const { data, error } = await supabase.functions.invoke('ai-prompt', {
+        const result = await invokeWithTimeout<any>('ai-prompt', {
           body: {
             task: 'edit_prompt',
             originalPromptText: params.originalPromptText,
             editInstructions: params.editInstructions,
             modelType: params.modelType === 'smart' ? 'smart' : 'fast',
           },
+          timeoutMs: 20000,
         });
-
-        if (error) {
-          console.error('AI Service: Edge function error editing prompt:', error);
-          return { success: false, newText: params.originalPromptText };
-        }
-
-        const result = data as any;
         const newText = result?.newText || params.originalPromptText;
          
         return { success: true, newText: newText || params.originalPromptText };

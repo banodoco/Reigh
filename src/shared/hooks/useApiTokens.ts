@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { invokeWithTimeout } from '@/shared/lib/invokeWithTimeout';
 
 interface ApiToken {
   id: string;
@@ -36,13 +37,10 @@ const generateApiToken = async (params: { label: string }): Promise<GenerateToke
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error('Not authenticated');
   
-  const response = await supabase.functions.invoke('generate-pat', {
-    body: params
+  return await invokeWithTimeout<GenerateTokenResponse>('generate-pat', {
+    body: params,
+    timeoutMs: 20000,
   });
-  
-  if (response.error) throw response.error;
-  
-  return response.data;
 };
 
 // Revoke an API token
@@ -50,11 +48,10 @@ const revokeApiToken = async (tokenId: string): Promise<void> => {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error('Not authenticated');
   
-  const response = await supabase.functions.invoke('revoke-pat', {
-    body: { tokenId }
+  await invokeWithTimeout('revoke-pat', {
+    body: { tokenId },
+    timeoutMs: 20000,
   });
-  
-  if (response.error) throw response.error;
 };
 
 export const useApiTokens = () => {

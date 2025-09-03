@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { invokeWithTimeout } from '@/shared/lib/invokeWithTimeout';
 
 interface CreditBalance {
   balance: number;
@@ -147,6 +148,7 @@ export function useCredits() {
 
   // Create checkout session with optional auto-top-up support
   const createCheckoutMutation = useMutation<CheckoutResponse, Error, CheckoutParams>({
+    mutationKey: ['stripe-checkout'],
     mutationFn: async (params: CheckoutParams) => {
       const { data: { session }, error } = await supabase.auth.getSession();
       
@@ -155,7 +157,7 @@ export function useCredits() {
       }
 
       // Call Supabase Edge Function for Stripe checkout
-      const { data, error: functionError } = await supabase.functions.invoke('stripe-checkout', {
+      const data = await invokeWithTimeout<CheckoutResponse>('stripe-checkout', {
         body: {
           amount: params.amount,
           autoTopupEnabled: params.autoTopupEnabled,
@@ -165,12 +167,8 @@ export function useCredits() {
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },
+        timeoutMs: 20000,
       });
-      
-      if (functionError) {
-        throw new Error(functionError.message || 'Failed to create checkout session');
-      }
-      
       return data;
     },
     onSuccess: (data) => {
@@ -188,6 +186,7 @@ export function useCredits() {
 
   // Grant credits - for admin use via Edge Function
   const grantCreditsMutation = useMutation<any, Error, { userId: string; amount: number; description: string }>({
+    mutationKey: ['grant-credits'],
     mutationFn: async ({ userId, amount, description }) => {
       const { data: { session }, error } = await supabase.auth.getSession();
       
@@ -196,18 +195,13 @@ export function useCredits() {
       }
 
       // Call Supabase Edge Function for granting credits
-      const { data, error: functionError } = await supabase.functions.invoke('grant-credits', {
+      return await invokeWithTimeout('grant-credits', {
         body: { userId, amount, description },
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },
+        timeoutMs: 20000,
       });
-      
-      if (functionError) {
-        throw new Error(functionError.message || 'Failed to grant credits');
-      }
-      
-      return data;
     },
     onSuccess: () => {
       // Invalidate balance and ledger to refresh

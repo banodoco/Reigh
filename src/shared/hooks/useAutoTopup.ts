@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { invokeWithTimeout } from '@/shared/lib/invokeWithTimeout';
 
 export interface AutoTopupPreferences {
   enabled: boolean;
@@ -84,23 +85,19 @@ async function updateAutoTopupPreferences(params: UpdateAutoTopupParams): Promis
   console.log('[AutoTopup:Hook] Calling setup-auto-topup with:', requestBody);
 
   // Call the setup-auto-topup edge function
-  const { data, error } = await supabase.functions.invoke('setup-auto-topup', {
+  const data = await invokeWithTimeout('setup-auto-topup', {
     body: requestBody,
     headers: {
       Authorization: `Bearer ${session.access_token}`,
     },
+    timeoutMs: 20000,
   });
   
   console.log('[AutoTopup:Hook] Edge function response:', { data, error });
   
-  if (error) {
-    console.error('[AutoTopup:Hook] Edge function error:', error);
-    throw new Error(error.message || 'Failed to update auto-top-up preferences');
-  }
-  
-  if (data?.error) {
+  if ((data as any)?.error) {
     console.error('[AutoTopup:Hook] Edge function returned error:', data);
-    throw new Error(data.message || 'Failed to update auto-top-up preferences');
+    throw new Error((data as any).message || 'Failed to update auto-top-up preferences');
   }
   
   console.log('[AutoTopup:Hook] Save operation completed successfully');

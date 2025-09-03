@@ -6,6 +6,7 @@ import { ImageGallery, GeneratedImageWithMetadata, DisplayableMetadata, Metadata
 import SettingsModal from "@/shared/components/SettingsModal";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { invokeWithTimeout } from '@/shared/lib/invokeWithTimeout';
 import { Button } from "@/shared/components/ui/button";
 import { useAddImageToShot, useAddImageToShotWithoutPosition, usePositionExistingGenerationInShot, useCreateShot } from "@/shared/hooks/useShots";
 import { useShots } from '@/shared/contexts/ShotsContext';
@@ -393,21 +394,10 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     toast.info("Sending request to DEBUG upscale function...", { id: toastId });
 
     try {
-      const { data: functionData, error: functionError } = await supabase.functions.invoke("hello-debug", {
+      const functionData = await invokeWithTimeout<any>('hello-debug', {
         body: { imageUrl },
+        timeoutMs: 15000,
       });
-
-      if (functionError) {
-        console.error("Supabase Edge Function error:", functionError);
-        let errorMessage = functionError.message;
-        try {
-          const parsedError = JSON.parse(functionError.message);
-          if (parsedError && parsedError.error) {
-            errorMessage = parsedError.error;
-          }
-        } catch (e) { /* Ignore if parsing fails */ }
-        throw new Error(`Upscale request failed: ${errorMessage}`);
-      }
 
       console.log("Debug function response data:", functionData);
 

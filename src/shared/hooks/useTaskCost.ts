@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { invokeWithTimeout } from '@/shared/lib/invokeWithTimeout';
 
 interface CalculateTaskCostRequest {
   task_id: string;
@@ -31,19 +32,16 @@ export function useTaskCost() {
       }
 
       // Call Supabase Edge Function for task cost calculation
-      const { data, error: functionError } = await supabase.functions.invoke('calculate-task-cost', {
+      const data = await invokeWithTimeout<CalculateTaskCostResponse>('calculate-task-cost', {
         body: { task_id },
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },
+        timeoutMs: 20000,
       });
       
-      if (functionError) {
-        throw new Error(functionError.message || 'Failed to calculate task cost');
-      }
-
-      if (data.error) {
-        throw new Error(data.error);
+      if ((data as any).error) {
+        throw new Error((data as any).error);
       }
       
       return data;
