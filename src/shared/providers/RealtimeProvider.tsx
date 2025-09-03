@@ -26,6 +26,34 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   const channelRef = React.useRef<ReturnType<typeof supabase.channel> | null>(null);
   const lastReconnectAtRef = React.useRef<number>(0);
   const lastEventAtRef = React.useRef<number>(0);
+  const isConnectingRef = React.useRef<boolean>(false);
+  const connectBackoffRef = React.useRef<number>(500);
+  const connectTimerRef = React.useRef<number | null>(null);
+
+  const clearConnectTimer = () => {
+    if (connectTimerRef.current) {
+      try { clearTimeout(connectTimerRef.current); } catch {}
+      connectTimerRef.current = null;
+    }
+  };
+
+  // Attach low-level realtime lifecycle logs once
+  React.useEffect(() => {
+    try {
+      const rt: any = (supabase as any)?.realtime;
+      if (!rt) return;
+      try { rt.onOpen?.(() => console.warn('[DeadModeInvestigation] Realtime onOpen')); } catch {}
+      try { rt.onClose?.(() => console.warn('[DeadModeInvestigation] Realtime onClose')); } catch {}
+      try { rt.onError?.((e: any) => console.warn('[DeadModeInvestigation] Realtime onError', { error: e?.message || String(e) })); } catch {}
+      // Fallback to socket events if available
+      const sock: any = rt.socket;
+      if (sock?.conn) {
+        try { sock.conn.onopen = () => console.warn('[DeadModeInvestigation] Socket conn.onopen'); } catch {}
+        try { sock.conn.onclose = () => console.warn('[DeadModeInvestigation] Socket conn.onclose'); } catch {}
+        try { sock.conn.onerror = () => console.warn('[DeadModeInvestigation] Socket conn.onerror'); } catch {}
+      }
+    } catch {}
+  }, []);
 
   // Helper: ensure realtime socket and project channel are alive
   const ensureRealtimeHealthy = React.useCallback(async () => {
@@ -165,6 +193,49 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     }
   }, [selectedProjectId]);
 
+  // Coordinated connect sequence with exponential backoff
+  const startConnectSequence = React.useCallback(() => {
+    if (isConnectingRef.current) return;
+    isConnectingRef.current = true;
+    connectBackoffRef.current = 500;
+    clearConnectTimer();
+
+    const step = async () => {
+      try {
+        const socket: any = (supabase as any)?.realtime?.socket;
+        const connected = !!socket?.isConnected?.();
+        if (connected) {
+          console.warn('[DeadModeInvestigation] Connect sequence: already connected');
+          isConnectingRef.current = false;
+          // Ensure channel exists once connected
+          await ensureRealtimeHealthy();
+          return;
+        }
+        console.warn('[DeadModeInvestigation] Connect sequence attempt', { backoffMs: connectBackoffRef.current });
+        // Use public API
+        try { (supabase as any)?.realtime?.disconnect?.(); } catch {}
+        await new Promise(r => setTimeout(r, 120));
+        try { (supabase as any)?.realtime?.connect?.(); } catch {}
+        await new Promise(r => setTimeout(r, 600));
+        const nowConnected = !!((supabase as any)?.realtime?.socket?.isConnected?.());
+        console.warn('[DeadModeInvestigation] Connect sequence result', { nowConnected });
+        if (nowConnected) {
+          isConnectingRef.current = false;
+          connectBackoffRef.current = 500;
+          await ensureRealtimeHealthy();
+          return;
+        }
+      } catch {}
+      // schedule next attempt
+      const delay = Math.min(connectBackoffRef.current, 30000);
+      connectBackoffRef.current = Math.min(connectBackoffRef.current * 2, 30000);
+      clearConnectTimer();
+      connectTimerRef.current = window.setTimeout(step, delay);
+    };
+
+    step();
+  }, [ensureRealtimeHealthy]);
+
   React.useEffect(() => {
     if (runtimeConfig.REALTIME_ENABLED === false) {
       return;
@@ -187,7 +258,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
         // If visible and disconnected, try to heal the connection and channel
         try {
           if (document.visibilityState === 'visible' && !isConnected) {
-            ensureRealtimeHealthy();
+            startConnectSequence();
           }
         } catch {}
         // Throttled realtime transition logs to correlate with dead-mode boosts
@@ -218,10 +289,10 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
     if (runtimeConfig.REALTIME_ENABLED === false) return;
     const onVis = () => {
-      if (document.visibilityState === 'visible') ensureRealtimeHealthy();
+      if (document.visibilityState === 'visible') startConnectSequence();
     };
-    const onRecover = () => ensureRealtimeHealthy();
-    const onAuthHeal = () => ensureRealtimeHealthy();
+    const onRecover = () => startConnectSequence();
+    const onAuthHeal = () => startConnectSequence();
     
     document.addEventListener('visibilitychange', onVis);
     window.addEventListener('realtime:visibility-recover', onRecover as any);
@@ -232,7 +303,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       window.removeEventListener('realtime:visibility-recover', onRecover as any);
       window.removeEventListener('realtime:auth-heal', onAuthHeal as any);
     };
-  }, [ensureRealtimeHealthy]);
+  }, [startConnectSequence]);
 
   // Safety: ensure single ownership of the project channel even if legacy listeners are accidentally enabled
   React.useEffect(() => {
