@@ -200,6 +200,32 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     connectBackoffRef.current = 500;
     clearConnectTimer();
 
+    const probeRealtimeConnectivity = () => {
+      try {
+        if (typeof window === 'undefined' || !('WebSocket' in window)) return;
+        const base = (import.meta as any)?.env?.VITE_SUPABASE_URL || '';
+        const key = (import.meta as any)?.env?.VITE_SUPABASE_ANON_KEY || '';
+        if (!base || !key) return;
+        const wsUrl = base.replace(/^http/, 'ws') + `/realtime/v1/websocket?apikey=${encodeURIComponent(key)}&vsn=1.0.0`;
+        console.warn('[DeadModeInvestigation] Realtime probe start', { wsUrl, online: navigator.onLine, visibility: document.visibilityState, net: (navigator as any)?.connection?.effectiveType });
+        try {
+          const test = new WebSocket(wsUrl);
+          test.onopen = () => {
+            console.warn('[DeadModeInvestigation] Realtime probe onopen');
+            try { test.close(); } catch {}
+          };
+          test.onerror = (e) => {
+            console.warn('[DeadModeInvestigation] Realtime probe onerror');
+          };
+          test.onclose = (ev: any) => {
+            console.warn('[DeadModeInvestigation] Realtime probe onclose', { code: ev?.code, reason: ev?.reason });
+          };
+        } catch (e) {
+          console.warn('[DeadModeInvestigation] Realtime probe failed to construct WS', { error: (e as any)?.message });
+        }
+      } catch {}
+    };
+
     const step = async () => {
       try {
         const socket: any = (supabase as any)?.realtime?.socket;
@@ -224,6 +250,10 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
           connectBackoffRef.current = 500;
           await ensureRealtimeHealthy();
           return;
+        }
+        // If still not connected after a few ramps, run a probe once
+        if (connectBackoffRef.current >= 4000) {
+          probeRealtimeConnectivity();
         }
       } catch {}
       // schedule next attempt
