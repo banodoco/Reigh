@@ -73,6 +73,15 @@ try {
         hasToken: !!session?.access_token,
         timestamp: Date.now()
       });
+      
+      // Trigger heal on SIGNED_IN events (occurs on tab resume)
+      if (event === 'SIGNED_IN' && typeof window !== 'undefined') {
+        setTimeout(() => {
+          try {
+            window.dispatchEvent(new CustomEvent('realtime:auth-heal'));
+          } catch {}
+        }, 1000); // Delay to let auth settle
+      }
     } catch (e) {
       console.warn('[DeadModeInvestigation] Realtime auth sync failed', e);
     }
