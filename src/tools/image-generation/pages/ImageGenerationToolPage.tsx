@@ -278,7 +278,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   const queryClient = useQueryClient();
   
   // [Strategic Debug] Check React Query cache state for this exact query
-  const generationsQueryKey = ['generations', selectedProjectId, currentPage, itemsPerPage, generationsFilters];
+  const generationsQueryKey = ['unified-generations', 'project', selectedProjectId, currentPage, itemsPerPage, generationsFilters];
   const cachedGenerationsData = queryClient.getQueryData(generationsQueryKey);
   const generationsQueryState = queryClient.getQueryState(generationsQueryKey);
   
@@ -887,11 +887,11 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     // Prefetch next page first (higher priority)
     if (nextPage) {
       queryClient.prefetchQuery({
-        queryKey: ['generations', selectedProjectId, nextPage, itemsPerPage, filters],
+        queryKey: ['unified-generations', 'project', selectedProjectId, nextPage, itemsPerPage, filters],
         queryFn: () => fetchGenerations(selectedProjectId, itemsPerPage, (nextPage - 1) * itemsPerPage, filters),
         staleTime: 30 * 1000,
       }).then(() => {
-        const cached = queryClient.getQueryData(['generations', selectedProjectId, nextPage, itemsPerPage, filters]) as GenerationsPaginatedResponse | undefined;
+        const cached = queryClient.getQueryData(['unified-generations', 'project', selectedProjectId, nextPage, itemsPerPage, filters]) as GenerationsPaginatedResponse | undefined;
         smartPreloadImages(cached, 'next', prefetchId, prefetchOperationsRef);
       });
     }
@@ -899,11 +899,11 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     // Prefetch previous page second (lower priority)
     if (prevPage) {
       queryClient.prefetchQuery({
-        queryKey: ['generations', selectedProjectId, prevPage, itemsPerPage, filters],
+        queryKey: ['unified-generations', 'project', selectedProjectId, prevPage, itemsPerPage, filters],
         queryFn: () => fetchGenerations(selectedProjectId, itemsPerPage, (prevPage - 1) * itemsPerPage, filters),
         staleTime: 30 * 1000,
       }).then(() => {
-        const cachedPrev = queryClient.getQueryData(['generations', selectedProjectId, prevPage, itemsPerPage, filters]) as GenerationsPaginatedResponse | undefined;
+        const cachedPrev = queryClient.getQueryData(['unified-generations', 'project', selectedProjectId, prevPage, itemsPerPage, filters]) as GenerationsPaginatedResponse | undefined;
         smartPreloadImages(cachedPrev, 'prev', prefetchId, prefetchOperationsRef);
       });
     }

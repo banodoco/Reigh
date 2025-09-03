@@ -145,7 +145,7 @@ const GenerationsPaneComponent: React.FC = () => {
     
     // Time-slice the cleanup operation to prevent UI blocking
     performanceMonitoredTimeout(() => {
-      smartCleanupOldPages(queryClient, currentPage, selectedProjectId, 'generations');
+      smartCleanupOldPages(queryClient, currentPage, selectedProjectId, 'unified-generations');
     }, 0, 'GenerationsPane cleanup');
     
     // Trigger image garbage collection periodically for pane to free browser memory
@@ -178,13 +178,13 @@ const GenerationsPaneComponent: React.FC = () => {
         performanceMonitoredTimeout(async () => {
           await measureAsync(
             () => queryClient.prefetchQuery({
-              queryKey: ['generations', selectedProjectId, nextPage, GENERATIONS_PER_PAGE, filters],
+              queryKey: ['unified-generations', 'project', selectedProjectId, nextPage, GENERATIONS_PER_PAGE, filters],
               queryFn: () => fetchGenerations(selectedProjectId, GENERATIONS_PER_PAGE, (nextPage - 1) * GENERATIONS_PER_PAGE, filters),
               staleTime: 30 * 1000,
             }),
             'Next page query'
           ).then(() => {
-            const cached = queryClient.getQueryData(['generations', selectedProjectId, nextPage, GENERATIONS_PER_PAGE, filters]) as any;
+            const cached = queryClient.getQueryData(['unified-generations', 'project', selectedProjectId, nextPage, GENERATIONS_PER_PAGE, filters]) as any;
             
             // Time-slice the image preloading
             performanceMonitoredTimeout(() => {
@@ -199,13 +199,13 @@ const GenerationsPaneComponent: React.FC = () => {
         performanceMonitoredTimeout(async () => {
           await measureAsync(
             () => queryClient.prefetchQuery({
-              queryKey: ['generations', selectedProjectId, prevPage, GENERATIONS_PER_PAGE, filters],
+              queryKey: ['unified-generations', 'project', selectedProjectId, prevPage, GENERATIONS_PER_PAGE, filters],
               queryFn: () => fetchGenerations(selectedProjectId, GENERATIONS_PER_PAGE, (prevPage - 1) * GENERATIONS_PER_PAGE, filters),
               staleTime: 30 * 1000,
             }),
             'Previous page query'
           ).then(() => {
-            const cached = queryClient.getQueryData(['generations', selectedProjectId, prevPage, GENERATIONS_PER_PAGE, filters]) as any;
+            const cached = queryClient.getQueryData(['unified-generations', 'project', selectedProjectId, prevPage, GENERATIONS_PER_PAGE, filters]) as any;
             
             // Time-slice the image preloading
             performanceMonitoredTimeout(() => {

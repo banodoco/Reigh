@@ -103,7 +103,7 @@ const GenerationsPage: React.FC = () => {
     initializePrefetchOperations(prefetchOperationsRef, prefetchId);
 
     // Clean up old pagination cache to prevent memory leaks
-    smartCleanupOldPages(queryClient, page, selectedProjectId, 'generations');
+    smartCleanupOldPages(queryClient, page, selectedProjectId, 'unified-generations');
     
     // Trigger image garbage collection every 10 pages to free browser memory
     if (page % 10 === 0) {
@@ -122,11 +122,11 @@ const GenerationsPage: React.FC = () => {
     // Prefetch next page first (higher priority)
     if (nextPage) {
       queryClient.prefetchQuery({
-        queryKey: ['generations', selectedProjectId, nextPage, GENERATIONS_PER_PAGE, filters],
+        queryKey: ['unified-generations', 'project', selectedProjectId, nextPage, GENERATIONS_PER_PAGE, filters],
         queryFn: () => fetchGenerations(selectedProjectId, GENERATIONS_PER_PAGE, (nextPage - 1) * GENERATIONS_PER_PAGE, filters),
         staleTime: 30 * 1000,
       }).then(() => {
-        const cached = queryClient.getQueryData(['generations', selectedProjectId, nextPage, GENERATIONS_PER_PAGE, filters]) as any;
+        const cached = queryClient.getQueryData(['unified-generations', 'project', selectedProjectId, nextPage, GENERATIONS_PER_PAGE, filters]) as any;
         smartPreloadImages(cached, 'next', prefetchId, prefetchOperationsRef);
       });
     }
@@ -134,11 +134,11 @@ const GenerationsPage: React.FC = () => {
     // Prefetch previous page second (lower priority)
     if (prevPage) {
       queryClient.prefetchQuery({
-        queryKey: ['generations', selectedProjectId, prevPage, GENERATIONS_PER_PAGE, filters],
+        queryKey: ['unified-generations', 'project', selectedProjectId, prevPage, GENERATIONS_PER_PAGE, filters],
         queryFn: () => fetchGenerations(selectedProjectId, GENERATIONS_PER_PAGE, (prevPage - 1) * GENERATIONS_PER_PAGE, filters),
         staleTime: 30 * 1000,
       }).then(() => {
-        const cached = queryClient.getQueryData(['generations', selectedProjectId, prevPage, GENERATIONS_PER_PAGE, filters]) as any;
+        const cached = queryClient.getQueryData(['unified-generations', 'project', selectedProjectId, prevPage, GENERATIONS_PER_PAGE, filters]) as any;
         smartPreloadImages(cached, 'prev', prefetchId, prefetchOperationsRef);
       });
     }

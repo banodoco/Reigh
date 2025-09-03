@@ -53,8 +53,8 @@ class CacheValidator {
     // Auto-detect project ID if not provided
     if (!projectId) {
       const allQueries = queryClient.getQueryCache().getAll();
-      const generationQuery = allQueries.find((q: any) => q.queryKey?.[0] === 'generations');
-      projectId = generationQuery?.queryKey?.[1];
+      const generationQuery = allQueries.find((q: any) => q.queryKey?.[0] === 'unified-generations' && q.queryKey?.[1] === 'project');
+      projectId = generationQuery?.queryKey?.[2];
     }
 
     if (!projectId) {
@@ -74,17 +74,18 @@ class CacheValidator {
     const allQueries = queryClient.getQueryCache().getAll();
     const generationQueries = allQueries.filter((query: any) => {
       const queryKey = query.queryKey;
-      return queryKey?.[0] === 'generations' && 
-             queryKey?.[1] === projectId && 
-             typeof queryKey?.[2] === 'number'; // page number
+      return queryKey?.[0] === 'unified-generations' && 
+             queryKey?.[1] === 'project' &&
+             queryKey?.[2] === projectId && 
+             typeof queryKey?.[3] === 'number'; // page number
     });
 
     const cachedPages = generationQueries
-      .map(q => q.queryKey[2])
+      .map(q => q.queryKey[3])
       .sort((a, b) => a - b);
 
     // Try to determine current page (most recently accessed)
-    const currentPage = Math.max(...cachedPages.filter(p => p !== undefined)) || 1;
+    const currentPage = Math.max(...cachedPages.filter((p: any) => p !== undefined)) || 1;
 
     // Determine device configuration (simplified)
     const isMobile = window.innerWidth < 768;

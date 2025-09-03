@@ -43,7 +43,7 @@ export function useGenerationsModular(
 ) {
   const offset = (page - 1) * limit;
   const queryClient = useQueryClient();
-  const queryKey = ['generations', projectId, page, limit, filters];
+  const queryKey = ['unified-generations', 'project', projectId, page, limit, filters];
 
   // 🎯 MODULAR POLLING: Configure resurrection polling with specific settings for generations
   const { refetchInterval } = useResurrectionPollingConfig(

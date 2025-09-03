@@ -536,13 +536,13 @@ export const useAddImageToShot = () => {
       if (project_id) {
         invalidationPromises.push(
           queryClient.invalidateQueries({ queryKey: ['shots', project_id] }),
-          queryClient.invalidateQueries({ queryKey: ['generations', project_id] })
+          queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', project_id] })
         );
       }
       
       if (shot_id) {
         invalidationPromises.push(
-          queryClient.invalidateQueries({ queryKey: ['all-shot-generations', shot_id] })
+          queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shot_id] })
         );
       }
       
@@ -626,13 +626,13 @@ export const useAddImageToShotWithoutPosition = () => {
       if (project_id) {
         invalidationPromises.push(
           queryClient.invalidateQueries({ queryKey: ['shots', project_id] }),
-          queryClient.invalidateQueries({ queryKey: ['generations', project_id] })
+          queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', project_id] })
         );
       }
       
       if (shot_id) {
         invalidationPromises.push(
-          queryClient.invalidateQueries({ queryKey: ['all-shot-generations', shot_id] })
+          queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shot_id] })
         );
       }
       
@@ -679,13 +679,13 @@ export const usePositionExistingGenerationInShot = () => {
       if (project_id) {
         invalidationPromises.push(
           queryClient.invalidateQueries({ queryKey: ['shots', project_id] }),
-          queryClient.invalidateQueries({ queryKey: ['generations', project_id] })
+          queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', project_id] })
         );
       }
       
       if (shot_id) {
         invalidationPromises.push(
-          queryClient.invalidateQueries({ queryKey: ['all-shot-generations', shot_id] })
+          queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shot_id] })
         );
       }
       
@@ -843,7 +843,7 @@ export const useDuplicateImageInShot = () => {
       // Invalidate to get fresh data
       queryClient.invalidateQueries({ queryKey: ['shots', project_id] });
       // CRITICAL: Invalidate the per-shot generations list used by ShotEditor
-      queryClient.invalidateQueries({ queryKey: ['all-shot-generations', shot_id] });
+      queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shot_id] });
     }
   });
 };
@@ -905,10 +905,10 @@ export const useRemoveImageFromShot = () => {
       
       if (project_id) {
         queryClient.invalidateQueries({ queryKey: ['shots', project_id] });
-        // Also invalidate generations cache so GenerationsPane updates immediately
-        queryClient.invalidateQueries({ queryKey: ['generations', project_id] });
+        // Also invalidate unified generations cache so GenerationsPane updates immediately
+        queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', project_id] });
         // CRITICAL: Invalidate the per-shot generations list used by ShotEditor
-        queryClient.invalidateQueries({ queryKey: ['all-shot-generations', variables.shot_id] });
+        queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', variables.shot_id] });
       }
     },
   });
@@ -1109,10 +1109,10 @@ export const useCreateShotWithImage = () => {
       
       // Invalidate and refetch relevant queries
       queryClient.invalidateQueries({ queryKey: ['shots', variables.projectId] });
-      queryClient.invalidateQueries({ queryKey: ['generations', variables.projectId] });
+      queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', variables.projectId] });
       
       if (data.shotId) {
-        queryClient.invalidateQueries({ queryKey: ['all-shot-generations', data.shotId] });
+        queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', data.shotId] });
       }
     },
     onError: (error: Error) => {

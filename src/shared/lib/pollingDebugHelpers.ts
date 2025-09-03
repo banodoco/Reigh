@@ -89,7 +89,7 @@ export function initPollingDebugHelpers(queryClient: QueryClient) {
         
         // Get project-wide generations
         const projectGenerations = queryClientInstance.getQueriesData({
-          queryKey: ['generations', projectId]
+          queryKey: ['unified-generations', 'project', projectId]
         });
         
         // Get unified project generations
@@ -103,10 +103,9 @@ export function initPollingDebugHelpers(queryClient: QueryClient) {
         }) : [];
         
         const allShotGenerations = shotId ? queryClientInstance.getQueriesData({
-          queryKey: ['all-shot-generations', shotId]
+          queryKey: ['unified-generations', 'shot', shotId]
         }) : [];
         
-        console.log('🖼️ Project Generations (legacy):', projectGenerations);
         console.log('🔄 Unified Project Generations:', unifiedProjectGenerations);
         
         if (shotId) {
@@ -153,7 +152,7 @@ export function initPollingDebugHelpers(queryClient: QueryClient) {
         
         console.log('[PollingDebug] Clearing generations cache for project:', projectId);
         queryClientInstance.removeQueries({
-          queryKey: ['generations', projectId]
+          queryKey: ['unified-generations', 'project', projectId]
         });
         queryClientInstance.removeQueries({
           queryKey: ['unified-generations']
@@ -176,10 +175,6 @@ export function initPollingDebugHelpers(queryClient: QueryClient) {
         if (!queryClientInstance) return;
         
         console.log('[PollingDebug] Force refetching generations for project:', projectId, shotId ? `and shot: ${shotId}` : '');
-        queryClientInstance.invalidateQueries({
-          queryKey: ['generations'],
-          refetchType: 'active'
-        });
         queryClientInstance.invalidateQueries({
           queryKey: ['unified-generations'],
           refetchType: 'active'

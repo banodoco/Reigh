@@ -29,7 +29,7 @@ const createOptimizedThrottling = () => {
     const lastTime = lastTimes.get(keyHash) || 0;
     
     // Smart throttle delay based on query type
-    const isHeavyQuery = Array.isArray(key) && key[0] === 'all-shot-generations';
+    const isHeavyQuery = Array.isArray(key) && key[0] === 'unified-generations' && key[1] === 'shot';
     const delay = isHeavyQuery ? HEAVY_QUERY_THROTTLE_DELAY : THROTTLE_DELAY;
     
     if (now - lastTime > delay) {
@@ -57,7 +57,7 @@ export function useWebSocket(projectId: string | null) {
     }
     
     // Smart deferral for heavy queries
-    const isHeavyQuery = Array.isArray(key) && key[0] === 'all-shot-generations';
+    const isHeavyQuery = Array.isArray(key) && key[0] === 'unified-generations' && key[1] === 'shot';
     if (isHeavyQuery) {
       const queryState = queryClient.getQueryState(key);
       if (queryState?.fetchStatus === 'fetching') {
@@ -219,12 +219,12 @@ export function useWebSocket(projectId: string | null) {
                 
                 // Be more selective about generations invalidation to avoid interfering with page transitions
                 // Only invalidate if no generations queries are currently fetching
-                const generationsQueries = queryClient.getQueriesData({ queryKey: ['generations', projectId] });
+                const generationsQueries = queryClient.getQueriesData({ queryKey: ['unified-generations', 'project', projectId] });
                 const hasActiveFetch = generationsQueries.length === 0 || 
-                  queryClient.isFetching({ queryKey: ['generations', projectId] }) > 0;
+                  queryClient.isFetching({ queryKey: ['unified-generations', 'project', projectId] }) > 0;
                 
                 if (!hasActiveFetch) {
-                  scheduleInvalidation(['generations', projectId]);
+                  scheduleInvalidation(['unified-generations', 'project', projectId]);
                 }
                 
                 // Invalidate task queries with common patterns only
@@ -291,7 +291,7 @@ export function useWebSocket(projectId: string | null) {
               // Task completion handling
               if (newRecord?.status === 'Complete' && oldRecord?.status !== 'Complete') {
                 scheduleInvalidation(['video-outputs', projectId]);
-                scheduleInvalidation(['generations', projectId]);
+                scheduleInvalidation(['unified-generations', 'project', projectId]);
                 scheduleInvalidation(['unified-generations', 'project', projectId]);
               }
             }
@@ -340,12 +340,10 @@ export function useWebSocket(projectId: string | null) {
             });
             
             // High-performance direct invalidation
-            scheduleInvalidation(['generations', projectId]);
-            scheduleInvalidation(['shots', projectId]);
             scheduleInvalidation(['unified-generations', 'project', projectId]);
+            scheduleInvalidation(['shots', projectId]);
             
             if (shotId) {
-              scheduleInvalidation(['all-shot-generations', shotId]);
               scheduleInvalidation(['unified-generations', 'shot', shotId]);
             }
           }
@@ -368,17 +366,13 @@ export function useWebSocket(projectId: string | null) {
             
             // Targeted invalidation for shot associations
             scheduleInvalidation(['shots', projectId]);
-            scheduleInvalidation(['generations', projectId]);
+            scheduleInvalidation(['unified-generations', 'project', projectId]);
             // Ensure VideoOutputsGallery (shot-specific unified generations) updates instantly
             if (shotId) {
               scheduleInvalidation(['unified-generations', 'shot', shotId]);
             }
             // Also nudge project-wide unified cache for safety in cross-views
             scheduleInvalidation(['unified-generations', 'project', projectId]);
-            
-            if (shotId) {
-              scheduleInvalidation(['all-shot-generations', shotId]);
-            }
           }
         )
         .subscribe((status, err) => {

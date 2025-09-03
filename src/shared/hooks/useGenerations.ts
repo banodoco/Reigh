@@ -415,7 +415,7 @@ export function useGenerations(
 ) {
   const offset = (page - 1) * limit;
   const queryClient = useQueryClient();
-  const queryKey = ['generations', projectId, page, limit, filters];
+  const queryKey = ['unified-generations', 'project', projectId, page, limit, filters];
 
   // [GalleryRenderDebug] Add comprehensive logging for useGenerations
   console.log('[GalleryRenderDebug] useGenerations called with:', {

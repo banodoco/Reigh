@@ -15,7 +15,7 @@ export const useShotGenerations = (
   shotId: string | null
 ): UseInfiniteQueryResult<ShotGenerationsPage> => {
   return useInfiniteQuery({
-    queryKey: ['shot-generations', shotId],
+    queryKey: ['unified-generations', 'shot', shotId],
     enabled: !!shotId,
     initialPageParam: 0,
     queryFn: async ({ pageParam, signal }: { pageParam: number; signal?: AbortSignal }) => {
@@ -148,7 +148,7 @@ export const useAllShotGenerations = (
   }
 
   return useQuery({
-    queryKey: ['all-shot-generations', stableShotId],
+    queryKey: ['unified-generations', 'shot', stableShotId],
     enabled: isEnabled,
     queryFn: async ({ signal }) => {
       // Check if request was cancelled before starting
