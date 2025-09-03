@@ -255,17 +255,29 @@ function App() {
     
     const handleVisibility = () => {
       try { (window as any).__VIS_CHANGE_AT__ = Date.now(); } catch {}
+      try {
+        const socket: any = (window as any)?.supabase?.realtime?.socket;
+        console.warn('[DeadModeInvestigation] visibilitychange', {
+          visibility: document.visibilityState,
+          connected: !!socket?.isConnected?.(),
+          state: socket?.connectionState,
+          timestamp: Date.now()
+        });
+      } catch {}
       if (debounceTimer) clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => {
         if (document.visibilityState === 'visible') {
           const now = Date.now();
           if (now - lastRecovery < RECOVERY_COOLDOWN) {
-            console.log('[DeadModeRecovery] Skipping - in cooldown');
+            console.warn('[DeadModeInvestigation] Foreground recover skipped (cooldown)', {
+              sinceMs: now - lastRecovery,
+              cooldownMs: RECOVERY_COOLDOWN
+            });
             return;
           }
           lastRecovery = now;
           
-          console.log('[DeadModeRecovery] Tab visible - starting recovery');
+          console.warn('[DeadModeInvestigation] Foreground recovery begin');
           
           // TARGETED recovery: only invalidate if realtime is actually down
           try {
@@ -276,18 +288,21 @@ function App() {
               const qc = (window as any).__REACT_QUERY_CLIENT__;
               if (qc) {
                 // Only invalidate stale data, not everything
+                console.warn('[DeadModeInvestigation] Invalidate during visibility recovery', {
+                  keys: [['task-status-counts']]
+                });
                 qc.invalidateQueries({ 
                   queryKey: ['task-status-counts'],
                   refetchType: 'inactive' // Only refetch if not currently fetching
                 });
-                console.log('[DeadModeRecovery] Invalidated task-status-counts only');
               }
             } else {
-              console.log('[DeadModeRecovery] Realtime connected - no recovery needed');
+              console.warn('[DeadModeInvestigation] Realtime connected on foreground - no invalidation');
             }
           } catch (e) {
-            console.warn('[DeadModeRecovery] Recovery error:', e);
+            console.warn('[DeadModeInvestigation] Foreground recovery error', { message: (e as any)?.message });
           }
+          console.warn('[DeadModeInvestigation] Foreground recovery end');
         }
       }, 2000); // 2s debounce
     };

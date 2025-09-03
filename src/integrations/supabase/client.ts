@@ -68,7 +68,7 @@ try {
     try {
       (supabase as any)?.realtime?.setAuth?.(session?.access_token ?? null);
       (supabase as any)?.realtime?.connect?.();
-      console.log('[DeadModeInvestigation] Realtime auth sync', {
+      console.warn('[DeadModeInvestigation] Realtime auth sync', {
         event,
         hasToken: !!session?.access_token,
         timestamp: Date.now()
@@ -78,6 +78,7 @@ try {
       if (event === 'SIGNED_IN' && typeof window !== 'undefined') {
         setTimeout(() => {
           try {
+            console.warn('[DeadModeInvestigation] Dispatching auth-heal');
             window.dispatchEvent(new CustomEvent('realtime:auth-heal'));
           } catch {}
         }, 1000); // Delay to let auth settle

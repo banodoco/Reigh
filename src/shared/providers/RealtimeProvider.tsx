@@ -38,7 +38,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       const wasConnected = !!socket?.isConnected?.();
       const wasState = socket?.connectionState;
 
-      console.log('[DeadModeInvestigation] Heal attempt starting', {
+      console.warn('[DeadModeInvestigation] Heal attempt starting', {
         wasConnected,
         wasState,
         visibility: document.visibilityState,
@@ -57,7 +57,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
           try { socket.connect?.(); } catch {}
         }
       } catch (e) {
-        console.warn('[DeadModeInvestigation] Socket reset failed:', e);
+        console.warn('[DeadModeInvestigation] Socket reset failed', { error: (e as any)?.message });
       }
 
       // Wait for connection to settle
@@ -79,7 +79,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       const needsRecreate = !channel || channel?.state === 'closed' || channel?.state === 'errored';
       
       if (needsRecreate) {
-        console.log('[DeadModeInvestigation] Recreating channel', { topic, oldState: channel?.state });
+        console.warn('[DeadModeInvestigation] Recreating channel', { topic, oldState: channel?.state });
         // Clean up old channel
         try { if (channelRef.current) (supabase as any).removeChannel?.(channelRef.current); } catch {}
         channelRef.current = null;
@@ -91,7 +91,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
           setState(prev => ({ ...prev, lastStateChangeAt: Date.now() }));
         }, 100);
       } else if (channel?.state !== 'joined') {
-        console.log('[DeadModeInvestigation] Re-joining existing channel', { topic, state: channel?.state });
+        console.warn('[DeadModeInvestigation] Re-joining existing channel', { topic, state: channel?.state });
         try { await channel.subscribe((status: any) => status); } catch {}
       }
 
@@ -100,7 +100,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       const nowConnected = !!finalSocket?.isConnected?.();
       const nowState = finalSocket?.connectionState;
       
-      console.log('[DeadModeInvestigation] Heal attempt complete', {
+      console.warn('[DeadModeInvestigation] Heal attempt complete', {
         wasConnected,
         nowConnected,
         wasState,
@@ -111,7 +111,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       });
 
     } catch (e) {
-      console.error('[DeadModeInvestigation] Heal failed:', e);
+      console.error('[DeadModeInvestigation] Heal failed', { error: (e as any)?.message });
     }
   }, [selectedProjectId]);
 
