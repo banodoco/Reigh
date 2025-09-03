@@ -25,6 +25,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   });
   const channelRef = React.useRef<ReturnType<typeof supabase.channel> | null>(null);
   const lastReconnectAtRef = React.useRef<number>(0);
+  const lastEventAtRef = React.useRef<number>(0);
 
   // Helper: ensure realtime socket and project channel are alive
   const ensureRealtimeHealthy = React.useCallback(async () => {
@@ -125,6 +126,10 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
         const isConnected = !!socket?.isConnected?.();
         const connectionState = socket?.connectionState;
         const channels = (supabase as any)?.getChannels?.()?.map((c: any) => ({ topic: c.topic, state: c.state })) || [];
+        try {
+          (window as any).__RT_LAST_EVENT_AT__ = lastEventAtRef.current || 0;
+          (window as any).__RT_CHANNELS__ = channels;
+        } catch {}
         setState((prev) => (
           connectionState !== prev.connectionState || isConnected !== prev.isConnected
             ? { isConnected, connectionState, lastStateChangeAt: Date.now(), channels }
@@ -142,11 +147,13 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
           const logKey = '__RT_SNAPSHOT__';
           const last = (window as any)[logKey] || 0;
           if (now - last > 15000) {
+            const lastEventAgo = lastEventAtRef.current ? Math.round((now - lastEventAtRef.current) / 1000) : null;
             console.warn('[DeadModeInvestigation] Realtime snapshot', {
               connected: isConnected,
               connectionState,
               channelCount: channels.length,
-              topicsSample: channels.slice(0, 5).map(c => c.topic)
+              topicsSample: channels.slice(0, 5).map(c => c.topic),
+              lastEventAgoSec: lastEventAgo
             });
             (window as any)[logKey] = now;
           }
@@ -219,6 +226,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       .channel(topic, { config: { broadcast: { self: false, ack: false } } })
       .on('broadcast', { event: 'task-update' }, (payload) => {
         try {
+          lastEventAtRef.current = Date.now();
           const message = payload.payload || {};
           if (message?.type === 'TASK_CREATED' || message?.type === 'TASKS_STATUS_UPDATE' || message?.type === 'TASK_COMPLETED') {
             routeEvent(queryClient, { type: 'TASK_STATUS_CHANGE', payload: { projectId: selectedProjectId } });
@@ -233,6 +241,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'tasks', filter: `project_id=eq.${selectedProjectId}` }, (payload) => {
         try {
+          lastEventAtRef.current = Date.now();
           const oldStatus = (payload.old as any)?.status;
           const newStatus = (payload.new as any)?.status;
           if (oldStatus !== newStatus) {
@@ -242,14 +251,17 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
         } catch {}
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'tasks', filter: `project_id=eq.${selectedProjectId}` }, () => {
+        lastEventAtRef.current = Date.now();
         routeEvent(queryClient, { type: 'TASK_STATUS_CHANGE', payload: { projectId: selectedProjectId } });
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'generations', filter: `project_id=eq.${selectedProjectId}` }, (payload) => {
+        lastEventAtRef.current = Date.now();
         const newRecord = payload.new as any;
         const shotId = newRecord?.params?.shotId || newRecord?.params?.shot_id || newRecord?.metadata?.shotId || newRecord?.metadata?.shot_id;
         routeEvent(queryClient, { type: 'GENERATION_INSERT', payload: { projectId: selectedProjectId, shotId } });
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'shot_generations' }, (payload) => {
+        lastEventAtRef.current = Date.now();
         const record = (payload.new || payload.old) as any;
         const shotId = record?.shot_id;
         routeEvent(queryClient, { type: 'SHOT_GENERATION_CHANGE', payload: { projectId: selectedProjectId, shotId } });

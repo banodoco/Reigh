@@ -261,6 +261,15 @@ export function useResurrectionPollingConfig(
         
         const realtimeEnabled = runtimeConfig.REALTIME_ENABLED !== false;
         if (!cachedRealtimeState || !realtimeEnabled) {
+          // Grace window after visibilitychange to allow healing
+          try {
+            const lastVis = (window as any).__VIS_CHANGE_AT__ || 0;
+            const sinceVis = lastVis ? (now - lastVis) : Infinity;
+            if (sinceVis < 4000) {
+              // Suppress boost logs and return a short interval to keep UI responsive while healing
+              return addJitter(6000, 800);
+            }
+          } catch {}
           // Boost polling when realtime is down
           const boosted = createResurrectionPollingFunction({
             ...config,
