@@ -24,6 +24,50 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     channels: [],
   });
   const channelRef = React.useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const lastReconnectAtRef = React.useRef<number>(0);
+
+  // Helper: ensure realtime socket and project channel are alive
+  const ensureRealtimeHealthy = React.useCallback(async () => {
+    try {
+      if (runtimeConfig.REALTIME_ENABLED === false) return;
+      const now = Date.now();
+      if (now - lastReconnectAtRef.current < 3000) return; // throttle
+      lastReconnectAtRef.current = now;
+
+      // Re-apply auth token to realtime (defensive) and connect socket
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        (supabase as any)?.realtime?.setAuth?.(session?.access_token ?? null);
+      } catch {}
+      try { (supabase as any)?.realtime?.connect?.(); } catch {}
+
+      // Ensure project channel exists and is joined
+      const topic = selectedProjectId ? `task-updates:${selectedProjectId}` : null;
+      if (!topic) return;
+      const existing = (supabase as any)?.getChannels?.() || [];
+      const matches = existing.filter((c: any) => c.topic?.endsWith(topic));
+
+      // Remove duplicates beyond one
+      if (matches.length > 1) {
+        matches.slice(1).forEach((ch: any) => { try { (supabase as any).removeChannel?.(ch); } catch {} });
+      }
+
+      let channel = matches[0] || channelRef.current;
+      const needsCreate = !channel || channel?.state === 'closed' || channel?.state === 'errored';
+      if (needsCreate) {
+        try { if (channelRef.current) (supabase as any).removeChannel?.(channelRef.current); } catch {}
+        channelRef.current = null;
+        // Recreate channel using the same subscription handlers
+        // We'll delegate to the effect that manages the channel lifecycle by flipping selectedProjectId dependency
+        // Quick subscribe attempt as a stopgap if the effect hasn't run yet
+        channel = supabase.channel(topic, { config: { broadcast: { self: false, ack: false } } });
+        try { await channel.subscribe((status) => status); } catch {}
+        channelRef.current = channel as any;
+      } else if (channel?.state !== 'joined') {
+        try { await channel.subscribe((status: any) => status); } catch {}
+      }
+    } catch {}
+  }, [selectedProjectId]);
 
   React.useEffect(() => {
     if (runtimeConfig.REALTIME_ENABLED === false) {
@@ -40,6 +84,12 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
             ? { isConnected, connectionState, lastStateChangeAt: Date.now(), channels }
             : { ...prev, channels }
         ));
+        // If visible and disconnected, try to heal the connection and channel
+        try {
+          if (document.visibilityState === 'visible' && !isConnected) {
+            ensureRealtimeHealthy();
+          }
+        } catch {}
         // Throttled realtime transition logs to correlate with dead-mode boosts
         try {
           const now = Date.now();
@@ -60,7 +110,22 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       }
     }, 2000);
     return () => clearInterval(interval);
-  }, []);
+  }, [ensureRealtimeHealthy]);
+
+  // Heal on visibility recovery and custom event
+  React.useEffect(() => {
+    if (runtimeConfig.REALTIME_ENABLED === false) return;
+    const onVis = () => {
+      if (document.visibilityState === 'visible') ensureRealtimeHealthy();
+    };
+    const onRecover = () => ensureRealtimeHealthy();
+    document.addEventListener('visibilitychange', onVis);
+    window.addEventListener('realtime:visibility-recover', onRecover as any);
+    return () => {
+      document.removeEventListener('visibilitychange', onVis);
+      window.removeEventListener('realtime:visibility-recover', onRecover as any);
+    };
+  }, [ensureRealtimeHealthy]);
 
   // Safety: ensure single ownership of the project channel even if legacy listeners are accidentally enabled
   React.useEffect(() => {
