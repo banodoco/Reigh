@@ -40,6 +40,21 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
             ? { isConnected, connectionState, lastStateChangeAt: Date.now(), channels }
             : { ...prev, channels }
         ));
+        // Throttled realtime transition logs to correlate with dead-mode boosts
+        try {
+          const now = Date.now();
+          const logKey = '__RT_SNAPSHOT__';
+          const last = (window as any)[logKey] || 0;
+          if (now - last > 15000) {
+            console.warn('[DeadModeInvestigation] Realtime snapshot', {
+              connected: isConnected,
+              connectionState,
+              channelCount: channels.length,
+              topicsSample: channels.slice(0, 5).map(c => c.topic)
+            });
+            (window as any)[logKey] = now;
+          }
+        } catch {}
       } catch {
         // ignore
       }

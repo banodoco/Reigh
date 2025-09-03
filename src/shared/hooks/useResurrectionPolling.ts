@@ -246,6 +246,8 @@ export function useResurrectionPollingConfig(
     const baseFn = createResurrectionPollingFunction(config);
     let lastRealtimeCheck = 0;
     let cachedRealtimeState = true;
+    // global rolling counters (window-scoped) to understand boost frequency per tag
+    const boostCounters: any = (typeof window !== 'undefined') ? ((window as any).__RQ_BOOST_COUNTERS__ = (window as any).__RQ_BOOST_COUNTERS__ || { lastReset: Date.now() }) : {};
     
     return (query: any) => {
       try {
@@ -267,32 +269,79 @@ export function useResurrectionPollingConfig(
             initialInterval: Math.min(config.initialInterval ?? 30000, 15000)
           });
           
-          // Throttle the warning log to prevent spam (max once per 30s per debugTag)
-          const logKey = `realtime-down-${debugTag}`;
-          const lastLog = (window as any)[logKey] || 0;
-          if (now - lastLog > 30000) {
-            console.warn('[DeadModeInvestigation] Polling boosted due to realtime=down', {
-              debugTag,
-              context,
-              throttled: true
-            });
-            (window as any)[logKey] = now;
-          }
-          
+          // Decide interval with boost
           const decided = boosted(query);
-          // When realtime is down, never return false (no polling). Force a minimum 5s poll.
+
+          let decision: 'forced-min' | 'clamped';
+          let finalInterval: number;
+          const visible = document.visibilityState === 'visible';
           if (decided === false) {
             const base = runtimeConfig.DEADMODE_FORCE_POLLING_MS ?? 5000;
-            const visible = document.visibilityState === 'visible';
             const clamped = visible ? Math.min(base, 15000) : Math.max(15000, base);
-            return addJitter(clamped, 1000);
+            finalInterval = addJitter(clamped, 1000);
+            decision = 'forced-min';
+          } else {
+            const numeric = typeof decided === 'number' ? decided : 5000;
+            const clamped = visible ? Math.min(numeric, 12000) : Math.max(20000, numeric);
+            finalInterval = addJitter(clamped, 1500);
+            decision = 'clamped';
           }
-          // Also clamp to a reasonable cap to avoid very long waits in dead mode
-          const visible = document.visibilityState === 'visible';
-          const numeric = typeof decided === 'number' ? decided : 5000;
-          // Slightly widen jitter to desynchronize concurrent queries across tabs/components
-          const clamped = visible ? Math.min(numeric, 12000) : Math.max(20000, numeric);
-          return addJitter(clamped, 1500);
+
+          // increment counters per tag
+          try {
+            if (typeof window !== 'undefined') {
+              const store = (window as any).__RQ_BOOST_COUNTERS__;
+              if (store) {
+                const since = now - (store.lastReset || 0);
+                if (since > 60000) {
+                  store.lastReset = now;
+                  store.counts = {};
+                }
+                store.counts = store.counts || {};
+                store.counts[debugTag] = (store.counts[debugTag] || 0) + 1;
+              }
+            }
+          } catch {}
+
+          // Throttled diagnostic log: include realtime snapshot and query context
+          try {
+            const logKey = `realtime-down-${debugTag}`;
+            const lastLog = (window as any)[logKey] || 0;
+            if (now - lastLog > 30000) {
+              const socket: any = (supabase as any)?.realtime?.socket;
+              const channels = (supabase as any)?.getChannels ? (supabase as any).getChannels() : [];
+              const snapshot = {
+                connected: !!socket?.isConnected?.(),
+                connState: socket?.connectionState,
+                channelCount: channels?.length || 0,
+                channelTopics: (channels || []).slice(0, 5).map((c: any) => c.topic),
+              };
+              const state = query?.state || {};
+              const dataAgeMs = state.dataUpdatedAt ? (now - state.dataUpdatedAt) : null;
+              console.warn('[DeadModeInvestigation] Polling boosted due to realtime=down', {
+                debugTag,
+                visibility: document.visibilityState,
+                decision,
+                finalIntervalMs: Math.round(finalInterval),
+                queryKey: (query as any)?.queryKey || 'unknown',
+                queryState: {
+                  status: state.status,
+                  fetchStatus: state.fetchStatus,
+                  isStale: state.isStale,
+                  isFetching: state.isFetching,
+                  errorMessage: state.error?.message,
+                  dataUpdatedAt: state.dataUpdatedAt,
+                  dataAgeSec: dataAgeMs != null ? Math.round(dataAgeMs / 1000) : null,
+                },
+                realtime: snapshot,
+                context,
+                counters: (typeof window !== 'undefined') ? ( (window as any).__RQ_BOOST_COUNTERS__?.counts || {} ) : {}
+              });
+              (window as any)[logKey] = now;
+            }
+          } catch {}
+
+          return finalInterval;
         }
       } catch {}
       return baseFn(query);
