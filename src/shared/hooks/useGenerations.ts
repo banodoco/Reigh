@@ -550,7 +550,7 @@ export function useToggleGenerationStar() {
       
       // Cancel outgoing refetches so they don't overwrite our optimistic update
       await Promise.all([
-        queryClient.cancelQueries({ queryKey: ['generations'] }),
+        queryClient.cancelQueries({ queryKey: ['unified-generations'] }),
         queryClient.cancelQueries({ queryKey: ['shots'] }),
       ]);
 
@@ -559,7 +559,7 @@ export function useToggleGenerationStar() {
       const previousShotsQueries = new Map();
 
       // 1) Optimistically update all generations-list caches
-      const generationsQueries = queryClient.getQueriesData({ queryKey: ['generations'] });
+      const generationsQueries = queryClient.getQueriesData({ queryKey: ['unified-generations'] });
       console.log('[StarDebug:useToggleGenerationStar] Found generations queries:', generationsQueries.length);
       
       generationsQueries.forEach(([queryKey, data]) => {

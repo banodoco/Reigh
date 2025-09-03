@@ -35,8 +35,6 @@ export function routeEvent(queryClient: QueryClient, event: InvalidationEvent) {
         const { projectId, shotId } = event.payload || {};
         if (projectId) scheduleInvalidate(queryClient, ['unified-generations', 'project', projectId]);
         if (shotId) scheduleInvalidate(queryClient, ['unified-generations', 'shot', shotId]);
-        // Legacy compatibility
-        if (projectId) scheduleInvalidate(queryClient, ['generations', projectId]);
         if (projectId) scheduleInvalidate(queryClient, ['shots', projectId]);
         break;
       }
@@ -44,8 +42,6 @@ export function routeEvent(queryClient: QueryClient, event: InvalidationEvent) {
         const { projectId, shotId } = event.payload || {};
         if (projectId) scheduleInvalidate(queryClient, ['unified-generations', 'project', projectId]);
         if (shotId) scheduleInvalidate(queryClient, ['unified-generations', 'shot', shotId]);
-        // Legacy compatibility
-        if (projectId) scheduleInvalidate(queryClient, ['generations', projectId]);
         break;
       }
       case 'TASK_STATUS_CHANGE': {
@@ -58,8 +54,6 @@ export function routeEvent(queryClient: QueryClient, event: InvalidationEvent) {
         const { projectId, shotId } = event.payload || {};
         if (projectId) scheduleInvalidate(queryClient, ['unified-generations', 'project', projectId]);
         if (shotId) scheduleInvalidate(queryClient, ['unified-generations', 'shot', shotId]);
-        // Legacy compatibility
-        if (projectId) scheduleInvalidate(queryClient, ['generations', projectId]);
         break;
       }
       default: {
