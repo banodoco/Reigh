@@ -1,9 +1,11 @@
 import React from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { runtimeConfig } from '@/shared/lib/config';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { useQueryClient } from '@tanstack/react-query';
-import { routeEvent } from '@/shared/lib/InvalidationRouter';
+import { SupabaseRealtimeAdapter } from '@/shared/realtime/SupabaseRealtimeAdapter';
+import { runtimeConfig } from '@/shared/lib/config';
+import { DiagnosticsLogger, DiagnosticsStore } from '@/shared/realtime/Diagnostics';
+import { ProjectChannelManager } from '@/shared/realtime/projectChannelManager';
 
 type RealtimeState = {
   isConnected: boolean;
@@ -23,410 +25,243 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     lastStateChangeAt: null,
     channels: [],
   });
-  const channelRef = React.useRef<ReturnType<typeof supabase.channel> | null>(null);
-  const lastReconnectAtRef = React.useRef<number>(0);
-  const lastEventAtRef = React.useRef<number>(0);
-  const isConnectingRef = React.useRef<boolean>(false);
-  const connectBackoffRef = React.useRef<number>(500);
-  const connectTimerRef = React.useRef<number | null>(null);
 
-  const clearConnectTimer = () => {
-    if (connectTimerRef.current) {
-      try { clearTimeout(connectTimerRef.current); } catch {}
-      connectTimerRef.current = null;
-    }
-  };
+  const adapterRef = React.useRef<SupabaseRealtimeAdapter | null>(null);
+  const diagnosticsRef = React.useRef<DiagnosticsStore | null>(null);
+  const loggerRef = React.useRef<DiagnosticsLogger | null>(null);
+  const managerRef = React.useRef<ProjectChannelManager | null>(null);
+  const lastHealAtRef = React.useRef<number>(0);
+  const recoveryInProgressRef = React.useRef<boolean>(false);
+  const lastSuccessfulEventRef = React.useRef<number>(0);
 
-  // Attach low-level realtime lifecycle logs once
+  if (!adapterRef.current) adapterRef.current = new SupabaseRealtimeAdapter();
+  if (!diagnosticsRef.current) diagnosticsRef.current = new DiagnosticsStore();
+  if (!loggerRef.current) loggerRef.current = new DiagnosticsLogger('RealtimeCore', runtimeConfig.RECONNECTION_LOGS_ENABLED);
+  if (!managerRef.current) managerRef.current = new ProjectChannelManager(adapterRef.current, diagnosticsRef.current, loggerRef.current, queryClient);
+
+  // Reflect diagnostics to provider state
   React.useEffect(() => {
-    try {
-      const rt: any = (supabase as any)?.realtime;
-      if (!rt) return;
-      try { rt.onOpen?.(() => console.warn('[DeadModeInvestigation] Realtime onOpen')); } catch {}
-      try { rt.onClose?.(() => console.warn('[DeadModeInvestigation] Realtime onClose')); } catch {}
-      try { rt.onError?.((e: any) => console.warn('[DeadModeInvestigation] Realtime onError', { error: e?.message || String(e) })); } catch {}
-      // Fallback to socket events if available
-      const sock: any = rt.socket;
-      if (sock?.conn) {
-        try { sock.conn.onopen = () => console.warn('[DeadModeInvestigation] Socket conn.onopen'); } catch {}
-        try { sock.conn.onclose = () => console.warn('[DeadModeInvestigation] Socket conn.onclose'); } catch {}
-        try { sock.conn.onerror = () => console.warn('[DeadModeInvestigation] Socket conn.onerror'); } catch {}
-      }
-    } catch {}
+    loggerRef.current?.info('[ReconnectionIssue][Initiation] Provider mount');
+    const diagnostics = diagnosticsRef.current!;
+    const adapter = adapterRef.current!;
+    const sync = () => {
+      const channels = (adapter.getChannels() || []).map((c: any) => ({ topic: c.topic, state: c.state }));
+      const channelState = diagnostics.snapshot.channelState;
+      setState((prev) => ({
+        isConnected: channelState === 'joined',
+        connectionState: channelState,
+        lastStateChangeAt: prev.connectionState !== channelState ? Date.now() : prev.lastStateChangeAt,
+        channels,
+      }));
+    };
+    sync();
+    const unsub = diagnostics.subscribe(sync);
+    const interval = window.setInterval(sync, 5000);
+    return () => { unsub(); window.clearInterval(interval); };
   }, []);
 
-  // Helper: ensure realtime socket and project channel are alive
-  const ensureRealtimeHealthy = React.useCallback(async () => {
-    try {
-      if (runtimeConfig.REALTIME_ENABLED === false) return;
-      const now = Date.now();
-      if (now - lastReconnectAtRef.current < 5000) return; // throttle to 5s
-      lastReconnectAtRef.current = now;
-
-      const socket: any = (supabase as any)?.realtime?.socket;
-      const wasConnected = !!socket?.isConnected?.();
-      const wasState = socket?.connectionState;
-
-      console.warn('[DeadModeInvestigation] Heal attempt starting', {
-        wasConnected,
-        wasState,
-        visibility: document.visibilityState,
-        selectedProjectId
-      });
-
-      // Force socket reset via public API: disconnect then reconnect to clear suspended state
+  // Join/leave on project changes
+  React.useEffect(() => {
+    const adapter = adapterRef.current!;
+    const manager = managerRef.current!;
+    let cancelled = false;
+    (async () => {
       try {
+        if (!selectedProjectId) {
+          loggerRef.current?.info('[ReconnectionIssue][AppInteraction] Leaving channel due to null project');
+          await manager.leave();
+          return;
+        }
+        loggerRef.current?.info('[ReconnectionIssue][AppInteraction] Joining project channel', { selectedProjectId });
         const { data: { session } } = await supabase.auth.getSession();
-        (supabase as any)?.realtime?.setAuth?.(session?.access_token ?? null);
-        try { (supabase as any)?.realtime?.disconnect?.(); } catch {}
-        await new Promise(resolve => setTimeout(resolve, 120)); // Brief pause
-        try { (supabase as any)?.realtime?.connect?.(); } catch {}
-      } catch (e) {
-        console.warn('[DeadModeInvestigation] Socket reset failed', { error: (e as any)?.message });
-      }
+        adapter.setAuth(session?.access_token ?? null);
+        adapter.connect(session?.access_token ?? null);
+        if (!cancelled) {
+          await manager.join(selectedProjectId);
+        }
+      } catch {}
+    })();
+    return () => { cancelled = true; };
+  }, [selectedProjectId]);
 
-      // Wait for connection to settle
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      // Ensure project channel exists and is properly joined
-      const topic = selectedProjectId ? `task-updates:${selectedProjectId}` : null;
-      if (!topic) return;
-
-      const existing = (supabase as any)?.getChannels?.() || [];
-      const matches = existing.filter((c: any) => c.topic?.endsWith(topic));
-
-      // Remove duplicates beyond one
-      if (matches.length > 1) {
-        matches.slice(1).forEach((ch: any) => { try { (supabase as any).removeChannel?.(ch); } catch {} });
-      }
-
-      let channel = matches[0] || channelRef.current;
-      const needsRecreate = !channel || channel?.state === 'closed' || channel?.state === 'errored';
-      
-      if (needsRecreate) {
-        console.warn('[DeadModeInvestigation] Recreating channel', { topic, oldState: channel?.state });
-        // Clean up old channel
-        try { if (channelRef.current) (supabase as any).removeChannel?.(channelRef.current); } catch {}
-        channelRef.current = null;
-        
-        // Create a fresh channel with handlers and subscribe with status logging
-        const fresh = supabase
-          .channel(topic, { config: { broadcast: { self: false, ack: false } } })
-          .on('broadcast', { event: 'task-update' }, (payload) => {
-            try {
-              lastEventAtRef.current = Date.now();
-              const message = payload.payload || {};
-              if (message?.type === 'TASK_CREATED' || message?.type === 'TASKS_STATUS_UPDATE' || message?.type === 'TASK_COMPLETED') {
-                routeEvent(queryClient, { type: 'TASK_STATUS_CHANGE', payload: { projectId: selectedProjectId } });
-                if (message?.type === 'TASK_COMPLETED') {
-                  routeEvent(queryClient, { type: 'GENERATIONS_UPDATED', payload: { projectId: selectedProjectId } });
-                }
-              } else if (message?.type === 'GENERATIONS_UPDATED') {
-                const { shotId } = message.payload || {};
-                routeEvent(queryClient, { type: 'GENERATIONS_UPDATED', payload: { projectId: selectedProjectId, shotId } });
-              }
-            } catch {}
-          })
-          .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'tasks', filter: `project_id=eq.${selectedProjectId}` }, (payload) => {
-            try {
-              lastEventAtRef.current = Date.now();
-              const oldStatus = (payload.old as any)?.status;
-              const newStatus = (payload.new as any)?.status;
-              if (oldStatus !== newStatus) {
-                routeEvent(queryClient, { type: 'TASK_STATUS_CHANGE', payload: { projectId: selectedProjectId } });
-                if (newStatus === 'Complete') routeEvent(queryClient, { type: 'GENERATIONS_UPDATED', payload: { projectId: selectedProjectId } });
-              }
-            } catch {}
-          })
-          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'tasks', filter: `project_id=eq.${selectedProjectId}` }, () => {
-            lastEventAtRef.current = Date.now();
-            routeEvent(queryClient, { type: 'TASK_STATUS_CHANGE', payload: { projectId: selectedProjectId } });
-          })
-          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'generations', filter: `project_id=eq.${selectedProjectId}` }, (payload) => {
-            lastEventAtRef.current = Date.now();
-            const newRecord = payload.new as any;
-            const shotId = newRecord?.params?.shotId || newRecord?.params?.shot_id || newRecord?.metadata?.shotId || newRecord?.metadata?.shot_id;
-            routeEvent(queryClient, { type: 'GENERATION_INSERT', payload: { projectId: selectedProjectId, shotId } });
-          })
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'shot_generations' }, (payload) => {
-            lastEventAtRef.current = Date.now();
-            const record = (payload.new || payload.old) as any;
-            const shotId = record?.shot_id;
-            routeEvent(queryClient, { type: 'SHOT_GENERATION_CHANGE', payload: { projectId: selectedProjectId, shotId } });
-          });
-        try {
-          await fresh.subscribe((status: any) => {
-            try {
-              console.warn('[DeadModeInvestigation] Channel subscribe status', { topic, status });
-            } catch {}
-            return status;
-          });
-        } catch {}
-        channelRef.current = fresh as any;
-      } else if (channel?.state !== 'joined') {
-        console.warn('[DeadModeInvestigation] Re-joining existing channel', { topic, state: channel?.state });
-        try {
-          await channel.subscribe((status: any) => {
-            try { console.warn('[DeadModeInvestigation] Channel subscribe status', { topic, status }); } catch {}
-            return status;
-          });
-        } catch {}
-      }
-
-      // Log final state
-      const finalSocket: any = (supabase as any)?.realtime?.socket;
-      const nowConnected = !!finalSocket?.isConnected?.();
-      const nowState = finalSocket?.connectionState;
-      
-      console.warn('[DeadModeInvestigation] Heal attempt complete', {
-        wasConnected,
-        nowConnected,
-        wasState,
-        nowState,
-        healed: !wasConnected && nowConnected,
-        topic,
-        channelState: (matches[0] || channelRef.current)?.state
+  // Consolidated recovery coordinator
+  const triggerRecovery = React.useCallback(async (reason: string) => {
+    if (!selectedProjectId) return;
+    if (recoveryInProgressRef.current) {
+      loggerRef.current?.info('[ReconnectionIssue][Recovery] Recovery already in progress, skipping', { reason });
+      return;
+    }
+    
+    const now = Date.now();
+    if (now - lastHealAtRef.current < 3000) {
+      loggerRef.current?.info('[ReconnectionIssue][Recovery] Too soon since last recovery', { 
+        reason, 
+        timeSinceLastHeal: now - lastHealAtRef.current 
       });
-
-    } catch (e) {
-      console.error('[DeadModeInvestigation] Heal failed', { error: (e as any)?.message });
+      return;
+    }
+    
+    const correlationId = `recovery-${now}-${Math.random().toString(36).substr(2, 9)}`;
+    loggerRef.current?.info('[ReconnectionIssue][Recovery] Starting recovery', { reason, correlationId });
+    
+    recoveryInProgressRef.current = true;
+    lastHealAtRef.current = now;
+    
+    try {
+      // Step 1: Refresh auth
+      const { data: { session } } = await supabase.auth.getSession();
+      adapterRef.current?.setAuth(session?.access_token ?? null);
+      
+      // Step 2: Reconnect socket if needed
+      const socketState = adapterRef.current?.getSocketConnectionState();
+      if (!socketState?.isConnected) {
+        loggerRef.current?.info('[ReconnectionIssue][Recovery] Reconnecting socket', { correlationId });
+        adapterRef.current?.connect(session?.access_token ?? null);
+        await new Promise(resolve => setTimeout(resolve, 500)); // Give socket time to connect
+      }
+      
+      // Step 3: Rejoin channel
+      await managerRef.current?.join(selectedProjectId);
+      
+      // Step 4: Verify recovery success
+      const diagnostics = diagnosticsRef.current?.snapshot;
+      const channelState = diagnostics?.channelState;
+      
+      if (channelState === 'joined') {
+        loggerRef.current?.info('[ReconnectionIssue][Recovery] Recovery completed successfully', { 
+          reason, 
+          correlationId,
+          channelState 
+        });
+      } else {
+        loggerRef.current?.error('[ReconnectionIssue][Recovery] Recovery failed', { 
+          reason, 
+          correlationId,
+          channelState 
+        });
+      }
+    } catch (error) {
+      loggerRef.current?.error('[ReconnectionIssue][Recovery] Recovery error', { 
+        reason, 
+        correlationId,
+        error: (error as any)?.message 
+      });
+    } finally {
+      recoveryInProgressRef.current = false;
     }
   }, [selectedProjectId]);
 
-  // Coordinated connect sequence with exponential backoff
-  const startConnectSequence = React.useCallback(() => {
-    if (isConnectingRef.current) return;
-    isConnectingRef.current = true;
-    connectBackoffRef.current = 500;
-    clearConnectTimer();
-
-    const probeRealtimeConnectivity = () => {
-      try {
-        if (typeof window === 'undefined' || !('WebSocket' in window)) return;
-        const base = (import.meta as any)?.env?.VITE_SUPABASE_URL || '';
-        const key = (import.meta as any)?.env?.VITE_SUPABASE_ANON_KEY || '';
-        if (!base || !key) return;
-        const wsUrl = base.replace(/^http/, 'ws') + `/realtime/v1/websocket?apikey=${encodeURIComponent(key)}&vsn=1.0.0`;
-        console.warn('[DeadModeInvestigation] Realtime probe start', { wsUrl, online: navigator.onLine, visibility: document.visibilityState, net: (navigator as any)?.connection?.effectiveType });
-        try {
-          const test = new WebSocket(wsUrl);
-          test.onopen = () => {
-            console.warn('[DeadModeInvestigation] Realtime probe onopen');
-            try { test.close(); } catch {}
-          };
-          test.onerror = (e) => {
-            console.warn('[DeadModeInvestigation] Realtime probe onerror');
-          };
-          test.onclose = (ev: any) => {
-            console.warn('[DeadModeInvestigation] Realtime probe onclose', { code: ev?.code, reason: ev?.reason });
-          };
-        } catch (e) {
-          console.warn('[DeadModeInvestigation] Realtime probe failed to construct WS', { error: (e as any)?.message });
-        }
-      } catch {}
-    };
-
-    const step = async () => {
-      try {
-        const socket: any = (supabase as any)?.realtime?.socket;
-        const connected = !!socket?.isConnected?.();
-        if (connected) {
-          console.warn('[DeadModeInvestigation] Connect sequence: already connected');
-          isConnectingRef.current = false;
-          // Ensure channel exists once connected
-          await ensureRealtimeHealthy();
-          return;
-        }
-        console.warn('[DeadModeInvestigation] Connect sequence attempt', { backoffMs: connectBackoffRef.current });
-        // Use public API
-        try { (supabase as any)?.realtime?.disconnect?.(); } catch {}
-        await new Promise(r => setTimeout(r, 120));
-        try { (supabase as any)?.realtime?.connect?.(); } catch {}
-        await new Promise(r => setTimeout(r, 600));
-        const nowConnected = !!((supabase as any)?.realtime?.socket?.isConnected?.());
-        console.warn('[DeadModeInvestigation] Connect sequence result', { nowConnected });
-        if (nowConnected) {
-          isConnectingRef.current = false;
-          connectBackoffRef.current = 500;
-          await ensureRealtimeHealthy();
-          return;
-        }
-        // If still not connected after a few ramps, run a probe once
-        if (connectBackoffRef.current >= 4000) {
-          probeRealtimeConnectivity();
-        }
-      } catch {}
-      // schedule next attempt
-      const delay = Math.min(connectBackoffRef.current, 30000);
-      connectBackoffRef.current = Math.min(connectBackoffRef.current * 2, 30000);
-      clearConnectTimer();
-      connectTimerRef.current = window.setTimeout(step, delay);
-    };
-
-    step();
-  }, [ensureRealtimeHealthy]);
-
+  // Visibility recovery
   React.useEffect(() => {
-    if (runtimeConfig.REALTIME_ENABLED === false) {
-      return;
-    }
-    const interval = setInterval(() => {
-      try {
-        const socket: any = (supabase as any)?.realtime?.socket;
-        const isConnected = !!socket?.isConnected?.();
-        const connectionState = socket?.connectionState;
-        const channels = (supabase as any)?.getChannels?.()?.map((c: any) => ({ topic: c.topic, state: c.state })) || [];
-        try {
-          (window as any).__RT_LAST_EVENT_AT__ = lastEventAtRef.current || 0;
-          (window as any).__RT_CHANNELS__ = channels;
-        } catch {}
-        setState((prev) => (
-          connectionState !== prev.connectionState || isConnected !== prev.isConnected
-            ? { isConnected, connectionState, lastStateChangeAt: Date.now(), channels }
-            : { ...prev, channels }
-        ));
-        // If visible and disconnected, try to heal the connection and channel
-        try {
-          if (document.visibilityState === 'visible' && !isConnected) {
-            startConnectSequence();
-          }
-        } catch {}
-        // Throttled realtime transition logs to correlate with dead-mode boosts
-        try {
-          const now = Date.now();
-          const logKey = '__RT_SNAPSHOT__';
-          const last = (window as any)[logKey] || 0;
-          if (now - last > 15000) {
-            const lastEventAgo = lastEventAtRef.current ? Math.round((now - lastEventAtRef.current) / 1000) : null;
-            console.warn('[DeadModeInvestigation] Realtime snapshot', {
-              connected: isConnected,
-              connectionState,
-              channelCount: channels.length,
-              topicsSample: channels.slice(0, 5).map(c => c.topic),
-              lastEventAgoSec: lastEventAgo
-            });
-            (window as any)[logKey] = now;
-          }
-        } catch {}
-      } catch {
-        // ignore
-      }
-    }, 2000);
-    return () => clearInterval(interval);
-  }, [ensureRealtimeHealthy]);
-
-  // Heal on visibility recovery and custom events
-  React.useEffect(() => {
-    if (runtimeConfig.REALTIME_ENABLED === false) return;
     const onVis = () => {
-      if (document.visibilityState === 'visible') startConnectSequence();
+      if (document.visibilityState !== 'visible') return;
+      loggerRef.current?.info('[ReconnectionIssue][Visibility] Became visible');
+      try { (window as any).__VIS_CHANGE_AT__ = Date.now(); } catch {}
+      triggerRecovery('visibility-change');
     };
-    const onRecover = () => startConnectSequence();
-    const onAuthHeal = () => startConnectSequence();
+    const onHide = () => {
+      if (document.visibilityState === 'hidden') {
+        loggerRef.current?.info('[ReconnectionIssue][Visibility] Became hidden');
+        try { (window as any).__VIS_CHANGE_AT__ = Date.now(); } catch {}
+      }
+    };
+    const onPageShow = () => { 
+      loggerRef.current?.info('[ReconnectionIssue][Visibility] pageshow'); 
+      try { (window as any).__VIS_CHANGE_AT__ = Date.now(); } catch {}
+      triggerRecovery('pageshow');
+    };
+    const onPageHide = () => { 
+      loggerRef.current?.info('[ReconnectionIssue][Visibility] pagehide'); 
+      try { (window as any).__VIS_CHANGE_AT__ = Date.now(); } catch {} 
+    };
+    
+    // Listen for auth-heal events from auth system
+    const onAuthHeal = () => {
+      loggerRef.current?.info('[ReconnectionIssue][Recovery] Auth heal event received');
+      triggerRecovery('auth-heal');
+    };
+    
+    // Listen for force recovery from debug tools
+    const onForceRecovery = () => {
+      loggerRef.current?.info('[ReconnectionIssue][Recovery] Force recovery requested');
+      triggerRecovery('force-recovery');
+    };
+    
+    // Listen for app visibility change events
+    const onAppVisibility = (e: any) => {
+      if (e.detail?.visible) {
+        loggerRef.current?.info('[ReconnectionIssue][Recovery] App visibility event received');
+        triggerRecovery('app-visibility');
+      }
+    };
     
     document.addEventListener('visibilitychange', onVis);
-    window.addEventListener('realtime:visibility-recover', onRecover as any);
+    document.addEventListener('visibilitychange', onHide);
+    window.addEventListener('pageshow', onPageShow);
+    window.addEventListener('pagehide', onPageHide);
     window.addEventListener('realtime:auth-heal', onAuthHeal as any);
+    window.addEventListener('realtime:force-recovery', onForceRecovery as any);
+    window.addEventListener('app:visibility-change', onAppVisibility as any);
     
     return () => {
       document.removeEventListener('visibilitychange', onVis);
-      window.removeEventListener('realtime:visibility-recover', onRecover as any);
+      document.removeEventListener('visibilitychange', onHide);
+      window.removeEventListener('pageshow', onPageShow);
+      window.removeEventListener('pagehide', onPageHide);
       window.removeEventListener('realtime:auth-heal', onAuthHeal as any);
+      window.removeEventListener('realtime:force-recovery', onForceRecovery as any);
+      window.removeEventListener('app:visibility-change', onAppVisibility as any);
     };
-  }, [startConnectSequence]);
+  }, [triggerRecovery]);
 
-  // Safety: ensure single ownership of the project channel even if legacy listeners are accidentally enabled
+  // Enhanced watchdog with event flow verification
   React.useEffect(() => {
-    if (runtimeConfig.REALTIME_ENABLED === false) return;
-    // Remove any extra channels with same topic to avoid double-subscribe
-    try {
-      const topic = selectedProjectId ? `task-updates:${selectedProjectId}` : null;
-      const channels = (supabase as any)?.getChannels?.() || [];
-      if (topic) {
-        const dups = channels.filter((c: any) => c.topic === topic);
-        // Keep the first, remove the rest
-        if (dups.length > 1) {
-          dups.slice(1).forEach((ch: any) => {
-            try { (supabase as any).removeChannel?.(ch); } catch {}
-          });
+    const diagnostics = diagnosticsRef.current!;
+    const tick = () => {
+      if (!selectedProjectId) return;
+      if (recoveryInProgressRef.current) return; // Don't interfere with ongoing recovery
+      
+      const snapshot = diagnostics.snapshot;
+      const lastEventAt = snapshot.lastEventAt || 0;
+      const channelState = snapshot.channelState;
+      const now = Date.now();
+      const timeSinceLastEvent = now - lastEventAt;
+      const tooLong = timeSinceLastEvent > 20000; // Increased to 20s to reduce false positives
+      
+      // Track if we're receiving events
+      if (lastEventAt > lastSuccessfulEventRef.current) {
+        lastSuccessfulEventRef.current = lastEventAt;
+        loggerRef.current?.debug('[ReconnectionIssue][Watchdog] Events flowing normally', { 
+          timeSinceLastEvent: Math.round(timeSinceLastEvent / 1000) + 's' 
+        });
+      }
+      
+      // Check for problems
+      if (channelState !== 'joined' || tooLong) {
+        const manager = managerRef.current as any;
+        const bindings = manager?.getBindingsCount?.() || 0;
+        
+        loggerRef.current?.warn('[ReconnectionIssue][Watchdog] Detected issue', { 
+          channelState, 
+          tooLong,
+          timeSinceLastEvent: Math.round(timeSinceLastEvent / 1000) + 's',
+          bindings,
+          lastEventAt: lastEventAt ? new Date(lastEventAt).toISOString() : 'never'
+        });
+        
+        // Special handling for zero bindings
+        if (channelState === 'joined' && bindings === 0) {
+          loggerRef.current?.error('[ReconnectionIssue][Watchdog] CRITICAL: Channel joined but no handlers!');
         }
-      }
-    } catch {}
-  }, [selectedProjectId]);
-
-  // Manage project-scoped channel & event routing
-  React.useEffect(() => {
-    if (runtimeConfig.REALTIME_ENABLED === false) return;
-    if (!selectedProjectId) {
-      if (channelRef.current) {
-        try { supabase.removeChannel(channelRef.current); } catch {}
-        channelRef.current = null;
-      }
-      return;
-    }
-
-    // Clean up old
-    if (channelRef.current) {
-      try { supabase.removeChannel(channelRef.current); } catch {}
-      channelRef.current = null;
-    }
-
-    const topic = `task-updates:${selectedProjectId}`;
-    const channel = supabase
-      .channel(topic, { config: { broadcast: { self: false, ack: false } } })
-      .on('broadcast', { event: 'task-update' }, (payload) => {
-        try {
-          lastEventAtRef.current = Date.now();
-          const message = payload.payload || {};
-          if (message?.type === 'TASK_CREATED' || message?.type === 'TASKS_STATUS_UPDATE' || message?.type === 'TASK_COMPLETED') {
-            routeEvent(queryClient, { type: 'TASK_STATUS_CHANGE', payload: { projectId: selectedProjectId } });
-            if (message?.type === 'TASK_COMPLETED') {
-              routeEvent(queryClient, { type: 'GENERATIONS_UPDATED', payload: { projectId: selectedProjectId } });
-            }
-          } else if (message?.type === 'GENERATIONS_UPDATED') {
-            const { shotId } = message.payload || {};
-            routeEvent(queryClient, { type: 'GENERATIONS_UPDATED', payload: { projectId: selectedProjectId, shotId } });
-          }
-        } catch {}
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'tasks', filter: `project_id=eq.${selectedProjectId}` }, (payload) => {
-        try {
-          lastEventAtRef.current = Date.now();
-          const oldStatus = (payload.old as any)?.status;
-          const newStatus = (payload.new as any)?.status;
-          if (oldStatus !== newStatus) {
-            routeEvent(queryClient, { type: 'TASK_STATUS_CHANGE', payload: { projectId: selectedProjectId } });
-            if (newStatus === 'Complete') routeEvent(queryClient, { type: 'GENERATIONS_UPDATED', payload: { projectId: selectedProjectId } });
-          }
-        } catch {}
-      })
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'tasks', filter: `project_id=eq.${selectedProjectId}` }, () => {
-        lastEventAtRef.current = Date.now();
-        routeEvent(queryClient, { type: 'TASK_STATUS_CHANGE', payload: { projectId: selectedProjectId } });
-      })
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'generations', filter: `project_id=eq.${selectedProjectId}` }, (payload) => {
-        lastEventAtRef.current = Date.now();
-        const newRecord = payload.new as any;
-        const shotId = newRecord?.params?.shotId || newRecord?.params?.shot_id || newRecord?.metadata?.shotId || newRecord?.metadata?.shot_id;
-        routeEvent(queryClient, { type: 'GENERATION_INSERT', payload: { projectId: selectedProjectId, shotId } });
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'shot_generations' }, (payload) => {
-        lastEventAtRef.current = Date.now();
-        const record = (payload.new || payload.old) as any;
-        const shotId = record?.shot_id;
-        routeEvent(queryClient, { type: 'SHOT_GENERATION_CHANGE', payload: { projectId: selectedProjectId, shotId } });
-      })
-      .subscribe();
-
-    channelRef.current = channel;
-
-    return () => {
-      if (channelRef.current) {
-        try { supabase.removeChannel(channelRef.current); } catch {}
-        channelRef.current = null;
+        
+        triggerRecovery('watchdog-' + (tooLong ? 'timeout' : 'not-joined'));
       }
     };
-  }, [selectedProjectId, queryClient]);
+    
+    const id = window.setInterval(tick, 5000);
+    tick(); // Run immediately
+    return () => window.clearInterval(id);
+  }, [selectedProjectId, triggerRecovery]);
 
   return (
     <RealtimeContext.Provider value={state}>

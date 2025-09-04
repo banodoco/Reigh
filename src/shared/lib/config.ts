@@ -1,6 +1,13 @@
 // Centralized runtime configuration with sensible defaults
 
 export const runtimeConfig = {
+  REALTIME_REFACTOR_ENABLED: (() => {
+    try {
+      const v = (import.meta as any)?.env?.VITE_REALTIME_REFACTOR_ENABLED;
+      if (typeof v === 'string') return v === 'true' || v === '1';
+    } catch {}
+    return false; // default OFF for safe rollout
+  })(),
   REALTIME_ENABLED: (() => {
     try {
       const v = (import.meta as any)?.env?.VITE_REALTIME_ENABLED;
@@ -24,6 +31,14 @@ export const runtimeConfig = {
       if (!Number.isNaN(n) && n > 0) return n;
     } catch {}
     return undefined;
+  })(),
+
+  RECONNECTION_LOGS_ENABLED: (() => {
+    try {
+      const v = (import.meta as any)?.env?.VITE_RECONNECTION_LOGS_ENABLED;
+      if (typeof v === 'string') return v === 'true' || v === '1';
+    } catch {}
+    return true; // default ON during investigation
   })(),
 };
 

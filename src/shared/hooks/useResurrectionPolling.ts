@@ -68,7 +68,9 @@ export function createResurrectionPollingFunction(config: ResurrectionPollingCon
 
     if (!data) {
       // If no data yet, poll slowly to get initial data
-      console.log(`🟡 [GalleryPollingDebug:${debugTag}] No data yet, using slow polling (${initialInterval/1000}s):`, baseLogContext);
+      if (runtimeConfig.RECONNECTION_LOGS_ENABLED) {
+        console.log(`[ReconnectionIssue][Polling:${debugTag}] No data yet, slow polling`, { intervalMs: initialInterval, ...baseLogContext });
+      }
       return initialInterval;
     }
     
@@ -81,13 +83,15 @@ export function createResurrectionPollingFunction(config: ResurrectionPollingCon
     const recentActivity = hasRecentActivity ? hasRecentActivity(data) : false;
     
     // Log the polling decision process with data-specific metrics
-    console.log(`🔍 [GalleryPollingDebug:${debugTag}] Polling interval calculation:`, {
-      ...baseLogContext,
-      ...dataMetrics,
-      hasRecentActivity: recentActivity,
-      dataAge: Math.round(dataAge / 1000) + 's',
-      visibilityState: document.visibilityState
-    });
+    if (runtimeConfig.RECONNECTION_LOGS_ENABLED) {
+      console.log(`[ReconnectionIssue][Polling:${debugTag}] Decision context`, {
+        ...baseLogContext,
+        ...dataMetrics,
+        hasRecentActivity: recentActivity,
+        dataAge: Math.round(dataAge / 1000) + 's',
+        visibilityState: document.visibilityState
+      });
+    }
     
     if (recentActivity) {
       // Fast polling when we have recent activity (might be more coming)
@@ -112,7 +116,9 @@ export function createResurrectionPollingFunction(config: ResurrectionPollingCon
         }
       }
       
-      console.log(`🚀 [GalleryPollingDebug:${debugTag}] Recent activity detected, using FAST polling:`, fastLogContext);
+      if (runtimeConfig.RECONNECTION_LOGS_ENABLED) {
+        console.log(`[ReconnectionIssue][Polling:${debugTag}] FAST polling`, fastLogContext);
+      }
       return fastInterval;
     } else if (dataAge > staleThreshold) {
       // RESURRECTION POLLING: If data is stale, poll occasionally
@@ -133,15 +139,19 @@ export function createResurrectionPollingFunction(config: ResurrectionPollingCon
         }
       }
       
-      console.log(`⚰️ [GalleryPollingDebug:${debugTag}] Data is stale, using RESURRECTION polling:`, resurrectionLogContext);
+      if (runtimeConfig.RECONNECTION_LOGS_ENABLED) {
+        console.log(`[ReconnectionIssue][Polling:${debugTag}] RESURRECTION polling`, resurrectionLogContext);
+      }
       return resurrectionInterval;
     } else {
       // Data is fresh and no recent activity - rely on WebSocket
-      console.log(`✅ [GalleryPollingDebug:${debugTag}] Data is fresh, WebSocket should handle updates:`, {
-        ...baseLogContext,
-        ...dataMetrics,
-        dataAge: Math.round(dataAge / 1000) + 's'
-      });
+      if (runtimeConfig.RECONNECTION_LOGS_ENABLED) {
+        console.log(`[ReconnectionIssue][Polling:${debugTag}] Fresh; rely on realtime`, {
+          ...baseLogContext,
+          ...dataMetrics,
+          dataAge: Math.round(dataAge / 1000) + 's'
+        });
+      }
       return false; // No polling, rely on WebSocket
     }
   };
@@ -246,6 +256,7 @@ export function useResurrectionPollingConfig(
     const baseFn = createResurrectionPollingFunction(config);
     let lastRealtimeCheck = 0;
     let cachedRealtimeState = true;
+    let cachedEventFlowing = true;
     // global rolling counters (window-scoped) to understand boost frequency per tag
     const boostCounters: any = (typeof window !== 'undefined') ? ((window as any).__RQ_BOOST_COUNTERS__ = (window as any).__RQ_BOOST_COUNTERS__ || { lastReset: Date.now() }) : {};
     
@@ -255,12 +266,42 @@ export function useResurrectionPollingConfig(
         // Throttle realtime checks to reduce overhead - only check every 5s
         if (now - lastRealtimeCheck > 5000) {
           const socket: any = (supabase as any)?.realtime?.socket;
-          cachedRealtimeState = !!socket?.isConnected?.();
+          const socketConnected = !!socket?.isConnected?.();
+          
+          // Check if we're actually receiving events (not just connected)
+          const channels = (supabase as any)?.getChannels ? (supabase as any).getChannels() : [];
+          const hasJoinedChannels = channels.some((c: any) => c.state === 'joined');
+          
+          // Check event flow from diagnostics if available
+          let eventsFlowing = false;
+          try {
+            // Access diagnostics from window if exposed
+            const diagnostics = (window as any).__REALTIME_DIAGNOSTICS__;
+            if (diagnostics) {
+              const lastEventAt = diagnostics.lastEventAt || 0;
+              eventsFlowing = (now - lastEventAt) < 30000; // Events in last 30s
+            }
+          } catch {}
+          
+          cachedRealtimeState = socketConnected && hasJoinedChannels;
+          cachedEventFlowing = eventsFlowing;
           lastRealtimeCheck = now;
+          
+          if (runtimeConfig.RECONNECTION_LOGS_ENABLED && !cachedRealtimeState) {
+            console.log(`[ReconnectionIssue][Polling:${debugTag}] Realtime health check`, {
+              socketConnected,
+              hasJoinedChannels,
+              channelCount: channels.length,
+              eventsFlowing,
+              cachedRealtimeState
+            });
+          }
         }
         
         const realtimeEnabled = runtimeConfig.REALTIME_ENABLED !== false;
-        if (!cachedRealtimeState || !realtimeEnabled) {
+        const realtimeHealthy = cachedRealtimeState && (cachedEventFlowing || document.visibilityState === 'hidden');
+        
+        if (!realtimeHealthy || !realtimeEnabled) {
           // Grace window after visibilitychange to allow healing
           try {
             const lastVis = (window as any).__VIS_CHANGE_AT__ || 0;
@@ -329,7 +370,7 @@ export function useResurrectionPollingConfig(
               const dataAgeMs = state.dataUpdatedAt ? (now - state.dataUpdatedAt) : null;
               const lastVisChange = (window as any).__VIS_CHANGE_AT__ || null;
               const sinceVisChange = lastVisChange ? (now - lastVisChange) : null;
-              console.warn('[DeadModeInvestigation] Polling boosted due to realtime=down', {
+              console.warn('[DeadModeInvestigation] Polling boosted due to realtime issues', {
                 debugTag,
                 visibility: document.visibilityState,
                 decision,
@@ -344,7 +385,11 @@ export function useResurrectionPollingConfig(
                   dataUpdatedAt: state.dataUpdatedAt,
                   dataAgeSec: dataAgeMs != null ? Math.round(dataAgeMs / 1000) : null,
                 },
-                realtime: snapshot,
+                realtime: {
+                  ...snapshot,
+                  healthy: cachedRealtimeState,
+                  eventsFlowing: cachedEventFlowing
+                },
                 lastVisibilityChangeAt: lastVisChange,
                 secondsSinceVisibilityChange: sinceVisChange != null ? Math.round(sinceVisChange / 1000) : null,
                 context,

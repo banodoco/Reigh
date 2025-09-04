@@ -20,6 +20,7 @@ import { GenerationTaskProvider } from '@/shared/contexts/GenerationTaskContext'
 // [MobileStallFix] Import debug utilities for console debugging
 import '@/shared/lib/mobileProjectDebug';
 import { initPollingDebugHelpers } from '@/shared/lib/pollingDebugHelpers';
+import { initRealtimeDebugHelpers } from '@/shared/lib/realtimeDebugHelpers';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -234,11 +235,13 @@ const AppInternalContent = () => {
 function App() {
   React.useEffect(() => {
     // Initialize debug helpers for console debugging
-    console.log('[DebugHelpers] Initializing polling debug helpers...');
+    console.log('[DebugHelpers] Initializing debug helpers...');
     try {
       initPollingDebugHelpers(queryClient);
+      initRealtimeDebugHelpers();
       console.log('[DebugHelpers] Debug helpers initialized successfully');
       console.log('[DebugHelpers] Try: debugPolling.inspectAllCaches("your-project-id")');
+      console.log('[DebugHelpers] Try: realtimeDebug.checkHealth() or rt() for realtime status');
     } catch (error) {
       console.error('[DebugHelpers] Failed to initialize debug helpers:', error);
     }
@@ -267,70 +270,36 @@ function App() {
     };
   }, []);
 
-  // Foreground recovery: when tab becomes visible, recover from dead mode (throttled)
+  // Visibility logging only - recovery handled by RealtimeProvider
   React.useEffect(() => {
-    let debounceTimer: NodeJS.Timeout;
-    let lastRecovery = 0;
-    const RECOVERY_COOLDOWN = 10000; // 10s cooldown to prevent storms
-    
     const handleVisibility = () => {
       try { (window as any).__VIS_CHANGE_AT__ = Date.now(); } catch {}
       try {
         const socket: any = (window as any)?.supabase?.realtime?.socket;
-        console.warn('[DeadModeInvestigation] visibilitychange', {
+        const diagnostics = (window as any).__REALTIME_DIAGNOSTICS__;
+        console.warn('[ReconnectionIssue][Visibility] App visibilitychange', {
           visibility: document.visibilityState,
           connected: !!socket?.isConnected?.(),
           state: socket?.connectionState,
+          channelState: diagnostics?.channelState,
+          lastEventAt: diagnostics?.lastEventAt,
           timestamp: Date.now()
         });
       } catch {}
-      if (debounceTimer) clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => {
-        if (document.visibilityState === 'visible') {
-          const now = Date.now();
-          if (now - lastRecovery < RECOVERY_COOLDOWN) {
-            console.warn('[DeadModeInvestigation] Foreground recover skipped (cooldown)', {
-              sinceMs: now - lastRecovery,
-              cooldownMs: RECOVERY_COOLDOWN
-            });
-            return;
-          }
-          lastRecovery = now;
-          
-          console.warn('[DeadModeInvestigation] Foreground recovery begin');
-          
-          // TARGETED recovery: only invalidate if realtime is actually down
-          try {
-            const socket: any = (window as any)?.supabase?.realtime?.socket;
-            const isRealtimeDown = !socket?.isConnected?.();
-            
-            if (isRealtimeDown) {
-              const qc = (window as any).__REACT_QUERY_CLIENT__;
-              if (qc) {
-                // Only invalidate stale data, not everything
-                console.warn('[DeadModeInvestigation] Invalidate during visibility recovery', {
-                  keys: [['task-status-counts']]
-                });
-                qc.invalidateQueries({ 
-                  queryKey: ['task-status-counts'],
-                  refetchType: 'inactive' // Only refetch if not currently fetching
-                });
-              }
-            } else {
-              console.warn('[DeadModeInvestigation] Realtime connected on foreground - no invalidation');
-            }
-          } catch (e) {
-            console.warn('[DeadModeInvestigation] Foreground recovery error', { message: (e as any)?.message });
-          }
-          console.warn('[DeadModeInvestigation] Foreground recovery end');
-        }
-      }, 2000); // 2s debounce
+      
+      // Dispatch event for RealtimeProvider to handle recovery
+      if (document.visibilityState === 'visible') {
+        try {
+          window.dispatchEvent(new CustomEvent('app:visibility-change', { 
+            detail: { visible: true } 
+          }));
+        } catch {}
+      }
     };
     
     document.addEventListener('visibilitychange', handleVisibility);
     return () => {
       document.removeEventListener('visibilitychange', handleVisibility);
-      if (debounceTimer) clearTimeout(debounceTimer);
     };
   }, []);
 

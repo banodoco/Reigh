@@ -90,7 +90,7 @@ try {
     try {
       (supabase as any)?.realtime?.setAuth?.(session?.access_token ?? null);
       (supabase as any)?.realtime?.connect?.();
-      console.warn('[DeadModeInvestigation] Realtime auth sync', {
+      console.warn('[ReconnectionIssue][Auth] Realtime auth sync', {
         event,
         hasToken: !!session?.access_token,
         timestamp: Date.now()
@@ -100,13 +100,13 @@ try {
       if (event === 'SIGNED_IN' && typeof window !== 'undefined') {
         setTimeout(() => {
           try {
-            console.warn('[DeadModeInvestigation] Dispatching auth-heal');
+            console.warn('[ReconnectionIssue][Auth] Dispatching auth-heal');
             window.dispatchEvent(new CustomEvent('realtime:auth-heal'));
           } catch {}
         }, 1000); // Delay to let auth settle
       }
     } catch (e) {
-      console.warn('[DeadModeInvestigation] Realtime auth sync failed', e);
+      console.warn('[ReconnectionIssue][Auth] Realtime auth sync failed', e);
     }
   });
 } catch {}

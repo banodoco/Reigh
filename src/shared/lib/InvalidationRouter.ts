@@ -1,4 +1,5 @@
 import { QueryClient } from '@tanstack/react-query';
+import { runtimeConfig } from '@/shared/lib/config';
 
 type EventPayload = any;
 
@@ -28,6 +29,10 @@ function scheduleInvalidate(queryClient: QueryClient, key: any) {
 
 export function routeEvent(queryClient: QueryClient, event: InvalidationEvent) {
   try {
+    if (runtimeConfig.RECONNECTION_LOGS_ENABLED) {
+      // eslint-disable-next-line no-console
+      console.log('[ReconnectionIssue][AppInteraction] routeEvent', { type: event.type, payload: event.payload });
+    }
     switch (event.type) {
       case 'GENERATION_INSERT':
       case 'GENERATION_UPDATE':
@@ -61,6 +66,12 @@ export function routeEvent(queryClient: QueryClient, event: InvalidationEvent) {
       }
     }
   } catch {}
+  finally {
+    if (runtimeConfig.RECONNECTION_LOGS_ENABLED && flushTimer == null && pending.size > 0) {
+      // eslint-disable-next-line no-console
+      console.log('[ReconnectionIssue][RouterFlush] scheduled', { count: pending.size });
+    }
+  }
 }
 
 
