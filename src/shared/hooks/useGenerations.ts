@@ -26,17 +26,46 @@ export async function fetchGenerations(
   total: number;
   hasMore: boolean;
 }> {
-  console.log('[GalleryRenderDebug] 🔍 fetchGenerations STARTED with:', {
+  const startTime = Date.now();
+  const debugTag = '[ReconnectionFunctionDebug]';
+  
+  console.log(`${debugTag} 🔍 fetchGenerations STARTED with:`, {
     projectId,
     limit,
     offset,
     filters,
-    timestamp: Date.now()
+    timestamp: startTime,
+    supabaseClientExists: !!supabase,
+    supabaseUrl: 'protected_property',
+    supabaseKey: 'protected_property'
   });
   
   if (!projectId) {
-    console.log('[GalleryRenderDebug] ❌ fetchGenerations: No projectId provided');
+    console.log(`${debugTag} ❌ fetchGenerations: No projectId provided`);
     return { items: [], total: 0, hasMore: false };
+  }
+
+  // Test basic Supabase connectivity first
+  try {
+    const { data: testData, error: testError } = await supabase
+      .from('projects')
+      .select('id')
+      .eq('id', projectId)
+      .limit(1);
+    
+    console.log(`${debugTag} 🔍 Supabase connectivity test:`, {
+      testData,
+      testError,
+      duration: Date.now() - startTime
+    });
+    
+    if (testError) {
+      console.error(`${debugTag} ❌ Supabase connectivity test failed:`, testError);
+      throw new Error(`Supabase connectivity failed: ${testError.message}`);
+    }
+  } catch (connectivityError) {
+    console.error(`${debugTag} ❌ Critical: Supabase connection completely broken:`, connectivityError);
+    throw connectivityError;
   }
   
   // Build count query
@@ -110,16 +139,19 @@ export async function fetchGenerations(
   
   let totalCount = 0;
   if (!shouldSkipCount) {
-    console.log('[GalleryRenderDebug] 🔢 Executing count query...');
+    console.log(`${debugTag} 🔢 Executing count query...`);
     const { count, error: countError } = await countQuery;
     if (countError) {
-      console.error('[GalleryRenderDebug] ❌ Count query failed:', countError);
+      console.error(`${debugTag} ❌ Count query failed:`, countError);
       throw countError;
     }
     totalCount = count || 0;
-    console.log('[GalleryRenderDebug] ✅ Count query result:', totalCount);
+    console.log(`${debugTag} ✅ Count query result:`, { 
+      totalCount, 
+      duration: Date.now() - startTime 
+    });
   } else {
-    console.log('[GalleryRenderDebug] ⏭️ Skipping count query (shouldSkipCount=true)');
+    console.log(`${debugTag} ⏭️ Skipping count query (shouldSkipCount=true)`);
   }
 
   // 🚀 PERFORMANCE FIX: Optimize query - select only needed fields
@@ -209,10 +241,11 @@ export async function fetchGenerations(
 
   // 🚀 PERFORMANCE FIX: Use limit+1 pattern for fast pagination when count is skipped
   const fetchLimit = shouldSkipCount ? limit + 1 : limit;
-  console.log('[GalleryRenderDebug] 📊 Executing data query with range:', {
+  console.log(`${debugTag} 📊 Executing data query with range:`, {
     offset,
     fetchLimit,
-    rangeEnd: offset + fetchLimit - 1
+    rangeEnd: offset + fetchLimit - 1,
+    queryStartTime: Date.now() - startTime
   });
   
   const { data, error } = await dataQuery
@@ -220,14 +253,15 @@ export async function fetchGenerations(
     .range(offset, offset + fetchLimit - 1);
   
   if (error) {
-    console.error('[GalleryRenderDebug] ❌ Data query failed:', error);
+    console.error(`${debugTag} ❌ Data query failed:`, error);
     throw error;
   }
   
-  console.log('[GalleryRenderDebug] ✅ Data query result:', {
+  console.log(`${debugTag} ✅ Data query result:`, {
     dataLength: data?.length || 0,
     firstItemId: data?.[0]?.id?.substring(0, 8),
-    firstItemLocation: data?.[0]?.location?.substring(0, 50) + '...'
+    firstItemLocation: data?.[0]?.location?.substring(0, 50) + '...',
+    queryDuration: Date.now() - startTime
   });
 
   // Calculate hasMore and process results based on count strategy
@@ -413,6 +447,18 @@ export function useGenerations(
     searchTerm?: string;
   }
 ) {
+  // IMMEDIATE logging at the very start of the hook
+  console.log('[ReconnectionFunctionDebug] 🎯 useGenerations HOOK ENTRY:', {
+    projectId,
+    enabled,
+    page,
+    limit,
+    timestamp: Date.now()
+  });
+  
+  // Also log with a simpler tag to see if it appears
+  console.log('🚨 SIMPLE LOG: useGenerations called with projectId:', projectId);
+
   const offset = (page - 1) * limit;
   const queryClient = useQueryClient();
   const queryKey = ['unified-generations', 'project', projectId, page, limit, filters];
@@ -442,9 +488,27 @@ export function useGenerations(
     }
   );
 
+  // Add immediate logging before React Query to see if the hook is even called
+  const debugTag = '[ReconnectionFunctionDebug]';
+  console.log(`${debugTag} 📋 useGenerations hook called:`, {
+    projectId,
+    enabled: !!projectId && enabled,
+    queryKey: queryKey.join(':'),
+    timestamp: Date.now(),
+    willExecuteQuery: !!projectId && enabled
+  });
+
   const result = useQuery<GenerationsPaginatedResponse, Error>({
     queryKey: queryKey,
-    queryFn: () => fetchGenerations(projectId, limit, offset, filters),
+    queryFn: () => {
+      console.log(`${debugTag} 🔍 React Query executing fetchGenerations:`, {
+        projectId,
+        enabled: !!projectId && enabled,
+        queryKey: queryKey.join(':'),
+        timestamp: Date.now()
+      });
+      return fetchGenerations(projectId, limit, offset, filters);
+    },
     enabled: !!projectId && enabled,
     // Use `placeholderData` with `keepPreviousData` to prevent UI flashes on pagination/filter changes
     placeholderData: keepPreviousData,

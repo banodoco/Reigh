@@ -26,6 +26,96 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Crimson+Text:ital,wght@0,400;0,600;0,700;1,400;1,600;1,700&family=Inter:wght@400;500;700&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap" rel="stylesheet">
 
+    <script>
+      // Capture native WebSocket early and set up interference detection
+      (function () {
+        try {
+          if (typeof window !== 'undefined' && 'WebSocket' in window) {
+            // Capture native WebSocket and its properties
+            window.__NATIVE_WEBSOCKET__ = window.WebSocket;
+            window.__NATIVE_WEBSOCKET_CONSTANTS__ = {
+              CONNECTING: window.WebSocket.CONNECTING,
+              OPEN: window.WebSocket.OPEN,
+              CLOSING: window.WebSocket.CLOSING,
+              CLOSED: window.WebSocket.CLOSED,
+            };
+            window.__NATIVE_WEBSOCKET_PROTOTYPE__ = Object.getOwnPropertyDescriptors(window.WebSocket.prototype);
+            
+            // Set up interference detection
+            let interferenceCount = 0;
+            const originalWebSocket = window.WebSocket;
+            
+            // Monitor WebSocket property changes
+            const checkWebSocketIntegrity = () => {
+              const current = window.WebSocket;
+              if (current !== originalWebSocket) {
+                interferenceCount++;
+                console.error('[InterferenceDetection] WebSocket constructor has been replaced!', {
+                  interferenceCount,
+                  originalName: originalWebSocket.name,
+                  currentName: current.name,
+                  currentConstructor: current.toString().substring(0, 100),
+                  stack: new Error().stack
+                });
+                
+                // Auto-restore if detected
+                if (window.__NATIVE_WEBSOCKET__) {
+                  window.WebSocket = window.__NATIVE_WEBSOCKET__;
+                  console.warn('[InterferenceDetection] WebSocket constructor restored to native');
+                }
+              }
+              
+              // Check if prototype has been modified
+              const currentProto = Object.getOwnPropertyDescriptors(window.WebSocket.prototype);
+              const originalProto = window.__NATIVE_WEBSOCKET_PROTOTYPE__;
+              for (const key in originalProto) {
+                if (currentProto[key]?.value !== originalProto[key]?.value) {
+                  console.error('[InterferenceDetection] WebSocket prototype modified!', {
+                    property: key,
+                    original: originalProto[key]?.value?.toString?.().substring(0, 50),
+                    current: currentProto[key]?.value?.toString?.().substring(0, 50)
+                  });
+                }
+              }
+            };
+            
+            // Check every 2 seconds for interference
+            setInterval(checkWebSocketIntegrity, 2000);
+            
+            // Set up MutationObserver to detect script injections
+            if ('MutationObserver' in window) {
+              const observer = new MutationObserver((mutations) => {
+                mutations.forEach((mutation) => {
+                  if (mutation.type === 'childList') {
+                    mutation.addedNodes.forEach((node) => {
+                      if (node.nodeName === 'SCRIPT') {
+                        const script = node;
+                        if (script.src && (script.src.includes('websocket') || script.src.includes('socket'))) {
+                          console.warn('[InterferenceDetection] Potential WebSocket-related script loaded:', script.src);
+                        }
+                        if (script.textContent && (script.textContent.includes('WebSocket') || script.textContent.includes('socket'))) {
+                          console.warn('[InterferenceDetection] Script with WebSocket code detected:', {
+                            content: script.textContent.substring(0, 200),
+                            src: script.src || 'inline'
+                          });
+                        }
+                      }
+                    });
+                  }
+                });
+              });
+              observer.observe(document, { childList: true, subtree: true });
+            }
+            
+            // Minimal one-time diagnostic
+            console.warn('[RealtimeResumeBug] Native WebSocket captured early with interference detection', window.__NATIVE_WEBSOCKET_CONSTANTS__);
+          }
+        } catch (e) {
+          console.error('[InterferenceDetection] Setup failed:', e);
+        }
+      })();
+    </script>
+
     <!-- Meta description for SEO and social sharing -->
     <meta name="description" content="Reigh is a tool for exploring the emerging artform of image-guided video. Create stunning motion by travelling between images with full creative control." />
     <meta name="author" content="Reigh" />

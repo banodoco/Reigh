@@ -115,12 +115,22 @@ export const useFalImageGeneration = (): UseFalImageGenerationResult => {
 
   const createGenerationTask = useCallback(
     async (params: FalImageGenerationParams, selectedProjectId: string): Promise<CreatedTaskInfo | null> => {
+      const debugTag = '[ReconnectionFunctionDebug]';
+      console.log(`${debugTag} 🚀 createGenerationTask called:`, {
+        hasParams: !!params,
+        selectedProjectId,
+        toolType: params?.toolType,
+        timestamp: Date.now()
+      });
       console.log("[useFalImageGeneration] createGenerationTask CALLED for API.");
+      
       if (!selectedProjectId) {
+        console.error(`${debugTag} ❌ No project selected`);
         toast.error("No project selected. Cannot create task.");
         return null;
       }
       if (!params.toolType) {
+        console.error(`${debugTag} ❌ No toolType specified`);
         toast.error("Task type (toolType) not specified in params. Cannot create task.");
         return null;
       }
@@ -236,6 +246,18 @@ export const useFalImageGeneration = (): UseFalImageGenerationResult => {
 
         // Use Supabase Edge Function to create task
         toast.info(`Creating '${toolType}' task via Supabase...`);
+        
+        const functionStartTime = Date.now();
+        const debugTag = '[ReconnectionFunctionDebug]';
+        
+        console.log(`${debugTag} 🚀 Invoking create_task function:`, {
+          taskId,
+          toolType,
+          selectedProjectId,
+          supabaseClientExists: !!supabase,
+          functionStartTime,
+          bodySize: JSON.stringify(taskDbParamsForApi).length
+        });
 
         const { data, error } = await supabase.functions.invoke('create_task', {
             body: {
@@ -246,9 +268,17 @@ export const useFalImageGeneration = (): UseFalImageGenerationResult => {
                 dependant_on: null
             }
         });
+        
+        console.log(`${debugTag} 🚀 create_task function result:`, {
+          success: !error,
+          error: error?.message || null,
+          data: data ? 'present' : 'missing',
+          duration: Date.now() - functionStartTime,
+          timestamp: Date.now()
+        });
 
         if (error) {
-            console.error('[useFalImageGeneration] Task creation error:', error);
+            console.error(`${debugTag} ❌ Task creation error:`, error);
             throw new Error(error.message || 'Failed to create task');
         }
 

@@ -252,22 +252,93 @@ export function useResurrectionPollingConfig(
     return (query: any) => {
       try {
         const now = Date.now();
+        const timeSinceLastCheck = now - lastRealtimeCheck;
+        
+        // Log every call to see if we're even getting here
+        console.log(`[RealtimeDetector:${debugTag}] Polling call`, {
+          timeSinceLastCheck,
+          cachedRealtimeState,
+          willCheckRealtime: timeSinceLastCheck > 5000,
+          timestamp: now
+        });
+        
         // Throttle realtime checks to reduce overhead - only check every 5s
-        if (now - lastRealtimeCheck > 5000) {
-          const socket: any = (supabase as any)?.realtime?.socket;
-          cachedRealtimeState = !!socket?.isConnected?.();
+        if (timeSinceLastCheck > 5000) {
+          const rt: any = (supabase as any)?.realtime;
+          const socket: any = rt?.socket || rt?.conn;
+          const channels = (supabase as any)?.getChannels
+            ? (supabase as any).getChannels()
+            : (Array.isArray(rt?.channels) ? rt.channels : []);
+          const anyJoined = Array.isArray(channels) && channels.some((c: any) => c?.state === 'joined');
+          const isConnecting = (socket?.readyState === 0) || (socket?.connectionState === 'connecting');
+          const socketConnected = !!socket?.isConnected?.();
+          const socketOpen = (socket?.readyState === 1); // WebSocket.OPEN
+          // Trust readyState over isConnected() since Supabase's internal tracking can lag
+          cachedRealtimeState = anyJoined || socketConnected || socketOpen || isConnecting;
+          
+          // Debug log to understand what's happening
+          console.warn(`[RealtimeDetector:${debugTag}] State check`, {
+            hasRt: !!rt,
+            hasSocket: !!socket,
+            socketReadyState: socket?.readyState,
+            socketConnectionState: socket?.connectionState,
+            socketConnected,
+            socketOpen,
+            isConnecting,
+            channelsCount: channels?.length || 0,
+            channelsFromGetChannels: !!(supabase as any)?.getChannels,
+            channelsFromRt: Array.isArray(rt?.channels),
+            anyJoined,
+            joinedChannels: channels?.filter((c: any) => c?.state === 'joined').map((c: any) => c.topic) || [],
+            allChannelStates: channels?.map((c: any) => ({ topic: c.topic, state: c.state })) || [],
+            finalState: cachedRealtimeState,
+            timestamp: now
+          });
+          
           lastRealtimeCheck = now;
         }
         
         const realtimeEnabled = runtimeConfig.REALTIME_ENABLED !== false;
         if (!cachedRealtimeState || !realtimeEnabled) {
+          // Log when we think realtime is down
+          if (cachedRealtimeState !== false) {
+            console.warn(`[RealtimeDetector:${debugTag}] Realtime detected as DOWN`, {
+              cachedRealtimeState,
+              realtimeEnabled,
+              timestamp: now
+            });
+          }
+          // If any channel is currently joined, treat realtime as up even if socket sample is stale
+          try {
+            const rt: any = (supabase as any)?.realtime;
+            const channels = (supabase as any)?.getChannels
+              ? (supabase as any).getChannels()
+              : (Array.isArray(rt?.channels) ? rt.channels : []);
+            const anyJoined = Array.isArray(channels) && channels.some((c: any) => c?.state === 'joined');
+            const socket: any = rt?.socket || rt?.conn;
+            const isConnecting = (socket?.readyState === 0) || (socket?.connectionState === 'connecting');
+            const socketOpen = (socket?.readyState === 1); // WebSocket.OPEN
+            if (anyJoined || isConnecting || socketOpen) {
+              return baseFn(query);
+            }
+          } catch {}
           // Grace window after visibilitychange to allow healing
           try {
             const lastVis = (window as any).__VIS_CHANGE_AT__ || 0;
             const sinceVis = lastVis ? (now - lastVis) : Infinity;
-            if (sinceVis < 4000) {
+            if (sinceVis < 8000) {
+              console.warn(`[RealtimeDetector:${debugTag}] In grace period after visibility change`, {
+                sinceVisMs: sinceVis,
+                gracePeriodMs: 8000,
+                returningInterval: 6000
+              });
               // Suppress boost logs and return a short interval to keep UI responsive while healing
               return addJitter(6000, 800);
+            } else {
+              console.log(`[RealtimeDetector:${debugTag}] Grace period expired`, {
+                sinceVisMs: sinceVis,
+                gracePeriodMs: 8000
+              });
             }
           } catch {}
           // Boost polling when realtime is down
@@ -317,11 +388,15 @@ export function useResurrectionPollingConfig(
             const logKey = `realtime-down-${debugTag}`;
             const lastLog = (window as any)[logKey] || 0;
             if (now - lastLog > 30000) {
-              const socket: any = (supabase as any)?.realtime?.socket;
-              const channels = (supabase as any)?.getChannels ? (supabase as any).getChannels() : [];
+              const rt: any = (supabase as any)?.realtime;
+              const socket: any = rt?.socket || rt?.conn;
+              const channels = (supabase as any)?.getChannels
+                ? (supabase as any).getChannels()
+                : (Array.isArray(rt?.channels) ? rt.channels : []);
               const snapshot = {
                 connected: !!socket?.isConnected?.(),
                 connState: socket?.connectionState,
+                readyState: socket?.readyState,
                 channelCount: channels?.length || 0,
                 channelTopics: (channels || []).slice(0, 5).map((c: any) => c.topic),
               };
@@ -355,6 +430,13 @@ export function useResurrectionPollingConfig(
           } catch {}
 
           return finalInterval;
+        } else {
+          // Log when realtime comes back online
+          console.warn(`[RealtimeDetector:${debugTag}] Realtime detected as UP - using normal polling`, {
+            cachedRealtimeState,
+            realtimeEnabled,
+            timestamp: now
+          });
         }
       } catch {}
       return baseFn(query);

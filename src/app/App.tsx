@@ -243,96 +243,15 @@ function App() {
       console.error('[DebugHelpers] Failed to initialize debug helpers:', error);
     }
     
-    // Install WebSocket constructor probe once
-    try {
-      const key = '__WS_PROBE_INSTALLED__';
-      if (!(window as any)[key]) {
-        (window as any)[key] = true;
-        const OriginalWS = window.WebSocket;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (window as any).WebSocket = function(url: string, protocols?: string | string[]) {
-          try { console.warn('[DeadModeInvestigation] WS new', { url, protocols }); } catch {}
-          const ws = protocols ? new OriginalWS(url, protocols) : new OriginalWS(url);
-          try {
-            ws.addEventListener('open', () => console.warn('[DeadModeInvestigation] WS open', { url }));
-            ws.addEventListener('error', (e) => console.warn('[DeadModeInvestigation] WS error', { url }));
-            ws.addEventListener('close', (e) => console.warn('[DeadModeInvestigation] WS close', { url, code: (e as CloseEvent)?.code, reason: (e as CloseEvent)?.reason }));
-          } catch {}
-          return ws;
-        } as any;
-      }
-    } catch {}
+    // WebSocket monkeypatch REMOVED - was interfering with Supabase realtime client
+    // The Supabase Phoenix client requires native WebSocket constructor semantics
+    console.warn('[RealtimeResumeBug] Native WebSocket preserved for Supabase compatibility');
 
     return () => {
     };
   }, []);
 
-  // Foreground recovery: when tab becomes visible, recover from dead mode (throttled)
-  React.useEffect(() => {
-    let debounceTimer: NodeJS.Timeout;
-    let lastRecovery = 0;
-    const RECOVERY_COOLDOWN = 10000; // 10s cooldown to prevent storms
-    
-    const handleVisibility = () => {
-      try { (window as any).__VIS_CHANGE_AT__ = Date.now(); } catch {}
-      try {
-        const socket: any = (window as any)?.supabase?.realtime?.socket;
-        console.warn('[DeadModeInvestigation] visibilitychange', {
-          visibility: document.visibilityState,
-          connected: !!socket?.isConnected?.(),
-          state: socket?.connectionState,
-          timestamp: Date.now()
-        });
-      } catch {}
-      if (debounceTimer) clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => {
-        if (document.visibilityState === 'visible') {
-          const now = Date.now();
-          if (now - lastRecovery < RECOVERY_COOLDOWN) {
-            console.warn('[DeadModeInvestigation] Foreground recover skipped (cooldown)', {
-              sinceMs: now - lastRecovery,
-              cooldownMs: RECOVERY_COOLDOWN
-            });
-            return;
-          }
-          lastRecovery = now;
-          
-          console.warn('[DeadModeInvestigation] Foreground recovery begin');
-          
-          // TARGETED recovery: only invalidate if realtime is actually down
-          try {
-            const socket: any = (window as any)?.supabase?.realtime?.socket;
-            const isRealtimeDown = !socket?.isConnected?.();
-            
-            if (isRealtimeDown) {
-              const qc = (window as any).__REACT_QUERY_CLIENT__;
-              if (qc) {
-                // Only invalidate stale data, not everything
-                console.warn('[DeadModeInvestigation] Invalidate during visibility recovery', {
-                  keys: [['task-status-counts']]
-                });
-                qc.invalidateQueries({ 
-                  queryKey: ['task-status-counts'],
-                  refetchType: 'inactive' // Only refetch if not currently fetching
-                });
-              }
-            } else {
-              console.warn('[DeadModeInvestigation] Realtime connected on foreground - no invalidation');
-            }
-          } catch (e) {
-            console.warn('[DeadModeInvestigation] Foreground recovery error', { message: (e as any)?.message });
-          }
-          console.warn('[DeadModeInvestigation] Foreground recovery end');
-        }
-      }, 2000); // 2s debounce
-    };
-    
-    document.addEventListener('visibilitychange', handleVisibility);
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibility);
-      if (debounceTimer) clearTimeout(debounceTimer);
-    };
-  }, []);
+  // Resume handling is centralized in RealtimeProvider
 
   return (
     <QueryClientProvider client={queryClient}>

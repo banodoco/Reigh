@@ -2,33 +2,73 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://wczysqzxlwdndgxitrvc.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndjenlzcXp4bHdkbmRneGl0cnZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE1MDI4NjgsImV4cCI6MjA2NzA3ODg2OH0.r-4RyHZiDibUjgdgDDM2Vo6x3YpgIO5-BTwfkB2qyYA";
-
-// Install WebSocket instrumentation as early as possible
-try {
-  if (typeof window !== 'undefined') {
-    const key = '__WS_PROBE_INSTALLED__';
-    if (!(window as any)[key]) {
-      (window as any)[key] = true;
-      const OriginalWS = window.WebSocket;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (window as any).WebSocket = function(url: string, protocols?: string | string[]) {
-        try { console.warn('[DeadModeInvestigation] WS new', { url, protocols }); } catch {}
-        const ws = protocols ? new OriginalWS(url, protocols) : new OriginalWS(url);
-        try {
-          ws.addEventListener('open', () => console.warn('[DeadModeInvestigation] WS open', { url }));
-          ws.addEventListener('error', () => console.warn('[DeadModeInvestigation] WS error', { url }));
-          ws.addEventListener('close', (e) => console.warn('[DeadModeInvestigation] WS close', { url, code: (e as CloseEvent)?.code, reason: (e as CloseEvent)?.reason }));
-        } catch {}
-        return ws;
-      } as any;
-    }
-  }
-} catch {}
+export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://wczysqzxlwdndgxitrvc.supabase.co";
+export const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndjenlzcXp4bHdkbmRneGl0cnZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE1MDI4NjgsImV4cCI6MjA2NzA3ODg2OH0.r-4RyHZiDibUjgdgDDM2Vo6x3YpgIO5-BTwfkB2qyYA";
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
+
+// Capture and preserve the native WebSocket constructor with interference protection
+let NATIVE_WEBSOCKET: any;
+try {
+  if (typeof window !== 'undefined') {
+    // First try the early-captured version from index.html
+    NATIVE_WEBSOCKET = (window as any).__NATIVE_WEBSOCKET__;
+    
+    // Verify the captured WebSocket is actually native
+    if (NATIVE_WEBSOCKET) {
+      const isNative = NATIVE_WEBSOCKET.toString().includes('[native code]') || 
+                      NATIVE_WEBSOCKET.name === 'WebSocket';
+      if (!isNative) {
+        console.error('[InterferenceDetection] Captured WebSocket appears to be monkeypatched!', {
+          name: NATIVE_WEBSOCKET.name,
+          toString: NATIVE_WEBSOCKET.toString().substring(0, 100)
+        });
+      }
+    }
+    
+    // If not available, capture current WebSocket (assuming it's still native)
+    if (!NATIVE_WEBSOCKET && 'WebSocket' in window) {
+      NATIVE_WEBSOCKET = window.WebSocket;
+      (window as any).__NATIVE_WEBSOCKET__ = NATIVE_WEBSOCKET;
+      console.warn('[RealtimeResumeBug] Native WebSocket captured in client.ts');
+    }
+    
+    // Always ensure global WebSocket is the native version before client creation
+    if (NATIVE_WEBSOCKET && window.WebSocket !== NATIVE_WEBSOCKET) {
+      console.warn('[InterferenceDetection] WebSocket constructor mismatch detected - restoring native');
+      window.WebSocket = NATIVE_WEBSOCKET;
+      console.warn('[RealtimeResumeBug] Global WebSocket restored to native in client.ts');
+    }
+    
+    // Set up continuous monitoring for WebSocket interference
+    if (typeof (window as any).__WS_MONITOR_ACTIVE__ === 'undefined') {
+      (window as any).__WS_MONITOR_ACTIVE__ = true;
+      
+      // Monitor every 5 seconds
+      setInterval(() => {
+        if (window.WebSocket !== NATIVE_WEBSOCKET) {
+          console.error('[InterferenceDetection] WebSocket constructor changed during runtime!', {
+            expected: NATIVE_WEBSOCKET?.name,
+            actual: window.WebSocket?.name,
+            timestamp: Date.now()
+          });
+          
+          // Auto-restore
+          window.WebSocket = NATIVE_WEBSOCKET;
+          console.warn('[InterferenceDetection] WebSocket constructor auto-restored');
+          
+          // Trigger realtime recovery
+          try {
+            window.dispatchEvent(new CustomEvent('realtime:interference-detected'));
+          } catch {}
+        }
+      }, 5000);
+    }
+  }
+} catch (e) {
+  console.error('[InterferenceDetection] Failed to capture/restore native WebSocket:', e);
+}
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
@@ -58,6 +98,21 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
   db: {
     schema: 'public',
   },
+  // Ensure Realtime uses the native WebSocket constructor
+  realtime: {
+    // Explicitly provide the native WebSocket constructor to bypass any monkeypatching
+    transport: NATIVE_WEBSOCKET || (typeof WebSocket !== 'undefined' ? WebSocket : undefined),
+    // Additional realtime-js options to ensure robust connection
+    heartbeatIntervalMs: 30000,
+    longpollerTimeout: 20000,
+    reconnectAfterMs: function(tries: number) {
+      return [1000, 2000, 5000, 10000][tries - 1] || 10000;
+    },
+    // Ensure params are passed correctly to Phoenix socket
+    params: {},
+    // Force logger to be disabled to avoid console spam
+    logger: undefined,
+  } as any,
 });
 
 // Auto-login for dev mode
@@ -81,32 +136,541 @@ if (import.meta.env.VITE_APP_ENV === 'dev') {
 try {
   if (typeof window !== 'undefined') {
     (window as any).supabase = supabase;
+    
+    // Add realtime debugging helpers
+    (window as any).realtimeDebug = {
+      checkPublication: async () => {
+        try {
+          const { data, error } = await supabase.functions.invoke('check-realtime-publication');
+          if (error) {
+            console.error('[RealtimeRefactor] Publication check failed:', error);
+            return { error };
+          }
+          console.log('[RealtimeRefactor] Publication status:', data);
+          return data;
+        } catch (e) {
+          console.error('[RealtimeRefactor] Publication check error:', e);
+          return { error: e.message };
+        }
+      },
+      getSocketState: () => {
+        const rt = (supabase as any)?.realtime;
+        const socket = rt?.socket || rt?.conn;
+        return {
+          exists: !!socket,
+          readyState: socket?.readyState,
+          url: socket?.url,
+          connectionState: socket?.connectionState,
+          totalChannels: rt?.channels?.length || 0,
+          channels: rt?.channels?.map((c: any, index: number) => {
+            const bindings = c.bindings;
+            const bindingsCount = !bindings ? 0 : 
+              Array.isArray(bindings) ? bindings.length : 
+              typeof bindings === 'object' ? Object.keys(bindings).length : 0;
+              
+            return {
+              index,
+              topic: c.topic,
+              state: c.state,
+              bindings: bindingsCount,
+              bindingsDetail: Array.isArray(bindings) ? bindings.map((b: any) => ({
+                type: b.type,
+                filter: b.filter,
+                event: b.event
+              })) : typeof bindings === 'object' ? Object.entries(bindings).map(([key, handlers]) => ({
+                event: key,
+                handlersCount: Array.isArray(handlers) ? handlers.length : 1,
+                isPostgresChanges: key.includes('postgres_changes')
+              })) : [],
+              rawBindings: bindings,
+              hasPostgresChanges: typeof bindings === 'object' && Object.keys(bindings).some(k => k.includes('postgres_changes'))
+            };
+          }) || []
+        };
+      },
+      testPostgresChanges: async (projectId: string) => {
+        console.log('[RealtimeRefactor] Testing postgres_changes by creating a test task...');
+        try {
+          // First, let's check what columns exist in tasks table
+          const { data: existingTasks, error: fetchError } = await supabase
+            .from('tasks')
+            .select('*')
+            .limit(1);
+            
+          if (fetchError) {
+            console.error('[RealtimeRefactor] Failed to fetch existing tasks:', fetchError);
+            return { error: fetchError };
+          }
+          
+          console.log('[RealtimeRefactor] Sample task structure:', existingTasks?.[0] ? Object.keys(existingTasks[0]) : 'No tasks found');
+          
+          // Try to create a minimal task with only required fields
+          const { data, error } = await supabase
+            .from('tasks')
+            .insert({
+              project_id: projectId,
+              status: 'Queued',
+              function_name: 'test-realtime-debug',
+              params: { test: true, timestamp: Date.now() }
+            })
+            .select()
+            .single();
+          
+          if (error) {
+            console.error('[RealtimeRefactor] Test task creation failed:', error);
+            
+            // Try even more minimal insert
+            console.log('[RealtimeRefactor] Trying minimal insert...');
+            const { data: minimalData, error: minimalError } = await supabase
+              .from('tasks')
+              .insert({
+                project_id: projectId
+              })
+              .select()
+              .single();
+              
+            if (minimalError) {
+              console.error('[RealtimeRefactor] Minimal insert also failed:', minimalError);
+              return { error: minimalError };
+            }
+            
+            console.log('[RealtimeRefactor] Minimal test task created:', minimalData);
+            
+            // Clean up minimal task
+            setTimeout(async () => {
+              try {
+                await supabase.from('tasks').delete().eq('id', minimalData.id);
+                console.log('[RealtimeRefactor] Minimal test task cleaned up');
+              } catch (e) {
+                console.warn('[RealtimeRefactor] Failed to clean up minimal test task:', e);
+              }
+            }, 5000);
+            
+            return { success: true, taskId: minimalData.id, wasMinimal: true };
+          }
+          
+          console.log('[RealtimeRefactor] Test task created:', data);
+          
+          // Clean up after 5 seconds
+          setTimeout(async () => {
+            try {
+              await supabase.from('tasks').delete().eq('id', data.id);
+              console.log('[RealtimeRefactor] Test task cleaned up');
+            } catch (e) {
+              console.warn('[RealtimeRefactor] Failed to clean up test task:', e);
+            }
+          }, 5000);
+          
+          return { success: true, taskId: data.id };
+        } catch (e) {
+          console.error('[RealtimeRefactor] Test failed:', e);
+          return { error: e.message };
+        }
+      }
+    };
+    try {
+      const rt: any = (supabase as any)?.realtime;
+      const usingCustom = !!rt?.transport;
+      console.warn('[RealtimeRefactor] Realtime client initialized', {
+        hasNative: !!NATIVE_WEBSOCKET,
+        nativeConstructorName: NATIVE_WEBSOCKET?.name || 'Unknown',
+        usingCustomTransport: usingCustom,
+        transportName: rt?.transport?.name || 'Default',
+        transportIsNative: rt?.transport === NATIVE_WEBSOCKET,
+        heartbeatIntervalMs: rt?.heartbeatIntervalMs,
+        longpollerTimeout: rt?.longpollerTimeout,
+        endPoint: rt?.endPoint,
+        params: rt?.params
+      });
+      
+      // Add socket lifecycle event listeners for deep debugging
+      if (rt) {
+        const originalOnOpen = rt.onOpen;
+        const originalOnClose = rt.onClose;
+        const originalOnError = rt.onError;
+        
+        rt.onOpen = function() {
+          console.warn('[RealtimeRefactor] Socket OPENED', {
+            readyState: rt.conn?.readyState,
+            url: rt.conn?.url,
+            timestamp: Date.now()
+          });
+          if (originalOnOpen) originalOnOpen.apply(this, arguments);
+        };
+        
+        rt.onClose = function() {
+          console.warn('[RealtimeRefactor] Socket CLOSED', {
+            readyState: rt.conn?.readyState,
+            timestamp: Date.now()
+          });
+          if (originalOnClose) originalOnClose.apply(this, arguments);
+        };
+        
+        rt.onError = function(error: any) {
+          console.error('[RealtimeRefactor] Socket ERROR', {
+            error: error?.message || error,
+            readyState: rt.conn?.readyState,
+            timestamp: Date.now()
+          });
+          if (originalOnError) originalOnError.apply(this, arguments);
+        };
+      }
+
+      // Immediately test socket creation to catch issues early
+      setTimeout(() => {
+        try {
+          const testSocket: any = rt?.socket || rt?.conn;
+          console.warn('[RealtimeRefactor] Initial socket check', {
+            socketExists: !!testSocket,
+            socketConstructor: testSocket?.constructor?.name,
+            connectionState: testSocket?.connectionState,
+            readyState: testSocket?.readyState,
+            transport: testSocket?.transport?.name || 'Unknown',
+            hasConn: !!testSocket?.conn,
+            url: testSocket?.url
+          });
+          
+          // If socket doesn't exist, try to understand why
+          if (!testSocket) {
+            console.warn('[RealtimeRefactor] No socket found - checking realtime client state');
+            console.warn('[RealtimeResumeBug] rt keys:', Object.keys(rt || {}));
+            console.warn('[RealtimeResumeBug] rt.socket explicitly:', rt?.socket);
+            console.warn('[RealtimeResumeBug] rt._socket:', rt?._socket);
+            console.warn('[RealtimeResumeBug] rt._client:', rt?._client);
+            
+            // Check for interference in the transport
+            if (rt?.transport) {
+              const transportIntegrity = {
+                isNative: rt.transport === NATIVE_WEBSOCKET,
+                name: rt.transport.name,
+                hasNativeCode: rt.transport.toString().includes('[native code]'),
+                constants: {
+                  CONNECTING: rt.transport.CONNECTING,
+                  OPEN: rt.transport.OPEN,
+                  CLOSING: rt.transport.CLOSING,
+                  CLOSED: rt.transport.CLOSED
+                }
+              };
+              console.warn('[InterferenceDetection] Transport integrity check:', {
+                isNative: transportIntegrity.isNative,
+                name: transportIntegrity.name,
+                hasNativeCode: transportIntegrity.hasNativeCode,
+                CONNECTING: transportIntegrity.constants.CONNECTING,
+                OPEN: transportIntegrity.constants.OPEN,
+                CLOSING: transportIntegrity.constants.CLOSING,
+                CLOSED: transportIntegrity.constants.CLOSED
+              });
+              
+              // If transport is compromised, try to fix it
+              if (!transportIntegrity.isNative && NATIVE_WEBSOCKET) {
+                console.error('[InterferenceDetection] Transport is not native - fixing...');
+                rt.transport = NATIVE_WEBSOCKET;
+              }
+            }
+            
+            // Try to force socket creation by calling connect
+            try {
+              console.warn('[RealtimeRefactor] Attempting to force socket creation...');
+              rt?.connect?.();
+              setTimeout(() => {
+                const forcedSocket = rt?.socket || rt?.conn;
+                console.warn('[RealtimeRefactor] After forced connect - socket exists:', !!forcedSocket);
+                if (forcedSocket) {
+                  console.warn('[InterferenceDetection] Socket creation successful after manual connect');
+                } else {
+                  console.error('[InterferenceDetection] Socket creation failed even after manual connect - investigating deeper...');
+                  
+                  // Deep dive into WHY socket creation is failing
+                  console.error('[InterferenceDetection] === DEEP SOCKET CREATION FAILURE ANALYSIS ===');
+                  console.error('[InterferenceDetection] WebSocket constructor check:', {
+                    globalWebSocket: window.WebSocket?.name,
+                    nativeWebSocket: NATIVE_WEBSOCKET?.name,
+                    areEqual: window.WebSocket === NATIVE_WEBSOCKET,
+                    globalToString: window.WebSocket?.toString().substring(0, 100),
+                    nativeToString: NATIVE_WEBSOCKET?.toString().substring(0, 100)
+                  });
+                  
+                  // Test direct WebSocket creation
+                  try {
+                    const testWS = new WebSocket('wss://echo.websocket.org');
+                    console.error('[InterferenceDetection] Direct WebSocket creation: SUCCESS');
+                    testWS.close();
+                  } catch (e) {
+                    console.error('[InterferenceDetection] Direct WebSocket creation: FAILED', e);
+                  }
+                  
+                  // Test with native WebSocket if different
+                  if (NATIVE_WEBSOCKET && window.WebSocket !== NATIVE_WEBSOCKET) {
+                    try {
+                      const testNativeWS = new NATIVE_WEBSOCKET('wss://echo.websocket.org');
+                      console.error('[InterferenceDetection] Native WebSocket creation: SUCCESS');
+                      testNativeWS.close();
+                    } catch (e) {
+                      console.error('[InterferenceDetection] Native WebSocket creation: FAILED', e);
+                    }
+                  }
+                  
+                  // Check if Phoenix Socket is the issue
+                  console.error('[InterferenceDetection] Phoenix Socket investigation:', {
+                    hasPhoenix: typeof (window as any).Phoenix !== 'undefined',
+                    hasSocket: typeof (window as any).Phoenix?.Socket !== 'undefined'
+                  });
+                  
+                  // Try to manually create a Phoenix Socket if available
+                  try {
+                    if ((window as any).Phoenix?.Socket) {
+                      const phoenixSocket = new (window as any).Phoenix.Socket('wss://echo.websocket.org');
+                      console.error('[InterferenceDetection] Phoenix Socket creation: SUCCESS');
+                    }
+                  } catch (e) {
+                    console.error('[InterferenceDetection] Phoenix Socket creation: FAILED', e);
+                  }
+                  
+                  console.error('[InterferenceDetection] === END DEEP ANALYSIS ===');
+                }
+              }, 500);
+            } catch (e) {
+              console.error('[InterferenceDetection] Failed to force socket creation:', e);
+            }
+          }
+        } catch (e) {
+          console.error('[RealtimeResumeBug] Initial socket check failed:', e);
+        }
+      }, 100);
+
+      // Verify realtime publication health
+      setTimeout(async () => {
+        try {
+          console.warn('[RealtimeRefactor] Checking realtime publication health...');
+          const { data, error } = await supabase.functions.invoke('check-realtime-publication');
+          if (error) {
+            console.error('[RealtimeRefactor] Publication check failed:', error);
+          } else {
+            console.warn('[RealtimeRefactor] Publication status:', data);
+            // Note: Edge function returns guidance, not actual health check
+            // Real publication setup is handled by migrations
+            if (data?.message) {
+              console.log('[RealtimeRefactor] Publication guidance:', data.message);
+              console.log('[RealtimeRefactor] Expected tables:', data.expectedTables);
+            }
+          }
+        } catch (e) {
+          console.warn('[RealtimeRefactor] Publication check unavailable (edge function not deployed?):', e.message);
+        }
+      }, 2000);
+    } catch (e) {
+      console.error('[RealtimeRefactor] Failed to inspect realtime client:', e);
+    }
   }
 } catch {}
+
+// Set up global error monitoring for interference detection
+if (typeof window !== 'undefined') {
+  // Capture original error handler
+  const originalOnError = window.onerror;
+  const originalOnUnhandledRejection = window.onunhandledrejection;
+  
+  window.onerror = function(message, source, lineno, colno, error) {
+    if (typeof message === 'string' && (message.includes('WebSocket') || message.includes('realtime') || message.includes('supabase'))) {
+      console.error('[InterferenceDetection] WebSocket/Realtime related error detected:', {
+        message, source, lineno, colno, error: error?.message
+      });
+    }
+    return originalOnError ? originalOnError.call(this, message, source, lineno, colno, error) : false;
+  };
+  
+  window.onunhandledrejection = function(event) {
+    if (event.reason && (event.reason.message?.includes('WebSocket') || event.reason.message?.includes('realtime'))) {
+      console.error('[InterferenceDetection] Unhandled WebSocket/Realtime rejection:', event.reason);
+    }
+    return originalOnUnhandledRejection ? originalOnUnhandledRejection.call(this, event) : false;
+  };
+}
 
 // Ensure Realtime socket always has a fresh auth token and nudge reconnects
 try {
   supabase.auth.onAuthStateChange((event, session) => {
+    const debugTag = '[ReconnectionFunctionDebug]';
     try {
       (supabase as any)?.realtime?.setAuth?.(session?.access_token ?? null);
       (supabase as any)?.realtime?.connect?.();
-      console.warn('[DeadModeInvestigation] Realtime auth sync', {
+      console.warn(`${debugTag} 🔐 Auth state changed:`, {
         event,
         hasToken: !!session?.access_token,
-        timestamp: Date.now()
+        hasUser: !!session?.user,
+        timestamp: Date.now(),
+        supabaseClientExists: !!supabase,
+        realtimeExists: !!(supabase as any)?.realtime
       });
       
       // Trigger heal on SIGNED_IN events (occurs on tab resume)
       if (event === 'SIGNED_IN' && typeof window !== 'undefined') {
         setTimeout(() => {
           try {
-            console.warn('[DeadModeInvestigation] Dispatching auth-heal');
+            console.warn(`${debugTag} 🔐 Dispatching auth-heal`);
             window.dispatchEvent(new CustomEvent('realtime:auth-heal'));
           } catch {}
         }, 1000); // Delay to let auth settle
       }
     } catch (e) {
-      console.warn('[DeadModeInvestigation] Realtime auth sync failed', e);
+      console.error('[InterferenceDetection] Realtime auth sync failed - possible interference:', e);
     }
   });
-} catch {}
+} catch (e) {
+  console.error('[InterferenceDetection] Failed to set up auth state change listener:', e);
+}
+
+// Global debug function to trigger manual diagnostics
+(window as any).__DEBUG_RECONNECTION__ = () => {
+  console.log('[ReconnectionFunctionDebug] 🔍 Manual diagnostic triggered by user');
+  
+  // Check if queries are enabled/working
+  const queryClient = (window as any).__REACT_QUERY_CLIENT__;
+  if (queryClient) {
+    const queryCache = queryClient.getQueryCache();
+    const queries = queryCache.getAll();
+    console.log('[ReconnectionFunctionDebug] 📊 Current React Query state:', {
+      totalQueries: queries.length,
+      enabledQueries: queries.filter(q => !q.options.enabled === false).length,
+      stalledQueries: queries.filter(q => q.state.fetchStatus === 'fetching').length,
+      errorQueries: queries.filter(q => q.state.status === 'error').length,
+      successQueries: queries.filter(q => q.state.status === 'success').length
+    });
+    
+    // Log specific generation queries
+    const generationQueries = queries.filter(q => 
+      q.queryKey[0] === 'unified-generations' || 
+      q.queryKey.includes('generations')
+    );
+    console.log('[ReconnectionFunctionDebug] 🖼️ Generation queries:', generationQueries.map(q => ({
+      queryKey: q.queryKey,
+      status: q.state.status,
+      fetchStatus: q.state.fetchStatus,
+      enabled: q.options.enabled,
+      dataUpdatedAt: q.state.dataUpdatedAt,
+      error: q.state.error?.message
+    })));
+  }
+  
+  // Trigger diagnostics
+  return diagnoseSupabaseState();
+};
+
+// Make React Query client available globally for debugging
+setTimeout(() => {
+  try {
+    const app = document.querySelector('#root')?._reactInternalInstance || 
+               document.querySelector('#root')?._reactInternals;
+    if (app) {
+      // Try to find QueryClient in React fiber tree
+      let fiber = app;
+      let queryClient = null;
+      while (fiber && !queryClient) {
+        if (fiber.memoizedProps?.client) {
+          queryClient = fiber.memoizedProps.client;
+        }
+        fiber = fiber.child || fiber.sibling || fiber.return;
+      }
+      if (queryClient) {
+        (window as any).__REACT_QUERY_CLIENT__ = queryClient;
+        console.log('[ReconnectionFunctionDebug] ✅ React Query client attached to window.__REACT_QUERY_CLIENT__');
+      }
+    }
+  } catch (e) {
+    console.warn('[ReconnectionFunctionDebug] Could not attach React Query client:', e);
+  }
+}, 2000);
+
+// Diagnostic function to check all Supabase functionality after reconnection
+export const diagnoseSupabaseState = async () => {
+  const debugTag = '[ReconnectionFunctionDebug]';
+  const startTime = Date.now();
+  
+  console.log(`${debugTag} 🔍 Starting comprehensive Supabase diagnostics...`);
+  
+  const results: any = {
+    timestamp: startTime,
+    client: {
+      exists: !!supabase,
+      url: 'protected_property',
+      key: 'protected_property'
+    },
+    auth: {},
+    database: {},
+    realtime: {},
+    functions: {}
+  };
+  
+  // Test auth
+  try {
+    const { data: { session }, error: authError } = await supabase.auth.getSession();
+    results.auth = {
+      hasSession: !!session,
+      hasUser: !!session?.user,
+      hasToken: !!session?.access_token,
+      tokenExpiry: session?.expires_at,
+      error: authError?.message || null
+    };
+    console.log(`${debugTag} 🔐 Auth test:`, results.auth);
+  } catch (e) {
+    results.auth.error = e.message;
+    console.error(`${debugTag} ❌ Auth test failed:`, e);
+  }
+  
+  // Test database connectivity
+  try {
+    const { data, error } = await supabase
+      .from('projects')
+      .select('id')
+      .limit(1);
+    results.database = {
+      connected: !error,
+      error: error?.message || null,
+      hasData: !!data && data.length > 0
+    };
+    console.log(`${debugTag} 🗄️ Database test:`, results.database);
+  } catch (e) {
+    results.database.error = e.message;
+    console.error(`${debugTag} ❌ Database test failed:`, e);
+  }
+  
+  // Test realtime
+  try {
+    const rt = (supabase as any)?.realtime;
+    const socket = rt?.socket || rt?.conn;
+    results.realtime = {
+      exists: !!rt,
+      socketExists: !!socket,
+      socketReadyState: socket?.readyState,
+      connectionState: socket?.connectionState,
+      isConnected: !!socket?.isConnected?.(),
+      channelsCount: rt?.channels?.length || 0
+    };
+    console.log(`${debugTag} 🔄 Realtime test:`, results.realtime);
+  } catch (e) {
+    results.realtime.error = e.message;
+    console.error(`${debugTag} ❌ Realtime test failed:`, e);
+  }
+  
+  // Test edge functions
+  try {
+    const { data, error } = await supabase.functions.invoke('check-realtime-publication');
+    results.functions = {
+      reachable: !error,
+      error: error?.message || null,
+      data: data ? 'present' : 'missing'
+    };
+    console.log(`${debugTag} ⚡ Functions test:`, results.functions);
+  } catch (e) {
+    results.functions.error = e.message;
+    console.error(`${debugTag} ❌ Functions test failed:`, e);
+  }
+  
+  results.totalDuration = Date.now() - startTime;
+  console.log(`${debugTag} 📋 Complete diagnostic results:`, results);
+  
+  // Make results available globally for debugging
+  (window as any).__SUPABASE_DIAGNOSTICS__ = results;
+  
+  return results;
+};
