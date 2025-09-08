@@ -53,23 +53,12 @@ export class DiagnosticsStore {
       eventsReceivedByType: {},
       lastError: null,
     };
-    
-    // Expose diagnostics globally for debugging and monitoring
-    if (typeof window !== 'undefined') {
-      (window as any).__REALTIME_DIAGNOSTICS__ = this.data;
-    }
   }
 
   get snapshot(): RealtimeDiagnostics { return this.data; }
 
   update(partial: Partial<RealtimeDiagnostics>) {
     this.data = { ...this.data, ...partial };
-    
-    // Update global reference
-    if (typeof window !== 'undefined') {
-      (window as any).__REALTIME_DIAGNOSTICS__ = this.data;
-    }
-    
     this.emit();
   }
 
@@ -80,13 +69,6 @@ export class DiagnosticsStore {
 
   bumpEvent(type: string) {
     this.data.eventsReceivedByType[type] = (this.data.eventsReceivedByType[type] || 0) + 1;
-    this.data.lastEventAt = Date.now(); // Update last event timestamp
-    
-    // Update global reference
-    if (typeof window !== 'undefined') {
-      (window as any).__REALTIME_DIAGNOSTICS__ = this.data;
-    }
-    
     this.emit();
   }
 

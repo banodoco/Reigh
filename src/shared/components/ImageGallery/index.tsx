@@ -142,25 +142,7 @@ export interface ImageGalleryProps {
  * - Main component for coordination and composition
  */
 export const ImageGallery: React.FC<ImageGalleryProps> = (props) => {
-  // [UPSTREAM DEBUG] Track ImageGallery component rendering
-  console.log('[GalleryRenderDebug] 🎬 ImageGallery component rendering with:', {
-    imagesCount: props.images?.length || 0,
-    hasImages: !!props.images,
-    totalCount: props.totalCount,
-    isDeleting: props.isDeleting,
-    timestamp: Date.now()
-  });
 
-  // [DEEP DEBUG] Add debug logging after hooks to see data flow  
-  React.useEffect(() => {
-    console.log('[GalleryRenderDebug] 🔍 DATA FLOW DEBUG:', {
-      originalImages: images.length,
-      filteredImages: filtersHook.filteredImages.length,
-      paginatedImages: paginationHook.paginatedImages.length,
-      isServerPagination: !!onServerPageChange,
-      timestamp: Date.now()
-    });
-  });
 
   const {
     images, 

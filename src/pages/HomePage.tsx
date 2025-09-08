@@ -194,58 +194,117 @@ export default function HomePage() {
       setSession(session);
     });
     
-    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('[AuthDebug] Auth state change:', event, !!session?.user?.id);
-      setSession(session);
-      
-      // If we get a successful sign-in, navigate to tools – but avoid auto-redirect
-      // on initial session restoration when the user is just viewing /home.
-      if (event === 'SIGNED_IN' && session) {
-        const isHomePath = location.pathname === '/home' || location.pathname === '/';
-        const oauthInProgress = localStorage.getItem('oauthInProgress') === 'true';
-        if (oauthInProgress) {
-          // Attempt referral conversion before navigating
-          try {
-            const referralCode = localStorage.getItem('referralCode');
-            const referralSessionId = localStorage.getItem('referralSessionId');
-            const referralFingerprint = localStorage.getItem('referralFingerprint');
-            if (referralCode) {
-              (async () => {
-                try {
-                  await supabase.rpc('create_referral_from_session', {
-                    p_session_id: referralSessionId,
-                    p_fingerprint: referralFingerprint,
-                  });
-                } catch (err) {
-                  console.warn('[Referral] RPC error creating referral', err);
-                } finally {
+    // Use centralized auth manager instead of direct listener
+    const authManager = (window as any).__AUTH_MANAGER__;
+    let unsubscribe: (() => void) | null = null;
+    
+    if (authManager) {
+      unsubscribe = authManager.subscribe('HomePage', (event, session) => {
+        console.log('[AuthDebug] Auth state change:', event, !!session?.user?.id);
+        setSession(session);
+        
+        // If we get a successful sign-in, navigate to tools – but avoid auto-redirect
+        // on initial session restoration when the user is just viewing /home.
+        if (event === 'SIGNED_IN' && session) {
+          const isHomePath = location.pathname === '/home' || location.pathname === '/';
+          const oauthInProgress = localStorage.getItem('oauthInProgress') === 'true';
+          if (oauthInProgress) {
+            // Attempt referral conversion before navigating
+            try {
+              const referralCode = localStorage.getItem('referralCode');
+              const referralSessionId = localStorage.getItem('referralSessionId');
+              const referralFingerprint = localStorage.getItem('referralFingerprint');
+              if (referralCode) {
+                (async () => {
                   try {
-                    localStorage.removeItem('referralCode');
-                    localStorage.removeItem('referralSessionId');
-                    localStorage.removeItem('referralFingerprint');
-                    localStorage.removeItem('referralTimestamp');
-                  } catch {}
-                }
-              })();
+                    await supabase.rpc('create_referral_from_session', {
+                      p_session_id: referralSessionId,
+                      p_fingerprint: referralFingerprint,
+                    });
+                  } catch (err) {
+                    console.warn('[Referral] RPC error creating referral', err);
+                  } finally {
+                    try {
+                      localStorage.removeItem('referralCode');
+                      localStorage.removeItem('referralSessionId');
+                      localStorage.removeItem('referralFingerprint');
+                      localStorage.removeItem('referralTimestamp');
+                    } catch {}
+                  }
+                })();
+              }
+            } catch (e) {
+              console.warn('[Referral] Failed to create referral on SIGNED_IN', e);
             }
-          } catch (e) {
-            console.warn('[Referral] Failed to create referral on SIGNED_IN', e);
+            // Clear flag and proceed to tools
+            localStorage.removeItem('oauthInProgress');
+            console.log('[AuthDebug] OAuth flow completed, navigating to /tools');
+            navigate('/tools');
+          } else if (!isHomePath) {
+            console.log('[AuthDebug] SIGNED_IN outside home, navigating to /tools');
+            navigate('/tools');
+          } else {
+            console.log('[AuthDebug] SIGNED_IN on home without oauth flag; staying on home');
           }
-          // Clear flag and proceed to tools
-          localStorage.removeItem('oauthInProgress');
-          console.log('[AuthDebug] OAuth flow completed, navigating to /tools');
-          navigate('/tools');
-        } else if (!isHomePath) {
-          console.log('[AuthDebug] SIGNED_IN outside home, navigating to /tools');
-          navigate('/tools');
-        } else {
-          console.log('[AuthDebug] SIGNED_IN on home without oauth flag; staying on home');
         }
-      }
-    });
+      });
+    } else {
+      // Fallback to direct listener if auth manager not available
+      console.error('[HomePage] AuthManager not available, using direct listener');
+      const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+        console.log('[AuthDebug] Auth state change:', event, !!session?.user?.id);
+        setSession(session);
+        
+        // If we get a successful sign-in, navigate to tools – but avoid auto-redirect
+        // on initial session restoration when the user is just viewing /home.
+        if (event === 'SIGNED_IN' && session) {
+          const isHomePath = location.pathname === '/home' || location.pathname === '/';
+          const oauthInProgress = localStorage.getItem('oauthInProgress') === 'true';
+          if (oauthInProgress) {
+            // Attempt referral conversion before navigating
+            try {
+              const referralCode = localStorage.getItem('referralCode');
+              const referralSessionId = localStorage.getItem('referralSessionId');
+              const referralFingerprint = localStorage.getItem('referralFingerprint');
+              if (referralCode) {
+                (async () => {
+                  try {
+                    await supabase.rpc('create_referral_from_session', {
+                      p_session_id: referralSessionId,
+                      p_fingerprint: referralFingerprint,
+                    });
+                  } catch (err) {
+                    console.warn('[Referral] RPC error creating referral', err);
+                  } finally {
+                    try {
+                      localStorage.removeItem('referralCode');
+                      localStorage.removeItem('referralSessionId');
+                      localStorage.removeItem('referralFingerprint');
+                      localStorage.removeItem('referralTimestamp');
+                    } catch {}
+                  }
+                })();
+              }
+            } catch (e) {
+              console.warn('[Referral] Failed to create referral on SIGNED_IN', e);
+            }
+            // Clear flag and proceed to tools
+            localStorage.removeItem('oauthInProgress');
+            console.log('[AuthDebug] OAuth flow completed, navigating to /tools');
+            navigate('/tools');
+          } else if (!isHomePath) {
+            console.log('[AuthDebug] SIGNED_IN outside home, navigating to /tools');
+            navigate('/tools');
+          } else {
+            console.log('[AuthDebug] SIGNED_IN on home without oauth flag; staying on home');
+          }
+        }
+      });
+      unsubscribe = () => listener.subscription.unsubscribe();
+    }
     
     return () => {
-      listener.subscription.unsubscribe();
+      if (unsubscribe) unsubscribe();
     };
   }, [navigate]);
 

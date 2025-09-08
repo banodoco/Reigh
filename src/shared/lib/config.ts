@@ -40,6 +40,14 @@ export const runtimeConfig = {
     } catch {}
     return true; // default ON during investigation
   })(),
+
+  POLLING_V2_ENABLED: (() => {
+    try {
+      const v = (import.meta as any)?.env?.VITE_POLLING_V2_ENABLED;
+      if (typeof v === 'string') return v !== 'false' && v !== '0';
+    } catch {}
+    return true; // default ON - unified polling system
+  })(),
 };
 
 export function addJitter(baseMs: number, jitterMs: number = 1000): number {

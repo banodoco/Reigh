@@ -76,8 +76,42 @@ const mapDbProjectToProject = (row: any): Project => ({
 });
 
 export const ProjectProvider = ({ children }: { children: ReactNode }) => {
+  // CRITICAL: Log component mount/unmount to detect tab suspension issues
+  React.useEffect(() => {
+    console.error('[ProjectContext:FastResume] 🚨 ProjectProvider MOUNTED', {
+      timestamp: Date.now(),
+      visibilityState: document.visibilityState,
+      stack: new Error().stack?.split('\n').slice(1, 3)
+    });
+    
+    return () => {
+      console.error('[ProjectContext:FastResume] 🚨 ProjectProvider UNMOUNTING', {
+        timestamp: Date.now(),
+        visibilityState: document.visibilityState,
+        stack: new Error().stack?.split('\n').slice(1, 3)
+      });
+    };
+  }, []);
+
   const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedProjectId, setSelectedProjectIdState] = useState<string | null>(null);
+  // FAST RESUME: Try to restore selectedProjectId from localStorage immediately
+  const [selectedProjectId, setSelectedProjectIdState] = useState<string | null>(() => {
+    console.log('[ProjectContext:FastResume] ATTEMPTING localStorage restoration');
+    try {
+      const stored = localStorage.getItem('lastSelectedProjectId');
+      console.log(`[ProjectContext:FastResume] localStorage result: ${stored}`);
+      if (stored) {
+        console.log(`[ProjectContext:FastResume] Restored selectedProjectId from localStorage: ${stored}`);
+        return stored;
+      } else {
+        console.log('[ProjectContext:FastResume] No stored selectedProjectId found in localStorage');
+      }
+    } catch (e) {
+      console.error('[ProjectContext:FastResume] localStorage access failed:', e);
+    }
+    console.log('[ProjectContext:FastResume] Falling back to null selectedProjectId');
+    return null;
+  });
   const [isLoadingProjects, setIsLoadingProjects] = useState(true);
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [isUpdatingProject, setIsUpdatingProject] = useState(false);
@@ -178,10 +212,21 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
       lastProcessedState = { event: 'INITIAL_SESSION', userId: session?.user?.id };
     });
 
-    const { data: listener } = supabase.auth.onAuthStateChange(handleAuthStateChange);
+    // Use centralized auth manager instead of direct listener
+    const authManager = (window as any).__AUTH_MANAGER__;
+    let unsubscribe: (() => void) | null = null;
+    
+    if (authManager) {
+      unsubscribe = authManager.subscribe('ProjectContext', handleAuthStateChange);
+    } else {
+      // Fallback to direct listener if auth manager not available
+      console.error('[ProjectContext] AuthManager not available, using direct listener');
+      const { data: listener } = supabase.auth.onAuthStateChange(handleAuthStateChange);
+      unsubscribe = () => listener.subscription.unsubscribe();
+    }
 
     return () => {
-      listener.subscription.unsubscribe();
+      if (unsubscribe) unsubscribe();
       if (debounceTimeout) {
         clearTimeout(debounceTimeout);
         // Process final pending state on cleanup if needed
@@ -346,9 +391,9 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
         
         const mappedProject = mapDbProjectToProject(newProject);
         setProjects([mappedProject]);
-        setSelectedProjectIdState(mappedProject.id);
-        // Save the default project as last opened
-        updateUserPreferences('user', { lastOpenedProjectId: mappedProject.id });
+        // FIXED: Use handleSetSelectedProjectId to ensure localStorage is saved
+        console.log(`[ProjectContext:FastResume] Setting default project: ${mappedProject.id}`);
+        handleSetSelectedProjectId(mappedProject.id);
       } else {
         const mappedProjects = projectsData.map(mapDbProjectToProject);
         setProjects(mappedProjects);
@@ -356,19 +401,29 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
         // Use the last opened project from user settings instead of localStorage
         const lastOpenedProjectId = userPreferencesRef.current?.lastOpenedProjectId;
         const projectIdToSelect = determineProjectIdToSelect(mappedProjects, null, lastOpenedProjectId);
-        setSelectedProjectIdState(projectIdToSelect);
         
-        // Save the selected project if it's different from what was stored
-        if (projectIdToSelect && projectIdToSelect !== lastOpenedProjectId) {
-          updateUserPreferences('user', { lastOpenedProjectId: projectIdToSelect });
-        }
+        // FIXED: Use handleSetSelectedProjectId to ensure localStorage is saved
+        console.log(`[ProjectContext:FastResume] Setting selected project from preferences: ${projectIdToSelect}`);
+        handleSetSelectedProjectId(projectIdToSelect);
       }
       console.log(`[ProjectContext:MobileDebug] Projects loaded successfully`);
     } catch (error: any) {
-      console.error('[ProjectContext] Error fetching projects via API:', error);
+      console.error('[ProjectContext] Error fetching projects via API:', {
+        error,
+        errorMessage: error?.message,
+        errorStack: error?.stack?.split('\n').slice(0, 3),
+        userId,
+        isLoadingPreferences,
+        visibilityState: document.visibilityState,
+        timestamp: Date.now(),
+        criticalNote: 'This error was previously clearing selectedProjectId - now preserved!'
+      });
       toast.error(`Failed to load projects: ${error.message}`);
       setProjects([]);
-      setSelectedProjectIdState(null);
+      // CRITICAL FIX: DO NOT clear selectedProjectId on fetch error!
+      // This was causing localStorage to be wiped and all queries to be disabled
+      // The selectedProjectId should persist even if project fetching fails
+      // setSelectedProjectIdState(null); // ← REMOVED: This was the root cause!
     } finally {
       // Clear timeout when fetch completes (success or error)
       if (projectsTimeoutRef.current) {
@@ -581,12 +636,11 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     console.log(`[ProjectContext:MobileDebug] Project loading check - userId: ${!!userId}, isLoadingPreferences: ${isLoadingPreferences}`);
     
-    // Wait for auth and user preferences to be ready before fetching projects
-    if (userId && !isLoadingPreferences) {
-      console.log(`[ProjectContext:MobileDebug] Starting project fetch with 100ms delay`);
-      const timer = setTimeout(() => {
-        fetchProjects();
-      }, 100); // Small delay to ensure everything is ready
+    // FAST RESUME: Start loading projects as soon as we have userId (don't wait for preferences)
+    if (userId) {
+      console.log(`[ProjectContext:MobileDebug] Starting project fetch immediately (removed 100ms delay)`);
+      // REMOVED: 100ms delay that was causing slow tab resume
+      fetchProjects();
 
       // [MobileStallFix] Set a fallback timeout for projects loading
       if (projectsTimeoutRef.current) {
@@ -603,7 +657,7 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
       }, isMobileRef.current ? 15000 : 10000); // Longer timeout for mobile
      
       return () => {
-        clearTimeout(timer);
+        // REMOVED: timer cleanup since we removed the setTimeout
         if (projectsTimeoutRef.current) {
           clearTimeout(projectsTimeoutRef.current);
           projectsTimeoutRef.current = undefined;
@@ -625,15 +679,38 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
   }, [userId, isLoadingPreferences, fetchProjects, isLoadingProjects]); // Refetch when user changes or preferences finish loading
 
   const handleSetSelectedProjectId = useCallback((projectId: string | null) => {
+    console.error('[TabReactivation] 🔥 SELECTED PROJECT ID CHANGING', {
+      from: selectedProjectId,
+      to: projectId,
+      visibilityState: document.visibilityState,
+      timestamp: Date.now(),
+      stack: new Error().stack?.split('\n').slice(1, 4)
+    });
+    
     setSelectedProjectIdState(projectId);
     
-    // Save to user settings instead of localStorage
+    // FAST RESUME: Save to localStorage immediately for fast tab resume
     if (projectId) {
+      try {
+        localStorage.setItem('lastSelectedProjectId', projectId);
+        console.log(`[ProjectContext:FastResume] Saved selectedProjectId to localStorage: ${projectId}`);
+        console.log(`[ProjectContext:FastResume] Verification - localStorage now contains: ${localStorage.getItem('lastSelectedProjectId')}`);
+      } catch (e) {
+        console.error(`[ProjectContext:FastResume] Failed to save to localStorage:`, e);
+      }
+      // Also save to user preferences (slower but persistent across devices)
       updateUserPreferences('user', { lastOpenedProjectId: projectId });
     } else {
+      try {
+        console.warn(`[ProjectContext:FastResume] REMOVING selectedProjectId from localStorage (projectId is null)`);
+        localStorage.removeItem('lastSelectedProjectId');
+        console.log(`[ProjectContext:FastResume] Verification after removal - localStorage now contains: ${localStorage.getItem('lastSelectedProjectId')}`);
+      } catch (e) {
+        console.error(`[ProjectContext:FastResume] Failed to remove from localStorage:`, e);
+      }
       updateUserPreferences('user', { lastOpenedProjectId: undefined });
     }
-  }, [updateUserPreferences]);
+  }, [updateUserPreferences, selectedProjectId]);
 
   const contextValue = useMemo(
     () => ({ 
@@ -663,6 +740,13 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
       isDeletingProject
     ]
   );
+
+  // Expose context globally for debugging
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as any).__PROJECT_CONTEXT__ = { selectedProjectId, projects };
+    }
+  }, [selectedProjectId, projects]);
 
   return (
     <ProjectContext.Provider value={contextValue}>

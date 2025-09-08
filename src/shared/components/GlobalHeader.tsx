@@ -61,30 +61,59 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
     
     getSessionAndUserData();
 
-    // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setSession(session);
-      
-      // Reset username when session changes
-      if (!session?.user?.id) {
-        setUsername(null);
-        setReferralStats(null);
-      } else {
-        // Get username for new session
-        const { data: userData, error } = await supabase
-          .from('users')
-          .select('username')
-          .eq('id', session.user.id)
-          .single();
+    // Use centralized auth manager instead of direct listener
+    const authManager = (window as any).__AUTH_MANAGER__;
+    let unsubscribe: (() => void) | null = null;
+    
+    if (authManager) {
+      unsubscribe = authManager.subscribe('GlobalHeader', async (_event, session) => {
+        setSession(session);
         
-        if (userData?.username && !error) {
-          setUsername(userData.username);
+        // Reset username when session changes
+        if (!session?.user?.id) {
+          setUsername(null);
+          setReferralStats(null);
+        } else {
+          // Get username for new session
+          const { data: userData, error } = await supabase
+            .from('users')
+            .select('username')
+            .eq('id', session.user.id)
+            .single();
+          
+          if (userData?.username && !error) {
+            setUsername(userData.username);
+          }
         }
-      }
-    });
+      });
+    } else {
+      // Fallback to direct listener if auth manager not available
+      console.error('[GlobalHeader] AuthManager not available, using direct listener');
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+        setSession(session);
+        
+        // Reset username when session changes
+        if (!session?.user?.id) {
+          setUsername(null);
+          setReferralStats(null);
+        } else {
+          // Get username for new session
+          const { data: userData, error } = await supabase
+            .from('users')
+            .select('username')
+            .eq('id', session.user.id)
+            .single();
+          
+          if (userData?.username && !error) {
+            setUsername(userData.username);
+          }
+        }
+      });
+      unsubscribe = () => subscription?.unsubscribe();
+    }
 
     return () => {
-      subscription?.unsubscribe();
+      if (unsubscribe) unsubscribe();
     };
   }, []);
   // Get referral stats when username is available

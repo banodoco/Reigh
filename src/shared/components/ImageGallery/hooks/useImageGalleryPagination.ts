@@ -56,6 +56,17 @@ export const useImageGalleryPagination = ({
   
   // Safety timeout ref for clearing stuck loading states
   const safetyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // CRITICAL: Track loadingButton state changes to debug disabled buttons
+  useEffect(() => {
+    console.warn(`[ReconnectionIssue][UI_LOADING_STATE] loadingButton state changed`, {
+      loadingButton,
+      isServerPagination,
+      buttonsDisabled: loadingButton !== null,
+      currentPage: isServerPagination ? serverPage : page,
+      timestamp: Date.now()
+    });
+  }, [loadingButton, isServerPagination, serverPage, page]);
   
   // isServerPagination already computed
   
@@ -102,6 +113,14 @@ export const useImageGalleryPagination = ({
     } // Prevent multiple clicks while any button is loading
     
     setLoadingButton(direction);
+    console.warn(`[ReconnectionIssue][UI_LOADING_STATE] Setting loadingButton to "${direction}" - buttons will be disabled`, {
+      navId,
+      direction,
+      isServerPagination,
+      currentPage: isServerPagination ? serverPage : page,
+      targetPage: newPage,
+      timestamp: Date.now()
+    });
     
     // Smart loading state: only show gallery loading for non-adjacent pages or when preloading is disabled
     const currentPageNum = isServerPagination ? (serverPage || 1) - 1 : page;
@@ -149,6 +168,11 @@ export const useImageGalleryPagination = ({
       // The progressive loading will handle the gallery loading state separately
       const buttonTimeout = setTimeout(() => {
         console.log(`🔘 [PAGELOADINGDEBUG] [NAV:${navId}] Server pagination button timeout - clearing button loading`);
+        console.warn(`[ReconnectionIssue][UI_LOADING_STATE] Clearing loadingButton via timeout - buttons will be re-enabled`, {
+          navId,
+          reason: 'Server pagination timeout (800ms)',
+          timestamp: Date.now()
+        });
         setLoadingButton(null);
       }, 800); // Shorter timeout for better UX
       
@@ -160,6 +184,11 @@ export const useImageGalleryPagination = ({
       setPage(newPage);
       setTimeout(() => {
         console.log(`✅ [PAGELOADINGDEBUG] [NAV:${navId}] Client pagination completed`);
+        console.warn(`[ReconnectionIssue][UI_LOADING_STATE] Clearing loadingButton via timeout - buttons will be re-enabled`, {
+          navId,
+          reason: `Client pagination timeout (${loadingDelay}ms)`,
+          timestamp: Date.now()
+        });
         setLoadingButton(null);
         // Don't clear gallery safety timeout here - let progressive loading handle it
         // Scroll to top of gallery AFTER page loads (only for bottom buttons)

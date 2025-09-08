@@ -133,12 +133,17 @@ export async function createTask(taskParams: BaseTaskParams): Promise<any> {
     controller.abort();
   }, timeoutMs);
 
-  console.log('[PollingBreakageIssue] [createTask] Invoking edge function', {
+  console.log('[TabResumeDebug] [createTask] Invoking edge function', {
     requestId,
     taskType: taskParams.task_type,
     projectId: taskParams.project_id,
     hasParams: !!taskParams.params,
     timestamp: startTime,
+    visibilityState: document.visibilityState,
+    hasSession: !!session,
+    sessionValid: session ? (session.expires_at * 1000 > Date.now()) : false,
+    tokenPreview: session?.access_token?.slice(0, 20),
+    userAgent: navigator.userAgent.slice(0, 50)
   });
 
   try {
@@ -156,14 +161,18 @@ export async function createTask(taskParams: BaseTaskParams): Promise<any> {
     });
 
     const durationMs = Date.now() - startTime;
-    console.log('[PollingBreakageIssue] [createTask] Invoke completed', {
+    console.log('[TabResumeDebug] [createTask] Invoke completed', {
       requestId,
       durationMs,
       slow: durationMs > 5000,
       taskType: taskParams.task_type,
       projectId: taskParams.project_id,
       hasError: !!error,
+      errorMessage: error?.message,
+      dataReceived: !!data,
+      dataPreview: data ? JSON.stringify(data).slice(0, 100) : null,
       timestamp: Date.now(),
+      visibilityState: document.visibilityState
     });
 
     if (error) {
@@ -189,12 +198,16 @@ export async function createTask(taskParams: BaseTaskParams): Promise<any> {
     if (err?.name === 'AbortError') {
       throw new Error('Task creation timed out. Please try again.');
     }
-    console.error('[PollingBreakageIssue] [createTask] Invoke failed', {
+    console.error('[TabResumeDebug] [createTask] Invoke failed', {
       requestId,
       taskType: taskParams.task_type,
       projectId: taskParams.project_id,
       errorMessage: err?.message,
+      errorName: err?.name,
+      errorStack: err?.stack?.split('\n').slice(0, 3),
       timestamp: Date.now(),
+      visibilityState: document.visibilityState,
+      durationMs: Date.now() - startTime
     });
     throw err;
   } finally {

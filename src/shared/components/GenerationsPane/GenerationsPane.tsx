@@ -36,11 +36,23 @@ const GenerationsPaneComponent: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
+  const {
+    isGenerationsPaneLocked,
+    setIsGenerationsPaneLocked,
+    isGenerationsPaneOpen,
+    setIsGenerationsPaneOpen,
+    generationsPaneHeight,
+    isShotsPaneLocked,
+    shotsPaneWidth,
+    isTasksPaneLocked,
+    tasksPaneWidth,
+  } = usePanes();
   
   // Check if we're on the generations page or image generation tool page
   const isOnGenerationsPage = location.pathname === '/generations';
   const isOnImageGenerationPage = location.pathname === '/tools/image-generation';
   const isOnVideoTravelPage = location.pathname === '/tools/travel-between-images';
+  const shouldEnableDataLoading = isOnGenerationsPage || ((isOnImageGenerationPage || isOnVideoTravelPage) && isGenerationsPaneOpen);
   
   const isMobile = useIsMobile();
   const { currentShotId } = useCurrentShot();
@@ -76,7 +88,7 @@ const GenerationsPaneComponent: React.FC = () => {
   } = useGenerationsPageLogic({
     itemsPerPage: GENERATIONS_PER_PAGE,
     mediaType: mediaTypeFilter,
-    enableDataLoading: true
+    enableDataLoading: shouldEnableDataLoading
   });
 
   // Fallback: use shots from shared context when local hook hasn't loaded yet
@@ -228,17 +240,7 @@ const GenerationsPaneComponent: React.FC = () => {
     }, 20, 'GenerationsPane total prefetch monitoring');
   }, [selectedProjectId, queryClient, mediaTypeFilter, selectedShotFilter, excludePositioned, starredOnly]);
 
-  const {
-    isGenerationsPaneLocked,
-    setIsGenerationsPaneLocked,
-    isGenerationsPaneOpen,
-    setIsGenerationsPaneOpen,
-    generationsPaneHeight,
-    isShotsPaneLocked,
-    shotsPaneWidth,
-    isTasksPaneLocked,
-    tasksPaneWidth,
-  } = usePanes();
+  
 
   const shotFilterContentRef = useRef<HTMLDivElement>(null);
   const mediaTypeContentRef = useRef<HTMLDivElement>(null);

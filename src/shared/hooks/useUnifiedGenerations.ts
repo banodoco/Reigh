@@ -401,7 +401,8 @@ export function useUnifiedGenerations(options: UseUnifiedGenerationsOptions) {
     preloadTaskData = false,
   } = options;
   
-  const cacheKey = getUnifiedGenerationsCacheKey(options);
+  const effectiveProjectId = options.projectId ?? (typeof window !== 'undefined' ? (window as any).__PROJECT_CONTEXT__?.selectedProjectId : null);
+  const cacheKey = getUnifiedGenerationsCacheKey({ ...options, projectId: effectiveProjectId });
   
   {
     const cacheKeyStr = cacheKey.join(':');
@@ -446,6 +447,19 @@ export function useUnifiedGenerations(options: UseUnifiedGenerationsOptions) {
   const query = useQuery({
     queryKey: cacheKey,
     queryFn: () => {
+      // Snapshot realtime state at fetch start for correlation
+      try {
+        const socket: any = (supabase as any)?.realtime?.socket;
+        const channels = (supabase as any)?.getChannels ? (supabase as any).getChannels() : [];
+        console.log('[ReconnectionIssue][UnifiedGenerations] Fetch start realtime snapshot', {
+          connected: !!socket?.isConnected?.(),
+          connState: socket?.connectionState,
+          channelCount: channels?.length || 0,
+          topics: (channels || []).slice(0, 5).map((c: any) => ({ topic: c.topic, state: c.state })),
+          visibility: document.visibilityState,
+          timestamp: Date.now(),
+        });
+      } catch {}
       if (options.enabled && options.projectId && (options.mode !== 'shot-specific' || options.shotId)) {
         console.log('[VideoGenMissing] Executing unified generations query:', {
           instanceId: hookInstanceIdRef.current,
@@ -456,9 +470,9 @@ export function useUnifiedGenerations(options: UseUnifiedGenerationsOptions) {
           timestamp: Date.now()
         });
       }
-      return fetchUnifiedGenerations(options);
+      return fetchUnifiedGenerations({ ...options, projectId: effectiveProjectId });
     },
-    enabled: enabled && !!options.projectId,
+    enabled: enabled && !!effectiveProjectId,
     staleTime: 10 * 1000, // 10 seconds - match task polling for consistency
     gcTime,
     // Do NOT carry over previous data across key changes (e.g., shot switches)
@@ -469,6 +483,7 @@ export function useUnifiedGenerations(options: UseUnifiedGenerationsOptions) {
     refetchIntervalInBackground: true, // CRITICAL: Continue polling when tab is not visible
     refetchOnWindowFocus: false, // Prevent double-fetches
     refetchOnReconnect: false, // Prevent double-fetches
+    // Note: onSettled removed due to TypeScript issues - using useEffect below instead
   });
 
   // 🎯 MODULAR LOGGING: Standardized debug logging with data signature tracking
@@ -486,8 +501,20 @@ export function useUnifiedGenerations(options: UseUnifiedGenerationsOptions) {
   // Log query results (original logging preserved)
   React.useEffect(() => {
     if (query.data && options.enabled && options.projectId && (options.mode !== 'shot-specific' || options.shotId)) {
+      try {
+        const socket: any = (supabase as any)?.realtime?.socket;
+        const channels = (supabase as any)?.getChannels ? (supabase as any).getChannels() : [];
+        console.log('[ReconnectionIssue][UnifiedGenerations] Success realtime snapshot', {
+          connected: !!socket?.isConnected?.(),
+          connState: socket?.connectionState,
+          channelCount: channels?.length || 0,
+          topics: (channels || []).slice(0, 5).map((c: any) => ({ topic: c.topic, state: c.state })),
+          visibility: document.visibilityState,
+          timestamp: Date.now(),
+        });
+      } catch {}
       const cacheKeyStr = cacheKey.join(':');
-      const sig = `${cacheKeyStr}:${(query.data.items as any[])?.length || 0}:${query.data.total || 0}:${query.data.hasMore ? 1 : 0}`;
+      const sig = `${cacheKeyStr}:${(query.data as any)?.items?.length || 0}:${(query.data as any)?.total || 0}:${(query.data as any)?.hasMore ? 1 : 0}`;
       if (lastSuccessSigRef.current !== sig) {
         lastSuccessSigRef.current = sig;
         console.log('[VideoGenMissing] Unified generations query success:', {
@@ -495,9 +522,9 @@ export function useUnifiedGenerations(options: UseUnifiedGenerationsOptions) {
           mode: options.mode,
           projectId: options.projectId,
           shotId: options.shotId,
-          itemsCount: query.data?.items?.length || 0,
-          total: query.data?.total || 0,
-          hasMore: query.data?.hasMore || false,
+          itemsCount: (query.data as any)?.items?.length || 0,
+          total: (query.data as any)?.total || 0,
+          hasMore: (query.data as any)?.hasMore || false,
           cacheKey: cacheKeyStr,
           timestamp: Date.now()
         });
@@ -525,6 +552,18 @@ export function useUnifiedGenerations(options: UseUnifiedGenerationsOptions) {
 
   React.useEffect(() => {
     if (query.error && options.enabled && options.projectId && (options.mode !== 'shot-specific' || options.shotId)) {
+      try {
+        const socket: any = (supabase as any)?.realtime?.socket;
+        const channels = (supabase as any)?.getChannels ? (supabase as any).getChannels() : [];
+        console.warn('[ReconnectionIssue][UnifiedGenerations] Error realtime snapshot', {
+          connected: !!socket?.isConnected?.(),
+          connState: socket?.connectionState,
+          channelCount: channels?.length || 0,
+          topics: (channels || []).slice(0, 5).map((c: any) => ({ topic: c.topic, state: c.state })),
+          visibility: document.visibilityState,
+          timestamp: Date.now(),
+        });
+      } catch {}
       console.error('[VideoGenMissing] Unified generations query error:', {
         mode: options.mode,
         projectId: options.projectId,
@@ -538,9 +577,9 @@ export function useUnifiedGenerations(options: UseUnifiedGenerationsOptions) {
   
   // Background task preloading
   React.useEffect(() => {
-    if (preloadTaskData && query.data?.items && !options.includeTaskData) {
+    if (preloadTaskData && (query.data as any)?.items && !options.includeTaskData) {
       // Background preload task data for hover/lightbox use
-      const itemsWithoutTasks = (query.data.items as GenerationWithTask[]).filter(item => item.taskId === null);
+      const itemsWithoutTasks = ((query.data as any)?.items as GenerationWithTask[] || []).filter(item => item.taskId === null);
       
       if (itemsWithoutTasks.length > 0) {
         // Throttled background preloading
@@ -551,7 +590,24 @@ export function useUnifiedGenerations(options: UseUnifiedGenerationsOptions) {
         return () => clearTimeout(timer);
       }
     }
-  }, [query.data?.items, preloadTaskData, options.includeTaskData, queryClient]);
+  }, [(query.data as any)?.items, preloadTaskData, options.includeTaskData, queryClient]);
+  
+  // Track query state changes for UI update debugging
+  React.useEffect(() => {
+    if (options.enabled && options.projectId && (options.mode !== 'shot-specific' || options.shotId)) {
+      console.warn('[ReconnectionIssue][UI_UPDATE_TRACE] UnifiedGenerations query state change', {
+        instanceId: hookInstanceIdRef.current,
+        cacheKey: cacheKey.join(':'),
+        status: query.status,
+        fetchStatus: query.fetchStatus,
+        isFetching: query.isFetching,
+        isStale: query.isStale,
+        hasData: !!query.data,
+        itemCount: (query.data as any)?.items?.length || 0,
+        timestamp: Date.now()
+      });
+    }
+  }, [query.status, query.fetchStatus, query.isFetching, query.isStale, query.data, cacheKey, options.enabled, options.projectId, options.shotId, options.mode]);
   
   return query;
 }

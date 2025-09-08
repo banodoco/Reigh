@@ -44,7 +44,8 @@ const Layout: React.FC = () => {
   const { setCurrentShotId } = useCurrentShot();
   
   // Track page visibility for debugging polling issues
-  usePageVisibility();
+  // TEMPORARILY DISABLED to avoid conflicts with RealtimeBoundary
+  // usePageVisibility();
 
   // Get content-responsive breakpoints for app-wide use
   const { isSm, isMd, isLg, isXl, is2Xl, contentWidth, contentHeight } = useContentResponsive();
@@ -78,12 +79,25 @@ const Layout: React.FC = () => {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-    });
+    // Use centralized auth manager instead of direct listener
+    const authManager = (window as any).__AUTH_MANAGER__;
+    let unsubscribe: (() => void) | null = null;
+    
+    if (authManager) {
+      unsubscribe = authManager.subscribe('Layout', (_event, session) => {
+        setSession(session);
+      });
+    } else {
+      // Fallback to direct listener if auth manager not available
+      console.error('[Layout] AuthManager not available, using direct listener');
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        setSession(session);
+      });
+      unsubscribe = () => subscription?.unsubscribe();
+    }
 
     return () => {
-      subscription?.unsubscribe();
+      if (unsubscribe) unsubscribe();
     };
   }, []);
 

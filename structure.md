@@ -107,6 +107,24 @@ Reigh supports both npm and bun package managers:
 | **`/public`** | Static assets | Images, fonts, manifests |
 | **Root configs** | Build & tooling | `vite.config.ts`, `tailwind.config.ts`, `tsconfig.json`, `railway.toml` |
 
+#### Supabase Client & Instrumentation (new modules)
+
+```
+src/integrations/supabase/
+├── client.ts                                 # Orchestrator: logs, window-only installers, client creation, exports
+├── config/
+│   └── env.ts                                # Central env + feature flags (URLs, keys, instrumentation gates)
+├── utils/
+│   ├── safeStringify.ts                      # Cycle-safe JSON stringify for diagnostics
+│   ├── snapshot.ts                           # captureRealtimeSnapshot, getEffectiveRealtimeSocket
+│   └── timeline.ts                           # __CORRUPTION_TIMELINE__, addCorruptionEvent
+└── instrumentation/
+    └── window/
+        └── index.ts                          # WebSocket wrapper, global error & fetch instrumentation (pre-client)
+```
+
+Behavior is unchanged; `client.ts` remains the public entry exporting `supabase`. Instrumentation is gated by env flags and is idempotent for HMR.
+
 ### 📚 Detailed Documentation Links
 
 | Topic | Documentation | Description |

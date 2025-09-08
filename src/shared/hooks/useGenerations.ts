@@ -26,16 +26,8 @@ export async function fetchGenerations(
   total: number;
   hasMore: boolean;
 }> {
-  console.log('[GalleryRenderDebug] 🔍 fetchGenerations STARTED with:', {
-    projectId,
-    limit,
-    offset,
-    filters,
-    timestamp: Date.now()
-  });
   
   if (!projectId) {
-    console.log('[GalleryRenderDebug] ❌ fetchGenerations: No projectId provided');
     return { items: [], total: 0, hasMore: false };
   }
   
@@ -110,16 +102,12 @@ export async function fetchGenerations(
   
   let totalCount = 0;
   if (!shouldSkipCount) {
-    console.log('[GalleryRenderDebug] 🔢 Executing count query...');
     const { count, error: countError } = await countQuery;
     if (countError) {
-      console.error('[GalleryRenderDebug] ❌ Count query failed:', countError);
       throw countError;
     }
     totalCount = count || 0;
-    console.log('[GalleryRenderDebug] ✅ Count query result:', totalCount);
   } else {
-    console.log('[GalleryRenderDebug] ⏭️ Skipping count query (shouldSkipCount=true)');
   }
 
   // 🚀 PERFORMANCE FIX: Optimize query - select only needed fields
@@ -209,26 +197,14 @@ export async function fetchGenerations(
 
   // 🚀 PERFORMANCE FIX: Use limit+1 pattern for fast pagination when count is skipped
   const fetchLimit = shouldSkipCount ? limit + 1 : limit;
-  console.log('[GalleryRenderDebug] 📊 Executing data query with range:', {
-    offset,
-    fetchLimit,
-    rangeEnd: offset + fetchLimit - 1
-  });
   
   const { data, error } = await dataQuery
     .order('created_at', { ascending: false })
     .range(offset, offset + fetchLimit - 1);
   
   if (error) {
-    console.error('[GalleryRenderDebug] ❌ Data query failed:', error);
     throw error;
   }
-  
-  console.log('[GalleryRenderDebug] ✅ Data query result:', {
-    dataLength: data?.length || 0,
-    firstItemId: data?.[0]?.id?.substring(0, 8),
-    firstItemLocation: data?.[0]?.location?.substring(0, 50) + '...'
-  });
 
   // Calculate hasMore and process results based on count strategy
   let finalData = data || [];
@@ -241,22 +217,8 @@ export async function fetchGenerations(
       finalData = finalData.slice(0, limit); // Remove the extra item
     }
     totalCount = offset + finalData.length + (hasMore ? 1 : 0); // Approximate total
-    console.log('[GalleryRenderDebug] 📊 Fast pagination calculation:', {
-      originalDataLength: data?.length,
-      finalDataLength: finalData.length,
-      hasMore,
-      approximateTotalCount: totalCount,
-      offset,
-      limit
-    });
   } else {
     hasMore = (offset + limit) < totalCount;
-    console.log('[GalleryRenderDebug] 📊 Full count pagination:', {
-      totalCount,
-      hasMore,
-      offset,
-      limit
-    });
   }
 
   const items = finalData?.map((item: any) => {
@@ -314,16 +276,6 @@ export async function fetchGenerations(
     return baseItem;
   }) || [];
 
-  // Debug logging for gallery rendering pipeline
-  console.log('[GalleryRenderDebug] fetchGenerations returning:', {
-    dataItemsCount: finalData.length,
-    itemsCount: items.length,
-    total: totalCount,
-    hasMore,
-    firstImageId: items[0]?.id?.substring(0, 8),
-    firstImageUrl: items[0]?.url?.substring(0, 50) + '...',
-    timestamp: Date.now()
-  });
 
   return { items, total: totalCount, hasMore };
 }
@@ -415,19 +367,9 @@ export function useGenerations(
 ) {
   const offset = (page - 1) * limit;
   const queryClient = useQueryClient();
-  const queryKey = ['unified-generations', 'project', projectId, page, limit, filters];
+  const effectiveProjectId = projectId ?? (typeof window !== 'undefined' ? (window as any).__PROJECT_CONTEXT__?.selectedProjectId : null);
+  const queryKey = ['unified-generations', 'project', effectiveProjectId, page, limit, filters];
 
-  // [GalleryRenderDebug] Add comprehensive logging for useGenerations
-  console.log('[GalleryRenderDebug] useGenerations called with:', {
-    projectId,
-    page,
-    limit,
-    enabled,
-    filters,
-    offset,
-    queryKey: queryKey.join(':'),
-    timestamp: Date.now()
-  });
 
   // 🎯 MODULAR POLLING: Configure resurrection polling with ImageGallery-specific settings
   const { refetchInterval } = useResurrectionPollingConfig(
@@ -444,8 +386,8 @@ export function useGenerations(
 
   const result = useQuery<GenerationsPaginatedResponse, Error>({
     queryKey: queryKey,
-    queryFn: () => fetchGenerations(projectId, limit, offset, filters),
-    enabled: !!projectId && enabled,
+    queryFn: () => fetchGenerations(effectiveProjectId, limit, offset, filters),
+    enabled: !!effectiveProjectId && enabled,
     // Use `placeholderData` with `keepPreviousData` to prevent UI flashes on pagination/filter changes
     placeholderData: keepPreviousData,
     // Synchronously grab initial data from the cache on mount to prevent skeletons on revisit

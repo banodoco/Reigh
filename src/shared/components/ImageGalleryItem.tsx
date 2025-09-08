@@ -155,11 +155,6 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   
   // Track successful image load events
   const handleImageLoad = useCallback(() => {
-    console.log(`[GalleryRenderDebug] ✅ Image ${index} LOADED successfully:`, {
-      imageId: image.id?.substring(0, 8),
-      wasCached: isPreloadedAndCached,
-      loadTime: Date.now()
-    });
     setImageLoaded(true);
     setImageLoading(false);
     // Mark this image as cached in the centralized cache to avoid future skeletons
@@ -342,17 +337,6 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
     const isPreloaded = isImageCached(image);
     
     if (index < 8) {
-      console.log(`[GalleryRenderDebug] Loading decision for image ${index}:`, {
-        imageId: image.id.substring(0, 8),
-        actualSrc: !!actualSrc,
-        imageLoaded,
-        shouldLoad,
-        isPriority,
-        isPreloaded,
-        actualDisplayUrl: actualDisplayUrl?.substring(0, 50) + '...',
-        canRender: !!(actualSrc && imageLoaded),
-        decision: !actualSrc && shouldLoad ? 'LOAD' : actualSrc ? 'SKIP_ALREADY_SET' : !shouldLoad ? 'SKIP_NOT_READY' : 'UNKNOWN'
-      });
     }
     
     // Only load if progressive loading system says we should AND we haven't loaded yet
@@ -360,30 +344,24 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
       
       // Don't load placeholder URLs - they indicate missing/invalid image data
       if (actualDisplayUrl === '/placeholder.svg' || !actualDisplayUrl) {
-        console.error(`[GalleryRenderDebug] ❌ INVALID URL - setting error state for image ${index}:`, actualDisplayUrl);
         setImageLoadError(true);
         return;
       }
       
       // Only set loading if the image isn't already cached/loaded
       if (!isPreloaded) {
-        console.log(`[GalleryRenderDebug] 🔄 Setting loading state for image ${index} (uncached)`);
         setImageLoading(true);
       } else {
-        console.log(`[GalleryRenderDebug] ⚡ Skipping loading state for image ${index} (cached)`);
       }
       
       // No additional delay - progressive loading system handles all timing
       // Images load immediately when shouldLoad becomes true
       if (index < 8) {
-        console.log(`[GalleryRenderDebug] 🚀 SETTING actualSrc for image ${index} immediately`);
       }
       setActualSrc(actualDisplayUrl);
       
     } else if (!shouldLoad) {
-      console.log(`[GalleryRenderDebug] ⏸️ Image ${index} WAITING for shouldLoad=true`);
     } else if (actualSrc) {
-      console.log(`[GalleryRenderDebug] ✅ Image ${index} ALREADY LOADED`);
     }
   }, [actualSrc, actualDisplayUrl, shouldLoad, image.id, index]);
 
@@ -614,13 +592,6 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
             <>
               {/* Show image once it's loaded, regardless of shouldLoad state */}
               {actualSrc && imageLoaded && (() => {
-                console.log(`[GalleryRenderDebug] 🖼️ RENDERING Image ${index}:`, {
-                  imageId: image.id?.substring(0, 8),
-                  actualSrc: !!actualSrc,
-                  imageLoaded,
-                  actualSrcUrl: actualSrc?.substring(0, 50) + '...',
-                  timestamp: Date.now()
-                });
                 return (
                 <img
                   src={actualSrc}

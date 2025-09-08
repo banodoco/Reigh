@@ -1,3 +1,6 @@
+// CRITICAL: Log at VERY TOP of App.tsx
+console.error('[ReconnectionIssue] 🔥 APP.TSX FILE LOADED AT:', new Date().toISOString());
+
 import React, { useContext } from 'react';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { TooltipProvider } from "@/shared/components/ui/tooltip";
@@ -10,8 +13,8 @@ import { NEW_GROUP_DROPPABLE_ID } from '@/shared/components/ShotsPane/NewGroupDr
 import { LastAffectedShotProvider, LastAffectedShotContext } from '@/shared/contexts/LastAffectedShotContext';
 import { AppRoutes } from "./routes";
 import { ProjectProvider, useProject } from "@/shared/contexts/ProjectContext";
-import { useWebSocket } from '@/shared/hooks/useWebSocket';
 import { RealtimeProvider } from '@/shared/providers/RealtimeProvider';
+// Removed RealtimeBoundary - using surgical observer restoration instead
 import { PanesProvider } from '@/shared/contexts/PanesContext';
 import { CurrentShotProvider } from '@/shared/contexts/CurrentShotContext';
 import { ToolPageHeaderProvider } from '@/shared/contexts/ToolPageHeaderContext';
@@ -20,7 +23,9 @@ import { GenerationTaskProvider } from '@/shared/contexts/GenerationTaskContext'
 // [MobileStallFix] Import debug utilities for console debugging
 import '@/shared/lib/mobileProjectDebug';
 import { initPollingDebugHelpers } from '@/shared/lib/pollingDebugHelpers';
-import { initRealtimeDebugHelpers } from '@/shared/lib/realtimeDebugHelpers';
+import { initTabReactivationTesting } from '@/shared/lib/tabReactivationTesting';
+import { initTabResumeDebugger } from '@/shared/lib/tabResumeDebugger';
+import { initWebSocketFailureTracker } from '@/shared/lib/webSocketFailureTracker';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -233,74 +238,12 @@ const AppInternalContent = () => {
 };
 
 function App() {
+  // Debug helpers only; removed WS probe and app-level visibility recovery to prevent overlap with RealtimeProvider
   React.useEffect(() => {
-    // Initialize debug helpers for console debugging
-    console.log('[DebugHelpers] Initializing debug helpers...');
-    try {
-      initPollingDebugHelpers(queryClient);
-      initRealtimeDebugHelpers();
-      console.log('[DebugHelpers] Debug helpers initialized successfully');
-      console.log('[DebugHelpers] Try: debugPolling.inspectAllCaches("your-project-id")');
-      console.log('[DebugHelpers] Try: realtimeDebug.checkHealth() or rt() for realtime status');
-    } catch (error) {
-      console.error('[DebugHelpers] Failed to initialize debug helpers:', error);
-    }
-    
-    // Install WebSocket constructor probe once
-    try {
-      const key = '__WS_PROBE_INSTALLED__';
-      if (!(window as any)[key]) {
-        (window as any)[key] = true;
-        const OriginalWS = window.WebSocket;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (window as any).WebSocket = function(url: string, protocols?: string | string[]) {
-          try { console.warn('[DeadModeInvestigation] WS new', { url, protocols }); } catch {}
-          const ws = protocols ? new OriginalWS(url, protocols) : new OriginalWS(url);
-          try {
-            ws.addEventListener('open', () => console.warn('[DeadModeInvestigation] WS open', { url }));
-            ws.addEventListener('error', (e) => console.warn('[DeadModeInvestigation] WS error', { url }));
-            ws.addEventListener('close', (e) => console.warn('[DeadModeInvestigation] WS close', { url, code: (e as CloseEvent)?.code, reason: (e as CloseEvent)?.reason }));
-          } catch {}
-          return ws;
-        } as any;
-      }
-    } catch {}
-
-    return () => {
-    };
-  }, []);
-
-  // Visibility logging only - recovery handled by RealtimeProvider
-  React.useEffect(() => {
-    const handleVisibility = () => {
-      try { (window as any).__VIS_CHANGE_AT__ = Date.now(); } catch {}
-      try {
-        const socket: any = (window as any)?.supabase?.realtime?.socket;
-        const diagnostics = (window as any).__REALTIME_DIAGNOSTICS__;
-        console.warn('[ReconnectionIssue][Visibility] App visibilitychange', {
-          visibility: document.visibilityState,
-          connected: !!socket?.isConnected?.(),
-          state: socket?.connectionState,
-          channelState: diagnostics?.channelState,
-          lastEventAt: diagnostics?.lastEventAt,
-          timestamp: Date.now()
-        });
-      } catch {}
-      
-      // Dispatch event for RealtimeProvider to handle recovery
-      if (document.visibilityState === 'visible') {
-        try {
-          window.dispatchEvent(new CustomEvent('app:visibility-change', { 
-            detail: { visible: true } 
-          }));
-        } catch {}
-      }
-    };
-    
-    document.addEventListener('visibilitychange', handleVisibility);
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibility);
-    };
+    try { initPollingDebugHelpers(queryClient); } catch {}
+    try { initTabReactivationTesting(); } catch {}
+    try { initTabResumeDebugger(); } catch {}
+    try { initWebSocketFailureTracker(); } catch {}
   }, []);
 
   return (

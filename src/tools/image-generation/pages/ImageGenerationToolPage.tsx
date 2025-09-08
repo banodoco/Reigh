@@ -17,7 +17,6 @@ import { nanoid } from 'nanoid';
 import { useGenerations, useDeleteGeneration, useUpdateGenerationLocation, GenerationsPaginatedResponse } from "@/shared/hooks/useGenerations";
 
 import { useApiKeys } from '@/shared/hooks/useApiKeys';
-import { useTaskQueueNotifier } from '@/shared/hooks/useTaskQueueNotifier';
 import { useQueryClient } from '@tanstack/react-query';
 import { useListPublicResources } from '@/shared/hooks/useResources';
 
@@ -143,7 +142,9 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     suppressPerTaskToast: true 
   }), [selectedProjectId]);
   
-  const { isEnqueuing, justQueued } = useTaskQueueNotifier(taskQueueOptions);
+  // REMOVED: useTaskQueueNotifier was interfering with RealtimeProvider
+  const isEnqueuing = false;
+  const justQueued = false;
   const [localIsGenerating, setLocalIsGenerating] = useState(false);
   const [localJustQueued, setLocalJustQueued] = useState(false);
   const localQueuedTimeoutRef = useRef<number | null>(null);

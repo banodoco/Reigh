@@ -294,9 +294,10 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
     });
   }
   
+  const effectiveProjectId = projectId ?? (typeof window !== 'undefined' ? (window as any).__PROJECT_CONTEXT__?.selectedProjectId : null);
   const query = useQuery<PaginatedTasksResponse, Error>({
     // CRITICAL: Use page-based cache keys like gallery
-    queryKey: [TASKS_QUERY_KEY, 'paginated', projectId, page, limit, status],
+    queryKey: [TASKS_QUERY_KEY, 'paginated', effectiveProjectId, page, limit, status],
     queryFn: async () => {
       // [TasksPaneCountMismatch] Log function entry params to catch limit corruption
       console.log('[TasksPaneCountMismatch]', {
@@ -325,7 +326,7 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
         cacheKey: [TASKS_QUERY_KEY, 'paginated', projectId, page, limit, status].join(':')
       });
       
-      if (!projectId) {
+      if (!effectiveProjectId) {
         return { tasks: [], total: 0, hasMore: false, totalPages: 0 }; 
       }
       
@@ -337,7 +338,7 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
       let countQuery = supabase
         .from('tasks')
         .select('*', { count: 'exact', head: true })
-        .eq('project_id', projectId)
+        .eq('project_id', effectiveProjectId)
         .is('params->orchestrator_task_id_ref', null); // Only parent tasks
 
       if (status && status.length > 0) {
@@ -351,7 +352,7 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
       let dataQuery = supabase
         .from('tasks')
         .select('*')
-        .eq('project_id', projectId)
+        .eq('project_id', effectiveProjectId)
         .is('params->orchestrator_task_id_ref', null); // Only parent tasks
 
       // For Succeeded view, order by completion time (most recent first)
@@ -574,7 +575,7 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
 
       return result;
     },
-    enabled: !!projectId,
+    enabled: !!effectiveProjectId,
     // CRITICAL: Gallery cache settings - prevent background refetches
     // Keep previous page's data visible during refetches to avoid UI blanks
     placeholderData: (previousData) => previousData,
@@ -585,6 +586,13 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
     refetchOnReconnect: false,
     // Add background polling for active tasks with resurrection mechanism
     refetchInterval: (query) => {
+      try {
+        const healing = Date.now() < (((window as any).__REACTIVATION_HEALING_UNTIL__) || 0);
+        if (healing) {
+          console.warn('[TabReactivation][Polling:Tasks] Suppressing polling during healing window');
+          return false;
+        }
+      } catch {}
       // Only poll if there are active tasks (Queued or In Progress)
       const data = query.state.data;
       const isStale = query.state.isStale;

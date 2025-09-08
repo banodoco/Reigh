@@ -11,8 +11,6 @@ import { smartPreloadImages, initializePrefetchOperations, smartCleanupOldPages,
 const GENERATIONS_PER_PAGE = 30; // 30 items per page for consistency
 
 const GenerationsPage: React.FC = () => {
-  // [UPSTREAM DEBUG] Track GenerationsPage component rendering
-  console.log('[GalleryRenderDebug] 📄 GenerationsPage component rendering');
   
   const { isLoadingProjects } = useProject();
   const queryClient = useQueryClient();
@@ -48,31 +46,7 @@ const GenerationsPage: React.FC = () => {
     mediaType: mediaTypeFilter // Pass dynamic mediaType instead of hardcoded 'image'
   });
 
-  // [UPSTREAM DEBUG] Track data from useGenerationsPageLogic
-  console.log('[GalleryRenderDebug] 📊 GenerationsPageLogic data:', {
-    selectedProjectId,
-    paginatedItemsCount: paginatedData?.items?.length || 0,
-    totalCount,
-    isLoading,
-    isFetching,
-    isError,
-    errorMessage: error?.message,
-    page,
-    isLoadingProjects,
-    timestamp: Date.now()
-  });
 
-  // [DEEP DEBUG] Log the exact skeleton gate conditions  
-  console.log('[GalleryRenderDebug] 🔍 SKELETON GATE CONDITIONS:', {
-    condition1_isLoadingProjects: isLoadingProjects,
-    condition2_emptyItems: paginatedData.items.length === 0,
-    condition3_isLoading: isLoading,
-    condition4_isFetching: isFetching,
-    condition5_totalCountNull: totalCount == null,
-    combinedCondition2: paginatedData.items.length === 0 && (isLoading || isFetching || totalCount == null),
-    willShowSkeleton: isLoadingProjects || (paginatedData.items.length === 0 && (isLoading || isFetching || totalCount == null)),
-    timestamp: Date.now()
-  });
 
   // Handle media type filter change
   const handleMediaTypeFilterChange = (newMediaType: 'all' | 'image' | 'video') => {
@@ -151,14 +125,6 @@ const GenerationsPage: React.FC = () => {
     isLoadingProjects ||
     (paginatedData.items.length === 0 && (isLoading || isFetching || totalCount == null))
   ) {
-    console.log('[GalleryRenderDebug] 🔄 EARLY SKELETON GATE: Preventing all UI flash', {
-      isLoadingProjects,
-      itemsLength: paginatedData.items.length,
-      isLoading,
-      isFetching,
-      totalCount,
-      timestamp: Date.now()
-    });
     return (
       <div className="container mx-auto p-4 flex flex-col h-full">
         <SkeletonGallery 
@@ -178,26 +144,18 @@ const GenerationsPage: React.FC = () => {
       
       {(() => {
         if (!selectedProjectId) {
-          console.log('[GalleryRenderDebug] ❌ No project selected');
           return <div className="text-center py-10">Please select a project to view generations.</div>;
         }
         
         if (isError) {
-          console.log('[GalleryRenderDebug] ❌ Error state:', error?.message);
           return <div className="text-center py-10 text-red-500">Error loading generations: {error?.message}</div>;
         }
         
         // Explicit empty state (true zero results)
         if (paginatedData.items.length === 0 && totalCount === 0) {
-          console.log('[GalleryRenderDebug] 📭 True empty state: no generations exist');
           return <div className="text-center py-10">No generations found.</div>;
         }
         
-        console.log('[GalleryRenderDebug] ✅ Rendering ImageGallery with:', {
-          itemsCount: paginatedData.items.length,
-          totalCount,
-          page
-        });
         return (
         <ImageGallery
           images={paginatedData.items}

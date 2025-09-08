@@ -148,6 +148,10 @@ export const ImageGalleryGrid: React.FC<ImageGalleryGridProps> = ({
               // Only clear button loading for server pagination - client pagination handles this separately
               if (isServerPagination) {
                 console.log(`🔘 [PAGELOADINGDEBUG] [GALLERY] Server pagination - also clearing button loading`);
+                console.warn(`[ReconnectionIssue][UI_LOADING_STATE] Clearing loadingButton - buttons will be re-enabled`, {
+                  reason: 'Server pagination images ready',
+                  timestamp: Date.now()
+                });
                 setLoadingButton(null);
               }
               

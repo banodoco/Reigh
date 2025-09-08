@@ -181,25 +181,8 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
     offset: (currentPage - 1) * ITEMS_PER_PAGE,
   });
 
-  // Immediate refresh listener: when a task is created, invalidate and refetch page 1 instantly
-  useEffect(() => {
-    if (!selectedProjectId) return;
-    const handler = (e: Event) => {
-      const detail = (e as CustomEvent).detail || {};
-      if (detail.projectId && detail.projectId !== selectedProjectId) return;
-      console.log('[PollingBreakageIssue] [TasksPane] task-created event received, forcing refresh', {
-        selectedProjectId,
-        currentPage,
-        selectedFilter,
-        timestamp: Date.now()
-      });
-      // Always go refresh the first page where new tasks appear
-      queryClient.invalidateQueries({ queryKey: ['tasks', 'paginated', selectedProjectId, 1] });
-      refetchPaginatedTasks();
-    };
-    window.addEventListener('task-created', handler as EventListener);
-    return () => window.removeEventListener('task-created', handler as EventListener);
-  }, [selectedProjectId, currentPage, selectedFilter, queryClient, refetchPaginatedTasks]);
+  // NOTE: Task invalidation is now handled by the centralized TaskInvalidationSubscriber
+  // which provides better read-after-write consistency with exponential backoff retry
   
   // [TasksPaneCountMismatch] Track paginated tasks hook results
   console.log('[TasksPaneCountMismatch]', {
@@ -234,14 +217,14 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
                         (!displayPaginatedData && paginatedData) ||
                         // IMMEDIATE UPDATE: If we have new data with more tasks, update immediately
                         (paginatedData && displayPaginatedData && 
-                         paginatedData.tasks.length > displayPaginatedData.tasks.length);
+                         (paginatedData as any).tasks.length > (displayPaginatedData as any).tasks.length);
     
     if (shouldUpdate) {
       console.log('[PollingBreakageIssue] [TasksPane] Updating display data', {
         context: 'TasksPane:update-display-paginated-data',
         reason: !displayPaginatedData ? 'initial' : 'new_data',
-        previousTasksCount: displayPaginatedData?.tasks?.length || 0,
-        newTasksCount: paginatedData?.tasks?.length || 0,
+        previousTasksCount: (displayPaginatedData as any)?.tasks?.length || 0,
+        newTasksCount: (paginatedData as any)?.tasks?.length || 0,
         isLoading: isPaginatedLoading,
         selectedFilter,
         currentPage,
@@ -256,19 +239,19 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
         selectedFilter,
         currentPage,
         isLoading: isPaginatedLoading,
-        tasksReceived: paginatedData?.tasks?.length || 0,
-        totalFromHook: paginatedData?.total || 0,
-        totalPagesFromHook: paginatedData?.totalPages || 0,
-        hasMoreFromHook: paginatedData?.hasMore,
+      tasksReceived: (paginatedData as any)?.tasks?.length || 0,
+      totalFromHook: (paginatedData as any)?.total || 0,
+      totalPagesFromHook: (paginatedData as any)?.totalPages || 0,
+      hasMoreFromHook: (paginatedData as any)?.hasMore,
         calculatedOffset: (currentPage - 1) * ITEMS_PER_PAGE,
         expectedItemsPerPage: ITEMS_PER_PAGE,
-        ISSUE_DETECTED: paginatedData?.tasks?.length === 0 && currentPage > 2 && (paginatedData?.total || 0) > 0,
+        ISSUE_DETECTED: (paginatedData as any)?.tasks?.length === 0 && currentPage > 2 && ((paginatedData as any)?.total || 0) > 0,
         timestamp: Date.now()
       });
 
       // [TasksPaneCountMismatch] Mismatch detector between counts and visible items on page
       try {
-        const tasks = paginatedData?.tasks || [];
+        const tasks = (paginatedData as any)?.tasks || [];
         const visibleTasks = filterVisibleTasks(tasks);
         const hiddenTasks = tasks.filter(t => !isTaskVisible((t as any).taskType));
         const processingOnPage = visibleTasks.filter(t => (t as any).status === 'Queued' || (t as any).status === 'In Progress');
@@ -335,7 +318,7 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
   const cancellableTaskCount = displayStatusCounts?.processing || 0;
   
   // Track count vs task list mismatch
-  const currentTasksCount = displayPaginatedData?.tasks?.length || 0;
+  const currentTasksCount = (displayPaginatedData as any)?.tasks?.length || 0;
   const isProcessingFilter = selectedFilter === 'Processing';
   
   const hasMismatch = isProcessingFilter && cancellableTaskCount > 0 && currentTasksCount === 0;
@@ -352,23 +335,12 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
     timestamp: Date.now()
   });
   
-  // Force refetch paginated tasks when there's a mismatch
-  useEffect(() => {
-    if (hasMismatch && !isPaginatedLoading && selectedProjectId) {
-      console.warn('[PollingBreakageIssue] [TasksPane] MISMATCH DETECTED - forcing paginated tasks refetch', {
-        cancellableTaskCount,
-        currentTasksCount,
-        selectedFilter,
-        currentPage,
-        timestamp: Date.now()
-      });
-      refetchPaginatedTasks();
-    }
-  }, [hasMismatch, isPaginatedLoading, selectedProjectId, refetchPaginatedTasks, cancellableTaskCount, currentTasksCount, selectedFilter, currentPage]);
+  // NOTE: Mismatch detection is now handled by the unified polling system
+  // which provides more robust detection and automatic resolution
 
   // [TasksPaneCountMismatch] Compare processing count badge to visible processing tasks on current page
   try {
-    const pageTasks = displayPaginatedData?.tasks || [];
+    const pageTasks = (displayPaginatedData as any)?.tasks || [];
     const visiblePageTasks = filterVisibleTasks(pageTasks);
     const processingOnPage = visiblePageTasks.filter(t => (t as any).status === 'Queued' || (t as any).status === 'In Progress');
     console.log('[TasksPaneCountMismatch]', {
@@ -466,8 +438,8 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
   });
 
   // Calculate pagination info using display data to avoid flickering
-  const totalTasks = displayPaginatedData?.total || 0;
-  const totalPages = displayPaginatedData?.totalPages || 0;
+  const totalTasks = (displayPaginatedData as any)?.total || 0;
+  const totalPages = (displayPaginatedData as any)?.totalPages || 0;
 
   return (
     <>
@@ -641,7 +613,7 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
               filterStatuses={STATUS_GROUPS[selectedFilter]}
               activeFilter={selectedFilter}
               statusCounts={displayStatusCounts}
-              paginatedData={displayPaginatedData}
+              paginatedData={displayPaginatedData as any}
               isLoading={isPaginatedLoading}
               currentPage={currentPage}
             />

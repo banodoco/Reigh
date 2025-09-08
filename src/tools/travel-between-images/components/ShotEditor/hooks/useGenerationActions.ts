@@ -18,7 +18,6 @@ import { parseRatio } from '@/shared/lib/aspectRatios';
 import { getDisplayUrl } from '@/shared/lib/utils';
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from '@tanstack/react-query';
-import { useTaskQueueNotifier } from "@/shared/hooks/useTaskQueueNotifier";
 import { useToolSettings } from '@/shared/hooks/useToolSettings';
 import { ShotEditorState } from '../state/types';
 import { isGenerationVideo, getNonVideoImages } from '../utils/generation-utils';
@@ -66,11 +65,10 @@ export const useGenerationActions = ({
   const duplicateImageInShotMutation = useDuplicateImageInShot();
   const handleExternalImageDropMutation = useHandleExternalImageDrop();
 
-  // Task queue
-  const { enqueueTasks, isEnqueuing, justQueued } = useTaskQueueNotifier({ 
-    projectId,
-    suppressPerTaskToast: true 
-  });
+  // REMOVED: useTaskQueueNotifier was interfering with RealtimeProvider
+  const enqueueTasks = async () => {};
+  const isEnqueuing = false;
+  const justQueued = false;
 
   // Upload settings
   const { settings: uploadSettings } = useToolSettings<{ cropToProjectSize?: boolean }>('upload', { projectId });
