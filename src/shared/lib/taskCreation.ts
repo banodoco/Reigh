@@ -65,6 +65,26 @@ export async function resolveProjectResolution(
 }
 
 /**
+ * Generates a UUID with fallback for mobile browsers
+ * Uses crypto.randomUUID() when available, falls back to nanoid
+ * 
+ * @returns UUID string
+ */
+export function generateUUID(): string {
+  // Check if crypto.randomUUID is available (requires secure context and modern browser)
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    try {
+      return crypto.randomUUID();
+    } catch (error) {
+      console.warn('[generateUUID] crypto.randomUUID failed, falling back to nanoid:', error);
+    }
+  }
+  
+  // Fallback to nanoid for mobile browsers or when crypto.randomUUID is not available
+  return nanoid();
+}
+
+/**
  * Generates a unique task ID with a prefix and timestamp
  * 
  * @param taskTypePrefix - Prefix for the task ID (e.g., "sm_travel_orchestrator")
@@ -72,7 +92,7 @@ export async function resolveProjectResolution(
  */
 export function generateTaskId(taskTypePrefix: string): string {
   const runId = new Date().toISOString().replace(/[-:.TZ]/g, "");
-  const shortUuid = crypto.randomUUID().slice(0, 6);
+  const shortUuid = generateUUID().slice(0, 6);
   return `${taskTypePrefix}_${runId.substring(2, 10)}_${shortUuid}`;
 }
 

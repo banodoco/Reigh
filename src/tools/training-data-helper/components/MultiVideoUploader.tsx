@@ -123,7 +123,7 @@ export function MultiVideoUploader({ onUpload, isUploading, selectedBatchId }: M
     // Immediately add files to queue instead of intermediate step
     const newVideoFiles: VideoFile[] = files.map(file => ({
       file,
-      id: crypto.randomUUID(),
+      id: generateUUID(),
       splitMode: 'manual' as SplitMode
     }));
     

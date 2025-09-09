@@ -1,11 +1,12 @@
 import { useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { generateUUID } from '@/shared/lib/taskCreation';
 
 function getOrCreateSessionId(): string {
   try {
     let sessionId = localStorage.getItem('sessionId');
     if (!sessionId) {
-      sessionId = crypto.randomUUID();
+      sessionId = generateUUID();
       localStorage.setItem('sessionId', sessionId);
     }
     return sessionId;
