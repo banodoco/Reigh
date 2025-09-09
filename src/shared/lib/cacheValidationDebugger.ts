@@ -7,6 +7,7 @@
 
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { VisibilityManager, type VisibilitySignals, type VisibilityEventType } from './VisibilityManager';
 
 interface CacheValidationResult {
   currentPage: number;
@@ -499,15 +500,43 @@ class CacheValidator {
   }
 
   reportEnvironment() {
+    const visibilityState = VisibilityManager.getState();
+    // Use centralized NetworkStatusManager instead of direct navigator access
+    let networkInfo;
+    try {
+      const { getNetworkStatusManager } = require('@/shared/lib/NetworkStatusManager');
+      const networkManager = getNetworkStatusManager();
+      const networkStatus = networkManager.getStatus();
+      networkInfo = {
+        online: networkStatus.isOnline,
+        connection: networkStatus.connection,
+        connectionQuality: networkManager.getConnectionQuality(),
+        lastTransitionAt: networkStatus.lastTransitionAt,
+        currentStatusDuration: networkStatus.currentStatusDuration,
+        source: 'NetworkStatusManager'
+      };
+    } catch {
+      // Fallback to direct navigator access if NetworkStatusManager not available
+      networkInfo = {
+        online: navigator.onLine,
+        connection: (navigator as any).connection ? {
+          effectiveType: (navigator as any).connection.effectiveType,
+          downlink: (navigator as any).connection.downlink,
+          rtt: (navigator as any).connection.rtt,
+        } : undefined,
+        source: 'navigator'
+      };
+    }
+    
     const info = {
-      online: navigator.onLine,
-      connection: (navigator as any).connection ? {
-        effectiveType: (navigator as any).connection.effectiveType,
-        downlink: (navigator as any).connection.downlink,
-        rtt: (navigator as any).connection.rtt,
-      } : undefined,
-      visibilityState: document.visibilityState,
-      hidden: document.hidden,
+      ...networkInfo,
+      visibility: {
+        state: visibilityState.visibilityState,
+        isVisible: visibilityState.isVisible,
+        changeCount: visibilityState.changeCount,
+        lastChangeAt: visibilityState.lastVisibilityChangeAt,
+        timeSinceLastChange: visibilityState.timeSinceLastChange
+      },
       userAgent: navigator.userAgent,
       time: new Date().toISOString(),
     };
@@ -637,6 +666,7 @@ class DeadModeDetector {
   private isInstalled = false;
   private lastInteractionTime = Date.now();
   private interactionTimeoutId: number | null = null;
+  private visibilitySubscriptionId: string | null = null;
   
   install() {
     if (this.isInstalled) return;
@@ -700,13 +730,14 @@ class DeadModeDetector {
     const healthCheck = () => {
       const now = Date.now();
       const timeSinceInteraction = now - this.lastInteractionTime;
+      const visibilityState = VisibilityManager.getState();
       
       // Check for signs of dead mode
       const suspiciousConditions = [];
       
       // Check for blocking overlays
       // Skip heavy scans when tab is hidden; reduce min coverage to speed
-      const overlays = document.hidden ? [] : cacheValidator.scanBlockingOverlays(0.5);
+      const overlays = !visibilityState.isVisible ? [] : cacheValidator.scanBlockingOverlays(0.5);
       if (overlays.length > 0) {
         suspiciousConditions.push(`${overlays.length} blocking overlays detected`);
       }
@@ -718,7 +749,7 @@ class DeadModeDetector {
       }
       
       // Check visibility
-      if (document.hidden) {
+      if (!visibilityState.isVisible) {
         suspiciousConditions.push('page is hidden');
       }
       
@@ -726,7 +757,8 @@ class DeadModeDetector {
         console.warn('[DeadModeInvestigation] Health check found issues:', {
           timeSinceInteractionMs: timeSinceInteraction,
           conditions: suspiciousConditions,
-          timestamp: now
+          timestamp: now,
+          visibilityState: visibilityState.visibilityState
         });
         
         // If multiple issues and no recent interaction, run full diagnostics
@@ -737,16 +769,24 @@ class DeadModeDetector {
     };
     
     // Adapt cadence based on visibility: scan less often when hidden
-    const getInterval = () => (document.hidden ? 60000 : 15000);
+    const getInterval = () => (VisibilityManager.getState().isVisible ? 15000 : 60000);
     let intervalId = setInterval(healthCheck, getInterval());
-    const onVisibility = () => {
+    
+    // Subscribe to visibility changes to adjust interval
+    this.visibilitySubscriptionId = VisibilityManager.subscribe((signals: VisibilitySignals) => {
       clearInterval(intervalId);
       intervalId = setInterval(healthCheck, getInterval());
-    };
-    document.addEventListener('visibilitychange', onVisibility);
+    }, {
+      id: 'cache-validation-debugger-health-check',
+      eventTypes: ['visibilitychange']
+    });
+    
     this.teardownFns.push(() => {
       clearInterval(intervalId);
-      document.removeEventListener('visibilitychange', onVisibility);
+      if (this.visibilitySubscriptionId) {
+        VisibilityManager.unsubscribe(this.visibilitySubscriptionId);
+        this.visibilitySubscriptionId = null;
+      }
     });
   }
   
@@ -887,6 +927,10 @@ class DeadModeDetector {
     if (this.interactionTimeoutId) {
       clearTimeout(this.interactionTimeoutId);
       this.interactionTimeoutId = null;
+    }
+    if (this.visibilitySubscriptionId) {
+      VisibilityManager.unsubscribe(this.visibilitySubscriptionId);
+      this.visibilitySubscriptionId = null;
     }
     console.log('[DeadModeInvestigation] Auto-diagnostics torn down');
   }

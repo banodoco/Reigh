@@ -1,8 +1,19 @@
 import { __WS_INSTRUMENTATION_ENABLED__, __CORRUPTION_TRACE_ENABLED__ } from '@/integrations/supabase/config/env';
 import { captureRealtimeSnapshot } from '@/integrations/supabase/utils/snapshot';
 import { __CORRUPTION_TIMELINE__, addCorruptionEvent } from '@/integrations/supabase/utils/timeline';
+import { InstrumentationManager } from '../InstrumentationManager';
 
 export function installWindowOnlyInstrumentation() {
+  // Use InstrumentationManager for centralized control
+  InstrumentationManager.install('window');
+  InstrumentationManager.install('localStorage');
+  InstrumentationManager.install('fetch');
+  InstrumentationManager.install('errorCapture');
+  return;
+}
+
+// Legacy function for backward compatibility - now delegates to InstrumentationManager
+export function installWindowOnlyInstrumentationLegacy() {
   if (typeof window === 'undefined') return;
 
   // DEBUGGING: Monitor localStorage operations for lastSelectedProjectId

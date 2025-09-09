@@ -250,7 +250,6 @@ export default function HomePage() {
       });
     } else {
       // Fallback to direct listener if auth manager not available
-      console.error('[HomePage] AuthManager not available, using direct listener');
       const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
         console.log('[AuthDebug] Auth state change:', event, !!session?.user?.id);
         setSession(session);

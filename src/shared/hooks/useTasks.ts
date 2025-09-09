@@ -5,6 +5,8 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useProject } from '../contexts/ProjectContext';
 import { filterVisibleTasks, isTaskVisible } from '@/shared/lib/taskConfig';
+import { invalidationRouter } from '@/shared/lib/InvalidationRouter';
+import { useStandardizedPolling, RecentActivityDetectors } from '@/shared/hooks/useResurrectionPolling';
 
 const TASKS_QUERY_KEY = 'tasks';
 
@@ -113,41 +115,28 @@ export const useCreateTask = (options?: { showToast?: boolean }) => {
         toast.success('Task created successfully');
       }
       
-      // GALLERY PATTERN: Only invalidate first page where new tasks appear
+      // Use InvalidationRouter for centralized, canonical invalidations
       if (selectedProjectId) {
-        console.log('[TasksPaneCountMismatch] [useCreateTask] TASK CREATED - Triggering invalidations:', {
+        console.log('[TasksPaneCountMismatch] [useCreateTask] TASK CREATED - Emitting domain event:', {
           projectId: selectedProjectId,
           functionName: variables.functionName,
           data,
           timestamp: Date.now()
         });
         
-        // Invalidate the lightweight status counts (badge updates immediately)
-        queryClient.invalidateQueries({ queryKey: ['task-status-counts', selectedProjectId] });
-        
-        // CRITICAL: Invalidate ALL page-1 paginated queries for this project regardless of status/limit
-        // so the visible list refetches immediately (Processing, Succeeded, etc.)
-        const invalidationResult1 = queryClient.invalidateQueries({ queryKey: ['tasks', 'paginated', selectedProjectId, 1] });
-        
-        // Also try more specific invalidation for Processing view
-        const processingKey = ['tasks', 'paginated', selectedProjectId, 1, 50, ['Queued', 'In Progress']];
-        const invalidationResult2 = queryClient.invalidateQueries({ queryKey: processingKey });
-        
-        console.log('[TasksPaneCountMismatch] [useCreateTask] Invalidations triggered for:', {
-          statusCountsKey: ['task-status-counts', selectedProjectId],
-          paginatedKey: ['tasks', 'paginated', selectedProjectId, 1],
-          processingSpecificKey: processingKey,
-          invalidationResult1,
-          invalidationResult2,
-          allQueriesInCache: Array.from(queryClient.getQueryCache().getAll().map(q => q.queryKey)),
-          timestamp: Date.now()
+        // Emit domain event - InvalidationRouter handles all canonical invalidations
+        invalidationRouter.taskCreated({ 
+          projectId: selectedProjectId,
+          taskId: data?.task_id 
         });
+        
+        console.log('[TasksPaneCountMismatch] [useCreateTask] Domain event emitted - InvalidationRouter will handle all invalidations');
         
         // Do NOT invalidate other pages - they'll update via realtime/polling
       } else {
-        // Fallback: invalidate generic queries (should rarely happen)
-        console.log('[useCreateTask] Invalidating generic tasks query');
-        queryClient.invalidateQueries({ queryKey: ['task-status-counts'] });
+        // Fallback: emit event without project context
+        console.log('[useCreateTask] Emitting task created event for unknown project');
+        invalidationRouter.taskCreated({ projectId: 'unknown' });
       }
     },
     onError: (error: Error, variables) => {
@@ -177,8 +166,15 @@ export const useUpdateTaskStatus = () => {
       if (error) throw error;
       return data;
     },
-    onSuccess: (_, taskId) => {
-      queryClient.invalidateQueries({ queryKey: [TASKS_QUERY_KEY] });      
+    onSuccess: (data, variables) => {
+      // Emit domain event for task status change
+      if (data?.project_id) {
+        invalidationRouter.taskStatusChanged({ 
+          projectId: data.project_id, 
+          taskId: variables.taskId,
+          status: variables.status
+        });
+      }
     },
     onError: (error: Error) => {
       console.error('Error updating task status:', error);
@@ -278,6 +274,19 @@ export const useListTasks = (params: ListTasksParams) => {
 export const usePaginatedTasks = (params: PaginatedTasksParams) => {
   const { projectId, status, limit = 50, offset = 0 } = params;
   const page = Math.floor(offset / limit) + 1;
+  
+  // 🎯 STANDARDIZED POLLING: Use standardized polling for paginated tasks
+  const { refetchInterval, refetchIntervalInBackground } = useStandardizedPolling(
+    'Tasks',
+    { projectId, page, status },
+    {
+      hasRecentActivity: RecentActivityDetectors.paginatedTasks,
+      fastInterval: 10000,        // 10s for active tasks
+      resurrectionInterval: 60000, // 60s for inactive state
+      initialInterval: 5000,      // 5s for Processing filter, 30s otherwise (handled in activity detector)
+      staleThreshold: 30000       // 30 seconds = stale
+    }
+  );
   
   // [TasksPaneCountMismatch] Debug unexpected limit values
   if (limit < 10) {
@@ -579,110 +588,13 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
     // CRITICAL: Gallery cache settings - prevent background refetches
     // Keep previous page's data visible during refetches to avoid UI blanks
     placeholderData: (previousData) => previousData,
-    keepPreviousData: true,
-    staleTime: 10 * 1000, // FIXED: 10 seconds - allow refetchInterval to work properly
+    staleTime: 10 * 1000, // 10 seconds - allow standardized polling to work properly
     gcTime: 5 * 60 * 1000, // 5 minutes  
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
-    // Add background polling for active tasks with resurrection mechanism
-    refetchInterval: (query) => {
-      try {
-        const healing = Date.now() < (((window as any).__REACTIVATION_HEALING_UNTIL__) || 0);
-        if (healing) {
-          console.warn('[TabReactivation][Polling:Tasks] Suppressing polling during healing window');
-          return false;
-        }
-      } catch {}
-      // Only poll if there are active tasks (Queued or In Progress)
-      const data = query.state.data;
-      const isStale = query.state.isStale;
-      const dataUpdatedAt = query.state.dataUpdatedAt;
-      const isFetching = query.state.isFetching;
-      const isError = query.state.isError;
-      const error = query.state.error;
-      const now = Date.now();
-      const processingFilterActive = Array.isArray(status) && status.includes(TASK_STATUS.QUEUED) && status.includes(TASK_STATUS.IN_PROGRESS);
-      
-      if (!data) {
-        // If no data yet: when Processing filter is active, use FAST polling to avoid 30–60s delays
-        console.log('[TaskPollingDebug] No data yet, using slow polling (30s):', {
-          projectId: params.projectId,
-          page,
-          isStale,
-          isFetching,
-          isError,
-          errorMessage: error?.message,
-          timestamp: now
-        });
-        return processingFilterActive ? 5000 : 30000; // 5s for Processing, 30s otherwise
-      }
-      
-      const hasActiveTasks = data.tasks?.some(task => 
-        task.status === 'Queued' || task.status === 'In Progress'
-      ) ?? false;
-      
-      const dataAge = now - dataUpdatedAt;
-      
-      console.log('[TaskPollingDebug] Polling interval calculation:', {
-        projectId: params.projectId,
-        page,
-        hasActiveTasks,
-        activeTaskCount: data.tasks?.filter(t => t.status === 'Queued' || t.status === 'In Progress').length || 0,
-        totalTasks: data.tasks?.length || 0,
-        dataAge: Math.round(dataAge / 1000) + 's',
-        isStale,
-        isFetching,
-        isError,
-        errorMessage: error?.message,
-        visibilityState: document.visibilityState,
-        timestamp: now
-      });
-      
-      // When Processing filter is selected, always use FAST polling regardless of current page contents
-      if (processingFilterActive || hasActiveTasks) {
-        const pollInterval = 10000; // 10 seconds for active tasks
-        console.log('[TaskPollingDebug] Active tasks detected, using FAST polling:', {
-          projectId: params.projectId,
-          page,
-          taskCount: data.tasks?.length,
-          activeTasks: data.tasks?.filter(t => t.status === 'Queued' || t.status === 'In Progress').length,
-          activeTasksDetails: data.tasks?.filter(t => t.status === 'Queued' || t.status === 'In Progress').map(t => ({
-            id: t.id,
-            status: t.status,
-            taskType: t.taskType,
-            createdAt: t.createdAt
-          })),
-          pollIntervalMs: pollInterval,
-          isStale,
-          dataAge: Math.round(dataAge / 1000) + 's',
-          dataUpdatedAt: new Date(dataUpdatedAt).toISOString(),
-          timestamp: now
-        });
-        return pollInterval;
-      } else {
-        // RESURRECTION FIX: Even with no active tasks, poll occasionally 
-        // to catch new tasks that might be created while polling was stopped
-        const pollInterval = 60000; // 60 seconds for inactive state
-        console.log('[TaskPollingDebug] No active tasks, using SLOW resurrection polling:', {
-          projectId: params.projectId,
-          page,
-          taskCount: data.tasks?.length,
-          recentTasksDetails: data.tasks?.slice(0, 3).map(t => ({
-            id: t.id,
-            status: t.status,
-            taskType: t.taskType,
-            createdAt: t.createdAt
-          })),
-          pollIntervalMs: pollInterval,
-          isStale,
-          dataAge: Math.round(dataAge / 1000) + 's',
-          dataUpdatedAt: new Date(dataUpdatedAt).toISOString(),
-          timestamp: now
-        });
-        return pollInterval;
-      }
-    },
-    refetchIntervalInBackground: true, // CRITICAL: Continue polling when tab is not visible
+    // 🎯 STANDARDIZED POLLING: Network-aware, jittered, healing-window-aware polling
+    refetchInterval,
+    refetchIntervalInBackground
   });
   
   // [TasksPaneCountMismatch] CRITICAL DEBUG: Log the actual query state to catch cache/stale issues
@@ -700,7 +612,7 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
     isStale: query.isStale,
     isError: query.isError,
     hasData: !!query.data,
-    dataTasksCount: query.data?.tasks?.length || 0,
+    dataTasksCount: query.data?.tasks ? query.data.tasks.length : 0,
     dataAge: query.dataUpdatedAt ? Math.round((Date.now() - query.dataUpdatedAt) / 1000) + 's' : 'never',
     errorMessage: query.error?.message,
     cacheKey: [TASKS_QUERY_KEY, 'paginated', projectId, page, limit, status].join(':'),
@@ -712,7 +624,7 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
   // NUCLEAR OPTION: Force refetch if query has data but no tasks for Processing view
   // SAFETY: Only trigger if data is genuinely stale (older than 30 seconds) to prevent infinite loops
   const isProcessingFilter = status && status.includes('Queued') && status.includes('In Progress');
-  const hasStaleEmptyData = query.data && query.data.tasks.length === 0 && !query.isFetching;
+  const hasStaleEmptyData = query.data && query.data.tasks && query.data.tasks.length === 0 && !query.isFetching;
   const dataAge = query.dataUpdatedAt ? Date.now() - query.dataUpdatedAt : Infinity;
   const isDataStale = dataAge > 30000; // 30 seconds
   
@@ -887,11 +799,13 @@ export const useCancelTask = (projectId: string | null) => {
   return useMutation({
     mutationFn: cancelTask,
     onSuccess: (_, taskId) => {
-      console.log(`[${Date.now()}] [useCancelTask] Task cancelled, invalidating queries for projectId:`, projectId);
-      queryClient.invalidateQueries({ queryKey: [TASKS_QUERY_KEY] });
-      // Also invalidate status counts since cancelling changes the processing count
+      console.log(`[${Date.now()}] [useCancelTask] Task cancelled, emitting domain event for projectId:`, projectId);
+      // Emit domain event for task cancellation
       if (projectId) {
-        queryClient.invalidateQueries({ queryKey: ['task-status-counts', projectId] });
+        invalidationRouter.emit({ 
+          type: 'TASK_CANCELLED', 
+          payload: { projectId, taskId } 
+        });
       }
     },
     onError: (error: Error) => {
@@ -908,12 +822,14 @@ export const useCancelPendingTasks = () => {
   return useMutation({
     mutationFn: cancelPendingTasks,
     onSuccess: (data, projectId) => {
-      console.log(`[${Date.now()}] [useCancelPendingTasks] Tasks cancelled, invalidating queries for projectId:`, projectId);
-      queryClient.invalidateQueries({ queryKey: [TASKS_QUERY_KEY, projectId] });
-      queryClient.invalidateQueries({ queryKey: [TASKS_QUERY_KEY, projectId, ['Queued']] });
-      queryClient.invalidateQueries({ queryKey: [TASKS_QUERY_KEY, projectId, ['Cancelled']] });
-      // Also invalidate status counts since cancelling changes the processing count  
-      queryClient.invalidateQueries({ queryKey: ['task-status-counts', projectId] });
+      console.log(`[${Date.now()}] [useCancelPendingTasks] Tasks cancelled, emitting batch domain event for projectId:`, projectId);
+      // Emit batch domain event for multiple task cancellations
+      if (projectId) {
+        invalidationRouter.emit({ 
+          type: 'TASKS_BATCH_UPDATE', 
+          payload: { projectId, taskIds: [] } 
+        });
+      }
     },
     onError: (error: Error) => {
       console.error('Error cancelling pending tasks:', error);
@@ -927,6 +843,15 @@ export const useCancelAllPendingTasks = useCancelPendingTasks;
 
 // Hook to get status counts for indicators
 export const useTaskStatusCounts = (projectId: string | null) => {
+  // 🎯 STANDARDIZED POLLING: Use standardized polling for status counts
+  const { refetchInterval, refetchIntervalInBackground } = useStandardizedPolling(
+    'TaskStatusCounts',
+    { projectId },
+    {
+      staticInterval: 5000 // 5 seconds - live status updates
+    }
+  );
+
   return useQuery({
     queryKey: ['task-status-counts', projectId],
     queryFn: async () => {
@@ -1087,8 +1012,9 @@ export const useTaskStatusCounts = (projectId: string | null) => {
       return result;
     },
     enabled: !!projectId,
-    staleTime: 4 * 1000, // 4 seconds - allow 5s refetchInterval to work properly
-    refetchInterval: 5000, // Refresh every 5 seconds for live updates
-    refetchIntervalInBackground: true, // CRITICAL: Continue polling when tab is not visible
+    staleTime: 4 * 1000, // 4 seconds - allow standardized polling to work properly
+    // 🎯 STANDARDIZED POLLING: Network-aware, jittered, healing-window-aware polling
+    refetchInterval,
+    refetchIntervalInBackground,
   });
 }; 

@@ -4,6 +4,7 @@ import { Shot, ShotImage, GenerationRow } from '@/types/shots';
 import { Database } from '@/integrations/supabase/types';
 import { uploadImageToStorage } from '@/shared/lib/imageUploader';
 import { toast } from 'sonner';
+import { invalidationRouter } from '@/shared/lib/InvalidationRouter';
 import React from 'react';
 import { log } from '@/shared/lib/logger';
 
@@ -46,7 +47,11 @@ export const useCreateShot = () => {
       return { shot: newShot, shouldSelectAfterCreation };
     },
     onSuccess: (newShot) => {
-      queryClient.invalidateQueries({ queryKey: ['shots'] });
+      // Emit domain event for shot creation
+      invalidationRouter.shotCreated({
+        projectId: newShot.project_id,
+        shotId: newShot.id
+      });
     },
     onError: (error: Error) => {
       console.error('Error creating shot:', error);
@@ -207,7 +212,8 @@ export const useDuplicateShot = () => {
     onSettled: (data, error, { projectId }) => {
       // Only invalidate on error - success case is handled in onSuccess
       if (error && projectId) {
-        queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
+        // Emit domain event for shot update on error (to refresh)
+        invalidationRouter.shotUpdated({ projectId });
       }
     },
   });
@@ -382,8 +388,12 @@ export const useReorderShots = () => {
       });
       // Invalidate queries to refresh from database and confirm the actual order
       if (projectId) {
-        queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
-        console.log(`${REORDER_DEBUG_TAG} Invalidated queries for project: ${projectId}`);
+        // Emit domain event for shot reordering
+        invalidationRouter.emit({
+          type: 'SHOT_REORDER',
+          payload: { projectId }
+        });
+        console.log(`${REORDER_DEBUG_TAG} Emitted SHOT_REORDER event for project: ${projectId}`);
       }
     },
     onError: (error, { projectId, shotOrders }) => {
@@ -527,27 +537,15 @@ export const useAddImageToShot = () => {
       return shotGeneration;
     },
     onSuccess: (_, variables) => {
-      // Batch invalidate queries for better performance
+      // Emit domain event for shot-generation change
       const { project_id, shot_id } = variables;
       
-      // Use a single batched invalidation call
-      const invalidationPromises = [];
-      
       if (project_id) {
-        invalidationPromises.push(
-          queryClient.invalidateQueries({ queryKey: ['shots', project_id] }),
-          queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', project_id] })
-        );
+        invalidationRouter.shotGenerationChanged({
+          projectId: project_id,
+          shotId: shot_id
+        });
       }
-      
-      if (shot_id) {
-        invalidationPromises.push(
-          queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shot_id] })
-        );
-      }
-      
-      // Execute all invalidations in parallel
-      Promise.all(invalidationPromises);
     },
     onError: (error: Error) => {
       console.error('Error adding image to shot:', error);
@@ -621,23 +619,13 @@ export const useAddImageToShotWithoutPosition = () => {
       // Batch invalidate queries for better performance
       const { project_id, shot_id } = variables;
       
-      const invalidationPromises = [];
-      
+      // Emit domain event for shot-generation change
       if (project_id) {
-        invalidationPromises.push(
-          queryClient.invalidateQueries({ queryKey: ['shots', project_id] }),
-          queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', project_id] })
-        );
+        invalidationRouter.shotGenerationChanged({
+          projectId: project_id,
+          shotId: shot_id
+        });
       }
-      
-      if (shot_id) {
-        invalidationPromises.push(
-          queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shot_id] })
-        );
-      }
-      
-      // Execute all invalidations in parallel
-      Promise.all(invalidationPromises);
     },
     onError: (error: Error) => {
       console.error('Error adding image to shot without position:', error);
@@ -674,23 +662,13 @@ export const usePositionExistingGenerationInShot = () => {
       // Batch invalidate queries for better performance
       const { project_id, shot_id } = variables;
       
-      const invalidationPromises = [];
-      
+      // Emit domain event for shot-generation change
       if (project_id) {
-        invalidationPromises.push(
-          queryClient.invalidateQueries({ queryKey: ['shots', project_id] }),
-          queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', project_id] })
-        );
+        invalidationRouter.shotGenerationChanged({
+          projectId: project_id,
+          shotId: shot_id
+        });
       }
-      
-      if (shot_id) {
-        invalidationPromises.push(
-          queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shot_id] })
-        );
-      }
-      
-      // Execute all invalidations in parallel
-      Promise.all(invalidationPromises);
     },
     onError: (error: Error) => {
       console.error('Error positioning existing generation in shot:', error);
@@ -929,8 +907,12 @@ export const useDeleteShot = () => {
       
       return shotId;
     },
-    onSuccess: (_, { projectId }) => {
-      queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
+    onSuccess: (_, { projectId, shotId }) => {
+      // Emit domain event for shot deletion
+      invalidationRouter.emit({
+        type: 'SHOT_DELETED',
+        payload: { projectId, shotId }
+      });
 
     },
     onError: (error: Error) => {

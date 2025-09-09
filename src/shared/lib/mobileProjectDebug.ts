@@ -50,8 +50,21 @@ window.checkProjectState = () => {
   console.log('🔍 Project State Check:');
   console.log('- Is Mobile:', isMobile);
   console.log('- User Agent:', navigator.userAgent);
-  console.log('- Network Status:', navigator.onLine ? 'Online' : 'Offline');
-  console.log('- Connection Type:', (navigator as any).connection?.effectiveType || 'Unknown');
+  
+  // Use centralized NetworkStatusManager if available
+  try {
+    const { getNetworkStatusManager } = require('@/shared/lib/NetworkStatusManager');
+    const manager = getNetworkStatusManager();
+    const status = manager.getStatus();
+    console.log('- Network Status (NetworkStatusManager):', status.isOnline ? 'Online' : 'Offline');
+    console.log('- Connection Type:', status.connection.effectiveType || 'Unknown');
+    console.log('- Connection Quality:', Math.round(manager.getConnectionQuality() * 100) + '%');
+    console.log('- Last Network Transition:', new Date(status.lastTransitionAt).toISOString());
+  } catch {
+    // Fallback to direct navigator access
+    console.log('- Network Status (navigator):', navigator.onLine ? 'Online' : 'Offline');
+    console.log('- Connection Type:', (navigator as any).connection?.effectiveType || 'Unknown');
+  }
   console.log('- Local Storage Available:', (() => {
     try {
       localStorage.setItem('test', 'test');

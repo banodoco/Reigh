@@ -47,16 +47,35 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({ isOpen, onOpenChan
     
     getSession();
     
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      
-      // Reset username when session changes
-      if (!session?.user?.id) {
-        setUsername(null);
-      }
-    });
+    // Use centralized auth manager instead of direct listener
+    const authManager = (window as any).__AUTH_MANAGER__;
+    let unsubscribe: (() => void) | null = null;
     
-    return () => subscription.unsubscribe();
+    if (authManager) {
+      unsubscribe = authManager.subscribe('ReferralModal', (_event, session) => {
+        setSession(session);
+        
+        // Reset username when session changes
+        if (!session?.user?.id) {
+          setUsername(null);
+        }
+      });
+    } else {
+      // Fallback to direct listener if auth manager not available
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        setSession(session);
+        
+        // Reset username when session changes
+        if (!session?.user?.id) {
+          setUsername(null);
+        }
+      });
+      unsubscribe = () => subscription.unsubscribe();
+    }
+    
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   // Get referral stats

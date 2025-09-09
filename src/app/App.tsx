@@ -26,6 +26,9 @@ import { initPollingDebugHelpers } from '@/shared/lib/pollingDebugHelpers';
 import { initTabReactivationTesting } from '@/shared/lib/tabReactivationTesting';
 import { initTabResumeDebugger } from '@/shared/lib/tabResumeDebugger';
 import { initWebSocketFailureTracker } from '@/shared/lib/webSocketFailureTracker';
+import { InstrumentationManager } from '@/integrations/supabase/instrumentation/InstrumentationManager';
+import { getNetworkStatusManager } from '@/shared/lib/NetworkStatusManager';
+import { invalidationRouter } from '@/shared/lib/InvalidationRouter';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -62,6 +65,9 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+// Initialize InvalidationRouter with QueryClient
+invalidationRouter.setQueryClient(queryClient);
 
 // New inner component that uses the context
 const AppInternalContent = () => {
@@ -238,12 +244,22 @@ const AppInternalContent = () => {
 };
 
 function App() {
-  // Debug helpers only; removed WS probe and app-level visibility recovery to prevent overlap with RealtimeProvider
+  // Initialize debug helpers using InstrumentationManager for centralized control
   React.useEffect(() => {
-    try { initPollingDebugHelpers(queryClient); } catch {}
-    try { initTabReactivationTesting(); } catch {}
-    try { initTabResumeDebugger(); } catch {}
-    try { initWebSocketFailureTracker(); } catch {}
+    try { 
+      // Install debug instrumentations through manager
+      InstrumentationManager.install('tabResume');
+      InstrumentationManager.install('webSocketFailure');
+      InstrumentationManager.install('cacheValidation');
+      InstrumentationManager.install('pollingDebug');
+      
+      // Legacy direct initializations (will be phased out)
+      initPollingDebugHelpers(queryClient); 
+      initTabReactivationTesting(); 
+    } catch {}
+    
+    // Initialize NetworkStatusManager for centralized network status handling
+    try { getNetworkStatusManager(); } catch {}
   }, []);
 
   return (

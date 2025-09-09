@@ -2,6 +2,8 @@
  * WebSocket Failure Tracker - Precisely tracks WebSocket failures during tab suspension
  */
 
+import { VisibilityManager, type VisibilitySignals, type VisibilityEventType } from './VisibilityManager';
+
 let tabSuspensionStartTime: number | null = null;
 let tabResumeTime: number | null = null;
 let webSocketFailures: Array<{
@@ -13,46 +15,50 @@ let webSocketFailures: Array<{
   visibilityState: string;
 }> = [];
 
-// Track tab suspension/resume timing
+let visibilitySubscriptionId: string | null = null;
+
+// Track tab suspension/resume timing using VisibilityManager
 if (typeof window !== 'undefined') {
-  document.addEventListener('visibilitychange', () => {
+  visibilitySubscriptionId = VisibilityManager.subscribe((signals: VisibilitySignals, eventType: VisibilityEventType, event: Event) => {
     const now = Date.now();
     
-    if (document.visibilityState === 'hidden') {
-      tabSuspensionStartTime = now;
-      console.error('[WebSocketDebug] 📱 TAB SUSPENDED:', {
+    if (eventType === 'visibilitychange') {
+      if (signals.justHidden) {
+        tabSuspensionStartTime = now;
+        console.error('[WebSocketDebug] 📱 TAB SUSPENDED:', {
+          timestamp: now,
+          suspensionTime: new Date(now).toISOString(),
+          changeCount: signals.changeCount
+        });
+      } else if (signals.justBecameVisible) {
+        tabResumeTime = now;
+        const suspensionDuration = tabSuspensionStartTime ? now - tabSuspensionStartTime : 0;
+        
+        console.error('[WebSocketDebug] 📱 TAB RESUMED:', {
+          timestamp: now,
+          resumeTime: new Date(now).toISOString(),
+          suspensionDuration,
+          suspensionDurationText: suspensionDuration > 0 ? `${Math.round(suspensionDuration / 1000)}s` : 'unknown',
+          changeCount: signals.changeCount
+        });
+        
+        // Clear old failures (keep only last 10)
+        webSocketFailures = webSocketFailures.slice(-10);
+      }
+    } else if (eventType === 'pagehide') {
+      console.error('[WebSocketDebug] 📱 PAGE HIDE EVENT:', {
         timestamp: now,
-        suspensionTime: new Date(now).toISOString()
+        persisted: event && 'persisted' in event ? (event as PageTransitionEvent).persisted : false
       });
-    } else if (document.visibilityState === 'visible') {
-      tabResumeTime = now;
-      const suspensionDuration = tabSuspensionStartTime ? now - tabSuspensionStartTime : 0;
-      
-      console.error('[WebSocketDebug] 📱 TAB RESUMED:', {
+    } else if (eventType === 'pageshow') {
+      console.error('[WebSocketDebug] 📱 PAGE SHOW EVENT:', {
         timestamp: now,
-        resumeTime: new Date(now).toISOString(),
-        suspensionDuration,
-        suspensionDurationText: suspensionDuration > 0 ? `${Math.round(suspensionDuration / 1000)}s` : 'unknown'
+        persisted: event && 'persisted' in event ? (event as PageTransitionEvent).persisted : false
       });
-      
-      // Clear old failures (keep only last 10)
-      webSocketFailures = webSocketFailures.slice(-10);
     }
-  });
-
-  // Track page hide/show events (more comprehensive than visibilitychange)
-  window.addEventListener('pagehide', () => {
-    console.error('[WebSocketDebug] 📱 PAGE HIDE EVENT:', {
-      timestamp: Date.now(),
-      persisted: event && 'persisted' in event ? (event as PageTransitionEvent).persisted : false
-    });
-  });
-
-  window.addEventListener('pageshow', () => {
-    console.error('[WebSocketDebug] 📱 PAGE SHOW EVENT:', {
-      timestamp: Date.now(),
-      persisted: event && 'persisted' in event ? (event as PageTransitionEvent).persisted : false
-    });
+  }, {
+    id: 'websocket-failure-tracker',
+    eventTypes: ['visibilitychange', 'pageshow', 'pagehide']
   });
 }
 
@@ -90,16 +96,22 @@ export function trackWebSocketFailure(url: string, error: string, readyState: nu
  * Get failure summary for debugging
  */
 export function getWebSocketFailureSummary() {
+  const visibilityState = VisibilityManager.getState();
+  
   return {
     totalFailures: webSocketFailures.length,
     recentFailures: webSocketFailures.filter(f => Date.now() - f.timestamp < 60000).length,
     failuresAfterTabResume: webSocketFailures.filter(f => f.timeSinceTabResume > 0 && f.timeSinceTabResume < 30000).length,
     lastFailure: webSocketFailures[webSocketFailures.length - 1],
     tabState: {
-      currentVisibility: document.visibilityState,
+      currentVisibility: visibilityState.visibilityState,
+      isVisible: visibilityState.isVisible,
       lastSuspensionTime: tabSuspensionStartTime,
       lastResumeTime: tabResumeTime,
-      timeSinceLastResume: tabResumeTime ? Date.now() - tabResumeTime : -1
+      timeSinceLastResume: tabResumeTime ? Date.now() - tabResumeTime : -1,
+      changeCount: visibilityState.changeCount,
+      lastVisibilityChangeAt: visibilityState.lastVisibilityChangeAt,
+      timeSinceLastChange: visibilityState.timeSinceLastChange
     }
   };
 }
@@ -116,6 +128,17 @@ export function initWebSocketFailureTracker() {
       console.error('[WebSocketDebug] 📊 FAILURE SUMMARY:', getWebSocketFailureSummary());
     }
   }, 30000);
+}
+
+/**
+ * Cleanup failure tracking
+ */
+export function cleanupWebSocketFailureTracker() {
+  if (visibilitySubscriptionId) {
+    VisibilityManager.unsubscribe(visibilitySubscriptionId);
+    visibilitySubscriptionId = null;
+    console.error('[WebSocketDebug] 🧹 WebSocket failure tracker cleaned up');
+  }
 }
 
 

@@ -1,6 +1,7 @@
 import React from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { runtimeConfig, addJitter } from '@/shared/lib/config';
+import { VisibilityManager } from '@/shared/lib/VisibilityManager';
 
 /**
  * Common resurrection polling logic that can be reused across different data types.
@@ -19,7 +20,7 @@ export interface ResurrectionPollingConfig {
   /** Age threshold to consider data stale (ms) */
   staleThreshold?: number;
   /** Function to detect if there's recent activity in the data */
-  hasRecentActivity?: (data: any) => boolean;
+  hasRecentActivity?: (data: any, context?: Record<string, any>) => boolean;
   /** Additional context for logging */
   context?: Record<string, any>;
 }
@@ -49,6 +50,25 @@ export function createResurrectionPollingFunction(config: ResurrectionPollingCon
   } = config;
 
   return (query: any) => {
+    // Get network-aware intervals from NetworkStatusManager
+    let networkStatusManager, networkStatus, recommendedIntervals, isSlowConnection;
+    try {
+      const { getNetworkStatusManager } = require('@/shared/lib/NetworkStatusManager');
+      networkStatusManager = getNetworkStatusManager();
+      networkStatus = networkStatusManager.getStatus();
+      recommendedIntervals = networkStatusManager.getRecommendedIntervals();
+      isSlowConnection = networkStatusManager.isSlowConnection();
+    } catch {
+      // Fallback if NetworkStatusManager not available
+      networkStatus = { isOnline: navigator.onLine, effectiveType: '4g' as const };
+      recommendedIntervals = { fast: 10000, normal: 30000, slow: 60000 };
+      isSlowConnection = false;
+    }
+
+    // Adjust intervals based on network status
+    const networkAwareFastInterval = Math.max(fastInterval, recommendedIntervals.fast);
+    const networkAwareResurrectionInterval = Math.max(resurrectionInterval, recommendedIntervals.normal);
+    const networkAwareInitialInterval = Math.max(initialInterval, recommendedIntervals.normal);
     // Suppress polling during healing window to avoid racing observer restoration
     try {
       const healing = Date.now() < (((window as any).__REACTIVATION_HEALING_UNTIL__) || 0);
@@ -94,15 +114,51 @@ export function createResurrectionPollingFunction(config: ResurrectionPollingCon
       timestamp: now,
       refetchIntervalTriggered: true,
       supabase: supabaseSnapshot,
+      networkStatus: {
+        isOnline: networkStatus.isOnline,
+        effectiveType: networkStatus.effectiveType,
+        isSlowConnection,
+        lastTransitionAt: networkStatus.lastTransitionAt
+      },
       ...context // Context can override any of the above
     };
 
-    if (!data) {
-      // If no data yet, poll slowly to get initial data
+    // Handle offline scenarios - use very slow polling or disable entirely
+    if (!networkStatus.isOnline) {
+      // If offline, use very slow polling to detect when we come back online
+      const offlineInterval = recommendedIntervals.slow;
       if (runtimeConfig.RECONNECTION_LOGS_ENABLED) {
-        console.log(`[Polling:${debugTag}] No data yet, slow polling`, { intervalMs: initialInterval, ...baseLogContext });
+        console.warn(`[Polling:${debugTag}] OFFLINE: Using slow polling to detect network recovery`, {
+          intervalMs: offlineInterval,
+          ...baseLogContext
+        });
       }
-      return initialInterval;
+      return offlineInterval;
+    }
+
+    if (!data) {
+      // If no data yet, use different intervals based on context
+      // For Processing filter, use faster initial polling to avoid delays
+      const processingFilterActive = context?.status && 
+        Array.isArray(context.status) && 
+        context.status.includes('Queued') && 
+        context.status.includes('In Progress');
+      
+      const contextAwareInitialInterval = processingFilterActive ? 
+        Math.max(5000, recommendedIntervals.fast) : // 5s for Processing filter
+        networkAwareInitialInterval; // Normal initial interval for others
+      
+      if (runtimeConfig.RECONNECTION_LOGS_ENABLED) {
+        console.log(`[Polling:${debugTag}] No data yet, context-aware initial polling`, { 
+          intervalMs: contextAwareInitialInterval,
+          originalInterval: initialInterval,
+          networkAwareInterval: networkAwareInitialInterval,
+          processingFilterActive,
+          networkAdjusted: contextAwareInitialInterval !== initialInterval,
+          ...baseLogContext 
+        });
+      }
+      return contextAwareInitialInterval;
     }
     
     const dataAge = now - dataUpdatedAt;
@@ -110,33 +166,39 @@ export function createResurrectionPollingFunction(config: ResurrectionPollingCon
     // Extract data metrics for logging (different for each hook type)
     const dataMetrics = extractDataMetrics(data, debugTag);
     
-    // Check for recent activity if function provided
-    const recentActivity = hasRecentActivity ? hasRecentActivity(data) : false;
+    // Check for recent activity if function provided (pass context for detectors that need it)
+    const recentActivity = hasRecentActivity ? hasRecentActivity(data, context) : false;
     
-    // Log the polling decision process with data-specific metrics
+      // Log the polling decision process with data-specific metrics
       if (runtimeConfig.RECONNECTION_LOGS_ENABLED) {
+        const visibilityState = VisibilityManager.getState();
         console.log(`[Polling:${debugTag}] Decision context`, {
         ...baseLogContext,
         ...dataMetrics,
         hasRecentActivity: recentActivity,
         dataAge: Math.round(dataAge / 1000) + 's',
-        visibilityState: document.visibilityState
+        visibilityState: visibilityState.visibilityState
       });
     }
     
     if (recentActivity) {
       // 🔧 CIRCUIT BREAKER: Check if data is stuck despite recent activity
       const isDataStuck = recentActivity && dataAge > (staleThreshold * 2); // Data should update with recent activity
-      let finalInterval = fastInterval;
+      let finalInterval = networkAwareFastInterval;
       
       if (isDataStuck) {
-        // Escalate polling when data appears stuck
-        finalInterval = Math.min(fastInterval * 0.5, 8000); // Max 8s when stuck
+        // Escalate polling when data appears stuck, but respect network conditions
+        const escalatedInterval = Math.min(networkAwareFastInterval * 0.5, 8000); // Max 8s when stuck
+        finalInterval = Math.max(escalatedInterval, recommendedIntervals.fast); // Don't go below network recommendations
+        
         if (runtimeConfig.RECONNECTION_LOGS_ENABLED) {
           console.warn(`[Polling:${debugTag}] CIRCUIT BREAKER: Data stuck despite activity, escalating polling`, {
             dataAge: Math.round(dataAge / 1000) + 's',
             staleThreshold: Math.round(staleThreshold / 1000) + 's',
             escalatedInterval: finalInterval,
+            originalFastInterval: fastInterval,
+            networkAwareFastInterval,
+            networkRecommendation: recommendedIntervals.fast,
             recentActivity,
             timestamp: now
           });
@@ -147,6 +209,8 @@ export function createResurrectionPollingFunction(config: ResurrectionPollingCon
         ...baseLogContext,
         ...dataMetrics,
         pollIntervalMs: finalInterval,
+        originalInterval: fastInterval,
+        networkAdjusted: finalInterval !== fastInterval,
         dataAge: Math.round(dataAge / 1000) + 's',
         dataUpdatedAt: new Date(dataUpdatedAt).toISOString(),
         circuitBreakerActive: isDataStuck
@@ -166,7 +230,7 @@ export function createResurrectionPollingFunction(config: ResurrectionPollingCon
       }
       
       if (runtimeConfig.RECONNECTION_LOGS_ENABLED) {
-        console.log(`[Polling:${debugTag}] FAST polling`, { ...fastLogContext, supabase: supabaseSnapshot });
+        console.log(`[Polling:${debugTag}] FAST network-aware polling`, { ...fastLogContext, supabase: supabaseSnapshot });
       }
       return finalInterval;
     } else if (dataAge > staleThreshold) {
@@ -176,7 +240,9 @@ export function createResurrectionPollingFunction(config: ResurrectionPollingCon
         ...baseLogContext,
         ...dataMetrics,
         dataAge: Math.round(dataAge / 1000) + 's',
-        pollIntervalMs: resurrectionInterval,
+        pollIntervalMs: networkAwareResurrectionInterval,
+        originalInterval: resurrectionInterval,
+        networkAdjusted: networkAwareResurrectionInterval !== resurrectionInterval,
         dataUpdatedAt: new Date(dataUpdatedAt).toISOString()
       };
       
@@ -189,9 +255,9 @@ export function createResurrectionPollingFunction(config: ResurrectionPollingCon
       }
       
       if (runtimeConfig.RECONNECTION_LOGS_ENABLED) {
-        console.log(`[Polling:${debugTag}] RESURRECTION polling`, { ...resurrectionLogContext, supabase: supabaseSnapshot });
+        console.log(`[Polling:${debugTag}] RESURRECTION network-aware polling`, { ...resurrectionLogContext, supabase: supabaseSnapshot });
       }
-      return resurrectionInterval;
+      return networkAwareResurrectionInterval;
     } else {
       // Data is fresh and no recent activity - rely on WebSocket,
       // unless realtime snapshot indicates potential degradation.
@@ -364,7 +430,8 @@ export function useResurrectionPollingConfig(
 
           let decision: 'forced-min' | 'clamped';
           let finalInterval: number;
-          const visible = document.visibilityState === 'visible';
+          const visibilityState = VisibilityManager.getState();
+          const visible = visibilityState.isVisible;
           if (decided === false) {
             const base = runtimeConfig.DEADMODE_FORCE_POLLING_MS ?? 5000;
             const clamped = visible ? Math.min(base, 15000) : Math.max(15000, base);
@@ -410,9 +477,15 @@ export function useResurrectionPollingConfig(
               const dataAgeMs = state.dataUpdatedAt ? (now - state.dataUpdatedAt) : null;
               const lastVisChange = (window as any).__VIS_CHANGE_AT__ || null;
               const sinceVisChange = lastVisChange ? (now - lastVisChange) : null;
+              const currentVisibility = VisibilityManager.getState();
               console.warn('[DeadModeInvestigation] Polling boosted due to realtime=down', {
                 debugTag,
-                visibility: document.visibilityState,
+                visibility: {
+                  state: currentVisibility.visibilityState,
+                  isVisible: currentVisibility.isVisible,
+                  changeCount: currentVisibility.changeCount,
+                  timeSinceLastChange: currentVisibility.timeSinceLastChange
+                },
                 decision,
                 finalIntervalMs: Math.round(finalInterval),
                 queryKey: (query as any)?.queryKey || 'unknown',
@@ -443,6 +516,91 @@ export function useResurrectionPollingConfig(
   }, [config, debugTag, context]);
 
   return { refetchInterval, debugConfig: config };
+}
+
+/**
+ * Standardized polling wrapper that extends useResurrectionPolling for specific use cases.
+ * This eliminates the need for custom polling logic in individual hooks.
+ */
+export function useStandardizedPolling(
+  debugTag: string,
+  context: Record<string, any> = {},
+  customConfig: Partial<ResurrectionPollingConfig> & {
+    /** Override for simple static intervals (e.g., cache refresh) */
+    staticInterval?: number;
+    /** Disable background polling when tab is hidden */
+    disableBackgroundPolling?: boolean;
+  } = {}
+): {
+  refetchInterval: (query: any) => number | false;
+  refetchIntervalInBackground: boolean;
+  debugConfig: ResurrectionPollingConfig;
+} {
+  const { staticInterval, disableBackgroundPolling, ...resurrectionConfig } = customConfig;
+  
+  // For simple static intervals (like cache refresh), use a simplified approach
+  if (staticInterval) {
+    const staticPollingFn = React.useMemo(() => (query: any) => {
+      // Suppress during healing window
+      try {
+        const healing = Date.now() < (((window as any).__REACTIVATION_HEALING_UNTIL__) || 0);
+        if (healing) {
+          if (runtimeConfig.RECONNECTION_LOGS_ENABLED) {
+            console.warn(`[TabReactivation][Polling:${debugTag}] Suppressing static polling during healing window`);
+          }
+          return false;
+        }
+      } catch {}
+
+      // Get network-aware intervals
+      let networkStatus, recommendedIntervals;
+      try {
+        const { getNetworkStatusManager } = require('@/shared/lib/NetworkStatusManager');
+        const manager = getNetworkStatusManager();
+        networkStatus = manager.getStatus();
+        recommendedIntervals = manager.getRecommendedIntervals();
+      } catch {
+        // Fallback if NetworkStatusManager not available
+        networkStatus = { isOnline: navigator.onLine, effectiveType: '4g' as const };
+        recommendedIntervals = { fast: 10000, normal: 30000, slow: 60000 };
+      }
+      
+      // Adjust static interval based on network conditions
+      const networkAwareInterval = Math.max(staticInterval, recommendedIntervals.normal);
+      const finalInterval = addJitter(networkAwareInterval, Math.min(networkAwareInterval * 0.1, 5000));
+      
+      if (runtimeConfig.RECONNECTION_LOGS_ENABLED && Math.random() < 0.1) { // Throttled logging
+        console.log(`[Polling:${debugTag}] Static network-aware polling`, {
+          originalInterval: staticInterval,
+          networkAwareInterval,
+          finalInterval,
+          networkStatus: {
+            isOnline: networkStatus.isOnline,
+            effectiveType: networkStatus.effectiveType
+          },
+          context,
+          timestamp: Date.now()
+        });
+      }
+      
+      return finalInterval;
+    }, [staticInterval, debugTag, context]);
+    
+    return {
+      refetchInterval: staticPollingFn,
+      refetchIntervalInBackground: !disableBackgroundPolling,
+      debugConfig: { debugTag, ...resurrectionConfig } as ResurrectionPollingConfig
+    };
+  }
+  
+  // For complex resurrection polling, use the full system
+  const { refetchInterval, debugConfig } = useResurrectionPollingConfig(debugTag, context, resurrectionConfig);
+  
+  return {
+    refetchInterval,
+    refetchIntervalInBackground: !disableBackgroundPolling,
+    debugConfig
+  };
 }
 
 /**
@@ -503,6 +661,24 @@ tasksWithMismatchDetection: (data: any, context?: Record<string, any>) => {
   }
   
   return hasActiveTasks;
+},
+
+/**
+ * Enhanced task activity detector that considers processing filter state
+ * Used for paginated tasks where the filter affects polling behavior
+ */
+paginatedTasks: (data: any, context?: Record<string, any>) => {
+  const hasActiveTasks = data?.tasks?.some((task: any) => 
+    task.status === 'Queued' || task.status === 'In Progress'
+  ) ?? false;
+  
+  // When Processing filter is selected, always use fast polling regardless of current page contents
+  const processingFilterActive = context?.status && 
+    Array.isArray(context.status) && 
+    context.status.includes('Queued') && 
+    context.status.includes('In Progress');
+  
+  return processingFilterActive || hasActiveTasks;
 },
 
   /**

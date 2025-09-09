@@ -7,6 +7,8 @@ import { runtimeConfig } from '@/shared/lib/config';
 import { DiagnosticsLogger, DiagnosticsStore } from '@/shared/realtime/Diagnostics';
 import { ProjectChannelManager } from '@/shared/realtime/projectChannelManager';
 import { TaskInvalidationSubscriber } from '@/shared/providers/TaskInvalidationSubscriber';
+import { VisibilityManager, type VisibilitySignals, type VisibilityEventType } from '@/shared/lib/VisibilityManager';
+import { invalidationRouter } from '@/shared/lib/InvalidationRouter';
 
 // Critical query families that need observer restoration
 const CRITICAL_QUERY_FAMILIES = [
@@ -523,13 +525,13 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     return () => { cancelled = true; };
   }, [selectedProjectId]);
 
-  // Visibility & auth-heal recovery: perform the same join routine as initial
-  // CRITICAL: Add periodic observer monitoring to catch exactly when observers disappear
+  // Observer monitoring during background state
   React.useEffect(() => {
     let observerMonitor: number;
     
     const monitorObservers = () => {
-      if (document.visibilityState === 'hidden') {
+      const visibilityState = VisibilityManager.getState();
+      if (!visibilityState.isVisible) {
         const queries = queryClient.getQueryCache().getAll().slice(0, 3);
         const observerStates = queries.map(q => ({
           key: q.queryKey.slice(0, 2),
@@ -542,184 +544,238 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
           console.error('[ReconnectionIssue][OBSERVER_LOSS_DETECTED]', {
             reason: 'All observers lost during tab background state - likely GC occurred',
             queryStates: observerStates,
-            visibilityState: document.visibilityState,
+            visibilityState: visibilityState.visibilityState,
             timestamp: Date.now()
           });
         }
       }
     };
     
-            // Monitor every 2 seconds during background (will be throttled by browser)
-        observerMonitor = setInterval(() => {
-          const startTime = performance.now();
-          monitorObservers();
-          const endTime = performance.now();
-          
-          // Log if execution is severely delayed (indicating browser throttling)
-          if (endTime - startTime > 100) {
-            console.error('[ReconnectionIssue][BROWSER_THROTTLING]', {
-              reason: 'Background execution severely throttled - may indicate aggressive resource management',
-              executionTime: endTime - startTime,
-              visibilityState: document.visibilityState,
-              timestamp: Date.now()
-            });
-          }
-        }, 2000) as any;
+    // Monitor every 2 seconds during background (will be throttled by browser)
+    observerMonitor = setInterval(() => {
+      const startTime = performance.now();
+      monitorObservers();
+      const endTime = performance.now();
+      
+      // Log if execution is severely delayed (indicating browser throttling)
+      if (endTime - startTime > 100) {
+        const visibilityState = VisibilityManager.getState();
+        console.error('[ReconnectionIssue][BROWSER_THROTTLING]', {
+          reason: 'Background execution severely throttled - may indicate aggressive resource management',
+          executionTime: endTime - startTime,
+          visibilityState: visibilityState.visibilityState,
+          timestamp: Date.now()
+        });
+      }
+    }, 2000) as any;
     
     return () => {
       if (observerMonitor) clearInterval(observerMonitor);
     };
   }, [queryClient]);
 
+  // Visibility & auth-heal recovery using VisibilityManager
   React.useEffect(() => {
-    const onVis = async () => {
-      if (document.visibilityState === 'hidden') return;
-      
-      // IMMEDIATE DIAGNOSTIC - This should always show up
-      console.error('🚨🚨🚨 [TabReactivation] TAB BECOMING VISIBLE - STARTING DIAGNOSTICS 🚨🚨🚨');
-      
-      // REMOVED: Healing window - no longer needed
+    const handleVisibilityEvents = async (signals: VisibilitySignals, eventType: VisibilityEventType, event: Event) => {
+      const now = Date.now();
 
-      // CRITICAL: Log WebSocket state after tab resume
-      const socketState = (window as any).supabase?.realtime?.socket?.readyState;
-      const socketUrl = (window as any).supabase?.realtime?.socket?.url;
-      console.error('[WebSocketDebug] 🔍 COMPLETE WEBSOCKET STATE AFTER TAB RESUME:', {
-        timestamp: Date.now(),
-        visibilityState: document.visibilityState,
-        socket: {
-          exists: !!(window as any).supabase?.realtime?.socket,
-          readyState: socketState,
-          readyStateText: socketState === 0 ? 'CONNECTING' : socketState === 1 ? 'OPEN' : socketState === 2 ? 'CLOSING' : socketState === 3 ? 'CLOSED' : `UNKNOWN(${socketState})`,
-          url: socketUrl?.slice(0, 100),
-          binaryType: (window as any).supabase?.realtime?.socket?.binaryType,
-          protocol: (window as any).supabase?.realtime?.socket?.protocol,
-          bufferedAmount: (window as any).supabase?.realtime?.socket?.bufferedAmount
-        },
-        connection: {
-          isConnected: (window as any).supabase?.realtime?.isConnected?.(),
-          channels: (window as any).supabase?.realtime?.channels ? Object.keys((window as any).supabase.realtime.channels).length : 0,
-          activeChannels: (window as any).supabase?.realtime?.channels ? Object.values((window as any).supabase.realtime.channels).filter((ch: any) => ch?.state === 'joined').length : 0
-        },
-        browser: {
-          onLine: navigator.onLine,
-          connectionType: (navigator as any).connection?.effectiveType,
-          userAgent: navigator.userAgent.slice(0, 50)
-        }
-      });
-      
-      // CRITICAL: Add browser memory pressure detection
-      if (typeof window !== 'undefined' && 'performance' in window) {
-        const memoryInfo = (performance as any).memory;
-        if (memoryInfo) {
-          console.error('[ReconnectionIssue][MEMORY_PRESSURE]', {
-            reason: 'Checking if browser memory pressure caused observer GC',
-            usedJSHeapSize: memoryInfo.usedJSHeapSize,
-            totalJSHeapSize: memoryInfo.totalJSHeapSize,
-            jsHeapSizeLimit: memoryInfo.jsHeapSizeLimit,
-            memoryPressure: memoryInfo.usedJSHeapSize / memoryInfo.jsHeapSizeLimit > 0.8,
+      if (eventType === 'visibilitychange') {
+        if (signals.justBecameVisible) {
+          // IMMEDIATE DIAGNOSTIC - This should always show up
+          console.error('🚨🚨🚨 [TabReactivation] TAB BECOMING VISIBLE - STARTING DIAGNOSTICS 🚨🚨🚨');
+          
+          // CRITICAL: Log WebSocket state after tab resume
+          const socketState = (window as any).supabase?.realtime?.socket?.readyState;
+          const socketUrl = (window as any).supabase?.realtime?.socket?.url;
+          console.error('[WebSocketDebug] 🔍 COMPLETE WEBSOCKET STATE AFTER TAB RESUME:', {
+            timestamp: now,
+            visibilityState: signals.visibilityState,
+            socket: {
+              exists: !!(window as any).supabase?.realtime?.socket,
+              readyState: socketState,
+              readyStateText: socketState === 0 ? 'CONNECTING' : socketState === 1 ? 'OPEN' : socketState === 2 ? 'CLOSING' : socketState === 3 ? 'CLOSED' : `UNKNOWN(${socketState})`,
+              url: socketUrl?.slice(0, 100),
+              binaryType: (window as any).supabase?.realtime?.socket?.binaryType,
+              protocol: (window as any).supabase?.realtime?.socket?.protocol,
+              bufferedAmount: (window as any).supabase?.realtime?.socket?.bufferedAmount
+            },
+            connection: {
+              isConnected: (window as any).supabase?.realtime?.isConnected?.(),
+              channels: (window as any).supabase?.realtime?.channels ? Object.keys((window as any).supabase.realtime.channels).length : 0,
+              activeChannels: (window as any).supabase?.realtime?.channels ? Object.values((window as any).supabase.realtime.channels).filter((ch: any) => ch?.state === 'joined').length : 0
+            },
+            browser: {
+              onLine: navigator.onLine,
+              connectionType: (navigator as any).connection?.effectiveType,
+              userAgent: navigator.userAgent.slice(0, 50)
+            },
+            networkStatusManager: (() => {
+              try {
+                const { getNetworkStatusManager } = require('@/shared/lib/NetworkStatusManager');
+                const manager = getNetworkStatusManager();
+                const status = manager.getStatus();
+                return {
+                  isOnline: status.isOnline,
+                  effectiveType: status.connection.effectiveType,
+                  connectionQuality: manager.getConnectionQuality(),
+                  lastTransitionAt: status.lastTransitionAt
+                };
+              } catch {
+                return { error: 'NetworkStatusManager not available' };
+              }
+            })()
+          });
+          
+          // CRITICAL: Add browser memory pressure detection
+          if (typeof window !== 'undefined' && 'performance' in window) {
+            const memoryInfo = (performance as any).memory;
+            if (memoryInfo) {
+              console.error('[ReconnectionIssue][MEMORY_PRESSURE]', {
+                reason: 'Checking if browser memory pressure caused observer GC',
+                usedJSHeapSize: memoryInfo.usedJSHeapSize,
+                totalJSHeapSize: memoryInfo.totalJSHeapSize,
+                jsHeapSizeLimit: memoryInfo.jsHeapSizeLimit,
+                memoryPressure: memoryInfo.usedJSHeapSize / memoryInfo.jsHeapSizeLimit > 0.8,
+                timestamp: now
+              });
+            }
+          }
+          
+          if (!selectedProjectId) return;
+          if (now - lastHealAtRef.current < 3000) return; // minimal debounce
+          lastHealAtRef.current = now;
+          
+          // CRITICAL: Signal React components that tab is becoming visible
+          console.warn('[ReconnectionIssue][REACT_STATE_DEBUG]', {
+            event: 'TAB_VISIBLE',
+            reason: 'Tab becoming visible - React components may have stale state',
+            selectedProjectId,
+            timestamp: now
+          });
+          
+          // CRITICAL DEBUG: Capture React Query observer state IMMEDIATELY after tab resume
+          const immediateQueryState = queryClient.getQueryCache().getAll().slice(0, 5).map(q => ({
+            key: q.queryKey.slice(0, 3),
+            observers: q.getObserversCount(),
+            status: q.state.status,
+            lastUpdated: q.state.dataUpdatedAt
+          }));
+          console.error('[TabReactivation] Observer state immediately after tab resume', {
+            reason: 'Observer state captured immediately after tab resume - before any processing',
+            queryStates: immediateQueryState,
+            timestamp: now
+          });
+          
+          // Dispatch event for components to listen to
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('debug:tab-visible', { 
+              detail: { timestamp: now, selectedProjectId } 
+            }));
+          }
+          
+          await rejoinLikeInitial();
+          
+          // CRITICAL FIX: Force refetch instead of just invalidate to ensure UI updates after tab resume
+          if (selectedProjectId) {
+            console.warn('[TabReactivation] 🔄 FORCE REFETCH key queries for guaranteed UI updates', {
+              selectedProjectId,
+              timestamp: Date.now()
+            });
+            
+            // FORCE REFETCH (not just invalidate) to guarantee UI updates
+            queryClient.refetchQueries({ queryKey: ['unified-generations', 'project', selectedProjectId], type: 'active' });
+            queryClient.refetchQueries({ queryKey: ['task-status-counts', selectedProjectId], type: 'active' });
+            queryClient.refetchQueries({ queryKey: ['tasks', 'paginated', selectedProjectId], type: 'active' });
+            
+            // Also invalidate for good measure
+            queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', selectedProjectId] });
+            queryClient.invalidateQueries({ queryKey: ['task-status-counts', selectedProjectId] });
+            queryClient.invalidateQueries({ queryKey: ['tasks', 'paginated', selectedProjectId] });
+            
+            console.warn('[TabReactivation] ✅ Forced refetch completed - UI should update now', {
+              selectedProjectId,
+              timestamp: Date.now()
+            });
+          }
+
+          console.warn('[TabReactivation] 🟢 Tab resume complete - normal operations active', {
             timestamp: Date.now()
           });
+        } else if (signals.justHidden) {
+          // IMMEDIATE DIAGNOSTIC - This should always show up
+          console.error('🚨🚨🚨 [TabReactivation] TAB BECOMING HIDDEN - CAPTURING BASELINE 🚨🚨🚨');
+          // CRITICAL: Log WebSocket state before tab hide
+          const socketState = (window as any).supabase?.realtime?.socket?.readyState;
+          const socketUrl = (window as any).supabase?.realtime?.socket?.url;
+          console.error('[ReconnectionIssue] 🔍 WEBSOCKET STATE BEFORE TAB HIDE:', {
+            socketExists: !!(window as any).supabase?.realtime?.socket,
+            socketState,
+            socketStateText: socketState === 0 ? 'CONNECTING' : socketState === 1 ? 'OPEN' : socketState === 2 ? 'CLOSING' : socketState === 3 ? 'CLOSED' : 'UNKNOWN',
+            socketUrl,
+            timestamp: now
+          });
+          
+          // CRITICAL DEBUG: Capture React Query observer state BEFORE tab hide
+          const preHideQueryState = queryClient.getQueryCache().getAll().slice(0, 5).map(q => ({
+            key: q.queryKey.slice(0, 3),
+            observers: q.getObserversCount(),
+            status: q.state.status,
+            lastUpdated: q.state.dataUpdatedAt
+          }));
+          console.error('[TabReactivation] Observer state before tab hide', {
+            reason: 'Observer state captured immediately before tab hide - baseline for comparison',
+            queryStates: preHideQueryState,
+            timestamp: now
+          });
+          // COMPREHENSIVE STATE SNAPSHOT on tab hide
+          try {
+            const socket: any = (supabase as any)?.realtime?.socket;
+            const channels = (supabase as any)?.getChannels ? (supabase as any).getChannels() : [];
+            const rtSnap = (typeof window !== 'undefined') ? ((window as any).__REALTIME_SNAPSHOT__ || null) : null;
+            const channelHealthCheck = managerRef.current?.getDetailedHealthCheck?.() || {};
+            
+            console.warn('[ReconnectionIssue][TAB_HIDE] 🔍 COMPREHENSIVE STATE SNAPSHOT - PRE HIDE', {
+              selectedProjectId,
+              socket: {
+                connected: !!socket?.isConnected?.(),
+                connState: socket?.connectionState,
+                exists: !!socket
+              },
+              channels: {
+                count: channels?.length || 0,
+                details: (channels || []).map((c: any) => ({ topic: c.topic, state: c.state }))
+              },
+              diagnostics: {
+                channelState: diagnosticsRef.current?.snapshot?.channelState,
+                lastEventAt: diagnosticsRef.current?.snapshot?.lastEventAt
+              },
+              rtSnapshot: rtSnap,
+              channelHealthCheck,
+              visibility: signals.visibilityState,
+              timestamp: now
+            });
+            
+            // CRITICAL: Signal to React components that tab is being hidden
+            console.warn('[ReconnectionIssue][REACT_STATE_DEBUG]', {
+              event: 'TAB_HIDE',
+              reason: 'Tab being hidden - React components should prepare for state sync issues',
+              timestamp: now
+            });
+            
+            // Dispatch event for components to listen to
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('debug:tab-hide', { 
+                detail: { timestamp: now, selectedProjectId } 
+              }));
+            }
+          } catch {}
         }
-      }
-      
-      try { (window as any).__VIS_CHANGE_AT__ = Date.now(); } catch {}
-      if (!selectedProjectId) return;
-      const now = Date.now();
-      if (now - lastHealAtRef.current < 3000) return; // minimal debounce
-      lastHealAtRef.current = now;
-      
-      // CRITICAL: Signal React components that tab is becoming visible
-      console.warn('[ReconnectionIssue][REACT_STATE_DEBUG]', {
-        event: 'TAB_VISIBLE',
-        reason: 'Tab becoming visible - React components may have stale state',
-        selectedProjectId,
-        timestamp: now
-      });
-      
-      // CRITICAL DEBUG: Capture React Query observer state IMMEDIATELY after tab resume
-      const immediateQueryState = queryClient.getQueryCache().getAll().slice(0, 5).map(q => ({
-        key: q.queryKey.slice(0, 3),
-        observers: q.getObserversCount(),
-        status: q.state.status,
-        lastUpdated: q.state.dataUpdatedAt
-      }));
-      console.error('[TabReactivation] Observer state immediately after tab resume', {
-        reason: 'Observer state captured immediately after tab resume - before any processing',
-        queryStates: immediateQueryState,
-        timestamp: now
-      });
-      
-      // Dispatch event for components to listen to
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('debug:tab-visible', { 
-          detail: { timestamp: now, selectedProjectId } 
-        }));
-      }
-      
-      await rejoinLikeInitial();
-      
-      // CRITICAL FIX: Force refetch instead of just invalidate to ensure UI updates after tab resume
-      if (selectedProjectId) {
-        console.warn('[TabReactivation] 🔄 FORCE REFETCH key queries for guaranteed UI updates', {
-          selectedProjectId,
-          timestamp: Date.now()
-        });
-        
-        // FORCE REFETCH (not just invalidate) to guarantee UI updates
-        queryClient.refetchQueries({ queryKey: ['unified-generations', 'project', selectedProjectId], type: 'active' });
-        queryClient.refetchQueries({ queryKey: ['task-status-counts', selectedProjectId], type: 'active' });
-        queryClient.refetchQueries({ queryKey: ['tasks', 'paginated', selectedProjectId], type: 'active' });
-        
-        // Also invalidate for good measure
-        queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', selectedProjectId] });
-        queryClient.invalidateQueries({ queryKey: ['task-status-counts', selectedProjectId] });
-        queryClient.invalidateQueries({ queryKey: ['tasks', 'paginated', selectedProjectId] });
-        
-        console.warn('[TabReactivation] ✅ Forced refetch completed - UI should update now', {
-          selectedProjectId,
-          timestamp: Date.now()
-        });
-      }
-
-      console.warn('[TabReactivation] 🟢 Tab resume complete - normal operations active', {
-        timestamp: Date.now()
-      });
-    };
-    const onHide = () => {
-      if (document.visibilityState === 'hidden') {
-        // IMMEDIATE DIAGNOSTIC - This should always show up
-        console.error('🚨🚨🚨 [TabReactivation] TAB BECOMING HIDDEN - CAPTURING BASELINE 🚨🚨🚨');
-        // CRITICAL: Log WebSocket state before tab hide
-        const socketState = (window as any).supabase?.realtime?.socket?.readyState;
-        const socketUrl = (window as any).supabase?.realtime?.socket?.url;
-        console.error('[ReconnectionIssue] 🔍 WEBSOCKET STATE BEFORE TAB HIDE:', {
-          socketExists: !!(window as any).supabase?.realtime?.socket,
-          socketState,
-          socketStateText: socketState === 0 ? 'CONNECTING' : socketState === 1 ? 'OPEN' : socketState === 2 ? 'CLOSING' : socketState === 3 ? 'CLOSED' : 'UNKNOWN',
-          socketUrl,
-          timestamp: Date.now()
-        });
-        
-        // CRITICAL DEBUG: Capture React Query observer state BEFORE tab hide
-        const preHideQueryState = queryClient.getQueryCache().getAll().slice(0, 5).map(q => ({
-          key: q.queryKey.slice(0, 3),
-          observers: q.getObserversCount(),
-          status: q.state.status,
-          lastUpdated: q.state.dataUpdatedAt
-        }));
-        console.error('[TabReactivation] Observer state before tab hide', {
-          reason: 'Observer state captured immediately before tab hide - baseline for comparison',
-          queryStates: preHideQueryState,
-          timestamp: Date.now()
-        });
-        // COMPREHENSIVE STATE SNAPSHOT on tab hide
+      } else if (eventType === 'pageshow') {
+        // COMPREHENSIVE STATE SNAPSHOT on pageshow
         try {
           const socket: any = (supabase as any)?.realtime?.socket;
           const channels = (supabase as any)?.getChannels ? (supabase as any).getChannels() : [];
-          const rtSnap = (typeof window !== 'undefined') ? ((window as any).__REALTIME_SNAPSHOT__ || null) : null;
-          const channelHealthCheck = managerRef.current?.getDetailedHealthCheck?.() || {};
-          
-          console.warn('[ReconnectionIssue][TAB_HIDE] 🔍 COMPREHENSIVE STATE SNAPSHOT - PRE HIDE', {
+          console.warn('[ReconnectionIssue][PAGE_SHOW] State snapshot on pageshow', {
             selectedProjectId,
             socket: {
               connected: !!socket?.isConnected?.(),
@@ -734,83 +790,39 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
               channelState: diagnosticsRef.current?.snapshot?.channelState,
               lastEventAt: diagnosticsRef.current?.snapshot?.lastEventAt
             },
-            rtSnapshot: rtSnap,
-            channelHealthCheck,
-            visibility: document.visibilityState,
-            timestamp: Date.now()
+            visibility: signals.visibilityState,
+            timestamp: now
           });
-          
-          // CRITICAL: Signal to React components that tab is being hidden
-          console.warn('[ReconnectionIssue][REACT_STATE_DEBUG]', {
-            event: 'TAB_HIDE',
-            reason: 'Tab being hidden - React components should prepare for state sync issues',
-            timestamp: Date.now()
-          });
-          
-          // Dispatch event for components to listen to
-          if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('debug:tab-hide', { 
-              detail: { timestamp: Date.now(), selectedProjectId } 
-            }));
-          }
         } catch {}
-        try { (window as any).__VIS_CHANGE_AT__ = Date.now(); } catch {}
+        try { loggerRef.current?.info('[ReconnectionIssue][Visibility] pageshow'); } catch {}
+      } else if (eventType === 'pagehide') {
+        // COMPREHENSIVE STATE SNAPSHOT on pagehide
+        try {
+          const socket: any = (supabase as any)?.realtime?.socket;
+          const channels = (supabase as any)?.getChannels ? (supabase as any).getChannels() : [];
+          console.warn('[ReconnectionIssue][PAGE_HIDE] State snapshot on pagehide', {
+            selectedProjectId,
+            socket: {
+              connected: !!socket?.isConnected?.(),
+              connState: socket?.connectionState,
+              exists: !!socket
+            },
+            channels: {
+              count: channels?.length || 0,
+              details: (channels || []).map((c: any) => ({ topic: c.topic, state: c.state }))
+            },
+            diagnostics: {
+              channelState: diagnosticsRef.current?.snapshot?.channelState,
+              lastEventAt: diagnosticsRef.current?.snapshot?.lastEventAt
+            },
+            visibility: signals.visibilityState,
+            timestamp: now
+          });
+        } catch {}
+        try { loggerRef.current?.info('[ReconnectionIssue][Visibility] pagehide'); } catch {}
       }
     };
-    const onPageShow = () => {
-      // COMPREHENSIVE STATE SNAPSHOT on pageshow
-      try {
-        const socket: any = (supabase as any)?.realtime?.socket;
-        const channels = (supabase as any)?.getChannels ? (supabase as any).getChannels() : [];
-        console.warn('[ReconnectionIssue][PAGE_SHOW] State snapshot on pageshow', {
-          selectedProjectId,
-          socket: {
-            connected: !!socket?.isConnected?.(),
-            connState: socket?.connectionState,
-            exists: !!socket
-          },
-          channels: {
-            count: channels?.length || 0,
-            details: (channels || []).map((c: any) => ({ topic: c.topic, state: c.state }))
-          },
-          diagnostics: {
-            channelState: diagnosticsRef.current?.snapshot?.channelState,
-            lastEventAt: diagnosticsRef.current?.snapshot?.lastEventAt
-          },
-          visibility: document.visibilityState,
-          timestamp: Date.now()
-        });
-      } catch {}
-      try { loggerRef.current?.info('[ReconnectionIssue][Visibility] pageshow'); } catch {}
-      try { (window as any).__VIS_CHANGE_AT__ = Date.now(); } catch {}
-    };
-    const onPageHide = () => {
-      // COMPREHENSIVE STATE SNAPSHOT on pagehide
-      try {
-        const socket: any = (supabase as any)?.realtime?.socket;
-        const channels = (supabase as any)?.getChannels ? (supabase as any).getChannels() : [];
-        console.warn('[ReconnectionIssue][PAGE_HIDE] State snapshot on pagehide', {
-          selectedProjectId,
-          socket: {
-            connected: !!socket?.isConnected?.(),
-            connState: socket?.connectionState,
-            exists: !!socket
-          },
-          channels: {
-            count: channels?.length || 0,
-            details: (channels || []).map((c: any) => ({ topic: c.topic, state: c.state }))
-          },
-          diagnostics: {
-            channelState: diagnosticsRef.current?.snapshot?.channelState,
-            lastEventAt: diagnosticsRef.current?.snapshot?.lastEventAt
-          },
-          visibility: document.visibilityState,
-          timestamp: Date.now()
-        });
-      } catch {}
-      try { loggerRef.current?.info('[ReconnectionIssue][Visibility] pagehide'); } catch {}
-      try { (window as any).__VIS_CHANGE_AT__ = Date.now(); } catch {}
-    };
+
     const onAuthHeal = async () => {
       try { loggerRef.current?.info('[ReconnectionIssue][Auth] auth-heal event received'); } catch {}
       const now = Date.now();
@@ -818,21 +830,21 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       lastHealAtRef.current = now;
       await rejoinLikeInitial();
     };
-    // Ensure we own the unified heal event from global fixer (if present)
-    // Global fixer now dispatches 'realtime:auth-heal' instead of forcing reconnects
-    document.addEventListener('visibilitychange', onVis);
-    document.addEventListener('visibilitychange', onHide);
-    window.addEventListener('pageshow', onPageShow);
-    window.addEventListener('pagehide', onPageHide);
+
+    // Subscribe to VisibilityManager for unified event handling
+    const subscriptionId = VisibilityManager.subscribe(handleVisibilityEvents, {
+      id: 'realtime-provider',
+      eventTypes: ['visibilitychange', 'pageshow', 'pagehide']
+    });
+
+    // Keep auth-heal listener as it's not a visibility event
     window.addEventListener('realtime:auth-heal', onAuthHeal as any);
+    
     return () => {
-      document.removeEventListener('visibilitychange', onVis);
-      document.removeEventListener('visibilitychange', onHide);
-      window.removeEventListener('pageshow', onPageShow);
-      window.removeEventListener('pagehide', onPageHide);
+      VisibilityManager.unsubscribe(subscriptionId);
       window.removeEventListener('realtime:auth-heal', onAuthHeal as any);
     };
-  }, [selectedProjectId, rejoinLikeInitial]);
+  }, [selectedProjectId, rejoinLikeInitial, queryClient]);
 
   // Watchdog: if not joined, perform the same join routine
   React.useEffect(() => {

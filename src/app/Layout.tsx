@@ -89,7 +89,6 @@ const Layout: React.FC = () => {
       });
     } else {
       // Fallback to direct listener if auth manager not available
-      console.error('[Layout] AuthManager not available, using direct listener');
       const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
         setSession(session);
       });

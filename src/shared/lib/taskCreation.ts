@@ -179,16 +179,15 @@ export async function createTask(taskParams: BaseTaskParams): Promise<any> {
       throw new Error(error.message || 'Failed to create task');
     }
 
-    // Broadcast a lightweight event so interested UIs can invalidate queries immediately
+    // Use InvalidationRouter for centralized cache invalidation
     try {
       if (typeof window !== 'undefined') {
-        const detail = {
+        const { invalidationRouter } = await import('@/shared/lib/InvalidationRouter');
+        invalidationRouter.taskCreated({
           projectId: taskParams.project_id,
-          taskType: taskParams.task_type,
-          createdAt: Date.now(),
-        };
-        window.dispatchEvent(new CustomEvent('task-created', { detail }));
-        console.log('[PollingBreakageIssue] [createTask] Dispatched task-created event', detail);
+          taskId: data?.task_id
+        });
+        console.log('[PollingBreakageIssue] [createTask] Emitted TASK_CREATED domain event');
       }
     } catch {}
 

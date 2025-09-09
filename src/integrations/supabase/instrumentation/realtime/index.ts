@@ -1,8 +1,15 @@
 import { __CORRUPTION_TRACE_ENABLED__, __REALTIME_DOWN_FIX_ENABLED__ } from '@/integrations/supabase/config/env';
 import { captureRealtimeSnapshot, getEffectiveRealtimeSocket } from '@/integrations/supabase/utils/snapshot';
 import { __CORRUPTION_TIMELINE__, addCorruptionEvent } from '@/integrations/supabase/utils/timeline';
+import { InstrumentationManager } from '../InstrumentationManager';
 
 export function installRealtimeInstrumentation(supabase: any) {
+  // Use InstrumentationManager for centralized control
+  return InstrumentationManager.installRealtimeWithClient(supabase);
+}
+
+// Legacy function for backward compatibility - now delegates to InstrumentationManager
+export function installRealtimeInstrumentationLegacy(supabase: any) {
   if (typeof window === 'undefined' || !supabase?.realtime) return;
   const realtime: any = supabase.realtime;
 
@@ -64,10 +71,18 @@ export function installRealtimeInstrumentation(supabase: any) {
       console.warn = function(...args: any[]) {
         const message = args.join(' ');
         if (message.includes('realtime=down') || message.includes('Polling boosted due to realtime=down')) {
-          console.error('[RealtimeDownFix] 🎯 REALTIME=DOWN TRIGGER DETECTED:', { fullMessage: message, messageArgs: args, triggerSource: 'console.warn interception', timestamp: Date.now() });
           try {
-            window.dispatchEvent(new CustomEvent('realtime:auth-heal'));
-          } catch {}
+            // Use ReconnectScheduler instead of direct event dispatch
+            const { getReconnectScheduler } = require('@/integrations/supabase/reconnect/ReconnectScheduler');
+            const scheduler = getReconnectScheduler();
+            scheduler.requestReconnect({
+              source: 'ConsoleWarnInterceptor',
+              reason: 'realtime=down detected in console output',
+              priority: 'medium'
+            });
+          } catch (error) {
+            console.error('[RealtimeDownFix] ❌ RECONNECT REQUEST FAILED:', error);
+          }
         }
         return originalConsoleWarn.apply(this, args as any);
       } as any;

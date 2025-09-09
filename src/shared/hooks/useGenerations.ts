@@ -4,6 +4,7 @@ import { GeneratedImageWithMetadata } from '@/shared/components/ImageGallery';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useResurrectionPollingConfig, RecentActivityDetectors } from './useResurrectionPolling';
+import { invalidationRouter } from '@/shared/lib/InvalidationRouter';
 import { useQueryDebugLogging, QueryDebugConfigs } from './useQueryDebugLogging';
 
 /**
@@ -431,9 +432,15 @@ export function useDeleteGeneration() {
         throw new Error(`Failed to delete generation: ${error.message}`);
       }
     },
-    onSuccess: () => {
-      // Invalidate all generations queries to refetch
-      queryClient.invalidateQueries({ queryKey: ['unified-generations'] });      
+    onSuccess: (data, variables) => {
+      // Emit domain event for generation location update
+      invalidationRouter.emit({
+        type: 'GENERATION_LOCATION_UPDATE',
+        payload: { 
+          projectId: data?.project_id,
+          generationId: variables.id 
+        }
+      });
     },
     onError: (error: Error) => {
       console.error('Error deleting generation:', error);
@@ -449,9 +456,15 @@ export function useUpdateGenerationLocation() {
     mutationFn: ({ id, location }: { id: string; location: string }) => {
       return updateGenerationLocation(id, location);
     },
-    onSuccess: () => {
-      // Invalidate all generations queries to refetch
-      queryClient.invalidateQueries({ queryKey: ['unified-generations'] });
+    onSuccess: (data, variables) => {
+      // Emit domain event for generation location update
+      invalidationRouter.emit({
+        type: 'GENERATION_LOCATION_UPDATE',
+        payload: {
+          projectId: data?.project_id,
+          generationId: variables.id
+        }
+      });
     },
     onError: (error: Error) => {
       console.error('Error updating generation location:', error);
@@ -468,9 +481,12 @@ export function useCreateGeneration() {
 
     return useMutation({
         mutationFn: createGeneration,
-        onSuccess: () => {
-      // Invalidate all generations queries to refetch
-            queryClient.invalidateQueries({ queryKey: ['unified-generations'] });
+        onSuccess: (data, variables) => {
+      // Emit domain event for generation creation
+            invalidationRouter.generationInserted({
+              projectId: variables.projectId,
+              generationId: data?.id
+            });
         },
         onError: (error: Error) => {
       console.error('Error creating generation:', error);
@@ -568,13 +584,19 @@ export function useToggleGenerationStar() {
     },
     onSuccess: (data, variables) => {
       console.log('[StarDebug:useToggleGenerationStar] onSuccess called', { variables, data });
+      // Emit domain event for generation star toggle
+      invalidationRouter.emit({
+        type: 'GENERATION_STAR_TOGGLE',
+        payload: {
+          projectId: data?.project_id,
+          generationId: variables.id
+        }
+      });
     },
     onSettled: () => {
       console.log('[StarDebug:useToggleGenerationStar] onSettled called - invalidating caches');
       
-      // Ensure both generations & shots caches are up-to-date after mutation
-      queryClient.invalidateQueries({ queryKey: ['unified-generations'] });
-      queryClient.invalidateQueries({ queryKey: ['shots'] });
+      // No need for manual invalidations - optimistic updates handle this
     },
   });
 }

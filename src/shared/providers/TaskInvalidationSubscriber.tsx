@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { runtimeConfig } from '@/shared/lib/config';
+import { invalidationRouter } from '@/shared/lib/InvalidationRouter';
 
 /**
  * Centralized task invalidation subscriber that handles all task-related cache invalidations.
@@ -45,12 +46,10 @@ export function TaskInvalidationSubscriber({ children }: { children: React.React
           }
           
           try {
-            // Invalidate all task-related queries for this project
-            queryClient.invalidateQueries({ queryKey: ['tasks', 'paginated', selectedProjectId] });
-            queryClient.invalidateQueries({ queryKey: ['task-status-counts', selectedProjectId] });
-            
-            // Also invalidate unified generations that might include task data
-            queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', selectedProjectId] });
+            // Use InvalidationRouter for centralized invalidations
+            invalidationRouter.taskCreated({
+              projectId: selectedProjectId
+            });
             
             if (runtimeConfig.RECONNECTION_LOGS_ENABLED) {
               console.log('[Polling:Tasks] Invalidation completed successfully', {
@@ -95,13 +94,16 @@ export function TaskInvalidationSubscriber({ children }: { children: React.React
       }
       
       // Immediate invalidation for status changes (no retry needed as task already exists)
-      queryClient.invalidateQueries({ queryKey: ['tasks', 'paginated', selectedProjectId] });
-      queryClient.invalidateQueries({ queryKey: ['task-status-counts', selectedProjectId] });
-      
-      // If task completed, also invalidate generations
-      if (detail.newStatus === 'Complete') {
-        queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', selectedProjectId] });
-      }
+      // Use InvalidationRouter for centralized invalidations
+      const eventType = detail.newStatus === 'Complete' ? 'TASK_COMPLETED' : 'TASK_STATUS_CHANGE';
+      invalidationRouter.emit({
+        type: eventType,
+        payload: {
+          projectId: selectedProjectId,
+          taskId: detail.taskId,
+          status: detail.newStatus
+        }
+      });
     };
 
     // Register event listeners

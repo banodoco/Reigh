@@ -88,7 +88,6 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
       });
     } else {
       // Fallback to direct listener if auth manager not available
-      console.error('[GlobalHeader] AuthManager not available, using direct listener');
       const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
         setSession(session);
         

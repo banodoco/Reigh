@@ -1,6 +1,7 @@
 import React, { useCallback, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useStandardizedPolling } from '@/shared/hooks/useResurrectionPolling';
 
 /**
  * Project-wide video counts cache
@@ -85,6 +86,16 @@ async function fetchProjectVideoCountsFromDB(projectId: string): Promise<Map<str
 export function useProjectVideoCountsCache(projectId: string | null) {
   const cacheRef = useRef(globalProjectVideoCountsCache);
   
+  // 🎯 STANDARDIZED POLLING: Use standardized polling for video counts cache
+  const { refetchInterval, refetchIntervalInBackground } = useStandardizedPolling(
+    'ProjectVideoCountsCache',
+    { projectId },
+    {
+      staticInterval: 60 * 1000, // 1 minute - cache refresh polling
+      disableBackgroundPolling: true // Only poll when tab is active for cache data
+    }
+  );
+  
   // Query to fetch all shot video counts for the project
   const { data: projectCounts, isLoading, error, refetch } = useQuery<Map<string, number>>({
     queryKey: ['project-video-counts', projectId],
@@ -92,8 +103,9 @@ export function useProjectVideoCountsCache(projectId: string | null) {
     enabled: !!projectId,
     staleTime: 5 * 60 * 1000, // 5 minutes - very aggressive caching for instant loads
     gcTime: 10 * 60 * 1000, // 10 minutes
-    refetchInterval: 60 * 1000, // Check for updates every minute
-    refetchIntervalInBackground: false, // Only when tab is active
+    // 🎯 STANDARDIZED POLLING: Network-aware, jittered, healing-window-aware polling
+    refetchInterval,
+    refetchIntervalInBackground,
     placeholderData: (previousData) => previousData, // Keep showing previous data while refetching
   });
   

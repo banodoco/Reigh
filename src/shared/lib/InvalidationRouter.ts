@@ -3,8 +3,50 @@ import { runtimeConfig } from '@/shared/lib/config';
 
 type EventPayload = any;
 
+export type DomainEventType = 
+  // Task events
+  | 'TASK_CREATED'
+  | 'TASK_STATUS_CHANGE'
+  | 'TASK_COMPLETED'
+  | 'TASK_FAILED'
+  | 'TASK_CANCELLED'
+  | 'TASK_DELETED'
+  
+  // Generation events
+  | 'GENERATION_INSERT'
+  | 'GENERATION_UPDATE'
+  | 'GENERATION_DELETE'
+  | 'GENERATION_STAR_TOGGLE'
+  | 'GENERATION_LOCATION_UPDATE'
+  
+  // Shot events
+  | 'SHOT_CREATED'
+  | 'SHOT_UPDATED'
+  | 'SHOT_DELETED'
+  | 'SHOT_GENERATION_CHANGE'
+  | 'SHOT_REORDER'
+  
+  // Project events
+  | 'PROJECT_UPDATED'
+  
+  // Credit events
+  | 'CREDITS_UPDATED'
+  | 'TOPUP_COMPLETED'
+  
+  // Settings events
+  | 'TOOL_SETTINGS_CHANGED'
+  | 'API_TOKEN_CHANGED'
+  
+  // Resource events
+  | 'RESOURCE_UPLOADED'
+  | 'RESOURCE_DELETED'
+  
+  // Batch events
+  | 'GENERATIONS_UPDATED'
+  | 'TASKS_BATCH_UPDATE';
+
 export type InvalidationEvent = {
-  type: 'GENERATION_INSERT' | 'GENERATION_UPDATE' | 'GENERATION_DELETE' | 'SHOT_GENERATION_CHANGE' | 'TASK_INSERT' | 'TASK_STATUS_CHANGE' | 'GENERATIONS_UPDATED' | string;
+  type: DomainEventType;
   payload: EventPayload;
 };
 
@@ -136,51 +178,315 @@ function scheduleInvalidate(queryClient: QueryClient, key: any) {
   }
 }
 
+/**
+ * Central InvalidationRouter - Routes domain events to canonical React Query invalidations
+ * 
+ * This replaces scattered manual queryClient.invalidateQueries() calls with a centralized
+ * event-driven system. Components emit domain events, and this router performs the minimal,
+ * canonical invalidations based on the event type and payload.
+ */
+// Global event emitter for domain events
+class InvalidationEventEmitter {
+  private queryClient: QueryClient | null = null;
+  private eventQueue: InvalidationEvent[] = [];
+
+  setQueryClient(queryClient: QueryClient) {
+    this.queryClient = queryClient;
+    // Process any queued events
+    const queuedEvents = [...this.eventQueue];
+    this.eventQueue = [];
+    queuedEvents.forEach(event => this.emit(event));
+  }
+
+  emit(event: InvalidationEvent) {
+    if (!this.queryClient) {
+      // Queue the event until queryClient is available
+      this.eventQueue.push(event);
+      console.warn('[InvalidationRouter] QueryClient not ready, queuing event:', event.type);
+      return;
+    }
+
+    routeEvent(this.queryClient, event);
+  }
+
+  // Convenience methods for common events
+  taskCreated(payload: { projectId: string; taskId?: string }) {
+    this.emit({ type: 'TASK_CREATED', payload });
+  }
+
+  taskStatusChanged(payload: { projectId: string; taskId: string; status?: string }) {
+    this.emit({ type: 'TASK_STATUS_CHANGE', payload });
+  }
+
+  generationInserted(payload: { projectId: string; shotId?: string; generationId?: string }) {
+    this.emit({ type: 'GENERATION_INSERT', payload });
+  }
+
+  generationUpdated(payload: { projectId: string; shotId?: string; generationId?: string }) {
+    this.emit({ type: 'GENERATION_UPDATE', payload });
+  }
+
+  generationDeleted(payload: { projectId: string; shotId?: string; generationId?: string }) {
+    this.emit({ type: 'GENERATION_DELETE', payload });
+  }
+
+  shotCreated(payload: { projectId: string; shotId?: string }) {
+    this.emit({ type: 'SHOT_CREATED', payload });
+  }
+
+  shotUpdated(payload: { projectId: string; shotId?: string }) {
+    this.emit({ type: 'SHOT_UPDATED', payload });
+  }
+
+  shotGenerationChanged(payload: { projectId: string; shotId?: string }) {
+    this.emit({ type: 'SHOT_GENERATION_CHANGE', payload });
+  }
+
+  creditsUpdated() {
+    this.emit({ type: 'CREDITS_UPDATED', payload: {} });
+  }
+
+  toolSettingsChanged(payload: { toolId?: string }) {
+    this.emit({ type: 'TOOL_SETTINGS_CHANGED', payload });
+  }
+}
+
+// Global singleton instance
+const invalidationRouter = new InvalidationEventEmitter();
+
+// Export for use in components
+export { invalidationRouter };
+
+/**
+ * Hook to get the invalidation router instance
+ * This ensures components have a consistent way to emit domain events
+ */
+export function useInvalidationRouter() {
+  return invalidationRouter;
+}
+
 export function routeEvent(queryClient: QueryClient, event: InvalidationEvent) {
   try {
     if (runtimeConfig.RECONNECTION_LOGS_ENABLED) {
-      // eslint-disable-next-line no-console
-      console.log('[ReconnectionIssue][AppInteraction] routeEvent', { type: event.type, payload: event.payload });
+      console.log('[InvalidationRouter] Processing domain event', { 
+        type: event.type, 
+        payload: event.payload,
+        timestamp: Date.now() 
+      });
     }
+    
     switch (event.type) {
-      case 'GENERATION_INSERT':
-      case 'GENERATION_UPDATE':
-      case 'GENERATION_DELETE': {
-        const { projectId, shotId } = event.payload || {};
-        if (projectId) scheduleInvalidate(queryClient, ['unified-generations', 'project', projectId]);
-        if (shotId) scheduleInvalidate(queryClient, ['unified-generations', 'shot', shotId]);
-        if (projectId) scheduleInvalidate(queryClient, ['shots', projectId]);
+      // === TASK EVENTS ===
+      case 'TASK_CREATED':
+      case 'TASK_STATUS_CHANGE':
+      case 'TASK_COMPLETED':
+      case 'TASK_FAILED':
+      case 'TASK_CANCELLED': {
+        const { projectId, taskId } = event.payload || {};
+        if (projectId) {
+          // Invalidate task status counts (for badges)
+          scheduleInvalidate(queryClient, ['task-status-counts', projectId]);
+          // Invalidate paginated tasks for this project
+          scheduleInvalidate(queryClient, ['tasks', 'paginated', projectId]);
+          // Invalidate unified generations (tasks may have associated generations)
+          scheduleInvalidate(queryClient, ['unified-generations', 'project', projectId]);
+        }
+        if (taskId) {
+          // Invalidate single task queries
+          scheduleInvalidate(queryClient, ['tasks', 'single', taskId]);
+          // Invalidate task-generation mapping
+          scheduleInvalidate(queryClient, ['task-generation-mapping', taskId]);
+        }
         break;
       }
+      
+      case 'TASK_DELETED': {
+        const { projectId, taskId } = event.payload || {};
+        if (projectId) {
+          scheduleInvalidate(queryClient, ['task-status-counts', projectId]);
+          scheduleInvalidate(queryClient, ['tasks', 'paginated', projectId]);
+        }
+        if (taskId) {
+          scheduleInvalidate(queryClient, ['tasks', 'single', taskId]);
+          scheduleInvalidate(queryClient, ['task-generation-mapping', taskId]);
+        }
+        break;
+      }
+      
+      case 'TASKS_BATCH_UPDATE': {
+        const { projectId, taskIds } = event.payload || {};
+        if (projectId) {
+          scheduleInvalidate(queryClient, ['task-status-counts', projectId]);
+          scheduleInvalidate(queryClient, ['tasks', 'paginated', projectId]);
+          scheduleInvalidate(queryClient, ['unified-generations', 'project', projectId]);
+        }
+        // Invalidate individual tasks if provided
+        if (taskIds && Array.isArray(taskIds)) {
+          taskIds.forEach((taskId: string) => {
+            scheduleInvalidate(queryClient, ['tasks', 'single', taskId]);
+            scheduleInvalidate(queryClient, ['task-generation-mapping', taskId]);
+          });
+        }
+        break;
+      }
+
+      // === GENERATION EVENTS ===
+      case 'GENERATION_INSERT':
+      case 'GENERATION_UPDATE': {
+        const { projectId, shotId, generationId } = event.payload || {};
+        if (projectId) {
+          scheduleInvalidate(queryClient, ['unified-generations', 'project', projectId]);
+          scheduleInvalidate(queryClient, ['shots', projectId]); // Shots may have generation counts
+        }
+        if (shotId) {
+          scheduleInvalidate(queryClient, ['unified-generations', 'shot', shotId]);
+        }
+        if (generationId) {
+          scheduleInvalidate(queryClient, ['generation-task-mapping', generationId]);
+        }
+        break;
+      }
+      
+      case 'GENERATION_DELETE': {
+        const { projectId, shotId, generationId } = event.payload || {};
+        if (projectId) {
+          scheduleInvalidate(queryClient, ['unified-generations', 'project', projectId]);
+          scheduleInvalidate(queryClient, ['shots', projectId]);
+        }
+        if (shotId) {
+          scheduleInvalidate(queryClient, ['unified-generations', 'shot', shotId]);
+        }
+        if (generationId) {
+          scheduleInvalidate(queryClient, ['generation-task-mapping', generationId]);
+        }
+        break;
+      }
+      
+      case 'GENERATION_STAR_TOGGLE':
+      case 'GENERATION_LOCATION_UPDATE': {
+        const { projectId, shotId, generationId } = event.payload || {};
+        // These are metadata-only changes, so we can be more targeted
+        if (projectId) {
+          scheduleInvalidate(queryClient, ['unified-generations', 'project', projectId]);
+        }
+        if (shotId) {
+          scheduleInvalidate(queryClient, ['unified-generations', 'shot', shotId]);
+        }
+        break;
+      }
+
+      // === SHOT EVENTS ===
+      case 'SHOT_CREATED':
+      case 'SHOT_UPDATED':
+      case 'SHOT_DELETED': {
+        const { projectId, shotId } = event.payload || {};
+        if (projectId) {
+          scheduleInvalidate(queryClient, ['shots', projectId]);
+          scheduleInvalidate(queryClient, ['unified-generations', 'project', projectId]);
+        }
+        if (shotId) {
+          scheduleInvalidate(queryClient, ['unified-generations', 'shot', shotId]);
+        }
+        break;
+      }
+      
       case 'SHOT_GENERATION_CHANGE': {
         const { projectId, shotId } = event.payload || {};
-        if (projectId) scheduleInvalidate(queryClient, ['unified-generations', 'project', projectId]);
-        if (shotId) scheduleInvalidate(queryClient, ['unified-generations', 'shot', shotId]);
+        if (projectId) {
+          scheduleInvalidate(queryClient, ['unified-generations', 'project', projectId]);
+          scheduleInvalidate(queryClient, ['shots', projectId]);
+        }
+        if (shotId) {
+          scheduleInvalidate(queryClient, ['unified-generations', 'shot', shotId]);
+        }
         break;
       }
-      case 'TASK_INSERT':
-      case 'TASK_STATUS_CHANGE': {
+      
+      case 'SHOT_REORDER': {
         const { projectId } = event.payload || {};
-        if (projectId) scheduleInvalidate(queryClient, ['task-status-counts', projectId]);
-        // Invalidate the paginated family for this project, not just page 1
-        if (projectId) scheduleInvalidate(queryClient, ['tasks', 'paginated', projectId]);
+        if (projectId) {
+          scheduleInvalidate(queryClient, ['shots', projectId]);
+        }
         break;
       }
+
+      // === PROJECT EVENTS ===
+      case 'PROJECT_UPDATED': {
+        const { projectId } = event.payload || {};
+        if (projectId) {
+          // Invalidate all project-scoped data
+          scheduleInvalidate(queryClient, ['shots', projectId]);
+          scheduleInvalidate(queryClient, ['unified-generations', 'project', projectId]);
+          scheduleInvalidate(queryClient, ['task-status-counts', projectId]);
+          scheduleInvalidate(queryClient, ['tasks', 'paginated', projectId]);
+        }
+        break;
+      }
+
+      // === CREDIT EVENTS ===
+      case 'CREDITS_UPDATED':
+      case 'TOPUP_COMPLETED': {
+        scheduleInvalidate(queryClient, ['credits', 'balance']);
+        scheduleInvalidate(queryClient, ['credits', 'ledger']);
+        scheduleInvalidate(queryClient, ['autoTopup', 'preferences']);
+        break;
+      }
+
+      // === SETTINGS EVENTS ===
+      case 'TOOL_SETTINGS_CHANGED': {
+        const { toolId } = event.payload || {};
+        if (toolId) {
+          scheduleInvalidate(queryClient, ['tool-settings', toolId]);
+        } else {
+          // Invalidate all tool settings
+          scheduleInvalidate(queryClient, ['tool-settings']);
+        }
+        break;
+      }
+      
+      case 'API_TOKEN_CHANGED': {
+        scheduleInvalidate(queryClient, ['apiTokens']);
+        break;
+      }
+
+      // === RESOURCE EVENTS ===
+      case 'RESOURCE_UPLOADED':
+      case 'RESOURCE_DELETED': {
+        const { type } = event.payload || {};
+        if (type) {
+          scheduleInvalidate(queryClient, ['resources', type]);
+        } else {
+          scheduleInvalidate(queryClient, ['resources']);
+        }
+        break;
+      }
+
+      // === BATCH EVENTS ===
       case 'GENERATIONS_UPDATED': {
         const { projectId, shotId } = event.payload || {};
-        if (projectId) scheduleInvalidate(queryClient, ['unified-generations', 'project', projectId]);
-        if (shotId) scheduleInvalidate(queryClient, ['unified-generations', 'shot', shotId]);
+        if (projectId) {
+          scheduleInvalidate(queryClient, ['unified-generations', 'project', projectId]);
+          scheduleInvalidate(queryClient, ['shots', projectId]);
+        }
+        if (shotId) {
+          scheduleInvalidate(queryClient, ['unified-generations', 'shot', shotId]);
+        }
         break;
       }
+
       default: {
-        // noop
+        console.warn('[InvalidationRouter] Unknown event type:', event.type);
+        break;
       }
     }
-  } catch {}
-  finally {
+  } catch (error) {
+    console.error('[InvalidationRouter] Error processing event:', error, event);
+  } finally {
     if (runtimeConfig.RECONNECTION_LOGS_ENABLED && flushTimer == null && pending.size > 0) {
-      // eslint-disable-next-line no-console
-      console.log('[ReconnectionIssue][RouterFlush] scheduled', { count: pending.size });
+      console.log('[InvalidationRouter] Scheduled flush', { 
+        pendingCount: pending.size,
+        timestamp: Date.now() 
+      });
     }
   }
 }

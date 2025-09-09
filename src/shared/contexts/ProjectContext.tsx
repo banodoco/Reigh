@@ -220,7 +220,6 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
       unsubscribe = authManager.subscribe('ProjectContext', handleAuthStateChange);
     } else {
       // Fallback to direct listener if auth manager not available
-      console.error('[ProjectContext] AuthManager not available, using direct listener');
       const { data: listener } = supabase.auth.onAuthStateChange(handleAuthStateChange);
       unsubscribe = () => listener.subscription.unsubscribe();
     }

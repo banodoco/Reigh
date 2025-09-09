@@ -59,6 +59,7 @@
 | **Mobile Modal Styling** | [mobile_modal_styling_system.md](structure_detail/mobile_modal_styling_system.md) | Unified mobile modal positioning, safe area handling, responsive modal layouts |
 | **Mobile Video Toggle** | - | Mobile UI toggle functionality between MediaLightbox video playback and TaskDetailsModal for viewing generation parameters |
 | **Railway Deployment** | [DEPLOY_RAILWAY.md](DEPLOY_RAILWAY.md) | Complete Railway.com deployment guide |
+| **Instrumentation System** | [instrumentation/README.md](src/integrations/supabase/instrumentation/README.md) | Centralized instrumentation management, diagnostics, and debugging tools |
 
 This document is meant to serve as a comprehensive view of Reigh's architecture. 
 
@@ -119,11 +120,15 @@ src/integrations/supabase/
 │   ├── snapshot.ts                           # captureRealtimeSnapshot, getEffectiveRealtimeSocket
 │   └── timeline.ts                           # __CORRUPTION_TIMELINE__, addCorruptionEvent
 └── instrumentation/
-    └── window/
-        └── index.ts                          # WebSocket wrapper, global error & fetch instrumentation (pre-client)
+    ├── InstrumentationManager.ts             # Single point of control for all instrumentation
+    ├── window/
+    │   └── index.ts                          # WebSocket wrapper (delegates to InstrumentationManager)
+    ├── realtime/
+    │   └── index.ts                          # Realtime instrumentation (delegates to InstrumentationManager)
+    └── README.md                             # Instrumentation documentation and usage guide
 ```
 
-Behavior is unchanged; `client.ts` remains the public entry exporting `supabase`. Instrumentation is gated by env flags and is idempotent for HMR.
+**Key Improvement**: Introduced `InstrumentationManager` as a single point of control for all instrumentation. This prevents multiple installs, overlapping logs, and provides unified diagnostics with configurable log verbosity. All existing instrumentation now delegates to the manager for centralized control.
 
 ### 📚 Detailed Documentation Links
 
@@ -266,3 +271,30 @@ See [README.md](README.md) for:
 [Back to Top](#-reigh-developer-onboarding) • [Add a Tool](structure_detail/adding_new_tool.md) • [Database & Storage](structure_detail/db_and_storage.md) • [Persistence](structure_detail/data_persistence.md)
 
   </div>
+
+---
+
+## 🔄 Recent Updates
+
+### Polling Intervals and Resurrection Logic Standardization (2024)
+
+All polling intervals across the codebase have been standardized to use the `useResurrectionPolling` system:
+
+**✅ Standardized Hooks:**
+- `usePaginatedTasks` - Now uses standardized polling with activity detection for Processing filters
+- `useTaskStatusCounts` - Migrated from static 5s interval to network-aware polling  
+- `useProjectVideoCountsCache` - Migrated from static 60s interval to network-aware polling
+- `useGenerations`, `useUnifiedGenerations` - Already using standardized system
+
+**🎯 Key Benefits:**
+- **Network Awareness**: All polling respects `NetworkStatusManager` for slow connections
+- **Visibility Management**: Polling adapts when tabs are hidden via `VisibilityManager`
+- **Jitter**: Prevents thundering herd problems with randomized intervals
+- **Healing Window Respect**: All polling pauses during tab reactivation healing periods
+- **Consistent Logging**: Unified debug tags and context for polling decisions
+
+**🔧 Implementation Details:**
+- `useStandardizedPolling()` wrapper provides simple static intervals with network awareness
+- `useResurrectionPollingConfig()` provides full resurrection logic for complex data
+- All custom polling logic replaced with standardized approach
+- No more ad-hoc intervals that conflict with resume timing

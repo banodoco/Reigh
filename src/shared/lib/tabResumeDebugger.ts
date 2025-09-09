@@ -3,13 +3,17 @@
  * Tracks user interactions, state changes, and system behavior after tab resume
  */
 
+import { VisibilityManager, type VisibilitySignals, type VisibilityEventType } from './VisibilityManager';
+
 let tabResumeTime: number | null = null;
 let isTrackingTabResume = false;
+let visibilitySubscriptionId: string | null = null;
 
-// Track when tab becomes visible
+// Initialize tracking when module loads
 if (typeof window !== 'undefined') {
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') {
+  // Subscribe to VisibilityManager for centralized visibility handling
+  visibilitySubscriptionId = VisibilityManager.subscribe((signals: VisibilitySignals, eventType: VisibilityEventType) => {
+    if (eventType === 'visibilitychange' && signals.justBecameVisible) {
       tabResumeTime = Date.now();
       isTrackingTabResume = true;
       
@@ -20,6 +24,11 @@ if (typeof window !== 'undefined') {
         localStorage: {
           lastSelectedProjectId: localStorage.getItem('lastSelectedProjectId'),
           supabaseAuth: localStorage.getItem('sb-wczysqzxlwdndgxitrvc-auth-token') ? 'present' : 'missing'
+        },
+        visibilitySignals: {
+          changeCount: signals.changeCount,
+          lastVisibilityChangeAt: signals.lastVisibilityChangeAt,
+          timeSinceLastChange: signals.timeSinceLastChange
         }
       });
 
@@ -29,6 +38,9 @@ if (typeof window !== 'undefined') {
         console.error('[TabResumeDebug] 🏁 Stopped tracking tab resume interactions');
       }, 30000);
     }
+  }, {
+    id: 'tab-resume-debugger',
+    eventTypes: ['visibilitychange']
   });
 
   // Track all clicks after tab resume
@@ -111,4 +123,12 @@ if (typeof window !== 'undefined') {
 
 export function initTabResumeDebugger() {
   console.error('[TabResumeDebug] 🔧 Tab resume debugger initialized');
+}
+
+export function cleanupTabResumeDebugger() {
+  if (visibilitySubscriptionId) {
+    VisibilityManager.unsubscribe(visibilitySubscriptionId);
+    visibilitySubscriptionId = null;
+    console.error('[TabResumeDebug] 🧹 Tab resume debugger cleaned up');
+  }
 }
