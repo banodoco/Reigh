@@ -8,6 +8,7 @@ export interface ShotNotifierProps {
   allShots: Array<{ id: string; name: string }>;
   onSwitchToAssociatedShot?: (shotId: string) => void;
   onShowAllShots?: () => void;
+  onVisitShot?: (shotId: string) => void;
 }
 
 export const ShotNotifier: React.FC<ShotNotifierProps> = ({
@@ -17,6 +18,7 @@ export const ShotNotifier: React.FC<ShotNotifierProps> = ({
   allShots,
   onSwitchToAssociatedShot,
   onShowAllShots,
+  onVisitShot,
 }) => {
   // Determine if we should show the shot notifier
   // Show when: 1) There's a form/shot mismatch, OR 2) Filtering for a specific shot
@@ -28,7 +30,7 @@ export const ShotNotifier: React.FC<ShotNotifierProps> = ({
   }, [formAssociatedShotId, shotFilter, showShotFilter]);
 
   // Get the names and text for the notifier
-  const { currentShotDisplayText, switchButtonText, showAllButtonText } = useMemo(() => {
+  const { currentShotDisplayText, switchButtonText, showAllButtonText, visitShotButtonText } = useMemo(() => {
     const currentShot = allShots.find(shot => shot.id === shotFilter);
     const associatedShot = allShots.find(shot => shot.id === formAssociatedShotId);
     const associatedShotName = associatedShot?.name || 'Unknown';
@@ -41,29 +43,33 @@ export const ShotNotifier: React.FC<ShotNotifierProps> = ({
       // Case 1: Form has associated shot but we're viewing all shots
       return {
         currentShotDisplayText: "You're viewing images for all shots",
-        switchButtonText: `Jump to '${associatedShotName}'`,
+        switchButtonText: `View images related to ${associatedShotName}`,
         showAllButtonText: null, // Don't show "Show All" when already viewing all
+        visitShotButtonText: null,
       };
     } else if (hasFormShotMismatch && isFilteringSpecificShot) {
       // Case 2: Form has associated shot but we're viewing a different specific shot - SHOW BOTH BUTTONS
       return {
-        currentShotDisplayText: `You're viewing images for '${currentShotName}'`,
-        switchButtonText: `Switch to '${associatedShotName}'`,
-        showAllButtonText: "Show All Shots",
+        currentShotDisplayText: `You're viewing images for ${currentShotName}`,
+        switchButtonText: `Switch to ${associatedShotName}`,
+        showAllButtonText: "Show images related to all shots",
+        visitShotButtonText: `Visit ${currentShotName}`,
       };
     } else if (isFilteringSpecificShot && !hasFormShotMismatch) {
-      // Case 3: Filtering for a specific shot (no form mismatch) - only show "Show All"
+      // Case 3: Filtering for a specific shot (no form mismatch) - show "Show All" and "Visit Shot"
       return {
-        currentShotDisplayText: `You're filtering for images related to '${currentShotName}'`,
+        currentShotDisplayText: `You're filtering for images related to ${currentShotName}`,
         switchButtonText: null,
-        showAllButtonText: "Show All Shots",
+        showAllButtonText: "Show images related to all shots",
+        visitShotButtonText: `Visit ${currentShotName}`,
       };
     } else {
       // Fallback (shouldn't happen if shouldShowShotNotifier logic is correct)
       return {
         currentShotDisplayText: "You're viewing images for all shots",
         switchButtonText: null,
-        showAllButtonText: "Show All Shots",
+        showAllButtonText: "Show images related to all shots",
+        visitShotButtonText: null,
       };
     }
   }, [allShots, shotFilter, formAssociatedShotId]);
@@ -75,6 +81,12 @@ export const ShotNotifier: React.FC<ShotNotifierProps> = ({
   const handleSwitchToAssociated = () => {
     if (formAssociatedShotId && onSwitchToAssociatedShot) {
       onSwitchToAssociatedShot(formAssociatedShotId);
+    }
+  };
+
+  const handleVisitShot = () => {
+    if (shotFilter !== 'all' && onVisitShot) {
+      onVisitShot(shotFilter);
     }
   };
 
@@ -96,6 +108,18 @@ export const ShotNotifier: React.FC<ShotNotifierProps> = ({
           </Button>
         )}
         
+        {/* Visit Shot button */}
+        {visitShotButtonText && (
+          <Button
+            variant="default"
+            size="sm"
+            onClick={handleVisitShot}
+            className="bg-green-600 hover:bg-green-700 text-white border-green-600 hover:border-green-700 dark:bg-green-700 dark:hover:bg-green-600 dark:border-green-700 dark:hover:border-green-600"
+          >
+            {visitShotButtonText}
+          </Button>
+        )}
+
         {/* Show All Shots button */}
         {showAllButtonText && (
           <Button

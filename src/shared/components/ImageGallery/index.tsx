@@ -271,6 +271,39 @@ export const ImageGallery: React.FC<ImageGalleryProps> = (props) => {
       .map(s => ({ id: s.id, name: s.name })), 
     [allShots]
   );
+
+  const handleVisitShotFromNotifier = useCallback((shotId: string) => {
+    console.log('[VisitShotDebug] 1. ImageGallery handleVisitShotFromNotifier called', {
+      shotId,
+      timestamp: Date.now()
+    });
+    
+    // Find the shot object from the shot ID
+    const shot = simplifiedShotOptions.find(s => s.id === shotId);
+    if (!shot) {
+      console.error('[VisitShotDebug] ERROR: Shot not found for ID:', shotId);
+      return;
+    }
+    
+    // Convert the simplified shot to a full Shot object
+    const fullShot = allShots.find(s => s.id === shotId);
+    if (!fullShot) {
+      console.error('[VisitShotDebug] ERROR: Full shot not found for ID:', shotId);
+      return;
+    }
+    
+    console.log('[VisitShotDebug] 2. ImageGallery found shot, calling navigateToShot', {
+      shot: fullShot,
+      timestamp: Date.now()
+    });
+    
+    try {
+      navigateToShot(fullShot);
+      console.log('[VisitShotDebug] 3. ImageGallery navigateToShot completed');
+    } catch (error) {
+      console.error('[VisitShotDebug] ERROR in ImageGallery handleVisitShotFromNotifier:', error);
+    }
+  }, [simplifiedShotOptions, allShots, navigateToShot]);
   
   // Memoize grid column classes to prevent unnecessary recalculations
   const gridColumnClasses = React.useMemo(() => {
@@ -627,6 +660,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = (props) => {
           allShots={simplifiedShotOptions}
           onSwitchToAssociatedShot={handleSwitchToAssociatedShot}
           onShowAllShots={handleShowAllShots}
+          onVisitShot={handleVisitShotFromNotifier}
         />
 
         {/* Main Gallery Grid */}
