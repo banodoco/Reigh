@@ -588,7 +588,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   const [modelOverride, setModelOverride] = useState<GenerationMode | undefined>(undefined);
 
   // Extract current values with defaults (apply optimistic override first)
-  const selectedModel = (modelOverride ?? projectImageSettings?.selectedModel) || 'wan-local';
+  const selectedModel = (modelOverride ?? projectImageSettings?.selectedModel) || 'qwen-image';
   const rawStyleReferenceImage = projectImageSettings?.styleReferenceImage || null;
   const currentStyleStrength = projectImageSettings?.styleReferenceStrength || 1;
   
@@ -1585,75 +1585,67 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
               <div className="space-y-2">
                 <div className="space-y-1">
                   <Label className="text-lg font-medium text-slate-700 dark:text-slate-200 border-l-8 border-purple-200/60 pl-3 py-1 relative">
-                    Style
+                    References
                     <span className="absolute top-1/2 left-full transform -translate-y-1/2 ml-2.5 w-12 h-2 bg-purple-200/60 rounded-full"></span>
                   </Label>
                 </div>
 
                 {/* Style Reference Upload */}
                 <div className="space-y-3">
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Style reference</p>
                   {styleReferenceImage ? (
                     /* Display uploaded style reference */
-                    <div className="relative">
-                      <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-800/50">
-                        <div className="flex items-start gap-4">
-                          <div className="flex-shrink-0">
-                            <img
-                              src={styleReferenceImage}
-                              alt="Style Reference"
-                              className="w-24 h-24 object-cover rounded-lg border border-gray-200 dark:border-gray-700"
-                            />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
-                              Style Reference Image
-                            </p>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-                              This image will guide the style of generated images
-                            </p>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={handleRemoveStyleReference}
+                    <div className="w-1/3">
+                      <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-800/50 relative">
+                        <div className="absolute top-2 right-2 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-full p-1 border border-gray-200 dark:border-gray-600 z-10">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={handleRemoveStyleReference}
+                            disabled={isGenerating}
+                            className="h-6 w-6 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30 flex items-center justify-center"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                        <div className="flex flex-col items-center space-y-3">
+                          <img
+                            src={styleReferenceImage}
+                            alt="Style Reference"
+                            className="w-full aspect-square object-cover rounded-lg border border-gray-200 dark:border-gray-700"
+                          />
+                          <div className="w-full">
+                            <SliderWithValue
+                              label="Reference Strength"
+                              value={styleReferenceStrength}
+                              onChange={handleStyleStrengthChange}
+                              min={0.1}
+                              max={2.0}
+                              step={0.1}
                               disabled={isGenerating}
-                              className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30"
-                            >
-                              <Trash2 className="h-4 w-4 mr-1" />
-                              Remove
-                            </Button>
+                              numberInputClassName="w-10"
+                            />
                           </div>
                         </div>
                       </div>
                     </div>
                   ) : (
                     /* Upload area for style reference */
-                    <FileInput
-                      onFileChange={handleStyleReferenceUpload}
-                      acceptTypes={['image']}
-                      multiple={false}
-                      disabled={isGenerating}
-                      label="Style Reference Image"
-                      className="w-full"
-                      suppressSelectionSummary
-                      suppressRemoveAll
-                      showLoaderDuringSingleSelection
-                      loaderDurationMs={400}
-                      forceLoading={isUploadingStyleReference}
-                    />
-                  )}
-                  
-                  {/* Style Reference Strength Slider */}
-                  {styleReferenceImage && (
-                    <div className="mt-4">
-                      <SliderWithValue
-                        label="Style Reference Strength"
-                        value={styleReferenceStrength}
-                        onChange={handleStyleStrengthChange}
-                        min={0.1}
-                        max={2.0}
-                        step={0.1}
+                    <div className="w-1/3">
+                      <FileInput
+                        onFileChange={handleStyleReferenceUpload}
+                        acceptTypes={['image']}
+                        multiple={false}
                         disabled={isGenerating}
+                        label=""
+                        className="w-full"
+                        suppressSelectionSummary
+                        suppressRemoveAll
+                        suppressAcceptedTypes
+                        showLoaderDuringSingleSelection
+                        loaderDurationMs={400}
+                        forceLoading={isUploadingStyleReference}
                       />
                     </div>
                   )}

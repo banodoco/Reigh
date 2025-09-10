@@ -13,6 +13,7 @@ interface SliderWithValueProps {
   variant?: "primary" | "secondary";
   hideLabel?: boolean;
   formatValue?: (value: number) => string;
+  numberInputClassName?: string;
 }
 
 const SliderWithValue = ({
@@ -26,6 +27,7 @@ const SliderWithValue = ({
   variant = "primary",
   hideLabel = false,
   formatValue,
+  numberInputClassName = "w-16",
 }: SliderWithValueProps) => {
   const handleValueChange = (values: number[]) => {
     onChange(values[0]);
@@ -39,7 +41,7 @@ const SliderWithValue = ({
         </div>
       )}
       <div className="flex gap-4">
-        <div className="border rounded w-16 h-10 flex items-center justify-center bg-white">
+        <div className={`border rounded ${numberInputClassName} h-10 flex items-center justify-center bg-white`}>
           {formatValue ? formatValue(value) : (Number.isInteger(value) ? value : value.toFixed(2))}
         </div>
         <Slider

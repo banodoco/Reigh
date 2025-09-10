@@ -26,6 +26,8 @@ interface FileInputProps {
   loaderDurationMs?: number;
   /** Force loader regardless of internal selection-loading state */
   forceLoading?: boolean;
+  /** Hide the "Accepted: image, video" text */
+  suppressAcceptedTypes?: boolean;
 }
 
 const FileInput: React.FC<FileInputProps> = ({
@@ -43,6 +45,7 @@ const FileInput: React.FC<FileInputProps> = ({
   showLoaderDuringSingleSelection = false,
   loaderDurationMs = 600,
   forceLoading = false,
+  suppressAcceptedTypes = false,
 }) => {
   const [internalFiles, setInternalFiles] = useState<File[]>([]);
   const [internalPreviewUrls, setInternalPreviewUrls] = useState<string[]>([]);
@@ -234,9 +237,11 @@ const FileInput: React.FC<FileInputProps> = ({
               <div className="flex flex-col items-center space-y-2 text-muted-foreground">
                 <UploadCloud className="h-10 w-10" />
                 <p>Drag & drop or click to upload {multiple ? 'files' : 'a file'}</p>
-                <p className="text-xs">
-                  Accepted: {acceptTypes.join(', ')}
-                </p>
+                {!suppressAcceptedTypes && (
+                  <p className="text-xs">
+                    Accepted: {acceptTypes.join(', ')}
+                  </p>
+                )}
               </div>
             )}
             {displayFiles.length > 0 && (
