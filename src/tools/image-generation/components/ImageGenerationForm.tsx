@@ -186,6 +186,11 @@ export interface PromptInputRowProps {
    * the remove button (if allowed).
    */
   rightHeaderAddon?: React.ReactNode;
+  /**
+   * When true on mobile, hides the header label and remove button and
+   * allows the right header addon to expand to full width.
+   */
+  mobileInlineEditing?: boolean;
 }
 
 export const PromptInputRow: React.FC<PromptInputRowProps> = React.memo(({
@@ -197,6 +202,7 @@ export const PromptInputRow: React.FC<PromptInputRowProps> = React.memo(({
   forceExpanded = false,
   autoEnterEditWhenActive = false,
   rightHeaderAddon,
+  mobileInlineEditing = false,
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const promptContainerRef = useRef<HTMLDivElement>(null);
@@ -414,12 +420,16 @@ export const PromptInputRow: React.FC<PromptInputRowProps> = React.memo(({
       className={`p-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600 transition-colors ${forceExpanded ? 'mt-0' : ''}`}
     >
       <div className="flex justify-between items-center mb-2">
-        <Label htmlFor={`fullPrompt-${promptEntry.id}`} className="text-xs font-medium text-muted-foreground">
-          Prompt #{index + 1}
-        </Label>
-        <div className="flex items-center space-x-1">
+        {!isMobile || !mobileInlineEditing ? (
+          <Label htmlFor={`fullPrompt-${promptEntry.id}`} className="text-xs font-medium text-muted-foreground">
+            Prompt #{index + 1}
+          </Label>
+        ) : (
+          <div className="h-5" />
+        )}
+        <div className={`flex items-center space-x-1 ${isMobile && mobileInlineEditing ? 'flex-1 justify-end' : ''}`}>
           {rightHeaderAddon ? (
-            <div className="flex items-center gap-2">{rightHeaderAddon}</div>
+            <div className={`flex items-center gap-2 ${isMobile && mobileInlineEditing ? 'w-full' : ''}`}>{rightHeaderAddon}</div>
           ) : (
             onEditWithAI && aiEditButtonIcon && hasApiKey && (
               <TooltipProvider>
@@ -443,7 +453,7 @@ export const PromptInputRow: React.FC<PromptInputRowProps> = React.memo(({
               </TooltipProvider>
             )
           )}
-          {canRemove && (
+          {canRemove && !(isMobile && mobileInlineEditing) && (
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>

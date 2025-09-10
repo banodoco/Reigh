@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
 import { PromptEntry, PromptInputRow, PromptInputRowProps } from '@/tools/image-generation/components/ImageGenerationForm';
-import { PlusCircle, AlertTriangle, Wand2Icon, Edit, PackagePlus, ArrowUp, Trash2, ChevronDown, ChevronRight, Sparkles, X } from 'lucide-react';
+import { PlusCircle, AlertTriangle, Wand2Icon, Edit, PackagePlus, ArrowUp, Trash2, ChevronDown, ChevronRight, Sparkles, X, Loader2 } from 'lucide-react';
 import { PromptGenerationControls, GenerationControlValues as PGC_GenerationControlValues } from '@/tools/image-generation/components/PromptGenerationControls';
 import { BulkEditControls, BulkEditParams as BEC_BulkEditParams, BulkEditControlValues as BEC_BulkEditControlValues } from '@/tools/image-generation/components/BulkEditControls';
 import { useAIInteractionService } from '@/shared/hooks/useAIInteractionService';
@@ -382,17 +382,15 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
   };
 
   const openEditWithAIForm = (promptId: string, currentText: string) => {
-    shouldFocusAITextareaRef.current = isMobile;
+    shouldFocusAITextareaRef.current = true;
     // iOS: prime the keyboard by focusing a temporary input in the same gesture
     if (isMobile && tempFocusInputRef.current) {
       try { tempFocusInputRef.current.focus({ preventScroll: true } as any); } catch {}
     }
     setPromptToEdit({ id: promptId, originalText: currentText, instructions: '', modelType: 'smart' });
-    if (isMobile) {
-      setTimeout(() => {
-        attemptFocusAITextarea();
-      }, 0);
-    }
+    setTimeout(() => {
+      attemptFocusAITextarea();
+    }, 0);
   };
 
   const handleConfirmEditWithAI = async () => {
@@ -511,14 +509,14 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
     };
   }, [isOpen]);
 
-  // Focus the nested AI edit textarea on open (especially for mobile)
+  // Focus the inline AI edit input on open (desktop and mobile)
   useEffect(() => {
-    if (promptToEdit && isMobile) {
+    if (promptToEdit) {
       setTimeout(() => {
         editInstructionsRef.current?.focus();
       }, 0);
     }
-  }, [promptToEdit, isMobile]);
+  }, [promptToEdit]);
 
   // Handle inside interactions to collapse active field without closing modal
   const handleInsideInteraction = useCallback((event: React.MouseEvent | React.TouchEvent) => {
@@ -715,14 +713,15 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
                 const isInlineEditing = promptToEdit?.id === prompt.id;
                 const isEmptyOriginal = isInlineEditing ? promptToEdit!.originalText.trim() === '' : false;
                 const rightHeaderAddon = isInlineEditing ? (
-                  <div className="flex items-center gap-2">
-                    <div className="relative">
+                  <div className="flex items-center gap-2 w-full max-w-full">
+                    <div className={`relative ${isMobile ? 'flex-1' : ''}`}>
                       <Input
                         ref={editInstructionsRef}
                         value={promptToEdit?.instructions || ''}
                         onChange={(e) => setPromptToEdit(prev => prev ? { ...prev, instructions: e.target.value } : null)}
                         placeholder={isEmptyOriginal ? 'Describe what you want' : 'Edit instructions'}
-                        className="h-8 w-48 md:w-72 pr-8"
+                        className={`h-8 ${isMobile ? 'w-full' : 'w-48 md:w-72'} pr-8 ${isMobile && isAIEditing ? 'opacity-80' : ''}`}
+                        disabled={isAIEditing}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' && promptToEdit && promptToEdit.instructions.trim() && !isAIEditing) {
                             e.preventDefault();
@@ -742,13 +741,17 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
                       </Button>
                     </div>
                     <Button
-                      size="sm"
+                      size={isMobile ? 'icon' : 'sm'}
+                      className={`${isMobile ? 'h-8 w-8 p-0' : ''}`}
                       onClick={handleConfirmEditWithAI}
                       disabled={isAIEditing || !(promptToEdit?.instructions || '').trim()}
+                      aria-label={isEmptyOriginal ? 'Create prompt' : 'Edit prompt'}
                     >
-                      {isAIEditing
-                        ? (isEmptyOriginal ? 'Creating...' : 'Editing...')
-                        : (isEmptyOriginal ? 'Create prompt' : 'Update prompt')}
+                      {isAIEditing ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Edit className="h-4 w-4" />
+                      )}
                     </Button>
                   </div>
                 ) : undefined;
@@ -772,8 +775,10 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
                       aiEditButtonIcon={<Edit className="h-4 w-4" />}
                       onSetActiveForFullView={setActivePromptIdForFullView}
                       isActiveForFullView={activePromptIdForFullView === prompt.id}
-                      autoEnterEditWhenActive={isMobile}
+                      autoEnterEditWhenActive={isMobile && !isInlineEditing}
+                      forceExpanded={isInlineEditing}
                       rightHeaderAddon={rightHeaderAddon}
+                      mobileInlineEditing={isMobile && isInlineEditing}
                     />
                   </div>
                 );

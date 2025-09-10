@@ -79,6 +79,23 @@ export function useUserUIState<K extends keyof UISettings>(
   key: K,
   fallback: UISettings[K]
 ) {
+  // Normalize logic specific to generationMethods to avoid ambiguous "both true" state.
+  // Allowed states:
+  // - inCloud: true, onComputer: false
+  // - inCloud: false, onComputer: true
+  // - inCloud: false, onComputer: false (explicitly disabled, used for warnings)
+  // Not allowed:
+  // - inCloud: true, onComputer: true → normalize to cloud by default
+  const normalizeIfGenerationMethods = (val: any): UISettings[K] => {
+    if ((key as unknown as string) !== 'generationMethods') return val as UISettings[K];
+    if (!val || typeof val !== 'object') return val as UISettings[K];
+    const inCloud = Boolean((val as any).inCloud);
+    const onComputer = Boolean((val as any).onComputer);
+    if (inCloud && onComputer) {
+      return { inCloud: true, onComputer: false } as UISettings[K];
+    }
+    return { inCloud, onComputer } as UISettings[K];
+  };
   const [value, setValue] = useState<UISettings[K]>(fallback);
   const [isLoading, setIsLoading] = useState(true);
   const userIdRef = useRef<string>();
@@ -91,13 +108,14 @@ export function useUserUIState<K extends keyof UISettings>(
   const saveFallbackToDatabase = async (userId: string, currentSettings: any) => {
     try {
       const currentUI = currentSettings.ui || {};
+      const fallbackToSave = normalizeIfGenerationMethods(fallback);
       
       // Only add the missing key, preserve everything else
       const updatedSettings = {
         ...currentSettings,
         ui: {
           ...currentUI,
-          [key]: fallback
+          [key]: fallbackToSave
         }
       };
       
@@ -119,7 +137,7 @@ export function useUserUIState<K extends keyof UISettings>(
         // Invalidate cache so other components see the backfilled values
         const cacheKey = `user_settings_${userId}`;
         settingsCache.delete(cacheKey);
-        setValue(fallback); // Update local state after successful save
+        setValue(fallbackToSave); // Update local state after successful save
       }
     } catch (error) {
       console.error('[useUserUIState] Error in saveFallbackToDatabase:', error);
@@ -151,14 +169,54 @@ export function useUserUIState<K extends keyof UISettings>(
         const keyValue = uiSettings?.[key];
         
         if (keyValue !== undefined) {
-          // Key exists in database - use stored value (even if both options are false)
-          setValue(keyValue);
-          // Loading successful – debug logs removed
+          // Key exists in database - merge with fallback to backfill any missing fields
+          const mergedValue = (typeof fallback === 'object' && fallback !== null)
+            ? ({ ...(fallback as any), ...(keyValue as any) } as UISettings[K])
+            : (keyValue as UISettings[K]);
+
+          const normalizedValue = normalizeIfGenerationMethods(mergedValue);
+          setValue(normalizedValue);
+
+          // If any fields from the fallback are missing in the stored value OR
+          // normalization changed the value, backfill them in DB
+          if (
+            (typeof keyValue === 'object' && keyValue !== null &&
+            typeof fallback === 'object' && fallback !== null &&
+            Object.keys(fallback as any).some((k) => (keyValue as any)[k] === undefined)) ||
+            JSON.stringify(normalizedValue) !== JSON.stringify(keyValue)
+          ) {
+            try {
+              const currentSettings = data?.settings || {};
+              const currentUI = currentSettings.ui || {};
+              const updatedSettings = {
+                ...currentSettings,
+                ui: {
+                  ...currentUI,
+                  [key]: normalizedValue
+                }
+              };
+
+              const { error: saveError } = await supabase
+                .from('users')
+                .update({ settings: updatedSettings })
+                .eq('id', user.id);
+
+              if (saveError) {
+                console.error('[useUserUIState] Error backfilling/normalizing fields:', saveError);
+              } else {
+                const cacheKey = `user_settings_${user.id}`;
+                settingsCache.delete(cacheKey);
+              }
+            } catch (e) {
+              console.error('[useUserUIState] Unexpected error during backfill/normalize:', e);
+            }
+          }
         } else {
           // Key doesn't exist in database - this is an existing user who hasn't set preferences yet
           // Save fallback values to backfill them (only runs when completely empty)
           console.log(`[useUserUIState] No value found for key "${key}", saving fallback to database`);
-          setValue(fallback); // Set fallback immediately for responsive UI
+          const normalizedFallback = normalizeIfGenerationMethods(fallback);
+          setValue(normalizedFallback); // Set normalized fallback immediately for responsive UI
           
           // Save to database in background (don't block loading)
           saveFallbackToDatabase(user.id, data?.settings || {}).catch(error => {
@@ -178,8 +236,11 @@ export function useUserUIState<K extends keyof UISettings>(
 
   // Debounced update function
   const update = (patch: Partial<UISettings[K]>) => {
-    // Immediately update local state for responsive UI
-    setValue(prev => ({ ...prev, ...patch }));
+    // Immediately update local state for responsive UI (with normalization)
+    setValue(prev => {
+      const nextVal = { ...(prev as any), ...(patch as any) } as UISettings[K];
+      return normalizeIfGenerationMethods(nextVal);
+    });
 
     // Clear existing timeout
     if (debounceRef.current) {
@@ -201,10 +262,16 @@ export function useUserUIState<K extends keyof UISettings>(
 
         const currentSettings = currentUser?.settings || {};
         const currentUI = currentSettings.ui || {};
-        const currentKeyValue = currentUI[key] || fallback;
+        // Merge current DB value over fallback to ensure all fields exist
+        const mergedCurrentKeyValue = (typeof fallback === 'object' && fallback !== null)
+          ? { ...(fallback as any), ...((currentUI[key] as any) || {}) }
+          : ((currentUI[key] ?? fallback) as any);
 
-        // Merge the patch with current value
-        const updatedKeyValue = { ...currentKeyValue, ...patch };
+        // Merge the patch with current value and normalize
+        const updatedKeyValue = normalizeIfGenerationMethods({
+          ...(mergedCurrentKeyValue as any),
+          ...(patch as any)
+        });
         
         // Update the database
         const { error } = await supabase

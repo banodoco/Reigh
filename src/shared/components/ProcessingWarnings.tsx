@@ -125,7 +125,7 @@ export const GlobalProcessingWarning: React.FC<ProcessingWarningsProps> = ({ onO
                   <span>Cloud processing enabled but you have no credits.</span>
                   <span
                     className="text-orange-700 underline hover:text-orange-800 cursor-pointer"
-                    onClick={() => updateGenerationMethods({ inCloud: false })}
+                    onClick={() => updateGenerationMethods({ inCloud: false, onComputer: true })}
                   >
                     Turn off cloud processing
                   </span>

@@ -54,6 +54,14 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 }) => {
   const isMobile = useIsMobile();
   
+  const isIpad = useMemo(() => {
+    if (typeof navigator === 'undefined') return false;
+    const ua = navigator.userAgent || navigator.vendor || '';
+    const isIpadUA = /\biPad\b/.test(ua);
+    const isTouchMac = navigator.platform === 'MacIntel' && (navigator.maxTouchPoints || 0) > 1;
+    return isIpadUA || isTouchMac;
+  }, []);
+  
   // Mobile modal styling
   const mobileModalStyling = useLargeModal();
   const { apiKeys, isLoading: isLoadingKeys, saveApiKeys, isUpdating } = useApiKeys();
@@ -432,6 +440,7 @@ python worker.py --db-type supabase \\
             size="sm"
             onClick={handleSignOut}
             className="absolute left-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            style={{ top: isIpad ? 14 : undefined }}
           >
             <LogOut className="h-4 w-4" />
             <span className="sr-only">Sign out</span>
@@ -447,6 +456,7 @@ python worker.py --db-type supabase \\
                 size="sm"
                 onClick={handleSignOut}
                 className="absolute top-0 right-0 flex items-center gap-2 text-muted-foreground hover:text-foreground"
+                style={{ top: isIpad ? -2 : undefined }}
               >
                 <LogOut className="h-4 w-4" />
                 Sign out
