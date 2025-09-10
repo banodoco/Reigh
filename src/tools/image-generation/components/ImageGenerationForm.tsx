@@ -180,6 +180,12 @@ export interface PromptInputRowProps {
    * When true on mobile, entering active full-view automatically switches into typing mode.
    */
   autoEnterEditWhenActive?: boolean;
+  /**
+   * Optional custom content to render on the right side of the header.
+   * When provided, it replaces the default AI edit icon button, but retains
+   * the remove button (if allowed).
+   */
+  rightHeaderAddon?: React.ReactNode;
 }
 
 export const PromptInputRow: React.FC<PromptInputRowProps> = React.memo(({
@@ -190,6 +196,7 @@ export const PromptInputRow: React.FC<PromptInputRowProps> = React.memo(({
   isActiveForFullView,
   forceExpanded = false,
   autoEnterEditWhenActive = false,
+  rightHeaderAddon,
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const promptContainerRef = useRef<HTMLDivElement>(null);
@@ -411,26 +418,30 @@ export const PromptInputRow: React.FC<PromptInputRowProps> = React.memo(({
           Prompt #{index + 1}
         </Label>
         <div className="flex items-center space-x-1">
-          {onEditWithAI && aiEditButtonIcon && hasApiKey && (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={onEditWithAI}
-                    className="text-primary/80 hover:text-primary hover:bg-primary/10 h-7 w-7"
-                    disabled={isGenerating}
-                    aria-label="Edit with AI"
-                  >
-                    {aiEditButtonIcon}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="top">
-                  <p>{promptEntry.fullPrompt.trim() === '' ? 'Create with AI' : 'Edit with AI'}</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+          {rightHeaderAddon ? (
+            <div className="flex items-center gap-2">{rightHeaderAddon}</div>
+          ) : (
+            onEditWithAI && aiEditButtonIcon && hasApiKey && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={onEditWithAI}
+                      className="text-primary/80 hover:text-primary hover:bg-primary/10 h-7 w-7"
+                      disabled={isGenerating}
+                      aria-label="Edit with AI"
+                    >
+                      {aiEditButtonIcon}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    <p>{promptEntry.fullPrompt.trim() === '' ? 'Create with AI' : 'Edit with AI'}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )
           )}
           {canRemove && (
             <TooltipProvider>
@@ -541,6 +552,10 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [directFormActivePromptId, setDirectFormActivePromptId] = useState<string | null>(null);
   const [styleReferenceStrength, setStyleReferenceStrength] = useState<number>(1);
+  const [isUploadingStyleReference, setIsUploadingStyleReference] = useState<boolean>(false);
+  // Optimistic local override for style reference image so UI updates immediately
+  // undefined => no override, use settings; string|null => explicit override
+  const [styleReferenceOverride, setStyleReferenceOverride] = useState<string | null | undefined>(undefined);
   
   const { selectedProjectId } = useProject();
   
@@ -554,13 +569,21 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     enabled: !!selectedProjectId
   });
   
-  // Extract current values with defaults
-  const selectedModel = projectImageSettings?.selectedModel || 'wan-local';
+  // Local optimistic override for model to avoid UI stutter while saving
+  const [modelOverride, setModelOverride] = useState<GenerationMode | undefined>(undefined);
+
+  // Extract current values with defaults (apply optimistic override first)
+  const selectedModel = (modelOverride ?? projectImageSettings?.selectedModel) || 'wan-local';
   const rawStyleReferenceImage = projectImageSettings?.styleReferenceImage || null;
   const currentStyleStrength = projectImageSettings?.styleReferenceStrength || 1;
   
   // Check if we have base64 data that needs to be converted to URL
   const styleReferenceImage = useMemo(() => {
+    // If we have an explicit local override (including null), use it
+    if (styleReferenceOverride !== undefined) {
+      return styleReferenceOverride;
+    }
+
     if (!rawStyleReferenceImage) return null;
     
     // If it's already a URL, return as-is
@@ -576,7 +599,24 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     }
     
     return rawStyleReferenceImage;
+  }, [styleReferenceOverride, rawStyleReferenceImage]);
+
+  // When the backing setting updates, drop the local override
+  useEffect(() => {
+    setStyleReferenceOverride(undefined);
   }, [rawStyleReferenceImage]);
+  
+  // Clear model override once server settings reflect the change
+  useEffect(() => {
+    if (modelOverride && projectImageSettings?.selectedModel === modelOverride) {
+      console.log('[ModelFlipIssue] Server settings now match override. Clearing override.', {
+        serverModel: projectImageSettings?.selectedModel,
+        override: modelOverride,
+        isUpdating: isSavingProjectSettings
+      });
+      setModelOverride(undefined);
+    }
+  }, [projectImageSettings?.selectedModel]);
   
   // Auto-migrate base64 data to URL when detected
   useEffect(() => {
@@ -927,11 +967,12 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     
     const file = files[0];
     if (!file.type.startsWith('image/')) {
-      toast.error('Please upload an image file');
+      // Silently ignore invalid file types (no toasts for style reference flows)
       return;
     }
 
     try {
+      setIsUploadingStyleReference(true);
       const dataURL = await fileToDataURL(file);
       
       // Process the image to match project aspect ratio
@@ -954,7 +995,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       }
       
       // Upload to storage and get URL
-      toast.info('Uploading style reference image...');
       const uploadedUrl = await uploadImageToStorage(processedFile);
       
       // Save the URL instead of base64 data
@@ -962,45 +1002,62 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         styleReferenceImage: uploadedUrl
       });
       markAsInteracted();
-      
-      if (selectedProjectId) {
-        toast.success('Style reference image uploaded and processed for project aspect ratio');
-      } else {
-        toast.success('Style reference image uploaded');
-      }
+      // Optimistically reflect the uploaded image immediately
+      setStyleReferenceOverride(uploadedUrl);
     } catch (error) {
       console.error('Error uploading style reference:', error);
-      toast.error('Failed to upload style reference image');
+      // No toasts on failure per request
+    } finally {
+      setIsUploadingStyleReference(false);
     }
   }, [updateProjectImageSettings, markAsInteracted, selectedProjectId]);
 
   // Handle removing style reference image
   const handleRemoveStyleReference = useCallback(async () => {
+    // Optimistically clear immediately
+    setStyleReferenceOverride(null);
     await updateProjectImageSettings('project', {
       styleReferenceImage: null
     });
     markAsInteracted();
-    toast.success('Style reference image removed');
   }, [updateProjectImageSettings, markAsInteracted]);
 
   // Handle model change
   const handleModelChange = useCallback(async (value: GenerationMode) => {
-    await updateProjectImageSettings('project', {
-      selectedModel: value
+    console.log('[ModelFlipIssue] onValueChange fired', {
+      from: selectedModel,
+      to: value,
+      serverModel: projectImageSettings?.selectedModel,
+      isUpdating: isSavingProjectSettings
     });
-    markAsInteracted();
-    
-    // Reset model-specific settings when switching
-    if (value === 'qwen-image') {
-      // Clear LoRAs when switching to Qwen.Image
-      loraManager.setSelectedLoras([]);
-    } else if (value === 'wan-local') {
-      // Clear style reference when switching to Wan 2.2
-      await updateProjectImageSettings('project', {
-        styleReferenceImage: null
+
+    // Optimistic UI flip
+    setModelOverride(value);
+
+    // Optimistically update settings cache to avoid jump-back while refetching
+    try {
+      queryClient.setQueryData(['toolSettings', 'project-image-settings', selectedProjectId, undefined], (prev: any) => {
+        const next = { ...(prev || {}), selectedModel: value };
+        console.log('[ModelFlipIssue] Applied optimistic cache update for selectedModel', { next });
+        return next;
       });
+    } catch (e) {
+      console.warn('[ModelFlipIssue] Failed to set optimistic cache data', e);
     }
-  }, [updateProjectImageSettings, markAsInteracted, loraManager]);
+
+    // Build a single debounced update payload to avoid dropping fields
+    if (value === 'qwen-image') {
+      // Clear LoRAs when switching to Qwen.Image (client state)
+      loraManager.setSelectedLoras([]);
+      await updateProjectImageSettings('project', { selectedModel: value });
+    } else {
+      // Clear style reference when switching to Wan 2.2 (persisted)
+      setStyleReferenceOverride(null);
+      await updateProjectImageSettings('project', { selectedModel: value, styleReferenceImage: null });
+    }
+
+    markAsInteracted();
+  }, [selectedModel, projectImageSettings?.selectedModel, isSavingProjectSettings, queryClient, selectedProjectId, loraManager, updateProjectImageSettings, markAsInteracted, setStyleReferenceOverride]);
   
   // Handle style reference strength change
   const handleStyleStrengthChange = useCallback(async (value: number) => {
@@ -1060,7 +1117,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     });
 
     setPrompts(sanitizedPrompts);
-    setIsPromptModalOpen(false);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -1514,7 +1570,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
               <div className="space-y-2">
                 <div className="space-y-1">
                   <Label className="text-lg font-medium text-slate-700 dark:text-slate-200 border-l-8 border-purple-200/60 pl-3 py-1 relative">
-                    Style Reference
+                    Style
                     <span className="absolute top-1/2 left-full transform -translate-y-1/2 ml-2.5 w-12 h-2 bg-purple-200/60 rounded-full"></span>
                   </Label>
                 </div>
@@ -1564,6 +1620,11 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
                       disabled={isGenerating}
                       label="Style Reference Image"
                       className="w-full"
+                      suppressSelectionSummary
+                      suppressRemoveAll
+                      showLoaderDuringSingleSelection
+                      loaderDurationMs={400}
+                      forceLoading={isUploadingStyleReference}
                     />
                   )}
                   

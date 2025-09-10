@@ -1,22 +1,20 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from '@/shared/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/shared/components/ui/dialog';
 import { Button } from '@/shared/components/ui/button';
+import { Input } from '@/shared/components/ui/input';
 import { PromptEntry, PromptInputRow, PromptInputRowProps } from '@/tools/image-generation/components/ImageGenerationForm';
-import { ScrollArea } from '@/shared/components/ui/scroll-area';
-import { PlusCircle, AlertTriangle, Wand2Icon, Edit, PackagePlus, ArrowUp, Trash2, ChevronDown, ChevronRight, Sparkles } from 'lucide-react';
+import { PlusCircle, AlertTriangle, Wand2Icon, Edit, PackagePlus, ArrowUp, Trash2, ChevronDown, ChevronRight, Sparkles, X } from 'lucide-react';
 import { PromptGenerationControls, GenerationControlValues as PGC_GenerationControlValues } from '@/tools/image-generation/components/PromptGenerationControls';
 import { BulkEditControls, BulkEditParams as BEC_BulkEditParams, BulkEditControlValues as BEC_BulkEditControlValues } from '@/tools/image-generation/components/BulkEditControls';
 import { useAIInteractionService } from '@/shared/hooks/useAIInteractionService';
 import { AIPromptItem, GeneratePromptsParams, EditPromptParams, AIModelType } from '@/types/ai';
-import { Textarea } from '@/shared/components/ui/textarea';
-import { Label } from '@/shared/components/ui/label';
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/components/ui/tabs";
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { usePersistentToolState } from '@/shared/hooks/usePersistentToolState';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/shared/components/ui/collapsible';
 import { useIsMobile } from "@/shared/hooks/use-mobile";
-import { useExtraLargeModal, useMediumModal, createMobileModalProps } from "@/shared/hooks/useMobileModalStyling";
+import { useExtraLargeModal, createMobileModalProps } from "@/shared/hooks/useMobileModalStyling";
 
 // Use aliased types for internal state if they were named the same
 interface GenerationControlValues extends PGC_GenerationControlValues {}
@@ -55,6 +53,8 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
   console.log(`[PromptEditorModal:COMPONENT_ENTRY] Component called with isOpen: ${isOpen}, initialPrompts.length: ${initialPrompts.length}`);
   
   const [internalPrompts, setInternalPrompts] = useState<PromptEntry[]>([]);
+  const internalPromptsRef = useRef<PromptEntry[]>([]);
+  useEffect(() => { internalPromptsRef.current = internalPrompts; }, [internalPrompts]);
   
   // Debug: Log whenever internalPrompts changes
   useEffect(() => {
@@ -66,9 +66,14 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
   const [activePromptIdForFullView, setActivePromptIdForFullView] = useState<string | null>(null);
   const isMobile = useIsMobile();
   const [isAIPromptSectionExpanded, setIsAIPromptSectionExpanded] = useState(false);
-  const editInstructionsRef = useRef<HTMLTextAreaElement>(null);
+  const editInstructionsRef = useRef<HTMLInputElement>(null);
   const shouldFocusAITextareaRef = useRef(false);
   const tempFocusInputRef = useRef<HTMLInputElement>(null);
+  // Track signatures for auto-save throttling
+  const currentPromptsSignature = useMemo(() => JSON.stringify(internalPrompts), [internalPrompts]);
+  const currentSignatureRef = useRef<string>(currentPromptsSignature);
+  useEffect(() => { currentSignatureRef.current = currentPromptsSignature; }, [currentPromptsSignature]);
+  const lastSavedSignatureRef = useRef<string>('');
   
   // Drag detection for collapsible trigger
   const dragStartPos = useRef<{ x: number; y: number } | null>(null);
@@ -90,8 +95,6 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
     footerContainerClassName: mobileModalStyling.footerContainerClassName
   });
   
-  // Nested dialog mobile styling - match medium modals like CreateProject/ProjectSettings
-  const nestedModalStyling = useMediumModal();
   const attemptFocusAITextarea = useCallback(() => {
     const start = Date.now();
     const tryFocus = () => {
@@ -175,8 +178,27 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
       setInternalPrompts(initialPrompts.map(p => ({ ...p })));
       setActivePromptIdForFullView(null);
       setIsAIPromptSectionExpanded(false); // Always start with AI section closed
+      // Initialize last-saved signature to current to avoid immediate auto-save
+      lastSavedSignatureRef.current = JSON.stringify(initialPrompts);
     }
   }, [isOpen]); // Only reinitialize when modal opens, not when initialPrompts change
+
+  // Auto-save while open: every 3s if changes detected
+  useEffect(() => {
+    if (!isOpen) return;
+    const intervalId = setInterval(() => {
+      const hasChanges = lastSavedSignatureRef.current !== currentSignatureRef.current;
+      if (hasChanges) {
+        try {
+          onSave(internalPromptsRef.current);
+          lastSavedSignatureRef.current = currentSignatureRef.current;
+        } catch (err) {
+          console.error('[PromptEditorModal:AUTO_SAVE] Failed to auto-save prompts:', err);
+        }
+      }
+    }, 3000);
+    return () => clearInterval(intervalId);
+  }, [isOpen, onSave]);
 
   const {
     generatePrompts: aiGeneratePrompts,
@@ -194,6 +216,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
   const handleFinalSaveAndClose = useCallback(() => {
     console.log(`[PromptEditorModal] 'Close' button clicked. Saving prompts. Count: ${internalPrompts.length}`, JSON.stringify(internalPrompts.map(p => ({id: p.id, text: p.fullPrompt.substring(0,30)+'...'}))));
     onSave(internalPrompts);
+    lastSavedSignatureRef.current = currentSignatureRef.current;
     if (scrollRef.current) {
         scrollRef.current.scrollTop = 0;
     }
@@ -597,6 +620,9 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
           }
         }}
       >
+        {isMobile && (
+          <input ref={tempFocusInputRef} type="text" className="sr-only" aria-hidden="true" />
+        )}
         <div className={mobileModalStyling.headerContainerClassName}>
           <DialogHeader className={`${mobileModalStyling.isMobile ? 'px-4 pt-6 pb-2' : 'px-6 pt-8 pb-2'} flex-shrink-0`}>
             <DialogTitle>Prompt Editor</DialogTitle>
@@ -685,125 +711,77 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
                   No prompts yet. Add one manually or use AI generation.
                 </div>
               )}
-              {internalPrompts.map((prompt, index) => (
-                <div 
-                  key={prompt.id} 
-                  className="mb-4"
-                  data-prompt-field
-                  data-prompt-id={prompt.id}
-                >
-                  <PromptInputRow
-                    promptEntry={prompt}
-                    index={index}
-                    onUpdate={handlePromptFieldUpdate}
-                    onRemove={() => handleInternalRemovePrompt(prompt.id)}
-                    canRemove={internalPrompts.length > 1}
-                    isGenerating={isAILoading}
-                    hasApiKey={true}
-                    onEditWithAI={() => openEditWithAIForm(prompt.id, prompt.fullPrompt)}
-                    aiEditButtonIcon={<Edit className="h-4 w-4" />}
-                    onSetActiveForFullView={setActivePromptIdForFullView}
-                    isActiveForFullView={activePromptIdForFullView === prompt.id}
-                    autoEnterEditWhenActive={isMobile}
-                  />
-                </div>
-              ))}
+              {internalPrompts.map((prompt, index) => {
+                const isInlineEditing = promptToEdit?.id === prompt.id;
+                const isEmptyOriginal = isInlineEditing ? promptToEdit!.originalText.trim() === '' : false;
+                const rightHeaderAddon = isInlineEditing ? (
+                  <div className="flex items-center gap-2">
+                    <div className="relative">
+                      <Input
+                        ref={editInstructionsRef}
+                        value={promptToEdit?.instructions || ''}
+                        onChange={(e) => setPromptToEdit(prev => prev ? { ...prev, instructions: e.target.value } : null)}
+                        placeholder={isEmptyOriginal ? 'Describe what you want' : 'Edit instructions'}
+                        className="h-8 w-48 md:w-72 pr-8"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && promptToEdit && promptToEdit.instructions.trim() && !isAIEditing) {
+                            e.preventDefault();
+                            handleConfirmEditWithAI();
+                          }
+                        }}
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0"
+                        onClick={() => setPromptToEdit(null)}
+                        aria-label="Cancel inline edit"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={handleConfirmEditWithAI}
+                      disabled={isAIEditing || !(promptToEdit?.instructions || '').trim()}
+                    >
+                      {isAIEditing
+                        ? (isEmptyOriginal ? 'Creating...' : 'Editing...')
+                        : (isEmptyOriginal ? 'Create prompt' : 'Update prompt')}
+                    </Button>
+                  </div>
+                ) : undefined;
+
+                return (
+                  <div 
+                    key={prompt.id} 
+                    className="mb-4"
+                    data-prompt-field
+                    data-prompt-id={prompt.id}
+                  >
+                    <PromptInputRow
+                      promptEntry={prompt}
+                      index={index}
+                      onUpdate={handlePromptFieldUpdate}
+                      onRemove={() => handleInternalRemovePrompt(prompt.id)}
+                      canRemove={internalPrompts.length > 1}
+                      isGenerating={isAILoading}
+                      hasApiKey={true}
+                      onEditWithAI={() => openEditWithAIForm(prompt.id, prompt.fullPrompt)}
+                      aiEditButtonIcon={<Edit className="h-4 w-4" />}
+                      onSetActiveForFullView={setActivePromptIdForFullView}
+                      isActiveForFullView={activePromptIdForFullView === prompt.id}
+                      autoEnterEditWhenActive={isMobile}
+                      rightHeaderAddon={rightHeaderAddon}
+                    />
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
 
-        {promptToEdit && (
-          <Dialog open={!!promptToEdit} onOpenChange={(open) => !open && setPromptToEdit(null)}>
-            <DialogContent 
-              className={nestedModalStyling.fullClassName}
-              style={{ 
-                ...nestedModalStyling.dialogContentStyle, 
-                pointerEvents: 'auto',
-                // Mobile-specific positioning for this nested AI edit dialog only
-                ...(isMobile ? {
-                  position: 'fixed',
-                  top: 'env(safe-area-inset-top, 20px)',
-                  left: '16px',
-                  right: '16px',
-                  transform: 'none',
-                  maxHeight: 'calc(100vh - env(safe-area-inset-top, 20px) - 40px)',
-                } : {})
-              }}
-              {...useMemo(() => createMobileModalProps(nestedModalStyling.isMobile), [nestedModalStyling.isMobile])}
-              onOpenAutoFocus={() => {
-                // Try to focus synchronously so iOS treats it as part of the gesture
-                if (editInstructionsRef.current) {
-                  const el = editInstructionsRef.current;
-                  el.focus();
-                  // Place caret at end
-                  const len = el.value?.length ?? 0;
-                  try { el.setSelectionRange?.(len, len); } catch {}
-                  // Ensure it is visible above the keyboard
-                  setTimeout(() => {
-                    try { el.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' }); } catch {}
-                  }, 50);
-                }
-              }}
-              onInteractOutside={(e) => {
-                const target = e.target as Element;
-                const isInputElement = target.matches('input, textarea, [contenteditable="true"]') ||
-                                      target.closest('input, textarea, [contenteditable="true"]');
-                if (isInputElement) {
-                  e.preventDefault();
-                }
-              }}
-              onPointerDownOutside={(e) => {
-                // Prevent nested modal from closing when interacting with input fields
-                const target = e.target as Element;
-                const isInputElement = target.matches('input, textarea, [contenteditable="true"]') ||
-                                      target.closest('input, textarea, [contenteditable="true"]');
-                if (isInputElement) {
-                  e.preventDefault();
-                }
-              }}
-            >
-                {/* Hidden input to prime the iOS keyboard focus in the same gesture */}
-                {isMobile && (
-                  <input ref={tempFocusInputRef} type="text" className="sr-only" aria-hidden="true" />
-                )}
-                <DialogHeader className={`${nestedModalStyling.isMobile ? 'px-4 pt-4 pb-2' : 'px-6 pt-4 pb-2'}`}>
-                  <DialogTitle>
-                    {promptToEdit.originalText.trim() === '' ? 'Create Prompt with AI' : 'Edit Prompt with AI'}
-                  </DialogTitle>
-                </DialogHeader>
-                
-                <div className={`${nestedModalStyling.isMobile ? 'px-4' : 'px-6'} space-y-4 py-4`}>
-                  <div className="space-y-2">
-                    <Label htmlFor="edit-instructions">
-                      {promptToEdit.originalText.trim() === '' ? 'Describe what you want' : 'Edit Instructions'}
-                    </Label>
-                    <Textarea
-                      id="edit-instructions"
-                      ref={editInstructionsRef}
-                      autoFocus={isMobile}
-                      value={promptToEdit.instructions}
-                      onChange={(e) => setPromptToEdit(prev => prev ? { ...prev, instructions: e.target.value } : null)}
-                      className="min-h-[100px]"
-                      placeholder={promptToEdit.originalText.trim() === '' 
-                        ? "e.g., a magical forest with glowing mushrooms, a portrait of a cyberpunk warrior, a cozy coffee shop in winter..."
-                        : "e.g., make it more poetic, add details about lighting, change the subject to a cat, make it shorter..."
-                      }
-                    />
-                  </div>
-                </div>
-                
-                <DialogFooter className={`${nestedModalStyling.isMobile ? 'px-4 pb-3 pt-4 flex-row justify-between' : 'px-6 pt-6 pb-4'} border-t`}>
-                  <Button variant="outline" onClick={() => setPromptToEdit(null)}>Cancel</Button>
-                  <Button onClick={handleConfirmEditWithAI} disabled={isAIEditing || !promptToEdit.instructions.trim()}>
-                    {isAIEditing 
-                      ? (promptToEdit.originalText.trim() === '' ? "Creating..." : "Editing...") 
-                      : (promptToEdit.originalText.trim() === '' ? "Create Prompt" : "Apply Changes")
-                    }
-                  </Button>
-                </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        )}
 
         <div className={mobileModalStyling.footerContainerClassName}>
           <DialogFooter className={`${mobileModalStyling.isMobile ? 'p-4 pt-4 pb-4 flex-row justify-between' : 'p-6 pt-6'} border-t`}>

@@ -440,7 +440,7 @@ python worker.py --db-type supabase \\
         
         <div className={mobileModalStyling.headerContainerClassName}>
           <DialogHeader className={`${mobileModalStyling.isMobile ? 'px-2 pt-2 pb-1' : 'px-2 pt-2 pb-1'} flex-shrink-0 relative`}>
-            <DialogTitle className="text-2xl">App Settings</DialogTitle>
+            <DialogTitle className="text-2xl md:mt-[11px]">App Settings</DialogTitle>
             {!isMobile && (
               <Button
                 variant="ghost"
@@ -572,7 +572,7 @@ python worker.py --db-type supabase \\
                   {/* Installation section */}
                   <div className="space-y-4">
                     {/* Computer Type Selection and API Token Display */}
-                    <div className={`${isMobile ? 'flex flex-col gap-4' : 'grid grid-cols-2 gap-6'} items-start`}>
+                    <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 items-start`}>
                       {/* Left: Computer Type Selection */}
                       <div className="space-y-2 sm:space-y-3">
                         <p className="text-sm font-light">What kind of computer do you have?</p>

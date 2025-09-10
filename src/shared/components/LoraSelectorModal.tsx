@@ -349,8 +349,8 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & {
                                       </span>
                                     )}
                                   </div>
-                                  {/* Mobile buttons - top right */}
-                                  <div className={`flex gap-2 flex-shrink-0 ${isMobile ? 'lg:hidden' : 'hidden'}`}>
+                                  {/* Mobile buttons - top right (keep visible on mobile, including iPad at lg widths) */}
+                                  <div className={`flex gap-2 flex-shrink-0 ${isMobile ? '' : 'hidden'}`}>
                                     {isSelectedOnGenerator ? (
                                       <Button
                                         variant="destructive"

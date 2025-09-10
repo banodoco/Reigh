@@ -26,13 +26,14 @@ import { MultiImagePreview, SingleImagePreview } from './ImageDragPreview';
 
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { Button } from './ui/button';
-import { ArrowDown, Trash2, Check } from 'lucide-react';
+import { ArrowDown, Trash2, Check, Sparkles } from 'lucide-react';
 import { ProgressiveLoadingManager } from '@/shared/components/ProgressiveLoadingManager';
 import { getImageLoadingStrategy } from '@/shared/lib/imageLoadingPriority';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel, AlertDialogOverlay } from "@/shared/components/ui/alert-dialog";
 import { Checkbox } from "@/shared/components/ui/checkbox";
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
 import { usePanes } from '@/shared/contexts/PanesContext';
+import MagicEditModal from '@/shared/components/MagicEditModal';
 
 // Removed legacy sessionStorage key constant now that setting is persisted in DB
 
@@ -1367,6 +1368,7 @@ const MobileImageItem: React.FC<MobileImageItemProps> = ({
   });
   const imageUrl = image.thumbUrl || image.imageUrl;
   const displayUrl = getDisplayUrl(imageUrl);
+  const [isMagicEditOpen, setIsMagicEditOpen] = useState(false);
 
   // Image loading state management
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -1531,6 +1533,18 @@ const MobileImageItem: React.FC<MobileImageItemProps> = ({
       {!hideDeleteButton && (
         <>
           <Button
+            variant="secondary"
+            size="icon"
+            className="absolute bottom-2 left-2 h-7 w-7 p-0 rounded-full opacity-70 hover:opacity-100 transition-opacity z-10"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsMagicEditOpen(true);
+            }}
+            title="Magic Edit"
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+          </Button>
+          <Button
             variant="destructive"
             size="icon"
             className="absolute top-2 right-2 h-7 w-7 p-0 rounded-full opacity-70 hover:opacity-100 transition-opacity z-10"
@@ -1565,6 +1579,11 @@ const MobileImageItem: React.FC<MobileImageItemProps> = ({
           </Button>
         </>
       )}
+      <MagicEditModal
+        isOpen={isMagicEditOpen}
+        imageUrl={displayUrl!}
+        onClose={() => setIsMagicEditOpen(false)}
+      />
     </div>
   );
 };

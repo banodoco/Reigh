@@ -3,7 +3,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { GenerationRow } from '@/types/shots';
 import { Button } from '@/shared/components/ui/button';
-import { Trash2, Copy, Check } from 'lucide-react';
+import { Trash2, Copy, Check, Sparkles } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,6 +19,7 @@ import { Checkbox } from '@/shared/components/ui/checkbox';
 import { Label } from '@/shared/components/ui/label';
 import { cn, getDisplayUrl } from '@/shared/lib/utils';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
+import MagicEditModal from '@/shared/components/MagicEditModal';
 
 interface SortableImageItemProps {
   image: GenerationRow;
@@ -108,6 +109,7 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
   const [skipConfirmationNextTimeVisual, setSkipConfirmationNextTimeVisual] = useState(skipConfirmation);
   const currentDialogSkipChoiceRef = useRef(skipConfirmation);
   const isMobile = useIsMobile();
+  const [isMagicEditOpen, setIsMagicEditOpen] = useState(false);
 
   // Track touch position to detect scrolling vs tapping
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -213,7 +215,7 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
           imageId: ((image.shotImageEntryId as any) || (image.id as any) || '').toString().substring(0, 8),
           isSelected,
           hasOnClickHandler: !!onClick,
-          eventTarget: e.target?.tagName || 'unknown',
+          eventTarget: (e.target as HTMLElement | null)?.tagName || 'unknown',
           actualDOMClasses: (e.currentTarget as HTMLElement)?.className || 'NO_CLASSES',
           timestamp: Date.now()
         });
@@ -241,7 +243,6 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
         }, 100);
         onPointerDown?.(e);
       }}
-      onPointerDown={onPointerDown}
       onDoubleClick={isMobile ? undefined : onDoubleClick}
     >
       {/* Simple image display like ShotsPane - no complex loading states */}
@@ -263,6 +264,19 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
       />
       {(!isMobile || !isDragDisabled) && (
         <>
+          {/* Magic Edit trigger */}
+          <Button
+            variant="secondary"
+            size="icon"
+            className="absolute bottom-1 left-1 h-7 w-7 p-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsMagicEditOpen(true);
+            }}
+            title="Magic Edit"
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+          </Button>
           {onDuplicate && position !== undefined && (
             <Button
               variant="secondary"
@@ -292,6 +306,12 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
           </Button>
         </>
       )}
+      {/* Magic Edit Modal */}
+      <MagicEditModal
+        isOpen={isMagicEditOpen}
+        onClose={() => setIsMagicEditOpen(false)}
+        imageUrl={displayUrl}
+      />
       <AlertDialog open={isConfirmDeleteDialogOpen} onOpenChange={setIsConfirmDeleteDialogOpen}>
         <AlertDialogOverlay
           onPointerDown={(e) => {

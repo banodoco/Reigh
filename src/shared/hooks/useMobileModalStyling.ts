@@ -103,20 +103,28 @@ const createMobileLayoutStrategy = (layout: MobileLayout, isMobile: boolean) => 
     }),
     
     'edge-buffered': () => ({
-      classes: `left-${MOBILE_SPACING.edge} right-${MOBILE_SPACING.edge} w-auto`,
-      centeringOverrides: ['translate-x-0', MODAL_BASE_CLASSES.closeButton],
-      customStyles: undefined,
+      // Keep horizontal centering from DialogContent and set width via inline style
+      // to ensure consistent behavior across devices (especially iPad Safari).
+      classes: '',
+      centeringOverrides: [MODAL_BASE_CLASSES.closeButton],
+      customStyles: {
+        // 2 * 1rem (Tailwind spacing.4) side buffers
+        width: 'calc(100vw - 2rem)',
+        // Always keep some vertical buffer above and below
+        maxHeight: 'min(90vh, calc(100vh - env(safe-area-inset-top, 20px) - env(safe-area-inset-bottom, 20px) - 64px))'
+      },
     }),
     
     fullscreen: () => ({
-      classes: `left-${MOBILE_SPACING.edge} right-${MOBILE_SPACING.edge} w-auto max-h-none`,
-      centeringOverrides: ['translate-x-0', 'translate-y-0', 'transform-none', MODAL_BASE_CLASSES.closeButton],
-      // Use CSS custom properties for safe positioning
+      // Keep horizontal and vertical centering from DialogContent.
+      // Only constrain width and max height to respect side buffers and safe areas.
+      classes: '',
+      centeringOverrides: [MODAL_BASE_CLASSES.closeButton],
       customStyles: {
-        position: 'fixed',
-        top: 'env(safe-area-inset-top, 20px)',
-        bottom: 'env(safe-area-inset-bottom, 20px)',
-        maxHeight: 'calc(100vh - env(safe-area-inset-top, 20px) - env(safe-area-inset-bottom, 20px) - 40px)',
+        // 2 * 1rem (Tailwind spacing.4) side buffers
+        width: 'calc(100vw - 2rem)',
+        // Always keep some vertical buffer above and below
+        maxHeight: 'min(90vh, calc(100vh - env(safe-area-inset-top, 20px) - env(safe-area-inset-bottom, 20px) - 64px))',
       },
     }),
   };
