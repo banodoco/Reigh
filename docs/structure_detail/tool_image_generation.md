@@ -13,16 +13,7 @@ src/tools/image-generation/
 ├── pages/
 │   └── ImageGenerationToolPage.tsx    # Main UI orchestrator
 ├── components/
-│   ├── ImageGenerationForm/           # Modular generation form
-│   │   ├── index.tsx                  # Main container (state, handlers)
-│   │   ├── types.ts                   # TypeScript interfaces
-│   │   ├── DynamicImportErrorBoundary.tsx
-│   │   └── components/
-│   │       ├── PromptInputRow.tsx     # Individual prompt input
-│   │       ├── PromptsSection.tsx     # Prompts management
-│   │       ├── ShotSelector.tsx       # Shot selection
-│   │       ├── ModelSection.tsx       # Model + LoRA/Style sections
-│   │       └── GenerateControls.tsx   # Slider + submit button
+│   ├── ImageGenerationForm.tsx        # Generation settings form
 │   ├── PromptGenerationControls.tsx   # Prompt management UI
 │   ├── BulkEditControls.tsx          # Batch operations
 └── settings.ts                       # Tool configuration
@@ -41,18 +32,14 @@ src/tools/image-generation/
 - No environment-specific branching (Wan-only)
 - **Gallery Filtering**: Supports media type (All/Images/Videos), shot filtering, position exclusion, and prompt search
 
-### `ImageGenerationForm/`
-**Modular generation form system** - Refactored from single 1751-line file into focused components
-- **Architecture**: Timeline-pattern with main container + presentational components
-- **State Management**: Centralized in `index.tsx` (persistence, LoRA manager, all React hooks)
-- **Components**: 
-  - `PromptInputRow.tsx` - Mobile/desktop prompt input with drag detection
-  - `PromptsSection.tsx` - Prompt list management, before/after text fields  
-  - `ShotSelector.tsx` - Shot dropdown, create/clear/jump functionality
-  - `ModelSection.tsx` - Model selector with embedded LoRA/Style Reference sections
-  - `GenerateControls.tsx` - Images slider and generate button
-- **Features**: Multi-model support (Wan 2.2, Qwen.Image), LoRA integration, style reference system
-- **Persistence**: Project-level settings, shot-specific prompts via `usePersistentToolState`
+### `ImageGenerationForm.tsx`
+**Simplified generation form**
+- **Inputs**: Prompts, images-per-prompt, before/after prompt text
+- **Features**: Wan LoRA picker integration, collapsible form UI
+
+- **State**: Persistent via `usePersistentToolState` (including form expand/collapse state)
+- **UX**: Form can be collapsed to save space, state persisted per project
+- **Sticky UI**: When collapsed, shows sticky button that attaches to top of screen while scrolling
 
 ### `PromptGenerationControls.tsx`
 **AI-powered prompt management interface**

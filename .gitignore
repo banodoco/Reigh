@@ -41,3 +41,4 @@ temp/
 *.md
 !structure.md
 !structure_detail/*.md
+!docs/structure_detail/*.md
