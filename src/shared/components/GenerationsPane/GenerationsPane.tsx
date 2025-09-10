@@ -99,7 +99,7 @@ const GenerationsPaneComponent: React.FC = () => {
 
   // Debug: Log the current filter state
   useEffect(() => {
-    console.log('[ExcludePositionedDebug] GenerationsPane filter state:', {
+    console.log('[PositionFix] GenerationsPane filter state:', {
       selectedShotFilter,
       excludePositioned,
       mediaTypeFilter,
@@ -120,9 +120,11 @@ const GenerationsPaneComponent: React.FC = () => {
         }
         return false;
       }).length,
+      shouldTriggerSpecialPositioning: selectedShotFilter === currentShotId && excludePositioned,
+      targetShotForAdding: currentShotId || lastAffectedShotId,
       timestamp: Date.now()
     });
-  }, [selectedShotFilter, excludePositioned, mediaTypeFilter, currentShotId, paginatedData.items]);
+  }, [selectedShotFilter, excludePositioned, mediaTypeFilter, currentShotId, paginatedData.items, lastAffectedShotId]);
 
   // Log every render with item count & page for loop detection
   useRenderLogger('GenerationsPane', { page, totalItems: totalCount });

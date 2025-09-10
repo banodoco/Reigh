@@ -3,6 +3,7 @@ import { useToast } from "@/shared/hooks/use-toast";
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { useIsMobile } from "@/shared/hooks/use-mobile";
+import { useShotNavigation } from '@/shared/hooks/useShotNavigation';
 import { useToggleGenerationStar } from '@/shared/hooks/useGenerations';
 import { useTaskFromUnifiedCache } from '@/shared/hooks/useUnifiedGenerations';
 import { useGetTask } from '@/shared/hooks/useTasks';
@@ -191,9 +192,13 @@ export const ImageGallery: React.FC<ImageGalleryProps> = (props) => {
     lastShotNameForTooltip
   } = props;
 
-  // Get project context for cache clearing
-  const { selectedProjectId } = useProject();
+  // Get project context for cache clearing and aspect ratio
+  const { selectedProjectId, projects } = useProject();
   const { currentShotId } = useCurrentShot();
+  
+  // Get current project's aspect ratio
+  const currentProject = projects.find(p => p.id === selectedProjectId);
+  const projectAspectRatio = currentProject?.aspectRatio;
   const rawIsMobile = useIsMobile();
   const { toast } = useToast();
   
@@ -233,7 +238,29 @@ export const ImageGallery: React.FC<ImageGalleryProps> = (props) => {
   
   // Star functionality
   const toggleStarMutation = useToggleGenerationStar();
-  
+  const { navigateToShot } = useShotNavigation();
+
+  const handleNavigateToShot = (shot: Shot) => {
+    console.log('[VisitShotDebug] 6. ImageGallery handleNavigateToShot called', {
+      shot,
+      hasNavigateToShot: !!navigateToShot,
+      hasHandleCloseLightbox: !!actionsHook.handleCloseLightbox,
+      timestamp: Date.now()
+    });
+    
+    try {
+      console.log('[VisitShotDebug] 7. ImageGallery calling navigateToShot');
+      navigateToShot(shot);
+      console.log('[VisitShotDebug] 8. ImageGallery navigateToShot completed, now closing lightbox');
+      
+      // Now we close the lightbox from the component that owns its state
+      actionsHook.handleCloseLightbox();
+      console.log('[VisitShotDebug] 9. ImageGallery handleCloseLightbox completed');
+    } catch (error) {
+      console.error('[VisitShotDebug] ERROR in ImageGallery handleNavigateToShot:', error);
+    }
+  };
+
   // Use mobile-optimized defaults to improve initial render performance
   const defaultItemsPerPage = isMobile ? DEFAULT_ITEMS_PER_PAGE.MOBILE : DEFAULT_ITEMS_PER_PAGE.DESKTOP;
   const actualItemsPerPage = itemsPerPage ?? defaultItemsPerPage;
@@ -613,6 +640,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = (props) => {
           reducedSpacing={reducedSpacing}
           whiteText={whiteText}
           gridColumnClasses={gridColumnClasses}
+          projectAspectRatio={projectAspectRatio}
           
           // Loading props
           isGalleryLoading={paginationHook.isGalleryLoading}
@@ -726,6 +754,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = (props) => {
         inputImages={inputImages}
         lightboxTaskMapping={lightboxTaskMapping}
         onShowTaskDetails={handleShowTaskDetails}
+        onCreateShot={onCreateShot}
+        onNavigateToShot={handleNavigateToShot}
       />
     </TooltipProvider>
   );

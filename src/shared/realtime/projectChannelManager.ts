@@ -26,6 +26,10 @@ export class ProjectChannelManager {
   private lastEventReceivedAt: number = 0;
   private channelCreatedAt: number = 0;
   private eventSequence: number = 0;
+  // Quick-win guards to prevent concurrent/thrashing joins
+  private joinInProgress: boolean = false;
+  private lastJoinAttemptAt: number = 0;
+  private readonly joinThrottleMs: number = 1000;
 
   // COMPREHENSIVE HEALTH CHECK
   getDetailedHealthCheck(): any {
@@ -129,6 +133,32 @@ export class ProjectChannelManager {
     }
     
     const topic = buildTaskUpdatesTopic(projectId);
+    const now = Date.now();
+
+    // Throttle repeated join attempts in a short window to avoid churn
+    if (!forceRejoin && now - this.lastJoinAttemptAt < this.joinThrottleMs) {
+      this.logger.warn('[ReconnectionIssue][JOIN_THROTTLED]', {
+        topic,
+        sinceLastMs: now - this.lastJoinAttemptAt,
+        throttleMs: this.joinThrottleMs,
+        timestamp: now
+      });
+      return;
+    }
+
+    // Prevent concurrent joins; allow explicit forceRejoin to override
+    if (this.joinInProgress && !forceRejoin) {
+      this.logger.warn('[ReconnectionIssue][JOIN_SUPPRESSED_INFLIGHT]', {
+        topic,
+        reason: 'Join already in progress',
+        timestamp: now
+      });
+      return;
+    }
+
+    this.joinInProgress = true;
+    this.lastJoinAttemptAt = now;
+    try {
     
     // CRITICAL: Ensure WebSocket is ready before attempting channel operations
     this.logger.warn('[ReconnectionIssue][WEBSOCKET_READINESS_CHECK]', {
@@ -771,6 +801,14 @@ export class ProjectChannelManager {
       this.logger.warn('[ReconnectionIssue][Initiation] No bindings after subscribe - will wait for events instead of immediate recreation', { topic });
       // Don't immediately recreate - let the provider watchdog handle this if no events arrive
     }
+  } finally {
+      // Ensure we always release the join lock
+      this.joinInProgress = false;
+      this.logger.warn('[ReconnectionIssue][JOIN_LOCK_RELEASED]', {
+        topic: buildTaskUpdatesTopic(projectId),
+        timestamp: Date.now()
+      });
+    }
   }
 
   async leave() {
@@ -996,8 +1034,8 @@ export class ProjectChannelManager {
           eventSequence: ++this.eventSequence,
           channelAge: timeSinceChannelCreated
         });
-        // FIXED: Use TASK_INSERT for INSERT events, not TASK_STATUS_CHANGE
-        routeEvent(this.queryClient, { type: 'TASK_INSERT', payload: { projectId } });
+        // FIXED: Use TASK_CREATED for INSERT events
+        routeEvent(this.queryClient, { type: 'TASK_CREATED', payload: { projectId } });
       });
 
     this.logger.warn('[ReconnectionIssue][ADDING_POSTGRES_INSERT_GENERATIONS]', {

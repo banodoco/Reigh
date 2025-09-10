@@ -142,16 +142,38 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
 
   // Extract current values with defaults (apply optimistic override first)
   const selectedModel = (modelOverride ?? projectImageSettings?.selectedModel) || 'qwen-image';
-  const rawStyleReferenceImage = projectImageSettings?.styleReferenceImage || null;
+  const rawStyleReferenceImage = projectImageSettings?.styleReferenceImage || null; // For generation
+  const rawStyleReferenceImageOriginal = projectImageSettings?.styleReferenceImageOriginal || null; // For display
   const currentStyleStrength = projectImageSettings?.styleReferenceStrength || 1;
   
-  // Check if we have base64 data that needs to be converted to URL
-  const styleReferenceImage = useMemo(() => {
+  // Display image (use original if available, fallback to processed)
+  const styleReferenceImageDisplay = useMemo(() => {
     // If we have an explicit local override (including null), use it
     if (styleReferenceOverride !== undefined) {
       return styleReferenceOverride;
     }
 
+    // Prefer original image for display
+    const imageToDisplay = rawStyleReferenceImageOriginal || rawStyleReferenceImage;
+    if (!imageToDisplay) return null;
+    
+    // If it's already a URL, return as-is
+    if (imageToDisplay.startsWith('http')) {
+      return imageToDisplay;
+    }
+    
+    // If it's base64 data, we need to convert it
+    if (imageToDisplay.startsWith('data:image/')) {
+      console.warn('[ImageGenerationForm] Found legacy base64 style reference, needs conversion');
+      // Return null for now to trigger re-upload
+      return null;
+    }
+    
+    return imageToDisplay;
+  }, [styleReferenceOverride, rawStyleReferenceImageOriginal, rawStyleReferenceImage]);
+
+  // Generation image (always use processed version)
+  const styleReferenceImageGeneration = useMemo(() => {
     if (!rawStyleReferenceImage) return null;
     
     // If it's already a URL, return as-is
@@ -162,12 +184,11 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     // If it's base64 data, we need to convert it
     if (rawStyleReferenceImage.startsWith('data:image/')) {
       console.warn('[ImageGenerationForm] Found legacy base64 style reference, needs conversion');
-      // Return null for now to trigger re-upload
       return null;
     }
     
     return rawStyleReferenceImage;
-  }, [styleReferenceOverride, rawStyleReferenceImage]);
+  }, [rawStyleReferenceImage]);
 
   // When the backing setting updates, drop the local override
   useEffect(() => {
@@ -202,12 +223,13 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
             return;
           }
           
-          // Upload to storage
+          // Upload to storage (use same image for both display and generation for legacy data)
           const uploadedUrl = await uploadImageToStorage(file);
           
-          // Update project settings with URL
+          // Update project settings with URL for both display and generation
           await updateProjectImageSettings('project', {
-            styleReferenceImage: uploadedUrl
+            styleReferenceImage: uploadedUrl,
+            styleReferenceImageOriginal: uploadedUrl
           });
           
           console.log('[ImageGenerationForm] Successfully migrated base64 style reference to URL:', uploadedUrl);
@@ -541,7 +563,11 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       setIsUploadingStyleReference(true);
       const dataURL = await fileToDataURL(file);
       
-      // Process the image to match project aspect ratio
+      // Upload the original image first (for display purposes)
+      const originalFile = file;
+      const originalUploadedUrl = await uploadImageToStorage(originalFile);
+      
+      // Process the image to match project aspect ratio (for generation)
       let processedDataURL = dataURL;
       if (selectedProjectId) {
         const { aspectRatio } = await resolveProjectResolution(selectedProjectId);
@@ -555,21 +581,22 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       }
       
       // Convert processed data URL back to File for upload
-      const processedFile = dataURLtoFile(processedDataURL, `style-reference-${Date.now()}.png`);
+      const processedFile = dataURLtoFile(processedDataURL, `style-reference-processed-${Date.now()}.png`);
       if (!processedFile) {
         throw new Error('Failed to convert processed image to file');
       }
       
-      // Upload to storage and get URL
-      const uploadedUrl = await uploadImageToStorage(processedFile);
+      // Upload processed version to storage
+      const processedUploadedUrl = await uploadImageToStorage(processedFile);
       
-      // Save the URL instead of base64 data
+      // Save both URLs - original for display, processed for generation
       await updateProjectImageSettings('project', {
-        styleReferenceImage: uploadedUrl
+        styleReferenceImage: processedUploadedUrl, // Used for generation
+        styleReferenceImageOriginal: originalUploadedUrl // Used for display
       });
       markAsInteracted();
-      // Optimistically reflect the uploaded image immediately
-      setStyleReferenceOverride(uploadedUrl);
+      // Optimistically reflect the original uploaded image for display
+      setStyleReferenceOverride(originalUploadedUrl);
     } catch (error) {
       console.error('Error uploading style reference:', error);
       // No toasts on failure per request
@@ -583,7 +610,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     // Optimistically clear immediately
     setStyleReferenceOverride(null);
     await updateProjectImageSettings('project', {
-      styleReferenceImage: null
+      styleReferenceImage: null,
+      styleReferenceImageOriginal: null
     });
     markAsInteracted();
   }, [updateProjectImageSettings, markAsInteracted]);
@@ -619,7 +647,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     } else {
       // Clear style reference when switching to Wan 2.2 (persisted)
       setStyleReferenceOverride(null);
-      await updateProjectImageSettings('project', { selectedModel: value, styleReferenceImage: null });
+      await updateProjectImageSettings('project', { selectedModel: value, styleReferenceImage: null, styleReferenceImageOriginal: null });
     }
 
     markAsInteracted();
@@ -696,7 +724,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     }
 
     // Validate model-specific requirements
-    if (selectedModel === 'qwen-image' && !styleReferenceImage) {
+    if (selectedModel === 'qwen-image' && !styleReferenceImageGeneration) {
         toast.error("Please upload a style reference image for Qwen.Image model.");
         return;
     }
@@ -710,12 +738,12 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       : [];
 
     // Debug: Log what style reference we're about to send
-    if (selectedModel === 'qwen-image' && styleReferenceImage) {
+    if (selectedModel === 'qwen-image' && styleReferenceImageGeneration) {
       console.log('[ImageGenerationForm] Style reference being sent to task:', {
-        isUrl: styleReferenceImage.startsWith('http'),
-        isBase64: styleReferenceImage.startsWith('data:'),
-        length: styleReferenceImage.length,
-        preview: styleReferenceImage.substring(0, 100) + '...'
+        isUrl: styleReferenceImageGeneration.startsWith('http'),
+        isBase64: styleReferenceImageGeneration.startsWith('data:'),
+        length: styleReferenceImageGeneration.length,
+        preview: styleReferenceImageGeneration.substring(0, 100) + '...'
       });
     }
     
@@ -735,8 +763,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       shot_id: associatedShotId || undefined, // Convert null to undefined for the helper
       model_name: selectedModel === 'wan-local' ? 'wan-2.2' : 'qwen-image',
       // Add style reference for Qwen.Image
-      ...(selectedModel === 'qwen-image' && styleReferenceImage && {
-        style_reference_image: styleReferenceImage,
+      ...(selectedModel === 'qwen-image' && styleReferenceImageGeneration && {
+        style_reference_image: styleReferenceImageGeneration,
         style_reference_strength: currentStyleStrength
       }),
       // resolution will be resolved by the helper
@@ -750,7 +778,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       fullSelectedLoras: loraManager.selectedLoras,
       generationMode: selectedModel, // Use selectedModel instead of hardcoded generationMode
       associatedShotId,
-      styleReferenceImage: selectedModel === 'qwen-image' ? styleReferenceImage : null,
+      styleReferenceImage: selectedModel === 'qwen-image' ? styleReferenceImageGeneration : null,
       styleReferenceStrength: selectedModel === 'qwen-image' ? currentStyleStrength : undefined,
       selectedModel,
       // Add the new unified params for the updated handler
@@ -901,7 +929,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
             isGenerating={isGenerating}
             availableLoras={availableLoras}
             selectedLoras={loraManager.selectedLoras}
-            styleReferenceImage={styleReferenceImage}
+            styleReferenceImage={styleReferenceImageDisplay}
             styleReferenceStrength={styleReferenceStrength}
             isUploadingStyleReference={isUploadingStyleReference}
             onModelChange={handleModelChange}

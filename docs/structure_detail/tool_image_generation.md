@@ -31,6 +31,7 @@ src/tools/image-generation/
 - Handles upscaling and deletion operations
 - No environment-specific branching (Wan-only)
 - **Gallery Filtering**: Supports media type (All/Images/Videos), shot filtering, position exclusion, and prompt search
+- **Dynamic Dimensions**: Gallery items automatically use project aspect ratio instead of square layout, providing consistent visual presentation that matches project settings
 
 ### `ImageGenerationForm.tsx`
 **Simplified generation form**

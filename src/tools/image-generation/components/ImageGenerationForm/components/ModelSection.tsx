@@ -120,6 +120,7 @@ const StyleReferenceSection: React.FC<{
                   src={styleReferenceImage}
                   alt="Style Reference"
                   className="w-full aspect-square object-cover rounded-lg border border-gray-200 dark:border-gray-700"
+                  style={{ objectFit: 'cover' }}
                 />
                 <div className="absolute top-2 left-2 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded px-2 py-1 border border-gray-200 dark:border-gray-600 z-10">
                   <p className="text-xs font-light text-gray-600 dark:text-gray-400">Style</p>

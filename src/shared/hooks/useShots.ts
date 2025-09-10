@@ -560,11 +560,38 @@ export const useAddImageToShot = () => {
       project_id: string;
     }) => {
       log('MobileNetworkDebug', `Starting add image to shot - ShotID: ${shot_id}, GenerationID: ${generation_id}, ImageURL: ${imageUrl?.substring(0, 100)}...`);
+      console.log('[PositionFix] useAddImageToShot starting (regular path):', {
+        shot_id,
+        generation_id,
+        imageUrl: imageUrl?.substring(0, 50) + '...',
+        project_id,
+        timestamp: Date.now()
+      });
       
       const startTime = Date.now();
+
+      // Check what currently exists for this shot-generation combo
+      const { data: existingRecord, error: checkError } = await supabase
+        .from('shot_generations')
+        .select('id, shot_id, generation_id, position')
+        .eq('shot_id', shot_id)
+        .eq('generation_id', generation_id)
+        .maybeSingle();
+
+      if (checkError) {
+        console.error('[PositionFix] Error checking existing record (regular path):', checkError);
+      } else {
+        console.log('[PositionFix] Existing shot_generation record (regular path):', {
+          existingRecord,
+          hasRecord: !!existingRecord,
+          currentPosition: existingRecord?.position,
+          isCurrentlyNull: existingRecord?.position === null || existingRecord?.position === undefined
+        });
+      }
       
       // First create generation if imageUrl is provided
       if (imageUrl && !generation_id) {
+        console.log('[PositionFix] Creating new generation from imageUrl');
         const { data: newGeneration, error: genError } = await supabase
           .from('generations')
           .insert({
@@ -578,9 +605,16 @@ export const useAddImageToShot = () => {
         
         if (genError) throw genError;
         generation_id = newGeneration.id;
+        console.log('[PositionFix] Created new generation:', { newGenerationId: generation_id });
       }
       
       // Use RPC function to atomically add generation to shot with proper position
+      console.log('[PositionFix] Calling RPC add_generation_to_shot (regular path) with params:', {
+        p_shot_id: shot_id,
+        p_generation_id: generation_id,
+        p_with_position: 'default (not specified - should be true)'
+      });
+
       const { data: shotGeneration, error: rpcError } = await supabase
         .rpc('add_generation_to_shot', {
           p_shot_id: shot_id,
@@ -590,7 +624,46 @@ export const useAddImageToShot = () => {
       
       if (rpcError) {
         log('MobileNetworkDebug', `RPC Error after ${Date.now() - startTime}ms:`, rpcError);
+        console.error('[PositionFix] RPC error (regular path):', {
+          rpcError,
+          code: rpcError.code,
+          message: rpcError.message,
+          details: rpcError.details,
+          hint: rpcError.hint
+        });
         throw rpcError;
+      }
+      
+      console.log('[PositionFix] RPC success (regular path), returned data:', {
+        shotGeneration,
+        newPosition: (shotGeneration as any)?.position,
+        timestamp: Date.now()
+      });
+
+      // Verify the final state
+      const { data: finalRecord, error: verifyError } = await supabase
+        .from('shot_generations')
+        .select('id, shot_id, generation_id, position')
+        .eq('shot_id', shot_id)
+        .eq('generation_id', generation_id)
+        .maybeSingle();
+
+      if (verifyError) {
+        console.error('[PositionFix] Error verifying final record (regular path):', {
+          verifyError,
+          errorCode: verifyError.code,
+          errorMessage: verifyError.message,
+          errorDetails: verifyError.details,
+          queryParams: { shot_id, generation_id }
+        });
+      } else {
+        console.log('[PositionFix] Final verification (regular path):', {
+          finalRecord,
+          finalPosition: finalRecord?.position,
+          positionChanged: existingRecord?.position !== finalRecord?.position,
+          wasNull: existingRecord?.position === null || existingRecord?.position === undefined,
+          isNowPositioned: finalRecord?.position !== null && finalRecord?.position !== undefined
+        });
       }
       
       log('MobileNetworkDebug', `Successfully added image to shot in ${Date.now() - startTime}ms`);
@@ -605,6 +678,13 @@ export const useAddImageToShot = () => {
           projectId: project_id,
           shotId: shot_id
         });
+        // Also directly invalidate unpositioned-count for immediate UI update
+        try {
+          const qc = (window as any).__REACT_QUERY_CLIENT__;
+          if (qc) {
+            qc.invalidateQueries({ queryKey: ['unpositioned-count', shot_id] });
+          }
+        } catch {}
       }
     },
     onError: (error: Error) => {
@@ -685,6 +765,13 @@ export const useAddImageToShotWithoutPosition = () => {
           projectId: project_id,
           shotId: shot_id
         });
+        // Also directly invalidate unpositioned-count for immediate UI update
+        try {
+          const qc = (window as any).__REACT_QUERY_CLIENT__;
+          if (qc) {
+            qc.invalidateQueries({ queryKey: ['unpositioned-count', shot_id] });
+          }
+        } catch {}
       }
     },
     onError: (error: Error) => {
@@ -704,8 +791,43 @@ export const usePositionExistingGenerationInShot = () => {
       generation_id: string; 
       project_id: string;
     }) => {
+      console.log('[PositionFix] usePositionExistingGenerationInShot starting:', {
+        shot_id,
+        generation_id,
+        project_id,
+        timestamp: Date.now()
+      });
+
+      // First, let's check what currently exists for this shot-generation combo
+      const { data: existingRecord, error: checkError } = await supabase
+        .from('shot_generations')
+        .select('id, shot_id, generation_id, position')
+        .eq('shot_id', shot_id)
+        .eq('generation_id', generation_id)
+        .maybeSingle();
+
+      if (checkError) {
+        console.error('[PositionFix] Error checking existing record:', checkError);
+      } else {
+        console.log('[PositionFix] Existing shot_generation record:', {
+          existingRecord,
+          hasRecord: !!existingRecord,
+          currentPosition: existingRecord?.position,
+          isCurrentlyNull: existingRecord?.position === null || existingRecord?.position === undefined,
+          recordId: existingRecord?.id,
+          shotId: existingRecord?.shot_id,
+          generationId: existingRecord?.generation_id
+        });
+      }
+      
       // Use the updated add_generation_to_shot function with positioning enabled
       // This will find existing records with NULL position and assign them a position
+      console.log('[PositionFix] Calling RPC add_generation_to_shot with params:', {
+        p_shot_id: shot_id,
+        p_generation_id: generation_id,
+        p_with_position: true
+      });
+
       const { data: shotGeneration, error: rpcError } = await supabase
         .rpc('add_generation_to_shot', {
           p_shot_id: shot_id,
@@ -714,7 +836,51 @@ export const usePositionExistingGenerationInShot = () => {
         })
         .single();
       
-      if (rpcError) throw rpcError;
+      if (rpcError) {
+        console.error('[PositionFix] RPC error:', {
+          rpcError,
+          code: rpcError.code,
+          message: rpcError.message,
+          details: rpcError.details,
+          hint: rpcError.hint
+        });
+        throw rpcError;
+      }
+      
+      console.log('[PositionFix] RPC success, returned data:', {
+        shotGeneration,
+        newPosition: (shotGeneration as any)?.position,
+        recordId: (shotGeneration as any)?.id,
+        shotId: (shotGeneration as any)?.shot_id,
+        generationId: (shotGeneration as any)?.generation_id,
+        timestamp: Date.now()
+      });
+
+      // Let's also verify the final state
+      const { data: finalRecord, error: verifyError } = await supabase
+        .from('shot_generations')
+        .select('id, shot_id, generation_id, position')
+        .eq('shot_id', shot_id)
+        .eq('generation_id', generation_id)
+        .maybeSingle();
+
+      if (verifyError) {
+        console.error('[PositionFix] Error verifying final record:', {
+          verifyError,
+          errorCode: verifyError.code,
+          errorMessage: verifyError.message,
+          errorDetails: verifyError.details,
+          queryParams: { shot_id, generation_id }
+        });
+      } else {
+        console.log('[PositionFix] Final verification of shot_generation record:', {
+          finalRecord,
+          finalPosition: finalRecord?.position,
+          positionChanged: existingRecord?.position !== finalRecord?.position,
+          wasNull: existingRecord?.position === null || existingRecord?.position === undefined,
+          isNowPositioned: finalRecord?.position !== null && finalRecord?.position !== undefined
+        });
+      }
       
       return shotGeneration;
     },
@@ -882,6 +1048,8 @@ export const useDuplicateImageInShot = () => {
       queryClient.invalidateQueries({ queryKey: ['shots', project_id] });
       // CRITICAL: Invalidate the per-shot generations list used by ShotEditor
       queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shot_id] });
+      // Also invalidate unpositioned-count in case duplication affects positions
+      queryClient.invalidateQueries({ queryKey: ['unpositioned-count', shot_id] });
     }
   });
 };
@@ -947,6 +1115,8 @@ export const useRemoveImageFromShot = () => {
         queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', project_id] });
         // CRITICAL: Invalidate the per-shot generations list used by ShotEditor
         queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', variables.shot_id] });
+        // Ensure unpositioned-count updates after deletion
+        queryClient.invalidateQueries({ queryKey: ['unpositioned-count', variables.shot_id] });
       }
     },
   });

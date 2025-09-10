@@ -289,7 +289,23 @@ export function useGenerationsPageLogic({
     // Fast path: minimal validation and direct execution
     const targetShotId = currentShotId || lastAffectedShotId;
     
+    console.log('[PositionFix] handleAddToShot called:', {
+      generationId,
+      imageUrl: imageUrl?.substring(0, 50) + '...',
+      currentShotId,
+      lastAffectedShotId,
+      targetShotId,
+      selectedProjectId,
+      selectedShotFilter,
+      excludePositioned,
+      timestamp: Date.now()
+    });
+    
     if (!targetShotId || !selectedProjectId) {
+      console.log('[PositionFix] Missing required IDs:', {
+        targetShotId,
+        selectedProjectId
+      });
       toast.error("No shot selected", {
         description: "Please select a shot in the gallery or create one first.",
       });
@@ -299,26 +315,66 @@ export function useGenerationsPageLogic({
     // Check if we're trying to add to the same shot that's currently filtered with excludePositioned enabled
     const shouldPositionExisting = selectedShotFilter === targetShotId && excludePositioned;
     
+    console.log('[PositionFix] Positioning decision:', {
+      shouldPositionExisting,
+      selectedShotFilter,
+      targetShotId,
+      excludePositioned,
+      filterMatchesTarget: selectedShotFilter === targetShotId,
+      willUsePositionExisting: shouldPositionExisting,
+      timestamp: Date.now()
+    });
+    
     try {
       if (shouldPositionExisting) {
-        // Use the position existing function for items in the filtered list
-        await positionExistingGenerationMutation.mutateAsync({
+        console.log('[PositionFix] Using positionExistingGenerationMutation with params:', {
           shot_id: targetShotId,
           generation_id: generationId,
           project_id: selectedProjectId,
         });
+        
+        // Use the position existing function for items in the filtered list
+        const result = await positionExistingGenerationMutation.mutateAsync({
+          shot_id: targetShotId,
+          generation_id: generationId,
+          project_id: selectedProjectId,
+        });
+        
+        console.log('[PositionFix] positionExistingGenerationMutation result:', {
+          result,
+          timestamp: Date.now()
+        });
       } else {
-        // Use the regular add function
-        await addImageToShotMutation.mutateAsync({
+        console.log('[PositionFix] Using regular addImageToShotMutation with params:', {
           shot_id: targetShotId,
           generation_id: generationId,
           imageUrl: imageUrl,
           project_id: selectedProjectId,
         });
+        
+        // Use the regular add function
+        const result = await addImageToShotMutation.mutateAsync({
+          shot_id: targetShotId,
+          generation_id: generationId,
+          imageUrl: imageUrl,
+          project_id: selectedProjectId,
+        });
+        
+        console.log('[PositionFix] addImageToShotMutation result:', {
+          result,
+          timestamp: Date.now()
+        });
       }
+      
+      console.log('[PositionFix] handleAddToShot completed successfully');
       return true;
     } catch (error) {
       console.error('[ADDTOSHOT] Error:', error);
+      console.error('[PositionFix] handleAddToShot failed:', {
+        error: error instanceof Error ? error.message : error,
+        stack: error instanceof Error ? error.stack : undefined,
+        timestamp: Date.now()
+      });
       toast.error("Failed to add image to shot", {
         description: error instanceof Error ? error.message : "Unknown error",
       });

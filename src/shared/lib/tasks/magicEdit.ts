@@ -142,6 +142,14 @@ function buildMagicEditTaskParams(
     taskParams.resolution = finalResolution;
   }
 
+  // Add shot_id as top-level parameter if provided
+  if (params.shot_id) {
+    taskParams.shot_id = params.shot_id;
+  }
+
+  // Always add add_in_position as false for magic edit tasks (unpositioned by default)
+  taskParams.add_in_position = false;
+
   return taskParams;
 }
 

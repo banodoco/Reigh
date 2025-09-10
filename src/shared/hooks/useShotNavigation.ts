@@ -63,18 +63,32 @@ export const useShotNavigation = (): ShotNavigationResult => {
   const navigateToShot = (shot: Shot, options: ShotNavigationOptions = {}) => {
     const opts = { ...defaultOptions, ...options };
     
+    console.log('[VisitShotDebug] 10. useShotNavigation navigateToShot called', {
+      shot,
+      options: opts,
+      currentUrl: window.location.href,
+      timestamp: Date.now()
+    });
+    
     // Update the current shot context
+    console.log('[VisitShotDebug] 11. useShotNavigation setting current shot ID:', shot.id);
     setCurrentShotId(shot.id);
     
     // Navigate to the shot with hash
-    navigate(`/tools/travel-between-images#${shot.id}`, {
+    const targetUrl = `/tools/travel-between-images#${shot.id}`;
+    console.log('[VisitShotDebug] 12. useShotNavigation navigating to:', targetUrl);
+    navigate(targetUrl, {
       state: { fromShotClick: true },
       replace: opts.replace,
     });
     
+    console.log('[VisitShotDebug] 13. useShotNavigation navigation called, handling side effects');
+    
     // Handle side effects
     performScroll(opts);
     closePanes(opts);
+    
+    console.log('[VisitShotDebug] 14. useShotNavigation completed');
   };
 
   const navigateToShotEditor = (options: ShotNavigationOptions = {}) => {

@@ -7,6 +7,13 @@ import { toolsManifest } from '@/tools';
 
 export type SettingsScope = 'user' | 'project' | 'shot';
 
+// Single-flight dedupe for settings fetches across components
+const inflightSettingsFetches = new Map<string, Promise<unknown>>();
+// Lightweight user cache to avoid repeated auth calls within a short window
+let cachedUser: { id: string } | null = null;
+let cachedUserAt: number = 0;
+const USER_CACHE_MS = 10_000; // 10 seconds
+
 // Tool defaults registry - client-side version matching server
 const toolDefaults: Record<string, unknown> = Object.fromEntries(
   toolsManifest.map(toolSettings => [toolSettings.id, toolSettings.defaults])
@@ -64,8 +71,16 @@ async function getUserWithTimeout(timeoutMs = 7000) {
     const { data: sessionData } = await supabase.auth.getSession();
     const sessionUser = sessionData?.session?.user || null;
     if (sessionUser) {
+      cachedUser = { id: sessionUser.id };
+      cachedUserAt = Date.now();
       clearTimeout(timeoutId);
       return { data: { user: sessionUser }, error: null } as any;
+    }
+
+    // Use short-lived cache to avoid duplicate getUser calls during bursts
+    if (cachedUser && (Date.now() - cachedUserAt) < USER_CACHE_MS) {
+      clearTimeout(timeoutId);
+      return { data: { user: { id: cachedUser.id } }, error: null } as any;
     }
 
     const result = await Promise.race([
@@ -76,6 +91,11 @@ async function getUserWithTimeout(timeoutMs = 7000) {
     ]);
     
     clearTimeout(timeoutId);
+    const fetchedUserId = (result as any)?.data?.user?.id;
+    if (fetchedUserId) {
+      cachedUser = { id: fetchedUserId };
+      cachedUserAt = Date.now();
+    }
     return result;
   } catch (error) {
     clearTimeout(timeoutId);
@@ -93,68 +113,83 @@ async function fetchToolSettingsSupabase(toolId: string, ctx: ToolSettingsContex
       throw new Error('Request was cancelled');
     }
     
-    // Mobile optimization: Cache user info to avoid repeated auth calls
-    // Add timeout to prevent hanging on mobile connections (aligned with Supabase global timeout)
-    const { data: { user }, error: authError } = await getUserWithTimeout(7000);
-    if (authError || !user) {
-      throw new Error('Authentication required');
-    }
-    
-    // Check again after auth call
-    if (signal?.aborted) {
-      throw new Error('Request was cancelled');
+    // Single-flight dedupe key for concurrent identical requests
+    const singleFlightKey = JSON.stringify({ toolId, projectId: ctx.projectId ?? null, shotId: ctx.shotId ?? null });
+    const existingPromise = inflightSettingsFetches.get(singleFlightKey);
+    if (existingPromise) {
+      return existingPromise;
     }
 
-    // Mobile optimization: Use more efficient queries with targeted JSON extraction
-    // NOTE: We fetch the entire settings JSON to avoid SQL path issues with tool IDs containing hyphens.
-    const [userResult, projectResult, shotResult] = await Promise.all([
-      supabase
-        .from('users')
-        .select('settings')
-        .eq('id', user.id)
-        .maybeSingle(),
+    const promise = (async () => {
+      // Mobile optimization: Cache user info to avoid repeated auth calls
+      // Add timeout to prevent hanging on mobile connections (aligned with Supabase global timeout)
+      const { data: { user }, error: authError } = await getUserWithTimeout(7000);
+      if (authError || !user) {
+        throw new Error('Authentication required');
+      }
+      
+      // Check again after auth call
+      if (signal?.aborted) {
+        throw new Error('Request was cancelled');
+      }
 
-      ctx.projectId
-        ? supabase
-            .from('projects')
-            .select('settings')
-            .eq('id', ctx.projectId)
-            .maybeSingle()
-        : Promise.resolve({ data: null, error: null }),
+      // Mobile optimization: Use more efficient queries with targeted JSON extraction
+      // NOTE: We fetch the entire settings JSON to avoid SQL path issues with tool IDs containing hyphens.
+      const [userResult, projectResult, shotResult] = await Promise.all([
+        supabase
+          .from('users')
+          .select('settings')
+          .eq('id', user.id)
+          .maybeSingle(),
 
-      ctx.shotId
-        ? supabase
-            .from('shots')
-            .select('settings')
-            .eq('id', ctx.shotId)
-            .maybeSingle()
-        : Promise.resolve({ data: null, error: null }),
-    ]);
+        ctx.projectId
+          ? supabase
+              .from('projects')
+              .select('settings')
+              .eq('id', ctx.projectId)
+              .maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
 
-    // Handle errors more gracefully for mobile
-    if (userResult.error && !userResult.error.message.includes('No rows found')) {
-      console.warn('[fetchToolSettingsSupabase] User settings error:', userResult.error);
-    }
-    if (projectResult.error && !projectResult.error.message.includes('No rows found')) {
-      console.warn('[fetchToolSettingsSupabase] Project settings error:', projectResult.error);
-    }
-    if (shotResult.error && !shotResult.error.message.includes('No rows found')) {
-      console.warn('[fetchToolSettingsSupabase] Shot settings error:', shotResult.error);
-    }
+        ctx.shotId
+          ? supabase
+              .from('shots')
+              .select('settings')
+              .eq('id', ctx.shotId)
+              .maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
+      ]);
 
-    // Extract tool-specific settings from the full settings JSON
-    const userSettings = (userResult.data?.settings?.[toolId] as any) ?? {};
-    const projectSettings = (projectResult.data?.settings?.[toolId] as any) ?? {};
-    const shotSettings = (shotResult.data?.settings?.[toolId] as any) ?? {};
+      // Handle errors more gracefully for mobile
+      if (userResult.error && !userResult.error.message.includes('No rows found')) {
+        console.warn('[fetchToolSettingsSupabase] User settings error:', userResult.error);
+      }
+      if (projectResult.error && !projectResult.error.message.includes('No rows found')) {
+        console.warn('[fetchToolSettingsSupabase] Project settings error:', projectResult.error);
+      }
+      if (shotResult.error && !shotResult.error.message.includes('No rows found')) {
+        console.warn('[fetchToolSettingsSupabase] Shot settings error:', shotResult.error);
+      }
 
-    // Merge in priority order: defaults → user → project → shot
-    return deepMerge(
-      {},
-      toolDefaults[toolId] ?? {},
-      userSettings,
-      projectSettings,
-      shotSettings
-    );
+      // Extract tool-specific settings from the full settings JSON
+      const userSettings = (userResult.data?.settings?.[toolId] as any) ?? {};
+      const projectSettings = (projectResult.data?.settings?.[toolId] as any) ?? {};
+      const shotSettings = (shotResult.data?.settings?.[toolId] as any) ?? {};
+
+      // Merge in priority order: defaults → user → project → shot
+      return deepMerge(
+        {},
+        toolDefaults[toolId] ?? {},
+        userSettings,
+        projectSettings,
+        shotSettings
+      );
+    })();
+
+    inflightSettingsFetches.set(singleFlightKey, promise);
+    promise.finally(() => {
+      inflightSettingsFetches.delete(singleFlightKey);
+    });
+    return promise;
 
   } catch (error) {
     // Handle abort errors silently to reduce noise during task cancellation

@@ -685,6 +685,12 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
         setLastAffectedShotId(result.shot.id);
         // Note: We're NOT changing setSelectedShotFilter here to keep the gallery populated
       }
+      
+      // Return the result so MediaLightbox can get the real shot ID
+      return {
+        shotId: result.shot?.id,
+        shotName: result.shot?.name || shotName
+      };
     } catch (error) {
       console.error('Error creating shot:', error);
       toast.error("Failed to create shot");

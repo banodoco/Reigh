@@ -81,6 +81,12 @@ export const useProgressiveImageLoading = ({
     }
   };
 
+  // Stabilize onImagesReady reference to prevent effect re-runs
+  const stableOnImagesReady = useRef(onImagesReady);
+  useEffect(() => {
+    stableOnImagesReady.current = onImagesReady;
+  }, [onImagesReady]);
+
   useEffect(() => {
     const now = Date.now();
     const timeSinceLastTrigger = now - lastTriggerTimeRef.current;
@@ -95,9 +101,9 @@ export const useProgressiveImageLoading = ({
         reason: !enabled ? 'disabled' : images.length === 0 ? 'no images' : 'lightbox open'
       });
       // Call onImagesReady even for empty images to clear loading states
-      if (images.length === 0 && onImagesReady) {
+      if (images.length === 0 && stableOnImagesReady.current) {
         console.log(`✅ [PAGELOADINGDEBUG] [PROG] Ready callback for empty page`);
-        onImagesReady();
+        stableOnImagesReady.current();
       }
       cancelActiveSession('disabled, no images, or lightbox open');
       return;
@@ -172,18 +178,18 @@ export const useProgressiveImageLoading = ({
     console.log(`📦 [PAGELOADINGDEBUG] [PROG:${sessionId}] Immediate load: ${images.length} images (${cachedCount}/${images.length} cached)`);
     
     // Notify that images are ready
-    if (onImagesReady && isSessionActive()) {
+    if (stableOnImagesReady.current && isSessionActive()) {
       if (allCached) {
         // Immediate callback for cached images
         console.log(`⚡ [PAGELOADINGDEBUG] [PROG:${sessionId}] Ready callback: IMMEDIATE (all cached)`);
-        onImagesReady();
+        stableOnImagesReady.current();
       } else {
         // Small delay for non-cached images
         console.log(`⏱️ [PAGELOADINGDEBUG] [PROG:${sessionId}] Ready callback: DELAYED 16ms (${images.length - cachedCount} uncached)`);
         const readyTimeout = setTimeout(() => {
           if (isSessionActive()) {
             console.log(`✅ [PAGELOADINGDEBUG] [PROG:${sessionId}] Ready callback executed`);
-            onImagesReady();
+            stableOnImagesReady.current?.();
           } else {
             console.log(`❌ [PAGELOADINGDEBUG] [PROG:${sessionId}] Ready callback cancelled (session inactive)`);
           }
@@ -201,7 +207,7 @@ export const useProgressiveImageLoading = ({
         cancelActiveSession('effect cleanup');
       }
     };
-  }, [imageSetId, page, enabled, isMobile, useIntersectionObserver, onImagesReady, isLightboxOpen]);
+  }, [imageSetId, page, enabled, isMobile, useIntersectionObserver, isLightboxOpen]);
   
   // Debug: Track when images prop changes
   useEffect(() => {

@@ -5,6 +5,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/shared/components/ui/toggle-grou
 import ShotImageManager from "@/shared/components/ShotImageManager";
 import Timeline from "@/tools/travel-between-images/components/Timeline";
 import { Button } from "@/shared/components/ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/shared/components/ui/tooltip";
 import FileInput from "@/shared/components/FileInput";
 
 interface ShotImagesEditorProps {
@@ -142,23 +143,40 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 <ToggleGroupItem value="batch" aria-label="Toggle batch">
                   Batch
                 </ToggleGroupItem>
-                <ToggleGroupItem value="timeline" aria-label="Toggle timeline" disabled={selectedModel === 'wan-2.2'}>
-                  Timeline
-                </ToggleGroupItem>
+                {selectedModel === 'wan-2.2' ? (
+                  <TooltipProvider delayDuration={300}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="inline-block">
+                          <ToggleGroupItem value="timeline" aria-label="Toggle timeline" disabled>
+                            Timeline
+                          </ToggleGroupItem>
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        Timeline mode only available with Wan 2.1
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                ) : (
+                  <ToggleGroupItem value="timeline" aria-label="Toggle timeline">
+                    Timeline
+                  </ToggleGroupItem>
+                )}
               </ToggleGroup>
-              {selectedModel === 'wan-2.2' && (
-                <p className="text-xs text-muted-foreground">Timeline mode only available with Wan 2.1</p>
-              )}
             </div>
           )}
         </div>
-        {(isMobile || generationMode === "timeline") && (
-          <p className="text-sm text-muted-foreground pt-1">
-            {isMobile
-              ? "Tap to select and move multiple images."
-              : "Drag images to precise frame positions. Drop on other images to reorder."}
-          </p>
-        )}
+        {/* Reserve space for instruction line to prevent header area height jitter */}
+        <div className="min-h-5">
+          {(isMobile || generationMode === "timeline") && (
+            <p className="text-sm text-muted-foreground pt-1">
+              {isMobile
+                ? "Tap to select and move multiple images."
+                : "Drag images to precise frame positions. Drop on other images to reorder."}
+            </p>
+          )}
+        </div>
       </CardHeader>
 
       {/* Content - Show skeleton if not ready, otherwise show actual content */}

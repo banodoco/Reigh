@@ -340,7 +340,11 @@ export function routeEvent(queryClient: QueryClient, event: InvalidationEvent) {
         }
         if (shotId) {
           scheduleInvalidate(queryClient, ['unified-generations', 'shot', shotId]);
+          // Invalidate unpositioned count as new generations may affect the count
+          scheduleInvalidate(queryClient, ['unpositioned-count', shotId]);
         }
+        // Failsafe: if shotId is not known in payload, refresh all unpositioned counters
+        scheduleInvalidate(queryClient, 'unpositioned-count');
         if (generationId) {
           scheduleInvalidate(queryClient, ['generation-task-mapping', generationId]);
         }
@@ -355,7 +359,11 @@ export function routeEvent(queryClient: QueryClient, event: InvalidationEvent) {
         }
         if (shotId) {
           scheduleInvalidate(queryClient, ['unified-generations', 'shot', shotId]);
+          // Invalidate unpositioned count as deleted generations may affect the count
+          scheduleInvalidate(queryClient, ['unpositioned-count', shotId]);
         }
+        // Failsafe: refresh all unpositioned counters
+        scheduleInvalidate(queryClient, 'unpositioned-count');
         if (generationId) {
           scheduleInvalidate(queryClient, ['generation-task-mapping', generationId]);
         }
@@ -398,7 +406,11 @@ export function routeEvent(queryClient: QueryClient, event: InvalidationEvent) {
         }
         if (shotId) {
           scheduleInvalidate(queryClient, ['unified-generations', 'shot', shotId]);
+          // Invalidate unpositioned count for this shot when positions change
+          scheduleInvalidate(queryClient, ['unpositioned-count', shotId]);
         }
+        // Failsafe: refresh all unpositioned counters
+        scheduleInvalidate(queryClient, 'unpositioned-count');
         break;
       }
       
@@ -470,7 +482,11 @@ export function routeEvent(queryClient: QueryClient, event: InvalidationEvent) {
         }
         if (shotId) {
           scheduleInvalidate(queryClient, ['unified-generations', 'shot', shotId]);
+          // Ensure unpositioned helper updates when generations change for this shot
+          scheduleInvalidate(queryClient, ['unpositioned-count', shotId]);
         }
+        // Failsafe: project-scoped broadcast may omit shotId; refresh all counters
+        scheduleInvalidate(queryClient, 'unpositioned-count');
         break;
       }
 

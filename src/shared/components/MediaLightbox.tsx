@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, X, FlipHorizontal, Save, Download, Trash2, Settings, PlusCircle, CheckCircle, Star } from 'lucide-react';
-import { GenerationRow } from '@/types/shots';
+import { GenerationRow, Shot } from '@/types/shots';
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Button } from '@/shared/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
+import ShotSelector from '@/shared/components/ShotSelector';
 import { getDisplayUrl, cn } from '@/shared/lib/utils';
 import HoverScrubVideo from '@/shared/components/HoverScrubVideo';
 import SimpleVideoPlayer from '@/tools/travel-between-images/components/SimpleVideoPlayer';
@@ -14,8 +14,10 @@ import { useToggleGenerationStar } from '@/shared/hooks/useGenerations';
 import MagicEditLauncher from '@/shared/components/MagicEditLauncher';
 import { toast } from 'sonner';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
+import { useCreateShotWithImage } from '@/shared/hooks/useShots';
+import { useProject } from '@/shared/contexts/ProjectContext';
 
-interface Shot {
+interface ShotOption {
   id: string;
   name: string;
 }
@@ -36,7 +38,7 @@ interface MediaLightboxProps {
   hasNext?: boolean;
   hasPrevious?: boolean;
   // Workflow-specific props
-  allShots?: Shot[];
+  allShots?: ShotOption[];
   selectedShotId?: string;
   onShotChange?: (shotId: string) => void;
   onAddToShot?: (generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
@@ -63,6 +65,10 @@ interface MediaLightboxProps {
   };
   // Mobile video task details toggle
   onShowTaskDetails?: () => void;
+  // Shot creation functionality
+  onCreateShot?: (shotName: string, files: File[]) => Promise<{shotId?: string; shotName?: string} | void>;
+  // Shot navigation functionality
+  onNavigateToShot?: (shot: Shot) => void;
 }
 
 const MediaLightbox: React.FC<MediaLightboxProps> = ({ 
@@ -97,13 +103,30 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   showTaskDetails = false,
   taskDetailsData,
   // Mobile video task details toggle
-  onShowTaskDetails
+  onShowTaskDetails,
+  // Shot creation functionality
+  onCreateShot,
+  // Shot navigation functionality
+  onNavigateToShot,
 }) => {
   const [isFlippedHorizontally, setIsFlippedHorizontally] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
   const [replaceImages, setReplaceImages] = useState(true);
+  const [isSelectOpen, setIsSelectOpen] = useState(false);
+  
+  // Shot creation state
+  const [isCreatingShot, setIsCreatingShot] = useState(false);
+  const [quickCreateSuccess, setQuickCreateSuccess] = useState<{
+    isSuccessful: boolean;
+    shotId: string | null;
+    shotName: string | null;
+  }>({ isSuccessful: false, shotId: null, shotName: null });
+  
+  // Hooks for atomic shot creation with image
+  const { selectedProjectId } = useProject();
+  const createShotWithImageMutation = useCreateShotWithImage();
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   // Ref for the dialog content so we can programmatically focus it, enabling keyboard shortcuts immediately
@@ -181,6 +204,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       const path = (e as any).composedPath ? (e as any).composedPath() as any[] : undefined;
       const isInside = !!(contentEl && (path ? path.includes(contentEl) : (target && contentEl.contains(target))));
 
+
       // NEW: Ignore interactions inside any Radix dialog content to avoid closing
       // other dialogs like Magic Edit that appear above the lightbox.
       const pathNodes: any[] = path || [];
@@ -192,12 +216,55 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
         }
       }) || (target instanceof Element && !!(target as Element).closest?.('[data-radix-dialog-content]'));
 
-      if (isInsideRadixDialog) {
-        return; // allow dialog interactions without closing lightbox
+      // Also ignore interactions inside Radix Select, Popover, and DropdownMenu components
+      const isInsideRadixPortal = pathNodes.some((n) => {
+        try {
+          return n instanceof Element && (
+            (n as Element).hasAttribute?.('data-radix-select-content') ||
+            (n as Element).hasAttribute?.('data-radix-select-viewport') ||
+            (n as Element).hasAttribute?.('data-radix-select-item') ||
+            (n as Element).hasAttribute?.('data-radix-popover-content') ||
+            (n as Element).hasAttribute?.('data-radix-dropdown-menu-content')
+          );
+        } catch {
+          return false;
+        }
+      }) || (target instanceof Element && !!(
+        (target as Element).closest?.('[data-radix-select-content]') ||
+        (target as Element).closest?.('[data-radix-select-viewport]') ||
+        (target as Element).closest?.('[data-radix-select-item]') ||
+        (target as Element).closest?.('[data-radix-popover-content]') ||
+        (target as Element).closest?.('[data-radix-dropdown-menu-content]')
+      ));
+
+      if (isInsideRadixDialog || isInsideRadixPortal) {
+        return; // allow dialog and portal interactions without closing lightbox
+      }
+
+      // Don't close if Select is open
+      if (isSelectOpen) {
+        return;
+      }
+
+      // Don't close if clicking on ShotSelector trigger or content (additional safety)
+      if (target instanceof Element) {
+        const shotSelectorTrigger = target.closest('[data-radix-select-trigger]');
+        const shotSelectorContent = target.closest('[data-radix-select-content]');
+        if (shotSelectorTrigger || shotSelectorContent) {
+          return;
+        }
       }
 
       // Allow all interactions inside the dialog content
-      if (isInside) return;
+      if (isInside) {
+        return;
+      }
+
+      // Special handling for click events on BODY - these are often bubbled events
+      // from elements that should not close the lightbox
+      if (e.type === 'click' && target instanceof Element && target.tagName === 'BODY') {
+        return;
+      }
 
       if (typeof (e as any).stopImmediatePropagation === 'function') {
         (e as any).stopImmediatePropagation();
@@ -505,6 +572,115 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     }
   };
 
+  // Handle quick create and add shot
+  const handleQuickCreateAndAdd = async () => {
+    console.log('[VisitShotDebug] handleQuickCreateAndAdd called', {
+      hasOnCreateShot: !!onCreateShot,
+      hasSelectedProjectId: !!selectedProjectId,
+      allShotsLength: allShots.length,
+      mediaId: media.id
+    });
+    
+    if (!selectedProjectId) {
+      console.error('[VisitShotDebug] No project selected');
+      return;
+    }
+    
+    // Generate automatic shot name
+    const shotCount = allShots.length;
+    const newShotName = `Shot ${shotCount + 1}`;
+    
+    setIsCreatingShot(true);
+    try {
+      console.log('[VisitShotDebug] Creating shot WITH image using atomic operation:', {
+        shotName: newShotName,
+        projectId: selectedProjectId,
+        generationId: media.id
+      });
+      
+      // Use atomic database function to create shot and add image in one operation
+      // This is the same approach as ImageGalleryItem
+      const result = await createShotWithImageMutation.mutateAsync({
+        projectId: selectedProjectId,
+        shotName: newShotName,
+        generationId: media.id
+      });
+      
+      console.log('[VisitShotDebug] Atomic shot creation result:', result);
+      
+      // Set success state with real shot ID
+      setQuickCreateSuccess({
+        isSuccessful: true,
+        shotId: result.shotId,
+        shotName: result.shotName
+      });
+      
+      // Clear success state after 5 seconds
+      setTimeout(() => {
+        setQuickCreateSuccess({ isSuccessful: false, shotId: null, shotName: null });
+      }, 5000);
+      
+    } catch (error) {
+      console.error('[VisitShotDebug] Error in atomic shot creation:', error);
+      toast.error('Failed to create shot and add image');
+    } finally {
+      setIsCreatingShot(false);
+    }
+  };
+
+  // Handle quick create success navigation
+  const handleQuickCreateSuccess = () => {
+    console.log('[VisitShotDebug] 2. MediaLightbox handleQuickCreateSuccess called', {
+      quickCreateSuccess,
+      hasOnNavigateToShot: !!onNavigateToShot,
+      allShotsCount: allShots?.length || 0,
+      timestamp: Date.now()
+    });
+
+    if (quickCreateSuccess.shotId && onNavigateToShot) {
+      // Try to find the shot in the list first (we only have id/name here)
+      const shotOption = allShots?.find(s => s.id === quickCreateSuccess.shotId);
+      
+      console.log('[VisitShotDebug] 3. MediaLightbox shot search result', {
+        shotId: quickCreateSuccess.shotId,
+        foundInList: !!shotOption,
+        shotOption: shotOption ? { id: shotOption.id, name: shotOption.name } : null,
+        allShots: allShots?.map(s => ({ id: s.id, name: s.name })) || []
+      });
+
+      if (shotOption) {
+        // Build a minimal Shot object compatible with navigation
+        const minimalShot: Shot = {
+          id: shotOption.id,
+          name: shotOption.name,
+          images: [],
+          position: 0,
+        };
+        console.log('[VisitShotDebug] 4a. MediaLightbox calling onNavigateToShot with found shot', minimalShot);
+        onNavigateToShot(minimalShot);
+      } else {
+        // Fallback when shot not in list yet
+        const minimalShot: Shot = {
+          id: quickCreateSuccess.shotId,
+          name: quickCreateSuccess.shotName || 'Shot',
+          images: [],
+          position: 0,
+        };
+        console.log('[VisitShotDebug] 4b. MediaLightbox calling onNavigateToShot with fallback shot', minimalShot);
+        onNavigateToShot(minimalShot);
+      }
+    } else {
+      console.log('[VisitShotDebug] 4c. MediaLightbox not navigating - missing requirements', {
+        hasShotId: !!quickCreateSuccess.shotId,
+        hasOnNavigateToShot: !!onNavigateToShot
+      });
+    }
+    
+    // Clear the success state
+    console.log('[VisitShotDebug] 5. MediaLightbox clearing success state');
+    setQuickCreateSuccess({ isSuccessful: false, shotId: null, shotName: null });
+  };
+
   const handleDelete = () => {
     if (onDelete) {
       // Trigger the deletion in the parent component
@@ -542,7 +718,12 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
   return (
     <TooltipProvider delayDuration={500}>
-      <DialogPrimitive.Root open={true} onOpenChange={(open) => !open && onClose()}>
+      <DialogPrimitive.Root 
+        open={true} 
+        onOpenChange={() => {
+          // Prevent automatic closing - we handle all closing manually
+        }}
+      >
         <DialogPrimitive.Portal>
           <DialogPrimitive.Overlay 
             className="fixed inset-0 z-[10000] bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
@@ -555,13 +736,10 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               }
             }}
             onClick={(e) => {
-              // Completely block all click events from reaching underlying elements
-              e.preventDefault();
-              e.stopPropagation();
-              if (e.nativeEvent && typeof e.nativeEvent.stopImmediatePropagation === 'function') {
-                e.nativeEvent.stopImmediatePropagation();
+              // Only close if clicking directly on the overlay (background)
+              if (e.target === e.currentTarget) {
+                onClose();
               }
-              onClose();
             }}
             onPointerUp={(e) => {
               // Also block pointer up events to prevent accidental interactions
@@ -691,6 +869,26 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                 if (target.closest('[data-task-details-panel]') || target.closest('[role="button"]')) {
                   return;
                 }
+              }
+
+              // Don't close if clicking inside Radix portals (Select, Popover, DropdownMenu)
+              const target = event.target as Element;
+              if (target.closest('[data-radix-select-content]') || 
+                  target.closest('[data-radix-select-viewport]') ||
+                  target.closest('[data-radix-select-item]') ||
+                  target.closest('[data-radix-popover-content]') || 
+                  target.closest('[data-radix-dropdown-menu-content]')) {
+                return;
+              }
+
+              // Don't close if Select is open
+              if (isSelectOpen) {
+                return;
+              }
+
+              // Don't close if clicking on ShotSelector trigger or content (additional safety)
+              if (target.closest('[data-radix-select-trigger]') || target.closest('[data-radix-select-content]')) {
+                return;
               }
               
               // Use setTimeout to ensure the event is fully blocked before closing
@@ -918,18 +1116,20 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           {/* Shot Selection and Add to Shot */}
                           {onAddToShot && allShots.length > 0 && (
                             <>
-                              <Select value={selectedShotId} onValueChange={onShotChange}>
-                                <SelectTrigger className="w-32 h-8 bg-black/50 border-white/20 text-white text-xs">
-                                  <SelectValue placeholder="Select shot" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {allShots.map((shot) => (
-                                    <SelectItem key={shot.id} value={shot.id}>
-                                      {shot.name}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
+                              <ShotSelector
+                                value={selectedShotId || ''}
+                                onValueChange={onShotChange || (() => {})}
+                                shots={allShots}
+                                placeholder="Select shot"
+                                triggerClassName="w-32 h-8 bg-black/50 border-white/20 text-white text-xs"
+                                onOpenChange={setIsSelectOpen}
+                                showAddShot={!!onCreateShot}
+                                onCreateShot={handleQuickCreateAndAdd}
+                                isCreatingShot={isCreatingShot}
+                                quickCreateSuccess={quickCreateSuccess}
+                                onQuickCreateSuccess={handleQuickCreateSuccess}
+                                container={contentRef.current}
+                              />
 
                               <Tooltip>
                                 <TooltipTrigger asChild>
@@ -1415,18 +1615,20 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       {/* Shot Selection and Add to Shot */}
                       {onAddToShot && allShots.length > 0 && (
                         <>
-                          <Select value={selectedShotId} onValueChange={onShotChange}>
-                            <SelectTrigger className="w-24 sm:w-32 h-7 sm:h-8 bg-black/50 border-white/20 text-white text-xs">
-                              <SelectValue placeholder="Select shot" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {allShots.map((shot) => (
-                                <SelectItem key={shot.id} value={shot.id}>
-                                  {shot.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <ShotSelector
+                            value={selectedShotId || ''}
+                            onValueChange={onShotChange || (() => {})}
+                            shots={allShots}
+                            placeholder="Select shot"
+                            triggerClassName="w-24 sm:w-32 h-7 sm:h-8 bg-black/50 border-white/20 text-white text-xs"
+                            onOpenChange={setIsSelectOpen}
+                            showAddShot={!!onCreateShot}
+                            onCreateShot={handleQuickCreateAndAdd}
+                            isCreatingShot={isCreatingShot}
+                            quickCreateSuccess={quickCreateSuccess}
+                            onQuickCreateSuccess={handleQuickCreateSuccess}
+                            container={contentRef.current}
+                          />
 
                           <Tooltip>
                             <TooltipTrigger asChild>

@@ -275,16 +275,16 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
   const { projectId, status, limit = 50, offset = 0 } = params;
   const page = Math.floor(offset / limit) + 1;
   
-  // 🎯 STANDARDIZED POLLING: Use standardized polling for paginated tasks
+  // 🎯 LIVE POLLING: Use gallery-style polling for more responsive task updates
   const { refetchInterval, refetchIntervalInBackground } = useStandardizedPolling(
     'Tasks',
     { projectId, page, status },
     {
       hasRecentActivity: RecentActivityDetectors.paginatedTasks,
-      fastInterval: 10000,        // 10s for active tasks
-      resurrectionInterval: 60000, // 60s for inactive state
-      initialInterval: 5000,      // 5s for Processing filter, 30s otherwise (handled in activity detector)
-      staleThreshold: 30000       // 30 seconds = stale
+      fastInterval: 5000,         // 5s for active tasks (faster than gallery's 15s)
+      resurrectionInterval: 30000, // 30s for inactive state (faster than gallery's 45s) 
+      initialInterval: 3000,      // 3s initial (faster than gallery's 30s)
+      staleThreshold: 15000       // 15 seconds = stale (faster than gallery's 60s)
     }
   );
   
@@ -592,9 +592,9 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
     gcTime: 5 * 60 * 1000, // 5 minutes  
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
-    // 🎯 STANDARDIZED POLLING: Network-aware, jittered, healing-window-aware polling
+    // 🎯 LIVE POLLING: Network-aware, jittered, healing-window-aware polling with background updates
     refetchInterval,
-    refetchIntervalInBackground
+    refetchIntervalInBackground: true // Enable background polling like the gallery
   });
   
   // [TasksPaneCountMismatch] CRITICAL DEBUG: Log the actual query state to catch cache/stale issues
@@ -843,12 +843,13 @@ export const useCancelAllPendingTasks = useCancelPendingTasks;
 
 // Hook to get status counts for indicators
 export const useTaskStatusCounts = (projectId: string | null) => {
-  // 🎯 STANDARDIZED POLLING: Use standardized polling for status counts
+  // 🎯 LIVE POLLING: Use faster polling for status counts to keep badges current
   const { refetchInterval, refetchIntervalInBackground } = useStandardizedPolling(
     'TaskStatusCounts',
     { projectId },
     {
-      staticInterval: 5000 // 5 seconds - live status updates
+      staticInterval: 3000, // 3 seconds - faster status updates
+      disableBackgroundPolling: false // Keep polling in background
     }
   );
 
@@ -1012,9 +1013,9 @@ export const useTaskStatusCounts = (projectId: string | null) => {
       return result;
     },
     enabled: !!projectId,
-    staleTime: 4 * 1000, // 4 seconds - allow standardized polling to work properly
-    // 🎯 STANDARDIZED POLLING: Network-aware, jittered, healing-window-aware polling
+    staleTime: 3 * 1000, // 3 seconds - faster refresh for live updates
+    // 🎯 LIVE POLLING: Network-aware, jittered, healing-window-aware polling with background updates
     refetchInterval,
-    refetchIntervalInBackground,
+    refetchIntervalInBackground: true, // Enable background polling like the gallery
   });
 }; 

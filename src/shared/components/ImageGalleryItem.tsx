@@ -7,13 +7,7 @@ import {
   TooltipProvider, 
   TooltipTrigger 
 } from "@/shared/components/ui/tooltip";
-import { 
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/shared/components/ui/select";
+import ShotSelector from "@/shared/components/ShotSelector";
 import { DraggableImage } from "@/shared/components/DraggableImage";
 import { getDisplayUrl } from "@/shared/lib/utils";
 import { isImageCached, setImageCacheStatus } from "@/shared/lib/imageCacheManager";
@@ -30,6 +24,7 @@ import { useAddImageToShot, useCreateShotWithImage } from "@/shared/hooks/useSho
 import { useProject } from "@/shared/contexts/ProjectContext";
 import { useShotNavigation } from "@/shared/hooks/useShotNavigation";
 import { useLastAffectedShot } from "@/shared/hooks/useLastAffectedShot";
+import { parseRatio } from "@/shared/lib/aspectRatios";
 
 interface ImageGalleryItemProps {
   image: GeneratedImageWithMetadata;
@@ -73,6 +68,8 @@ interface ImageGalleryItemProps {
   // Shot creation props
   onCreateShot?: (shotName: string, files: File[]) => Promise<void>;
   currentViewingShotId?: string; // ID of the shot currently being viewed (hides navigation buttons)
+  // Project dimensions
+  projectAspectRatio?: string;
 }
 
 export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
@@ -115,6 +112,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   isGalleryLoading = false,
   onCreateShot,
   currentViewingShotId,
+  projectAspectRatio,
 }) => {
   // Debug mobile state for first few items (reduced frequency)
   React.useEffect(() => {
@@ -439,6 +437,32 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
     return currentViewingShotId && selectedShotIdLocal && currentViewingShotId === selectedShotIdLocal;
   }, [currentViewingShotId, selectedShotIdLocal]);
   
+  // Handle quick create success navigation
+  const handleQuickCreateSuccess = useCallback(() => {
+    if (quickCreateSuccess.shotId) {
+      // Try to find the shot in the list first
+      const shot = simplifiedShotOptions.find(s => s.id === quickCreateSuccess.shotId);
+      if (shot) {
+        // Shot found in list, use it
+        navigateToShot({ 
+          id: shot.id, 
+          name: shot.name,
+          images: [],
+          position: 0
+        });
+      } else {
+        // Shot not in list yet, but we have the ID and name, so navigate anyway
+        console.log('[QuickCreate] Shot not in list yet, navigating with stored data');
+        navigateToShot({ 
+          id: quickCreateSuccess.shotId, 
+          name: quickCreateSuccess.shotName || `Shot`,
+          images: [],
+          position: 0
+        });
+      }
+    }
+  }, [quickCreateSuccess, simplifiedShotOptions, navigateToShot]);
+
   let aspectRatioPadding = '100%'; 
   let minHeight = '120px'; // Minimum height for very small images
   
@@ -468,6 +492,16 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
     // For videos without dimensions, use a common video aspect ratio instead of square
     // 16:9 is the most common video aspect ratio
     aspectRatioPadding = '56.25%'; // 9/16 * 100% = 56.25% for 16:9 aspect ratio
+  } else if (projectAspectRatio) {
+    // Use project aspect ratio as fallback instead of square
+    const ratio = parseRatio(projectAspectRatio);
+    if (!isNaN(ratio)) {
+      const calculatedPadding = (1 / ratio) * 100; // height/width * 100
+      // Ensure reasonable aspect ratio bounds
+      const minPadding = 60; // Minimum 60% height (for very wide images)
+      const maxPadding = 200; // Maximum 200% height (for very tall images)
+      aspectRatioPadding = `${Math.min(Math.max(calculatedPadding, minPadding), maxPadding)}%`;
+    }
   }
 
   // If it's a placeholder, render simplified placeholder item
@@ -652,114 +686,25 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
           {/* Add to Shot UI - Top Left */}
           {simplifiedShotOptions.length > 0 && onAddToLastShot && (
           <div className="absolute top-2 left-2 flex flex-col items-start gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-              <Select
+              <ShotSelector
                   value={selectedShotIdLocal}
                   onValueChange={(value) => {
                       setSelectedShotIdLocal(value);
                       setLastAffectedShotId(value);
                   }}
-              >
-                  <SelectTrigger
-                      className="h-7 px-2 py-1 rounded-md bg-black/50 hover:bg-black/70 text-white text-xs min-w-[70px] max-w-[90px] truncate focus:ring-0 focus:ring-offset-0"
-                      aria-label="Select target shot"
-                      onMouseEnter={(e) => e.stopPropagation()}
-                      onMouseLeave={(e) => e.stopPropagation()}
-                      onPointerDown={(e) => e.stopPropagation()}
-                  >
-                      <SelectValue placeholder="Shot...">
-                          {selectedShotIdLocal ? (
-                              (() => {
-                                  const shotName = simplifiedShotOptions.find(s => s.id === selectedShotIdLocal)?.name || '';
-                                  return shotName.length > 10 ? `${shotName.substring(0, 10)}...` : shotName;
-                              })()
-                          ) : 'Shot...'}
-                      </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent 
-                      className="z-[9999] w-[var(--radix-select-trigger-width)] bg-zinc-900 border-zinc-700 text-white max-h-60 flex flex-col" 
-                      style={{ zIndex: 10000 }}
-                      position="popper"
-                      side="top"
-                      sideOffset={4}
-                      align="start"
-                      collisionPadding={8}
-                  >
-                      {/* Fixed Add Shot button at the top */}
-                      {onCreateShot && (
-                        <div className="flex-shrink-0 bg-zinc-900 border-b border-zinc-700 p-1">
-                          {quickCreateSuccess.isSuccessful ? (
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              className="w-full h-8 text-xs justify-center bg-zinc-600 hover:bg-zinc-500 text-white border-zinc-500"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                                                  if (quickCreateSuccess.shotId) {
-                                    // Try to find the shot in the list first
-                                    const shot = simplifiedShotOptions.find(s => s.id === quickCreateSuccess.shotId);
-                                    if (shot) {
-                                      // Shot found in list, use it
-                                      navigateToShot({ 
-                                        id: shot.id, 
-                                        name: shot.name,
-                                        images: [],
-                                        position: 0
-                                      });
-                                    } else {
-                                      // Shot not in list yet, but we have the ID and name, so navigate anyway
-                                      console.log('[QuickCreate] Shot not in list yet, navigating with stored data');
-                                      navigateToShot({ 
-                                        id: quickCreateSuccess.shotId, 
-                                        name: quickCreateSuccess.shotName || `Shot`,
-                                        images: [],
-                                        position: 0
-                                      });
-                                    }
-                                  }
-                              }}
-                            >
-                              <Check className="h-3 w-3 mr-1" />
-                              Visit {quickCreateSuccess.shotName}
-                            </Button>
-                          ) : (
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              className="w-full h-8 text-xs justify-center bg-zinc-600 hover:bg-zinc-500 text-white border-zinc-500"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                handleQuickCreateAndAdd();
-                              }}
-                              disabled={addingToShotImageId === image.id}
-                            >
-                              {addingToShotImageId === image.id ? (
-                                <>
-                                  <div className="h-3 w-3 animate-spin rounded-full border-b-2 border-white mr-1"></div>
-                                  Creating...
-                                </>
-                              ) : (
-                                <>
-                                  <PlusCircle className="h-3 w-3 mr-1" />
-                                  Add Shot
-                                </>
-                              )}
-                            </Button>
-                          )}
-                        </div>
-                      )}
-                      
-                      {/* Scrollable shot list takes remaining space */}
-                      <div className="flex-1 overflow-y-auto min-h-0">
-                        {simplifiedShotOptions.map(shot => (
-                            <SelectItem key={shot.id} value={shot.id} className="text-xs">
-                                {shot.name}
-                            </SelectItem>
-                        ))}
-                      </div>
-                  </SelectContent>
-              </Select>
+                  shots={simplifiedShotOptions}
+                  placeholder="Shot..."
+                  triggerClassName="h-7 px-2 py-1 rounded-md bg-black/50 hover:bg-black/70 text-white text-xs min-w-[70px] max-w-[90px] truncate focus:ring-0 focus:ring-offset-0"
+                  contentClassName="w-[var(--radix-select-trigger-width)]"
+                  showAddShot={!!onCreateShot}
+                  onCreateShot={handleQuickCreateAndAdd}
+                  isCreatingShot={addingToShotImageId === image.id}
+                  quickCreateSuccess={quickCreateSuccess}
+                  onQuickCreateSuccess={handleQuickCreateSuccess}
+                  side="top"
+                  align="start"
+                  sideOffset={4}
+              />
 
               <div className="relative">
                 <Tooltip delayDuration={0} disableHoverableContent>

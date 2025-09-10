@@ -126,7 +126,7 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({ isOp
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent 
-        className={`${mobileModalStyling.fullClassName} data-[state=open]:!slide-in-from-top data-[state=open]:!slide-in-from-left-1/4 data-[state=closed]:!slide-out-to-top data-[state=closed]:!slide-out-to-left-1/4`}
+        className={`${mobileModalStyling.fullClassName} data-[state=closed]:!slide-out-to-left data-[state=closed]:!slide-out-to-top-[48%] data-[state=open]:!slide-in-from-left data-[state=open]:!slide-in-from-top-[48%]`}
         style={mobileModalStyling.dialogContentStyle}
         {...createMobileModalProps(mobileModalStyling.isMobile)}
       >

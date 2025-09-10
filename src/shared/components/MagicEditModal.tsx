@@ -72,6 +72,9 @@ export const MagicEditModal: React.FC<MagicEditModalProps> = ({
     setTasksCreated(false);
 
     try {
+      // Determine shot_id: prioritize currentShotId (when ON a shot), then magicEditShotId (when selected from dropdown)
+      const shotId = currentShotId || magicEditShotId || undefined;
+      
       // Create batch magic edit tasks using the unified system
       const batchParams = {
         project_id: selectedProjectId,
@@ -82,8 +85,10 @@ export const MagicEditModal: React.FC<MagicEditModalProps> = ({
         resolution: imageDimensions ? `${imageDimensions.width}x${imageDimensions.height}` : undefined,
         seed: 11111, // Base seed, will be incremented for each image
         in_scene: magicEditInSceneBoost,
-        shot_id: currentShotId || magicEditShotId || undefined, // Associate with current shot if in shot context
+        shot_id: shotId, // Associate with shot if available (currentShotId takes priority over magicEditShotId)
       };
+      
+      console.log(`[MagicEditModal] Creating tasks with shot_id: ${shotId} (currentShotId: ${currentShotId}, magicEditShotId: ${magicEditShotId})`);
 
       const results = await createBatchMagicEditTasks(batchParams);
       

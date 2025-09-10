@@ -2,13 +2,13 @@
 
 > **How to Use This Guide**  
 > • Skim the Tech Stack & Directory tables below to orient yourself.  
-> • Need implementation specifics? Follow the links to sub-docs in [structure_detail/](structure_detail/) (one file per topic).  
+> • Need implementation specifics? Follow the links to sub-docs in [docs/structure_detail/](docs/structure_detail/) (one file per topic).  
 > • This guide documents the current architecture and setup, not historical changes or bug fixes. If you need to see change history, fetch git commits.
 > • When in doubt, the source of truth is always the code – this guide just points you in the right direction.
 
 > **When to Update This Guide & Sub-Docs**  
 > • Create, delete, rename, or move any top-level directory, core config file, or critical script.  
-> • Add, hide, deprecate, or significantly refactor a tool — also create/update its doc in `structure_detail/`.  
+> • Add, hide, deprecate, or significantly refactor a tool — also create/update its doc in `docs/structure_detail/`.  
 > • Modify database schema, migrations, RLS policies, or Edge Function names/logic.  
 > • Introduce a new state-persistence strategy (storage bucket, LocalStorage schema, etc.).  
 > • Add or change shared hooks, contexts, or reusable UI primitives.  
@@ -36,27 +36,26 @@
 | Topic | File | Description |
 |-------|------|-------------|
 | **Development Setup** | [README.md](README.md) | Local environment setup, commands, troubleshooting |
-| **Database & Storage** | [db_and_storage.md](structure_detail/db_and_storage.md) | Schema map, migration workflow, storage buckets |
-| **Data Persistence** | [data_persistence.md](structure_detail/data_persistence.md) | State management patterns, hooks, storage layers |
-| **Task System** | [task_worker_lifecycle.md](structure_detail/task_worker_lifecycle.md) | Async task queue, worker polling, Edge Functions |
-| **Unified Task Creation** | [unified_task_creation.md](structure_detail/unified_task_creation.md) | Client-side task creation pattern, migration guide, authentication flow |
-| **Edge Functions** | [edge_functions.md](structure_detail/edge_functions.md) | Complete serverless function reference and API details |
-| **Adding Tools** | [adding_new_tool.md](structure_detail/adding_new_tool.md) | Step-by-step guide for new tool modules |
-| **Design Standards** | [design_motion_guidelines.md](structure_detail/design_motion_guidelines.md) | UI/UX patterns, motion, accessibility, mobile touch interactions |
-| **Shared Code** | [shared_hooks_contexts.md](structure_detail/shared_hooks_contexts.md) | Reusable hooks, contexts, components catalog |
-| **Realtime Architecture** | [realtime_system.md](structure_detail/realtime_system.md) | Implemented unified realtime system and usage guide |
-| **Realtime Dead-Mode Incident** | [realtime_dead_mode_incident.md](structure_detail/realtime_dead_mode_incident.md) | Analysis of tab-resume realtime failures, diagnostics, and mitigations |
-| **Component Modularity** | [component_modularization.md](structure_detail/component_modularization.md) | Reusable UI component patterns and shared details |
-| **Tool: Image Gen** | [tool_image_generation.md](structure_detail/tool_image_generation.md) | Multi-model image generation (Wan 2.2, Qwen.Image), LoRA support, style reference system |
-| **Tool: Video Travel** | [tool_video_travel.md](structure_detail/tool_video_travel.md) | Frame-accurate video generation workflow, shot reordering, mobile video preloading |
-| **Tool: Edit Travel** | [tool_edit_travel.md](structure_detail/tool_edit_travel.md) | Text-guided image transformations |
-| **Tool: Training Data** | [tool_training_data_helper.md](structure_detail/tool_training_data_helper.md) | Training video upload & segmentation |
-| **Auto-Top-Up System** | [auto_topup_system.md](structure_detail/auto_topup_system.md) | Credit purchases, auto-top-up setup, Stripe integration, database triggers |
-| **Referral System** | [referral_system.md](structure_detail/referral_system.md) | Referral tracking with username-based links, visitor attribution, secure conversion handling |
-| **Debug Logging** | [debug_logging.md](structure_detail/debug_logging.md) | PerfDebug log helpers & profiling |
-| **Component Modularization** | [component_modularization.md](structure_detail/component_modularization.md) | Guide for breaking down large components into maintainable modules |
-| **Image Loading System** | [image_loading_system.md](structure_detail/image_loading_system.md) | Progressive loading, adjacent page preloading, performance optimization |
-| **Mobile Modal Styling** | [mobile_modal_styling_system.md](structure_detail/mobile_modal_styling_system.md) | Unified mobile modal positioning, safe area handling, responsive modal layouts |
+| **Database & Storage** | [db_and_storage.md](docs/structure_detail/db_and_storage.md) | Schema map, migration workflow, storage buckets |
+| **Data Persistence** | [data_persistence.md](docs/structure_detail/data_persistence.md) | State management patterns, hooks, storage layers |
+| **Task System** | [task_worker_lifecycle.md](docs/structure_detail/task_worker_lifecycle.md) | Async task queue, worker polling, Edge Functions |
+| **Unified Task Creation** | [unified_task_creation.md](docs/structure_detail/unified_task_creation.md) | Client-side task creation pattern, migration guide, authentication flow |
+| **Edge Functions** | [edge_functions.md](docs/structure_detail/edge_functions.md) | Complete serverless function reference and API details |
+| **Adding Tools** | [adding_new_tool.md](docs/structure_detail/adding_new_tool.md) | Step-by-step guide for new tool modules |
+| **Design Standards** | [design_motion_guidelines.md](docs/structure_detail/design_motion_guidelines.md) | UI/UX patterns, motion, accessibility, mobile touch interactions |
+| **Shared Code** | [shared_hooks_contexts.md](docs/structure_detail/shared_hooks_contexts.md) | Reusable hooks, contexts, components catalog |
+| **Realtime Architecture** | [realtime_system.md](docs/structure_detail/realtime_system.md) | Implemented unified realtime system and usage guide |
+| **Component Modularity** | [component_modularization.md](docs/structure_detail/component_modularization.md) | Reusable UI component patterns and shared details |
+| **Tool: Image Gen** | [tool_image_generation.md](docs/structure_detail/tool_image_generation.md) | Multi-model image generation (Wan 2.2, Qwen.Image), LoRA support, style reference system |
+| **Tool: Video Travel** | [tool_video_travel.md](docs/structure_detail/tool_video_travel.md) | Frame-accurate video generation workflow, shot reordering, mobile video preloading |
+| **Tool: Edit Travel** | [tool_edit_travel.md](docs/structure_detail/tool_edit_travel.md) | Text-guided image transformations |
+| **Tool: Training Data** | [tool_training_data_helper.md](docs/structure_detail/tool_training_data_helper.md) | Training video upload & segmentation |
+| **Auto-Top-Up System** | [auto_topup_system.md](docs/structure_detail/auto_topup_system.md) | Credit purchases, auto-top-up setup, Stripe integration, database triggers |
+| **Referral System** | [referral_system.md](docs/structure_detail/referral_system.md) | Referral tracking with username-based links, visitor attribution, secure conversion handling |
+| **Debug Logging** | [debug_logging.md](docs/structure_detail/debug_logging.md) | PerfDebug log helpers & profiling |
+| **Component Modularization** | [component_modularization.md](docs/structure_detail/component_modularization.md) | Guide for breaking down large components into maintainable modules |
+| **Image Loading System** | [image_loading_system.md](docs/structure_detail/image_loading_system.md) | Progressive loading, adjacent page preloading, performance optimization |
+| **Modal Styling System** | [modal_styling_system.md](docs/structure_detail/modal_styling_system.md) | Unified responsive modal system for both mobile and desktop, positioning, safe area handling |
 | **Mobile Video Toggle** | - | Mobile UI toggle functionality between MediaLightbox video playback and TaskDetailsModal for viewing generation parameters |
 | **Railway Deployment** | [DEPLOY_RAILWAY.md](DEPLOY_RAILWAY.md) | Complete Railway.com deployment guide |
 | **Instrumentation System** | [instrumentation/README.md](src/integrations/supabase/instrumentation/README.md) | Centralized instrumentation management, diagnostics, and debugging tools |
@@ -134,11 +133,11 @@ src/integrations/supabase/
 
 | Topic | Documentation | Description |
 |-------|---------------|-------------|
-| **Database & Storage** | [`db_and_storage.md`](structure_detail/db_and_storage.md) | Schema, migrations, RLS policies, storage buckets |
-| **Persistence** | [`data_persistence.md`](structure_detail/data_persistence.md) | State management & storage patterns |
-| **Adding Tools** | [`adding_new_tool.md`](structure_detail/adding_new_tool.md) | Step-by-step tool creation guide |
-| **Design System** | [`design_motion_guidelines.md`](structure_detail/design_motion_guidelines.md) | UI/UX standards & animations |
-| **Shared Code** | [`shared_hooks_contexts.md`](structure_detail/shared_hooks_contexts.md) | Reusable hooks & contexts catalog |
+| **Database & Storage** | [`db_and_storage.md`](docs/structure_detail/db_and_storage.md) | Schema, migrations, RLS policies, storage buckets |
+| **Persistence** | [`data_persistence.md`](docs/structure_detail/data_persistence.md) | State management & storage patterns |
+| **Adding Tools** | [`adding_new_tool.md`](docs/structure_detail/adding_new_tool.md) | Step-by-step tool creation guide |
+| **Design System** | [`design_motion_guidelines.md`](docs/structure_detail/design_motion_guidelines.md) | UI/UX standards & animations |
+| **Shared Code** | [`shared_hooks_contexts.md`](docs/structure_detail/shared_hooks_contexts.md) | Reusable hooks & contexts catalog |
 
 ---
 
@@ -168,7 +167,7 @@ Configuration via environment variables for database, AI services, payments, and
 
 #### ⚡ Edge Functions
 
-Serverless functions handle AI processing, payments, and task management. For complete function reference and implementation details, see [`edge_functions.md`](structure_detail/edge_functions.md).
+Serverless functions handle AI processing, payments, and task management. For complete function reference and implementation details, see [`edge_functions.md`](docs/structure_detail/edge_functions.md).
 
 ---
 
@@ -205,16 +204,17 @@ tool-name/
 
 | Tool | Status | Documentation | Key Features |
 |------|--------|---------------|--------------|
-| **Image Generation** | ✅ Active | [`tool_image_generation.md`](structure_detail/tool_image_generation.md) | Multi-model generation (Wan 2.2, Qwen.Image), LoRA & style reference support |
-| **Video Travel** | ✅ Active | [`tool_video_travel.md`](structure_detail/tool_video_travel.md) | Frame-accurate timeline with dynamic spacing, batch processing, drag-and-drop shot reordering |
-| **Edit Travel** | ⚠️ Hidden | [`tool_edit_travel.md`](structure_detail/tool_edit_travel.md) | Text-guided transformations |
-| **Training Data** | ⚠️ Hidden | [`tool_training_data_helper.md`](structure_detail/tool_training_data_helper.md) | Video upload & segmentation |
+| **Image Generation** | ✅ Active | [`tool_image_generation.md`](docs/structure_detail/tool_image_generation.md) | Multi-model generation (Wan 2.2, Qwen.Image), LoRA & style reference support |
+| **Video Travel** | ✅ Active | [`tool_video_travel.md`](docs/structure_detail/tool_video_travel.md) | Frame-accurate timeline with dynamic spacing, batch processing, drag-and-drop shot reordering |
+| **Edit Travel** | ⚠️ Hidden | [`tool_edit_travel.md`](docs/structure_detail/tool_edit_travel.md) | Text-guided transformations |
+| **Training Data** | ⚠️ Hidden | [`tool_training_data_helper.md`](docs/structure_detail/tool_training_data_helper.md) | Video upload & segmentation |
 
 ### 🔄 Shared Elements (`/src/shared/`)
 
-For the complete catalog, see [`shared_hooks_contexts.md`](structure_detail/shared_hooks_contexts.md).
+For the complete catalog, see [`shared_hooks_contexts.md`](docs/structure_detail/shared_hooks_contexts.md).
 
 #### 🖼️ Image Gallery Features
+- **Project-Aware Dimensions**: Gallery items automatically use project aspect ratio (16:9, 4:3, 9:16, etc.) instead of square layout for consistent visual presentation
 - **Dual Add-to-Shot Options**: Images can be added to shots in two ways:
   - **With position** (main button): Adds image at the final position in the shot timeline
   - **Without position** (secondary button): Associates image with shot but without timeline position
@@ -234,7 +234,7 @@ For the complete catalog, see [`shared_hooks_contexts.md`](structure_detail/shar
 
 #### 🪝 Essential Hooks
 
-Shared hooks provide data management, state persistence, real-time updates, and UI utilities. Complete hook catalog with usage examples: [`shared_hooks_contexts.md`](structure_detail/shared_hooks_contexts.md).
+Shared hooks provide data management, state persistence, real-time updates, and UI utilities. Complete hook catalog with usage examples: [`shared_hooks_contexts.md`](docs/structure_detail/shared_hooks_contexts.md).
 
 #### 🧮 Services & Utilities
 
@@ -248,15 +248,15 @@ Shared hooks provide data management, state persistence, real-time updates, and 
 
 ## 4. Task & Worker Lifecycle
 
-Reigh uses an async task queue for AI workloads. For the complete flow diagram and implementation details, see [structure_detail/task_worker_lifecycle.md](structure_detail/task_worker_lifecycle.md).
+Reigh uses an async task queue for AI workloads. For the complete flow diagram and implementation details, see [docs/structure_detail/task_worker_lifecycle.md](docs/structure_detail/task_worker_lifecycle.md).
 
 ### External Workers
-**Headless-Wan2GP** handles all AI processing tasks via GPU-accelerated Python environment. Supports local CUDA and cloud scaling. Complete setup and task flow details: [`task_worker_lifecycle.md`](structure_detail/task_worker_lifecycle.md).
+**Headless-Wan2GP** handles all AI processing tasks via GPU-accelerated Python environment. Supports local CUDA and cloud scaling. Complete setup and task flow details: [`task_worker_lifecycle.md`](docs/structure_detail/task_worker_lifecycle.md).
 
 ## 5. Development Workflow
 
 ### Debug Logging & Performance Profiling  
-Reigh includes environment-toggleable debug logging for performance monitoring and troubleshooting. Enable with `VITE_DEBUG_LOGS=true`. Complete setup and API reference: [`debug_logging.md`](structure_detail/debug_logging.md).
+Reigh includes environment-toggleable debug logging for performance monitoring and troubleshooting. Enable with `VITE_DEBUG_LOGS=true`. Complete setup and API reference: [`debug_logging.md`](docs/structure_detail/debug_logging.md).
 
 See [README.md](README.md) for:
 - Local environment setup (5-min quickstart)
@@ -268,7 +268,7 @@ See [README.md](README.md) for:
 
 **🎯 Quick Links**
 
-[Back to Top](#-reigh-developer-onboarding) • [Add a Tool](structure_detail/adding_new_tool.md) • [Database & Storage](structure_detail/db_and_storage.md) • [Persistence](structure_detail/data_persistence.md)
+[Back to Top](#-reigh-developer-onboarding) • [Add a Tool](docs/structure_detail/adding_new_tool.md) • [Database & Storage](docs/structure_detail/db_and_storage.md) • [Persistence](docs/structure_detail/data_persistence.md)
 
   </div>
 

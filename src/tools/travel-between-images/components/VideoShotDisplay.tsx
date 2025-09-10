@@ -249,8 +249,22 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
     }
   };
 
-  const imagesOnly = shot.images?.filter(image => image.type !== 'video' && image.type !== 'video_travel_output') || [];
-  const imagesToShow: GenerationRow[] = imagesOnly.slice(0, 5);
+  // Match ShotEditor/ShotsPane: show only positioned, non-video images sorted by position
+  const positionedImages = (shot.images || [])
+    .filter(img => (img as any).position !== null && (img as any).position !== undefined)
+    .filter(img => {
+      const isVideo = img.type === 'video' || img.type === 'video_travel_output' ||
+        ((img as any).location && (img as any).location.endsWith('.mp4')) ||
+        ((img as any).imageUrl && (img as any).imageUrl.endsWith('.mp4'));
+      return !isVideo;
+    })
+    .sort((a, b) => {
+      const posA = (a as any).position as number;
+      const posB = (b as any).position as number;
+      return posA - posB;
+    });
+
+  const imagesToShow: GenerationRow[] = positionedImages.slice(0, 5);
 
   // [Performance] Disabled excessive logging that was causing render cascades
   // Debug logging
@@ -351,7 +365,7 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
           ) : (
             <p className="text-sm text-muted-foreground italic">No images in this shot yet.</p>
           )}
-          {imagesOnly.length > 5 && (
+          {positionedImages.length > 5 && (
             <div 
               className="flex-shrink-0 w-32 h-32 rounded border bg-muted flex items-center justify-center cursor-pointer hover:bg-muted/80 hover:shadow-wes-deep hover:scale-105 transition-all duration-300 animate-in fade-in-up"
               style={{ animationDelay: `${imagesToShow.length * 0.1}s` }}
@@ -360,7 +374,7 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
                 onSelectShot();
               }}
             >
-              <p className="text-sm text-muted-foreground text-center pointer-events-none">+{imagesOnly.length - 5} more</p>
+              <p className="text-sm text-muted-foreground text-center pointer-events-none">+{positionedImages.length - 5} more</p>
             </div>
           )}
         </div>

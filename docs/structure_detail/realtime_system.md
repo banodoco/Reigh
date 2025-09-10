@@ -97,7 +97,7 @@ UI ↔ React Query cache ← InvalidationRouter ← RealtimeProvider ← Supabas
   - Payload: `{ projectId, shotId? }`
   - Invalidations:
     - `['unified-generations', 'project', projectId]`
-    - If `shotId`: `['unified-generations', 'shot', shotId]`
+    - If `shotId`: `['unified-generations', 'shot', shotId]` and `['unpositioned-count', shotId]`
     - Also nudges `['shots', projectId]` when relevant to lists
 
 - SHOT_GENERATION_CHANGE (any change in `shot_generations`)
@@ -105,6 +105,7 @@ UI ↔ React Query cache ← InvalidationRouter ← RealtimeProvider ← Supabas
   - Invalidations:
     - `['unified-generations', 'project', projectId]`
     - `['unified-generations', 'shot', shotId]`
+    - `['unpositioned-count', shotId]` (for position changes affecting unpositioned generation count)
 
 - TASK_STATUS_CHANGE (INSERT/UPDATE in `tasks`)
   - Payload: `{ projectId }`

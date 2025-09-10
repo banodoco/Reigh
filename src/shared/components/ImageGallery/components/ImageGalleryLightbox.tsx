@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import MediaLightbox from "@/shared/components/MediaLightbox";
 import TaskDetailsModal from '@/tools/travel-between-images/components/TaskDetailsModal';
-import { GenerationRow } from "@/types/shots";
+import { GenerationRow, Shot } from "@/types/shots";
 import { GeneratedImageWithMetadata } from '../ImageGallery';
 
 export interface ImageGalleryLightboxProps {
@@ -46,6 +46,11 @@ export interface ImageGalleryLightboxProps {
   inputImages?: string[];
   lightboxTaskMapping?: any;
   onShowTaskDetails?: () => void;
+  
+  // Shot creation
+  onCreateShot?: (shotName: string, files: File[]) => Promise<void>;
+  // Shot navigation
+  onNavigateToShot?: (shot: Shot) => void;
 }
 
 export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
@@ -79,6 +84,8 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
   inputImages,
   lightboxTaskMapping,
   onShowTaskDetails,
+  onCreateShot,
+  onNavigateToShot,
 }) => {
   
   // Calculate navigation availability for MediaLightbox
@@ -164,6 +171,8 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
             onClose: onClose
           }}
           onShowTaskDetails={isMobile ? onShowTaskDetails : undefined}
+          onCreateShot={onCreateShot}
+          onNavigateToShot={onNavigateToShot}
         />
       )}
 

@@ -1,5 +1,6 @@
 import { useInfiniteQuery, useQuery, UseInfiniteQueryResult, UseQueryResult } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useResurrectionPollingConfig } from '@/shared/hooks/useResurrectionPolling';
 import { GenerationRow } from '@/types/shots';
 import React from 'react';
 
@@ -82,6 +83,7 @@ export const useShotGenerations = (
 export const useUnpositionedGenerationsCount = (
   shotId: string | null
 ): UseQueryResult<number> => {
+  const { refetchInterval } = useResurrectionPollingConfig('UnpositionedCount', { shotId });
   return useQuery({
     queryKey: ['unpositioned-count', shotId],
     enabled: !!shotId,
@@ -117,6 +119,8 @@ export const useUnpositionedGenerationsCount = (
       return nonVideoCount;
     },
     staleTime: 30 * 1000, // 30 seconds
+    // Resurrection polling: ensure updates even if realtime degrades
+    refetchInterval,
   });
 };
 

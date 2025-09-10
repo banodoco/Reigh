@@ -147,7 +147,9 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
   };
 
   const handleDeleteClick = (e: React.MouseEvent) => {
+    e.preventDefault();
     e.stopPropagation();
+    e.nativeEvent.stopImmediatePropagation();
     if (skipConfirmation) {
       onDelete(image.shotImageEntryId);
     } else {
@@ -166,7 +168,9 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
   };
 
   const handleDuplicateClick = (e: React.MouseEvent) => {
+    e.preventDefault();
     e.stopPropagation();
+    e.nativeEvent.stopImmediatePropagation();
     if (onDuplicate && position !== undefined) {
       onDuplicate(image.shotImageEntryId, position);
     }
@@ -209,25 +213,39 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
       data-selected={isSelected}
       data-image-id={((image.shotImageEntryId as any) || (image.id as any) || '').toString().substring(0, 8)}
       {...(!isDragDisabled ? attributes : {})}
-      {...(!isDragDisabled ? listeners : {})}
       onClick={(e) => {
+        // Check if the click originated from a button or its children
+        const target = e.target as HTMLElement;
+        const isButtonClick = target.closest('button') !== null;
+        
         console.log('[SelectionDebug:SortableImageItem] onClick triggered', {
           imageId: ((image.shotImageEntryId as any) || (image.id as any) || '').toString().substring(0, 8),
           isSelected,
           hasOnClickHandler: !!onClick,
-          eventTarget: (e.target as HTMLElement | null)?.tagName || 'unknown',
+          eventTarget: target?.tagName || 'unknown',
+          isButtonClick,
+          buttonElement: target.closest('button')?.title || 'none',
           actualDOMClasses: (e.currentTarget as HTMLElement)?.className || 'NO_CLASSES',
           timestamp: Date.now()
         });
-        onClick?.(e);
+        
+        // Don't trigger onClick if the click came from a button
+        if (!isButtonClick) {
+          onClick?.(e);
+        }
       }}
       onPointerDown={(e) => {
+        // Check if the pointer down originated from a button or its children
+        const target = e.target as HTMLElement;
+        const isButtonClick = target.closest('button') !== null;
+        
         // Add DOM inspection after render
         setTimeout(() => {
           const element = e.currentTarget as HTMLElement;
           console.log('[SelectionDebug:SortableImageItem] DOM INSPECTION POST-RENDER', {
             imageId: ((image.shotImageEntryId as any) || (image.id as any) || '').toString().substring(0, 8),
             isSelected,
+            isButtonClick,
             actualDOMClasses: element.className,
             computedStyles: {
               borderColor: window.getComputedStyle(element).borderColor,
@@ -241,7 +259,11 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
             }
           });
         }, 100);
-        onPointerDown?.(e);
+        
+        // Don't trigger onPointerDown if the click came from a button
+        if (!isButtonClick) {
+          onPointerDown?.(e);
+        }
       }}
       onDoubleClick={isMobile ? undefined : onDoubleClick}
     >
@@ -254,6 +276,7 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
         onTouchEnd={isMobile ? handleTouchEnd : undefined}
         loading="lazy"
         draggable={false}
+        {...(!isDragDisabled ? listeners : {})}
         onError={(e) => {
           // Fallback to original URL if display URL fails
           const target = e.target as HTMLImageElement;
@@ -270,8 +293,20 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
             size="icon"
             className="absolute bottom-1 left-1 h-7 w-7 p-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10"
             onClick={(e) => {
+              e.preventDefault();
               e.stopPropagation();
+              e.nativeEvent.stopImmediatePropagation();
               setIsMagicEditOpen(true);
+            }}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              e.nativeEvent.stopImmediatePropagation();
+            }}
+            onPointerDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              e.nativeEvent.stopImmediatePropagation();
             }}
             title="Magic Edit"
           >
@@ -283,6 +318,16 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
               size="icon"
               className="absolute top-1 right-9 h-7 w-7 p-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10"
               onClick={handleDuplicateClick}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                e.nativeEvent.stopImmediatePropagation();
+              }}
+              onPointerDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                e.nativeEvent.stopImmediatePropagation();
+              }}
               disabled={duplicatingImageId === image.shotImageEntryId}
               title="Duplicate image"
             >
@@ -300,6 +345,16 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
             size="icon"
             className="absolute top-1 right-1 h-7 w-7 p-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10"
             onClick={handleDeleteClick}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              e.nativeEvent.stopImmediatePropagation();
+            }}
+            onPointerDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              e.nativeEvent.stopImmediatePropagation();
+            }}
             title="Remove image from shot"
           >
             <Trash2 className="h-3.5 w-3.5" />

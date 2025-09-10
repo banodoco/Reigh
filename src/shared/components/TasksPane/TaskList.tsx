@@ -21,6 +21,7 @@ interface TaskListProps {
   paginatedData?: PaginatedTasksResponse;
   isLoading?: boolean;
   currentPage?: number; // Add current page to track pagination changes
+  onVisibleCountChange?: (count: number) => void; // Callback to report actual visible count
 }
 
 const TaskList: React.FC<TaskListProps> = ({ 
@@ -29,7 +30,8 @@ const TaskList: React.FC<TaskListProps> = ({
   statusCounts,
   paginatedData,
   isLoading = false,
-  currentPage = 1
+  currentPage = 1,
+  onVisibleCountChange
 }) => {
   const { selectedProjectId } = useProject();
 
@@ -91,11 +93,19 @@ const TaskList: React.FC<TaskListProps> = ({
   const filteredTasks = useMemo(() => {
     if (!tasks) return [] as Task[];
     const visible = filterVisibleTasks(tasks);
+    
+    // Calculate processing count and report it to parent
+    const processingVisible = visible.filter(t => t.status === 'Queued' || t.status === 'In Progress');
+    
+    // Report the actual visible processing count to parent for badge
+    if (onVisibleCountChange && activeFilter === 'Processing') {
+      onVisibleCountChange(processingVisible.length);
+    }
+    
     // [TasksPaneCountMismatch] Log when local filtering hides tasks that might be counted
     try {
       const hidden = tasks.filter(t => !isTaskVisible(t.taskType));
-      const processingVisible = visible.filter(t => t.status === 'Queued' || t.status === 'In Progress');
-      console.log('[TasksPaneCountMismatch]', {
+      console.log('[TaskList] Visible task filtering', {
         context: 'TaskList:filter-visible-tasks',
         activeFilter,
         tasksCount: tasks.length,
@@ -103,11 +113,12 @@ const TaskList: React.FC<TaskListProps> = ({
         hiddenCount: hidden.length,
         hiddenTypesSample: hidden.slice(0, 5).map(t => ({ id: t.id, taskType: t.taskType, status: t.status })),
         processingVisibleCount: processingVisible.length,
+        reportedToParent: activeFilter === 'Processing' ? processingVisible.length : 'not processing filter',
         timestamp: Date.now()
       });
     } catch {}
     return visible;
-  }, [tasks]);
+  }, [tasks, activeFilter, onVisibleCountChange]);
 
   const summaryMessage = useMemo(() => {
     if (!statusCounts) return null;

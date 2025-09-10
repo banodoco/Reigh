@@ -16,6 +16,7 @@ export interface ImageGalleryGridProps {
   reducedSpacing?: boolean;
   whiteText?: boolean;
   gridColumnClasses: string;
+  projectAspectRatio?: string;
   
   // Loading props
   isGalleryLoading: boolean;
@@ -57,6 +58,7 @@ export const ImageGalleryGrid: React.FC<ImageGalleryGridProps> = ({
   reducedSpacing = false,
   whiteText = false,
   gridColumnClasses,
+  projectAspectRatio,
   
   // Loading props
   isGalleryLoading,
@@ -88,6 +90,9 @@ export const ImageGalleryGrid: React.FC<ImageGalleryGridProps> = ({
   ...itemProps
 }) => {
   
+  // Guard to avoid redundant button clears and unnecessary renders
+  const lastClearedButtonRef = React.useRef<'prev' | 'next' | null | 'cleared'>(null);
+
   return (
     <>
       {/* Adjacent Page Preloading Manager - handles preloading in background */}
@@ -143,16 +148,20 @@ export const ImageGalleryGrid: React.FC<ImageGalleryGridProps> = ({
             instanceId={`gallery-${isServerPagination ? (serverPage || 1) : page}`}
             onImagesReady={() => {
               console.log(`🎯 [PAGELOADINGDEBUG] [GALLERY] Images ready - clearing gallery loading state`);
-              setIsGalleryLoading(false);
+              // Only update if needed to prevent render thrash
+              if (isGalleryLoading) setIsGalleryLoading(false);
               
               // Only clear button loading for server pagination - client pagination handles this separately
               if (isServerPagination) {
                 console.log(`🔘 [PAGELOADINGDEBUG] [GALLERY] Server pagination - also clearing button loading`);
-                console.warn(`[ReconnectionIssue][UI_LOADING_STATE] Clearing loadingButton - buttons will be re-enabled`, {
-                  reason: 'Server pagination images ready',
-                  timestamp: Date.now()
-                });
-                setLoadingButton(null);
+                if (lastClearedButtonRef.current !== 'cleared') {
+                  console.warn(`[ReconnectionIssue][UI_LOADING_STATE] Clearing loadingButton - buttons will be re-enabled`, {
+                    reason: 'Server pagination images ready',
+                    timestamp: Date.now()
+                  });
+                  setLoadingButton(null);
+                  lastClearedButtonRef.current = 'cleared';
+                }
               }
               
               // Clear the gallery safety timeout since loading completed successfully
@@ -197,6 +206,7 @@ export const ImageGalleryGrid: React.FC<ImageGalleryGridProps> = ({
                         isPriority={loadingStrategy.shouldLoadInInitialBatch}
                         isGalleryLoading={isGalleryLoading}
                         isMobile={isMobile}
+                        projectAspectRatio={projectAspectRatio}
                         {...itemProps}
                       />
                     );

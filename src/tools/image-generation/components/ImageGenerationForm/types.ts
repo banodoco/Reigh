@@ -49,7 +49,8 @@ export interface PersistedFormSettings {
 // Project-level settings for model and style reference
 export interface ProjectImageSettings {
   selectedModel?: GenerationMode;
-  styleReferenceImage?: string | null; // URL of uploaded style reference image
+  styleReferenceImage?: string | null; // URL of processed style reference image (used for generation)
+  styleReferenceImageOriginal?: string | null; // URL of original uploaded image (used for display)
   styleReferenceStrength?: number; // Strength slider value
 }
 
