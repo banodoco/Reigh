@@ -240,11 +240,11 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
       const { data: currentTask, error: taskFetchError } = await supabaseAdmin
         .from("tasks")
         .select(`
-          tasks.params, 
-          tasks.task_type,
+          params, 
+          task_type,
           task_types!inner(tool_type, category)
         `)
-        .eq("tasks.id", taskIdString)
+        .eq("id", taskIdString)
         .single();
 
       if (!taskFetchError && currentTask && currentTask.params) {
@@ -313,7 +313,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
               }
             }
           } else {
-            const { data: shotData, error: shotError } = await supabaseAdmin.from("shots").select("shots.id").eq("shots.id", shotIdString).single();
+            const { data: shotData, error: shotError } = await supabaseAdmin.from("shots").select("id").eq("id", shotIdString).single();
             if (shotError || !shotData) {
               console.log(`[COMPLETE-TASK-DEBUG] Shot ${shotIdString} does not exist (error: ${shotError?.message || 'not found'}), removing from task parameters`);
               needsParamsUpdate = true;
