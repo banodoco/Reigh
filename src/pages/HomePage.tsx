@@ -867,7 +867,7 @@ export default function HomePage() {
                                 }
                               }
                             }}
-                            className={`sparkle-underline cursor-pointer transition-all duration-200 ${ecosystemTipOpen ? 'tooltip-open font-semibold' : ''} ${ecosystemTipDisabled ? 'pointer-events-none' : ''}`}
+                            className={`sparkle-underline cursor-pointer transition-all duration-300 ease-out ${ecosystemTipOpen ? 'tooltip-open font-bold scale-110' : 'scale-100'} ${ecosystemTipDisabled ? 'pointer-events-none' : ''}`}
                           >
                             open source ecosystem
                           </span>
