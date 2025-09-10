@@ -571,21 +571,26 @@ export const useAddImageToShot = () => {
       const startTime = Date.now();
 
       // Check what currently exists for this shot-generation combo
-      const { data: existingRecord, error: checkError } = await supabase
+      const { data: allExistingRecords, error: checkError } = await supabase
         .from('shot_generations')
-        .select('id, shot_id, generation_id, position')
+        .select('id, shot_id, generation_id, position, created_at')
         .eq('shot_id', shot_id)
         .eq('generation_id', generation_id)
-        .maybeSingle();
+        .order('created_at', { ascending: true });
 
       if (checkError) {
-        console.error('[PositionFix] Error checking existing record (regular path):', checkError);
+        console.error('[PositionFix] Error checking existing records (regular path):', checkError);
       } else {
-        console.log('[PositionFix] Existing shot_generation record (regular path):', {
-          existingRecord,
-          hasRecord: !!existingRecord,
-          currentPosition: existingRecord?.position,
-          isCurrentlyNull: existingRecord?.position === null || existingRecord?.position === undefined
+        console.log('[PositionFix] ALL existing records (regular path):', {
+          shot_id,
+          generation_id,
+          recordCount: allExistingRecords?.length || 0,
+          allRecords: allExistingRecords?.map(record => ({
+            id: record.id,
+            position: record.position,
+            created_at: record.created_at,
+            isPositionNull: record.position === null || record.position === undefined
+          })) || []
         });
       }
       
@@ -641,15 +646,15 @@ export const useAddImageToShot = () => {
       });
 
       // Verify the final state
-      const { data: finalRecord, error: verifyError } = await supabase
+      const { data: finalRecords, error: verifyError } = await supabase
         .from('shot_generations')
-        .select('id, shot_id, generation_id, position')
+        .select('id, shot_id, generation_id, position, created_at')
         .eq('shot_id', shot_id)
         .eq('generation_id', generation_id)
-        .maybeSingle();
+        .order('created_at', { ascending: true });
 
       if (verifyError) {
-        console.error('[PositionFix] Error verifying final record (regular path):', {
+        console.error('[PositionFix] Error verifying final records (regular path):', {
           verifyError,
           errorCode: verifyError.code,
           errorMessage: verifyError.message,
@@ -658,11 +663,19 @@ export const useAddImageToShot = () => {
         });
       } else {
         console.log('[PositionFix] Final verification (regular path):', {
-          finalRecord,
-          finalPosition: finalRecord?.position,
-          positionChanged: existingRecord?.position !== finalRecord?.position,
-          wasNull: existingRecord?.position === null || existingRecord?.position === undefined,
-          isNowPositioned: finalRecord?.position !== null && finalRecord?.position !== undefined
+          shot_id,
+          generation_id,
+          beforeCount: allExistingRecords?.length || 0,
+          afterCount: finalRecords?.length || 0,
+          recordsAdded: (finalRecords?.length || 0) - (allExistingRecords?.length || 0),
+          finalRecords: finalRecords?.map(record => ({
+            id: record.id,
+            position: record.position,
+            created_at: record.created_at,
+            isPositionNull: record.position === null || record.position === undefined
+          })) || [],
+          rpcReturnedPosition: (shotGeneration as any)?.position,
+          rpcReturnedId: (shotGeneration as any)?.id
         });
       }
       
@@ -799,24 +812,29 @@ export const usePositionExistingGenerationInShot = () => {
       });
 
       // First, let's check what currently exists for this shot-generation combo
-      const { data: existingRecord, error: checkError } = await supabase
+      // Use .select() instead of .maybeSingle() to see ALL records
+      const { data: allExistingRecords, error: checkError } = await supabase
         .from('shot_generations')
-        .select('id, shot_id, generation_id, position')
+        .select('id, shot_id, generation_id, position, created_at')
         .eq('shot_id', shot_id)
         .eq('generation_id', generation_id)
-        .maybeSingle();
+        .order('created_at', { ascending: true });
 
       if (checkError) {
-        console.error('[PositionFix] Error checking existing record:', checkError);
+        console.error('[PositionFix] Error checking existing records:', checkError);
       } else {
-        console.log('[PositionFix] Existing shot_generation record:', {
-          existingRecord,
-          hasRecord: !!existingRecord,
-          currentPosition: existingRecord?.position,
-          isCurrentlyNull: existingRecord?.position === null || existingRecord?.position === undefined,
-          recordId: existingRecord?.id,
-          shotId: existingRecord?.shot_id,
-          generationId: existingRecord?.generation_id
+        console.log('[PositionFix] ALL existing shot_generation records for this combo:', {
+          shot_id,
+          generation_id,
+          recordCount: allExistingRecords?.length || 0,
+          allRecords: allExistingRecords?.map(record => ({
+            id: record.id,
+            position: record.position,
+            created_at: record.created_at,
+            isPositionNull: record.position === null || record.position === undefined
+          })) || [],
+          hasNullPositionRecord: allExistingRecords?.some(r => r.position === null || r.position === undefined) || false,
+          hasPositionedRecord: allExistingRecords?.some(r => r.position !== null && r.position !== undefined) || false
         });
       }
       
@@ -856,16 +874,16 @@ export const usePositionExistingGenerationInShot = () => {
         timestamp: Date.now()
       });
 
-      // Let's also verify the final state
-      const { data: finalRecord, error: verifyError } = await supabase
+      // Let's verify the final state - get ALL records again to see what happened
+      const { data: finalRecords, error: verifyError } = await supabase
         .from('shot_generations')
-        .select('id, shot_id, generation_id, position')
+        .select('id, shot_id, generation_id, position, created_at')
         .eq('shot_id', shot_id)
         .eq('generation_id', generation_id)
-        .maybeSingle();
+        .order('created_at', { ascending: true });
 
       if (verifyError) {
-        console.error('[PositionFix] Error verifying final record:', {
+        console.error('[PositionFix] Error verifying final records:', {
           verifyError,
           errorCode: verifyError.code,
           errorMessage: verifyError.message,
@@ -873,12 +891,20 @@ export const usePositionExistingGenerationInShot = () => {
           queryParams: { shot_id, generation_id }
         });
       } else {
-        console.log('[PositionFix] Final verification of shot_generation record:', {
-          finalRecord,
-          finalPosition: finalRecord?.position,
-          positionChanged: existingRecord?.position !== finalRecord?.position,
-          wasNull: existingRecord?.position === null || existingRecord?.position === undefined,
-          isNowPositioned: finalRecord?.position !== null && finalRecord?.position !== undefined
+        console.log('[PositionFix] Final verification - ALL records after RPC:', {
+          shot_id,
+          generation_id,
+          beforeCount: allExistingRecords?.length || 0,
+          afterCount: finalRecords?.length || 0,
+          recordsAdded: (finalRecords?.length || 0) - (allExistingRecords?.length || 0),
+          finalRecords: finalRecords?.map(record => ({
+            id: record.id,
+            position: record.position,
+            created_at: record.created_at,
+            isPositionNull: record.position === null || record.position === undefined
+          })) || [],
+          rpcReturnedPosition: (shotGeneration as any)?.position,
+          rpcReturnedId: (shotGeneration as any)?.id
         });
       }
       
