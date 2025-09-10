@@ -779,6 +779,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({
                       forceExpanded={isInlineEditing}
                       rightHeaderAddon={rightHeaderAddon}
                       mobileInlineEditing={isMobile && isInlineEditing}
+                      hideRemoveButton={isInlineEditing}
                     />
                   </div>
                 );

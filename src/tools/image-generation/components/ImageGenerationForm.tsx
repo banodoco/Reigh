@@ -191,6 +191,10 @@ export interface PromptInputRowProps {
    * allows the right header addon to expand to full width.
    */
   mobileInlineEditing?: boolean;
+  /**
+   * When true, hides the remove button regardless of platform.
+   */
+  hideRemoveButton?: boolean;
 }
 
 export const PromptInputRow: React.FC<PromptInputRowProps> = React.memo(({
@@ -203,6 +207,7 @@ export const PromptInputRow: React.FC<PromptInputRowProps> = React.memo(({
   autoEnterEditWhenActive = false,
   rightHeaderAddon,
   mobileInlineEditing = false,
+  hideRemoveButton = false,
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const promptContainerRef = useRef<HTMLDivElement>(null);
@@ -453,7 +458,7 @@ export const PromptInputRow: React.FC<PromptInputRowProps> = React.memo(({
               </TooltipProvider>
             )
           )}
-          {canRemove && !(isMobile && mobileInlineEditing) && (
+          {canRemove && !hideRemoveButton && (
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
