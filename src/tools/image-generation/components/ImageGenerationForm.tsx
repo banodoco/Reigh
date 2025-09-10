@@ -1592,32 +1592,34 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
 
                 {/* Style Reference Upload */}
                 <div className="space-y-3">
-                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Style reference</p>
                   {styleReferenceImage ? (
                     /* Display uploaded style reference */
                     <div className="w-1/3">
                       <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-800/50 relative">
-                        <div className="absolute top-2 right-2 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-full p-1 border border-gray-200 dark:border-gray-600 z-10">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            onClick={handleRemoveStyleReference}
-                            disabled={isGenerating}
-                            className="h-6 w-6 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30 flex items-center justify-center"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </div>
+                        <p className="text-xs font-light text-gray-600 dark:text-gray-400 mb-3">Style</p>
                         <div className="flex flex-col items-center space-y-3">
-                          <img
-                            src={styleReferenceImage}
-                            alt="Style Reference"
-                            className="w-full aspect-square object-cover rounded-lg border border-gray-200 dark:border-gray-700"
-                          />
+                          <div className="relative w-full">
+                            <img
+                              src={styleReferenceImage}
+                              alt="Style Reference"
+                              className="w-full aspect-square object-cover rounded-lg border border-gray-200 dark:border-gray-700"
+                            />
+                            <div className="absolute top-2 right-2 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-full p-1 border border-gray-200 dark:border-gray-600 z-10">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={handleRemoveStyleReference}
+                                disabled={isGenerating}
+                                className="h-6 w-6 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30 flex items-center justify-center"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </div>
                           <div className="w-full">
                             <SliderWithValue
-                              label="Reference Strength"
+                              label="Strength"
                               value={styleReferenceStrength}
                               onChange={handleStyleStrengthChange}
                               min={0.1}
@@ -1633,20 +1635,23 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
                   ) : (
                     /* Upload area for style reference */
                     <div className="w-1/3">
-                      <FileInput
-                        onFileChange={handleStyleReferenceUpload}
-                        acceptTypes={['image']}
-                        multiple={false}
-                        disabled={isGenerating}
-                        label=""
-                        className="w-full"
-                        suppressSelectionSummary
-                        suppressRemoveAll
-                        suppressAcceptedTypes
-                        showLoaderDuringSingleSelection
-                        loaderDurationMs={400}
-                        forceLoading={isUploadingStyleReference}
-                      />
+                      <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-800/50">
+                        <p className="text-xs font-light text-gray-600 dark:text-gray-400 mb-3">Style</p>
+                        <FileInput
+                          onFileChange={handleStyleReferenceUpload}
+                          acceptTypes={['image']}
+                          multiple={false}
+                          disabled={isGenerating}
+                          label=""
+                          className="w-full"
+                          suppressSelectionSummary
+                          suppressRemoveAll
+                          suppressAcceptedTypes
+                          showLoaderDuringSingleSelection
+                          loaderDurationMs={400}
+                          forceLoading={isUploadingStyleReference}
+                        />
+                      </div>
                     </div>
                   )}
                 </div>
