@@ -53,10 +53,22 @@ enable_signup = true
 [functions.ai-prompt]
 verify_jwt = false
 
+[functions.broadcast-realtime]
+verify_jwt = false
+
+[functions.broadcast-update]
+verify_jwt = false
+
 [functions.calculate-task-cost]
 verify_jwt = false
 
 [functions.claim-next-task]
+verify_jwt = false
+
+[functions.complete_task]
+verify_jwt = false
+
+[functions.complete-auto-topup-setup]
 verify_jwt = false
 
 [functions.create-task]
@@ -68,10 +80,7 @@ verify_jwt = false
 [functions.grant-credits]
 verify_jwt = false
 
-[functions.magic-edit]
-verify_jwt = false
-
-[functions.process-completed-task]
+[functions.process-auto-topup]
 verify_jwt = false
 
 [functions.replicate-upscale]
@@ -80,10 +89,7 @@ verify_jwt = false
 [functions.revoke-pat]
 verify_jwt = false
 
-[functions.single-image-generate]
-verify_jwt = false
-
-[functions.steerable-motion]
+[functions.setup-auto-topup]
 verify_jwt = false
 
 [functions.stripe-checkout]
@@ -96,6 +102,9 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.tasks-list]
+verify_jwt = false
+
+[functions.trigger-auto-topup]
 verify_jwt = false
 
 [functions.update-task-status]
