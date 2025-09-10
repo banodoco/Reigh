@@ -296,9 +296,8 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
           ) : (
             <h3 
               className="text-xl font-light group-hover:text-primary/80 transition-colors duration-300 flex-grow mr-2"
-              title={shot.name}
             >
-              {shot.name.length > 16 ? shot.name.substring(0, 13) + '...' : shot.name}
+              {shot.name}
             </h3>
           )}
           <div className="flex items-center space-x-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
