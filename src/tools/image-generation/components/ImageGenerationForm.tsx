@@ -1596,7 +1596,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
                     /* Display uploaded style reference */
                     <div className="w-1/3">
                       <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-800/50 relative">
-                        <p className="text-xs font-light text-gray-600 dark:text-gray-400 mb-3">Style</p>
                         <div className="flex flex-col items-center space-y-3">
                           <div className="relative w-full">
                             <img
@@ -1604,16 +1603,19 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
                               alt="Style Reference"
                               className="w-full aspect-square object-cover rounded-lg border border-gray-200 dark:border-gray-700"
                             />
-                            <div className="absolute top-2 right-2 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-full p-1 border border-gray-200 dark:border-gray-600 z-10">
+                            <div className="absolute top-2 left-2 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded px-2 py-1 border border-gray-200 dark:border-gray-600 z-10">
+                              <p className="text-xs font-light text-gray-600 dark:text-gray-400">Style</p>
+                            </div>
+                            <div className="absolute top-2 right-2 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-full p-0.5 border border-gray-200 dark:border-gray-600 z-10">
                               <Button
                                 type="button"
                                 variant="ghost"
                                 size="icon"
                                 onClick={handleRemoveStyleReference}
                                 disabled={isGenerating}
-                                className="h-6 w-6 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30 flex items-center justify-center"
+                                className="h-5 w-5 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30 flex items-center justify-center"
                               >
-                                <Trash2 className="h-3 w-3" />
+                                <Trash2 className="h-2.5 w-2.5" />
                               </Button>
                             </div>
                           </div>
@@ -1635,8 +1637,10 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
                   ) : (
                     /* Upload area for style reference */
                     <div className="w-1/3">
-                      <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-800/50">
-                        <p className="text-xs font-light text-gray-600 dark:text-gray-400 mb-3">Style</p>
+                      <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-800/50 relative">
+                        <div className="absolute top-2 left-2 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded px-2 py-1 border border-gray-200 dark:border-gray-600 z-10">
+                          <p className="text-xs font-light text-gray-600 dark:text-gray-400">Style</p>
+                        </div>
                         <FileInput
                           onFileChange={handleStyleReferenceUpload}
                           acceptTypes={['image']}
