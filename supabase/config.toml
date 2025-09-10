@@ -40,15 +40,13 @@ refresh_token_reuse_interval = 10
 enable_signup = true
 enable_anonymous_sign_ins = false
 enable_manual_linking = false
-# Enable leaked password protection for enhanced security
-enable_password_strength = true
+ # enable_password_strength is not supported by current CLI schema; removing to fix db push
 
 [auth.email]
 enable_signup = true
 double_confirm_changes = true
 enable_confirmations = false
-# Reduce OTP expiry to under 1 hour (3600 seconds) for security
-otp_expiry_duration = 1800  # 30 minutes
+ # otp_expiry_duration is not supported by current CLI schema; removing to fix db push
 
 [auth.sms]
 enable_signup = true
