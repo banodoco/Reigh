@@ -40,11 +40,15 @@ refresh_token_reuse_interval = 10
 enable_signup = true
 enable_anonymous_sign_ins = false
 enable_manual_linking = false
+# Enable leaked password protection for enhanced security
+enable_password_strength = true
 
 [auth.email]
 enable_signup = true
 double_confirm_changes = true
 enable_confirmations = false
+# Reduce OTP expiry to under 1 hour (3600 seconds) for security
+otp_expiry_duration = 1800  # 30 minutes
 
 [auth.sms]
 enable_signup = true
