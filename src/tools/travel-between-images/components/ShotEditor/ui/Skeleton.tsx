@@ -18,42 +18,38 @@ export const ImageManagerSkeleton: React.FC<ImageManagerSkeletonProps> = ({
 }) => {
   // Filter out videos AND unpositioned images to match the actual filtering logic
   const actualImageCount = React.useMemo(() => {
-    const filteredImages = shotImages.filter(img => {
-      // First filter: exclude videos
+    let positionedNonVideoCount = 0;
+    let videosFiltered = 0;
+    let unpositionedFiltered = 0;
+    
+    // Single pass through the array for efficiency
+    shotImages.forEach(img => {
       const isVideo = img.type === 'video' ||
                      img.type === 'video_travel_output' ||
                      (img.location && img.location.endsWith('.mp4')) ||
                      (img.imageUrl && img.imageUrl.endsWith('.mp4'));
-      if (isVideo) return false;
       
-      // Second filter: only include positioned images (matching simpleFilteredImages logic)
-      const hasPosition = (img as any).position !== null && (img as any).position !== undefined;
-      return hasPosition;
+      if (isVideo) {
+        videosFiltered++;
+      } else {
+        const hasPosition = (img as any).position !== null && (img as any).position !== undefined;
+        if (hasPosition) {
+          positionedNonVideoCount++;
+        } else {
+          unpositionedFiltered++;
+        }
+      }
     });
     
     console.log('[PROFILING] Skeleton - Real shot composition:', {
       totalImages: shotImages.length,
-      positionedNonVideoCount: filteredImages.length,
-      videosFiltered: shotImages.filter(img => {
-        const isVideo = img.type === 'video' ||
-                       img.type === 'video_travel_output' ||
-                       (img.location && img.location.endsWith('.mp4')) ||
-                       (img.imageUrl && img.imageUrl.endsWith('.mp4'));
-        return isVideo;
-      }).length,
-      unpositionedFiltered: shotImages.filter(img => {
-        const isVideo = img.type === 'video' ||
-                       img.type === 'video_travel_output' ||
-                       (img.location && img.location.endsWith('.mp4')) ||
-                       (img.imageUrl && img.imageUrl.endsWith('.mp4'));
-        if (isVideo) return false;
-        const hasPosition = (img as any).position !== null && (img as any).position !== undefined;
-        return !hasPosition;
-      }).length,
+      positionedNonVideoCount,
+      videosFiltered,
+      unpositionedFiltered,
       projectAspectRatio
     });
     
-    return filteredImages.length;
+    return positionedNonVideoCount;
   }, [shotImages, projectAspectRatio]);
 
   // Determine grid columns based on explicit columns prop if provided
