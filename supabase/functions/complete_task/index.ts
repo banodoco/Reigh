@@ -236,54 +236,107 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
     // 8.5) Validate shot existence and clean up parameters if necessary
     console.log(`[COMPLETE-TASK-DEBUG] Validating shot references for task ${taskIdString}`);
     try {
-      // Get the current task to check its parameters
-      const { data: currentTask, error: taskFetchError } = await supabaseAdmin.from("tasks").select("params, task_type").eq("id", taskIdString).single();
+      // Get the current task and its task type metadata
+      const { data: currentTask, error: taskFetchError } = await supabaseAdmin
+        .from("tasks")
+        .select(`
+          tasks.params, 
+          tasks.task_type,
+          task_types!inner(tool_type, category)
+        `)
+        .eq("tasks.id", taskIdString)
+        .single();
+
       if (!taskFetchError && currentTask && currentTask.params) {
-        let shotId = null;
+        let extractedShotId = null;
         let needsParamsUpdate = false;
         let updatedParams = {
           ...currentTask.params
         };
-        // Extract shot_id based on task type
-        if (currentTask.task_type === 'travel_stitch') {
-          shotId = currentTask.params?.full_orchestrator_payload?.shot_id;
-        } else if (currentTask.task_type === 'single_image') {
-          shotId = currentTask.params?.shot_id;
+
+        const taskTypeInfo = currentTask.task_types;
+        const toolType = taskTypeInfo?.tool_type;
+        
+        console.log(`[COMPLETE-TASK-DEBUG] Task type: ${currentTask.task_type}, tool_type: ${toolType}`);
+
+        // Extract shot_id based on tool_type from task_types table
+        if (toolType === 'travel-between-images') {
+          // For travel-between-images tasks, try multiple possible locations
+          extractedShotId = currentTask.params?.originalParams?.orchestrator_details?.shot_id ||
+                            currentTask.params?.orchestrator_details?.shot_id ||
+                            currentTask.params?.full_orchestrator_payload?.shot_id;
+        } else if (toolType === 'image-generation') {
+          // For image generation tasks, shot_id is typically at top level
+          extractedShotId = currentTask.params?.shot_id;
+        } else {
+          // Fallback for other task types - try common locations
+          extractedShotId = currentTask.params?.shot_id ||
+                            currentTask.params?.orchestrator_details?.shot_id;
         }
         // If there's a shot_id, validate it exists
-        if (shotId) {
-          console.log(`[COMPLETE-TASK-DEBUG] Checking if shot ${shotId} exists...`);
+        if (extractedShotId) {
+          console.log(`[COMPLETE-TASK-DEBUG] Checking if shot ${extractedShotId} exists...`);
           // Ensure shotId is properly converted from JSONB to string
           let shotIdString;
-          if (typeof shotId === 'string') {
-            shotIdString = shotId;
-          } else if (typeof shotId === 'object' && shotId !== null) {
+          if (typeof extractedShotId === 'string') {
+            shotIdString = extractedShotId;
+          } else if (typeof extractedShotId === 'object' && extractedShotId !== null) {
             // If it's wrapped in an object, try to extract the actual UUID
-            shotIdString = String(shotId.id || shotId.uuid || shotId);
+            shotIdString = String(extractedShotId.id || extractedShotId.uuid || extractedShotId);
           } else {
-            shotIdString = String(shotId);
+            shotIdString = String(extractedShotId);
           }
           // Validate UUID format before using in query
           const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
           if (!uuidRegex.test(shotIdString)) {
             console.log(`[COMPLETE-TASK-DEBUG] Invalid UUID format for shot: ${shotIdString}, removing from parameters`);
             needsParamsUpdate = true;
-            // Remove invalid shot_id from parameters
-            if (currentTask.task_type === 'travel_stitch' && updatedParams.full_orchestrator_payload) {
-              delete updatedParams.full_orchestrator_payload.shot_id;
-            } else if (currentTask.task_type === 'single_image') {
+            // Remove invalid shot_id from parameters based on tool_type
+            if (toolType === 'travel-between-images') {
+              // Clean up all possible locations for travel-between-images tasks
+              if (updatedParams.originalParams?.orchestrator_details) {
+                delete updatedParams.originalParams.orchestrator_details.shot_id;
+              }
+              if (updatedParams.orchestrator_details) {
+                delete updatedParams.orchestrator_details.shot_id;
+              }
+              if (updatedParams.full_orchestrator_payload) {
+                delete updatedParams.full_orchestrator_payload.shot_id;
+              }
+            } else if (toolType === 'image-generation') {
               delete updatedParams.shot_id;
+            } else {
+              // Fallback cleanup for other task types
+              delete updatedParams.shot_id;
+              if (updatedParams.orchestrator_details) {
+                delete updatedParams.orchestrator_details.shot_id;
+              }
             }
           } else {
-            const { data: shotData, error: shotError } = await supabaseAdmin.from("shots").select("id").eq("id", shotIdString).single();
+            const { data: shotData, error: shotError } = await supabaseAdmin.from("shots").select("shots.id").eq("shots.id", shotIdString).single();
             if (shotError || !shotData) {
               console.log(`[COMPLETE-TASK-DEBUG] Shot ${shotIdString} does not exist (error: ${shotError?.message || 'not found'}), removing from task parameters`);
               needsParamsUpdate = true;
-              // Remove shot_id from parameters
-              if (currentTask.task_type === 'travel_stitch' && updatedParams.full_orchestrator_payload) {
-                delete updatedParams.full_orchestrator_payload.shot_id;
-              } else if (currentTask.task_type === 'single_image') {
+              // Remove shot_id from parameters based on tool_type
+              if (toolType === 'travel-between-images') {
+                // Clean up all possible locations for travel-between-images tasks
+                if (updatedParams.originalParams?.orchestrator_details) {
+                  delete updatedParams.originalParams.orchestrator_details.shot_id;
+                }
+                if (updatedParams.orchestrator_details) {
+                  delete updatedParams.orchestrator_details.shot_id;
+                }
+                if (updatedParams.full_orchestrator_payload) {
+                  delete updatedParams.full_orchestrator_payload.shot_id;
+                }
+              } else if (toolType === 'image-generation') {
                 delete updatedParams.shot_id;
+              } else {
+                // Fallback cleanup for other task types
+                delete updatedParams.shot_id;
+                if (updatedParams.orchestrator_details) {
+                  delete updatedParams.orchestrator_details.shot_id;
+                }
               }
             } else {
               console.log(`[COMPLETE-TASK-DEBUG] Shot ${shotIdString} exists and is valid`);

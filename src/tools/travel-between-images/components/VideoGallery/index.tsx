@@ -243,6 +243,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     timestamp: Date.now()
   });
 
+
   // Use unified generations hook with task data preloading
   const { data: generationsData, isLoading: isLoadingGenerations, isFetching: isFetchingGenerations, error: generationsError } = useUnifiedGenerations({
     projectId,
@@ -303,6 +304,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
       })),
       timestamp: Date.now()
     });
+    
     
     return transformed;
   }, [(generationsData as any)?.items]);

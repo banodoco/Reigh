@@ -217,6 +217,7 @@ async function fetchShotSpecificGenerations({
     })),
     timestamp: Date.now()
   });
+
   
   // Store original count before client-side filtering
   const originalItemsCount = items.length;

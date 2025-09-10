@@ -308,6 +308,15 @@ serve(async (req) => {
 
     let updateResult;
 
+    console.log(`[UPDATE-TASK-DEBUG] About to update task:`, {
+      task_id,
+      status,
+      isServiceRole,
+      callerId,
+      updatePayload,
+      timestamp: Date.now()
+    });
+
     if (isServiceRole) {
       // Service role: can update any task
       console.log(`Service role: Updating task ${task_id} to status '${status}'`);
@@ -335,6 +344,8 @@ serve(async (req) => {
 
       const projectIds = userProjects.map(p => p.id);
       
+      console.log(`[UPDATE-TASK-DEBUG] User ${callerId} has projects:`, projectIds);
+      
       // Update task only if it belongs to user's projects
       updateResult = await supabaseAdmin
         .from("tasks")
@@ -345,12 +356,30 @@ serve(async (req) => {
         .single();
     }
 
+    console.log(`[UPDATE-TASK-DEBUG] Update result:`, {
+      hasData: !!updateResult.data,
+      hasError: !!updateResult.error,
+      errorCode: updateResult.error?.code,
+      errorMessage: updateResult.error?.message,
+      timestamp: Date.now()
+    });
+
     if (updateResult.error) {
       if (updateResult.error.code === "PGRST116") {
         console.log(`Task ${task_id} not found or not accessible`);
         return new Response("Task not found or not accessible", { status: 404 });
       }
-      console.error("Update error:", updateResult.error);
+      console.error("Update error details:", {
+        error: updateResult.error,
+        code: updateResult.error.code,
+        message: updateResult.error.message,
+        details: updateResult.error.details,
+        hint: updateResult.error.hint,
+        task_id: task_id,
+        status: status,
+        isServiceRole: isServiceRole,
+        callerId: callerId
+      });
       return new Response(`Database error: ${updateResult.error.message}`, { status: 500 });
     }
 
