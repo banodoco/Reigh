@@ -114,4 +114,4 @@ export const ImageManagerSkeleton: React.FC<ImageManagerSkeletonProps> = ({
         </div>
     </>
   );
-}; 
+}; // Modified file

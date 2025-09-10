@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
@@ -49,38 +49,42 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
   const [addSummary, setAddSummary] = useState(initialValues?.addSummary || false);
   const [temperature, setTemperature] = useState<number>(initialValues?.temperature || 0.8);
 
+  // Hydrate from initialValues only once to avoid overriding user typing on parent updates
+  const hasHydratedRef = useRef(false);
   useEffect(() => {
-    if (initialValues) {
+    if (!hasHydratedRef.current && initialValues) {
       setOverallPromptText(initialValues.overallPromptText || '');
       setRulesToRememberText(initialValues.rulesToRememberText || '');
       setNumberToGenerate(initialValues.numberToGenerate || 3);
       setIncludeExistingContext(initialValues.includeExistingContext ?? true);
       setAddSummary(initialValues.addSummary || false);
       setTemperature(initialValues.temperature || 0.8);
-    }
-  }, [initialValues]);
-
-  const handleValueChange = useCallback(() => {
-    if (onValuesChange) {
-      onValuesChange({
-        overallPromptText,
-        rulesToRememberText,
-        numberToGenerate,
-        includeExistingContext,
-        addSummary,
-        temperature,
+      hasHydratedRef.current = true;
+      // Emit once after hydration so parent has a consistent snapshot
+      onValuesChange?.({
+        overallPromptText: initialValues.overallPromptText || '',
+        rulesToRememberText: initialValues.rulesToRememberText || '',
+        numberToGenerate: initialValues.numberToGenerate || 3,
+        includeExistingContext: initialValues.includeExistingContext ?? true,
+        addSummary: initialValues.addSummary || false,
+        temperature: initialValues.temperature || 0.8,
       });
     }
-  }, [
-    overallPromptText, rulesToRememberText, 
-    numberToGenerate, includeExistingContext, addSummary, temperature,
-    onValuesChange
-  ]);
+  }, [initialValues, onValuesChange]);
 
-  // Only call on initial mount and when initialValues change (hydration)
-  useEffect(() => { 
-    handleValueChange(); 
-  }, [initialValues]); // Remove handleValueChange dependency to prevent render loop
+  // Emit change using latest values with optional overrides to avoid stale closures
+  const emitChange = useCallback((overrides?: Partial<GenerationControlValues>) => {
+    if (!onValuesChange) return;
+    onValuesChange({
+      overallPromptText,
+      rulesToRememberText,
+      numberToGenerate,
+      includeExistingContext,
+      addSummary,
+      temperature,
+      ...overrides,
+    });
+  }, [overallPromptText, rulesToRememberText, numberToGenerate, includeExistingContext, addSummary, temperature, onValuesChange]);
 
   const handleGenerateClick = async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
@@ -109,7 +113,7 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
       Math.abs(curr.value - newValue) < Math.abs(prev.value - newValue) ? curr : prev
     );
     setTemperature(closest.value);
-    handleValueChange();
+    emitChange({ temperature: closest.value });
   };
 
   return (
@@ -117,33 +121,51 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
       <h3 className="text-lg font-light flex items-center">
         <Wand2 className="mr-2 h-5 w-5" /> Generate Prompts
       </h3>
-        <div>
-        <Label htmlFor="gen_overallPromptText">What prompts would you like to generate?</Label>
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div className="md:col-span-3">
+          <Label htmlFor="gen_overallPromptText">What prompts would you like to generate?</Label>
           <Textarea
             id="gen_overallPromptText"
             value={overallPromptText}
             onChange={(e) => {
-              setOverallPromptText(e.target.value);
-              handleValueChange();
+              const next = e.target.value;
+              setOverallPromptText(next);
+              emitChange({ overallPromptText: next });
             }}
-          placeholder="e.g., A medieval fantasy adventure with dragons and magic..."
-          rows={4}
+            placeholder="e.g., A medieval fantasy adventure with dragons and magic..."
+            rows={4}
             disabled={!hasApiKey || isGenerating}
           />
-      </div>
-      <div>
-        <Label htmlFor="gen_rulesToRememberText">Rules/Constraints</Label>
-        <Textarea
-          id="gen_rulesToRememberText"
-          value={rulesToRememberText}
-          onChange={(e) => {
-            setRulesToRememberText(e.target.value);
-            handleValueChange();
-          }}
-          placeholder="e.g., Prompts should be under 50 words. No mention of modern technology."
-          rows={3}
-          disabled={!hasApiKey || isGenerating}
-        />
+        </div>
+        <div className="md:col-span-2">
+          <Label htmlFor="gen_rulesToRememberText">Rules/Constraints</Label>
+          <Textarea
+            id="gen_rulesToRememberText"
+            value={rulesToRememberText}
+            onChange={(e) => {
+              const next = e.target.value;
+              // Add bullet points for new lines
+              const lines = next.split('\n');
+              const formattedLines = lines.map((line, index) => {
+                const trimmedLine = line.trim();
+                if (index === 0 || trimmedLine === '') {
+                  return line; // First line or empty lines don't get bullets
+                }
+                // If line doesn't already start with a bullet, add one
+                if (!trimmedLine.startsWith('•') && !trimmedLine.startsWith('-') && !trimmedLine.startsWith('*')) {
+                  return `• ${trimmedLine}`;
+                }
+                return line;
+              });
+              const formatted = formattedLines.join('\n');
+              setRulesToRememberText(formatted);
+              emitChange({ rulesToRememberText: formatted });
+            }}
+            placeholder="e.g., Under 50 words&#10;No modern technology&#10;Include vivid descriptions"
+            rows={4}
+            disabled={!hasApiKey || isGenerating}
+          />
+        </div>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-[1fr_2fr_1fr] gap-6 items-start">
         <div>
@@ -153,8 +175,9 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
             type="number"
             value={numberToGenerate}
             onChange={(e) => {
-              setNumberToGenerate(Math.max(1, parseInt(e.target.value, 10) || 1));
-              handleValueChange();
+              const next = Math.max(1, parseInt(e.target.value, 10) || 1);
+              setNumberToGenerate(next);
+              emitChange({ numberToGenerate: next });
             }}
             min="1"
             disabled={!hasApiKey || isGenerating}
@@ -200,8 +223,9 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
                     id="gen_includeExistingContext" 
                     checked={includeExistingContext} 
                     onCheckedChange={(checked) => {
-                      setIncludeExistingContext(Boolean(checked));
-                      handleValueChange();
+                      const next = Boolean(checked);
+                      setIncludeExistingContext(next);
+                      emitChange({ includeExistingContext: next });
                     }} 
                     disabled={!hasApiKey || isGenerating || existingPromptsForContext.length === 0}
                 />
@@ -214,8 +238,9 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
                     id="gen_addSummary" 
                     checked={addSummary} 
                     onCheckedChange={(checked) => {
-                      setAddSummary(Boolean(checked));
-                      handleValueChange();
+                      const next = Boolean(checked);
+                      setAddSummary(next);
+                      emitChange({ addSummary: next });
                     }} 
                     disabled={!hasApiKey || isGenerating}
                 />

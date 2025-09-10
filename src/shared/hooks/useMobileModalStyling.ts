@@ -123,8 +123,8 @@ const createMobileLayoutStrategy = (layout: MobileLayout, isMobile: boolean) => 
       customStyles: {
         // 2 * 1rem (Tailwind spacing.4) side buffers
         width: 'calc(100vw - 2rem)',
-        // Always keep some vertical buffer above and below
-        maxHeight: 'min(90vh, calc(100vh - env(safe-area-inset-top, 20px) - env(safe-area-inset-bottom, 20px) - 64px))',
+        // Provide more conservative vertical buffer - 80vh max height ensures 20vh total buffer
+        maxHeight: 'min(80vh, calc(100vh - env(safe-area-inset-top, 20px) - env(safe-area-inset-bottom, 20px) - 80px))',
       },
     }),
   };

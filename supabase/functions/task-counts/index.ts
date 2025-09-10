@@ -155,7 +155,6 @@ serve(async (req) => {
       const queued_only = countQueuedOnly.data ?? 0;
       const queued_plus_active = countQueuedPlusActive.data ?? 0;
       
-      const pathTag = runType === 'api' ? '[SERVICE_ROLE] [API_PATH]' : '[SERVICE_ROLE] [GPU_PATH]';
       console.log(`${pathTag} Count results - queued_only: ${queued_only}, queued_plus_active: ${queued_plus_active}`);
       // Compute active_only directly from cloud In Progress tasks (exclude orchestrators)
       let active_only = 0;
@@ -190,17 +189,14 @@ serve(async (req) => {
         const { count: activeCloudNonOrchestrator } = await query;
         active_only = activeCloudNonOrchestrator ?? 0;
       } catch (e) {
-        const pathTag = runType === 'api' ? '[SERVICE_ROLE] [API_PATH]' : '[SERVICE_ROLE] [GPU_PATH]';
         console.log(`${pathTag} [TaskCounts:CountDebug] Failed to compute active_only directly, falling back to diff method:`, (e as any)?.message);
         active_only = Math.max(0, queued_plus_active - queued_only);
       }
-      const pathTag = runType === 'api' ? '[SERVICE_ROLE] [API_PATH]' : '[SERVICE_ROLE] [GPU_PATH]';
       console.log(`${pathTag} [TaskCounts:CountDebug] Service-role totals: queued_only=${queued_only}, active_only=${active_only}, queued_plus_active=${queued_plus_active}`);
 
       // Per-user breakdown (cloud-claimed active only in function; may include orchestrators)
       let user_stats: any[] = [];
       try {
-        const pathTag = runType === 'api' ? '[SERVICE_ROLE] [API_PATH]' : '[SERVICE_ROLE] [GPU_PATH]';
         console.log(`${pathTag} [TaskCounts:CountDebug] Calling analyze_task_availability_service_role(include_active=true)`);
         const { data: analysis } = await supabaseAdmin
           .rpc('analyze_task_availability_service_role', { p_include_active: true, p_run_type: runType });
@@ -209,12 +205,10 @@ serve(async (req) => {
           console.log(`${pathTag} [TaskCounts:CountDebug] Analysis user_stats count=${user_stats.length}`);
         }
       } catch (e) {
-        const pathTag = runType === 'api' ? '[SERVICE_ROLE] [API_PATH]' : '[SERVICE_ROLE] [GPU_PATH]';
         console.log(`${pathTag} analyze_task_availability failed:`, (e as any)?.message);
       }
       // Fallback: always-on per-user capacity stats when analysis provides no breakdown
       if (user_stats.length === 0) {
-        const pathTag = runType === 'api' ? '[SERVICE_ROLE] [API_PATH]' : '[SERVICE_ROLE] [GPU_PATH]';
         console.log(`${pathTag} [TaskCounts:CountDebug] Analysis returned no user_stats; using per_user_capacity_stats_service_role fallback`);
         try {
           const { data: perUser } = await supabaseAdmin
@@ -316,14 +310,12 @@ serve(async (req) => {
       const queued_only_capacity = countQueuedOnly.data ?? 0;
       const queued_plus_active_capacity = countQueuedPlusActive.data ?? 0;
       const active_only_capacity = Math.max(0, queued_plus_active_capacity - queued_only_capacity);
-      const pathTag = runType === 'api' ? '[PERSONAL_ACCESS_TOKEN] [API_PATH]' : '[PERSONAL_ACCESS_TOKEN] [GPU_PATH]';
       console.log(`${pathTag} [TaskCounts:CountDebug] User ${callerId} totals: queued_only_capacity=${queued_only_capacity}, active_only_capacity=${active_only_capacity}, queued_plus_active_capacity=${queued_plus_active_capacity}`);
 
       // Get eligible queued count and some context via analysis RPC
       let eligible_queued = 0;
       let user_info: any = {};
       try {
-        const pathTag = runType === 'api' ? '[PERSONAL_ACCESS_TOKEN] [API_PATH]' : '[PERSONAL_ACCESS_TOKEN] [GPU_PATH]';
         console.log(`${pathTag} [TaskCounts:CountDebug] User ${callerId}: calling analyze_task_availability_user(include_active=true)`);
         const { data: analysis } = await supabaseAdmin
           .rpc('analyze_task_availability_user', { p_user_id: callerId, p_include_active: true, p_run_type: runType });
@@ -333,7 +325,6 @@ serve(async (req) => {
           console.log(`${pathTag} [TaskCounts:CountDebug] User ${callerId}: eligible_queued=${eligible_queued}`);
         }
       } catch (e) {
-        const pathTag = runType === 'api' ? '[PERSONAL_ACCESS_TOKEN] [API_PATH]' : '[PERSONAL_ACCESS_TOKEN] [GPU_PATH]';
         console.log(`${pathTag} User analyze_task_availability failed:`, (e as any)?.message);
       }
 

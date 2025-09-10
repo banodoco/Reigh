@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/shared/components/ui/button';
 import { Label } from '@/shared/components/ui/label';
 import { Textarea } from '@/shared/components/ui/textarea';
@@ -33,23 +33,31 @@ export const BulkEditControls: React.FC<BulkEditControlsProps> = ({
   const [editInstructions, setEditInstructions] = useState(initialValues?.editInstructions || '');
   const [modelType, setModelType] = useState<AIModelType>(initialValues?.modelType || 'standard');
 
+  const hasHydratedRef = useRef(false);
   useEffect(() => {
-    if (initialValues) {
+    if (!hasHydratedRef.current && initialValues) {
       setEditInstructions(initialValues.editInstructions || '');
       setModelType(initialValues.modelType || 'standard');
+      hasHydratedRef.current = true;
+      // Emit once after hydration so parent has a consistent snapshot (same as Generate view)
+      onValuesChange?.({
+        editInstructions: initialValues.editInstructions || '',
+        modelType: initialValues.modelType || 'standard',
+      });
     }
-  }, [initialValues]);
+  }, [initialValues, onValuesChange]);
 
-  const handleValueChange = useCallback(() => {
-    if (onValuesChange) {
-      onValuesChange({ editInstructions, modelType });
-    }
+  // Emit change using latest values with optional overrides to avoid stale closures (same as Generate view)
+  const emitChange = useCallback((overrides?: Partial<BulkEditControlValues>) => {
+    if (!onValuesChange) return;
+    onValuesChange({
+      editInstructions,
+      modelType,
+      ...overrides,
+    });
   }, [editInstructions, modelType, onValuesChange]);
 
-  // Only call on initial mount and when initialValues change (hydration)
-  useEffect(() => { 
-    handleValueChange(); 
-  }, [initialValues]); // Remove handleValueChange dependency to prevent render loop
+  // No cleanup needed since debounce is disabled
 
   const handleBulkEditClick = async (e: React.MouseEvent<HTMLButtonElement>) => {
     if (!hasApiKey || !editInstructions.trim() || numberOfPromptsToEdit === 0) {
@@ -87,8 +95,9 @@ export const BulkEditControls: React.FC<BulkEditControlsProps> = ({
           id="bulkEditInstructions_field"
           value={editInstructions}
           onChange={(e) => {
-            setEditInstructions(e.target.value);
-            handleValueChange();
+            const next = e.target.value;
+            setEditInstructions(next);
+            emitChange({ editInstructions: next });
           }}
           placeholder="e.g., Make all prompts more concise and add a call to action..."
           rows={3}
@@ -103,8 +112,9 @@ export const BulkEditControls: React.FC<BulkEditControlsProps> = ({
             <Select 
                 value={modelType}
                 onValueChange={(value: string) => {
-                  setModelType(value as AIModelType);
-                  handleValueChange();
+                  const next = value as AIModelType;
+                  setModelType(next);
+                  emitChange({ modelType: next });
                 }}
                 disabled={!hasApiKey || isEditing || numberOfPromptsToEdit === 0}
             >

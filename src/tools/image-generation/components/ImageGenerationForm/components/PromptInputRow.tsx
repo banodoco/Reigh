@@ -44,6 +44,9 @@ export const PromptInputRow: React.FC<PromptInputRowProps> = React.memo(({
     if (!isEditingFullPrompt) {
       // If parent changed the prompt (like from AI edit), sync local state
       if (promptEntry.fullPrompt !== lastParentUpdate) {
+        console.log(`[PromptEditResetTrace] Row:${promptEntry.id}:Parent->Local sync`, {
+          oldLocal: lastParentUpdate.length, newFromParent: promptEntry.fullPrompt.length
+        });
         setLocalFullPrompt(promptEntry.fullPrompt);
         setLastParentUpdate(promptEntry.fullPrompt);
       }
@@ -136,6 +139,7 @@ export const PromptInputRow: React.FC<PromptInputRowProps> = React.memo(({
 
   const handleFullPromptChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newText = e.target.value;
+    console.count(`[PromptEditResetTrace] Row:${promptEntry.id}:onChange`);
     setLocalFullPrompt(newText);
     onUpdate(promptEntry.id, 'fullPrompt', newText);
   };
@@ -218,6 +222,9 @@ export const PromptInputRow: React.FC<PromptInputRowProps> = React.memo(({
   };
 
   const handleBlur = () => {
+    console.log(`[PromptEditResetTrace] Row:${promptEntry.id}:onBlur save`, {
+      local: localFullPrompt.length, parent: promptEntry.fullPrompt.length
+    });
     setIsEditingFullPrompt(false);
     // Save changes when leaving edit mode
     if (localFullPrompt !== promptEntry.fullPrompt) {
@@ -228,6 +235,9 @@ export const PromptInputRow: React.FC<PromptInputRowProps> = React.memo(({
   // Save changes when edit mode is closed (e.g., when another prompt becomes active)
   useEffect(() => {
     if (!isEditingFullPrompt && localFullPrompt !== promptEntry.fullPrompt && localFullPrompt !== lastParentUpdate) {
+      console.log(`[PromptEditResetTrace] Row:${promptEntry.id}:EditClosed save`, {
+        local: localFullPrompt.length, parent: promptEntry.fullPrompt.length
+      });
       // Only save if the local prompt is different from both parent and last parent update
       // This prevents feedback loops when parent updates (like from AI edit)
       onUpdate(promptEntry.id, 'fullPrompt', localFullPrompt);

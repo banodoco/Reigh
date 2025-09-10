@@ -140,17 +140,61 @@ serve(async (req) => {
       const pathTag = runType === 'api' ? '[SERVICE_ROLE] [API_PATH]' : '[SERVICE_ROLE] [GPU_PATH]';
       console.log(`${pathTag} Using optimized PostgreSQL function`);
       
+      // First, test if the function exists
+      try {
+        console.log(`${pathTag} [DIAGNOSTIC] Testing function existence...`);
+        const { data: functionTest, error: functionError } = await supabaseAdmin
+          .from('information_schema.routines')
+          .select('routine_name, routine_type, data_type')
+          .eq('routine_name', 'claim_next_task_service_role')
+          .eq('routine_schema', 'public');
+        
+        console.log(`${pathTag} [DIAGNOSTIC] Function existence check:`, {
+          found: functionTest?.length > 0,
+          details: functionTest,
+          error: functionError
+        });
+      } catch (e) {
+        console.log(`${pathTag} [DIAGNOSTIC] Could not check function existence:`, e);
+      }
+      
       // Claim next eligible task
       console.log(`${pathTag} Attempting to claim task for worker: ${workerId}`);
-      const { data: claimResult, error: claimError } = await supabaseAdmin
-        .rpc('claim_next_task_service_role', {
-          p_worker_id: workerId,
-          p_include_active: false,
-          p_run_type: runType
+      console.log(`${pathTag} [DIAGNOSTIC] RPC parameters:`, {
+        p_worker_id: workerId,
+        p_include_active: false,
+        p_run_type: runType
+      });
+      
+      let claimResult, claimError;
+      try {
+        console.log(`${pathTag} [DIAGNOSTIC] Calling claim_next_task_service_role...`);
+        const rpcResponse = await supabaseAdmin
+          .rpc('claim_next_task_service_role', {
+            p_worker_id: workerId,
+            p_include_active: false,
+            p_run_type: runType
+          });
+        
+        claimResult = rpcResponse.data;
+        claimError = rpcResponse.error;
+        
+        console.log(`${pathTag} [DIAGNOSTIC] RPC response received:`, {
+          hasData: !!claimResult,
+          dataLength: claimResult ? claimResult.length : 'null',
+          hasError: !!claimError,
+          errorCode: claimError?.code,
+          errorMessage: claimError?.message
         });
+        
+      } catch (e) {
+        console.error(`${pathTag} [DIAGNOSTIC] Exception during RPC call:`, e);
+        throw e;
+      }
 
       if (claimError) {
         console.error(`${pathTag} Claim error:`, claimError);
+        console.error(`${pathTag} [DIAGNOSTIC] Full error details:`, JSON.stringify(claimError, null, 2));
         throw claimError;
       }
 
