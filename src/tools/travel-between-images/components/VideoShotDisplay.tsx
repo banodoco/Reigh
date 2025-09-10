@@ -282,7 +282,7 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
                     setIsEditingName(false);
                   }
                 }}
-                className="!text-xl font-light h-auto py-0 px-0 border-0 bg-transparent shadow-none focus:ring-0 focus:border-0"
+                className="!text-xl font-light h-auto py-0 px-2 border-0 bg-transparent shadow-none focus:ring-0 focus:border-0"
                 autoFocus
                 maxLength={30}
               />

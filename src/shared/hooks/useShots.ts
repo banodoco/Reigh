@@ -31,26 +31,63 @@ export const useCreateShot = () => {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async ({ name, projectId, shouldSelectAfterCreation = true }: { name: string; projectId: string; shouldSelectAfterCreation?: boolean }) => {
-      const { data: newShot, error } = await supabase
-        .from('shots')
-        .insert({ 
-          name, 
-          project_id: projectId,
-          position: null  // Explicitly set to NULL to trigger the database function
-        })
-        .select()
-        .single();
+    mutationFn: async ({ name, projectId, shouldSelectAfterCreation = true, position }: { 
+      name: string; 
+      projectId: string; 
+      shouldSelectAfterCreation?: boolean;
+      position?: number; 
+    }) => {
+      let newShot;
       
-      if (error) throw error;
+      if (position !== undefined) {
+        // Use the new database function to insert at specific position
+        const { data, error } = await supabase
+          .rpc('insert_shot_at_position', {
+            p_project_id: projectId,
+            p_shot_name: name,
+            p_position: position
+          })
+          .single();
+        
+        if (error) throw error;
+        
+        const result = data as { shot_id: string; success: boolean } | null;
+        if (!result?.success) {
+          throw new Error('Failed to create shot at position');
+        }
+        
+        // Fetch the created shot
+        const { data: shotData, error: fetchError } = await supabase
+          .from('shots')
+          .select()
+          .eq('id', result.shot_id)
+          .single();
+        
+        if (fetchError) throw fetchError;
+        newShot = shotData;
+      } else {
+        // Use regular insertion (triggers auto-position assignment)
+        const { data, error } = await supabase
+          .from('shots')
+          .insert({ 
+            name, 
+            project_id: projectId,
+            position: null  // Explicitly set to NULL to trigger the database function
+          })
+          .select()
+          .single();
+        
+        if (error) throw error;
+        newShot = data;
+      }
       
       return { shot: newShot, shouldSelectAfterCreation };
     },
-    onSuccess: (newShot) => {
+    onSuccess: (result) => {
       // Emit domain event for shot creation
       invalidationRouter.shotCreated({
-        projectId: newShot.project_id,
-        shotId: newShot.id
+        projectId: result.shot.project_id,
+        shotId: result.shot.id
       });
     },
     onError: (error: Error) => {
@@ -98,11 +135,12 @@ export const useDuplicateShot = () => {
       
       if (fetchError || !originalShot) throw new Error('Shot not found');
       
-      // Create new shot
+      // Create new shot at position right after the original
       const { shot: newShot } = await createShot.mutateAsync({
         name: newName || originalShot.name + ' Copy',
         projectId: projectId,
-        shouldSelectAfterCreation: false
+        shouldSelectAfterCreation: false,
+        position: (originalShot.position || 0) + 1
       }) as { shot: Shot };
       
       // Copy only non-video images to the new shot
@@ -180,9 +218,31 @@ export const useDuplicateShot = () => {
           position: (originalShot.position || 0) + 1, // Position after the original shot
         };
 
-        queryClient.setQueryData<Shot[]>(['shots', projectId], (oldShots = []) =>
-          [optimisticDuplicatedShot, ...oldShots] // Add at beginning since server orders by newest first
-        );
+        queryClient.setQueryData<Shot[]>(['shots', projectId], (oldShots = []) => {
+          // Insert the duplicate at the correct position in the ordered list
+          // Since shots are ordered by position (ascending), find the insertion point
+          const insertionIndex = oldShots.findIndex(shot => 
+            shot.position > (originalShot.position || 0)
+          );
+          
+          if (insertionIndex === -1) {
+            // No shots with higher position found, append at end
+            return [...oldShots, optimisticDuplicatedShot];
+          } else {
+            // Insert at the found position and shift subsequent positions
+            const updatedShots = [...oldShots];
+            // Update positions of shots that will be shifted
+            for (let i = insertionIndex; i < updatedShots.length; i++) {
+              updatedShots[i] = {
+                ...updatedShots[i],
+                position: (updatedShots[i].position || 0) + 1
+              };
+            }
+            // Insert the duplicate at the correct position
+            updatedShots.splice(insertionIndex, 0, optimisticDuplicatedShot);
+            return updatedShots;
+          }
+        });
       }
 
       return { previousShots, projectId };

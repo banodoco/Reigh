@@ -172,12 +172,11 @@ export const MagicEditModal: React.FC<MagicEditModalProps> = ({
             <div className="space-y-4 py-3">
         {/* Image Preview */}
         <div className="relative w-full">
-          <Label>Image</Label>
-          <div className="mt-2 rounded-lg border border-border overflow-hidden bg-muted/50">
+          <div className="rounded-lg border border-border overflow-hidden bg-muted/50 w-1/2">
             <img 
               src={imageUrl} 
               alt="Image to edit"
-              className="w-full h-48 object-contain"
+              className="w-full h-24 object-contain"
             />
           </div>
         </div>
@@ -222,7 +221,7 @@ export const MagicEditModal: React.FC<MagicEditModalProps> = ({
             value={magicEditPrompt}
             onChange={(e) => setMagicEditPrompt(e.target.value)}
             placeholder="Describe how you want to transform this image..."
-            className="min-h-[100px] resize-none"
+            className="min-h-[50px] resize-none"
           />
         </div>
 
