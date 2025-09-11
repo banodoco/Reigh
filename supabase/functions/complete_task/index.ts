@@ -347,15 +347,28 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
         if (thumbnailUrl) {
           console.log(`[COMPLETE-TASK-DEBUG] Adding thumbnail_url to task parameters: ${thumbnailUrl}`);
           needsParamsUpdate = true;
+          
+          // Handle thumbnail URL based on task type and existing parameter structure
           if (currentTask.task_type === 'travel_stitch') {
             // For travel_stitch tasks, add to full_orchestrator_payload.thumbnail_url
             if (!updatedParams.full_orchestrator_payload) {
               updatedParams.full_orchestrator_payload = {};
             }
             updatedParams.full_orchestrator_payload.thumbnail_url = thumbnailUrl;
+          } else if (currentTask.task_type === 'wan_2_2_i2v') {
+            // For wan_2_2_i2v tasks, add to orchestrator_details.thumbnail_url
+            if (!updatedParams.orchestrator_details) {
+              updatedParams.orchestrator_details = {};
+            }
+            updatedParams.orchestrator_details.thumbnail_url = thumbnailUrl;
           } else if (currentTask.task_type === 'single_image') {
             // For single_image tasks, add to thumbnail_url
             updatedParams.thumbnail_url = thumbnailUrl;
+          } else {
+            // For any other task type, add thumbnail_url at the top level
+            // This ensures we don't miss any task types that might need thumbnails
+            updatedParams.thumbnail_url = thumbnailUrl;
+            console.log(`[COMPLETE-TASK-DEBUG] Added thumbnail_url for task type '${currentTask.task_type}' at top level`);
           }
         }
         // Update task parameters if needed (before marking as complete)
@@ -395,10 +408,25 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
               updatedParams.full_orchestrator_payload.thumbnail_url = thumbnailUrl;
               shouldUpdate = true;
             }
+          } else if (currentTask.task_type === 'wan_2_2_i2v') {
+            if (!updatedParams.orchestrator_details) {
+              updatedParams.orchestrator_details = {};
+            }
+            if (!updatedParams.orchestrator_details.thumbnail_url) {
+              updatedParams.orchestrator_details.thumbnail_url = thumbnailUrl;
+              shouldUpdate = true;
+            }
           } else if (currentTask.task_type === 'single_image') {
             if (!updatedParams.thumbnail_url) {
               updatedParams.thumbnail_url = thumbnailUrl;
               shouldUpdate = true;
+            }
+          } else {
+            // For any other task type, add thumbnail_url at the top level if not already present
+            if (!updatedParams.thumbnail_url) {
+              updatedParams.thumbnail_url = thumbnailUrl;
+              shouldUpdate = true;
+              console.log(`[COMPLETE-TASK-DEBUG] Fallback: Added thumbnail_url for task type '${currentTask.task_type}' at top level`);
             }
           }
           if (shouldUpdate) {

@@ -102,7 +102,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, 
         <div className={`flex-shrink-0 ${mobileModalStyling.isMobile ? 'px-4' : 'px-6'}`}>
           <div className="grid gap-4 py-3">
             <div className={`${mobileModalStyling.isMobile ? 'space-y-2' : 'grid grid-cols-3 items-center gap-6'}`}>
-              <Label htmlFor="project-name" className={mobileModalStyling.isMobile ? 'text-left' : 'text-right'}>
+              <Label htmlFor="project-name" className="text-left">
                 Name
               </Label>
               <Input
@@ -116,7 +116,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, 
               />
             </div>
             <div className={`${mobileModalStyling.isMobile ? 'space-y-2' : 'grid grid-cols-3 items-center gap-6'}`}>
-              <Label htmlFor="aspect-ratio" className={mobileModalStyling.isMobile ? 'text-left' : 'text-right'}>
+              <Label htmlFor="aspect-ratio" className="text-left">
                 Aspect Ratio
               </Label>
               <div className={mobileModalStyling.isMobile ? 'w-full' : 'col-span-2'}>

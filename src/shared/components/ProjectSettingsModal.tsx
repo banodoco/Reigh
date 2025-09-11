@@ -124,7 +124,7 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({ isOp
         <div className={`${mobileModalStyling.isMobile ? 'px-4' : 'px-6'} flex-1 overflow-y-auto min-h-0`}>
           <div className="grid gap-4 py-3">
             <div className="grid grid-cols-3 items-center gap-6">
-              <Label htmlFor="project-name-settings" className="text-right">
+              <Label htmlFor="project-name-settings" className="text-left">
                 Name
               </Label>
               <Input
@@ -137,7 +137,7 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({ isOp
               />
             </div>
             <div className="grid grid-cols-3 items-center gap-6">
-              <Label htmlFor="aspect-ratio-settings" className="text-right">
+              <Label htmlFor="aspect-ratio-settings" className="text-left">
                 Aspect Ratio
               </Label>
               <div className="col-span-2">
@@ -151,7 +151,7 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({ isOp
               </div>
             </div>
             <div className="grid grid-cols-3 items-center gap-6">
-              <Label className="text-right">
+              <Label className="text-left">
                 Image Upload
               </Label>
               <div className="col-span-2 flex items-center gap-3">
