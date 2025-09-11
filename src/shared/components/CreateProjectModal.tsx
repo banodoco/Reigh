@@ -11,31 +11,18 @@ import {
 } from "@/shared/components/ui/dialog";
 import { Input } from "@/shared/components/ui/input";
 import { Label } from "@/shared/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/shared/components/ui/select";
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { toast } from 'sonner';
-import { ASPECT_RATIO_TO_RESOLUTION } from '@/shared/lib/aspectRatios';
 import { getRandomDummyName } from '../lib/dummyNames';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useMediumModal, createMobileModalProps } from '@/shared/hooks/useMobileModalStyling';
+import { AspectRatioSelector } from '@/shared/components/AspectRatioSelector';
 
 interface CreateProjectModalProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
 }
 
-const ASPECT_RATIOS = Object.keys(ASPECT_RATIO_TO_RESOLUTION)
-    .filter(key => key !== 'Square')
-    .map(key => ({
-        value: key,
-        label: `${key} (${ASPECT_RATIO_TO_RESOLUTION[key]})`
-    }));
 
 export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, onOpenChange }) => {
   const [projectName, setProjectName] = useState('');
@@ -113,8 +100,8 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, 
         </div>
         
         <div className={`flex-shrink-0 ${mobileModalStyling.isMobile ? 'px-4' : 'px-6'}`}>
-          <div className="grid gap-3 py-3">
-            <div className={`${mobileModalStyling.isMobile ? 'space-y-2' : 'grid grid-cols-4 items-center gap-4'}`}>
+          <div className="grid gap-4 py-3">
+            <div className={`${mobileModalStyling.isMobile ? 'space-y-2' : 'grid grid-cols-3 items-center gap-6'}`}>
               <Label htmlFor="project-name" className={mobileModalStyling.isMobile ? 'text-left' : 'text-right'}>
                 Name
               </Label>
@@ -122,28 +109,26 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, 
                 id="project-name"
                 value={projectName}
                 onChange={(e) => setProjectName(e.target.value)}
-                className={mobileModalStyling.isMobile ? 'w-full' : 'col-span-3'}
+                className={mobileModalStyling.isMobile ? 'w-full' : 'col-span-2'}
                 disabled={isCreatingProject}
                 maxLength={30}
                 placeholder="Enter project name..."
               />
             </div>
-            <div className={`${mobileModalStyling.isMobile ? 'space-y-2' : 'grid grid-cols-4 items-center gap-4'}`}>
+            <div className={`${mobileModalStyling.isMobile ? 'space-y-2' : 'grid grid-cols-3 items-center gap-6'}`}>
               <Label htmlFor="aspect-ratio" className={mobileModalStyling.isMobile ? 'text-left' : 'text-right'}>
                 Aspect Ratio
               </Label>
-              <Select value={aspectRatio} onValueChange={setAspectRatio} disabled={isCreatingProject}>
-                <SelectTrigger className={mobileModalStyling.isMobile ? 'w-full' : 'col-span-3'} id="aspect-ratio">
-                  <SelectValue placeholder="Select aspect ratio" />
-                </SelectTrigger>
-                <SelectContent>
-                  {ASPECT_RATIOS.map((ratio) => (
-                    <SelectItem key={ratio.value} value={ratio.value}>
-                      {ratio.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className={mobileModalStyling.isMobile ? 'w-full' : 'col-span-2'}>
+                <AspectRatioSelector
+                  value={aspectRatio}
+                  onValueChange={setAspectRatio}
+                  disabled={isCreatingProject}
+                  id="aspect-ratio"
+                  showVisualizer={!mobileModalStyling.isMobile}
+                  className={mobileModalStyling.isMobile ? 'w-full' : ''}
+                />
+              </div>
             </div>
           </div>
         </div>

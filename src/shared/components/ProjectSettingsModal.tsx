@@ -10,31 +10,17 @@ import {
 } from "@/shared/components/ui/dialog";
 import { Input } from "@/shared/components/ui/input";
 import { Label } from "@/shared/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/shared/components/ui/select";
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { toast } from 'sonner';
 import { Project } from '@/types/project';
-import { ASPECT_RATIO_TO_RESOLUTION } from '@/shared/lib/aspectRatios';
 import { Checkbox } from '@/shared/components/ui/checkbox';
 import { useToolSettings } from '@/shared/hooks/useToolSettings';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/shared/components/ui/collapsible';
 import { ChevronDown, AlertTriangle } from 'lucide-react';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useMediumModal, createMobileModalProps } from '@/shared/hooks/useMobileModalStyling';
+import { AspectRatioSelector } from '@/shared/components/AspectRatioSelector';
 
-// Create the aspect ratio options from the centralized object
-const ASPECT_RATIOS = Object.keys(ASPECT_RATIO_TO_RESOLUTION)
-    .filter(key => key !== 'Square') // Exclude 'Square' if '1:1' is preferred
-    .map(key => ({
-        value: key,
-        label: `${key} (${ASPECT_RATIO_TO_RESOLUTION[key]})`
-    }));
 
 interface ProjectSettingsModalProps {
   isOpen: boolean;
@@ -58,14 +44,14 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({ isOp
   useEffect(() => {
     if (project && isOpen) { // Also check isOpen to re-init when modal re-opens with same project
       setProjectName(project.name);
-      setAspectRatio(project.aspectRatio || ASPECT_RATIOS[0].value); // Fallback if aspectRatio is undefined
+      setAspectRatio(project.aspectRatio || '16:9'); // Fallback if aspectRatio is undefined
       if (!isLoadingUploadSettings) {
         setCropToProjectSize(uploadSettings?.cropToProjectSize ?? true);
       }
     } else if (!isOpen) {
       // Optionally reset when modal is closed, or let useEffect handle it if project becomes null
       // setProjectName('');
-      // setAspectRatio(ASPECT_RATIOS[0].value);
+      // setAspectRatio('16:9');
     }
   }, [project, isOpen, uploadSettings, isLoadingUploadSettings]);
 
@@ -136,8 +122,8 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({ isOp
           </DialogHeader>
         </div>
         <div className={`${mobileModalStyling.isMobile ? 'px-4' : 'px-6'} flex-1 overflow-y-auto min-h-0`}>
-          <div className="grid gap-3 py-3">
-            <div className="grid grid-cols-4 items-center gap-4">
+          <div className="grid gap-4 py-3">
+            <div className="grid grid-cols-3 items-center gap-6">
               <Label htmlFor="project-name-settings" className="text-right">
                 Name
               </Label>
@@ -145,42 +131,44 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({ isOp
                 id="project-name-settings"
                 value={projectName}
                 onChange={(e) => setProjectName(e.target.value)}
-                className="col-span-3"
+                className="col-span-2"
                 disabled={isUpdatingProject}
                 maxLength={30}
               />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
+            <div className="grid grid-cols-3 items-center gap-6">
               <Label htmlFor="aspect-ratio-settings" className="text-right">
                 Aspect Ratio
               </Label>
-              <Select value={aspectRatio} onValueChange={setAspectRatio} disabled={isUpdatingProject}>
-                <SelectTrigger className="col-span-3" id="aspect-ratio-settings">
-                  <SelectValue placeholder="Select aspect ratio" />
-                </SelectTrigger>
-                <SelectContent>
-                  {ASPECT_RATIOS.map((ratio) => (
-                    <SelectItem key={ratio.value} value={ratio.value}>
-                      {ratio.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="col-span-2">
+                <AspectRatioSelector
+                  value={aspectRatio}
+                  onValueChange={setAspectRatio}
+                  disabled={isUpdatingProject}
+                  id="aspect-ratio-settings"
+                  showVisualizer={true}
+                />
+              </div>
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
+            <div className="grid grid-cols-3 items-center gap-6">
               <Label className="text-right">
                 Image Upload
               </Label>
-              <div className="col-span-3 flex items-center space-x-2">
-                <Checkbox 
-                  id="crop-to-project-size-settings"
-                  checked={cropToProjectSize}
-                  onCheckedChange={(checked) => handleCropToProjectSizeChange(checked === true)}
-                  disabled={isUpdatingProject}
-                />
-                <Label htmlFor="crop-to-project-size-settings" className="text-sm">
-                  Crop to project size when uploading images
-                </Label>
+              <div className="col-span-2 flex items-center gap-3">
+                <div className="w-2/3 flex items-center space-x-2">
+                  <Checkbox 
+                    id="crop-to-project-size-settings"
+                    checked={cropToProjectSize}
+                    onCheckedChange={(checked) => handleCropToProjectSizeChange(checked === true)}
+                    disabled={isUpdatingProject}
+                  />
+                  <Label htmlFor="crop-to-project-size-settings" className="text-sm">
+                    Crop uploaded images to project size
+                  </Label>
+                </div>
+                <div className="flex-1">
+                  {/* Empty space to maintain layout consistency */}
+                </div>
               </div>
             </div>
             {/* Danger Zone */}
