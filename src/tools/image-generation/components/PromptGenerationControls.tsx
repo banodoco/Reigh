@@ -14,6 +14,7 @@ export interface GenerationControlValues {
   numberToGenerate: number;
   includeExistingContext: boolean;
   addSummary: boolean;
+  replaceCurrentPrompts: boolean;
   temperature: number;
 }
 
@@ -47,6 +48,7 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
   const [numberToGenerate, setNumberToGenerate] = useState<number>(initialValues?.numberToGenerate || 3);
   const [includeExistingContext, setIncludeExistingContext] = useState(initialValues?.includeExistingContext ?? true);
   const [addSummary, setAddSummary] = useState(initialValues?.addSummary || false);
+  const [replaceCurrentPrompts, setReplaceCurrentPrompts] = useState(initialValues?.replaceCurrentPrompts || false);
   const [temperature, setTemperature] = useState<number>(initialValues?.temperature || 0.8);
 
   // Hydrate from initialValues only once to avoid overriding user typing on parent updates
@@ -58,6 +60,7 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
       setNumberToGenerate(initialValues.numberToGenerate || 3);
       setIncludeExistingContext(initialValues.includeExistingContext ?? true);
       setAddSummary(initialValues.addSummary || false);
+      setReplaceCurrentPrompts(initialValues.replaceCurrentPrompts || false);
       setTemperature(initialValues.temperature || 0.8);
       hasHydratedRef.current = true;
       // Emit once after hydration so parent has a consistent snapshot
@@ -67,6 +70,7 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
         numberToGenerate: initialValues.numberToGenerate || 3,
         includeExistingContext: initialValues.includeExistingContext ?? true,
         addSummary: initialValues.addSummary || false,
+        replaceCurrentPrompts: initialValues.replaceCurrentPrompts || false,
         temperature: initialValues.temperature || 0.8,
       });
     }
@@ -81,10 +85,11 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
       numberToGenerate,
       includeExistingContext,
       addSummary,
+      replaceCurrentPrompts,
       temperature,
       ...overrides,
     });
-  }, [overallPromptText, rulesToRememberText, numberToGenerate, includeExistingContext, addSummary, temperature, onValuesChange]);
+  }, [overallPromptText, rulesToRememberText, numberToGenerate, includeExistingContext, addSummary, replaceCurrentPrompts, temperature, onValuesChange]);
 
   const handleGenerateClick = async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
@@ -98,6 +103,7 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
       numberToGenerate,
       existingPrompts: includeExistingContext ? existingPromptsForContext : undefined,
       addSummaryForNewPrompts: addSummary,
+      replaceCurrentPrompts,
       temperature,
     });
   };
@@ -144,22 +150,53 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
             value={rulesToRememberText}
             onChange={(e) => {
               const next = e.target.value;
-              // Add bullet points for new lines
+              // Add bullet points for all lines (including empty ones)
               const lines = next.split('\n');
-              const formattedLines = lines.map((line, index) => {
+              const formattedLines = lines.map((line) => {
                 const trimmedLine = line.trim();
-                if (index === 0 || trimmedLine === '') {
-                  return line; // First line or empty lines don't get bullets
-                }
-                // If line doesn't already start with a bullet, add one
-                if (!trimmedLine.startsWith('•') && !trimmedLine.startsWith('-') && !trimmedLine.startsWith('*')) {
-                  return `• ${trimmedLine}`;
+                // Add bullet to any line that doesn't already have one
+                if (!line.startsWith('•') && !line.startsWith('-') && !line.startsWith('*')) {
+                  return `• ${line}`;
                 }
                 return line;
               });
               const formatted = formattedLines.join('\n');
               setRulesToRememberText(formatted);
               emitChange({ rulesToRememberText: formatted });
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                const textarea = e.target as HTMLTextAreaElement;
+                const cursorPos = textarea.selectionStart;
+                const currentValue = textarea.value;
+                
+                // Insert new line with bullet point
+                const beforeCursor = currentValue.slice(0, cursorPos);
+                const afterCursor = currentValue.slice(cursorPos);
+                const newValue = beforeCursor + '\n• ' + afterCursor;
+                
+                setRulesToRememberText(newValue);
+                emitChange({ rulesToRememberText: newValue });
+                
+                // Position cursor after the new bullet
+                setTimeout(() => {
+                  textarea.setSelectionRange(cursorPos + 3, cursorPos + 3);
+                }, 0);
+              }
+            }}
+            onFocus={(e) => {
+              // Add bullet point when focusing on empty textarea
+              const currentValue = e.target.value;
+              if (currentValue.trim() === '') {
+                const newValue = '• ';
+                setRulesToRememberText(newValue);
+                emitChange({ rulesToRememberText: newValue });
+                // Position cursor after the bullet
+                setTimeout(() => {
+                  e.target.setSelectionRange(2, 2);
+                }, 0);
+              }
             }}
             placeholder="e.g., Under 50 words&#10;No modern technology&#10;Include vivid descriptions"
             rows={4}
@@ -245,6 +282,19 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
                     disabled={!hasApiKey || isGenerating}
                 />
                 <Label htmlFor="gen_addSummary" className="font-normal">Add short summaries</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+                <Checkbox 
+                    id="gen_replaceCurrentPrompts" 
+                    checked={replaceCurrentPrompts} 
+                    onCheckedChange={(checked) => {
+                      const next = Boolean(checked);
+                      setReplaceCurrentPrompts(next);
+                      emitChange({ replaceCurrentPrompts: next });
+                    }} 
+                    disabled={!hasApiKey || isGenerating}
+                />
+                <Label htmlFor="gen_replaceCurrentPrompts" className="font-normal">Replace current prompts</Label>
             </div>
         </div>
       </div>

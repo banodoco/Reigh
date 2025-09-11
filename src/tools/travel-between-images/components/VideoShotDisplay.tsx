@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { getDisplayUrl } from '@/shared/lib/utils';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/shared/components/ui/alert-dialog';
 import { useClickRipple } from '@/shared/hooks/useClickRipple';
+import { parseRatio } from '@/shared/lib/aspectRatios';
 
 interface VideoShotDisplayProps {
   shot: Shot;
@@ -20,6 +21,7 @@ interface VideoShotDisplayProps {
   };
   shouldLoadImages?: boolean;
   shotIndex?: number;
+  projectAspectRatio?: string;
 }
 
 // Component for individual shot image with loading state
@@ -30,9 +32,10 @@ interface ShotImageProps {
   shotName: string;
   shouldLoad?: boolean;
   shotIndex?: number;
+  projectAspectRatio?: string;
 }
 
-const ShotImage: React.FC<ShotImageProps> = ({ image, index, onSelectShot, shotName, shouldLoad = true, shotIndex = 0 }) => {
+const ShotImage: React.FC<ShotImageProps> = ({ image, index, onSelectShot, shotName, shouldLoad = true, shotIndex = 0, projectAspectRatio }) => {
   // Handle both old and new field naming conventions
   const imageUrl = image.imageUrl || image.location;
   const thumbUrl = image.thumbUrl || image.location;
@@ -80,11 +83,45 @@ const ShotImage: React.FC<ShotImageProps> = ({ image, index, onSelectShot, shotN
     return null;
   }
 
+  // Calculate final height based on aspect ratio and min/max constraints
+  const imageWidth = 128; // from w-32 class
+  let desiredHeight = imageWidth; // Default to 1:1
+
+  // Try to get dimensions from image metadata first
+  let width = (image as any).metadata?.width;
+  let height = (image as any).metadata?.height;
+
+  // If not found, try to extract from resolution string
+  if (!width || !height) {
+    const resolution = (image as any).metadata?.originalParams?.orchestrator_details?.resolution;
+    if (resolution && typeof resolution === 'string' && resolution.includes('x')) {
+      const [w, h] = resolution.split('x').map(Number);
+      if (!isNaN(w) && !isNaN(h)) {
+        width = w;
+        height = h;
+      }
+    }
+  }
+
+  if (width && height && width > 0) {
+    desiredHeight = (imageWidth / width) * height;
+  } else if (projectAspectRatio) {
+    const ratio = parseRatio(projectAspectRatio); // This is width/height
+    if (!isNaN(ratio) && ratio > 0) {
+      desiredHeight = imageWidth / ratio;
+    }
+  }
+
+  const minHeight = 120; // Sensible min-height to fill the card vertically
+  const maxHeight = imageWidth * 2; // Max height of 2:1 portrait to prevent layout breaking
+  const finalHeight = Math.min(Math.max(desiredHeight, minHeight), maxHeight);
+
   return (
-    <div 
-      className="flex-shrink-0 w-32 h-32 rounded overflow-hidden border cursor-pointer hover:shadow-wes-deep hover:scale-105 transition-all duration-300 relative bg-gray-200"
-      style={{ 
-        animationDelay: `${index * 0.1}s`
+    <div
+      className="flex-shrink-0 w-32 rounded overflow-hidden border cursor-pointer hover:shadow-wes-deep hover:scale-105 transition-all duration-300 relative bg-gray-200"
+      style={{
+        animationDelay: `${index * 0.1}s`,
+        height: `${finalHeight}px`,
       }}
       onClick={(e) => {
         e.stopPropagation();
@@ -92,7 +129,6 @@ const ShotImage: React.FC<ShotImageProps> = ({ image, index, onSelectShot, shotN
       }}
     >
       {imageLoadError ? (
-        // Error state
         <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-gray-100 text-gray-500">
           <div className="text-center">
             <div className="h-4 w-4 mx-auto mb-1 opacity-50">⚠️</div>
@@ -133,7 +169,7 @@ const ShotImage: React.FC<ShotImageProps> = ({ image, index, onSelectShot, shotN
   );
 };
 
-const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot, currentProjectId, dragHandleProps, shouldLoadImages = true, shotIndex = 0 }) => {
+const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot, currentProjectId, dragHandleProps, shouldLoadImages = true, shotIndex = 0, projectAspectRatio }) => {
   // Click ripple effect
   const { triggerRipple, rippleStyles, isRippleActive } = useClickRipple();
   
@@ -283,7 +319,7 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
     <>
       <div 
         key={shot.id} 
-        className={`click-ripple group h-48 p-4 border rounded-lg bg-card/50 hover:bg-card/80 hover:shadow-wes-hover hover:scale-[1.02] transition-all duration-300 relative cursor-pointer flex flex-col ${isRippleActive ? 'ripple-active' : ''}`}
+        className={`click-ripple group min-h-48 p-4 border rounded-lg bg-card/50 hover:bg-card/80 hover:shadow-wes-hover hover:scale-[1.02] transition-all duration-300 relative cursor-pointer flex flex-col ${isRippleActive ? 'ripple-active' : ''}`}
         style={rippleStyles}
         onPointerDown={triggerRipple}
         onClick={onSelectShot}
@@ -355,7 +391,7 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
           </div>
         </div>
         
-        <div className="flex space-x-2 overflow-hidden flex-1 items-start">
+        <div className="flex space-x-2 overflow-x-auto flex-1 items-start">
           {imagesToShow.length > 0 ? (
             imagesToShow.map((image, index) => (
               <ShotImage
@@ -366,23 +402,46 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
                 shotName={shot.name}
                 shouldLoad={shouldLoadImages}
                 shotIndex={shotIndex}
+                projectAspectRatio={projectAspectRatio}
               />
             ))
           ) : (
             <p className="text-sm text-muted-foreground italic">No images in this shot yet.</p>
           )}
-          {positionedImages.length > 5 && (
-            <div 
-              className="flex-shrink-0 w-32 h-32 rounded border bg-muted flex items-center justify-center cursor-pointer hover:bg-muted/80 hover:shadow-wes-deep hover:scale-105 transition-all duration-300 animate-in fade-in-up"
-              style={{ animationDelay: `${imagesToShow.length * 0.1}s` }}
-              onClick={(e) => {
-                e.stopPropagation();
-                onSelectShot();
-              }}
-            >
-              <p className="text-sm text-muted-foreground text-center pointer-events-none">+{positionedImages.length - 5} more</p>
-            </div>
-          )}
+          {positionedImages.length > 5 && (() => {
+            // Calculate aspect ratio padding for the "more" indicator to match other images
+            const imageWidth = 128;
+            let desiredHeight = imageWidth;
+
+            if (projectAspectRatio) {
+              const ratio = parseRatio(projectAspectRatio);
+              if (!isNaN(ratio) && ratio > 0) {
+                desiredHeight = imageWidth / ratio;
+              }
+            }
+            
+            const minHeight = 120;
+            const maxHeight = imageWidth * 2;
+            const finalHeight = Math.min(Math.max(desiredHeight, minHeight), maxHeight);
+            
+            return (
+              <div 
+                className="flex-shrink-0 w-32 rounded border bg-muted cursor-pointer hover:bg-muted/80 hover:shadow-wes-deep hover:scale-105 transition-all duration-300 animate-in fade-in-up relative"
+                style={{
+                  animationDelay: `${imagesToShow.length * 0.1}s`,
+                  height: `${finalHeight}px`,
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSelectShot();
+                }}
+              >
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <p className="text-sm text-muted-foreground text-center pointer-events-none">+{positionedImages.length - 5} more</p>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       </div>
 

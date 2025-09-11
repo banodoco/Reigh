@@ -21,6 +21,7 @@ import { Button } from '@/shared/components/ui/button';
 import { useReorderShots } from '@/shared/hooks/useShots';
 import { useShots } from '@/shared/contexts/ShotsContext';
 import { useProject } from '@/shared/contexts/ProjectContext';
+import { useCurrentProject } from '@/shared/hooks/useCurrentProject';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
@@ -43,6 +44,7 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
   // Get hooks first before using them in useMemo
   const { isLoading: shotsLoading, error: shotsError } = useShots();
   const { selectedProjectId: currentProjectId } = useProject();
+  const currentProject = useCurrentProject();
   const reorderShotsMutation = useReorderShots();
   const queryClient = useQueryClient();
   const [optimisticShots, setOptimisticShots] = React.useState<Shot[] | null>(null);
@@ -363,6 +365,7 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
                 isDragDisabled={reorderShotsMutation.isPending}
                 shouldLoadImages={true} // Always load images since they're from context
                 shotIndex={index}
+                projectAspectRatio={currentProject?.aspectRatio}
               />
             );
           })}

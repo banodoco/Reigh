@@ -12,6 +12,7 @@ export interface GeneratePromptsParams {
   existingPrompts?: AIPromptItem[];         // Renamed and kept optional
   includeExistingContext?: boolean;         // Added from user specification
   addSummaryForNewPrompts?: boolean;        // Renamed from addSummary
+  replaceCurrentPrompts?: boolean;          // Whether to replace existing prompts instead of adding
   temperature?: number;                     // AI creativity level (0.6-1.4)
 }
 

@@ -53,9 +53,48 @@ export default function HomePage() {
   const [emergingTipOpen, setEmergingTipOpen] = useState(false);
   const [emergingTipDisabled, setEmergingTipDisabled] = useState(false);
 
+  // Example style state
+  const [selectedExampleStyle, setSelectedExampleStyle] = useState('Dramatic');
+
   // Tooltip state: Ecosystem preview
   const [ecosystemTipOpen, setEcosystemTipOpen] = useState(false);
   const [ecosystemTipDisabled, setEcosystemTipDisabled] = useState(false);
+
+  // Example styles data
+  const exampleStyles = {
+    'Dramatic': {
+      prompt: 'He runs up to the camera rapidly',
+      image1: '/files/main_example_input_1.png',
+      image2: '/files/main_example_input_2.png',
+      video: '/files/main_example_output.mp4'
+    },
+    'Whimsical': {
+      prompt: 'She dances with butterflies',
+      image1: '/files/main_example_input_1.png',
+      image2: '/files/main_example_input_2.png',
+      video: '/files/main_example_output.mp4'
+    },
+    'Action-Packed': {
+      prompt: 'Explosion in the background',
+      image1: '/files/main_example_input_1.png',
+      image2: '/files/main_example_input_2.png',
+      video: '/files/main_example_output.mp4'
+    },
+    'Eerie': {
+      prompt: 'Shadows creep closer slowly',
+      image1: '/files/main_example_input_1.png',
+      image2: '/files/main_example_input_2.png',
+      video: '/files/main_example_output.mp4'
+    },
+    'Questionable': {
+      prompt: 'Something feels very wrong',
+      image1: '/files/main_example_input_1.png',
+      image2: '/files/main_example_input_2.png',
+      video: '/files/main_example_output.mp4'
+    }
+  };
+
+  const currentExample = exampleStyles[selectedExampleStyle];
 
   // Debug ecosystem tooltip state
   useEffect(() => {
@@ -574,14 +613,27 @@ export default function HomePage() {
                   side="top"
                   align="center"
                   onClick={handleEmergingActivate}
-                  className="group flex items-center gap-2 text-left p-3 max-w-xs border-2 border-transparent bg-wes-cream/80 rounded-lg shadow-md cursor-pointer transition-all duration-300 hover:bg-gradient-to-r hover:from-wes-pink/10 hover:via-wes-coral/10 hover:to-wes-vintage-gold/10 hover:border-transparent hover:bg-origin-border hover:shadow-2xl hover:-translate-y-1"
+                  className="group flex items-center gap-2 text-left p-4 max-w-xs min-h-[80px] border-2 border-transparent bg-wes-cream/80 rounded-lg shadow-md cursor-pointer transition-all duration-300 hover:bg-gradient-to-r hover:from-wes-pink/10 hover:via-wes-coral/10 hover:to-wes-vintage-gold/10 hover:border-transparent hover:bg-origin-border hover:shadow-2xl hover:-translate-y-1"
                 >
                   <div className="flex items-center gap-1 text-primary">
-                    <div className="w-16 h-16 sm:w-20 sm:h-20 bg-muted/20 border rounded" />
-                    <span className="text-xs sm:text-sm font-light">+</span>
-                    <div className="w-16 h-16 sm:w-20 sm:h-20 bg-muted/20 border rounded" />
-                    <span className="text-xs sm:text-sm font-light">=</span>
-                    <div className="w-16 h-16 sm:w-20 sm:h-20 bg-muted/20 border rounded" />
+                    <img 
+                      src="/files/main_example_input_1.png" 
+                      alt="Input image 1"
+                      className="w-16 h-16 sm:w-20 sm:h-20 object-cover border rounded"
+                    />
+                    <span className="text-sm sm:text-base font-light">+</span>
+                    <div className="flex items-center">
+                        <div className="text-xs font-medium text-center px-2 py-1.5 bg-gradient-to-r from-wes-cream/90 to-wes-vintage-gold/20 border border-wes-vintage-gold/30 rounded-md shadow-sm max-w-[80px] text-primary">
+                          "{currentExample.prompt}"
+                        </div>
+                    </div>
+                    <span className="text-sm sm:text-base font-light">+</span>
+                    <img 
+                      src="/files/main_example_input_2.png" 
+                      alt="Input image 2"
+                      className="w-16 h-16 sm:w-20 sm:h-20 object-cover border rounded"
+                    />
+                    <span className="text-sm sm:text-base font-light">=</span>
                   </div>
                   <div className="flex-shrink-0">
                     <ChevronRight className="hover-arrow w-6 h-6 text-wes-vintage-gold transition-transform transition-colors duration-700 ease-in-out group-hover:text-wes-coral group-hover:animate-sway-x" />
@@ -1018,26 +1070,118 @@ export default function HomePage() {
               </p>
               {/* Section 1 */}
               <div className="space-y-2 mt-4 mb-4">
-                {/* Inputs row */}
-                <div className="flex gap-4">
-                  {imagePairIndices.map(i => (
-                    <div key={i} className="bg-muted/20 border rounded-lg w-40 sm:w-52 aspect-video flex items-center justify-center text-xs text-muted-foreground">
-                      16:9 Image {i}
+                <div className="flex gap-4 items-start">
+                  {/* Left side: Two stacked square images */}
+                  <div className="flex flex-col gap-2">
+                    <div className="w-20 h-20 sm:w-32 sm:h-32 flex-shrink-0">
+                      <img 
+                        src={currentExample.image1} 
+                        alt="Input image 1"
+                        className="w-full h-full object-cover border rounded-lg"
+                      />
                     </div>
-                  ))}
+                    <div className="w-20 h-20 sm:w-32 sm:h-32 flex-shrink-0">
+                      <img 
+                        src={currentExample.image2} 
+                        alt="Input image 2"
+                        className="w-full h-full object-cover border rounded-lg"
+                      />
+                    </div>
+                  </div>
+                  {/* Right side: Output video - square matching combined height */}
+                  <div className="w-[168px] h-[168px] sm:w-[264px] sm:h-[264px] flex-shrink-0 relative">
+                    <video 
+                      key={selectedExampleStyle}
+                      ref={(video) => {
+                        if (video && showPhilosophy) {
+                          const playButton = video.nextElementSibling;
+                          if (playButton) {
+                            playButton.style.display = 'none';
+                            playButton.style.opacity = '0';
+                          }
+                          video.currentTime = 0;
+                          video.play();
+                        }
+                      }}
+                      src={currentExample.video}
+                      muted
+                      playsInline
+                      onPlay={(e) => {
+                        const playButton = e.target.nextElementSibling;
+                        if (playButton) {
+                          playButton.style.display = 'none';
+                          playButton.style.opacity = '0';
+                        }
+                      }}
+                      onEnded={(e) => {
+                        const playButton = e.target.nextElementSibling;
+                        if (playButton) {
+                          // Start with no blur and gradually increase
+                          playButton.style.display = 'flex';
+                          playButton.style.backdropFilter = 'blur(0px)';
+                          playButton.style.opacity = '1';
+                          
+                          // Gradually increase blur over 1 second
+                          let blurAmount = 0;
+                          const blurInterval = setInterval(() => {
+                            blurAmount += 0.1;
+                            playButton.style.backdropFilter = `blur(${blurAmount}px)`;
+                            if (blurAmount >= 2) {
+                              clearInterval(blurInterval);
+                            }
+                          }, 50);
+                        }
+                      }}
+                      className="w-full h-full object-cover border rounded-lg"
+                    />
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const video = e.currentTarget.previousElementSibling;
+                        if (video) {
+                          video.currentTime = 0;
+                          video.play();
+                          e.currentTarget.style.opacity = '0';
+                          setTimeout(() => {
+                            e.currentTarget.style.display = 'none';
+                          }, 300);
+                        }
+                      }}
+                      className="absolute inset-0 bg-black/40 rounded-lg items-center justify-center text-white hover:bg-black/50 transition-all duration-500 opacity-0"
+                      style={{ display: 'none' }}
+                    >
+                      <svg className="w-8 h-8 sm:w-12 sm:h-12" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M8 5v14l11-7z"/>
+                      </svg>
+                    </button>
+                  </div>
                 </div>
-                {/* Spacer between inputs and output */}
-                <div className="h-0.5" />
-                {/* Output row */}
-                <div className="bg-muted/20 border rounded-lg w-full aspect-video flex items-center justify-center text-xs text-muted-foreground">
-                  16:9 Output
+              </div>
+
+              {/* Style Toggle */}
+              <div className="mt-6 mb-8">
+                <div className="flex justify-center gap-2">
+                  {Object.keys(exampleStyles).map((style) => (
+                    <button
+                      key={style}
+                      onClick={() => setSelectedExampleStyle(style)}
+                      className={`px-3 py-1.5 text-xs font-medium rounded-full border transition-all duration-200 ${
+                        selectedExampleStyle === style
+                          ? 'bg-wes-vintage-gold text-white border-wes-vintage-gold shadow-sm'
+                          : 'bg-white/50 text-muted-foreground border-muted/30 hover:border-wes-vintage-gold/40 hover:bg-wes-vintage-gold/10'
+                      }`}
+                    >
+                      {style}
+                    </button>
+                  ))}
                 </div>
               </div>
 
               {/* Section 2 */}
               <div className="space-y-3 mt-4 mb-4">
                 <p className="text-sm leading-relaxed">
-                  Just as a songwriter who sticks to only guitar might uncover infinite nuance to be found in six strings, we believe an entire artform lies waiting in the AI-driven journey between images:
+                  Just as a songwriter might uncover infinite nuance to be found in six strings, we believe an entire artform lies waiting in the AI-driven journey between images - especially with the ability <strong>generate precise images based on references</strong>:
                 </p>
                 <div className="grid grid-cols-2 items-stretch gap-4">
                   {/* Left part: 4 inputs in 2x2 grid */}

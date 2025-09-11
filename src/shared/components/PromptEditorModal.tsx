@@ -209,6 +209,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
   const [generationControlValues, setGenerationControlValues] = useState<GenerationControlValues>({
     overallPromptText: '', rulesToRememberText: '',
     numberToGenerate: 24, includeExistingContext: true, addSummary: true,
+    replaceCurrentPrompts: false,
     temperature: 0.8,
   });
   const [bulkEditControlValues, setBulkEditControlValues] = useState<BulkEditControlValues>({
@@ -374,13 +375,14 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
     }));
     console.log(`[PromptEditorModal] AI Generation: Parsed ${newEntries.length} new PromptEntry items:`, JSON.stringify(newEntries.map(p => ({id: p.id, text: p.fullPrompt.substring(0,30)+'...'}))));
     
-    // Add new prompts to the state first
+    // Add or replace prompts based on user preference
     let newlyAddedPromptIds: string[] = [];
-    console.log(`[PromptEditorModal:AI_GENERATION] About to add ${newEntries.length} AI-generated prompts`);
+    const shouldReplace = params.replaceCurrentPrompts;
+    console.log(`[PromptEditorModal:AI_GENERATION] About to ${shouldReplace ? 'replace' : 'add'} ${newEntries.length} AI-generated prompts`);
     setInternalPrompts(currentPrompts => {
-      const updatedPrompts = [...currentPrompts, ...newEntries];
+      const updatedPrompts = shouldReplace ? newEntries : [...currentPrompts, ...newEntries];
       newlyAddedPromptIds = newEntries.map(e => e.id); // Capture IDs of newly added prompts
-      console.log(`[PromptEditorModal:AI_GENERATION] Added ${newEntries.length} prompts to internal list. New total: ${updatedPrompts.length}`);
+      console.log(`[PromptEditorModal:AI_GENERATION] ${shouldReplace ? 'Replaced' : 'Added'} ${newEntries.length} prompts to internal list. New total: ${updatedPrompts.length}`);
       return updatedPrompts;
     });
 
