@@ -333,7 +333,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                 variant="ghost"
                 size="icon"
                 onClick={() => setIsProjectSettingsModalOpen(true)}
-                className="h-12 w-12 wes-button bg-gradient-to-br from-wes-coral to-wes-salmon border-2 border-wes-vintage-gold/30 hover:from-wes-coral-dark hover:to-wes-salmon-dark shadow-wes-vintage hover:shadow-wes-hover group [&::before]:bg-gradient-to-t [&::before]:from-transparent [&::before]:via-white/20 [&::before]:to-transparent [&::before]:translate-y-[100%] [&::before]:translate-x-0 [&::before]:transition-transform [&::before]:duration-0 [&:hover::before]:translate-y-[-100%] [&:hover::before]:translate-x-0 [&:hover::before]:duration-700 disabled:cursor-not-allowed"
+                className="h-12 w-12 wes-button-subtle bg-gradient-to-br from-wes-coral to-wes-salmon border-2 border-wes-vintage-gold/30 hover:from-wes-coral-dark hover:to-wes-salmon-dark shadow-wes-vintage hover:shadow-wes-hover group disabled:cursor-not-allowed"
                 title={isLoadingProjects ? "Loading projects..." : !selectedProject ? "Select a project first" : "Project settings"}
                 disabled={isLoadingProjects || !selectedProject}
               >
@@ -345,7 +345,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                 variant="ghost" 
                 size="icon" 
                 onClick={() => setIsCreateProjectModalOpen(true)} 
-                className="h-12 w-12 wes-button bg-gradient-to-br from-wes-yellow to-wes-salmon border-2 border-wes-vintage-gold/30 hover:from-wes-yellow-dark hover:to-wes-salmon shadow-wes-vintage hover:shadow-wes-hover group"
+                className="h-12 w-12 wes-button-pulse bg-gradient-to-br from-wes-yellow to-wes-salmon border-2 border-wes-vintage-gold/30 hover:from-wes-yellow-dark hover:to-wes-salmon shadow-wes-vintage hover:shadow-wes-hover group"
                 title="Create new project"
               >
                 <PlusCircle className="h-5 w-5 text-white transition-transform duration-300 group-hover:scale-110" />
@@ -370,7 +370,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
               variant="ghost"
               size="icon"
               onClick={onOpenSettings}
-              className="h-12 w-12 wes-button bg-gradient-to-br from-wes-dusty-blue to-wes-lavender border-2 border-wes-vintage-gold/40 hover:from-wes-dusty-blue-dark hover:to-wes-lavender-dark shadow-wes-vintage hover:shadow-wes-hover group relative overflow-hidden [&::before]:bg-gradient-to-b [&::before]:from-transparent [&::before]:via-white/20 [&::before]:to-transparent [&::before]:translate-y-[-100%] [&::before]:translate-x-0 [&::before]:transition-transform [&::before]:duration-0 [&:hover::before]:translate-y-[100%] [&:hover::before]:translate-x-0 [&:hover::before]:duration-700"
+              className="h-12 w-12 no-sweep wes-button-spin-pulse bg-gradient-to-br from-wes-dusty-blue to-wes-lavender border-2 border-wes-vintage-gold/40 hover:from-wes-dusty-blue-dark hover:to-wes-lavender-dark shadow-wes-vintage hover:shadow-wes-hover group relative overflow-hidden"
               title="App Settings"
             >
               {/* Animated background pattern */}
@@ -434,7 +434,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                 variant="ghost"
                 size="icon"
                 onClick={() => setIsProjectSettingsModalOpen(true)}
-                className="h-10 w-10 wes-button bg-gradient-to-br from-wes-coral to-wes-salmon border-2 border-wes-vintage-gold/30 hover:from-wes-coral-dark hover:to-wes-salmon-dark shadow-wes-vintage hover:shadow-wes-hover group [&::before]:bg-gradient-to-t [&::before]:from-transparent [&::before]:via-white/20 [&::before]:to-transparent [&::before]:translate-y-[100%] [&::before]:translate-x-0 [&::before]:transition-transform [&::before]:duration-0 [&:hover::before]:translate-y-[-100%] [&:hover::before]:translate-x-0 [&:hover::before]:duration-700 disabled:cursor-not-allowed"
+                className="h-10 w-10 wes-button-subtle bg-gradient-to-br from-wes-coral to-wes-salmon border-2 border-wes-vintage-gold/30 hover:from-wes-coral-dark hover:to-wes-salmon-dark shadow-wes-vintage hover:shadow-wes-hover group disabled:cursor-not-allowed"
                 title={isLoadingProjects ? "Loading projects..." : !selectedProject ? "Select a project first" : "Project settings"}
                 disabled={isLoadingProjects || !selectedProject}
               >
@@ -446,7 +446,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                 variant="ghost" 
                 size="icon" 
                 onClick={() => setIsCreateProjectModalOpen(true)} 
-                className="h-10 w-10 wes-button bg-gradient-to-br from-wes-yellow to-wes-salmon border-2 border-wes-vintage-gold/30 hover:from-wes-yellow-dark hover:to-wes-salmon shadow-wes-vintage hover:shadow-wes-hover group"
+                className="h-10 w-10 wes-button-pulse bg-gradient-to-br from-wes-yellow to-wes-salmon border-2 border-wes-vintage-gold/30 hover:from-wes-yellow-dark hover:to-wes-salmon shadow-wes-vintage hover:shadow-wes-hover group"
                 title="Create new project"
               >
                 <PlusCircle className="h-4 w-4 text-white transition-transform duration-300 group-hover:scale-110" />
@@ -476,7 +476,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                 variant="ghost"
                 size="icon"
                 onClick={onOpenSettings}
-                className="h-11 w-11 wes-button bg-gradient-to-br from-wes-dusty-blue to-wes-lavender border-2 border-wes-vintage-gold/40 hover:from-wes-dusty-blue-dark hover:to-wes-lavender-dark shadow-wes-vintage hover:shadow-wes-hover group relative overflow-hidden [&::before]:bg-gradient-to-b [&::before]:from-transparent [&::before]:via-white/20 [&::before]:to-transparent [&::before]:translate-y-[-100%] [&::before]:translate-x-0 [&::before]:transition-transform [&::before]:duration-0 [&:hover::before]:translate-y-[100%] [&:hover::before]:translate-x-0 [&:hover::before]:duration-700"
+                className="h-11 w-11 no-sweep wes-button-spin-pulse bg-gradient-to-br from-wes-dusty-blue to-wes-lavender border-2 border-wes-vintage-gold/40 hover:from-wes-dusty-blue-dark hover:to-wes-lavender-dark shadow-wes-vintage hover:shadow-wes-hover group relative overflow-hidden"
                 title="App Settings"
               >
                 <div className="absolute inset-0 bg-film-grain opacity-20 animate-film-grain"></div>
