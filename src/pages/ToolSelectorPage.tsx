@@ -8,6 +8,7 @@ import { useContentResponsive, useContentResponsiveDirection, useContentResponsi
 import React, { memo } from 'react';
 import { time, timeEnd } from '@/shared/lib/logger';
 import { useVideoGalleryPreloader } from '@/shared/hooks/useVideoGalleryPreloader';
+import { useClickRipple } from '@/shared/hooks/useClickRipple';
 
 // Define process tools (main workflow)
 const processTools = [
@@ -98,15 +99,24 @@ const assistantTools = [
 const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any, isSquare?: boolean, index?: number, isVisible: boolean }) => {
   const [isWiggling, setIsWiggling] = useState(false);
   const navigate = useNavigate();
+  const { triggerRipple, triggerRippleAtCenter, rippleStyles, isRippleActive } = useClickRipple();
   
   // Use content-responsive breakpoints for dynamic sizing
   const { isSm, isLg } = useContentResponsive();
 
+  const handlePointerDown = (e: React.PointerEvent) => {
+    triggerRipple(e);
+    time('NavPerf', `ClickLag:${item.id}`);
+  };
+
   const handleComingSoonClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    triggerRipple(e);
     setIsWiggling(true);
-    setTimeout(() => setIsWiggling(false), 500); // Match animation duration
+    setTimeout(() => {
+      setIsWiggling(false);
+    }, 600); // Match animation duration
   };
 
   const isComingSoon = item.comingSoon || (!item.tool);
@@ -121,7 +131,10 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
   const descriptionSize = isSm ? 'text-base' : 'text-xs';
 
   const content = (
-    <div className={`wes-tool-card relative overflow-hidden ${isSquare ? 'min-h-48' : 'h-32 sm:h-32'} ${isComingSoon ? 'opacity-40' : ''} h-full`}>
+    <div 
+      className={`wes-tool-card click-ripple relative overflow-hidden ${isSquare ? 'min-h-48' : 'h-32 sm:h-32'} ${isComingSoon ? 'opacity-40' : ''} ${isRippleActive ? 'ripple-active' : ''} h-full`}
+      style={rippleStyles}
+    >
       {/* Coming Soon Badge */}
       {isComingSoon && isSm && (
         <div className={`absolute ${isSquare ? 'top-1 right-2' : 'top-2 right-2'} z-10 ${isWiggling ? 'animate-subtle-wiggle' : ''}`}>
@@ -211,7 +224,7 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
       className="relative group cursor-pointer w-full h-full"
       role="button"
       tabIndex={0}
-      onPointerDown={(e) => { e.stopPropagation(); time('NavPerf', `ClickLag:${item.id}`); }}
+      onPointerDown={handlePointerDown}
       onPointerUp={() => {
         if (item.tool?.path) {
           timeEnd('NavPerf', `ClickLag:${item.id}`);
@@ -222,6 +235,7 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
       onKeyDown={(e) => {
         if (item.tool?.path && (e.key === 'Enter' || e.key === ' ')) {
           e.preventDefault(); // Prevent scrolling on spacebar
+          triggerRippleAtCenter();
           timeEnd('NavPerf', `ClickLag:${item.id}`);
           time('NavPerf', `PageLoad:${item.tool.path}`);
           navigate(item.tool.path);

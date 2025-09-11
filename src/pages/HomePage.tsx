@@ -459,10 +459,17 @@ export default function HomePage() {
               </h1>
             </FadeInSection>
             
-            {/* Decorative divider */}
-            <FadeInSection delayMs={100}>
-              <div className="w-32 h-1.5 bg-gradient-to-r from-wes-pink to-wes-vintage-gold rounded-full mx-auto mb-8 shadow-inner-vintage animate-pulse-glow"></div>
-            </FadeInSection>
+            {/* Decorative divider - loading bar that fills from left to right */}
+            <div className="relative w-32 h-1.5 mx-auto mb-8">
+              {/* Background track */}
+              <div className="absolute inset-0 bg-muted/20 rounded-full"></div>
+              {/* Loading/loaded bar */}
+              <div className={`absolute top-0 left-0 h-full bg-gradient-to-r from-wes-pink to-wes-vintage-gold rounded-full shadow-inner-vintage transition-all duration-1000 ease-out ${
+                !assetsLoaded 
+                  ? 'w-0 animate-pulse' 
+                  : 'w-full animate-pulse-glow'
+              }`}></div>
+            </div>
             
             {/* Subtitle */}
             <FadeInSection delayMs={200}>

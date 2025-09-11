@@ -1138,26 +1138,56 @@
       inset 0 0 0 1px hsl(var(--primary) / 0.1);
   }
 
+  /* Reusable click ripple effect */
+  .click-ripple::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 300px;
+    height: 300px;
+    background: 
+      radial-gradient(circle, 
+        hsl(var(--theme-lala-accent) / 0.35) 0%, 
+        hsl(var(--theme-lala-accent) / 0.1) 40%,
+        transparent 70%
+      );
+    transform: translate(-50%, -50%) translate(var(--ripple-x, 0), var(--ripple-y, 0)) scale(0);
+    transition: transform 0s; /* No transition by default */
+    pointer-events: none;
+    z-index: 5;
+    border-radius: 50%;
+  }
+
+  .click-ripple.ripple-active::before {
+    transform: translate(-50%, -50%) translate(var(--ripple-x, 0), var(--ripple-y, 0)) scale(1);
+    transition: transform 0.15s ease-out;
+  }
+
+  /* Tool card specific implementation */
   .wes-tool-card::before {
     content: '';
     position: absolute;
-    top: -50%;
-    left: -50%;
-    width: 200%;
-    height: 200%;
+    top: 50%;
+    left: 50%;
+    width: 300px;
+    height: 300px;
     background: 
-      radial-gradient(circle at center, 
-        hsl(var(--lala-golden-yellow) / 0.1) 0%, 
-        transparent 50%
+      radial-gradient(circle, 
+        hsl(var(--theme-lala-accent) / 0.35) 0%, 
+        hsl(var(--theme-lala-accent) / 0.1) 40%,
+        transparent 70%
       );
-    transform: scale(0);
-    transition: transform 0.6s ease;
-    border-radius: 50%;
+    transform: translate(-50%, -50%) translate(var(--ripple-x, 0), var(--ripple-y, 0)) scale(0);
+    transition: transform 0s; /* No transition by default */
     pointer-events: none;
+    z-index: 5;
+    border-radius: 50%;
   }
 
-  .wes-tool-card:hover::before {
-    transform: scale(1);
+  .wes-tool-card.clicked::before {
+    transform: translate(-50%, -50%) translate(var(--ripple-x, 0), var(--ripple-y, 0)) scale(1);
+    transition: transform 0.15s ease-out; /* Much faster animation */
   }
 
   .wes-tool-card:hover {

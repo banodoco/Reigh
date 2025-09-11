@@ -8,6 +8,7 @@ import { Pencil, Trash2, Check, X, Copy, GripVertical } from 'lucide-react'; // 
 import { toast } from 'sonner';
 import { getDisplayUrl } from '@/shared/lib/utils';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/shared/components/ui/alert-dialog';
+import { useClickRipple } from '@/shared/hooks/useClickRipple';
 
 interface VideoShotDisplayProps {
   shot: Shot;
@@ -133,6 +134,9 @@ const ShotImage: React.FC<ShotImageProps> = ({ image, index, onSelectShot, shotN
 };
 
 const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot, currentProjectId, dragHandleProps, shouldLoadImages = true, shotIndex = 0 }) => {
+  // Click ripple effect
+  const { triggerRipple, rippleStyles, isRippleActive } = useClickRipple();
+  
   const [isEditingName, setIsEditingName] = useState(false);
   const [editableName, setEditableName] = useState(shot.name);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -279,7 +283,9 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
     <>
       <div 
         key={shot.id} 
-        className="group h-48 p-4 border rounded-lg bg-card/50 hover:bg-card/80 hover:shadow-wes-hover hover:scale-[1.02] transition-all duration-300 relative cursor-pointer flex flex-col"
+        className={`click-ripple group h-48 p-4 border rounded-lg bg-card/50 hover:bg-card/80 hover:shadow-wes-hover hover:scale-[1.02] transition-all duration-300 relative cursor-pointer flex flex-col ${isRippleActive ? 'ripple-active' : ''}`}
+        style={rippleStyles}
+        onPointerDown={triggerRipple}
         onClick={onSelectShot}
       >
         <div className="flex justify-between items-start mb-3">

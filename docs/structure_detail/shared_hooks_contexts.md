@@ -52,6 +52,7 @@
 | **`useContentResponsive`** | Responsive utilities | Mobile/desktop detection |
 | **`useMobile`** | Mobile detection | `const isMobile = useMobile()` |
 | **`useLastAffectedShot`** | Shot tracking | Recently modified shot reference |
+| **`useClickRipple`** | Click ripple effect | Reusable golden circle expand animation on click |
 
 ### 🔄 Real-time & Resources
 
