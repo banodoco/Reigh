@@ -208,14 +208,12 @@ const { showFade, scrollRef } = useScrollFade({ isOpen });
 4. **Simple API** - Single hook provides all styling needs
 5. **Performance** - Efficient scroll detection with proper cleanup
 
-### ✅ Directional Entrance Animations
-Each modal has a unique entrance animation that provides visual context about functionality:
-- **SettingsModal**: slides from right
-- **ReferralModal**: slides from top-right diagonal  
-- **CreateProjectModal**: slides straight from top
-- **ProjectSettingsModal**: slides from top with subtle left angle
-- **PromptEditorModal**: slides from left
-- **LoraSelectorModal**: slides from upper-left diagonal
+### ✅ Consistent Entrance Animations
+All modals now use the same standard center-based entrance animation for a unified user experience:
+- **Standard Animation**: fade + zoom + center-based slide (200ms duration)
+- **Entrance**: fade-in-0, zoom-in-95, slide-in-from-left-1/2, slide-in-from-top-[48%]
+- **Exit**: fade-out-0, zoom-out-95, slide-out-to-left-1/2, slide-out-to-top-[48%]
+- **Consistent UX**: All modals behave identically across the application
 
 ### ✅ Responsive Positioning
 - Proper vertical centering on both mobile and desktop

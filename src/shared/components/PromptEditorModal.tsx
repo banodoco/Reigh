@@ -679,7 +679,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
       onOpenChange={handleModalClose}
     >
       <DialogContent
-        className={`${modal.className} data-[state=open]:!slide-in-from-left data-[state=closed]:!slide-out-to-left`}
+        className={modal.className}
         style={modal.style}
         {...mobileProps}
         onInteractOutside={(e) => {

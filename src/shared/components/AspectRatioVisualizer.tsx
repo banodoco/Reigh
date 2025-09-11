@@ -38,7 +38,7 @@ export const AspectRatioVisualizer: React.FC<AspectRatioVisualizerProps> = ({
   return (
     <div className={`flex items-center justify-center w-16 h-16 ${className}`}>
       <div 
-        className="border-2 border-blue-400 bg-blue-50 rounded shadow-sm"
+        className="border-2 border-blue-200 bg-blue-50 rounded shadow-sm"
         style={{
           width: `${width}px`,
           height: `${height}px`,

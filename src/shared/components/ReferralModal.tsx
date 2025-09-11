@@ -106,7 +106,7 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({ isOpen, onOpenChan
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent 
-        className={`${modal.className} data-[state=open]:!slide-in-from-top data-[state=open]:!slide-in-from-right data-[state=closed]:!slide-out-to-top data-[state=closed]:!slide-out-to-right`}
+        className={modal.className}
         style={modal.style}
         {...{...modal.props}}
       >

@@ -89,7 +89,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent
-        className={`${modal.className} data-[state=open]:!slide-in-from-top data-[state=open]:!slide-in-from-left-0 data-[state=closed]:!slide-out-to-top data-[state=closed]:!slide-out-to-left-0`}
+        className={modal.className}
         style={modal.style}
         {...modal.props}
       >

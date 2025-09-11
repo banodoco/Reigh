@@ -1143,7 +1143,7 @@ export const LoraSelectorModal: React.FC<LoraSelectorModalProps> = ({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent
-        className={`${modal.className} data-[state=open]:!slide-in-from-top-1/4 data-[state=open]:!slide-in-from-left data-[state=closed]:!slide-out-to-top-1/4 data-[state=closed]:!slide-out-to-left`}
+        className={modal.className}
         style={modal.style}
         {...{...modal.props}}
       >
