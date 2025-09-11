@@ -113,7 +113,7 @@ const StyleReferenceSection: React.FC<{
       {styleReferenceImage ? (
         /* Display uploaded style reference */
         <div className="w-1/3">
-          <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-800/50 relative">
+          <div className="border-2 border-solid border-gray-300 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-800/50 relative">
             <div className="flex flex-col items-center space-y-3">
               <div className="relative w-full">
                 <img
@@ -156,7 +156,7 @@ const StyleReferenceSection: React.FC<{
       ) : (
         /* Upload area for style reference */
         <div className="w-1/3">
-          <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-800/50 relative">
+          <div className="border-2 border-solid border-gray-300 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-800/50 relative">
             <div className="absolute top-2 left-2 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded px-2 py-1 border border-gray-200 dark:border-gray-600 z-10">
               <p className="text-xs font-light text-gray-600 dark:text-gray-400">Style</p>
             </div>

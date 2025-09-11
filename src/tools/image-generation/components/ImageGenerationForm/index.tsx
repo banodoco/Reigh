@@ -645,9 +645,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       loraManager.setSelectedLoras([]);
       await updateProjectImageSettings('project', { selectedModel: value });
     } else {
-      // Clear style reference when switching to Wan 2.2 (persisted)
-      setStyleReferenceOverride(null);
-      await updateProjectImageSettings('project', { selectedModel: value, styleReferenceImage: null, styleReferenceImageOriginal: null });
+      // Just update the model when switching to Wan 2.2, preserve style reference
+      await updateProjectImageSettings('project', { selectedModel: value });
     }
 
     markAsInteracted();
