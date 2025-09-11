@@ -14,7 +14,8 @@ import { useProject } from '@/shared/contexts/ProjectContext';
 import { usePersistentToolState } from '@/shared/hooks/usePersistentToolState';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/shared/components/ui/collapsible';
 import { useIsMobile } from "@/shared/hooks/use-mobile";
-import { useExtraLargeModal, createMobileModalProps } from "@/shared/hooks/useMobileModalStyling";
+import { useExtraLargeModal } from "@/shared/hooks/useModal";
+import { useScrollFade } from "@/shared/hooks/useScrollFade";
 
 // Use aliased types for internal state if they were named the same
 interface GenerationControlValues extends PGC_GenerationControlValues {}
@@ -158,17 +159,17 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
   // Modal content ref for outside click detection
   const modalContentRef = useRef<HTMLDivElement>(null);
   
-  // Mobile modal styling - using fixed useExtraLargeModal
-  const mobileModalStyling = useExtraLargeModal('promptEditor');
+  // Modal styling
+  const modal = useExtraLargeModal('promptEditor');
   
   // Debug mobile modal styling hook result
   console.log(`[PromptEditorModal:MOBILE_STYLING_DEBUG] useExtraLargeModal result:`, {
-    isMobile: mobileModalStyling.isMobile,
-    fullClassName: mobileModalStyling.fullClassName,
-    dialogContentStyle: mobileModalStyling.dialogContentStyle,
-    headerContainerClassName: mobileModalStyling.headerContainerClassName,
-    scrollContainerClassName: mobileModalStyling.scrollContainerClassName,
-    footerContainerClassName: mobileModalStyling.footerContainerClassName
+    isMobile: modal.isMobile,
+    fullClassName: modal.className,
+    dialogContentStyle: modal.style,
+    headerContainerClassName: modal.headerClass,
+    scrollContainerClassName: modal.scrollClass,
+    footerContainerClassName: modal.footerClass
   });
   
   const attemptFocusAITextarea = useCallback(() => {
@@ -198,8 +199,11 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
     tryFocus();
   }, []);
   
-  // Scroll state and ref
-  const scrollRef = useRef<HTMLDivElement>(null);
+  // Scroll state, ref, and fade effect
+  const { showFade, scrollRef } = useScrollFade({ 
+    isOpen: isOpen,
+    debug: false
+  });
   const [showScrollToTop, setShowScrollToTop] = useState(false);
 
   const [generationControlValues, setGenerationControlValues] = useState<GenerationControlValues>({
@@ -651,18 +655,18 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
   }, [isOpen, handleFinalSaveAndClose]);
 
   // Debug modal rendering
-  console.log(`[PromptEditorModal:RENDER_DEBUG] Rendering modal. isOpen: ${isOpen}, isMobile: ${isMobile}, mobileModalStyling:`, {
-    fullClassName: mobileModalStyling.fullClassName,
-    dialogContentStyle: mobileModalStyling.dialogContentStyle,
-    isMobile: mobileModalStyling.isMobile
+  console.log(`[PromptEditorModal:RENDER_DEBUG] Rendering modal. isOpen: ${isOpen}, isMobile: ${isMobile}, modal:`, {
+    fullClassName: modal.className,
+    dialogContentStyle: modal.style,
+    isMobile: modal.isMobile
   });
 
   // More debug info before rendering - memoize mobile props to prevent recreation
-  const mobileProps = useMemo(() => createMobileModalProps(mobileModalStyling.isMobile), [mobileModalStyling.isMobile]);
+  const mobileProps = useMemo(() => ({ ...modal.props }), [modal.isMobile]);
   console.log(`[PromptEditorModal:DIALOG_DEBUG] About to render Dialog with:`, {
     open: isOpen,
     isMobile,
-    'mobileModalStyling.isMobile': mobileModalStyling.isMobile,
+    'modal.isMobile': modal.isMobile,
     createMobileModalPropsResult: mobileProps
   });
   
@@ -675,8 +679,8 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
       onOpenChange={handleModalClose}
     >
       <DialogContent
-        className={`${mobileModalStyling.fullClassName} data-[state=open]:!slide-in-from-left data-[state=closed]:!slide-out-to-left`}
-        style={mobileModalStyling.dialogContentStyle}
+        className={`${modal.className} data-[state=open]:!slide-in-from-left data-[state=closed]:!slide-out-to-left`}
+        style={modal.style}
         {...mobileProps}
         onInteractOutside={(e) => {
           const target = e.target as Element;
@@ -720,8 +724,8 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
         {isMobile && (
           <input ref={tempFocusInputRef} type="text" className="sr-only" aria-hidden="true" />
         )}
-        <div className={mobileModalStyling.headerContainerClassName}>
-          <DialogHeader className={`${mobileModalStyling.isMobile ? 'px-4 pt-6 pb-2' : 'px-6 pt-8 pb-2'} flex-shrink-0`}>
+        <div className={modal.headerClass}>
+          <DialogHeader className={`${modal.isMobile ? 'px-4 pt-6 pb-2' : 'px-6 pt-8 pb-2'} flex-shrink-0`}>
             <DialogTitle>Prompt Editor</DialogTitle>
           </DialogHeader>
         </div>
@@ -731,12 +735,12 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
           onScroll={handleScroll}
           onClickCapture={handleInsideInteraction}
           onTouchStartCapture={handleInsideInteraction}
-          className={`${mobileModalStyling.scrollContainerClassName}`}
+          className={`${modal.scrollClass}`}
         >
           <Collapsible 
             open={isAIPromptSectionExpanded} 
             onOpenChange={setIsAIPromptSectionExpanded}
-            className={`${mobileModalStyling.isMobile ? 'px-4' : 'px-6'}`}
+            className={`${modal.isMobile ? 'px-4' : 'px-6'}`}
           >
             <CollapsibleTrigger asChild>
               <Button
@@ -796,7 +800,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
             </CollapsibleContent>
           </Collapsible>
           
-                      <div className={`${mobileModalStyling.isMobile ? 'px-4' : 'px-6'} text-sm text-muted-foreground mb-6 flex justify-between items-center`}>
+                      <div className={`${modal.isMobile ? 'px-4' : 'px-6'} text-sm text-muted-foreground mb-6 flex justify-between items-center`}>
             <span>Editing {internalPrompts.length} prompt(s). Changes are auto-saved.</span>
             {internalPrompts.length > 0 && (
               <Button variant="destructive" size="sm" onClick={handleRemoveAllPrompts} className="ml-auto">
@@ -806,7 +810,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
             )}
           </div>
           <div className="border-t">
-            <div className={`${mobileModalStyling.isMobile ? 'p-4 pb-1' : 'p-6 pb-2'}`}>
+            <div className={`${modal.isMobile ? 'p-4 pb-1' : 'p-6 pb-2'}`}>
               {internalPrompts.length === 0 && (
                 <div className="text-center text-muted-foreground py-8">
                   No prompts yet. Add one manually or use AI generation.
@@ -904,9 +908,19 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
         </div>
 
 
-        <div className={mobileModalStyling.footerContainerClassName}>
-          <DialogFooter className={`${mobileModalStyling.isMobile ? 'p-4 pt-4 pb-4 flex-row justify-between' : 'p-6 pt-6'} border-t`}>
-           <Button variant="outline" onClick={handleInternalAddBlankPrompt} className={mobileModalStyling.isMobile ? '' : 'mr-auto'}>
+        <div className={`${modal.footerClass} relative`}>
+          {/* Fade overlay */}
+          {showFade && (
+            <div 
+              className="absolute top-0 left-0 right-0 h-16 pointer-events-none z-10"
+              style={{ transform: 'translateY(-64px)' }}
+            >
+              <div className="h-full bg-gradient-to-t from-white via-white/95 to-transparent dark:from-gray-950 dark:via-gray-950/95 dark:to-transparent" />
+            </div>
+          )}
+          
+          <DialogFooter className={`${modal.isMobile ? 'p-4 pt-4 pb-4 flex-row justify-between' : 'p-6 pt-6'} border-t relative z-20`}>
+           <Button variant="outline" onClick={handleInternalAddBlankPrompt} className={modal.isMobile ? '' : 'mr-auto'}>
             <PackagePlus className="mr-2 h-4 w-4" /> Blank Prompt
           </Button>
                       <Button onClick={handleFinalSaveAndClose}>Close</Button>

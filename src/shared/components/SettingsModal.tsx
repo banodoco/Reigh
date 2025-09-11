@@ -20,7 +20,8 @@ import usePersistentState from "@/shared/hooks/usePersistentState";
 import { useCredits } from "@/shared/hooks/useCredits";
 import { supabase } from "@/integrations/supabase/client";
 import { useIsMobile } from "@/shared/hooks/use-mobile";
-import { useLargeModal, createMobileModalProps } from '@/shared/hooks/useMobileModalStyling';
+import { useLargeModal } from '@/shared/hooks/useModal';
+import { useScrollFade } from "@/shared/hooks/useScrollFade";
 import { 
   Select,
   SelectContent,
@@ -62,8 +63,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     return isIpadUA || isTouchMac;
   }, []);
   
-  // Mobile modal styling
-  const mobileModalStyling = useLargeModal();
+  // Modal styling and scroll fade
+  const modal = useLargeModal();
+  const { showFade, scrollRef } = useScrollFade({ 
+    isOpen: isOpen,
+    debug: false
+  });
   const { apiKeys, isLoading: isLoadingKeys, saveApiKeys, isUpdating } = useApiKeys();
   const { 
     tokens, 
@@ -429,9 +434,9 @@ python worker.py --db-type supabase \\
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent 
-        className={`${mobileModalStyling.fullClassName} data-[state=closed]:!slide-out-to-right data-[state=closed]:!slide-out-to-top-2 data-[state=open]:!slide-in-from-right data-[state=open]:!slide-in-from-top-2`}
-        style={mobileModalStyling.dialogContentStyle}
-        {...createMobileModalProps(mobileModalStyling.isMobile)}
+        className={`${modal.className} data-[state=closed]:!slide-out-to-right data-[state=closed]:!slide-out-to-top-2 data-[state=open]:!slide-in-from-right data-[state=open]:!slide-in-from-top-2`}
+        style={modal.style}
+        {...modal.props}
       >
         {/* Top button container - positioned relative to DialogContent */}
         {isMobile && (
@@ -447,8 +452,8 @@ python worker.py --db-type supabase \\
           </Button>
         )}
         
-        <div className={mobileModalStyling.headerContainerClassName}>
-          <DialogHeader className={`${mobileModalStyling.isMobile ? 'px-2 pt-2 pb-1' : 'px-2 pt-2 pb-1'} flex-shrink-0 relative`}>
+        <div className={modal.headerClass}>
+          <DialogHeader className={`${modal.isMobile ? 'px-2 pt-2 pb-1' : 'px-2 pt-2 pb-1'} flex-shrink-0 relative`}>
             <DialogTitle className="text-2xl md:mt-[11px]">App Settings</DialogTitle>
             {!isMobile && (
               <Button
@@ -466,7 +471,10 @@ python worker.py --db-type supabase \\
         </div>
         
         {/* Scrollable content container */}
-        <div className={`${mobileModalStyling.scrollContainerClassName} ${mobileModalStyling.isMobile ? 'px-2' : 'px-2'} overflow-x-visible [scrollbar-gutter:stable_both-edges] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] sm:[&::-webkit-scrollbar]:block sm:[-ms-overflow-style:auto] sm:[scrollbar-width:auto] sm:pr-4`}>
+        <div 
+          ref={scrollRef}
+          className={`${modal.scrollClass} ${modal.isMobile ? 'px-2' : 'px-2'} overflow-x-visible [scrollbar-gutter:stable_both-edges] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] sm:[&::-webkit-scrollbar]:block sm:[-ms-overflow-style:auto] sm:[scrollbar-width:auto] sm:pr-4`}
+        >
           {/* Generation Method Selection */}
           <div className="mb-5">
           {/* Mobile header */}
@@ -1131,8 +1139,18 @@ python worker.py --db-type supabase \\
         </div>
         
         {/* Footer */}
-        <div className={mobileModalStyling.footerContainerClassName}>
-          <DialogFooter className={`${mobileModalStyling.isMobile ? 'px-2 pt-6 pb-2' : 'px-2 pt-7 pb-2'} border-t`}>
+        <div className={`${modal.footerClass} relative`}>
+          {/* Fade overlay */}
+          {showFade && (
+            <div 
+              className="absolute top-0 left-0 right-0 h-16 pointer-events-none z-10"
+              style={{ transform: 'translateY(-64px)' }}
+            >
+              <div className="h-full bg-gradient-to-t from-white via-white/95 to-transparent dark:from-gray-950 dark:via-gray-950/95 dark:to-transparent" />
+            </div>
+          )}
+          
+          <DialogFooter className={`${modal.isMobile ? 'px-2 pt-6 pb-2' : 'px-2 pt-7 pb-2'} border-t relative z-20`}>
             <Button variant="outline" onClick={() => onOpenChange(false)} className="w-full">
               Close
             </Button>

@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/shared/components/ui/dialog';
 import { Button } from '@/shared/components/ui/button';
 import { Copy, Check, ExternalLink } from 'lucide-react';
-import { useLargeModal, createMobileModalProps } from '@/shared/hooks/useMobileModalStyling';
+import { useLargeModal } from '@/shared/hooks/useModal';
+import { useScrollFade } from '@/shared/hooks/useScrollFade';
 import { supabase } from '@/integrations/supabase/client';
 import type { Session } from '@supabase/supabase-js';
 import ProfitSplitBar from '@/shared/components/ProfitSplitBar';
@@ -18,12 +19,17 @@ interface ReferralStats {
 }
 
 export const ReferralModal: React.FC<ReferralModalProps> = ({ isOpen, onOpenChange }) => {
-  const mobileModalStyling = useLargeModal();
+  const modal = useLargeModal();
   const [copied, setCopied] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
   const [username, setUsername] = useState<string | null>(null);
   const [stats, setStats] = useState<ReferralStats | null>(null);
   const [isLoadingStats, setIsLoadingStats] = useState(false);
+
+  // Simple scroll fade hook
+  const { showFade, scrollRef } = useScrollFade({ 
+    isOpen: isOpen
+  });
 
   // Get session and username
   useEffect(() => {
@@ -39,78 +45,49 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({ isOpen, onOpenChan
           .eq('id', session.user.id)
           .single();
         
-        if (userData?.username && !error) {
+        if (!error && userData?.username) {
           setUsername(userData.username);
         }
       }
     };
-    
-    getSession();
-    
-    // Use centralized auth manager instead of direct listener
-    const authManager = (window as any).__AUTH_MANAGER__;
-    let unsubscribe: (() => void) | null = null;
-    
-    if (authManager) {
-      unsubscribe = authManager.subscribe('ReferralModal', (_event, session) => {
-        setSession(session);
-        
-        // Reset username when session changes
-        if (!session?.user?.id) {
-          setUsername(null);
-        }
-      });
-    } else {
-      // Fallback to direct listener if auth manager not available
-      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-        setSession(session);
-        
-        // Reset username when session changes
-        if (!session?.user?.id) {
-          setUsername(null);
-        }
-      });
-      unsubscribe = () => subscription.unsubscribe();
-    }
-    
-    return () => {
-      if (unsubscribe) unsubscribe();
-    };
-  }, []);
 
-  // Get referral stats
+    if (isOpen) {
+      getSession();
+    }
+  }, [isOpen]);
+
+  // Fetch referral statistics
   useEffect(() => {
-    const getStats = async () => {
-      if (!username || !isOpen) return;
-      
+    const fetchStats = async () => {
+      if (!session?.user?.id) return;
+
       setIsLoadingStats(true);
       try {
         const { data, error } = await supabase
           .from('referral_stats')
           .select('total_visits, successful_referrals')
-          .eq('username', username)
+          .eq('user_id', session.user.id)
           .single();
-        
-        if (data && !error) {
+
+        if (!error && data) {
           setStats(data);
-        } else {
-          // No stats yet, show zeros
-          setStats({ total_visits: 0, successful_referrals: 0 });
         }
       } catch (err) {
-        setStats({ total_visits: 0, successful_referrals: 0 });
+        console.error('Failed to fetch referral stats:', err);
       } finally {
         setIsLoadingStats(false);
       }
     };
+
+    if (session?.user?.id) {
+      fetchStats();
+    }
+  }, [session]);
+
+  const handleCopyLink = async () => {
+    if (!username) return;
     
-    getStats();
-  }, [username, isOpen]);
-
-  const referralLink = username ? `https://reigh.art?from=${username}` : '';
-
-  const copyToClipboard = async () => {
-    if (!referralLink) return;
+    const referralLink = `https://reigh.art?from=${username}`;
     
     try {
       await navigator.clipboard.writeText(referralLink);
@@ -121,100 +98,65 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({ isOpen, onOpenChan
     }
   };
 
+  // Don't render for non-authenticated users
   if (!session) {
-    return (
-      <Dialog open={isOpen} onOpenChange={onOpenChange}>
-        <DialogContent 
-          className={`${mobileModalStyling.fullClassName} data-[state=open]:!slide-in-from-top data-[state=open]:!slide-in-from-right data-[state=closed]:!slide-out-to-top data-[state=closed]:!slide-out-to-right`}
-          style={mobileModalStyling.dialogContentStyle}
-          {...createMobileModalProps(mobileModalStyling.isMobile)}
-        >
-          <div className={mobileModalStyling.headerContainerClassName}>
-            <DialogHeader className={`${mobileModalStyling.isMobile ? 'px-4 pt-4 pb-2' : 'px-6 pt-4 pb-2'} flex-shrink-0`}>
-              <DialogTitle className="text-xl font-cocogoose text-primary">
-                Refer artists to create with Reigh
-              </DialogTitle>
-            </DialogHeader>
-          </div>
-          
-          <div className={`${mobileModalStyling.scrollContainerClassName} ${mobileModalStyling.isMobile ? 'px-4' : 'px-6'} overflow-x-visible [scrollbar-gutter:stable_both-edges] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] sm:[&::-webkit-scrollbar]:block sm:[-ms-overflow-style:auto] sm:[scrollbar-width:auto] sm:pr-4`}>
-            <div className="text-center pb-6">
-              <p className="text-muted-foreground">
-                Please sign in to access your referral link and statistics.
-              </p>
-            </div>
-          </div>
-          
-          {/* Footer with Close Button for non-authenticated state */}
-          <div className={mobileModalStyling.footerContainerClassName}>
-            <div className={`${mobileModalStyling.isMobile ? 'p-3 pt-3 pb-2' : 'p-4 pt-4 pb-2'} border-t`}>
-              <div className="flex justify-end">
-                <Button 
-                  variant="outline" 
-                  onClick={() => onOpenChange(false)}
-                  className="h-12 px-4 text-sm font-medium"
-                >
-                  Close
-                </Button>
-              </div>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-    );
+    return null;
   }
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent 
-        className={`${mobileModalStyling.fullClassName} data-[state=open]:!slide-in-from-top data-[state=open]:!slide-in-from-right data-[state=closed]:!slide-out-to-top data-[state=closed]:!slide-out-to-right`}
-        style={mobileModalStyling.dialogContentStyle}
-        {...createMobileModalProps(mobileModalStyling.isMobile)}
+        className={`${modal.className} data-[state=open]:!slide-in-from-top data-[state=open]:!slide-in-from-right data-[state=closed]:!slide-out-to-top data-[state=closed]:!slide-out-to-right`}
+        style={modal.style}
+        {...{...modal.props}}
       >
-        <div className={mobileModalStyling.headerContainerClassName}>
-          <DialogHeader className={`${mobileModalStyling.isMobile ? 'px-4 pt-4 pb-2' : 'px-6 pt-4 pb-2'} flex-shrink-0`}>
+        <div className={modal.headerClass}>
+          <DialogHeader className={`${modal.isMobile ? 'px-4 pt-4 pb-2' : 'px-6 pt-4 pb-2'} flex-shrink-0`}>
             <DialogTitle className="text-xl font-cocogoose text-primary">
               Refer artists to create with Reigh
             </DialogTitle>
           </DialogHeader>
         </div>
         
-        <div className={`${mobileModalStyling.scrollContainerClassName} ${mobileModalStyling.isMobile ? 'px-4' : 'px-6'} overflow-x-visible [scrollbar-gutter:stable_both-edges] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] sm:[&::-webkit-scrollbar]:block sm:[-ms-overflow-style:auto] sm:[scrollbar-width:auto] sm:pr-4`}>
-          <div className="space-y-4 pb-6">
+        <div 
+          ref={scrollRef}
+          className={`${modal.scrollClass} ${modal.isMobile ? 'px-4' : 'px-6'} overflow-x-visible [scrollbar-gutter:stable_both-edges] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] sm:[&::-webkit-scrollbar]:block sm:[-ms-overflow-style:auto] sm:[scrollbar-width:auto] sm:pr-4 relative`}
+        >
+          <div className="space-y-4 pb-6 relative z-0">
             {/* Main Description */}
             <div className="space-y-3 text-sm leading-relaxed text-muted-foreground">
               <p>
                 Artists can run Reigh for free on their computers.
               </p>
-              
               <p>
                 However, for those who prefer the convenience of running on the cloud, we charge twice compute costs. Because we run on consumer GPUs, this is still significantly cheaper than other providers.
               </p>
-              
               <p>
-                Of this, after costs, we offer <strong>16% of our lifetime profits</strong> from referred users to those who refer them via a link:
+                Of this, after costs, we offer 16% of our lifetime profits from referred users to those who refer them via a link:
               </p>
             </div>
 
-            {/* Referral Link */}
-            {session && username ? (
+            {/* Referral Link Section */}
+            {username ? (
               <div className="space-y-2">
-                <div className="flex items-center space-x-2">
-                  <div className="flex-1 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border text-sm font-mono break-all">
-                    {referralLink}
+                <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1 text-sm font-mono text-muted-foreground truncate mr-3">
+                      https://reigh.art?from={username}
+                    </div>
+                    <Button
+                      onClick={handleCopyLink}
+                      size="sm"
+                      variant="outline"
+                      className="flex-shrink-0"
+                    >
+                      {copied ? (
+                        <Check className="h-4 w-4 text-green-600" />
+                      ) : (
+                        <Copy className="h-4 w-4" />
+                      )}
+                    </Button>
                   </div>
-                  <Button
-                    onClick={copyToClipboard}
-                    size="sm"
-                    variant="outline"
-                    className="flex-shrink-0"
-                  >
-                    {copied ? (
-                      <Check className="h-4 w-4 text-green-600" />
-                    ) : (
-                      <Copy className="h-4 w-4" />
-                    )}
-                  </Button>
                 </div>
               </div>
             ) : session ? (
@@ -264,13 +206,22 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({ isOpen, onOpenChan
               </div>
             </div>
 
-
           </div>
         </div>
         
-        {/* Statistics Footer */}
-        <div className={mobileModalStyling.footerContainerClassName}>
-          <div className={`${mobileModalStyling.isMobile ? 'p-3 pt-3 pb-2' : 'p-4 pt-4 pb-2'} border-t`}>
+        {/* Footer */}
+        <div className={`${modal.footerClass} relative`}>
+          {/* Fade overlay */}
+          {showFade && (
+            <div 
+              className="absolute top-0 left-0 right-0 h-16 pointer-events-none z-10"
+              style={{ transform: 'translateY(-64px)' }}
+            >
+              <div className="h-full bg-gradient-to-t from-white via-white/95 to-transparent dark:from-gray-950 dark:via-gray-950/95 dark:to-transparent" />
+            </div>
+          )}
+          
+          <div className={`${modal.isMobile ? 'p-3 pt-3 pb-2' : 'p-4 pt-4 pb-2'} border-t relative z-20`}>
             <div className="flex gap-3 items-start">
               {/* Statistics Section - 3/5 width */}
               <div className="w-3/5 space-y-1">

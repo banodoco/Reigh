@@ -2,130 +2,211 @@
 
 ## Overview
 
-The modal styling system provides consistent responsive behavior across all dialogs and modals in the application. It centralizes both mobile and desktop styling logic, offers three distinct responsive patterns, and includes directional entrance animations for enhanced UX.
+The modal styling system provides consistent responsive behavior across all dialogs and modals in the application. It centralizes both mobile and desktop styling logic, offers predefined size patterns, and includes scroll-aware fade effects and directional entrance animations for enhanced UX.
 
 ## Architecture
 
-### Core Hook: `useMobileModalStyling`
+### Core Hook: `useModal`
 
-Located in `src/shared/hooks/useMobileModalStyling.ts`, this hook provides:
+Located in `src/shared/hooks/useModal.ts`, this hook provides:
 
 - **Mobile detection** via `useIsMobile()`
-- **Conditional styling** based on screen size
+- **Conditional styling** based on screen size and modal size
+- **Predefined size patterns** (small, medium, large, extra-large)
 - **Consistent class patterns** for different modal types
-- **Helper utilities** for integration
+- **Proper z-index management** to ensure modals appear above overlays
 
-### Helper Functions
+### Scroll Fade Effect: `useScrollFade`
 
-1. **`mergeMobileModalClasses(baseClasses, mobileClasses, isMobile)`**
-   - Combines base desktop classes with mobile-specific classes
-   - Only applies mobile classes when `isMobile` is true
+Located in `src/shared/hooks/useScrollFade.ts`, this hook provides:
 
-2. **`createMobileModalProps(isMobile)`**
-   - Returns mobile-specific props (e.g., preventing auto-focus)
-   - Prevents mobile keyboard popup on modal open
+- **Smart scroll detection** that only shows fade when content overflows
+- **Auto-hide behavior** when user scrolls to bottom
+- **Responsive observers** using ResizeObserver and MutationObserver
+- **Consistent visual design** across all modals
+
+### Convenience Hooks
+
+- **`useSmallModal()`** - For small dialogs
+- **`useMediumModal()`** - For standard forms  
+- **`useLargeModal()`** - For content-heavy modals
+- **`useExtraLargeModal()`** - For complex interfaces
 
 ## Modal Patterns
 
-### Pattern 1: Large Fullscreen Modals
+### Basic Usage
 
-**Used by:** SettingsModal, LoraSelectorModal, PromptEditorModal (main)
+```tsx
+import { useLargeModal } from '@/shared/hooks/useModal';
+import { useScrollFade } from '@/shared/hooks/useScrollFade';
 
-**Configuration:**
-```typescript
-const mobileModalStyling = useMobileModalStyling({
-  enableMobileFullscreen: true,
-  disableCenteringOnMobile: true,
-});
+const MyModal = ({ isOpen, onOpenChange }) => {
+  const modal = useLargeModal();
+  const { showFade, scrollRef } = useScrollFade({ isOpen });
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent 
+        className={modal.className}
+        style={modal.style}
+        {...modal.props}
+      >
+        <div className={modal.headerClass}>
+          <DialogHeader>
+            <DialogTitle>My Modal</DialogTitle>
+          </DialogHeader>
+        </div>
+        
+        <div ref={scrollRef} className={modal.scrollClass}>
+          {/* Scrollable content */}
+        </div>
+        
+        <div className={`${modal.footerClass} relative`}>
+          {/* Fade overlay */}
+          {showFade && (
+            <div 
+              className="absolute top-0 left-0 right-0 h-16 pointer-events-none z-10"
+              style={{ transform: 'translateY(-64px)' }}
+            >
+              <div className="h-full bg-gradient-to-t from-white via-white/95 to-transparent dark:from-gray-950 dark:via-gray-950/95 dark:to-transparent" />
+            </div>
+          )}
+          
+          <DialogFooter className="border-t relative z-20">
+            {/* Footer content */}
+          </DialogFooter>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
 ```
 
-**Behavior:**
-- Nearly full-screen on mobile (16px edges, 32px top/bottom)
-- Large desktop width (`sm:max-w-2xl` or `max-w-4xl`)
-- Includes scrollable content areas
+### Modal Sizes
 
-**Classes Applied:**
-- `left-4 right-4 top-8 bottom-8 w-auto max-h-none rounded-lg translate-x-0 translate-y-0`
+#### Small Modals
+- **Max width:** `sm:max-w-sm`
+- **Mobile behavior:** Centered with default padding
+- **Use case:** Simple confirmations, alerts
 
-### Pattern 2: Medium Edge-Buffered Modals
+#### Medium Modals  
+- **Max width:** `sm:max-w-[425px]`
+- **Mobile behavior:** Edge-buffered (small side margins)
+- **Use case:** Forms, settings panels
 
-**Used by:** CreateProjectModal, ProjectSettingsModal, MagicEditModal, CreateShotModal, AI Edit Dialog
+#### Large Modals
+- **Max width:** `sm:max-w-2xl`  
+- **Mobile behavior:** Near-fullscreen with safe areas
+- **Use case:** Content-heavy interfaces
+- **Examples:** SettingsModal, ReferralModal
 
-**Configuration:**
+#### Extra-Large Modals
+- **Max width:** `max-w-4xl`
+- **Mobile behavior:** Fullscreen with safe areas  
+- **Use case:** Complex interfaces, editors
+- **Examples:** PromptEditorModal, LoraSelectorModal
+
+### Scroll Fade Effect
+
+The scroll fade effect automatically appears above footer borders when content overflows:
+
+**Features:**
+- Only shows when content is actually scrollable
+- Disappears when user scrolls to bottom  
+- 64px white-to-transparent gradient
+- Dark mode support (gray-to-transparent)
+- Non-interactive (`pointer-events-none`)
+
+**Implementation:**
 ```typescript
-const mobileModalStyling = useMobileModalStyling({
-  enableMobileEdgeBuffers: true,
-  disableCenteringOnMobile: true,
-});
+const { showFade, scrollRef } = useScrollFade({ isOpen });
+
+// In JSX:
+<div ref={scrollRef} className={modal.scrollClass}>
+  {/* scrollable content */}
+</div>
+
+{/* In footer */}
+{showFade && (
+  <div 
+    className="absolute top-0 left-0 right-0 h-16 pointer-events-none z-10"
+    style={{ transform: 'translateY(-64px)' }}
+  >
+    <div className="h-full bg-gradient-to-t from-white via-white/95 to-transparent dark:from-gray-950 dark:via-gray-950/95 dark:to-transparent" />
+  </div>
+)}
 ```
 
-**Behavior:**
-- Fixed width with edge buffers on mobile (16px sides)
-- Medium desktop width (`sm:max-w-[425px]` or `sm:max-w-[500px]`)
-- Maintains aspect ratio, doesn't fill screen
+### Migration from Old System
 
-**Classes Applied:**
-- `left-4 right-4 w-auto rounded-lg translate-x-0`
+The modal system was simplified from `useMobileModalStyling` to `useModal`:
 
-### Pattern 3: Default Centered Modals
-
-**Used by:** Small confirmation dialogs, simple alerts
-
-**Configuration:**
+**Before:**
 ```typescript
-const mobileModalStyling = useMobileModalStyling({});
-```
+const mobileModalStyling = useLargeModal();
 
-**Behavior:**
-- Uses default dialog centering behavior
-- No special mobile positioning
-- Relies on base DialogContent styling
-
-**Classes Applied:**
-- None (empty string)
-
-## Usage Pattern
-
-All modals follow this consistent structure:
-
-```typescript
-// 1. Configure mobile styling
-const mobileModalStyling = useMobileModalStyling({
-  enableMobileEdgeBuffers: true,
-  disableCenteringOnMobile: true,
-});
-
-// 2. Apply to DialogContent
 <DialogContent 
-  className={mergeMobileModalClasses(
-    'sm:max-w-[425px] bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800 flex flex-col rounded-lg',
-    mobileModalStyling.dialogContentClassName,
-    mobileModalStyling.isMobile
-  )}
+  className={mobileModalStyling.fullClassName}
   style={mobileModalStyling.dialogContentStyle}
   {...createMobileModalProps(mobileModalStyling.isMobile)}
 >
-  {/* 3. Use responsive containers */}
   <div className={mobileModalStyling.headerContainerClassName}>
-    <DialogHeader className={`${mobileModalStyling.isMobile ? 'px-4 pt-4 pb-2' : 'px-6 pt-4 pb-2'}`}>
-      {/* Header content */}
-    </DialogHeader>
+    {/* header */}
   </div>
-  
   <div className={mobileModalStyling.scrollContainerClassName}>
-    {/* Scrollable content */}
+    {/* content */}
   </div>
-  
   <div className={mobileModalStyling.footerContainerClassName}>
-    <DialogFooter className={`${mobileModalStyling.isMobile ? 'px-4 pt-4 pb-1' : 'px-6 pt-5 pb-2'} border-t`}>
-      {/* Footer content */}
-    </DialogFooter>
+    {/* footer */}
   </div>
 </DialogContent>
 ```
 
+**After:**
+```typescript
+const modal = useLargeModal();
+const { showFade, scrollRef } = useScrollFade({ isOpen });
 
-## Key Features
+<DialogContent 
+  className={modal.className}
+  style={modal.style}
+  {...modal.props}
+>
+  <div className={modal.headerClass}>
+    {/* header */}
+  </div>
+  <div ref={scrollRef} className={modal.scrollClass}>
+    {/* content */}
+  </div>
+  <div className={`${modal.footerClass} relative`}>
+    {/* fade overlay */}
+    {showFade && <div>...</div>}
+    {/* footer */}
+  </div>
+</DialogContent>
+```
+
+## Current Modal Implementations
+
+### With Scroll Fade Effect
+- **ReferralModal** - Large modal with referral information and statistics
+- **PromptEditorModal** - Extra-large modal for prompt editing interface  
+- **SettingsModal** - Large modal with application settings
+- **LoraSelectorModal** - Extra-large modal for LoRA library browsing
+
+### Standard Modals (No Fade)
+- **CreateProjectModal** - Medium modal for project creation
+- **ProjectSettingsModal** - Medium modal for project configuration
+- **MagicEditModal** - Medium modal for image editing
+- **CreateShotModal** - Medium modal for shot creation
+
+## Key Benefits
+
+1. **Consistent UX** - All modals behave predictably across devices
+2. **Responsive Design** - Automatic mobile optimization with safe areas
+3. **Enhanced Usability** - Scroll fade indicates more content available  
+4. **Simple API** - Single hook provides all styling needs
+5. **Performance** - Efficient scroll detection with proper cleanup
 
 ### ✅ Directional Entrance Animations
 Each modal has a unique entrance animation that provides visual context about functionality:

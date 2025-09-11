@@ -6,7 +6,8 @@ import { Card, CardContent, CardDescription, CardFooter as ItemCardFooter, CardH
 import { Input } from "@/shared/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/components/ui/select";
 import { useIsMobile } from '@/shared/hooks/use-mobile';
-import { useExtraLargeModal, createMobileModalProps } from '@/shared/hooks/useMobileModalStyling';
+import { useExtraLargeModal } from '@/shared/hooks/useModal';
+import { useScrollFade } from '@/shared/hooks/useScrollFade';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/components/ui/tabs";
 import { useListResources, useCreateResource, useDeleteResource, Resource } from '@/shared/hooks/useResources';
 import { Textarea } from '@/shared/components/ui/textarea';
@@ -1128,8 +1129,12 @@ export const LoraSelectorModal: React.FC<LoraSelectorModalProps> = ({
   const [showAddedLorasOnly, setShowAddedLorasOnly] = useState(false);
   const [processedLorasLength, setProcessedLorasLength] = useState(0);
   
-  // Mobile modal styling
-  const mobileModalStyling = useExtraLargeModal('loraSelector');
+  // Modal styling and scroll fade
+  const modal = useExtraLargeModal('loraSelector');
+  const { showFade, scrollRef } = useScrollFade({ 
+    isOpen: isOpen,
+    debug: false
+  });
 
   if (!isOpen) {
     return null;
@@ -1138,17 +1143,20 @@ export const LoraSelectorModal: React.FC<LoraSelectorModalProps> = ({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent
-        className={`${mobileModalStyling.fullClassName} data-[state=open]:!slide-in-from-top-1/4 data-[state=open]:!slide-in-from-left data-[state=closed]:!slide-out-to-top-1/4 data-[state=closed]:!slide-out-to-left`}
-        style={mobileModalStyling.dialogContentStyle}
-        {...createMobileModalProps(mobileModalStyling.isMobile)}
+        className={`${modal.className} data-[state=open]:!slide-in-from-top-1/4 data-[state=open]:!slide-in-from-left data-[state=closed]:!slide-out-to-top-1/4 data-[state=closed]:!slide-out-to-left`}
+        style={modal.style}
+        {...{...modal.props}}
       >
-        <div className={mobileModalStyling.headerContainerClassName}>
-          <DialogHeader className={`${mobileModalStyling.isMobile ? 'px-2 pt-2 pb-2' : 'px-6 pt-4 pb-2'} flex-shrink-0`}>
+        <div className={modal.headerClass}>
+          <DialogHeader className={`${modal.isMobile ? 'px-2 pt-2 pb-2' : 'px-6 pt-4 pb-2'} flex-shrink-0`}>
             <DialogTitle>LoRA Library</DialogTitle>
           </DialogHeader>
         </div>
-        <div className={mobileModalStyling.scrollContainerClassName}>
-          <div className={`${mobileModalStyling.isMobile ? 'px-2' : 'px-6'} py-2 flex-shrink-0`}>
+        <div 
+          ref={scrollRef}
+          className={modal.scrollClass}
+        >
+          <div className={`${modal.isMobile ? 'px-2' : 'px-6'} py-2 flex-shrink-0`}>
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex flex-col flex-1 overflow-hidden">
               <TabsList className="grid w-full grid-cols-2 mb-2">
                   <TabsTrigger value="browse" className="w-full">Browse LoRAs</TabsTrigger>
@@ -1197,8 +1205,18 @@ export const LoraSelectorModal: React.FC<LoraSelectorModalProps> = ({
         
         {/* Control Panel Footer - Always sticks to bottom like PromptEditorModal */}
         {activeTab === 'browse' && (
-          <div className={mobileModalStyling.footerContainerClassName}>
-            <div className={`${mobileModalStyling.isMobile ? 'p-4 pt-4 pb-1' : 'p-6 pt-6 pb-2'} border-t`}>
+          <div className={`${modal.footerClass} relative`}>
+            {/* Fade overlay */}
+            {showFade && (
+              <div 
+                className="absolute top-0 left-0 right-0 h-16 pointer-events-none z-10"
+                style={{ transform: 'translateY(-64px)' }}
+              >
+                <div className="h-full bg-gradient-to-t from-white via-white/95 to-transparent dark:from-gray-950 dark:via-gray-950/95 dark:to-transparent" />
+              </div>
+            )}
+            
+            <div className={`${modal.isMobile ? 'p-4 pt-4 pb-1' : 'p-6 pt-6 pb-2'} border-t relative z-20`}>
               <div className="flex flex-col gap-3">
                 {/* Filter Controls Row */}
                 <div className="flex items-center gap-3 flex-wrap justify-center sm:justify-start">
@@ -1249,7 +1267,7 @@ export const LoraSelectorModal: React.FC<LoraSelectorModalProps> = ({
                   <Button 
                     variant="outline" 
                     onClick={onClose}
-                    className={`flex items-center gap-1.5 ${mobileModalStyling.isMobile ? 'w-full mt-2' : 'ml-auto'}`}
+                    className={`flex items-center gap-1.5 ${modal.isMobile ? 'w-full mt-2' : 'ml-auto'}`}
                   >
                     <X className="h-4 w-4" />
                     Close

@@ -783,12 +783,18 @@
   }
 
   /* Subtle variant for project settings */
+  .wes-button-subtle {
+    position: relative;
+    overflow: hidden;
+  }
+
   .wes-button-subtle::before {
     content: '';
     @apply absolute inset-0;
     background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.08), transparent);
     @apply translate-x-[-100%];
     transition: transform 900ms ease-out;
+    pointer-events: none;
   }
 
   .wes-button-subtle:hover::before {

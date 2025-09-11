@@ -14,7 +14,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { createBatchMagicEditTasks, TaskValidationError } from '@/shared/lib/tasks/magicEdit';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
-import { useModalStyling, createMobileModalProps } from '@/shared/hooks/useMobileModalStyling';
+import { useMediumModal } from '@/shared/hooks/useModal';
 import {
   Dialog,
   DialogContent,
@@ -38,8 +38,8 @@ export const MagicEditModal: React.FC<MagicEditModalProps> = ({
 }) => {
   const isMobile = useIsMobile();
   
-  // Mobile modal styling
-  const mobileModalStyling = useModalStyling('medium-wide');
+  // Modal styling
+  const modal = useMediumModal();
   const [magicEditPrompt, setMagicEditPrompt] = useState('');
   const [magicEditNumImages, setMagicEditNumImages] = useState(1);
   const [magicEditInSceneBoost, setMagicEditInSceneBoost] = useState(false);
@@ -163,17 +163,17 @@ export const MagicEditModal: React.FC<MagicEditModalProps> = ({
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent
-          className={mobileModalStyling.fullClassName}
-          style={mobileModalStyling.dialogContentStyle}
-          {...createMobileModalProps(mobileModalStyling.isMobile)}
+          className={modal.className}
+          style={modal.style}
+          {...{...modal.props}}
         >
-          <div className={mobileModalStyling.headerContainerClassName}>
-            <DialogHeader className={`${mobileModalStyling.isMobile ? 'px-4 pt-3 pb-1' : 'px-6 pt-3 pb-1'} flex-shrink-0`}>
+          <div className={modal.headerClass}>
+            <DialogHeader className={`${modal.isMobile ? 'px-4 pt-3 pb-1' : 'px-6 pt-3 pb-1'} flex-shrink-0`}>
               <DialogTitle>Magic Edit</DialogTitle>
             </DialogHeader>
           </div>
           
-          <div className={`${mobileModalStyling.isMobile ? 'px-4' : 'px-6'} flex-1 overflow-y-auto min-h-0`}>
+          <div className={`${modal.isMobile ? 'px-4' : 'px-6'} flex-1 overflow-y-auto min-h-0`}>
             <div className="space-y-4 py-3">
         {/* Image Preview */}
         <div className="relative w-full">
@@ -257,9 +257,9 @@ export const MagicEditModal: React.FC<MagicEditModalProps> = ({
             </div>
           </div>
           
-          <div className={mobileModalStyling.footerContainerClassName}>
-            <DialogFooter className={`${mobileModalStyling.isMobile ? 'px-4 pt-4 pb-1 flex-row justify-between' : 'px-6 pt-5 pb-2'} border-t`}>
-              <Button variant="outline" onClick={onClose} disabled={isCreatingTasks} className={mobileModalStyling.isMobile ? '' : 'mr-auto'}>
+          <div className={modal.footerClass}>
+            <DialogFooter className={`${modal.isMobile ? 'px-4 pt-4 pb-1 flex-row justify-between' : 'px-6 pt-5 pb-2'} border-t`}>
+              <Button variant="outline" onClick={onClose} disabled={isCreatingTasks} className={modal.isMobile ? '' : 'mr-auto'}>
                 Cancel
               </Button>
               <Button 

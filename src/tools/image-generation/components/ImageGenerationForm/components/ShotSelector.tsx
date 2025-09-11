@@ -46,6 +46,28 @@ export const ShotSelector: React.FC<ShotSelectorProps> = ({
       </div>
       {/* Select dropdown and create button with aligned jump link */}
       <div className="flex items-center gap-2">
+        {associatedShotId && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={onClearShot}
+                  disabled={!hasApiKey || isGenerating}
+                  className="h-8 w-8 p-0 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                  aria-label="Clear shot selection"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                <p>Clear selection</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
         <div className="relative flex-1">
           <Select
             value={associatedShotId || "none"}
@@ -79,28 +101,6 @@ export const ShotSelector: React.FC<ShotSelectorProps> = ({
             ) : null;
           })()}
         </div>
-        {associatedShotId && (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={onClearShot}
-                  disabled={!hasApiKey || isGenerating}
-                  className="h-8 w-8 p-0 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
-                  aria-label="Clear shot selection"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="top">
-                <p>Clear selection</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        )}
         <Button
           type="button"
           variant="outline"

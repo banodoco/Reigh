@@ -18,7 +18,7 @@ import { useToolSettings } from '@/shared/hooks/useToolSettings';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/shared/components/ui/collapsible';
 import { ChevronDown, AlertTriangle } from 'lucide-react';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
-import { useMediumModal, createMobileModalProps } from '@/shared/hooks/useMobileModalStyling';
+import { useMediumModal } from '@/shared/hooks/useModal';
 import { AspectRatioSelector } from '@/shared/components/AspectRatioSelector';
 
 
@@ -30,7 +30,7 @@ interface ProjectSettingsModalProps {
 
 export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({ isOpen, onOpenChange, project }) => {
   const isMobile = useIsMobile();
-  const mobileModalStyling = useMediumModal();
+  const modal = useMediumModal();
   const [projectName, setProjectName] = useState('');
   const [aspectRatio, setAspectRatio] = useState<string>('');
   // Persistent project-level upload settings
@@ -112,16 +112,16 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({ isOp
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent 
-        className={`${mobileModalStyling.fullClassName} data-[state=closed]:!slide-out-to-left data-[state=closed]:!slide-out-to-top-[48%] data-[state=open]:!slide-in-from-left data-[state=open]:!slide-in-from-top-[48%]`}
-        style={mobileModalStyling.dialogContentStyle}
-        {...createMobileModalProps(mobileModalStyling.isMobile)}
+        className={`${modal.className} data-[state=closed]:!slide-out-to-left data-[state=closed]:!slide-out-to-top-[48%] data-[state=open]:!slide-in-from-left data-[state=open]:!slide-in-from-top-[48%]`}
+        style={modal.style}
+        {...{...modal.props}}
       >
-        <div className={mobileModalStyling.headerContainerClassName}>
-          <DialogHeader className={`${mobileModalStyling.isMobile ? 'px-4 pt-4 pb-2' : 'px-6 pt-4 pb-2'} flex-shrink-0`}>
+        <div className={modal.headerClass}>
+          <DialogHeader className={`${modal.isMobile ? 'px-4 pt-4 pb-2' : 'px-6 pt-4 pb-2'} flex-shrink-0`}>
             <DialogTitle>Project Settings</DialogTitle>
           </DialogHeader>
         </div>
-        <div className={`${mobileModalStyling.isMobile ? 'px-4' : 'px-6'} flex-1 overflow-y-auto min-h-0`}>
+        <div className={`${modal.isMobile ? 'px-4' : 'px-6'} flex-1 overflow-y-auto min-h-0`}>
           <div className="grid gap-4 py-3">
             <div className="grid grid-cols-3 items-center gap-6">
               <Label htmlFor="project-name-settings" className="text-left">
@@ -218,8 +218,8 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({ isOp
             </Collapsible>
           </div>
         </div>
-        <DialogFooter className={`${mobileModalStyling.isMobile ? 'px-4 pt-4 pb-1 flex-row justify-between' : 'px-6 pt-5 pb-2'} border-t`}>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isUpdatingProject} className={mobileModalStyling.isMobile ? '' : 'mr-auto'}>
+        <DialogFooter className={`${modal.isMobile ? 'px-4 pt-4 pb-1 flex-row justify-between' : 'px-6 pt-5 pb-2'} border-t`}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isUpdatingProject} className={modal.isMobile ? '' : 'mr-auto'}>
             Cancel
           </Button>
           <Button 
