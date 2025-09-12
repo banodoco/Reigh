@@ -16,18 +16,35 @@ interface UseUpdatingTimestampOptions {
   disabled?: boolean;
 }
 
-// Default abbreviation function
+// Simple, direct abbreviation function
 const defaultAbbreviate = (str: string) => {
-  // Handle "less than a minute ago" special case
+  // Handle all variations of "1 hour" - remove "about" and use singular
+  if (str.includes('1 hr') || str.includes('1 hour')) {
+    return '1 hr ago';
+  }
+  
+  // Handle all variations of "1 day" - remove "about" and use singular  
+  if (str.includes('1 day')) {
+    return '1 day ago';
+  }
+  
+  // Handle "less than a minute ago"
   if (str.includes('less than a minute')) {
     return '<1 min ago';
   }
   
+  // Handle other single units
+  if (str.includes('1 minute')) {
+    return '1 min ago';
+  }
+  
+  if (str.includes('1 second')) {
+    return '1 sec ago';
+  }
+  
+  // Handle plurals - remove "about" prefix and abbreviate
   return str
-    .replace(/1 minutes ago/, '1 min ago')
-    .replace(/1 hours ago/, '1 hr ago')
-    .replace(/1 seconds ago/, '1 sec ago')
-    .replace(/1 days ago/, '1 day ago')
+    .replace(/^about /, '') // Remove "about" prefix
     .replace(/minutes?/, 'mins')
     .replace(/hours?/, 'hrs')
     .replace(/seconds?/, 'secs')
@@ -77,7 +94,17 @@ export function useUpdatingTimestamp({
     if (!parsedDate) return 'Unknown';
     
     const formatted = formatDistanceToNow(parsedDate, { addSuffix: true });
-    return abbreviate(formatted);
+    const abbreviated = abbreviate(formatted);
+    
+    // DEBUG: Log what date-fns returns vs what we output
+    console.log('[TimestampDebug] date-fns vs abbreviated:', {
+      original: formatted,
+      abbreviated: abbreviated,
+      date: parsedDate.toISOString(),
+      timestamp: Date.now()
+    });
+    
+    return abbreviated;
   }, [parsedDate?.getTime(), updateTrigger, abbreviate]);
   
   return formattedTime;

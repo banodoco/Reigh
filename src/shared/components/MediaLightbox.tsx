@@ -6,9 +6,6 @@ import { Button } from '@/shared/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
 import ShotSelector from '@/shared/components/ShotSelector';
 import { getDisplayUrl, cn } from '@/shared/lib/utils';
-import HoverScrubVideo from '@/shared/components/HoverScrubVideo';
-import SimpleVideoPlayer from '@/tools/travel-between-images/components/SimpleVideoPlayer';
-import LightboxScrubVideo from '@/shared/components/LightboxScrubVideo';
 import TaskDetailsPanel from '@/tools/travel-between-images/components/TaskDetailsPanel';
 import { useToggleGenerationStar } from '@/shared/hooks/useGenerations';
 import MagicEditLauncher from '@/shared/components/MagicEditLauncher';
@@ -33,7 +30,6 @@ interface MediaLightboxProps {
   showImageEditTools?: boolean;
   showDownload?: boolean;
   showMagicEdit?: boolean;
-  videoPlayerComponent?: 'hover-scrub' | 'simple-player' | 'lightbox-scrub';
   // Navigation availability
   hasNext?: boolean;
   hasPrevious?: boolean;
@@ -81,7 +77,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   showImageEditTools = true,
   showDownload = true,
   showMagicEdit = false,
-  videoPlayerComponent = 'lightbox-scrub',
   // Navigation availability
   hasNext = true,
   hasPrevious = true,
@@ -944,30 +939,20 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   {/* Media Content */}
                   <div className="relative max-w-full max-h-full flex items-center justify-center">
                     {isVideo ? (
-                      videoPlayerComponent === 'simple-player' ? (
-                        <div style={{ maxWidth: '55vw', maxHeight: '90vh' }}>
-                          <SimpleVideoPlayer
-                            src={displayUrl}
-                            poster={media.thumbUrl}
-                            className="w-full h-full object-contain"
-                          />
-                        </div>
-                      ) : videoPlayerComponent === 'lightbox-scrub' ? (
-                        <LightboxScrubVideo
-                          src={displayUrl}
-                          poster={media.thumbUrl}
-                          className="object-contain"
-                          style={{ maxWidth: '55vw', maxHeight: '90vh' }}
-                        />
-                      ) : (
-                        <HoverScrubVideo
-                          src={displayUrl}
-                          poster={media.thumbUrl}
-                          className="object-contain"
-                          style={{ maxWidth: '55vw', maxHeight: '90vh' }}
-                          disableScrubbing={true}
-                        />
-                      )
+                      <video
+                        src={displayUrl}
+                        poster={media.thumbUrl}
+                        controls
+                        loop
+                        muted
+                        playsInline
+                        autoPlay
+                        preload="auto"
+                        className="object-contain"
+                        style={{ maxWidth: '55vw', maxHeight: '90vh' }}
+                      >
+                        Your browser does not support the video tag.
+                      </video>
                     ) : (
                       <div className="relative">
                         {isSaving ? (
@@ -1244,28 +1229,19 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   {/* Media Content - same as above but adapted for mobile */}
                   <div className="relative w-full h-full flex items-center justify-center">
                     {isVideo ? (
-                      videoPlayerComponent === 'simple-player' ? (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <SimpleVideoPlayer
-                            src={displayUrl}
-                            poster={media.thumbUrl}
-                            className="max-w-full max-h-full object-contain"
-                          />
-                        </div>
-                      ) : videoPlayerComponent === 'lightbox-scrub' ? (
-                        <LightboxScrubVideo
-                          src={displayUrl}
-                          poster={media.thumbUrl}
-                          className="max-w-full max-h-full object-contain"
-                        />
-                      ) : (
-                        <HoverScrubVideo
-                          src={displayUrl}
-                          poster={media.thumbUrl}
-                          className="max-w-full max-h-full object-contain"
-                          disableScrubbing={true}
-                        />
-                      )
+                      <video
+                        src={displayUrl}
+                        poster={media.thumbUrl}
+                        controls
+                        loop
+                        muted
+                        playsInline
+                        autoPlay
+                        preload="auto"
+                        className="max-w-full max-h-full object-contain"
+                      >
+                        Your browser does not support the video tag.
+                      </video>
                     ) : (
                       <div className="relative">
                         {isSaving ? (
@@ -1416,37 +1392,23 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               {/* Media Content */}
               <div className="relative">
                 {isVideo ? (
-                  videoPlayerComponent === 'simple-player' ? (
-                    <div style={{ maxWidth: '95vw' }}>
-                      <SimpleVideoPlayer
-                        src={displayUrl}
-                        poster={media.thumbUrl}
-                        className="h-auto max-h-[85vh] sm:max-h-[85vh] object-contain"
-                      />
-                    </div>
-                  ) : videoPlayerComponent === 'lightbox-scrub' ? (
-                    <LightboxScrubVideo
-                      src={displayUrl}
-                      poster={media.thumbUrl}
-                      className={cn(
-                        'h-auto object-contain w-[95vw]',
-                        // Keep full-viewport width on touch-like devices; allow responsive sm: rules on desktop
-                        isTouchLikeDevice ? 'max-h-[85vh]' : 'max-h-[85vh] sm:max-h-[85vh]'
-                      )}
-                      style={{ maxWidth: '95vw' }}
-                    />
-                  ) : (
-                    <HoverScrubVideo
-                      src={displayUrl}
-                      poster={media.thumbUrl}
-                      className={cn(
-                        'h-auto object-contain w-[95vw]',
-                        isTouchLikeDevice ? 'max-h-[85vh]' : 'max-h-[85vh] sm:max-h-[85vh]'
-                      )}
-                      style={{ maxWidth: '95vw' }}
-                      disableScrubbing={true}
-                    />
-                  )
+                  <video
+                    src={displayUrl}
+                    poster={media.thumbUrl}
+                    controls
+                    loop
+                    muted
+                    playsInline
+                    autoPlay
+                    preload="auto"
+                    className={cn(
+                      'h-auto object-contain w-[95vw]',
+                      isTouchLikeDevice ? 'max-h-[85vh]' : 'max-h-[85vh] sm:max-h-[85vh]'
+                    )}
+                    style={{ maxWidth: '95vw' }}
+                  >
+                    Your browser does not support the video tag.
+                  </video>
                 ) : (
                   <div className="relative">
                     {isSaving ? (

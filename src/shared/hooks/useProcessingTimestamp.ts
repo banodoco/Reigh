@@ -32,12 +32,12 @@ const formatProcessingDuration = (startDate: Date): string => {
   
   // Less than 1 minute
   if (diffMinutes < 1) {
-    return 'Processing: <1 min';
+    return 'Processing for <1 min';
   }
   
   // 1-59 minutes
   if (diffMinutes < 60) {
-    return `Processing: for ${diffMinutes} min${diffMinutes === 1 ? '' : 's'}`;
+    return `Processing for ${diffMinutes} min${diffMinutes === 1 ? '' : 's'}`;
   }
   
   // Hours and minutes
@@ -45,9 +45,9 @@ const formatProcessingDuration = (startDate: Date): string => {
   const remainingMinutes = diffMinutes % 60;
   
   if (remainingMinutes === 0) {
-    return `Processing: for ${hours} hr${hours === 1 ? '' : 's'}`;
+    return `Processing for ${hours} hr${hours === 1 ? '' : 's'}`;
   } else {
-    return `Processing: for ${hours} hr${hours === 1 ? '' : 's'}, ${remainingMinutes} min${remainingMinutes === 1 ? '' : 's'}`;
+    return `Processing for ${hours} hr${hours === 1 ? '' : 's'}, ${remainingMinutes} min${remainingMinutes === 1 ? '' : 's'}`;
   }
 };
 
@@ -62,12 +62,12 @@ const formatCompletedTime = (completedDate: Date): string => {
   
   // Less than 1 minute
   if (diffMinutes < 1) {
-    return 'Completed: <1 min ago';
+    return 'Completed <1 min ago';
   }
   
   // 1-59 minutes
   if (diffMinutes < 60) {
-    return `Completed: ${diffMinutes} min${diffMinutes === 1 ? '' : 's'} ago`;
+    return `Completed ${diffMinutes} min${diffMinutes === 1 ? '' : 's'} ago`;
   }
   
   // Less than 24 hours - show hours and minutes
@@ -76,9 +76,9 @@ const formatCompletedTime = (completedDate: Date): string => {
     const remainingMinutes = diffMinutes % 60;
     
     if (remainingMinutes === 0) {
-      return `Completed: ${hours} hr${hours === 1 ? '' : 's'} ago`;
+      return `Completed ${hours} hr${hours === 1 ? '' : 's'} ago`;
     } else {
-      return `Completed: ${hours} hr${hours === 1 ? '' : 's'}, ${remainingMinutes} min${remainingMinutes === 1 ? '' : 's'} ago`;
+      return `Completed ${hours} hr${hours === 1 ? '' : 's'}, ${remainingMinutes} min${remainingMinutes === 1 ? '' : 's'} ago`;
     }
   }
   
@@ -87,9 +87,9 @@ const formatCompletedTime = (completedDate: Date): string => {
   const remainingHours = Math.floor((diffMinutes % (24 * 60)) / 60);
   
   if (remainingHours === 0) {
-    return `Completed: ${days} day${days === 1 ? '' : 's'} ago`;
+    return `Completed ${days} day${days === 1 ? '' : 's'} ago`;
   } else {
-    return `Completed: ${days} day${days === 1 ? '' : 's'}, ${remainingHours} hr${remainingHours === 1 ? '' : 's'} ago`;
+    return `Completed ${days} day${days === 1 ? '' : 's'}, ${remainingHours} hr${remainingHours === 1 ? '' : 's'} ago`;
   }
 };
 

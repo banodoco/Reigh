@@ -576,7 +576,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
             processingTime : 
             task.status === 'Complete' && completedTime ?
             completedTime :
-            `Created: ${createdTimeAgo}`
+            `Created ${createdTimeAgo}`
           }
         </span>
         
@@ -659,7 +659,6 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
           showImageEditTools={false}
           showDownload={true}
           showMagicEdit={false}
-          videoPlayerComponent="lightbox-scrub"
           hasNext={videoLightboxIndex < travelData.videoOutputs!.length - 1}
           hasPrevious={videoLightboxIndex > 0}
         />

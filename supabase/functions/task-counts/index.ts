@@ -137,7 +137,32 @@ serve(async (req) => {
       // queued_only = count(include_active=false)
       // queued_plus_active = count(include_active=true)
       // active_only = diff (eligibility-aware)
-      console.log(`${pathTag} [TaskCounts:CountDebug] Starting count computations`);
+      console.log(`[TASK_COUNT_DEBUG] [SERVICE_ROLE] [${runType || 'ALL'}] Starting count computations`);
+      
+      // Add detailed logging for raw task data first
+      console.log(`[TASK_COUNT_DEBUG] [RAW_TASKS] [${runType || 'ALL'}] Querying task data...`);
+      const { data: rawTasks, error: rawTasksError } = await supabaseAdmin
+        .from('tasks')
+        .select(`
+          id, task_type, status, worker_id, project_id, dependant_on,
+          projects!inner(user_id, users!inner(credits, settings))
+        `)
+        .in('status', ['Queued', 'In Progress'])
+        .limit(50);
+      
+      if (!rawTasksError && rawTasks) {
+        console.log(`[TASK_COUNT_DEBUG] [RAW_TASKS] [${runType || 'ALL'}] Found ${rawTasks.length} tasks`);
+        rawTasks.forEach(task => {
+          const isOrchestrator = task.task_type?.toLowerCase().includes('orchestrator') ? 'ORCH' : 'NORMAL';
+          const hasWorker = task.worker_id ? 'CLOUD' : 'LOCAL';
+          const inCloudSetting = task.projects.users.settings?.ui?.generationMethods?.inCloud ?? true;
+          const hasDep = task.dependant_on ? 'DEP' : 'NODEP';
+          console.log(`[TASK_COUNT_DEBUG] [RAW_TASKS] [${runType || 'ALL'}] ${task.id.substring(0, 8)}: ${task.task_type} | ${task.status} | ${isOrchestrator} | ${hasWorker} | ${hasDep} | user=${task.projects.user_id.substring(0, 8)} | credits=${task.projects.users.credits} | inCloud=${inCloudSetting}`);
+        });
+      } else {
+        console.log(`[TASK_COUNT_DEBUG] [RAW_TASKS] [${runType || 'ALL'}] ERROR:`, rawTasksError);
+      }
+
       const [countQueuedOnly, countQueuedPlusActive] = await Promise.all([
         supabaseAdmin.rpc('count_eligible_tasks_service_role', { p_include_active: false, p_run_type: runType }),
         supabaseAdmin.rpc('count_eligible_tasks_service_role', { p_include_active: true, p_run_type: runType })
@@ -155,31 +180,66 @@ serve(async (req) => {
       const queued_only = countQueuedOnly.data ?? 0;
       const queued_plus_active = countQueuedPlusActive.data ?? 0;
       
-      console.log(`${pathTag} Count results - queued_only: ${queued_only}, queued_plus_active: ${queued_plus_active}`);
+      console.log(`[TASK_COUNT_DEBUG] [MAIN_FUNCTION] [${runType || 'ALL'}] queued_only=${queued_only}, queued_plus_active=${queued_plus_active}`);
       // Compute active_only from eligibility-aware counts for consistency
       const active_only = Math.max(0, queued_plus_active - queued_only);
-      console.log(`${pathTag} [TaskCounts:CountDebug] Service-role totals: queued_only=${queued_only}, active_only=${active_only}, queued_plus_active=${queued_plus_active}`);
+      console.log(`[TASK_COUNT_DEBUG] [MAIN_FUNCTION] [${runType || 'ALL'}] FINAL: queued=${queued_only}, active=${active_only}, total=${queued_plus_active}`);
+      
+      // Add detailed breakdown by task type for debugging
+      console.log(`[TASK_COUNT_DEBUG] [BREAKDOWN] [${runType || 'ALL'}] Analyzing task type breakdown...`);
+      const { data: taskTypeBreakdown, error: taskTypeError } = await supabaseAdmin
+        .from('tasks')
+        .select(`
+          task_type, status, worker_id,
+          projects!inner(user_id, users!inner(credits))
+        `)
+        .in('status', ['Queued', 'In Progress']);
+      
+      if (!taskTypeError && taskTypeBreakdown) {
+        const breakdown = taskTypeBreakdown.reduce((acc, task) => {
+          const key = `${task.task_type}_${task.status}`;
+          acc[key] = (acc[key] || 0) + 1;
+          return acc;
+        }, {});
+        console.log(`[TASK_COUNT_DEBUG] [BREAKDOWN] [${runType || 'ALL'}] Summary:`, JSON.stringify(breakdown));
+        
+        // Show orchestrator tasks specifically
+        const orchestratorTasks = taskTypeBreakdown.filter(t => t.task_type && t.task_type.toLowerCase().includes('orchestrator'));
+        console.log(`[TASK_COUNT_DEBUG] [ORCHESTRATORS] [${runType || 'ALL'}] Found ${orchestratorTasks.length} orchestrator tasks`);
+        orchestratorTasks.forEach(task => {
+          console.log(`[TASK_COUNT_DEBUG] [ORCHESTRATORS] [${runType || 'ALL'}] ${task.task_type} | ${task.status} | worker=${task.worker_id ? 'YES' : 'NO'} | credits=${task.projects.users.credits}`);
+        });
+      }
 
       // Per-user breakdown (cloud-claimed active only in function; may include orchestrators)
       let user_stats: any[] = [];
       try {
-        console.log(`${pathTag} [TaskCounts:CountDebug] Calling analyze_task_availability_service_role(include_active=true)`);
+        console.log(`[TASK_COUNT_DEBUG] [ANALYSIS] [${runType || 'ALL'}] Calling analyze_task_availability_service_role...`);
         const { data: analysis } = await supabaseAdmin
           .rpc('analyze_task_availability_service_role', { p_include_active: true, p_run_type: runType });
         if (analysis && Array.isArray(analysis.user_stats) && analysis.user_stats.length > 0) {
           user_stats = analysis.user_stats;
-          console.log(`${pathTag} [TaskCounts:CountDebug] Analysis user_stats count=${user_stats.length}`);
+          console.log(`[TASK_COUNT_DEBUG] [ANALYSIS] [${runType || 'ALL'}] Got ${user_stats.length} user stats from analysis`);
+        } else {
+          console.log(`[TASK_COUNT_DEBUG] [ANALYSIS] [${runType || 'ALL'}] No user stats from analysis, will use fallback`);
         }
       } catch (e) {
-        console.log(`${pathTag} analyze_task_availability failed:`, (e as any)?.message);
+        console.log(`[TASK_COUNT_DEBUG] [ANALYSIS] [${runType || 'ALL'}] ERROR:`, (e as any)?.message);
       }
       // Fallback: always-on per-user capacity stats when analysis provides no breakdown
       if (user_stats.length === 0) {
-        console.log(`${pathTag} [TaskCounts:CountDebug] Analysis returned no user_stats; using per_user_capacity_stats_service_role fallback`);
+        console.log(`[TASK_COUNT_DEBUG] [FALLBACK] [${runType || 'ALL'}] Using per_user_capacity_stats_service_role fallback`);
         try {
-          const { data: perUser } = await supabaseAdmin
+          const { data: perUser, error: perUserError } = await supabaseAdmin
             .rpc('per_user_capacity_stats_service_role');
+          
+          if (perUserError) {
+            console.log(`[TASK_COUNT_DEBUG] [FALLBACK] [${runType || 'ALL'}] ERROR:`, perUserError);
+          }
+          
           if (Array.isArray(perUser)) {
+            console.log(`[TASK_COUNT_DEBUG] [FALLBACK] [${runType || 'ALL'}] Got ${perUser.length} users from fallback`);
+            
             user_stats = perUser.map((u: any) => ({
               user_id: u.user_id,
               credits: u.credits,
@@ -188,12 +248,16 @@ serve(async (req) => {
               allows_cloud: u.allows_cloud,
               at_limit: u.at_limit
             }));
-            console.log(`${pathTag} [TaskCounts:CountDebug] Fallback user_stats count=${user_stats.length}`);
-            const preview = user_stats.slice(0, 5).map(u => `${u.user_id}: queued=${u.queued_tasks}, in_progress=${u.in_progress_tasks}, credits=${u.credits}, at_limit=${u.at_limit}`);
-            console.log(`${pathTag} [TaskCounts:CountDebug] Fallback users preview:`, preview);
+            
+            // Show users with tasks
+            const usersWithTasks = user_stats.filter(u => u.in_progress_tasks > 0 || u.queued_tasks > 0);
+            console.log(`[TASK_COUNT_DEBUG] [FALLBACK] [${runType || 'ALL'}] Users with tasks: ${usersWithTasks.length}`);
+            usersWithTasks.forEach(u => {
+              console.log(`[TASK_COUNT_DEBUG] [FALLBACK] [${runType || 'ALL'}] User ${u.user_id.substring(0, 8)}: queued=${u.queued_tasks}, in_progress=${u.in_progress_tasks}, credits=${u.credits}`);
+            });
           }
         } catch (e) {
-          console.log(`${pathTag} per_user_capacity_stats_service_role failed:`, (e as any)?.message);
+          console.log(`[TASK_COUNT_DEBUG] [FALLBACK] [${runType || 'ALL'}] EXCEPTION:`, (e as any)?.message);
         }
       }
 
@@ -206,6 +270,20 @@ serve(async (req) => {
         in_progress_local: 0, // Our service role function only counts cloud tasks
         orchestrator_tasks: 0 // Orchestrators are excluded from our function counts
       };
+      
+      // Compare main function results with fallback user stats totals
+      const fallbackTotalInProgress = user_stats.reduce((sum, u) => sum + (u.in_progress_tasks || 0), 0);
+      const fallbackTotalQueued = user_stats.reduce((sum, u) => sum + (u.queued_tasks || 0), 0);
+      console.log(`[TASK_COUNT_DEBUG] [COMPARISON] [${runType || 'ALL'}] Main: active=${active_only}, queued=${queued_only}`);
+      console.log(`[TASK_COUNT_DEBUG] [COMPARISON] [${runType || 'ALL'}] Fallback: active=${fallbackTotalInProgress}, queued=${fallbackTotalQueued}`);
+      
+      if (active_only !== fallbackTotalInProgress) {
+        console.log(`[TASK_COUNT_DEBUG] [DISCREPANCY] [${runType || 'ALL'}] ⚠️  MISMATCH: Main says ${active_only} active, fallback says ${fallbackTotalInProgress}!`);
+      }
+      
+      if (queued_only !== fallbackTotalQueued) {
+        console.log(`[TASK_COUNT_DEBUG] [DISCREPANCY] [${runType || 'ALL'}] ⚠️  MISMATCH: Main says ${queued_only} queued, fallback says ${fallbackTotalQueued}!`);
+      }
 
       return new Response(JSON.stringify({
         mode: 'count',

@@ -14,6 +14,7 @@ import { Badge } from '@/shared/components/ui/badge';
 import { Separator } from '@/shared/components/ui/separator';
 import { Checkbox } from '@/shared/components/ui/checkbox';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
+import { useLargeModal } from '@/shared/hooks/useModal';
 import { Label } from '@/shared/components/ui/label';
 import { ScrollArea } from '@/shared/components/ui/scroll-area';
 import { Task } from '@/types/tasks';
@@ -39,6 +40,7 @@ interface TaskDetailsModalProps {
 
 const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, children, onApplySettings, onApplySettingsFromTask, onClose, onShowVideo, isVideoContext, open, onOpenChange }) => {
   const isMobile = useIsMobile();
+  const modal = useLargeModal();
   const [internalOpen, setInternalOpen] = useState(false);
   
   // Use controlled state if provided, otherwise fall back to internal state
@@ -143,19 +145,21 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
       {/* Avoid rendering an active trigger when controlled via `open` to prevent unintended close events */}
       {!open && children && <DialogTrigger asChild>{children}</DialogTrigger>}
       <DialogContent 
-        className={`sm:max-w-[700px] flex flex-col ${
-          isMobile ? 'mx-2 max-h-[calc(100vh-4rem)] top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] fixed' : ''
-        }`}
+        className={modal.className}
+        style={modal.style}
+        {...modal.props}
         aria-describedby="task-details-description"
       >
-        <DialogHeader className="flex-shrink-0">
-          <DialogTitle className="text-xl font-light">Generation Task Details</DialogTitle>
-          <p id="task-details-description" className="sr-only">
-            View details about the task that generated this video, including input images, settings, and parameters.
-          </p>
-        </DialogHeader>
+        <div className={modal.headerClass}>
+          <DialogHeader>
+            <DialogTitle className="text-xl font-light">Generation Task Details</DialogTitle>
+            <p id="task-details-description" className="sr-only">
+              View details about the task that generated this video, including input images, settings, and parameters.
+            </p>
+          </DialogHeader>
+        </div>
         
-        <div className="flex-1 overflow-hidden">
+        <div className={modal.scrollClass}>
           {isLoading ? (
             <div className="flex justify-center items-center h-64">
               <div className="flex flex-col items-center space-y-3">
@@ -167,7 +171,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
               </div>
             </div>
           ) : task ? (
-            <div className="overflow-y-auto pr-2 space-y-6" style={{ maxHeight: 'calc(80vh - 140px)' }}>
+            <div className="space-y-6 p-4">
               {/* Generation Summary Section */}
               <div className="space-y-3">
                 <SharedTaskDetails
@@ -233,11 +237,11 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
           )}
         </div>
         
-        <DialogFooter className="flex-shrink-0 pt-4 border-t">
-          <div className="flex justify-between w-full items-center">
-            <div className="flex items-center space-x-4">
+        <div className={modal.footerClass}>
+          <DialogFooter className="pt-4 border-t">
+           <div className="flex w-full items-center gap-3">
               {inputImages.length > 0 && (
-                <div className="flex items-center space-x-4">
+                <>
                   <div className="flex items-center space-x-2">
                     <Checkbox 
                       id="replaceImages"
@@ -252,15 +256,14 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
                     <Button 
                       variant="default" 
                       onClick={handleApplySettingsFromTask}
-                      className={`text-sm ${isMobile ? 'whitespace-pre-line leading-tight py-3 px-4 min-h-[4rem]' : ''}`}
+                      className={`text-sm ${isMobile ? 'whitespace-pre-line leading-tight py-3 px-4 min-h-[3rem]' : ''}`}
                     >
-                      {isMobile ? 'Apply\nThese\nSettings' : 'Apply These Settings'}
+                      {isMobile ? 'Apply\nSettings' : 'Apply Settings'}
                     </Button>
                   )}
-                </div>
+                </>
               )}
-            </div>
-            <div className="flex items-center space-x-3">
+              <div className="flex items-center space-x-3 ml-auto">
               {/* Show Video button for mobile video context - now positioned directly to the left of close button */}
               {isMobile && isVideoContext && onShowVideo && (
                 <Button 
@@ -283,7 +286,8 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
               </Button>
             </div>
           </div>
-        </DialogFooter>
+          </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );

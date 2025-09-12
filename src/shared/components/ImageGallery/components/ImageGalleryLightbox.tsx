@@ -142,7 +142,6 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
           showImageEditTools={!activeLightboxMedia.type.includes('video')}
           showDownload={true}
           showMagicEdit={true}
-          videoPlayerComponent="simple-player"
           hasNext={hasNext}
           hasPrevious={hasPrevious}
           allShots={simplifiedShotOptions}

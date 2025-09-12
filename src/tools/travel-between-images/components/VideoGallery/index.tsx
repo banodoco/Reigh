@@ -776,7 +776,6 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
             showNavigation={true}
             showImageEditTools={false}
             showDownload={true}
-            videoPlayerComponent="lightbox-scrub"
             hasNext={lightboxIndex < displaySortedVideoOutputs.length - 1}
             hasPrevious={lightboxIndex > 0}
             starred={(displaySortedVideoOutputs[lightboxIndex] as { starred?: boolean }).starred || false}
