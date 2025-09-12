@@ -11,13 +11,6 @@ interface WelcomeBonusModalProps {
   onClose: () => void;
 }
 
-// Function to detect Chrome desktop
-const isChromeDesktop = () => {
-  const isChrome = /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor);
-  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-  return isChrome && !isMobile;
-};
-
 // PWA Installation Hook
 const usePWAInstall = () => {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -82,7 +75,7 @@ const IntroductionStep: React.FC<{ onNext: () => void }> = ({ onNext }) => (
         Reigh aims to provide you with the best techniques in the open source AI art ecosystem for both generating anchor images, and travelling between them.
       </p>
       <p className="text-muted-foreground">
-        Our goal is to make the beautiful struggle of creating art that feels truly your own as easy as possible - while also making it accessible to everyone.
+        Our goal is to make the beautiful struggle of creating art that feels truly your own as easy as possible.
       </p>
 
     </div>
@@ -109,13 +102,18 @@ const CommunityStep: React.FC<{ onNext: () => void }> = ({ onNext }) => (
     </DialogHeader>
     
     <div className="text-center space-y-4">
-
+      <p className="text-muted-foreground">
+        We want to make Reigh into a true companion to artists.
+      </p>
       
       <p className="text-muted-foreground">
-        If you want to get good at creating art - or doing anything for that matter - the hardest part is to not give up.
+        If you want to get good at creating art—or doing anything for that matter—the hardest part is not giving up.
       </p>
       <p className="text-muted-foreground">
         Our community will grow to become a place where artists can learn from, support, and inspire each other.
+      </p>
+      <p className="text-muted-foreground">
+        We hope it blossoms into a scene of creative but, most importantly, determined artists who ultimately create remarkable work.
       </p>
 
     </div>
@@ -138,14 +136,6 @@ const CommunityStep: React.FC<{ onNext: () => void }> = ({ onNext }) => (
 // Step 3: PWA Installation (existing logic)
 const PWAInstallStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
   const { canInstall, installPWA } = usePWAInstall();
-  const [showInstructions, setShowInstructions] = useState(false);
-
-  // Check if user is on Chrome desktop - if not, auto-skip this step
-  useEffect(() => {
-    if (!isChromeDesktop()) {
-      onNext();
-    }
-  }, [onNext]);
 
   const handleInstall = async () => {
     const installed = await installPWA();
@@ -153,15 +143,6 @@ const PWAInstallStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
       onNext();
     }
   };
-
-  const handleShowInstructions = () => {
-    setShowInstructions(true);
-  };
-
-  // If not Chrome desktop, don't render anything (will auto-skip)
-  if (!isChromeDesktop()) {
-    return null;
-  }
 
   // Detect platform for better messaging
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
@@ -182,57 +163,40 @@ const PWAInstallStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
         <p className="text-lg font-light">
           Get the best experience by installing Reigh as an app!
         </p>
-        
-        <div className="space-y-3 text-left">
-          <div className="flex items-start space-x-3">
-            <div className="w-2 h-2 bg-green-500 rounded-full mt-2 flex-shrink-0"></div>
-            <span className="text-sm text-muted-foreground">Work offline and access your projects anytime</span>
-          </div>
-          <div className="flex items-start space-x-3">
-            <div className="w-2 h-2 bg-green-500 rounded-full mt-2 flex-shrink-0"></div>
-            <span className="text-sm text-muted-foreground">Faster performance and native app feel</span>
-          </div>
-          <div className="flex items-start space-x-3">
-            <div className="w-2 h-2 bg-green-500 rounded-full mt-2 flex-shrink-0"></div>
-            <span className="text-sm text-muted-foreground">Easy access from your home screen</span>
-          </div>
-        </div>
 
-        {/* Platform-specific instructions */}
-        {!canInstall && (showInstructions || isIOS || isAndroid) && (
-          <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 text-sm">
-            {isIOS && (
-              <>
-                <p className="font-light mb-2">📱 On iOS Safari:</p>
-                <p className="text-muted-foreground">
-                  1. Tap the <strong>Share</strong> button (□↗) at the bottom<br/>
-                  2. Scroll down and select <strong>"Add to Home Screen"</strong><br/>
-                  3. Tap <strong>"Add"</strong> to install
-                </p>
-              </>
-            )}
-            {isAndroid && (
-              <>
-                <p className="font-light mb-2">🤖 On Android:</p>
-                <p className="text-muted-foreground">
-                  1. Look for <strong>"Install"</strong> button in address bar<br/>
-                  2. Or tap browser menu (⋮) → <strong>"Add to Home Screen"</strong><br/>
-                  3. Follow the prompts to install
-                </p>
-              </>
-            )}
-            {!isIOS && !isAndroid && showInstructions && (
-              <>
-                <p className="font-light mb-2">💻 On Chrome Desktop:</p>
-                <p className="text-muted-foreground">
-                  1. Look for the <strong>install icon</strong> (⊞) in Chrome's address bar<br/>
-                  2. Or click the three dots menu → <strong>"Install Reigh..."</strong><br/>
-                  3. Click <strong>"Install"</strong> to add Reigh to your desktop
-                </p>
-              </>
-            )}
-          </div>
-        )}
+        {/* Platform-specific instructions - always shown */}
+        <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 text-sm">
+          {isIOS && (
+            <>
+              <p className="font-light mb-2">📱 On iOS Safari:</p>
+              <p className="text-muted-foreground">
+                1. Tap the <strong>Share</strong> button (□↗) at the bottom<br/>
+                2. Scroll down and select <strong>"Add to Home Screen"</strong><br/>
+                3. Tap <strong>"Add"</strong> to install
+              </p>
+            </>
+          )}
+          {isAndroid && (
+            <>
+              <p className="font-light mb-2">🤖 On Android Chrome:</p>
+              <p className="text-muted-foreground">
+                1. Look for <strong>"Install"</strong> button in address bar<br/>
+                2. Or tap menu (⋮) → <strong>"Install app"</strong><br/>
+                3. Follow the prompts to install
+              </p>
+            </>
+          )}
+          {!isIOS && !isAndroid && (
+            <>
+              <p className="font-light mb-2">💻 On Desktop (Chrome/Edge):</p>
+              <p className="text-muted-foreground">
+                1. Look for install icon in your browser's address bar<br/>
+                2. Or check browser menu → <strong>"Install Reigh"</strong><br/>
+                3. Follow the prompts to install
+              </p>
+            </>
+          )}
+        </div>
       </div>
       
       <div className="flex flex-col space-y-2 pt-4">
@@ -247,30 +211,19 @@ const PWAInstallStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
             </Button>
           </>
         ) : (
-          <>
-            {!showInstructions ? (
-              <Button onClick={handleShowInstructions} className="w-full">
-                <Download className="w-4 h-4 mr-2" />
-                Show Install Instructions
-              </Button>
-            ) : (
-              <Button onClick={onNext} className="w-full">
-                Continue
-              </Button>
-            )}
-            <Button variant="outline" onClick={onNext} className="w-full text-sm">
-              Skip for now
-            </Button>
-          </>
+          <Button onClick={onNext} className="w-full">
+            Continue
+          </Button>
         )}
       </div>
     </>
   );
 };
 
-// Step 4: Generation Method Selection
+// Step 4: Generation Method Selection (Lazy-loaded to improve modal performance)
 const GenerationMethodStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
   // Use database-backed generation preferences (same as SettingsModal)
+  // Only loads when this step is actually rendered, improving initial modal performance
   const { 
     value: generationMethods, 
     update: updateGenerationMethods,
@@ -280,7 +233,7 @@ const GenerationMethodStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
   const onComputerChecked = generationMethods.onComputer;
   const inCloudChecked = generationMethods.inCloud;
 
-  // Show loading state while preferences are being fetched
+  // Show skeleton loading state while preferences are being fetched
   if (isLoadingGenerationMethods) {
     return (
       <>
@@ -289,11 +242,44 @@ const GenerationMethodStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
             <Monitor className="w-8 h-8 text-orange-600 dark:text-orange-400" />
           </div>
           <DialogTitle className="text-2xl font-bold text-center">
-            Loading your preferences...
+            How would you like to generate?
           </DialogTitle>
         </DialogHeader>
-        <div className="text-center py-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600 mx-auto"></div>
+        
+        <div className="space-y-6">
+          {/* Skeleton for description text */}
+          <div className="text-center">
+            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mx-auto w-80"></div>
+            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mx-auto w-48 mt-1"></div>
+          </div>
+
+          {/* Skeleton for toggle switch - matches actual design */}
+          <div className="flex justify-center">
+            <div className="relative inline-flex items-center bg-gray-200 rounded-full p-1 shadow-inner">
+              <div className="flex">
+                {/* In the cloud button skeleton */}
+                <div className="px-6 py-2 rounded-full bg-gray-300 dark:bg-gray-600 animate-pulse">
+                  <div className="h-4 w-24 bg-gray-400 dark:bg-gray-500 rounded"></div>
+                </div>
+                {/* On my computer button skeleton */}
+                <div className="px-6 py-2 rounded-full">
+                  <div className="h-4 w-28 bg-gray-300 dark:bg-gray-600 rounded animate-pulse"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Skeleton for additional info section */}
+          <div className="text-center space-y-3">
+            <div className="p-4 bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse">
+              <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded mx-auto w-64"></div>
+            </div>
+          </div>
+        </div>
+        
+        {/* Skeleton for continue button */}
+        <div className="flex justify-center pt-4">
+          <div className="w-full sm:w-auto h-10 bg-gray-300 dark:bg-gray-600 rounded animate-pulse px-8"></div>
         </div>
       </>
     );
@@ -418,16 +404,11 @@ const CreditsStep: React.FC<{ onNext: () => void }> = ({ onNext }) => (
       </div>
       
       <p className="text-muted-foreground">
-        Your credits are ready to use for cloud generation. If anything isn't working for you, 
-        please let us know in the Discord community!
+      Credits are used for AI generation tasks in the cloud. 
+      You can check your balance anytime in Settings.
       </p>
 
-      <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-4">
-        <p className="text-sm text-muted-foreground">
-          💡 <strong>Tip:</strong> Credits are used for AI generation tasks in the cloud. 
-          You can check your balance anytime in Settings.
-        </p>
-      </div>
+
     </div>
     
     <div className="flex justify-center pt-4">
@@ -457,27 +438,21 @@ const SetupCompleteStep: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           <Check className="w-8 h-8 text-green-600 dark:text-green-400" />
         </div>
         <DialogTitle className="text-2xl font-bold text-center">
-          You're all set! 🎉
+          One more thing...
         </DialogTitle>
       </DialogHeader>
       
       <div className="text-center space-y-4">
-        <p className="text-lg font-light">
-          Ready to start creating amazing art with Reigh
-        </p>
+  
         
         <p className="text-muted-foreground">
-          You can always change your generation preferences, manage credits, 
-          or set up local generation later in the settings.
+          If there's anything that isn't working for you or could be better, please drop into our Discord and leave a message in our #support channel or DM POM.
+        </p>
+        <p className="text-muted-foreground">
+          There's no feedback too big or too small - so please share!
         </p>
 
-        <div className="bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20 rounded-lg p-4">
-          <p className="text-sm text-muted-foreground">
-            🎨 Start by creating a new project<br/>
-            🔧 Fine-tune settings as needed<br/>
-            💬 Join the community for support and inspiration
-          </p>
-        </div>
+
       </div>
       
       <div className="flex flex-col space-y-2 pt-4">
@@ -497,17 +472,26 @@ export const WelcomeBonusModal: React.FC<WelcomeBonusModalProps> = ({
   isOpen,
   onClose,
 }) => {
+  console.log('[WelcomeBonusModal] 🎭 Modal component rendered with props:', { isOpen });
+  
   const [currentStep, setCurrentStep] = useState(1);
 
   // Reset to step 1 when modal opens
   useEffect(() => {
+    console.log('[WelcomeBonusModal] 🔄 isOpen changed:', { isOpen, currentStep });
     if (isOpen) {
+      console.log('[WelcomeBonusModal] ✅ Modal opening, resetting to step 1');
       setCurrentStep(1);
     }
-  }, [isOpen]);
+  }, [isOpen]); // Remove currentStep from dependency array to prevent infinite loop
 
   const handleNext = () => {
-    setCurrentStep(prev => Math.min(prev + 1, 6));
+    console.log('[WelcomeBonusModal] ➡️ handleNext called, current step:', currentStep);
+    setCurrentStep(prev => {
+      const newStep = Math.min(prev + 1, 6);
+      console.log('[WelcomeBonusModal] 📈 Moving from step', prev, 'to step', newStep);
+      return newStep;
+    });
   };
 
   const handleBack = () => {
@@ -519,17 +503,35 @@ export const WelcomeBonusModal: React.FC<WelcomeBonusModalProps> = ({
     onClose();
   };
 
-  const steps = [
-    { component: <IntroductionStep onNext={handleNext} />, title: "Welcome" },
-    { component: <CommunityStep onNext={handleNext} />, title: "Community" },
-    { component: <PWAInstallStep onNext={handleNext} />, title: "Install App" },
-    { component: <GenerationMethodStep onNext={handleNext} />, title: "Generation" },
-    { component: <CreditsStep onNext={handleNext} />, title: "Credits" },
-    { component: <SetupCompleteStep onClose={handleClose} />, title: "Complete" },
-  ];
+  // Render current step component conditionally to avoid calling hooks for unused steps
+  const renderCurrentStep = () => {
+    switch (currentStep) {
+      case 1:
+        return <IntroductionStep onNext={handleNext} />;
+      case 2:
+        return <CommunityStep onNext={handleNext} />;
+      case 3:
+        return <PWAInstallStep onNext={handleNext} />;
+      case 4:
+        return <GenerationMethodStep onNext={handleNext} />;
+      case 5:
+        return <CreditsStep onNext={handleNext} />;
+      case 6:
+        return <SetupCompleteStep onClose={handleClose} />;
+      default:
+        return <IntroductionStep onNext={handleNext} />;
+    }
+  };
 
+  const stepTitles = ["Welcome", "Community", "Install App", "Generation", "Credits", "Complete"];
+
+  console.log('[WelcomeBonusModal] 🎨 Rendering Dialog with:', { isOpen, currentStep });
+  
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      console.log('[WelcomeBonusModal] 📝 Dialog onOpenChange called:', { open });
+      !open && handleClose();
+    }}>
       <DialogContent className="sm:max-w-md">
         {/* Close button */}
         <button
@@ -540,7 +542,7 @@ export const WelcomeBonusModal: React.FC<WelcomeBonusModalProps> = ({
           <span className="sr-only">Close</span>
         </button>
 
-        {steps[currentStep - 1].component}
+        {renderCurrentStep()}
         
         {/* Step indicator and back button container */}
         <div className="relative flex justify-center space-x-2 pt-2 pb-2">
@@ -557,12 +559,12 @@ export const WelcomeBonusModal: React.FC<WelcomeBonusModalProps> = ({
           
           {/* Step indicators */}
           <div className="flex space-x-2">
-            {steps.map((_, index) => (
+            {stepTitles.map((_, index) => (
               <div 
                 key={index}
                 className={`w-2 h-2 rounded-full transition-colors ${
                   currentStep === index + 1 ? 'bg-primary' : 'bg-muted'
-                }`} 
+                }`}
               />
             ))}
           </div>

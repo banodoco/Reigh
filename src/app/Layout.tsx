@@ -16,6 +16,7 @@ import { GlobalProcessingWarning } from '@/shared/components/ProcessingWarnings'
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 import { useWelcomeBonus } from '@/shared/hooks/useWelcomeBonus';
 import { WelcomeBonusModal } from '@/shared/components/WelcomeBonusModal';
+import { useUserUIState } from '@/shared/hooks/useUserUIState';
 import { usePageVisibility } from '@/shared/hooks/usePageVisibility';
 import '@/shared/lib/debugPolling';
 
@@ -108,6 +109,10 @@ const Layout: React.FC = () => {
   // Check for welcome bonus when user is authenticated
   const { showWelcomeModal, closeWelcomeModal } = useWelcomeBonus();
 
+  // Preload user settings to warm the cache for the welcome modal
+  // This prevents loading delays when users reach the generation method step
+  useUserUIState('generationMethods', { onComputer: true, inCloud: true });
+
   // Listen for settings open event from welcome modal
   useEffect(() => {
     const handleOpenSettings = (event: CustomEvent) => {
@@ -195,6 +200,8 @@ const Layout: React.FC = () => {
         creditsTab={settingsCreditsTab}
       />
 
+
+      {/* Welcome Bonus Modal */}
       <WelcomeBonusModal
         isOpen={showWelcomeModal}
         onClose={closeWelcomeModal}
