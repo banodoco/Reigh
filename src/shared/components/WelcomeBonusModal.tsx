@@ -5,6 +5,8 @@ import { Gift, Sparkles, Smartphone, Download, ChevronRight, X, ChevronLeft, Pal
 
 import usePersistentState from '@/shared/hooks/usePersistentState';
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
+import { useMediumModal } from '@/shared/hooks/useModal';
+import { useScrollFade } from '@/shared/hooks/useScrollFade';
 
 interface WelcomeBonusModalProps {
   isOpen: boolean;
@@ -57,7 +59,7 @@ const usePWAInstall = () => {
 // Step 1: Introduction to Reigh
 const IntroductionStep: React.FC<{ onNext: () => void }> = ({ onNext }) => (
   <>
-    <DialogHeader className="text-center space-y-4">
+    <DialogHeader className="text-center space-y-4 mb-6">
       <div className="mx-auto w-16 h-16 bg-gradient-to-br from-purple-100 to-pink-100 dark:from-purple-900/20 dark:to-pink-900/20 rounded-full flex items-center justify-center">
         <Palette className="w-8 h-8 text-purple-600 dark:text-purple-400" />
       </div>
@@ -80,7 +82,7 @@ const IntroductionStep: React.FC<{ onNext: () => void }> = ({ onNext }) => (
 
     </div>
     
-    <div className="flex justify-center pt-4">
+    <div className="flex justify-center pt-5 pb-2">
       <Button onClick={onNext} className="w-full sm:w-auto">
         Let's get started
         <ChevronRight className="w-4 h-4 ml-2" />
@@ -92,7 +94,7 @@ const IntroductionStep: React.FC<{ onNext: () => void }> = ({ onNext }) => (
 // Step 2: Community
 const CommunityStep: React.FC<{ onNext: () => void }> = ({ onNext }) => (
   <>
-    <DialogHeader className="text-center space-y-4">
+    <DialogHeader className="text-center space-y-4 mb-6">
       <div className="mx-auto w-16 h-16 bg-blue-100 dark:bg-blue-900/20 rounded-full flex items-center justify-center">
         <Users className="w-8 h-8 text-blue-600 dark:text-blue-400" />
       </div>
@@ -102,10 +104,6 @@ const CommunityStep: React.FC<{ onNext: () => void }> = ({ onNext }) => (
     </DialogHeader>
     
     <div className="text-center space-y-4">
-      <p className="text-muted-foreground">
-        We want to make Reigh into a true companion to artists.
-      </p>
-      
       <p className="text-muted-foreground">
         If you want to get good at creating art—or doing anything for that matter—the hardest part is not giving up.
       </p>
@@ -118,7 +116,7 @@ const CommunityStep: React.FC<{ onNext: () => void }> = ({ onNext }) => (
 
     </div>
     
-    <div className="flex flex-col space-y-2 pt-4">
+    <div className="flex flex-col space-y-2 pt-5 pb-2">
       <Button 
         onClick={() => window.open('https://discord.gg/D5K2c6kfhy', '_blank')}
         className="w-full"
@@ -150,7 +148,7 @@ const PWAInstallStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
 
   return (
     <>
-      <DialogHeader className="text-center space-y-4">
+      <DialogHeader className="text-center space-y-4 mb-6">
         <div className="mx-auto w-16 h-16 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center">
           <Smartphone className="w-8 h-8 text-green-600 dark:text-green-400" />
         </div>
@@ -170,7 +168,7 @@ const PWAInstallStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
             <>
               <p className="font-light mb-2">📱 On iOS Safari:</p>
               <p className="text-muted-foreground">
-                1. Tap the <strong>Share</strong> button (□↗) at the bottom<br/>
+                1. Tap the <strong>Share</strong> button (square with arrow) at the bottom<br/>
                 2. Scroll down and select <strong>"Add to Home Screen"</strong><br/>
                 3. Tap <strong>"Add"</strong> to install
               </p>
@@ -199,7 +197,7 @@ const PWAInstallStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
         </div>
       </div>
       
-      <div className="flex flex-col space-y-2 pt-4">
+      <div className="flex flex-col space-y-2 pt-5 pb-2">
         {canInstall ? (
           <>
             <Button onClick={handleInstall} className="w-full">
@@ -237,7 +235,7 @@ const GenerationMethodStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
   if (isLoadingGenerationMethods) {
     return (
       <>
-        <DialogHeader className="text-center space-y-4">
+        <DialogHeader className="text-center space-y-4 mb-6">
           <div className="mx-auto w-16 h-16 bg-orange-100 dark:bg-orange-900/20 rounded-full flex items-center justify-center">
             <Monitor className="w-8 h-8 text-orange-600 dark:text-orange-400" />
           </div>
@@ -254,15 +252,15 @@ const GenerationMethodStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
           </div>
 
           {/* Skeleton for toggle switch - matches actual design */}
-          <div className="flex justify-center">
-            <div className="relative inline-flex items-center bg-gray-200 rounded-full p-1 shadow-inner">
+          <div className="flex justify-center px-4">
+            <div className="relative inline-flex items-center bg-gray-200 rounded-full p-1 shadow-inner min-w-fit">
               <div className="flex">
                 {/* In the cloud button skeleton */}
-                <div className="px-6 py-2 rounded-full bg-gray-300 dark:bg-gray-600 animate-pulse">
+                <div className="px-4 py-2 rounded-full bg-gray-300 dark:bg-gray-600 animate-pulse">
                   <div className="h-4 w-24 bg-gray-400 dark:bg-gray-500 rounded"></div>
                 </div>
                 {/* On my computer button skeleton */}
-                <div className="px-6 py-2 rounded-full">
+                <div className="px-4 py-2 rounded-full">
                   <div className="h-4 w-28 bg-gray-300 dark:bg-gray-600 rounded animate-pulse"></div>
                 </div>
               </div>
@@ -278,7 +276,7 @@ const GenerationMethodStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
         </div>
         
         {/* Skeleton for continue button */}
-        <div className="flex justify-center pt-4">
+        <div className="flex justify-center pt-5 pb-2">
           <div className="w-full sm:w-auto h-10 bg-gray-300 dark:bg-gray-600 rounded animate-pulse px-8"></div>
         </div>
       </>
@@ -287,7 +285,7 @@ const GenerationMethodStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
 
   return (
     <>
-      <DialogHeader className="text-center space-y-4">
+      <DialogHeader className="text-center space-y-4 mb-6">
         <div className="mx-auto w-16 h-16 bg-orange-100 dark:bg-orange-900/20 rounded-full flex items-center justify-center">
           <Monitor className="w-8 h-8 text-orange-600 dark:text-orange-400" />
         </div>
@@ -301,17 +299,17 @@ const GenerationMethodStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
           Choose where you'd like to run AI generation. You can change this later in settings.
         </p>
 
-        <div className="flex justify-center">
-          <div className="relative inline-flex items-center bg-gray-200 rounded-full p-1 shadow-inner">
+        <div className="flex justify-center px-4">
+          <div className="relative inline-flex items-center bg-gray-200 rounded-full p-1 shadow-inner min-w-fit">
             {/* Toggle track */}
             <div className="flex">
               {/* In the cloud button */}
               <button
                 onClick={() => updateGenerationMethods({ inCloud: true, onComputer: false })}
-                className={`px-6 py-2 font-light rounded-full transition-all duration-200 whitespace-nowrap ${
+                className={`px-4 py-2 font-light rounded-full transition-all duration-200 whitespace-nowrap text-sm ${
                   inCloudChecked && !onComputerChecked
-                    ? 'bg-white text-blue-600 shadow-sm text-base'
-                    : 'text-gray-600 hover:text-gray-800 text-sm'
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-800'
                 }`}
               >
                 In the cloud ☁️
@@ -320,10 +318,10 @@ const GenerationMethodStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
               {/* On my computer button */}
               <button
                 onClick={() => updateGenerationMethods({ onComputer: true, inCloud: false })}
-                className={`px-6 py-2 font-light rounded-full transition-all duration-200 whitespace-nowrap ${
+                className={`px-4 py-2 font-light rounded-full transition-all duration-200 whitespace-nowrap text-sm ${
                   onComputerChecked && !inCloudChecked
-                    ? 'bg-white text-green-600 shadow-sm text-base'
-                    : 'text-gray-600 hover:text-gray-800 text-sm'
+                    ? 'bg-white text-green-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-800'
                 }`}
               >
                 On my computer 💻
@@ -370,7 +368,7 @@ const GenerationMethodStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
         )}
       </div>
       
-      <div className="flex justify-center pt-4">
+      <div className="flex justify-center pt-5 pb-2">
         <Button 
           onClick={onNext} 
           disabled={!onComputerChecked && !inCloudChecked}
@@ -387,7 +385,7 @@ const GenerationMethodStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
 // Step 5: Credits Welcome (moved from step 1)
 const CreditsStep: React.FC<{ onNext: () => void }> = ({ onNext }) => (
   <>
-    <DialogHeader className="text-center space-y-4">
+    <DialogHeader className="text-center space-y-4 mb-6">
       <div className="mx-auto w-16 h-16 bg-yellow-100 dark:bg-yellow-900/20 rounded-full flex items-center justify-center">
         <Coins className="w-8 h-8 text-yellow-600 dark:text-yellow-400" />
       </div>
@@ -411,7 +409,7 @@ const CreditsStep: React.FC<{ onNext: () => void }> = ({ onNext }) => (
 
     </div>
     
-    <div className="flex justify-center pt-4">
+    <div className="flex justify-center pt-5 pb-2">
       <Button onClick={onNext} className="w-full sm:w-auto">
         Awesome!
         <ChevronRight className="w-4 h-4 ml-2" />
@@ -433,7 +431,7 @@ const SetupCompleteStep: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
   return (
     <>
-      <DialogHeader className="text-center space-y-4">
+      <DialogHeader className="text-center space-y-4 mb-6">
         <div className="mx-auto w-16 h-16 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center">
           <Check className="w-8 h-8 text-green-600 dark:text-green-400" />
         </div>
@@ -455,7 +453,7 @@ const SetupCompleteStep: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
       </div>
       
-      <div className="flex flex-col space-y-2 pt-4">
+      <div className="flex flex-col space-y-2 pt-5 pb-2">
         <Button onClick={handleOpenSettings} className="w-full">
           <Settings className="w-4 h-4 mr-2" />
           Open Settings to Get Set Up
@@ -472,26 +470,19 @@ export const WelcomeBonusModal: React.FC<WelcomeBonusModalProps> = ({
   isOpen,
   onClose,
 }) => {
-  console.log('[WelcomeBonusModal] 🎭 Modal component rendered with props:', { isOpen });
-  
   const [currentStep, setCurrentStep] = useState(1);
+  const modal = useMediumModal();
+  const { showFade, scrollRef } = useScrollFade({ isOpen });
 
   // Reset to step 1 when modal opens
   useEffect(() => {
-    console.log('[WelcomeBonusModal] 🔄 isOpen changed:', { isOpen, currentStep });
     if (isOpen) {
-      console.log('[WelcomeBonusModal] ✅ Modal opening, resetting to step 1');
       setCurrentStep(1);
     }
-  }, [isOpen]); // Remove currentStep from dependency array to prevent infinite loop
+  }, [isOpen]);
 
   const handleNext = () => {
-    console.log('[WelcomeBonusModal] ➡️ handleNext called, current step:', currentStep);
-    setCurrentStep(prev => {
-      const newStep = Math.min(prev + 1, 6);
-      console.log('[WelcomeBonusModal] 📈 Moving from step', prev, 'to step', newStep);
-      return newStep;
-    });
+    setCurrentStep(prev => Math.min(prev + 1, 6));
   };
 
   const handleBack = () => {
@@ -499,7 +490,7 @@ export const WelcomeBonusModal: React.FC<WelcomeBonusModalProps> = ({
   };
 
   const handleClose = () => {
-    setCurrentStep(1); // Reset for next time
+    setCurrentStep(1);
     onClose();
   };
 
@@ -524,48 +515,66 @@ export const WelcomeBonusModal: React.FC<WelcomeBonusModalProps> = ({
   };
 
   const stepTitles = ["Welcome", "Community", "Install App", "Generation", "Credits", "Complete"];
-
-  console.log('[WelcomeBonusModal] 🎨 Rendering Dialog with:', { isOpen, currentStep });
   
   return (
     <Dialog open={isOpen} onOpenChange={() => {
       // Prevent closing by clicking outside - users must complete the onboarding flow
     }}>
-      <DialogContent className="sm:max-w-md">
-        {/* Close button */}
-        <button
-          onClick={handleClose}
-          className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"
-        >
-          <X className="h-4 w-4" />
-          <span className="sr-only">Close</span>
-        </button>
+      <DialogContent 
+        className={modal.className}
+        style={modal.style}
+        {...modal.props}
+      >
+        <div className={modal.headerClass}>
+          {/* Close button */}
+          <button
+            onClick={handleClose}
+            className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"
+          >
+            <X className="h-4 w-4" />
+            <span className="sr-only">Close</span>
+          </button>
+        </div>
 
-        {renderCurrentStep()}
+        <div ref={scrollRef} className={modal.scrollClass}>
+          {renderCurrentStep()}
+        </div>
         
-        {/* Step indicator and back button container */}
-        <div className="relative flex justify-center space-x-2 pt-2 pb-2">
-          {/* Back button - only show after step 1 */}
-          {currentStep > 1 && (
-            <button
-              onClick={handleBack}
-              className="absolute left-0 top-1/2 -translate-y-1/2 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 flex items-center space-x-1 text-sm text-muted-foreground hover:text-foreground"
+        <div className={`${modal.footerClass} relative`}>
+          {/* Fade overlay */}
+          {showFade && (
+            <div 
+              className="absolute top-0 left-0 right-0 h-16 pointer-events-none z-10"
+              style={{ transform: 'translateY(-64px)' }}
             >
-              <ChevronLeft className="h-4 w-4" />
-              <span>Back</span>
-            </button>
+              <div className="h-full bg-gradient-to-t from-white via-white/95 to-transparent dark:from-gray-950 dark:via-gray-950/95 dark:to-transparent" />
+            </div>
           )}
-          
-          {/* Step indicators */}
-          <div className="flex space-x-2">
-            {stepTitles.map((_, index) => (
-              <div 
-                key={index}
-                className={`w-2 h-2 rounded-full transition-colors ${
-                  currentStep === index + 1 ? 'bg-primary' : 'bg-muted'
-                }`}
-              />
-            ))}
+
+          {/* Step indicator and back button container */}
+          <div className="relative flex justify-center space-x-2 pt-6 pb-2 border-t relative z-20">
+            {/* Back button - only show after step 1 */}
+            {currentStep > 1 && (
+              <button
+                onClick={handleBack}
+                className="absolute left-0 top-1/2 -translate-y-1/4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 flex items-center space-x-1 text-sm text-muted-foreground hover:text-foreground"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                <span>Back</span>
+              </button>
+            )}
+            
+            {/* Step indicators */}
+            <div className="flex space-x-2">
+              {stepTitles.map((_, index) => (
+                <div 
+                  key={index}
+                  className={`w-2 h-2 rounded-full transition-colors ${
+                    currentStep === index + 1 ? 'bg-primary' : 'bg-muted'
+                  }`}
+                />
+              ))}
+            </div>
           </div>
         </div>
       </DialogContent>
