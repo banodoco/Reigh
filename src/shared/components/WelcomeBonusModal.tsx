@@ -528,9 +528,8 @@ export const WelcomeBonusModal: React.FC<WelcomeBonusModalProps> = ({
   console.log('[WelcomeBonusModal] 🎨 Rendering Dialog with:', { isOpen, currentStep });
   
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => {
-      console.log('[WelcomeBonusModal] 📝 Dialog onOpenChange called:', { open });
-      !open && handleClose();
+    <Dialog open={isOpen} onOpenChange={() => {
+      // Prevent closing by clicking outside - users must complete the onboarding flow
     }}>
       <DialogContent className="sm:max-w-md">
         {/* Close button */}
