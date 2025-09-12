@@ -136,7 +136,7 @@ serve(async (req) => {
       // Aggregated counts and per-user breakdown for service role
       // queued_only = count(include_active=false)
       // queued_plus_active = count(include_active=true)
-      // active_only = diff (cloud-claimed, orchestrators excluded per migration)
+      // active_only = diff (eligibility-aware)
       console.log(`${pathTag} [TaskCounts:CountDebug] Starting count computations`);
       const [countQueuedOnly, countQueuedPlusActive] = await Promise.all([
         supabaseAdmin.rpc('count_eligible_tasks_service_role', { p_include_active: false, p_run_type: runType }),
@@ -156,42 +156,8 @@ serve(async (req) => {
       const queued_plus_active = countQueuedPlusActive.data ?? 0;
       
       console.log(`${pathTag} Count results - queued_only: ${queued_only}, queued_plus_active: ${queued_plus_active}`);
-      // Compute active_only directly from cloud In Progress tasks (exclude orchestrators)
-      let active_only = 0;
-      try {
-        let query = supabaseAdmin
-          .from('tasks')
-          .select('id', { count: 'exact', head: true })
-          .eq('status', 'In Progress')
-          .not('worker_id', 'is', null)
-          .not('task_type', 'ilike', '%orchestrator%');
-        
-        // Apply run_type filter if specified
-        if (runType) {
-          // We need to filter by tasks that match the run_type
-          // Since we can't join directly in the count query, we'll use a subquery approach
-          const { data: taskTypesForRunType } = await supabaseAdmin
-            .from('task_types')
-            .select('name')
-            .eq('run_type', runType)
-            .eq('is_active', true);
-          
-          if (taskTypesForRunType && taskTypesForRunType.length > 0) {
-            const taskTypeNames = taskTypesForRunType.map(tt => tt.name);
-            query = query.in('task_type', taskTypeNames);
-          } else {
-            // No task types for this run_type, so 0 tasks
-            active_only = 0;
-            throw new Error(`No active task types found for run_type: ${runType}`);
-          }
-        }
-        
-        const { count: activeCloudNonOrchestrator } = await query;
-        active_only = activeCloudNonOrchestrator ?? 0;
-      } catch (e) {
-        console.log(`${pathTag} [TaskCounts:CountDebug] Failed to compute active_only directly, falling back to diff method:`, (e as any)?.message);
-        active_only = Math.max(0, queued_plus_active - queued_only);
-      }
+      // Compute active_only from eligibility-aware counts for consistency
+      const active_only = Math.max(0, queued_plus_active - queued_only);
       console.log(`${pathTag} [TaskCounts:CountDebug] Service-role totals: queued_only=${queued_only}, active_only=${active_only}, queued_plus_active=${queued_plus_active}`);
 
       // Per-user breakdown (cloud-claimed active only in function; may include orchestrators)
