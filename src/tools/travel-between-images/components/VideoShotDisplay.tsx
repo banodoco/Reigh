@@ -173,6 +173,18 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
   // Click ripple effect
   const { triggerRipple, rippleStyles, isRippleActive } = useClickRipple();
   
+  // Handle ripple trigger with button detection
+  const handleRippleTrigger = (e: React.PointerEvent) => {
+    // Check if the click target or any parent is a button or has button-like behavior
+    const target = e.target as HTMLElement;
+    const isButton = target.closest('button, [role="button"], input');
+    
+    // Only trigger ripple if not clicking on a button
+    if (!isButton) {
+      triggerRipple(e);
+    }
+  };
+  
   const [isEditingName, setIsEditingName] = useState(false);
   const [editableName, setEditableName] = useState(shot.name);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -321,7 +333,7 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
         key={shot.id} 
         className={`click-ripple group min-h-48 p-4 border rounded-lg bg-card/50 hover:bg-card/80 hover:shadow-wes-hover hover:scale-[1.02] transition-all duration-300 relative cursor-pointer flex flex-col ${isRippleActive ? 'ripple-active' : ''}`}
         style={rippleStyles}
-        onPointerDown={triggerRipple}
+        onPointerDown={handleRippleTrigger}
         onClick={onSelectShot}
       >
         <div className="flex justify-between items-start mb-3">
