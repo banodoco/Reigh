@@ -145,6 +145,7 @@ const PWAInstallStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
   // Detect platform for better messaging
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
   const isAndroid = /Android/.test(navigator.userAgent);
+  const isChromeOnIOS = isIOS && /CriOS/.test(navigator.userAgent);
 
   return (
     <>
@@ -164,7 +165,18 @@ const PWAInstallStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
 
         {/* Platform-specific instructions - always shown */}
         <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 text-sm">
-          {isIOS && (
+          {isChromeOnIOS && (
+            <>
+              <p className="font-light mb-2">📱 On iPhone Chrome:</p>
+              <p className="text-muted-foreground">
+                1. <strong>Switch to Safari</strong> - copy this URL and open in Safari<br/>
+                2. Tap the <strong>Share</strong> button (square with arrow) at the bottom<br/>
+                3. Scroll down and select <strong>"Add to Home Screen"</strong><br/>
+                4. Tap <strong>"Add"</strong> to install
+              </p>
+            </>
+          )}
+          {isIOS && !isChromeOnIOS && (
             <>
               <p className="font-light mb-2">📱 On iOS Safari:</p>
               <p className="text-muted-foreground">
@@ -176,11 +188,11 @@ const PWAInstallStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
           )}
           {isAndroid && (
             <>
-              <p className="font-light mb-2">🤖 On Android Chrome:</p>
+              <p className="font-light mb-2">🤖 On Android:</p>
               <p className="text-muted-foreground">
-                1. Look for <strong>"Install"</strong> button in address bar<br/>
-                2. Or tap menu (⋮) → <strong>"Install app"</strong><br/>
-                3. Follow the prompts to install
+                1. Look for <strong>"Install"</strong> button in the address bar<br/>
+                2. Or tap the three-dot menu (⋮) → <strong>"Add to Home screen"</strong><br/>
+                3. Tap <strong>"Add"</strong> to confirm installation
               </p>
             </>
           )}
