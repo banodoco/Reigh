@@ -11,6 +11,13 @@ interface WelcomeBonusModalProps {
   onClose: () => void;
 }
 
+// Function to detect Chrome desktop
+const isChromeDesktop = () => {
+  const isChrome = /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor);
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  return isChrome && !isMobile;
+};
+
 // PWA Installation Hook
 const usePWAInstall = () => {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -62,27 +69,22 @@ const IntroductionStep: React.FC<{ onNext: () => void }> = ({ onNext }) => (
         <Palette className="w-8 h-8 text-purple-600 dark:text-purple-400" />
       </div>
       <DialogTitle className="text-2xl font-bold text-center">
-        Welcome to Reigh! 🎨
+        Welcome to Reigh!
       </DialogTitle>
     </DialogHeader>
     
     <div className="text-center space-y-4">
-      <p className="text-lg font-light">
-        Reigh is a tool to help <em>you</em> make art with AI
-      </p>
-      
+
       <p className="text-muted-foreground">
-        We want to make the struggle of creating art that feels truly your own as easy as possible. 
-        Let's get you set up with everything you need to start creating.
+        We believe that combining image anchoring with additional control mechanisms can allow artists to steer AI video with unparalleled precision.
+      </p>
+      <p className="text-muted-foreground">
+        Reigh aims to provide you with the best techniques in the open source AI art ecosystem for both generating anchor images, and travelling between them.
+      </p>
+      <p className="text-muted-foreground">
+        Our goal is to make the beautiful struggle of creating art that feels truly your own as easy as possible - while also making it accessible to everyone.
       </p>
 
-      <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-lg p-4">
-        <p className="text-sm text-muted-foreground">
-          ✨ Create image-guided videos<br/>
-          🎯 Full creative control<br/>
-          🚀 Generate locally or in the cloud
-        </p>
-      </div>
     </div>
     
     <div className="flex justify-center pt-4">
@@ -107,29 +109,15 @@ const CommunityStep: React.FC<{ onNext: () => void }> = ({ onNext }) => (
     </DialogHeader>
     
     <div className="text-center space-y-4">
-      <p className="text-lg font-light">
-        Creating art that feels like you made it is hard
-      </p>
+
       
       <p className="text-muted-foreground">
-        Being part of a community will help you not give up. Get inspiration, share your work, 
-        and learn from other artists exploring this new medium.
+        If you want to get good at creating art - or doing anything for that matter - the hardest part is to not give up.
+      </p>
+      <p className="text-muted-foreground">
+        Our community will grow to become a place where artists can learn from, support, and inspire each other.
       </p>
 
-      <div className="space-y-3 text-left">
-        <div className="flex items-start space-x-3">
-          <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
-          <span className="text-sm text-muted-foreground">Get help and troubleshooting support</span>
-        </div>
-        <div className="flex items-start space-x-3">
-          <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
-          <span className="text-sm text-muted-foreground">Share your creations and get feedback</span>
-        </div>
-        <div className="flex items-start space-x-3">
-          <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
-          <span className="text-sm text-muted-foreground">Learn new techniques and workflows</span>
-        </div>
-      </div>
     </div>
     
     <div className="flex flex-col space-y-2 pt-4">
@@ -152,6 +140,13 @@ const PWAInstallStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
   const { canInstall, installPWA } = usePWAInstall();
   const [showInstructions, setShowInstructions] = useState(false);
 
+  // Check if user is on Chrome desktop - if not, auto-skip this step
+  useEffect(() => {
+    if (!isChromeDesktop()) {
+      onNext();
+    }
+  }, [onNext]);
+
   const handleInstall = async () => {
     const installed = await installPWA();
     if (installed) {
@@ -162,6 +157,11 @@ const PWAInstallStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
   const handleShowInstructions = () => {
     setShowInstructions(true);
   };
+
+  // If not Chrome desktop, don't render anything (will auto-skip)
+  if (!isChromeDesktop()) {
+    return null;
+  }
 
   // Detect platform for better messaging
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
@@ -223,11 +223,11 @@ const PWAInstallStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
             )}
             {!isIOS && !isAndroid && showInstructions && (
               <>
-                <p className="font-light mb-2">💻 On Desktop:</p>
+                <p className="font-light mb-2">💻 On Chrome Desktop:</p>
                 <p className="text-muted-foreground">
-                  1. Press <strong>Ctrl+D</strong> (or <strong>Cmd+D</strong> on Mac) to bookmark<br/>
-                  2. Or look for install icon in your browser's address bar<br/>
-                  3. Check browser menu for "Install" or "Add to Home Screen"
+                  1. Look for the <strong>install icon</strong> (⊞) in Chrome's address bar<br/>
+                  2. Or click the three dots menu → <strong>"Install Reigh..."</strong><br/>
+                  3. Click <strong>"Install"</strong> to add Reigh to your desktop
                 </p>
               </>
             )}

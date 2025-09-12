@@ -1161,7 +1161,7 @@ export default function HomePage() {
 
               {/* Style Toggle */}
               <div className="mt-6 mb-8">
-                <div className="flex justify-center gap-2">
+                <div className="flex flex-wrap sm:flex-nowrap justify-center gap-2">
                   {Object.keys(exampleStyles).map((style) => (
                     <button
                       key={style}
