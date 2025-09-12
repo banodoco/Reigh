@@ -16,6 +16,7 @@ import { PaletteIcon } from '@/shared/components/PaletteIcon';
 import { WesAndersonBackground } from '@/shared/components/WesAndersonBackground';
 import { ReighLoading } from '@/shared/components/ReighLoading';
 import { ProfitSplitBar } from '@/shared/components/ProfitSplitBar';
+import { useScrollFade } from '@/shared/hooks/useScrollFade';
 
 
 
@@ -181,6 +182,16 @@ export default function HomePage() {
   const examplesContentRef = useRef<HTMLDivElement | null>(null);
   const creativeContentRef = useRef<HTMLDivElement | null>(null);
   const philosophyContentRef = useRef<HTMLDivElement | null>(null);
+
+  // Scroll fade effects for side panes
+  const creativeScrollFade = useScrollFade({ 
+    isOpen: showCreativePartner,
+    debug: false 
+  });
+  const philosophyScrollFade = useScrollFade({ 
+    isOpen: showPhilosophy,
+    debug: false 
+  });
 
   // Helper to reset pane scroll after close animation (300ms)
   const resetPaneScroll = (ref: React.RefObject<HTMLDivElement>) => {
@@ -814,10 +825,10 @@ export default function HomePage() {
         )}
 
         {/* Creative Partner Programme Side Pane */}
-        <div className={`fixed top-0 left-0 h-full w-5/6 max-w-[30rem] sm:w-[30rem] bg-white shadow-2xl z-[70] transform transition-transform duration-300 ease-in-out overflow-visible ${
+        <div className={`fixed top-0 left-0 h-full w-5/6 max-w-[30rem] sm:w-[30rem] bg-white shadow-2xl z-[70] transform transition-transform duration-300 ease-in-out overflow-visible flex flex-col ${
           showCreativePartner ? 'translate-x-0' : '-translate-x-full'
         }`}>
-          <div ref={creativeContentRef} className="px-4 sm:px-8 pt-2 sm:pt-4 pb-4 sm:pb-8 h-full overflow-y-auto overflow-x-visible">
+          <div ref={creativeScrollFade.scrollRef} className="px-4 sm:px-8 pt-2 sm:pt-4 pb-4 sm:pb-8 flex-1 overflow-y-auto overflow-x-visible min-h-0">
             {/* Close Button */}
             <button
               onClick={() => {
@@ -1028,13 +1039,22 @@ export default function HomePage() {
               </div>
             </div>
           </div>
+          
+          {/* Fade overlay for Creative Partner pane */}
+          {creativeScrollFade.showFade && (
+            <div 
+              className="absolute bottom-0 left-0 right-0 h-16 pointer-events-none z-10"
+            >
+              <div className="h-full bg-gradient-to-t from-white via-white/95 to-transparent" />
+            </div>
+          )}
         </div>
 
         {/* Philosophy Side Pane */}
-        <div className={`fixed top-0 right-0 h-full w-5/6 max-w-[30rem] sm:w-[30rem] bg-white shadow-2xl z-[60] transform transition-transform duration-300 ease-in-out overflow-visible ${
+        <div className={`fixed top-0 right-0 h-full w-5/6 max-w-[30rem] sm:w-[30rem] bg-white shadow-2xl z-[60] transform transition-transform duration-300 ease-in-out overflow-visible flex flex-col ${
           showPhilosophy ? 'translate-x-0' : 'translate-x-full'
         }`}>
-          <div ref={philosophyContentRef} className="px-4 sm:px-8 pt-2 sm:pt-4 pb-4 sm:pb-8 h-full overflow-y-auto overflow-x-visible">
+          <div ref={philosophyScrollFade.scrollRef} className="px-4 sm:px-8 pt-2 sm:pt-4 pb-4 sm:pb-8 flex-1 overflow-y-auto overflow-x-visible min-h-0">
             {/* Close Button */}
             <button
               onClick={() => {
@@ -1284,6 +1304,15 @@ export default function HomePage() {
               </div>
             </div>
           </div>
+          
+          {/* Fade overlay for Philosophy pane */}
+          {philosophyScrollFade.showFade && (
+            <div 
+              className="absolute bottom-0 left-0 right-0 h-16 pointer-events-none z-10"
+            >
+              <div className="h-full bg-gradient-to-t from-white via-white/95 to-transparent" />
+            </div>
+          )}
         </div>
 
         {/* Examples Bottom Pane */}
