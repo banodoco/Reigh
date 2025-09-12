@@ -46,7 +46,12 @@ BEGIN
       u.credits,
       COALESCE((u.settings->'ui'->'generationMethods'->>'inCloud')::boolean, true) AS allows_cloud,
       -- Count all in-progress tasks for concurrency checks (cloud/local both count toward the 5-task cap)
-      COUNT(CASE WHEN t.status = 'In Progress' THEN 1 END) AS in_progress_count,
+      -- BUT exclude orchestrator tasks from capacity calculations
+      COUNT(CASE 
+        WHEN t.status = 'In Progress' 
+          AND COALESCE(t.task_type, '') NOT ILIKE '%orchestrator%'
+        THEN 1 
+      END) AS in_progress_count,
       -- Count ready queued tasks with dependency resolved and optional run_type filter
       COUNT(CASE 
         WHEN t.status = 'Queued'
@@ -64,7 +69,11 @@ BEGIN
     WHERE u.credits > 0
       AND COALESCE((u.settings->'ui'->'generationMethods'->>'inCloud')::boolean, true) = true
     GROUP BY u.id, u.credits, u.settings
-    HAVING COALESCE(COUNT(CASE WHEN t.status = 'In Progress' THEN 1 END), 0) < 5
+    HAVING COALESCE(COUNT(CASE 
+      WHEN t.status = 'In Progress' 
+        AND COALESCE(t.task_type, '') NOT ILIKE '%orchestrator%'
+      THEN 1 
+    END), 0) < 5
   )
   SELECT COALESCE(SUM(
     CASE 
@@ -83,7 +92,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.count_eligible_tasks_service_role(BOOLEAN, TEXT) IS
-'Returns capacity-limited task counts across eligible users; respects run_type and dependency resolution. include_active=true counts current in-progress toward capacity.';
+'Returns capacity-limited task counts across eligible users; respects run_type and dependency resolution. Excludes orchestrator tasks from In Progress counts for capacity calculations. include_active=true counts current in-progress toward capacity.';
 
 -- =============================================================================
 -- count_eligible_tasks_user(p_user_id, p_include_active, p_run_type)
@@ -105,10 +114,15 @@ DECLARE
   v_capacity INTEGER;
 BEGIN
   -- Aggregate per-user eligibility and counts
+  -- Exclude orchestrator tasks from In Progress counts for capacity calculations
   SELECT 
     COALESCE((u.settings->'ui'->'generationMethods'->>'onComputer')::boolean, true) AS allows_local,
     u.credits,
-    COUNT(CASE WHEN t.status = 'In Progress' THEN 1 END) AS in_progress_count,
+    COUNT(CASE 
+      WHEN t.status = 'In Progress' 
+        AND COALESCE(t.task_type, '') NOT ILIKE '%orchestrator%'
+      THEN 1 
+    END) AS in_progress_count,
     COUNT(CASE 
       WHEN t.status = 'Queued'
         AND (t.dependant_on IS NULL OR dep.status = 'Complete')
@@ -126,7 +140,7 @@ BEGIN
   WHERE u.id = p_user_id
   GROUP BY u.id, u.settings, u.credits;
 
-  -- Eligibility checks
+  -- Eligibility checks (using non-orchestrator In Progress count)
   IF NOT v_allows_local OR v_user_credits <= 0 OR COALESCE(v_in_progress_count, 0) >= 5 THEN
     RETURN 0;
   END IF;
@@ -143,6 +157,6 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.count_eligible_tasks_user(UUID, BOOLEAN, TEXT) IS
-'Returns capacity-limited task counts for a user; respects run_type and dependency resolution. include_active=true counts current in-progress toward capacity.';
+'Returns capacity-limited task counts for a user; respects run_type and dependency resolution. Excludes orchestrator tasks from In Progress counts for capacity calculations. include_active=true counts current in-progress toward capacity.';
 
 

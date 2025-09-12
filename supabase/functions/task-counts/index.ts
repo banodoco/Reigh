@@ -197,36 +197,14 @@ serve(async (req) => {
         }
       }
 
-      // Additional debugging data - filter by run_type if specified
-      let globalStatsQuery = supabaseAdmin
-        .from('tasks')
-        .select('status, task_type, worker_id, created_at')
-        .in('status', ['Queued', 'In Progress'])
-        .order('created_at', { ascending: false })
-        .limit(20);
-
-      // Apply run_type filter if specified
-      if (runType) {
-        const { data: taskTypesForRunType } = await supabaseAdmin
-          .from('task_types')
-          .select('name')
-          .eq('run_type', runType)
-          .eq('is_active', true);
-        
-        if (taskTypesForRunType && taskTypesForRunType.length > 0) {
-          const taskTypeNames = taskTypesForRunType.map(tt => tt.name);
-          globalStatsQuery = globalStatsQuery.in('task_type', taskTypeNames);
-        }
-      }
-
-      const { data: globalStats } = await globalStatsQuery;
-
+      // Use function-based counts instead of direct database queries
+      // This ensures consistency with our orchestrator exclusion logic
       const taskBreakdown = {
-        queued_total: (globalStats || []).filter(t => t.status === 'Queued').length,
-        in_progress_total: (globalStats || []).filter(t => t.status === 'In Progress').length,
-        in_progress_cloud: (globalStats || []).filter(t => t.status === 'In Progress' && t.worker_id).length,
-        in_progress_local: (globalStats || []).filter(t => t.status === 'In Progress' && !t.worker_id).length,
-        orchestrator_tasks: (globalStats || []).filter(t => t.task_type?.toLowerCase().includes('orchestrator')).length
+        queued_total: queued_only,
+        in_progress_total: active_only,
+        in_progress_cloud: active_only, // All active tasks from our function are cloud-claimed
+        in_progress_local: 0, // Our service role function only counts cloud tasks
+        orchestrator_tasks: 0 // Orchestrators are excluded from our function counts
       };
 
       return new Response(JSON.stringify({
@@ -240,12 +218,7 @@ serve(async (req) => {
         },
         global_task_breakdown: taskBreakdown,
         users: user_stats,
-        recent_tasks: (globalStats || []).slice(0, 10).map(t => ({
-          status: t.status,
-          type: t.task_type,
-          is_cloud: !!t.worker_id,
-          age_minutes: Math.round((Date.now() - new Date(t.created_at).getTime()) / 60000)
-        }))
+        recent_tasks: [] // Removed direct database query - using function-based counts only
       }), {
         status: 200,
         headers: { "Content-Type": "application/json" }
@@ -294,52 +267,14 @@ serve(async (req) => {
         console.log(`${pathTag} User analyze_task_availability failed:`, (e as any)?.message);
       }
 
-      // Compute live in-progress metrics for this user
-      // 1) Fetch user project ids
-      const { data: projects, error: projErr } = await supabaseAdmin
-        .from('projects')
-        .select('id')
-        .eq('user_id', callerId);
-      if (projErr) {
-        console.error('Fetch projects error:', projErr);
-        throw projErr;
-      }
-      const projectIds = (projects || []).map((p: any) => p.id);
-
-      let in_progress_any = 0;
-      let in_progress_cloud = 0;
-      let in_progress_cloud_non_orchestrator = 0;
-      if (projectIds.length > 0) {
-        const [qAny, qCloud, qCloudNonOrch] = await Promise.all([
-          supabaseAdmin.from('tasks').select('id', { count: 'exact', head: true }).in('project_id', projectIds).eq('status', 'In Progress'),
-          supabaseAdmin.from('tasks').select('id', { count: 'exact', head: true }).in('project_id', projectIds).eq('status', 'In Progress').not('worker_id', 'is', null),
-          supabaseAdmin.from('tasks').select('id', { count: 'exact', head: true }).in('project_id', projectIds).eq('status', 'In Progress').not('worker_id', 'is', null).not('task_type', 'ilike', '%orchestrator%')
-        ]);
-        in_progress_any = qAny.count ?? 0;
-        in_progress_cloud = qCloud.count ?? 0;
-        in_progress_cloud_non_orchestrator = qCloudNonOrch.count ?? 0;
-      }
-
-      // Get recent tasks for this user for debugging
-      let recent_user_tasks: any[] = [];
-      if (projectIds.length > 0) {
-        const { data: recentTasks } = await supabaseAdmin
-          .from('tasks')
-          .select('id, status, task_type, worker_id, created_at, dependant_on')
-          .in('project_id', projectIds)
-          .in('status', ['Queued', 'In Progress', 'Complete'])
-          .order('created_at', { ascending: false })
-          .limit(15);
-        
-        recent_user_tasks = (recentTasks || []).map(t => ({
-          id: t.id,
-          status: t.status,
-          type: t.task_type,
-          is_cloud: !!t.worker_id,
-          has_dependency: !!t.dependant_on,
-          age_minutes: Math.round((Date.now() - new Date(t.created_at).getTime()) / 60000)
-        }));
-      }
+      // Use function-based counts instead of direct database queries
+      // This ensures consistency with our orchestrator exclusion logic
+      const in_progress_any = active_only_capacity;
+      const in_progress_cloud = active_only_capacity; // Our user function excludes orchestrators
+      const in_progress_cloud_non_orchestrator = active_only_capacity; // Already excluded by our function
+      
+      // Remove recent tasks direct query - using function-based approach only
+      const recent_user_tasks: any[] = [];
 
       return new Response(JSON.stringify({
         mode: 'count',
@@ -360,8 +295,8 @@ serve(async (req) => {
         debug_summary: {
           at_capacity: in_progress_any >= 5,
           capacity_used_pct: Math.round((in_progress_any / 5) * 100),
-          orchestrator_count: recent_user_tasks.filter(t => t.type?.toLowerCase().includes('orchestrator')).length,
-          queued_with_deps: recent_user_tasks.filter(t => t.status === 'Queued' && t.has_dependency).length,
+          orchestrator_count: 0, // Orchestrators excluded from our function counts
+          queued_with_deps: 0, // Removed direct query - using function-based approach
           can_claim_more: in_progress_any < 5 && eligible_queued > 0
         }
       }), {
