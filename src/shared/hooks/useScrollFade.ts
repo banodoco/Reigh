@@ -7,6 +7,8 @@ interface UseScrollFadeOptions {
   bottomThreshold?: number;
   /** Whether to enable debug logging */
   debug?: boolean;
+  /** Show fade immediately when opened, then adjust based on content */
+  preloadFade?: boolean;
 }
 
 interface UseScrollFadeReturn {
@@ -23,13 +25,19 @@ interface UseScrollFadeReturn {
 export const useScrollFade = ({
   isOpen = true,
   bottomThreshold = 5,
-  debug = false
+  debug = false,
+  preloadFade = false
 }: UseScrollFadeOptions = {}): UseScrollFadeReturn => {
-  const [showFade, setShowFade] = useState(false);
+  const [showFade, setShowFade] = useState(preloadFade && isOpen);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Small delay to ensure DOM is ready
+    // If preloadFade is enabled, show fade immediately when opening
+    if (preloadFade && isOpen) {
+      setShowFade(true);
+    }
+
+    // Reduced delay for faster response, but still ensure DOM is ready
     const timer = setTimeout(() => {
       const container = scrollRef.current;
       if (!container) {
@@ -78,12 +86,12 @@ export const useScrollFade = ({
         resizeObserver.disconnect();
         mutationObserver.disconnect();
       };
-    }, 100); // 100ms delay
+    }, 50); // Reduced delay from 100ms to 50ms for faster response
 
     return () => {
       clearTimeout(timer);
     };
-  }, [isOpen, bottomThreshold, debug, showFade]);
+  }, [isOpen, bottomThreshold, debug, preloadFade]);
 
 
   return {

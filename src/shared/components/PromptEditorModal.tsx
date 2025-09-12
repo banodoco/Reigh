@@ -202,7 +202,8 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
   // Scroll state, ref, and fade effect
   const { showFade, scrollRef } = useScrollFade({ 
     isOpen: isOpen,
-    debug: false
+    debug: false,
+    preloadFade: modal.isMobile
   });
   const [showScrollToTop, setShowScrollToTop] = useState(false);
 

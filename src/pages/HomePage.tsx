@@ -186,11 +186,13 @@ export default function HomePage() {
   // Scroll fade effects for side panes
   const creativeScrollFade = useScrollFade({ 
     isOpen: showCreativePartner,
-    debug: false 
+    debug: false,
+    preloadFade: isMobile
   });
   const philosophyScrollFade = useScrollFade({ 
     isOpen: showPhilosophy,
-    debug: false 
+    debug: false,
+    preloadFade: isMobile
   });
 
   // Helper to reset pane scroll after close animation (300ms)

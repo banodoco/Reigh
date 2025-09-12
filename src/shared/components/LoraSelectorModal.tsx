@@ -1133,7 +1133,8 @@ export const LoraSelectorModal: React.FC<LoraSelectorModalProps> = ({
   const modal = useExtraLargeModal('loraSelector');
   const { showFade, scrollRef } = useScrollFade({ 
     isOpen: isOpen,
-    debug: false
+    debug: false,
+    preloadFade: modal.isMobile
   });
 
   if (!isOpen) {

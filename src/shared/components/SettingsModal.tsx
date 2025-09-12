@@ -67,7 +67,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const modal = useLargeModal();
   const { showFade, scrollRef } = useScrollFade({ 
     isOpen: isOpen,
-    debug: false
+    debug: false,
+    preloadFade: modal.isMobile
   });
   const { apiKeys, isLoading: isLoadingKeys, saveApiKeys, isUpdating } = useApiKeys();
   const { 

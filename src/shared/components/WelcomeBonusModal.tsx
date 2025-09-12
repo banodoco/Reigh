@@ -484,7 +484,10 @@ export const WelcomeBonusModal: React.FC<WelcomeBonusModalProps> = ({
 }) => {
   const [currentStep, setCurrentStep] = useState(1);
   const modal = useMediumModal();
-  const { showFade, scrollRef } = useScrollFade({ isOpen });
+  const { showFade, scrollRef } = useScrollFade({ 
+    isOpen,
+    preloadFade: modal.isMobile 
+  });
 
   // Reset to step 1 when modal opens
   useEffect(() => {

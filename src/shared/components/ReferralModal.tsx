@@ -28,7 +28,8 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({ isOpen, onOpenChan
 
   // Simple scroll fade hook
   const { showFade, scrollRef } = useScrollFade({ 
-    isOpen: isOpen
+    isOpen: isOpen,
+    preloadFade: modal.isMobile
   });
 
   // Get session and username
