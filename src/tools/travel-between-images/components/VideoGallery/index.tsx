@@ -164,7 +164,35 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   // Stable content key to avoid resets during background refetches
   const contentKey = `${shotId ?? ''}:pagination-will-be-handled-by-hook`;
   
-  const itemsPerPage = 6;
+  // Calculate items per page based on project aspect ratio to optimize pagination
+  const itemsPerPage = React.useMemo(() => {
+    if (!projectAspectRatio) {
+      return 6; // Default: 2 rows of 3 items each
+    }
+    
+    const [width, height] = projectAspectRatio.split(':').map(Number);
+    if (width && height) {
+      const aspectRatio = width / height;
+      
+      // For very wide aspect ratios (16:9 and wider), show 2 videos per row
+      // 6 items per page = 3 rows of 2 items each
+      if (aspectRatio >= 16/9) {
+        return 6;
+      }
+      // For very narrow aspect ratios (narrower than 4:3), show 4 videos per row
+      // 8 items per page = 2 rows of 4 items each
+      else if (aspectRatio < 4/3) {
+        return 8;
+      }
+      // For moderate aspect ratios (4:3 to 16:9), use default
+      // 6 items per page = 2 rows of 3 items each
+      else {
+        return 6;
+      }
+    }
+    
+    return 6; // Fallback
+  }, [projectAspectRatio]);
   const taskDetailsButtonRef = useRef<HTMLButtonElement>(null);
   const isMobile = useIsMobile();
   // Treat iPads/tablets as mobile for lightbox layout width decisions.
@@ -445,7 +473,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   // Suppress skeletons if cache says 0 for this shot
   const showSkeletons = isLoadingGenerations && videoOutputs.length === 0 && !hasEverFetched && (cachedCount === null || cachedCount > 0);
   
-  const skeletonCount = showSkeletons ? Math.min(cachedCount || 6, 6) : 0;
+  const skeletonCount = showSkeletons ? Math.min(cachedCount || itemsPerPage, itemsPerPage) : 0;
   
   // UNIQUE DEBUG ID for tracking this specific issue
   const debugId = `[SkeletonIssue:${shotId?.substring(0, 8) || 'no-shot'}:${Date.now()}]`;
@@ -674,6 +702,33 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     return { aspectRatio: '16/9' }; // Fallback
   }, [projectAspectRatio]);
 
+  // Calculate grid classes for skeletons based on project aspect ratio (MUST be at top level)
+  const skeletonGridClasses = React.useMemo(() => {
+    if (!projectAspectRatio) {
+      return "w-1/2 lg:w-1/3"; // Default: 2 per row mobile, 3 per row desktop
+    }
+    
+    const [width, height] = projectAspectRatio.split(':').map(Number);
+    if (width && height) {
+      const aspectRatio = width / height;
+      
+      // For very wide aspect ratios (16:9 and wider), show 2 videos per row
+      if (aspectRatio >= 16/9) {
+        return "w-1/2"; // 2 videos per row on all screen sizes
+      }
+      // For very narrow aspect ratios (narrower than 4:3), show 4 videos per row
+      else if (aspectRatio < 4/3) {
+        return "w-1/4 sm:w-1/4"; // 4 videos per row on all screen sizes
+      }
+      // For moderate aspect ratios (4:3 to 16:9), use responsive layout
+      else {
+        return "w-1/2 lg:w-1/3"; // 2 per row mobile, 3 per row desktop
+      }
+    }
+    
+    return "w-1/2 lg:w-1/3"; // Fallback
+  }, [projectAspectRatio]);
+
   // ===============================================================================
   // RENDER
   // ===============================================================================
@@ -702,7 +757,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
         {showSkeletons ? (
           <div className="flex flex-wrap -mx-1 sm:-mx-1.5 md:-mx-2">
             {Array.from({ length: skeletonCount }, (_, index) => (
-              <div key={`skeleton-${index}`} className="w-1/2 lg:w-1/3 px-1 sm:px-1.5 md:px-2 mb-2 sm:mb-3 md:mb-4">
+              <div key={`skeleton-${index}`} className={`${skeletonGridClasses} px-1 sm:px-1.5 md:px-2 mb-2 sm:mb-3 md:mb-4`}>
                 <div 
                   className="bg-muted rounded-lg animate-pulse border"
                   style={aspectRatioStyle}

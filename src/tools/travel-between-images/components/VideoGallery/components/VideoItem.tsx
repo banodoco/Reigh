@@ -313,6 +313,37 @@ export const VideoItem = React.memo<VideoItemProps>(({
   }, [projectAspectRatio]);
 
   // ===============================================================================
+  // GRID LAYOUT CALCULATION - Dynamic grid based on project aspect ratio
+  // ===============================================================================
+  
+  // Calculate grid classes based on project aspect ratio
+  const gridClasses = React.useMemo(() => {
+    if (!projectAspectRatio) {
+      return "w-1/2 lg:w-1/3"; // Default: 2 per row mobile, 3 per row desktop
+    }
+    
+    const [width, height] = projectAspectRatio.split(':').map(Number);
+    if (width && height) {
+      const aspectRatio = width / height;
+      
+      // For very wide aspect ratios (16:9 and wider), show 2 videos per row
+      if (aspectRatio >= 16/9) {
+        return "w-1/2"; // 2 videos per row on all screen sizes
+      }
+      // For very narrow aspect ratios (narrower than 4:3), show 4 videos per row
+      else if (aspectRatio < 4/3) {
+        return "w-1/4 sm:w-1/4"; // 4 videos per row on all screen sizes
+      }
+      // For moderate aspect ratios (4:3 to 16:9), use responsive layout
+      else {
+        return "w-1/2 lg:w-1/3"; // 2 per row mobile, 3 per row desktop
+      }
+    }
+    
+    return "w-1/2 lg:w-1/3"; // Fallback
+  }, [projectAspectRatio]);
+
+  // ===============================================================================
   // RENDER - Clean component rendering
   // ===============================================================================
 
@@ -338,7 +369,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
   }
 
   return (
-    <div className="w-1/2 lg:w-1/3 px-1 sm:px-1.5 md:px-2 mb-2 sm:mb-3 md:mb-4 relative group">
+    <div className={`${gridClasses} px-1 sm:px-1.5 md:px-2 mb-2 sm:mb-3 md:mb-4 relative group`}>
       <div 
         className="bg-gray-100 rounded-lg overflow-hidden shadow-sm border relative"
         style={aspectRatioStyle}

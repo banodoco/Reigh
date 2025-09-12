@@ -9,6 +9,7 @@ import { getDisplayUrl, cn } from '@/shared/lib/utils';
 import TaskDetailsPanel from '@/tools/travel-between-images/components/TaskDetailsPanel';
 import { useToggleGenerationStar } from '@/shared/hooks/useGenerations';
 import MagicEditLauncher from '@/shared/components/MagicEditLauncher';
+import StyledVideoPlayer from '@/shared/components/StyledVideoPlayer';
 import { toast } from 'sonner';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useCreateShotWithImage } from '@/shared/hooks/useShots';
@@ -939,20 +940,17 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   {/* Media Content */}
                   <div className="relative max-w-full max-h-full flex items-center justify-center">
                     {isVideo ? (
-                      <video
+                      <StyledVideoPlayer
                         src={displayUrl}
                         poster={media.thumbUrl}
-                        controls
                         loop
                         muted
-                        playsInline
                         autoPlay
+                        playsInline
                         preload="auto"
-                        className="object-contain"
+                        className="shadow-wes border border-border/20"
                         style={{ maxWidth: '55vw', maxHeight: '90vh' }}
-                      >
-                        Your browser does not support the video tag.
-                      </video>
+                      />
                     ) : (
                       <div className="relative">
                         {isSaving ? (
@@ -1229,19 +1227,16 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   {/* Media Content - same as above but adapted for mobile */}
                   <div className="relative w-full h-full flex items-center justify-center">
                     {isVideo ? (
-                      <video
+                      <StyledVideoPlayer
                         src={displayUrl}
                         poster={media.thumbUrl}
-                        controls
                         loop
                         muted
-                        playsInline
                         autoPlay
+                        playsInline
                         preload="auto"
-                        className="max-w-full max-h-full object-contain"
-                      >
-                        Your browser does not support the video tag.
-                      </video>
+                        className="max-w-full max-h-full shadow-wes border border-border/20"
+                      />
                     ) : (
                       <div className="relative">
                         {isSaving ? (
@@ -1392,23 +1387,20 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               {/* Media Content */}
               <div className="relative">
                 {isVideo ? (
-                  <video
+                  <StyledVideoPlayer
                     src={displayUrl}
                     poster={media.thumbUrl}
-                    controls
                     loop
                     muted
-                    playsInline
                     autoPlay
+                    playsInline
                     preload="auto"
                     className={cn(
-                      'h-auto object-contain w-[95vw]',
+                      'h-auto w-[95vw] shadow-wes border border-border/20',
                       isTouchLikeDevice ? 'max-h-[85vh]' : 'max-h-[85vh] sm:max-h-[85vh]'
                     )}
                     style={{ maxWidth: '95vw' }}
-                  >
-                    Your browser does not support the video tag.
-                  </video>
+                  />
                 ) : (
                   <div className="relative">
                     {isSaving ? (
