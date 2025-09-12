@@ -5,6 +5,23 @@
 -- - run_type filtering via task_types (respects is_active)
 -- - No SECURITY DEFINER to align with recent RLS policy decisions
 
+-- First, ensure get_task_run_type has consistent fallback behavior
+CREATE OR REPLACE FUNCTION get_task_run_type(p_task_type TEXT)
+RETURNS TEXT
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    run_type_result text;
+BEGIN
+    SELECT run_type INTO run_type_result
+    FROM task_types
+    WHERE name = p_task_type AND is_active = true;
+    
+    -- Use 'gpu' as fallback for consistency with claim functions
+    RETURN COALESCE(run_type_result, 'gpu');
+END;
+$$;
+
 -- =============================================================================
 -- count_eligible_tasks_service_role(p_include_active, p_run_type)
 -- =============================================================================
@@ -18,7 +35,10 @@ LANGUAGE plpgsql
 AS $$
 DECLARE
   v_total_capacity INTEGER := 0;
+  v_debug_info TEXT;
 BEGIN
+  -- Debug logging
+  RAISE NOTICE 'count_eligible_tasks_service_role called with p_include_active=%, p_run_type=%', p_include_active, p_run_type;
   -- Calculate per-user capacity and sum across all eligible users
   WITH per_user_capacity AS (
     SELECT 
@@ -44,7 +64,7 @@ BEGIN
     WHERE u.credits > 0
       AND COALESCE((u.settings->'ui'->'generationMethods'->>'inCloud')::boolean, true) = true
     GROUP BY u.id, u.credits, u.settings
-    HAVING COUNT(CASE WHEN t.status = 'In Progress' THEN 1 END) < 5
+    HAVING COALESCE(COUNT(CASE WHEN t.status = 'In Progress' THEN 1 END), 0) < 5
   )
   SELECT COALESCE(SUM(
     CASE 
