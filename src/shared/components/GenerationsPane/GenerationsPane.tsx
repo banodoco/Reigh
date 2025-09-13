@@ -19,6 +19,7 @@ import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 import { performanceMonitoredTimeout, measureAsync } from '@/shared/lib/performanceUtils';
 import { useShots } from '@/shared/contexts/ShotsContext';
+import { useProject } from '@/shared/contexts/ProjectContext';
 
 import { 
   Select,
@@ -52,6 +53,11 @@ const GenerationsPaneComponent: React.FC = () => {
   const isOnGenerationsPage = location.pathname === '/generations';
   const isOnImageGenerationPage = location.pathname === '/tools/image-generation';
   const isOnVideoTravelPage = location.pathname === '/tools/travel-between-images';
+  
+  // Get current project's aspect ratio
+  const { selectedProjectId, projects } = useProject();
+  const currentProject = projects.find(p => p.id === selectedProjectId);
+  const projectAspectRatio = currentProject?.aspectRatio;
   const shouldEnableDataLoading = isOnGenerationsPage || ((isOnImageGenerationPage || isOnVideoTravelPage) && isGenerationsPaneOpen);
   
   const isMobile = useIsMobile();
@@ -66,7 +72,6 @@ const GenerationsPaneComponent: React.FC = () => {
 
   // Use the generalized logic - data loading now enabled on all pages
   const {
-    selectedProjectId,
     shotsData,
     paginatedData,
     lastAffectedShotId,
@@ -465,6 +470,7 @@ const GenerationsPaneComponent: React.FC = () => {
                     columns={{ base: 2, sm: 3, md: 4, lg: 5, xl: 6, '2xl': 6 }}
                     whiteText={true}
                     showControls={false}
+                    projectAspectRatio={projectAspectRatio}
                 />
             )}
             {error && <p className="text-red-500 text-center">Error: {error.message}</p>}

@@ -959,42 +959,34 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       />
                     ) : (
                       <div className="relative">
-                        {isSaving ? (
-                          <div 
-                            className="flex items-center justify-center bg-black/20 rounded-lg object-contain"
-                            style={{ 
-                              maxHeight: '90vh',
-                              maxWidth: '55vw',
-                              aspectRatio: imageDimensions ? `${imageDimensions.width}/${imageDimensions.height}` : '1',
-                              minWidth: '300px',
-                              minHeight: '300px'
-                            }}
-                          >
-                            <div className="text-white text-center">
-                              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-2"></div>
-                              <p>Saving image...</p>
+                        <img 
+                          src={displayUrl} 
+                          alt="Media content"
+                          className={`object-contain transition-opacity duration-300 ${
+                            isFlippedHorizontally ? 'scale-x-[-1]' : ''
+                          } ${
+                            isSaving ? 'opacity-30' : 'opacity-100'
+                          }`}
+                          style={{ 
+                            maxHeight: '90vh',
+                            maxWidth: '55vw',
+                            transform: isFlippedHorizontally ? 'scaleX(-1)' : 'none'
+                          }}
+                          onLoad={(e) => {
+                            const img = e.target as HTMLImageElement;
+                            setImageDimensions({
+                              width: img.naturalWidth,
+                              height: img.naturalHeight
+                            });
+                          }}
+                        />
+                        {isSaving && (
+                          <div className="absolute inset-0 flex items-center justify-center z-10">
+                            <div className="text-center text-white bg-black/60 rounded-lg p-4 backdrop-blur-sm">
+                              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2"></div>
+                              <p className="text-sm">Saving...</p>
                             </div>
                           </div>
-                        ) : (
-                          <img 
-                            src={displayUrl} 
-                            alt="Media content"
-                            className={`object-contain ${
-                              isFlippedHorizontally ? 'scale-x-[-1]' : ''
-                            }`}
-                            style={{ 
-                              maxHeight: '90vh',
-                              maxWidth: '55vw',
-                              transform: isFlippedHorizontally ? 'scaleX(-1)' : 'none'
-                            }}
-                            onLoad={(e) => {
-                              const img = e.target as HTMLImageElement;
-                              setImageDimensions({
-                                width: img.naturalWidth,
-                                height: img.naturalHeight
-                              });
-                            }}
-                          />
                         )}
                         {/* Hidden canvas for image processing */}
                         <canvas 
@@ -1245,42 +1237,34 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       />
                     ) : (
                       <div className="relative">
-                        {isSaving ? (
-                          <div 
-                            className="flex items-center justify-center bg-black/20 rounded-lg object-contain"
-                            style={{ 
-                              maxHeight: '50vh',
-                              maxWidth: '95vw',
-                              aspectRatio: imageDimensions ? `${imageDimensions.width}/${imageDimensions.height}` : '1',
-                              minWidth: '200px',
-                              minHeight: '200px'
-                            }}
-                          >
-                            <div className="text-white text-center">
-                              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2"></div>
-                              <p>Saving image...</p>
+                        <img 
+                          src={displayUrl} 
+                          alt="Media content"
+                          className={`object-contain transition-opacity duration-300 ${
+                            isFlippedHorizontally ? 'scale-x-[-1]' : ''
+                          } ${
+                            isSaving ? 'opacity-30' : 'opacity-100'
+                          }`}
+                          style={{ 
+                            maxHeight: '50vh',
+                            maxWidth: '95vw',
+                            transform: isFlippedHorizontally ? 'scaleX(-1)' : 'none'
+                          }}
+                          onLoad={(e) => {
+                            const img = e.target as HTMLImageElement;
+                            setImageDimensions({
+                              width: img.naturalWidth,
+                              height: img.naturalHeight
+                            });
+                          }}
+                        />
+                        {isSaving && (
+                          <div className="absolute inset-0 flex items-center justify-center z-10">
+                            <div className="text-center text-white bg-black/60 rounded-lg p-3 backdrop-blur-sm">
+                              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mx-auto mb-2"></div>
+                              <p className="text-xs">Saving...</p>
                             </div>
                           </div>
-                        ) : (
-                          <img 
-                            src={displayUrl} 
-                            alt="Media content"
-                            className={`object-contain ${
-                              isFlippedHorizontally ? 'scale-x-[-1]' : ''
-                            }`}
-                            style={{ 
-                              maxHeight: '50vh',
-                              maxWidth: '95vw',
-                              transform: isFlippedHorizontally ? 'scaleX(-1)' : 'none'
-                            }}
-                            onLoad={(e) => {
-                              const img = e.target as HTMLImageElement;
-                              setImageDimensions({
-                                width: img.naturalWidth,
-                                height: img.naturalHeight
-                              });
-                            }}
-                          />
                         )}
                         {/* Hidden canvas for image processing */}
                         <canvas 
@@ -1409,46 +1393,36 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   />
                 ) : (
                   <div className="relative">
-                    {isSaving ? (
-                      <div 
-                        className="flex items-center justify-center bg-black/20 rounded-lg object-contain"
-                        style={{ 
-                          width: 'auto',
-                          height: 'auto',
-                          maxHeight: '85vh',
-                          maxWidth: '95vw',
-                          aspectRatio: imageDimensions ? `${imageDimensions.width}/${imageDimensions.height}` : '1',
-                          minWidth: '300px',
-                          minHeight: '300px'
-                        }}
-                      >
-                        <div className="text-white text-center">
-                          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-2"></div>
-                          <p>Saving image...</p>
+                    <img 
+                      src={displayUrl} 
+                      alt="Media content"
+                      className={`w-full h-full object-contain transition-opacity duration-300 ${
+                        isFlippedHorizontally ? 'scale-x-[-1]' : ''
+                      } ${
+                        isSaving ? 'opacity-30' : 'opacity-100'
+                      }`}
+                      style={{ 
+                        maxHeight: '85vh',
+                        maxWidth: '95vw',
+                        width: 'auto',
+                        height: 'auto',
+                        transform: isFlippedHorizontally ? 'scaleX(-1)' : 'none'
+                      }}
+                      onLoad={(e) => {
+                        const img = e.target as HTMLImageElement;
+                        setImageDimensions({
+                          width: img.naturalWidth,
+                          height: img.naturalHeight
+                        });
+                      }}
+                    />
+                    {isSaving && (
+                      <div className="absolute inset-0 flex items-center justify-center z-10">
+                        <div className="text-center text-white bg-black/60 rounded-lg p-4 backdrop-blur-sm">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2"></div>
+                          <p className="text-sm">Saving...</p>
                         </div>
                       </div>
-                    ) : (
-                      <img 
-                        src={displayUrl} 
-                        alt="Media content"
-                        className={`w-full h-full object-contain ${
-                          isFlippedHorizontally ? 'scale-x-[-1]' : ''
-                        }`}
-                        style={{ 
-                          maxHeight: '85vh',
-                          maxWidth: '95vw',
-                          width: 'auto',
-                          height: 'auto',
-                          transform: isFlippedHorizontally ? 'scaleX(-1)' : 'none'
-                        }}
-                        onLoad={(e) => {
-                          const img = e.target as HTMLImageElement;
-                          setImageDimensions({
-                            width: img.naturalWidth,
-                            height: img.naturalHeight
-                          });
-                        }}
-                      />
                     )}
                     {/* Hidden canvas for image processing */}
                     <canvas 

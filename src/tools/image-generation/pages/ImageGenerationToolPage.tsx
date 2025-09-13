@@ -132,7 +132,11 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   });
   
   // Use the new task queue notifier hook
-  const { selectedProjectId } = useProject();
+  const { selectedProjectId, projects } = useProject();
+  
+  // Get current project's aspect ratio
+  const currentProject = projects.find(p => p.id === selectedProjectId);
+  const projectAspectRatio = currentProject?.aspectRatio;
   
   console.log(`${DEBUG_TAG} Render #${renderCount.current} - selectedProjectId:`, selectedProjectId);
   
@@ -1167,6 +1171,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
                 count={20}
                 columns={{ base: 2, sm: 3, md: 4, lg: 5, xl: 5, '2xl': 5 }}
                 showControls={true}
+                projectAspectRatio={projectAspectRatio}
               />
             ) : (
               <div className={isLoadingGenerations && isFilterChange ? 'opacity-60 pointer-events-none transition-opacity duration-200' : ''}>

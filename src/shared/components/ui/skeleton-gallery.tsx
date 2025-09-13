@@ -1,5 +1,6 @@
 import React from 'react';
 import { cn } from '@/shared/lib/utils';
+import { parseRatio } from '@/shared/lib/aspectRatios';
 
 interface SkeletonGalleryProps {
   /** Number of skeleton items to show */
@@ -19,6 +20,8 @@ interface SkeletonGalleryProps {
   className?: string;
   /** Whether to show skeleton controls at the top (pagination, filters, search) */
   showControls?: boolean;
+  /** Project aspect ratio (e.g. "16:9", "4:3", "1:1") to match project dimensions */
+  projectAspectRatio?: string;
 }
 
 /**
@@ -30,7 +33,8 @@ export function SkeletonGallery({
   columns = { base: 2, sm: 3, md: 4, lg: 5, xl: 6 },
   whiteText = false,
   className,
-  showControls = false
+  showControls = false,
+  projectAspectRatio
 }: SkeletonGalleryProps) {
   
   const gridCols = cn(
@@ -74,6 +78,20 @@ export function SkeletonGallery({
   );
 
   const skeletonBg = whiteText ? 'bg-zinc-700/60' : 'bg-muted';
+
+  // Calculate aspect ratio for skeleton items
+  let aspectRatioPadding = '100%'; // Default to square (1:1)
+  
+  if (projectAspectRatio) {
+    const ratio = parseRatio(projectAspectRatio);
+    if (!isNaN(ratio)) {
+      const calculatedPadding = (1 / ratio) * 100; // height/width * 100
+      // Ensure reasonable aspect ratio bounds
+      const minPadding = 60; // Minimum 60% height (for very wide images)
+      const maxPadding = 200; // Maximum 200% height (for very tall images)
+      aspectRatioPadding = `${Math.min(Math.max(calculatedPadding, minPadding), maxPadding)}%`;
+    }
+  }
 
   return (
     <div className={cn('space-y-6 pb-8', className)}>
@@ -121,9 +139,10 @@ export function SkeletonGallery({
           <div 
             key={idx} 
             className={cn(
-              'aspect-square animate-pulse rounded-lg',
+              'animate-pulse rounded-lg relative',
               skeletonBg
             )}
+            style={{ paddingBottom: aspectRatioPadding }}
           />
         ))}
       </div>

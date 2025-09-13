@@ -12,7 +12,11 @@ const GENERATIONS_PER_PAGE = 30; // 30 items per page for consistency
 
 const GenerationsPage: React.FC = () => {
   
-  const { isLoadingProjects } = useProject();
+  const { isLoadingProjects, selectedProjectId: currentProjectId, projects } = useProject();
+  
+  // Get current project's aspect ratio
+  const currentProject = projects.find(p => p.id === currentProjectId);
+  const projectAspectRatio = currentProject?.aspectRatio;
   const queryClient = useQueryClient();
   // Add state for media type filter
   const [mediaTypeFilter, setMediaTypeFilter] = React.useState<'all' | 'image' | 'video'>('all');
@@ -131,6 +135,7 @@ const GenerationsPage: React.FC = () => {
           count={GENERATIONS_PER_PAGE}
           columns={{ base: 2, sm: 3, md: 4, lg: 5, xl: 6, '2xl': 6 }}
           showControls={true}
+          projectAspectRatio={projectAspectRatio}
         />
       </div>
     );
