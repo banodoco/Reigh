@@ -224,7 +224,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   const createShotMutation = useCreateShot();
   const { lastAffectedShotId, setLastAffectedShotId } = useLastAffectedShot();
   // Use consistent page sizes with ImageGallery defaults to prevent cache mismatches
-  const itemsPerPage = isMobile ? 20 : 45;
+  const itemsPerPage = isMobile ? 20 : 20;
   
   // Use stable object for filters to prevent recreating on every render
   const generationsFilters = useStableObject(() => ({

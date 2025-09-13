@@ -806,9 +806,9 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
                       <div className={`${modal.isMobile ? 'px-4' : 'px-6'} text-sm text-muted-foreground mb-6 flex justify-between items-center`}>
             <span>Editing {internalPrompts.length} prompt(s). Changes are auto-saved.</span>
             {internalPrompts.length > 0 && (
-              <Button variant="destructive" size="sm" onClick={handleRemoveAllPrompts} className="ml-auto">
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete All Prompts
+              <Button variant="destructive" size="sm" onClick={handleRemoveAllPrompts} className="ml-auto h-auto py-2">
+                <Trash2 className="mr-2 h-4 w-4 self-center" />
+                <span className="leading-tight">Delete<br />Prompts</span>
               </Button>
             )}
           </div>
