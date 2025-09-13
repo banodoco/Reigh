@@ -67,6 +67,7 @@ export interface UseImageGalleryStateReturn {
   mainTickTimeoutRef: React.MutableRefObject<NodeJS.Timeout | null>;
   secondaryTickTimeoutRef: React.MutableRefObject<NodeJS.Timeout | null>;
   lastTouchTimeRef: React.MutableRefObject<number>;
+  lastTappedImageIdRef: React.MutableRefObject<string | null>;
   doubleTapTimeoutRef: React.MutableRefObject<NodeJS.Timeout | null>;
   galleryTopRef: React.MutableRefObject<HTMLDivElement | null>;
   safetyTimeoutRef: React.MutableRefObject<NodeJS.Timeout | null>;
@@ -190,6 +191,7 @@ export const useImageGalleryState = ({
   const mainTickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const secondaryTickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastTouchTimeRef = useRef<number>(0);
+  const lastTappedImageIdRef = useRef<string | null>(null);
   const doubleTapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const galleryTopRef = useRef<HTMLDivElement | null>(null);
   const safetyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -364,6 +366,7 @@ export const useImageGalleryState = ({
     mainTickTimeoutRef,
     secondaryTickTimeoutRef,
     lastTouchTimeRef,
+    lastTappedImageIdRef,
     doubleTapTimeoutRef,
     galleryTopRef,
     safetyTimeoutRef,

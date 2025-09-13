@@ -8,6 +8,7 @@ export interface UseMobileInteractionsProps {
   mobilePopoverOpenImageId: string | null;
   setMobilePopoverOpenImageId: (id: string | null) => void;
   lastTouchTimeRef: React.MutableRefObject<number>;
+  lastTappedImageIdRef: React.MutableRefObject<string | null>;
   doubleTapTimeoutRef: React.MutableRefObject<NodeJS.Timeout | null>;
   onOpenLightbox: (image: GeneratedImageWithMetadata) => void;
 }
@@ -23,6 +24,7 @@ export const useMobileInteractions = ({
   mobilePopoverOpenImageId,
   setMobilePopoverOpenImageId,
   lastTouchTimeRef,
+  lastTappedImageIdRef,
   doubleTapTimeoutRef,
   onOpenLightbox,
 }: UseMobileInteractionsProps): UseMobileInteractionsReturn => {
@@ -31,26 +33,30 @@ export const useMobileInteractions = ({
   const handleMobileTap = useCallback((image: GeneratedImageWithMetadata) => {
     const currentTime = Date.now();
     const timeSinceLastTap = currentTime - lastTouchTimeRef.current;
+    const lastTappedImageId = lastTappedImageIdRef.current;
+    const isSameImage = lastTappedImageId === image.id;
     
     console.log('[MobileDebug] Tap detected:', {
       imageId: image.id?.substring(0, 8),
+      lastTappedImageId: lastTappedImageId?.substring(0, 8),
+      isSameImage,
       currentTime,
       lastTouchTime: lastTouchTimeRef.current,
       timeSinceLastTap,
-      isDoubleTap: timeSinceLastTap < 800 && timeSinceLastTap > 10 && lastTouchTimeRef.current > 0,
+      isDoubleTap: timeSinceLastTap < 800 && timeSinceLastTap > 10 && lastTouchTimeRef.current > 0 && isSameImage,
       hasTimeout: !!doubleTapTimeoutRef.current
     });
     
-    if (timeSinceLastTap < 800 && timeSinceLastTap > 10 && lastTouchTimeRef.current > 0) {
-      // This is a double-tap, clear any pending timeout and open lightbox
-      console.log('[MobileDebug] ✅ Double-tap detected! Opening lightbox');
+    if (timeSinceLastTap < 800 && timeSinceLastTap > 10 && lastTouchTimeRef.current > 0 && isSameImage) {
+      // This is a double-tap on the same image, clear any pending timeout and open lightbox
+      console.log('[MobileDebug] ✅ Double-tap detected on same image! Opening lightbox');
       if (doubleTapTimeoutRef.current) {
         clearTimeout(doubleTapTimeoutRef.current);
         doubleTapTimeoutRef.current = null;
       }
       onOpenLightbox(image);
     } else {
-      // This is a single tap, set a timeout to handle it if no second tap comes
+      // This is a single tap or tap on different image, set a timeout to handle it if no second tap comes
       console.log('[MobileDebug] Single tap detected, setting timeout for settings');
       if (doubleTapTimeoutRef.current) {
         clearTimeout(doubleTapTimeoutRef.current);
@@ -67,8 +73,10 @@ export const useMobileInteractions = ({
       }, 800);
     }
     
+    // Update the last tapped image and time
+    lastTappedImageIdRef.current = image.id;
     lastTouchTimeRef.current = currentTime;
-  }, [lastTouchTimeRef, doubleTapTimeoutRef, onOpenLightbox, mobilePopoverOpenImageId, setMobilePopoverOpenImageId, setMobileActiveImageId]);
+  }, [lastTouchTimeRef, lastTappedImageIdRef, doubleTapTimeoutRef, onOpenLightbox, mobilePopoverOpenImageId, setMobilePopoverOpenImageId, setMobileActiveImageId]);
 
   // Close mobile popover on scroll or when clicking outside
   useEffect(() => {

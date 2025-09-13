@@ -393,6 +393,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = (props) => {
     mobilePopoverOpenImageId: stateHook.mobilePopoverOpenImageId,
     setMobilePopoverOpenImageId: stateHook.setMobilePopoverOpenImageId,
     lastTouchTimeRef: stateHook.lastTouchTimeRef,
+    lastTappedImageIdRef: stateHook.lastTappedImageIdRef,
     doubleTapTimeoutRef: stateHook.doubleTapTimeoutRef,
     onOpenLightbox: actionsHook.handleOpenLightbox,
   });
