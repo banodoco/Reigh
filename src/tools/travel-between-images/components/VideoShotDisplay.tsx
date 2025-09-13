@@ -123,11 +123,6 @@ const ShotImage: React.FC<ShotImageProps> = ({ image, index, onSelectShot, shotN
         animationDelay: `${index * 0.1}s`,
         height: `${finalHeight}px`,
       }}
-      onClick={(e) => {
-        e.stopPropagation();
-        e.preventDefault();
-        // Prevent clicking on individual images - they should not be interactive
-      }}
     >
       {imageLoadError ? (
         <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-gray-100 text-gray-500">
@@ -198,11 +193,6 @@ const PlaceholderBlock: React.FC<PlaceholderBlockProps> = ({ index, projectAspec
       style={{
         animationDelay: `${index * 0.1}s`,
         height: `${finalHeight}px`,
-      }}
-      onClick={(e) => {
-        e.stopPropagation();
-        e.preventDefault();
-        // Prevent clicking on placeholder blocks
       }}
     >
       <div className="absolute inset-0 flex items-center justify-center">
@@ -508,11 +498,6 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
                 style={{
                   animationDelay: `${imagesToShow.length * 0.1}s`,
                   height: `${finalHeight}px`,
-                }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  e.preventDefault();
-                  // Prevent clicking on more indicator
                 }}
               >
                 <div className="absolute inset-0 flex items-center justify-center">
