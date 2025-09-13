@@ -4,7 +4,8 @@ import { ProgressiveLoadingManager } from "@/shared/components/ProgressiveLoadin
 import { ImagePreloadManager } from "@/shared/components/ImagePreloadManager";
 import { ImageGalleryItem } from "@/shared/components/ImageGalleryItem";
 import { getImageLoadingStrategy } from '@/shared/lib/imageLoadingPriority';
-import { GeneratedImageWithMetadata } from '../ImageGallery';
+import { GeneratedImageWithMetadata } from '../index';
+import { parseRatio } from '@/shared/lib/aspectRatios';
 
 export interface ImageGalleryGridProps {
   // Data props
@@ -43,6 +44,13 @@ export interface ImageGalleryGridProps {
   
   // Filter state for empty states
   hasFilters: boolean;
+  
+  // Backfill state
+  isBackfillLoading?: boolean;
+  backfillSkeletonCount?: number;
+  setIsBackfillLoading?: (loading: boolean) => void;
+  setBackfillSkeletonCount?: (count: number) => void;
+  onSkeletonCleared?: () => void;
   
   // ImageGalleryItem props - passing through all the props it needs
   [key: string]: any; // This allows passing through all other props
@@ -86,12 +94,59 @@ export const ImageGalleryGrid: React.FC<ImageGalleryGridProps> = ({
   // Filter state
   hasFilters,
   
+  // Backfill state
+  isBackfillLoading = false,
+  backfillSkeletonCount = 0,
+  setIsBackfillLoading,
+  setBackfillSkeletonCount,
+  onSkeletonCleared,
+  
   // Pass through all other props for ImageGalleryItem
   ...itemProps
 }) => {
   
   // Guard to avoid redundant button clears and unnecessary renders
   const lastClearedButtonRef = React.useRef<'prev' | 'next' | null | 'cleared'>(null);
+  
+  // Track previous paginated images length to detect when new images arrive
+  const prevPaginatedLengthRef = React.useRef(paginatedImages.length);
+  
+  // Clear skeleton immediately when new images arrive
+  React.useEffect(() => {
+    if (isBackfillLoading && paginatedImages.length > prevPaginatedLengthRef.current) {
+      console.log('[SKELETON_DEBUG] Direct effect - clearing skeleton (new images detected):', {
+        prevLength: prevPaginatedLengthRef.current,
+        newLength: paginatedImages.length,
+        isBackfillLoading,
+        timestamp: Date.now()
+      });
+      if (setIsBackfillLoading) setIsBackfillLoading(false);
+      if (setBackfillSkeletonCount) setBackfillSkeletonCount(0);
+      
+      // Notify the actions hook to reset deletion count
+      if (onSkeletonCleared) {
+        console.log('[SKELETON_DEBUG] Direct effect - calling onSkeletonCleared callback');
+        onSkeletonCleared();
+      }
+    }
+    prevPaginatedLengthRef.current = paginatedImages.length;
+  }, [paginatedImages.length, isBackfillLoading, setIsBackfillLoading, setBackfillSkeletonCount, onSkeletonCleared]);
+
+  // Compute aspect ratio padding to match ImageGalleryItem container
+  const aspectRatioPadding = React.useMemo(() => {
+    // Default to 16:9 if not provided
+    let padding = 56.25; // 9/16 * 100
+    if (projectAspectRatio) {
+      const ratio = parseRatio(projectAspectRatio);
+      if (!Number.isNaN(ratio) && ratio > 0) {
+        const calculated = (1 / ratio) * 100; // height/width * 100
+        const minPadding = 60; // Minimum 60% height (for very wide images)
+        const maxPadding = 200; // Maximum 200% height (for very tall images)
+        padding = Math.min(Math.max(calculated, minPadding), maxPadding);
+      }
+    }
+    return `${padding}%`;
+  }, [projectAspectRatio]);
 
   return (
     <>
@@ -148,9 +203,27 @@ export const ImageGalleryGrid: React.FC<ImageGalleryGridProps> = ({
             instanceId={`gallery-${isServerPagination ? (serverPage || 1) : page}`}
             onImagesReady={() => {
               console.log(`🎯 [PAGELOADINGDEBUG] [GALLERY] Images ready - clearing gallery loading state`);
+              console.log('[SKELETON_DEBUG] ProgressiveLoadingManager onImagesReady fired:', {
+                isBackfillLoading,
+                hasSetters: !!(setIsBackfillLoading && setBackfillSkeletonCount),
+                paginatedImagesLength: paginatedImages.length,
+                timestamp: Date.now()
+              });
+              
               // Only update if needed to prevent render thrash
               if (isGalleryLoading) setIsGalleryLoading(false);
               
+              // If we were showing backfill skeletons, hide them as soon as real images appear
+              if (isBackfillLoading && setIsBackfillLoading) {
+                console.log('[SKELETON_DEBUG] ProgressiveLoadingManager - clearing skeleton (images ready):', {
+                  isBackfillLoading,
+                  hasSetters: !!(setIsBackfillLoading && setBackfillSkeletonCount),
+                  timestamp: Date.now()
+                });
+                setIsBackfillLoading(false);
+                if (setBackfillSkeletonCount) setBackfillSkeletonCount(0);
+              }
+
               // Only clear button loading for server pagination - client pagination handles this separately
               if (isServerPagination) {
                 console.log(`🔘 [PAGELOADINGDEBUG] [GALLERY] Server pagination - also clearing button loading`);
@@ -211,6 +284,34 @@ export const ImageGalleryGrid: React.FC<ImageGalleryGridProps> = ({
                       />
                     );
                   })}
+                  
+                  {/* Backfill skeleton items - matching ImageGalleryItem design */}
+                  {isBackfillLoading && backfillSkeletonCount > 0 && (() => {
+                    console.log('[SKELETON_DEBUG] Rendering skeleton items:', {
+                      isBackfillLoading,
+                      backfillSkeletonCount,
+                      paginatedImagesLength: paginatedImages.length,
+                      timestamp: Date.now()
+                    });
+                    return Array.from({ length: backfillSkeletonCount }).map((_, index) => {
+                      const skeletonIndex = paginatedImages.length + index;
+                    return (
+                      <div key={`skeleton-${skeletonIndex}`} className="relative group">
+                        {/* Match ImageGalleryItem container: border, rounded, overflow-hidden */}
+                        <div className="border rounded-lg overflow-hidden hover:shadow-md transition-all duration-300 relative group bg-card">
+                          <div className="relative w-full">
+                            <div style={{ paddingBottom: aspectRatioPadding }} className="relative bg-gray-200">
+                              {/* Match exact skeleton design from ImageGalleryItem */}
+                              <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-gray-200 animate-pulse">
+                                <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-gray-400"></div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                    });
+                  })()}
                 </div>
               </div>
             )}

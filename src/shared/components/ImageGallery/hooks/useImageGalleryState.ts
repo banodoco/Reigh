@@ -1,12 +1,14 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { GenerationRow } from '@/types/shots';
-import { GeneratedImageWithMetadata } from '../ImageGallery';
+import { GeneratedImageWithMetadata } from '../index';
 
 export interface UseImageGalleryStateProps {
   images: GeneratedImageWithMetadata[];
   currentShotId?: string;
   lastShotId?: string;
   simplifiedShotOptions: { id: string; name: string }[];
+  isServerPagination?: boolean;
+  serverPage?: number;
 }
 
 export interface UseImageGalleryStateReturn {
@@ -55,6 +57,12 @@ export interface UseImageGalleryStateReturn {
   pendingLightboxTarget: 'first' | 'last' | null;
   setPendingLightboxTarget: (target: 'first' | 'last' | null) => void;
   
+  // Backfill state
+  isBackfillLoading: boolean;
+  setIsBackfillLoading: (loading: boolean) => void;
+  backfillSkeletonCount: number;
+  setBackfillSkeletonCount: (count: number) => void;
+  
   // Refs
   mainTickTimeoutRef: React.MutableRefObject<NodeJS.Timeout | null>;
   secondaryTickTimeoutRef: React.MutableRefObject<NodeJS.Timeout | null>;
@@ -68,7 +76,9 @@ export const useImageGalleryState = ({
   images,
   currentShotId,
   lastShotId,
-  simplifiedShotOptions
+  simplifiedShotOptions,
+  isServerPagination = false,
+  serverPage
 }: UseImageGalleryStateProps): UseImageGalleryStateReturn => {
   
   // Lightbox state
@@ -90,6 +100,19 @@ export const useImageGalleryState = ({
   
   // State for tracking which item to open after page navigation
   const [pendingLightboxTarget, setPendingLightboxTarget] = useState<'first' | 'last' | null>(null);
+  
+  // Backfill loading state
+  const [isBackfillLoading, setIsBackfillLoading] = useState<boolean>(false);
+  const [backfillSkeletonCount, setBackfillSkeletonCount] = useState<number>(0);
+  
+  // Debug skeleton state changes
+  useEffect(() => {
+    console.log('[SKELETON_DEBUG] State changed:', {
+      isBackfillLoading,
+      backfillSkeletonCount,
+      timestamp: Date.now()
+    });
+  }, [isBackfillLoading, backfillSkeletonCount]);
   
   // Shot selection state
   const [selectedShotIdLocal, setSelectedShotIdLocal] = useState<string>(() => {
@@ -211,8 +234,25 @@ export const useImageGalleryState = ({
     [images]
   );
 
+  // Track previous image count for backfill skeleton clearing
+  const prevImageCountRef = useRef<number>(images.length);
+  
   // Reconcile optimistic state when images update
   useEffect(() => {
+    
+    // Clear backfill skeleton immediately when new images arrive (server pagination only)
+    if (isServerPagination && isBackfillLoading && images.length > prevImageCountRef.current) {
+      console.log('[SKELETON_DEBUG] State reconciliation - clearing skeleton (new images detected):', {
+        prevCount: prevImageCountRef.current,
+        newCount: images.length,
+        serverPage,
+        isBackfillLoading,
+        timestamp: Date.now()
+      });
+      setIsBackfillLoading(false);
+      setBackfillSkeletonCount(0);
+    }
+    prevImageCountRef.current = images.length;
     
     // Clean up optimistic sets - remove IDs for images no longer in the list
     setOptimisticUnpositionedIds(prev => {
@@ -248,7 +288,7 @@ export const useImageGalleryState = ({
       }
       return next;
     });
-  }, [currentImageIds]); // 🚀 PERFORMANCE FIX: Use memoized IDs instead of raw images array
+  }, [currentImageIds, images.length, isServerPagination, isBackfillLoading, serverPage, setIsBackfillLoading, setBackfillSkeletonCount]); // 🚀 PERFORMANCE FIX: Use memoized IDs instead of raw images array
 
   // Cleanup timeouts on unmount
   useEffect(() => {
@@ -313,6 +353,12 @@ export const useImageGalleryState = ({
     // Pagination state
     pendingLightboxTarget,
     setPendingLightboxTarget,
+    
+    // Backfill state
+    isBackfillLoading,
+    setIsBackfillLoading,
+    backfillSkeletonCount,
+    setBackfillSkeletonCount,
     
     // Refs
     mainTickTimeoutRef,

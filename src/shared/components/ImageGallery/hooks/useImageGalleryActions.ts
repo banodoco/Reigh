@@ -1,9 +1,9 @@
-import { useCallback } from 'react';
+import { useCallback, useRef, useEffect } from 'react';
 import { GenerationRow } from '@/types/shots';
 import { useToast } from '@/shared/hooks/use-toast';
 import { useLastAffectedShot } from '@/shared/hooks/useLastAffectedShot';
 import { getDisplayUrl } from '@/shared/lib/utils';
-import { GeneratedImageWithMetadata, DisplayableMetadata } from '../ImageGallery';
+import { GeneratedImageWithMetadata, DisplayableMetadata } from '../index';
 
 export interface UseImageGalleryActionsProps {
   onDelete?: (id: string) => void;
@@ -21,6 +21,12 @@ export interface UseImageGalleryActionsProps {
   setShowTickForSecondaryImageId: (id: string | null) => void;
   mainTickTimeoutRef: React.MutableRefObject<NodeJS.Timeout | null>;
   secondaryTickTimeoutRef: React.MutableRefObject<NodeJS.Timeout | null>;
+  onBackfillRequest?: (deletedCount: number, currentPage: number, itemsPerPage: number) => Promise<GeneratedImageWithMetadata[]>;
+  serverPage?: number;
+  itemsPerPage: number;
+  isServerPagination: boolean;
+  setIsBackfillLoading: (loading: boolean) => void;
+  setBackfillSkeletonCount: (count: number) => void;
 }
 
 export interface UseImageGalleryActionsReturn {
@@ -32,6 +38,7 @@ export interface UseImageGalleryActionsReturn {
   handleShowTick: (imageId: string) => void;
   handleShowSecondaryTick: (imageId: string) => void;
   handleShotChange: (shotId: string) => void;
+  handleSkeletonCleared: () => void;
 }
 
 export const useImageGalleryActions = ({
@@ -50,12 +57,22 @@ export const useImageGalleryActions = ({
   setShowTickForSecondaryImageId,
   mainTickTimeoutRef,
   secondaryTickTimeoutRef,
+  onBackfillRequest,
+  serverPage,
+  itemsPerPage,
+  isServerPagination,
+  setIsBackfillLoading,
+  setBackfillSkeletonCount,
 }: UseImageGalleryActionsProps): UseImageGalleryActionsReturn => {
   
   const { toast } = useToast();
   const { setLastAffectedShotId } = useLastAffectedShot();
   
-  // Optimistic delete handler
+  // Track deletions per page for backfilling
+  const deletionsCountRef = useRef<Map<number, number>>(new Map());
+  const backfillTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Optimistic delete handler with backfill logic
   const handleOptimisticDelete = useCallback(async (imageId: string) => {
     // Immediately mark as optimistically deleted
     markOptimisticDeleted(imageId);
@@ -70,12 +87,122 @@ export const useImageGalleryActions = ({
       if (onDelete) {
         await onDelete(imageId);
       }
+      
+      // Debug: Check if we're in server pagination mode
+      console.log('[SKELETON_DEBUG] Delete handler - pagination check:', {
+        isServerPagination,
+        serverPage,
+        hasBackfillRequest: !!onBackfillRequest,
+        willShowSkeleton: !!(isServerPagination && serverPage && onBackfillRequest),
+        timestamp: Date.now()
+      });
+      
+      // Track deletion for backfill logic (only for server pagination)
+      if (isServerPagination && serverPage && onBackfillRequest) {
+        const currentPageNum = serverPage;
+        const currentCount = deletionsCountRef.current.get(currentPageNum) || 0;
+        const newCount = currentCount + 1;
+        deletionsCountRef.current.set(currentPageNum, newCount);
+        
+        console.log('[SKELETON_DEBUG] Deletion tracked - checking conditions:', {
+          imageId: imageId.substring(0, 8),
+          page: currentPageNum,
+          previousCount: currentCount,
+          deletionsCount: newCount,
+          itemsPerPage,
+          isServerPagination,
+          hasServerPage: !!serverPage,
+          hasBackfillRequest: !!onBackfillRequest,
+          deletionsMapSize: deletionsCountRef.current.size,
+          timestamp: Date.now()
+        });
+        
+        // Show skeleton loading immediately for any deletion in server pagination mode
+        console.log('[SKELETON_DEBUG] Setting skeleton state ON:', {
+          newCount,
+          serverPage: currentPageNum,
+          timestamp: Date.now()
+        });
+        setIsBackfillLoading(true);
+        setBackfillSkeletonCount(newCount);
+        
+        // Clear any existing timeout and set a new one
+        if (backfillTimeoutRef.current) {
+          clearTimeout(backfillTimeoutRef.current);
+        }
+        
+        // Debounce backfill requests to handle multiple rapid deletions
+        backfillTimeoutRef.current = setTimeout(async () => {
+          const deletionsCount = deletionsCountRef.current.get(currentPageNum) || 0;
+          
+          // Only trigger backfill if we've deleted a significant number of items
+          // or if we've deleted more than half the page
+          const backfillThreshold = Math.min(3, Math.ceil(itemsPerPage / 2));
+          
+          if (deletionsCount >= backfillThreshold) {
+            console.log('[BackfillDebug] Triggering backfill request:', {
+              page: currentPageNum,
+              deletionsCount,
+              backfillThreshold,
+              itemsPerPage,
+              timestamp: Date.now()
+            });
+            
+            try {
+              // Skeleton loading state is already set immediately upon deletion
+              console.log('[SKELETON_DEBUG] Starting backfill request');
+              const backfillItems = await onBackfillRequest(deletionsCount, currentPageNum, itemsPerPage);
+              console.log('[SKELETON_DEBUG] Backfill request completed - clearing skeleton immediately:', {
+                backfillItemsCount: backfillItems.length,
+                timestamp: Date.now()
+              });
+              
+              // Clear skeleton immediately when backfill request completes
+              setIsBackfillLoading(false);
+              setBackfillSkeletonCount(0);
+              
+              // Reset deletion count for this page since we've backfilled
+              deletionsCountRef.current.delete(currentPageNum);
+              
+              console.log('[SKELETON_DEBUG] Deletion count reset for page:', currentPageNum);
+            } catch (error) {
+              console.error('[SKELETON_DEBUG] Backfill failed - clearing skeleton:', error);
+              // Clear skeleton even if backfill fails
+              setIsBackfillLoading(false);
+              setBackfillSkeletonCount(0);
+              // Reset deletion count even if backfill fails
+              deletionsCountRef.current.delete(currentPageNum);
+              console.log('[SKELETON_DEBUG] Deletion count reset for page (after error):', currentPageNum);
+              // Don't show error to user as this is a nice-to-have feature
+            } finally {
+              console.log('[SKELETON_DEBUG] Backfill request finished - skeleton cleared');
+            }
+          }
+        }, 500); // 500ms debounce
+      }
+      
       // If successful, the image will be removed from the server response
       // and our reconciliation effect will clean up the optimistic state
     } catch (error) {
       console.error('Delete failed, reverting optimistic state:', error);
       // If delete fails, remove from optimistic deleted state to show the image again
       removeOptimisticDeleted(imageId);
+      
+      // Clear skeleton loading state if delete fails
+      if (isServerPagination && serverPage && onBackfillRequest) {
+        const currentPageNum = serverPage;
+        const currentCount = deletionsCountRef.current.get(currentPageNum) || 0;
+        if (currentCount > 0) {
+          deletionsCountRef.current.set(currentPageNum, currentCount - 1);
+          const newCount = currentCount - 1;
+          if (newCount === 0) {
+            setIsBackfillLoading(false);
+            setBackfillSkeletonCount(0);
+          } else {
+            setBackfillSkeletonCount(newCount);
+          }
+        }
+      }
       
       // Show error toast
       toast({
@@ -84,7 +211,7 @@ export const useImageGalleryActions = ({
         variant: "destructive"
       });
     }
-  }, [markOptimisticDeleted, removeOptimisticDeleted, onDelete, activeLightboxMedia, setActiveLightboxMedia, toast]);
+  }, [markOptimisticDeleted, removeOptimisticDeleted, onDelete, activeLightboxMedia, setActiveLightboxMedia, toast, isServerPagination, serverPage, onBackfillRequest, itemsPerPage, setIsBackfillLoading, setBackfillSkeletonCount]);
 
   const handleOpenLightbox = useCallback((image: GeneratedImageWithMetadata) => {
     console.log('[MobileDebug] handleOpenLightbox called with image:', {
@@ -203,6 +330,23 @@ export const useImageGalleryActions = ({
     setLastAffectedShotId(shotId);
   }, [setLastAffectedShotId]);
 
+  // Handle skeleton cleared callback - reset deletion count
+  const handleSkeletonCleared = useCallback(() => {
+    if (isServerPagination && serverPage) {
+      console.log('[SKELETON_DEBUG] Skeleton cleared callback - resetting deletion count for page:', serverPage);
+      deletionsCountRef.current.delete(serverPage);
+    }
+  }, [isServerPagination, serverPage]);
+
+  // Cleanup backfill timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (backfillTimeoutRef.current) {
+        clearTimeout(backfillTimeoutRef.current);
+      }
+    };
+  }, []);
+
   return {
     handleOptimisticDelete,
     handleOpenLightbox,
@@ -212,5 +356,6 @@ export const useImageGalleryActions = ({
     handleShowTick,
     handleShowSecondaryTick,
     handleShotChange,
+    handleSkeletonCleared,
   };
 };

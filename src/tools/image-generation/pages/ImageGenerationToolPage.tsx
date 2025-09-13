@@ -727,6 +727,43 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     setSelectedShotFilter(shotId);
   }, []); // Remove dependencies to prevent stale closure issues
 
+  // Handle backfill request to fill empty spaces after deletions
+  const handleBackfillRequest = useCallback(async (deletedCount: number, currentPage: number, itemsPerPage: number): Promise<GeneratedImageWithMetadata[]> => {
+    if (!selectedProjectId) {
+      console.warn('[BackfillDebug] No project selected for backfill');
+      return [];
+    }
+
+    try {
+      console.log('[BackfillDebug] Triggering data refresh for backfill:', {
+        deletedCount,
+        currentPage,
+        itemsPerPage,
+        selectedProjectId,
+        timestamp: Date.now()
+      });
+
+      // Instead of fetching new data, we'll trigger a refresh of the current page
+      // The server will naturally return items from the next page to fill gaps
+      await queryClient.invalidateQueries({ 
+        queryKey: ['unified-generations', 'project', selectedProjectId] 
+      });
+      
+      // Refetch the current page - this will get updated data with items moved up from next page
+      await queryClient.refetchQueries({ 
+        queryKey: ['unified-generations', 'project', selectedProjectId, currentPage, itemsPerPage, generationsFilters] 
+      });
+
+      console.log('[BackfillDebug] Data refresh completed for backfill');
+      
+      // Return empty array since the refresh will update the main data source
+      return [];
+    } catch (error) {
+      console.error('[BackfillDebug] Failed to refresh data for backfill:', error);
+      return [];
+    }
+  }, [selectedProjectId, queryClient, generationsFilters]);
+
   // Handle creating a new shot
   const handleCreateShot = useCallback(async (shotName: string, files: File[]) => {
     if (!selectedProjectId) {
@@ -1211,6 +1248,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
                 onSwitchToAssociatedShot={handleSwitchToAssociatedShot}
                 onPrefetchAdjacentPages={handlePrefetchAdjacentPages}
                 onCreateShot={handleCreateShot}
+                onBackfillRequest={handleBackfillRequest}
               />
               </div>
             )}

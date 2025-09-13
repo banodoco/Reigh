@@ -122,6 +122,47 @@ const GenerationsPage: React.FC = () => {
     }
   }, [selectedProjectId, queryClient, mediaTypeFilter, selectedShotFilter, excludePositioned, starredOnly]);
 
+  // Handle backfill request to fill empty spaces after deletions
+  const handleBackfillRequest = useCallback(async (deletedCount: number, currentPage: number, itemsPerPage: number) => {
+    if (!selectedProjectId) {
+      console.warn('[BackfillDebug] No project selected for backfill');
+      return [];
+    }
+
+    try {
+      console.log('[BackfillDebug] Triggering data refresh for backfill:', {
+        deletedCount,
+        currentPage,
+        itemsPerPage,
+        selectedProjectId,
+        timestamp: Date.now()
+      });
+
+      const filters = { 
+        mediaType: mediaTypeFilter,
+        shotId: selectedShotFilter === 'all' ? undefined : selectedShotFilter,
+        excludePositioned: selectedShotFilter !== 'all' ? excludePositioned : undefined,
+        starredOnly
+      };
+
+      // Trigger a refresh of the current page - this will get updated data with items moved up from next page
+      await queryClient.invalidateQueries({ 
+        queryKey: ['unified-generations', 'project', selectedProjectId] 
+      });
+      
+      await queryClient.refetchQueries({ 
+        queryKey: ['unified-generations', 'project', selectedProjectId, currentPage, itemsPerPage, filters] 
+      });
+
+      console.log('[BackfillDebug] Data refresh completed for backfill');
+      
+      // Return empty array since the refresh will update the main data source
+      return [];
+    } catch (error) {
+      console.error('[BackfillDebug] Failed to refresh data for backfill:', error);
+      return [];
+    }
+  }, [selectedProjectId, queryClient, mediaTypeFilter, selectedShotFilter, excludePositioned, starredOnly]);
 
     // EARLY SKELETON GATE: Show skeleton immediately if we're in any loading state
   // This prevents any UI flash (header, filters, empty state) during initial load
@@ -189,6 +230,7 @@ const GenerationsPage: React.FC = () => {
           initialStarredFilter={starredOnly}
           onStarredFilterChange={setStarredOnly}
           onPrefetchAdjacentPages={handlePrefetchAdjacentPages}
+          onBackfillRequest={handleBackfillRequest}
         />
         );
       })()}

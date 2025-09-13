@@ -216,7 +216,7 @@ export const ImageGalleryPagination: React.FC<ImageGalleryPaginationProps> = ({
             paddingRight: '16px',
           }}
         >
-          <div className="bg-white/95 backdrop-blur-md rounded-full px-4 py-2 shadow-lg border border-gray-200/50">
+          <div className="bg-white/80 backdrop-blur-md rounded-full px-4 py-2 shadow-lg border border-gray-200/50">
             <div className="flex items-center gap-3">
               <Button
                 variant="outline"

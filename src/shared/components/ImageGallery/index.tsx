@@ -131,6 +131,7 @@ export interface ImageGalleryProps {
   onPrefetchAdjacentPages?: (prevPage: number | null, nextPage: number | null) => void;
   enableAdjacentPagePreloading?: boolean;
   onCreateShot?: (shotName: string, files: File[]) => Promise<void>;
+  onBackfillRequest?: (deletedCount: number, currentPage: number, itemsPerPage: number) => Promise<GeneratedImageWithMetadata[]>;
 }
 
 /**
@@ -189,7 +190,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = (props) => {
     onPrefetchAdjacentPages,
     enableAdjacentPagePreloading = true,
     onCreateShot,
-    lastShotNameForTooltip
+    lastShotNameForTooltip,
+    onBackfillRequest
   } = props;
 
   // Get project context for cache clearing and aspect ratio
@@ -316,6 +318,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = (props) => {
     currentShotId,
     lastShotId,
     simplifiedShotOptions,
+    isServerPagination: !!(onServerPageChange && serverPage),
+    serverPage,
   });
 
   // Filters hook
@@ -373,6 +377,12 @@ export const ImageGallery: React.FC<ImageGalleryProps> = (props) => {
     setShowTickForSecondaryImageId: stateHook.setShowTickForSecondaryImageId,
     mainTickTimeoutRef: stateHook.mainTickTimeoutRef,
     secondaryTickTimeoutRef: stateHook.secondaryTickTimeoutRef,
+    onBackfillRequest,
+    serverPage,
+    itemsPerPage: actualItemsPerPage,
+    isServerPagination: paginationHook.isServerPagination,
+    setIsBackfillLoading: stateHook.setIsBackfillLoading,
+    setBackfillSkeletonCount: stateHook.setBackfillSkeletonCount,
   });
 
   // Mobile interactions hook
@@ -701,6 +711,13 @@ export const ImageGallery: React.FC<ImageGalleryProps> = (props) => {
           
           // Filter state for empty states
           hasFilters={hasFilters}
+          
+          // Backfill state
+          isBackfillLoading={stateHook.isBackfillLoading}
+          backfillSkeletonCount={stateHook.backfillSkeletonCount}
+          setIsBackfillLoading={stateHook.setIsBackfillLoading}
+          setBackfillSkeletonCount={stateHook.setBackfillSkeletonCount}
+          onSkeletonCleared={actionsHook.handleSkeletonCleared}
           
           // ImageGalleryItem props
           isDeleting={isDeleting}
