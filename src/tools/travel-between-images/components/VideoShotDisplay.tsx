@@ -118,10 +118,15 @@ const ShotImage: React.FC<ShotImageProps> = ({ image, index, onSelectShot, shotN
 
   return (
     <div
-      className="flex-shrink-0 w-32 rounded overflow-hidden border relative bg-gray-200 pointer-events-none"
+      className="flex-shrink-0 w-32 rounded overflow-hidden border relative bg-gray-200"
       style={{
         animationDelay: `${index * 0.1}s`,
         height: `${finalHeight}px`,
+      }}
+      onClick={(e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        // Prevent clicking on individual images - they should not be interactive
       }}
     >
       {imageLoadError ? (
@@ -189,10 +194,15 @@ const PlaceholderBlock: React.FC<PlaceholderBlockProps> = ({ index, projectAspec
 
   return (
     <div
-      className="flex-shrink-0 w-32 rounded overflow-hidden border relative bg-gray-100 pointer-events-none opacity-30"
+      className="flex-shrink-0 w-32 rounded overflow-hidden border relative bg-gray-100 opacity-30"
       style={{
         animationDelay: `${index * 0.1}s`,
         height: `${finalHeight}px`,
+      }}
+      onClick={(e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        // Prevent clicking on placeholder blocks
       }}
     >
       <div className="absolute inset-0 flex items-center justify-center">
@@ -494,10 +504,15 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
             
             return (
               <div 
-                className="flex-shrink-0 w-32 rounded border bg-muted animate-in fade-in-up relative pointer-events-none"
+                className="flex-shrink-0 w-32 rounded border bg-muted animate-in fade-in-up relative"
                 style={{
                   animationDelay: `${imagesToShow.length * 0.1}s`,
                   height: `${finalHeight}px`,
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  // Prevent clicking on more indicator
                 }}
               >
                 <div className="absolute inset-0 flex items-center justify-center">
