@@ -133,7 +133,7 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({ isOpen, onOpenChan
                 However, for those who prefer the convenience of running on the cloud, we charge twice compute costs. Because we run on consumer GPUs, this is still significantly cheaper than other providers.
               </p>
               <p>
-                Of this, after costs, we offer 16% of our lifetime profits from referred users to those who refer them via a link:
+                Of this, after costs, we offer 16% of our <strong>lifetime</strong> profits from referred users to those who refer them via a link:
               </p>
             </div>
 

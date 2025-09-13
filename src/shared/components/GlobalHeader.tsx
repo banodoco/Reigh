@@ -178,7 +178,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
   // Generate dynamic referral button text based on stats
   const getReferralButtonText = () => {
     if (!session || !referralStats) {
-      return "Refer people to Reigh?";
+      return "You've referred 0 visitors :(";
     }
 
     const { total_visits, successful_referrals } = referralStats;
@@ -197,7 +197,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
     }
 
     // Default text when no stats
-    return "Refer people to Reigh?";
+    return "You've referred 0 visitors :(";
   };
 
   const selectedProject = projects.find(p => p.id === selectedProjectId);
