@@ -14,7 +14,7 @@ import { useLastAffectedShot } from "@/shared/hooks/useLastAffectedShot";
 import { useProject } from "@/shared/contexts/ProjectContext";
 import { uploadImageToStorage } from '@/shared/lib/imageUploader';
 import { nanoid } from 'nanoid';
-import { useGenerations, useDeleteGeneration, useUpdateGenerationLocation, GenerationsPaginatedResponse } from "@/shared/hooks/useGenerations";
+import { useGenerations, useDeleteGeneration, useUpdateGenerationLocation, useCreateGeneration, GenerationsPaginatedResponse } from "@/shared/hooks/useGenerations";
 
 import { useApiKeys } from '@/shared/hooks/useApiKeys';
 import { useQueryClient } from '@tanstack/react-query';
@@ -276,6 +276,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   
   const deleteGenerationMutation = useDeleteGeneration();
   const updateGenerationLocationMutation = useUpdateGenerationLocation();
+  const createGenerationMutation = useCreateGeneration();
 
   const queryClient = useQueryClient();
   
@@ -492,31 +493,92 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
 
   // Remove the old task tracking effect - it's now handled by useTaskQueueNotifier
 
-  const handleImageSaved = useCallback(async (imageId: string, newImageUrl: string) => {
+  const handleImageSaved = useCallback(async (imageId: string, newImageUrl: string, createNew?: boolean) => {
     try {
-      // Update the database record via Supabase
-      await updateGenerationLocationMutation.mutateAsync({
-        id: imageId,
-        location: newImageUrl,
-      });
+      if (createNew) {
+        // Create a new generation entry
+        const originalImage = generatedImages.find(img => img.id === imageId);
+        if (!originalImage) {
+          throw new Error('Original image not found');
+        }
 
-      // Update local state
-      setGeneratedImages(prevImages => {
-        return prevImages.map(img => 
-          img.id === imageId 
-            ? { ...img, url: newImageUrl } 
-            : img
-        );
-      });
+        const newGeneration = await createGenerationMutation.mutateAsync({
+          imageUrl: newImageUrl,
+          fileName: `edited_${originalImage.prompt?.substring(0, 20) || 'image'}.png`,
+          fileType: 'image/png',
+          fileSize: 0, // We don't have the file size for uploaded images
+          projectId: selectedProjectId!,
+          prompt: `Edited: ${originalImage.prompt || 'Image edit'}`,
+        });
 
-      // Invalidate the generations query to ensure fresh data
-      queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', selectedProjectId] });
+        // Add the new image to local state
+        const newImageWithMetadata: GeneratedImageWithMetadata = {
+          id: newGeneration.id,
+          url: newImageUrl,
+          prompt: `Edited: ${originalImage.prompt || 'Image edit'}`,
+          metadata: {
+            ...originalImage.metadata,
+            source: 'image_edit',
+            original_image_id: imageId,
+          },
+          createdAt: newGeneration.created_at || new Date().toISOString(),
+          isVideo: false,
+        };
+
+        setGeneratedImages(prevImages => [newImageWithMetadata, ...prevImages]);
+      } else {
+        // Update the existing database record via Supabase
+        await updateGenerationLocationMutation.mutateAsync({
+          id: imageId,
+          location: newImageUrl,
+          projectId: selectedProjectId, // Pass projectId so cache invalidation works properly
+        });
+
+        // Update local state with cache-busting URL
+        setGeneratedImages(prevImages => {
+          return prevImages.map(img => {
+            if (img.id === imageId) {
+              console.log('[ImageSave] Updating local state for image:', {
+                imageId,
+                oldUrl: img.url,
+                newUrl: newImageUrl,
+                urlChanged: img.url !== newImageUrl
+              });
+              return { 
+                ...img, 
+                url: newImageUrl,
+                thumbUrl: newImageUrl, // Also update thumbUrl so imageIdentifier changes
+                // Force re-render by updating a key that components watch
+                updatedAt: Date.now().toString()
+              };
+            }
+            return img;
+          });
+        });
+        // Optimistically update all cached generations lists so the gallery updates immediately
+        const generationsQueries = queryClient.getQueriesData({ queryKey: ['unified-generations'] });
+        generationsQueries.forEach(([qk, data]) => {
+          if (data && typeof data === 'object' && 'items' in data) {
+            const updated = {
+              ...(data as any),
+              items: (data as any).items.map((g: any) => (
+                g.id === imageId ? { ...g, url: newImageUrl, thumbUrl: newImageUrl, updatedAt: Date.now().toString() } : g
+              )),
+            } as any;
+            queryClient.setQueryData(qk, updated);
+          }
+        });
+      }
+
+      // Aggressively invalidate and refetch the generations query to ensure fresh data
+      await queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', selectedProjectId] });
+      await queryClient.refetchQueries({ queryKey: ['unified-generations', 'project', selectedProjectId] });
       
     } catch (error) {
       console.error("[ImageGeneration-HandleImageSaved] Error:", error);
-      toast.error("Failed to update image.");
+      toast.error(createNew ? "Failed to create new image." : "Failed to update image.");
     }
-  }, [updateGenerationLocationMutation, setGeneratedImages, queryClient, selectedProjectId]);
+  }, [updateGenerationLocationMutation, createGenerationMutation, setGeneratedImages, queryClient, selectedProjectId, generatedImages]);
 
   const falApiKey = getApiKey('fal_api_key');
   const openaiApiKey = getApiKey('openai_api_key');

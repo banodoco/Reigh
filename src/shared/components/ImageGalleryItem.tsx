@@ -246,7 +246,8 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   
   // Track previous image ID to detect actual changes vs re-renders
   // Create a stable identifier for the image
-  const imageIdentifier = image.id || `${image.url}-${image.thumbUrl}`;
+  // Include URL (and optional updatedAt) so identifier changes when the image asset changes
+  const imageIdentifier = `${image.id}:${image.url || ''}:${image.thumbUrl || ''}:${(image as any).updatedAt || ''}`;
   const prevImageIdentifierRef = useRef<string>(imageIdentifier);
 
   // Handle image load error with retry mechanism

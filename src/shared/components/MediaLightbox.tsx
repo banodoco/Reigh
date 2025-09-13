@@ -6,6 +6,7 @@ import { Button } from '@/shared/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
 import ShotSelector from '@/shared/components/ShotSelector';
 import { getDisplayUrl, cn } from '@/shared/lib/utils';
+import { uploadImageToStorage } from '@/shared/lib/imageUploader';
 import TaskDetailsPanel from '@/tools/travel-between-images/components/TaskDetailsPanel';
 import { useToggleGenerationStar } from '@/shared/hooks/useGenerations';
 import MagicEditLauncher from '@/shared/components/MagicEditLauncher';
@@ -426,14 +427,19 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       });
 
       if (onImageSaved) {
-        const url = URL.createObjectURL(blob);
-        
+        // Convert Blob to File and upload so we return a persistent URL
+        const fileName = `flipped_${media.id || 'image'}_${Date.now()}.png`;
+        const file = new File([blob], fileName, { type: 'image/png' });
+
+        // Upload to storage and get a public URL
+        const uploadedUrl = await uploadImageToStorage(file);
+
         // Reset state
         setIsFlippedHorizontally(false);
         setHasChanges(false);
 
-        // Await parent handler
-        await onImageSaved(url, true);
+        // Await parent handler with the persistent URL - always replace original
+        await onImageSaved(uploadedUrl, false);
 
         // Close the lightbox on successful save
         onClose();

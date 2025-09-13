@@ -453,7 +453,7 @@ export function useUpdateGenerationLocation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, location }: { id: string; location: string }) => {
+    mutationFn: ({ id, location, projectId }: { id: string; location: string; projectId?: string }) => {
       return updateGenerationLocation(id, location);
     },
     onSuccess: (data, variables) => {
@@ -461,7 +461,7 @@ export function useUpdateGenerationLocation() {
       invalidationRouter.emit({
         type: 'GENERATION_LOCATION_UPDATE',
         payload: {
-          projectId: data?.project_id,
+          projectId: variables.projectId, // Use projectId from variables since updateGenerationLocation returns void
           generationId: variables.id
         }
       });
