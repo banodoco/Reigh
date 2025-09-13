@@ -118,14 +118,10 @@ const ShotImage: React.FC<ShotImageProps> = ({ image, index, onSelectShot, shotN
 
   return (
     <div
-      className="flex-shrink-0 w-32 rounded overflow-hidden border cursor-pointer hover:shadow-wes-deep hover:scale-105 transition-all duration-300 relative bg-gray-200"
+      className="flex-shrink-0 w-32 rounded overflow-hidden border relative bg-gray-200 pointer-events-none"
       style={{
         animationDelay: `${index * 0.1}s`,
         height: `${finalHeight}px`,
-      }}
-      onClick={(e) => {
-        e.stopPropagation();
-        onSelectShot();
       }}
     >
       {imageLoadError ? (
@@ -165,6 +161,43 @@ const ShotImage: React.FC<ShotImageProps> = ({ image, index, onSelectShot, shotN
           )}
         </>
       )}
+    </div>
+  );
+};
+
+// Component for empty placeholder blocks to maintain consistent layout
+interface PlaceholderBlockProps {
+  index: number;
+  projectAspectRatio?: string;
+}
+
+const PlaceholderBlock: React.FC<PlaceholderBlockProps> = ({ index, projectAspectRatio }) => {
+  // Calculate final height using the same logic as ShotImage
+  const imageWidth = 128; // from w-32 class
+  let desiredHeight = imageWidth; // Default to 1:1
+
+  if (projectAspectRatio) {
+    const ratio = parseRatio(projectAspectRatio); // This is width/height
+    if (!isNaN(ratio) && ratio > 0) {
+      desiredHeight = imageWidth / ratio;
+    }
+  }
+
+  const minHeight = 120; // Sensible min-height to fill the card vertically
+  const maxHeight = imageWidth * 2; // Max height of 2:1 portrait to prevent layout breaking
+  const finalHeight = Math.min(Math.max(desiredHeight, minHeight), maxHeight);
+
+  return (
+    <div
+      className="flex-shrink-0 w-32 rounded overflow-hidden border relative bg-gray-100 pointer-events-none opacity-30"
+      style={{
+        animationDelay: `${index * 0.1}s`,
+        height: `${finalHeight}px`,
+      }}
+    >
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="w-8 h-8 rounded border-2 border-dashed border-gray-300"></div>
+      </div>
     </div>
   );
 };
@@ -317,6 +350,12 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
     });
 
   const imagesToShow: GenerationRow[] = positionedImages.slice(0, 5);
+  
+  // Calculate how many placeholder blocks we need to fill to 5 total slots
+  const maxSlots = 5;
+  const actualImageCount = Math.min(imagesToShow.length, maxSlots);
+  const hasMoreIndicator = positionedImages.length > 5;
+  const placeholderCount = hasMoreIndicator ? 0 : Math.max(0, maxSlots - actualImageCount);
 
   // [Performance] Disabled excessive logging that was causing render cascades
   // Debug logging
@@ -405,20 +444,37 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
         
         <div className="flex space-x-2 overflow-x-auto flex-1 items-start">
           {imagesToShow.length > 0 ? (
-            imagesToShow.map((image, index) => (
-              <ShotImage
-                key={image.shotImageEntryId || `img-${index}`}
-                image={image}
+            <>
+              {imagesToShow.map((image, index) => (
+                <ShotImage
+                  key={image.shotImageEntryId || `img-${index}`}
+                  image={image}
+                  index={index}
+                  onSelectShot={onSelectShot}
+                  shotName={shot.name}
+                  shouldLoad={shouldLoadImages}
+                  shotIndex={shotIndex}
+                  projectAspectRatio={projectAspectRatio}
+                />
+              ))}
+              {/* Add placeholder blocks to fill remaining slots */}
+              {Array.from({ length: placeholderCount }).map((_, index) => (
+                <PlaceholderBlock
+                  key={`placeholder-${index}`}
+                  index={actualImageCount + index}
+                  projectAspectRatio={projectAspectRatio}
+                />
+              ))}
+            </>
+          ) : (
+            /* Show placeholder blocks when no images exist */
+            Array.from({ length: maxSlots }).map((_, index) => (
+              <PlaceholderBlock
+                key={`empty-placeholder-${index}`}
                 index={index}
-                onSelectShot={onSelectShot}
-                shotName={shot.name}
-                shouldLoad={shouldLoadImages}
-                shotIndex={shotIndex}
                 projectAspectRatio={projectAspectRatio}
               />
             ))
-          ) : (
-            <p className="text-sm text-muted-foreground italic">No images in this shot yet.</p>
           )}
           {positionedImages.length > 5 && (() => {
             // Calculate aspect ratio padding for the "more" indicator to match other images
@@ -438,14 +494,10 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
             
             return (
               <div 
-                className="flex-shrink-0 w-32 rounded border bg-muted cursor-pointer hover:bg-muted/80 hover:shadow-wes-deep hover:scale-105 transition-all duration-300 animate-in fade-in-up relative"
+                className="flex-shrink-0 w-32 rounded border bg-muted animate-in fade-in-up relative pointer-events-none"
                 style={{
                   animationDelay: `${imagesToShow.length * 0.1}s`,
                   height: `${finalHeight}px`,
-                }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onSelectShot();
                 }}
               >
                 <div className="absolute inset-0 flex items-center justify-center">
