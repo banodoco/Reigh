@@ -21,7 +21,6 @@ interface TaskListProps {
   paginatedData?: PaginatedTasksResponse;
   isLoading?: boolean;
   currentPage?: number; // Add current page to track pagination changes
-  onVisibleCountChange?: (count: number) => void; // Callback to report actual visible count
 }
 
 const TaskList: React.FC<TaskListProps> = ({ 
@@ -30,8 +29,7 @@ const TaskList: React.FC<TaskListProps> = ({
   statusCounts,
   paginatedData,
   isLoading = false,
-  currentPage = 1,
-  onVisibleCountChange
+  currentPage = 1
 }) => {
   const { selectedProjectId } = useProject();
 
@@ -88,21 +86,7 @@ const TaskList: React.FC<TaskListProps> = ({
     hasInitializedRef.current = false;
   }, [filterStatuses, currentPage]);
 
-  // Calculate processing count for parent callback (separate from filtered tasks)
-  const processingVisibleCount = useMemo(() => {
-    if (!tasks) return 0;
-    const visible = filterVisibleTasks(tasks);
-    return activeFilter === 'Processing'
-      ? visible.filter(t => t.status === 'Queued' || t.status === 'In Progress').length
-      : 0;
-  }, [tasks, activeFilter]);
-
-  // Report the actual visible processing count to parent for badge (in effect, not during render)
-  useEffect(() => {
-    if (onVisibleCountChange && activeFilter === 'Processing') {
-      onVisibleCountChange(processingVisibleCount);
-    }
-  }, [processingVisibleCount, activeFilter, onVisibleCountChange]);
+  // Note: Processing count for badge is now handled by parent using status counts total
 
   // Filter out travel_segment and travel_stitch tasks so they do not appear in the sidebar
   // NOTE: Sorting is now done at the query level in usePaginatedTasks for better performance
@@ -120,13 +104,11 @@ const TaskList: React.FC<TaskListProps> = ({
         visibleCount: visible.length,
         hiddenCount: hidden.length,
         hiddenTypesSample: hidden.slice(0, 5).map(t => ({ id: t.id, taskType: t.taskType, status: t.status })),
-        processingVisibleCount,
-        reportedToParent: activeFilter === 'Processing' ? processingVisibleCount : 'not processing filter',
         timestamp: Date.now()
       });
     } catch {}
     return visible;
-  }, [tasks, activeFilter, processingVisibleCount]);
+  }, [tasks, activeFilter]);
 
   const summaryMessage = useMemo(() => {
     if (!statusCounts) return null;

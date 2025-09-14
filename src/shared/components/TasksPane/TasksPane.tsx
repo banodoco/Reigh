@@ -315,27 +315,23 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
     }
   }, [statusCounts, isStatusCountsLoading, displayStatusCounts]);
   
-  // Track the actual visible processing count from TaskList
-  const [actualVisibleProcessingCount, setActualVisibleProcessingCount] = useState(0);
+  // Note: We now use status counts total instead of per-page visible count for badge consistency
 
-  // Use actual visible processing tasks count for the badge, fallback to status counts for other filters
-  const cancellableTaskCount = selectedFilter === 'Processing' 
-    ? actualVisibleProcessingCount 
-    : displayStatusCounts?.processing || 0;
+  // Use status counts for badge (total across all pages), not just current page count
+  const cancellableTaskCount = displayStatusCounts?.processing || 0;
   
   // Track count vs task list mismatch
   const currentTasksCount = (displayPaginatedData as any)?.tasks?.length || 0;
   const isProcessingFilter = selectedFilter === 'Processing';
   
-  // No mismatch detection needed when using visible count - they should always match
+  // Badge now uses status counts total, pagination uses database total - both should match
   const hasMismatch = false;
   
   console.log('[TasksPane] Badge count calculation', {
     selectedFilter,
-    actualVisibleProcessingCount,
-    fallbackStatusCount: displayStatusCounts?.processing || 0,
+    statusCountsProcessing: displayStatusCounts?.processing || 0,
     finalBadgeCount: cancellableTaskCount,
-    usingActualCount: selectedFilter === 'Processing',
+    usingStatusCounts: true,
     totalTasksInView: (displayPaginatedData as any)?.tasks?.length || 0,
     timestamp: Date.now()
   });
@@ -369,10 +365,6 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
   const handleFilterChange = (filter: FilterGroup) => {
     setSelectedFilter(filter);
     setCurrentPage(1);
-    // Reset processing count when switching away from Processing filter
-    if (filter !== 'Processing') {
-      setActualVisibleProcessingCount(0);
-    }
   };
 
   // Handle page changes
@@ -446,9 +438,11 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
     onToggleLock: () => setIsTasksPaneLocked(!isTasksPaneLocked),
   });
 
-  // Calculate pagination info using display data to avoid flickering
-  const totalTasks = (displayPaginatedData as any)?.total || 0;
-  const totalPages = (displayPaginatedData as any)?.totalPages || 0;
+  // Calculate pagination info - use status counts for consistency with badge
+  const totalTasks = selectedFilter === 'Processing' 
+    ? (displayStatusCounts?.processing || 0)
+    : ((displayPaginatedData as any)?.total || 0);
+  const totalPages = Math.ceil(totalTasks / ITEMS_PER_PAGE);
 
   return (
     <>
@@ -515,7 +509,7 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
               {/* Processing button - full width on top */}
               {(() => {
                 const filter = 'Processing' as FilterGroup;
-                // Use the actual visible processing count we compute live, not statusCounts
+                // Use the same status counts total that the badge uses
                 const count = cancellableTaskCount;
                 
                 return (
@@ -611,7 +605,6 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
               paginatedData={displayPaginatedData as any}
               isLoading={isPaginatedLoading}
               currentPage={currentPage}
-              onVisibleCountChange={setActualVisibleProcessingCount}
             />
           </div>
         </div>
