@@ -340,8 +340,8 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
       }
       
       // GALLERY PATTERN: Get count and data separately, efficiently
-      // Skip expensive count during fast polling (when likely active tasks)
-      const shouldSkipCount = status?.some(s => s === TASK_STATUS.QUEUED || s === TASK_STATUS.IN_PROGRESS);
+      // Always get accurate count - the approximation was causing 10x multiplication bug
+      const shouldSkipCount = false;
       
       // 1. Get total count with lightweight query (skip if fast polling likely)
       let countQuery = supabase
@@ -535,7 +535,8 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
       }
       
       // Use approximation when count is skipped during fast polling
-      const total = count !== null ? count : (paginatedTasks.length > 0 ? paginatedTasks.length * 10 : 0);
+      // For Processing tasks, use a more reasonable approximation based on current page
+      const total = count !== null ? count : Math.max(paginatedTasks.length, offset + paginatedTasks.length);
       const totalPages = Math.ceil(total / limit);
       const hasMore = count !== null ? offset + limit < total : paginatedTasks.length >= limit;
 
