@@ -333,6 +333,9 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
     finalBadgeCount: cancellableTaskCount,
     usingStatusCounts: true,
     totalTasksInView: (displayPaginatedData as any)?.tasks?.length || 0,
+    paginatedTotal: (displayPaginatedData as any)?.total || 0,
+    rawStatusCounts: statusCounts,
+    displayStatusCounts,
     timestamp: Date.now()
   });
   
@@ -511,6 +514,17 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
                 const filter = 'Processing' as FilterGroup;
                 // Use the same status counts total that the badge uses
                 const count = cancellableTaskCount;
+                
+                // Debug: Log what we're showing vs what we have
+                console.log('[TasksPane] Processing button count debug', {
+                  buttonCount: count,
+                  statusCountsProcessing: displayStatusCounts?.processing,
+                  paginatedTotal: (displayPaginatedData as any)?.total,
+                  tasksOnCurrentPage: (displayPaginatedData as any)?.tasks?.length,
+                  selectedFilter,
+                  currentPage,
+                  timestamp: Date.now()
+                });
                 
                 return (
                   <Button
