@@ -317,8 +317,12 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
   
   // Note: We now use status counts total instead of per-page visible count for badge consistency
 
-  // Use status counts for badge (total across all pages), not just current page count
-  const cancellableTaskCount = displayStatusCounts?.processing || 0;
+  // Always use paginated data total for perfect consistency between badge, pagination, and task list
+  // For Processing filter: shows total processing tasks across all pages
+  // For other filters: shows the processing tasks count from status counts (for the badge)
+  const cancellableTaskCount = selectedFilter === 'Processing' 
+    ? ((displayPaginatedData as any)?.total || 0)
+    : (displayStatusCounts?.processing || 0);
   
   // Track count vs task list mismatch
   const currentTasksCount = (displayPaginatedData as any)?.tasks?.length || 0;
@@ -330,12 +334,10 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
   console.log('[TasksPane] Badge count calculation', {
     selectedFilter,
     statusCountsProcessing: displayStatusCounts?.processing || 0,
-    finalBadgeCount: cancellableTaskCount,
-    usingStatusCounts: true,
-    totalTasksInView: (displayPaginatedData as any)?.tasks?.length || 0,
     paginatedTotal: (displayPaginatedData as any)?.total || 0,
-    rawStatusCounts: statusCounts,
-    displayStatusCounts,
+    finalBadgeCount: cancellableTaskCount,
+    usingPaginatedTotal: selectedFilter === 'Processing',
+    totalTasksInView: (displayPaginatedData as any)?.tasks?.length || 0,
     timestamp: Date.now()
   });
   
@@ -441,10 +443,8 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
     onToggleLock: () => setIsTasksPaneLocked(!isTasksPaneLocked),
   });
 
-  // Calculate pagination info - use status counts for consistency with badge
-  const totalTasks = selectedFilter === 'Processing' 
-    ? (displayStatusCounts?.processing || 0)
-    : ((displayPaginatedData as any)?.total || 0);
+  // Calculate pagination info - use paginated data total for perfect consistency with badge
+  const totalTasks = (displayPaginatedData as any)?.total || 0;
   const totalPages = Math.ceil(totalTasks / ITEMS_PER_PAGE);
 
   return (
@@ -518,7 +518,7 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
                 // Debug: Log what we're showing vs what we have
                 console.log('[TasksPane] Processing button count debug', {
                   buttonCount: count,
-                  statusCountsProcessing: displayStatusCounts?.processing,
+                  source: 'paginatedData.total (actual count from query)',
                   paginatedTotal: (displayPaginatedData as any)?.total,
                   tasksOnCurrentPage: (displayPaginatedData as any)?.tasks?.length,
                   selectedFilter,
