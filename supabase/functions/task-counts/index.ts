@@ -310,9 +310,11 @@ serve(async (req) => {
       
       // Aggregated counts and details for a single user
       console.log(`${pathTag} [TaskCounts:CountDebug] User ${callerId}: starting count computations`);
+      
+      // Use PAT-friendly functions that bypass credits and run_type constraints for PAT users
       const [countQueuedOnly, countQueuedPlusActive] = await Promise.all([
-        supabaseAdmin.rpc('count_eligible_tasks_user', { p_user_id: callerId, p_include_active: false, p_run_type: runType }),
-        supabaseAdmin.rpc('count_eligible_tasks_user', { p_user_id: callerId, p_include_active: true, p_run_type: runType })
+        supabaseAdmin.rpc('count_eligible_tasks_user_pat', { p_user_id: callerId, p_include_active: false }),
+        supabaseAdmin.rpc('count_eligible_tasks_user_pat', { p_user_id: callerId, p_include_active: true })
       ]);
 
       if (countQueuedOnly.error) {
@@ -333,9 +335,9 @@ serve(async (req) => {
       let eligible_queued = 0;
       let user_info: any = {};
       try {
-        console.log(`${pathTag} [TaskCounts:CountDebug] User ${callerId}: calling analyze_task_availability_user(include_active=true)`);
+        console.log(`${pathTag} [TaskCounts:CountDebug] User ${callerId}: calling analyze_task_availability_user_pat(include_active=true)`);
         const { data: analysis } = await supabaseAdmin
-          .rpc('analyze_task_availability_user', { p_user_id: callerId, p_include_active: true, p_run_type: runType });
+          .rpc('analyze_task_availability_user_pat', { p_user_id: callerId, p_include_active: true });
         if (analysis) {
           eligible_queued = analysis.eligible_count ?? 0;
           user_info = analysis.user_info ?? {};
@@ -360,9 +362,9 @@ serve(async (req) => {
         user_id: callerId,
         run_type_filter: runType,
         totals: {
-          queued_only_capacity,
-          active_only_capacity,
-          queued_plus_active_capacity,
+          queued_only: queued_only_capacity,
+          active_only: active_only_capacity,
+          queued_plus_active: queued_plus_active_capacity,
           eligible_queued,
           in_progress_any,
           in_progress_cloud,

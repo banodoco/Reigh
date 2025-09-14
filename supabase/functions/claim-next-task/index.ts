@@ -257,12 +257,11 @@ serve(async (req) => {
       const pathTag = runType === 'api' ? '[PERSONAL_ACCESS_TOKEN] [API_PATH]' : '[PERSONAL_ACCESS_TOKEN] [GPU_PATH]';
       console.log(`${pathTag} Using optimized PostgreSQL function for user ${callerId}`);
       
-      // Claim next eligible task for this user
+      // Claim next eligible task for this user using PAT-friendly function
       const { data: claimResult, error: claimError } = await supabaseAdmin
-        .rpc('claim_next_task_user', {
+        .rpc('claim_next_task_user_pat', {
           p_user_id: callerId,
-          p_include_active: false,
-          p_run_type: runType
+          p_include_active: false
         });
 
       if (claimError) {
@@ -273,13 +272,12 @@ serve(async (req) => {
       if (!claimResult || claimResult.length === 0) {
         console.log(`${pathTag} No eligible tasks available for user ${callerId}`);
         
-        // Add detailed debugging analysis for user
+        // Add detailed debugging analysis for user using PAT-friendly function
         try {
           const { data: analysis } = await supabaseAdmin
-            .rpc('analyze_task_availability_user', {
+            .rpc('analyze_task_availability_user_pat', {
               p_user_id: callerId,
-              p_include_active: false,
-              p_run_type: runType
+              p_include_active: false
             });
           
           if (analysis) {

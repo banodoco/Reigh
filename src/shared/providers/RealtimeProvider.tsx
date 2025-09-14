@@ -187,6 +187,36 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     timestamp: Date.now()
   });
   
+  // CRITICAL FIX: Prevent multiple RealtimeProvider instances with singleton pattern
+  React.useEffect(() => {
+    const now = Date.now();
+    const globalManager = (window as any).__GLOBAL_REALTIME_MANAGER__;
+    
+    if (globalManager && globalManager.timestamp > now - 5000) {
+      console.error('[RealtimeProvider] ⚠️ EXISTING MANAGER DETECTED - REUSING:', {
+        existingManagerAge: now - globalManager.timestamp,
+        timestamp: now
+      });
+      managerRef.current = globalManager.instance;
+      return;
+    }
+    
+    // Mark this as the active provider
+    (window as any).__GLOBAL_REALTIME_MANAGER__ = {
+      timestamp: now,
+      instance: null // Will be set when manager is created
+    };
+    
+    return () => {
+      // Only cleanup if this is the current global manager
+      const current = (window as any).__GLOBAL_REALTIME_MANAGER__;
+      if (current && current.timestamp === now) {
+        console.error('[RealtimeProvider] 🧹 CLEANING UP GLOBAL MANAGER');
+        (window as any).__GLOBAL_REALTIME_MANAGER__ = null;
+      }
+    };
+  }, []);
+  
   const [state, setState] = React.useState<RealtimeState>({
     isConnected: true,
     connectionState: undefined,
@@ -199,6 +229,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   const loggerRef = React.useRef<DiagnosticsLogger | null>(null);
   const managerRef = React.useRef<ProjectChannelManager | null>(null);
   const lastHealAtRef = React.useRef<number>(0);
+  const mountTimeRef = React.useRef<number>(Date.now());
   
   console.error('[SilentRejoinDebug] 🔧 REFS CREATED', {
     hasAdapterRef: !!adapterRef,
@@ -220,7 +251,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   try {
     if (!adapterRef.current) {
       console.error('[SilentRejoinDebug] 🔌 CREATING ADAPTER');
-      adapterRef.current = new SupabaseRealtimeAdapter();
+      adapterRef.current = new SupabaseRealtimeAdapter(loggerRef.current);
       console.error('[SilentRejoinDebug] ✅ ADAPTER CREATED', { adapter: !!adapterRef.current });
     }
     
@@ -237,9 +268,23 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     }
     
     if (!managerRef.current) {
-      console.error('[SilentRejoinDebug] 🎛️ CREATING MANAGER');
+      // Check if we can reuse existing global manager
+      const globalManager = (window as any).__GLOBAL_REALTIME_MANAGER__;
+      if (globalManager?.instance) {
+        console.error('[RealtimeProvider] ♻️ REUSING EXISTING GLOBAL MANAGER');
+        managerRef.current = globalManager.instance;
+        return;
+      }
+      
+      console.error('[RealtimeProvider] 🎛️ CREATING NEW MANAGER');
       managerRef.current = new ProjectChannelManager(adapterRef.current, diagnosticsRef.current, loggerRef.current, queryClient);
-      console.error('[SilentRejoinDebug] ✅ MANAGER CREATED', { manager: !!managerRef.current });
+      
+      // Store in global singleton
+      if (globalManager) {
+        globalManager.instance = managerRef.current;
+      }
+      
+      console.error('[RealtimeProvider] ✅ MANAGER CREATED AND STORED GLOBALLY');
     }
     
     console.error('[SilentRejoinDebug] 🎉 ALL COMPONENTS INITIALIZED', {
@@ -673,7 +718,23 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
             }));
           }
           
-          await rejoinLikeInitial();
+          // Only rejoin if channel is not already healthy
+          const currentChannelState = managerRef.current?.getChannelState?.() || 'unknown';
+          const shouldRejoin = currentChannelState !== 'joined';
+          
+          console.warn('[TabReactivation] 🔍 VISIBILITY RECOVERY DECISION:', {
+            currentChannelState,
+            shouldRejoin,
+            reason: shouldRejoin ? 'channel not joined' : 'channel already healthy',
+            timestamp: Date.now()
+          });
+          
+          if (shouldRejoin) {
+            console.warn('[TabReactivation] 🚀 TRIGGERING REJOIN - Channel needs healing');
+            await rejoinLikeInitial();
+          } else {
+            console.warn('[TabReactivation] ✅ SKIPPING REJOIN - Channel already healthy');
+          }
           
           // CRITICAL FIX: Force refetch instead of just invalidate to ensure UI updates after tab resume
           if (selectedProjectId) {
@@ -874,14 +935,21 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       
       if (channelState !== 'joined') {
         const since = now - lastHealAtRef.current;
+        
+        // Prevent healing during initial connection phase (first 10 seconds)
+        const timeSinceMount = now - (mountTimeRef.current || now);
+        const isInitialConnectionPhase = timeSinceMount < 10000;
+        
         console.warn('[SilentRejoinDebug] 🚨 WATCHDOG DETECTED NOT JOINED', {
           channelState,
           timeSinceLastHeal: since,
-          willTriggerRejoin: since > 3000,
+          timeSinceMount,
+          isInitialConnectionPhase,
+          willTriggerRejoin: since > 3000 && !isInitialConnectionPhase,
           timestamp: now
         });
         
-        if (since > 3000) {
+        if (since > 3000 && !isInitialConnectionPhase) {
           lastHealAtRef.current = now;
           try { 
             loggerRef.current?.warn('[ReconnectionIssue][Watchdog] Not joined → rejoining (simplified)'); 

@@ -571,11 +571,14 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       let processedDataURL = dataURL;
       if (selectedProjectId) {
         const { aspectRatio } = await resolveProjectResolution(selectedProjectId);
+        console.log('[StyleRefDebug] Project resolution lookup returned aspectRatio:', aspectRatio);
         const processed = await processStyleReferenceForAspectRatioString(dataURL, aspectRatio);
         
         if (processed) {
           processedDataURL = processed;
+          console.log('[StyleRefDebug] Style reference processing completed successfully');
         } else {
+          console.error('[StyleRefDebug] Style reference processing failed');
           throw new Error('Failed to process image for aspect ratio');
         }
       }
@@ -586,10 +589,30 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         throw new Error('Failed to convert processed image to file');
       }
       
+      console.log('[StyleRefDebug] Processed file details:', {
+        name: processedFile.name,
+        size: processedFile.size,
+        type: processedFile.type
+      });
+      
+      // Check the actual dimensions of the processed file
+      const tempImg = new Image();
+      tempImg.onload = () => {
+        console.log('[StyleRefDebug] Processed file actual dimensions:', tempImg.width, 'x', tempImg.height);
+      };
+      tempImg.src = processedDataURL;
+      
       // Upload processed version to storage
+      console.log('[StyleRefDebug] About to upload processed file to storage...');
       const processedUploadedUrl = await uploadImageToStorage(processedFile);
+      console.log('[StyleRefDebug] Upload completed, URL:', processedUploadedUrl);
       
       // Save both URLs - original for display, processed for generation
+      console.log('[StyleRefDebug] Saving URLs:', {
+        original: originalUploadedUrl,
+        processed: processedUploadedUrl
+      });
+      
       await updateProjectImageSettings('project', {
         styleReferenceImage: processedUploadedUrl, // Used for generation
         styleReferenceImageOriginal: originalUploadedUrl // Used for display
@@ -597,6 +620,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       markAsInteracted();
       // Optimistically reflect the original uploaded image for display
       setStyleReferenceOverride(originalUploadedUrl);
+      
+      console.log('[StyleRefDebug] Style reference upload completed successfully!');
     } catch (error) {
       console.error('Error uploading style reference:', error);
       // No toasts on failure per request

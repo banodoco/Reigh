@@ -120,6 +120,28 @@ export class ProjectChannelManager {
   getLastEventReceivedAt(): number { return this.lastEventReceivedAt || 0; }
 
   async join(projectId: string, forceRejoin: boolean = false) {
+    // Join concurrency guard - use existing now variable declared below
+    const elapsedSinceLastJoin = Date.now() - this.lastJoinAttemptAt;
+    
+    console.error('[JoinGuard] 🔍 JOIN ATTEMPT:', {
+      projectId,
+      forceRejoin,
+      joinInProgress: this.joinInProgress,
+      lastJoinAttemptAt: this.lastJoinAttemptAt,
+      elapsedSinceLastJoin,
+      throttleMs: this.joinThrottleMs,
+      willProceed: forceRejoin || !this.joinInProgress || elapsedSinceLastJoin > this.joinThrottleMs,
+      timestamp: Date.now()
+    });
+    
+    if (!forceRejoin && this.joinInProgress && elapsedSinceLastJoin < this.joinThrottleMs) {
+      console.error('[JoinGuard] ⏸️ JOIN THROTTLED - ignoring concurrent join attempt');
+      return;
+    }
+    
+    this.joinInProgress = true;
+    this.lastJoinAttemptAt = Date.now();
+    
     this.logger.error('[SilentRejoinDebug] 🔗 MANAGER.JOIN() CALLED', {
       projectId,
       forceRejoin,
@@ -316,7 +338,7 @@ export class ProjectChannelManager {
       timestamp: Date.now()
     });
     
-    this.channel = this.adapter.channel(topic);
+    this.channel = await this.adapter.channel(topic);
     this.handlersAttached = false;
     this.channelCreatedAt = Date.now();
     this.eventSequence = 0;
@@ -561,6 +583,21 @@ export class ProjectChannelManager {
                 channelRef: this.ref,
                 timestamp: Date.now()
               });
+
+              // CRITICAL: Enhanced join reply analysis
+              if (event === 'phx_reply' && ref === this.joinRef) {
+                console.error('[PhoenixJoinDiag] 🎯 JOIN REPLY RECEIVED:', {
+                  payload,
+                  payloadStatus: payload?.status,
+                  payloadResponse: payload?.response,
+                  isOk: payload?.status === 'ok',
+                  isError: payload?.status === 'error',
+                  errorReason: payload?.response?.reason || payload?.response,
+                  channelState: this.state,
+                  joinRef: this.joinRef,
+                  timestamp: Date.now()
+                });
+              }
             }
             
             // Update realtime snapshot with latest activity
@@ -626,6 +663,74 @@ export class ProjectChannelManager {
       timestamp: Date.now()
     });
 
+    // CRITICAL: Log realtime connection details at subscribe time
+    try {
+      const realtime = (window as any).supabase?.realtime;
+      this.logger.error('[PhoenixJoinDiag] 🔍 REALTIME CONNECTION DETAILS AT SUBSCRIBE:', {
+        endPointURL: realtime?.conn?.endPointURL?.(),
+        params: realtime?.params,
+        connState: realtime?.conn?.connectionState,
+        connTransport: !!realtime?.conn?.transport,
+        connTransportType: typeof realtime?.conn?.transport,
+        connIsConnecting: realtime?.conn?.isConnecting,
+        connShouldReconnect: realtime?.conn?.shouldReconnect,
+        timestamp: Date.now()
+      });
+    } catch (e) {
+      this.logger.error('[PhoenixJoinDiag] ❌ Failed to log connection details:', e);
+    }
+
+    // CRITICAL: Intercept socket.send to capture join frame transmission
+    try {
+      const realtime = (window as any).supabase?.realtime;
+      const socket = realtime?.conn?.transport;
+      if (socket && !socket.__SEND_INTERCEPTED__) {
+        socket.__SEND_INTERCEPTED__ = true;
+        const originalSend = socket.send;
+        let sendCount = 0;
+        
+        socket.send = function(data: any) {
+          sendCount++;
+          if (sendCount <= 5) {
+            try {
+              const parsedData = typeof data === 'string' ? JSON.parse(data) : data;
+              console.error('[PhoenixJoinDiag] 📤 SOCKET.SEND FRAME #' + sendCount + ':', {
+                rawData: typeof data === 'string' ? data.slice(0, 200) + '...' : '[BINARY]',
+                parsedData,
+                event: parsedData?.event,
+                topic: parsedData?.topic,
+                ref: parsedData?.ref,
+                payload: parsedData?.payload,
+                isJoinFrame: parsedData?.event === 'phx_join',
+                timestamp: Date.now()
+              });
+            } catch (parseError) {
+              console.error('[PhoenixJoinDiag] 📤 SOCKET.SEND FRAME #' + sendCount + ' (unparseable):', {
+                rawData: String(data).slice(0, 100),
+                dataType: typeof data,
+                timestamp: Date.now()
+              });
+            }
+          }
+          return originalSend.call(this, data);
+        };
+      }
+    } catch (e) {
+      this.logger.error('[PhoenixJoinDiag] ❌ Failed to intercept socket.send:', e);
+    }
+
+    // CRITICAL: Log pushBuffer state before subscribe call
+    const pushBufferBefore = channelRef.pushBuffer?.length || 0;
+    this.logger.error('[PhoenixJoinDiag] 📋 PUSH BUFFER STATE BEFORE SUBSCRIBE:', {
+      pushBufferLength: pushBufferBefore,
+      pushBufferItems: (channelRef.pushBuffer || []).slice(0, 3).map((item: any) => ({
+        event: item?.event,
+        payload: item?.payload,
+        ref: item?.ref
+      })),
+      timestamp: Date.now()
+    });
+
     const ref = await (this.channel as any).subscribe((status: any, response?: any) => {
       try {
         const elapsed = Date.now() - subscribeStartedAt;
@@ -639,6 +744,26 @@ export class ProjectChannelManager {
           socketState: (this.channel as any)?.socket?.readyState,
           timestamp: Date.now()
         });
+
+        // CRITICAL: Log join ref and response details for timeouts/errors
+        if (status === 'TIMED_OUT' || status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+          const currentJoinRef = channelRef.joinRef;
+          const currentRef = channelRef.ref;
+          this.logger.error('[PhoenixJoinDiag] 🚨 JOIN FAILURE DETAILS:', {
+            status,
+            response,
+            joinRef: currentJoinRef,
+            channelRef: currentRef,
+            subscribeRef: ref,
+            pushBufferAfter: channelRef.pushBuffer?.length || 0,
+            lastPushes: (channelRef.pushBuffer || []).slice(-3).map((item: any) => ({
+              event: item?.event,
+              ref: item?.ref,
+              sent: item?.sent
+            })),
+            timestamp: Date.now()
+          });
+        }
         
         // CRITICAL: Log detailed subscribe result for diagnosis
         const subscribeResult = {
@@ -1377,7 +1502,7 @@ export class ProjectChannelManager {
     if (!this.projectId) return;
     const topic = buildTaskUpdatesTopic(this.projectId);
     try { if (this.channel) await (this.channel as any).unsubscribe?.(); } catch {}
-    this.channel = this.adapter.channel(topic);
+    this.channel = await this.adapter.channel(topic);
     this.handlersAttached = false;
     this.attachHandlersOnce();
     this.diagnostics.increment('channelRecreatedCount');

@@ -68,16 +68,23 @@ try {
         const isAuthRequest = url.includes('/auth/v1/');
         const isRestRequest = url.includes('/rest/v1/');
         if (!isEdgeFunction && !isStorageUpload) {
-          console.error('[ReconnectionIssue] Allowing unlimited time for auth/rest request:', { url, isAuthRequest, isRestRequest });
+          // Sample logging: only log 1 in 20 requests to reduce noise
+          const shouldLog = Math.random() < 0.05;
+          if (shouldLog) {
+            console.error('[ReconnectionIssue] Allowing unlimited time for auth/rest request:', { url, isAuthRequest, isRestRequest });
+          }
           const startTime = Date.now();
           return fetch(url, options).then(
             (response) => {
               const duration = Date.now() - startTime;
-              console.error('[ReconnectionIssue] Auth/rest request succeeded:', { url, duration, status: (response as any).status });
+              if (shouldLog) {
+                console.error('[ReconnectionIssue] Auth/rest request succeeded:', { url, duration, status: (response as any).status });
+              }
               return response;
             },
             (error) => {
               const duration = Date.now() - startTime;
+              // Always log errors, but sample success/start logs
               console.error('[ReconnectionIssue] Auth/rest request failed:', { url, duration, error: (error as any).message, name: (error as any).name });
               throw error;
             }

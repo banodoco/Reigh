@@ -110,6 +110,43 @@ function validateBatchImageGenerationParams(params: BatchImageGenerationTaskPara
 // Removed buildImageGenerationPayload function - now storing all data at top level to avoid duplication
 
 /**
+ * Calculates the final resolution for image generation tasks
+ * @param projectId - Project ID for resolution lookup
+ * @param customResolution - Optional custom resolution override
+ * @param modelName - Model name (affects scaling for Qwen)
+ * @param hasStyleReference - Whether task has style reference (affects scaling for Qwen)
+ * @returns Promise resolving to the final resolution string
+ */
+export async function calculateTaskResolution(
+  projectId: string,
+  customResolution?: string,
+  modelName?: string,
+  hasStyleReference?: boolean
+): Promise<string> {
+  // 1. If custom resolution is provided, use it as-is (assume it's already final)
+  if (customResolution?.trim()) {
+    console.log(`[calculateTaskResolution] Using provided custom resolution: ${customResolution}`);
+    return customResolution.trim();
+  }
+  
+  // 2. Get base resolution from project
+  const { resolution: baseResolution } = await resolveProjectResolution(projectId);
+  
+  // 3. Apply Qwen scaling if needed
+  const isQwenModel = modelName === 'qwen-image';
+  if (isQwenModel && hasStyleReference) {
+    const [width, height] = baseResolution.split('x').map(Number);
+    const scaledWidth = Math.round(width * 1.5);
+    const scaledHeight = Math.round(height * 1.5);
+    const scaledResolution = `${scaledWidth}x${scaledHeight}`;
+    console.log(`[calculateTaskResolution] Scaling Qwen resolution from ${baseResolution} to ${scaledResolution} for style reference`);
+    return scaledResolution;
+  }
+  
+  return baseResolution;
+}
+
+/**
  * Creates a single image generation task using the unified approach
  * This replaces the direct call to the single-image-generate edge function
  * 
@@ -123,10 +160,12 @@ export async function createImageGenerationTask(params: ImageGenerationTaskParam
     // 1. Validate parameters
     validateImageGenerationParams(params);
 
-    // 2. Resolve project resolution (client-side, matching original edge function logic)
-    const { resolution: finalResolution } = await resolveProjectResolution(
+    // 2. Calculate final resolution (handles Qwen scaling automatically)
+    const finalResolution = await calculateTaskResolution(
       params.project_id,
-      params.resolution
+      params.resolution,
+      params.model_name,
+      !!params.style_reference_image
     );
 
     // 3. Determine task type based on model
@@ -194,10 +233,12 @@ export async function createBatchImageGenerationTasks(params: BatchImageGenerati
     // 1. Validate parameters
     validateBatchImageGenerationParams(params);
 
-    // 2. Resolve project resolution once for all tasks
-    const { resolution: finalResolution } = await resolveProjectResolution(
+    // 2. Calculate final resolution once for all tasks (handles Qwen scaling automatically)
+    const finalResolution = await calculateTaskResolution(
       params.project_id,
-      params.resolution
+      params.resolution,
+      params.model_name,
+      !!params.style_reference_image
     );
 
     // 3. Generate individual task parameters for each image
@@ -209,7 +250,7 @@ export async function createBatchImageGenerationTasks(params: BatchImageGenerati
         return {
           project_id: params.project_id,
           prompt: promptEntry.fullPrompt,
-          resolution: finalResolution,
+          resolution: finalResolution, // Pass the pre-calculated resolution
           seed,
           loras: params.loras,
           shot_id: params.shot_id,
