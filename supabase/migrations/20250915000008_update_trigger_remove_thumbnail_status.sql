@@ -85,17 +85,9 @@ BEGIN
             RAISE LOG '[ProcessTask] Error extracting add_in_position for task %, defaulting to false: %', NEW.id, SQLERRM;
         END;
 
-        -- Extract output location from the result
-        IF NEW.result IS NOT NULL AND NEW.result ? 'outputLocation' THEN
-            output_location := NEW.result->>'outputLocation';
-            RAISE LOG '[ProcessTask] Found outputLocation: %', output_location;
-        ELSIF NEW.result IS NOT NULL AND NEW.result ? 'output_location' THEN
-            output_location := NEW.result->>'output_location';
-            RAISE LOG '[ProcessTask] Found output_location: %', output_location;
-        ELSE
-            output_location := NULL;
-            RAISE LOG '[ProcessTask] No outputLocation found in result for task %', NEW.id;
-        END IF;
+        -- Get output location directly from the task record
+        output_location := NEW.output_location;
+        RAISE LOG '[ProcessTask] Using output_location: %', output_location;
 
         -- Extract thumbnail_url from task params (if provided by client)
         BEGIN
