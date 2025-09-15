@@ -19,7 +19,9 @@ export const GalleryPagination = React.memo<GalleryPaginationProps>(({
 }) => {
   const isMobile = useIsMobile();
 
-  if (totalPages <= 1 || isLoadingGenerations || isFetchingGenerations) {
+  // Only hide pagination during initial loading, not during background fetches
+  // This prevents pagination from disappearing when ShotEditor triggers refetches
+  if (totalPages <= 1 || isLoadingGenerations) {
     return null;
   }
 

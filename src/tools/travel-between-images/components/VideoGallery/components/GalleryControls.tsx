@@ -31,7 +31,7 @@ export const GalleryControls = React.memo<GalleryControlsProps>(({
           `(${sortedVideoOutputs.length})`
         )}
       </h3>
-      {totalPages > 1 && !(isLoadingGenerations || isFetchingGenerations) && (
+      {totalPages > 1 && !isLoadingGenerations && (
         <div className="flex items-center space-x-2">
           <span className="text-xs sm:text-sm text-muted-foreground">
             Page {currentPage} of {totalPages}
