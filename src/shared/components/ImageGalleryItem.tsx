@@ -509,10 +509,6 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
     const minPadding = 60; // Minimum 60% height (for very wide images)
     const maxPadding = 200; // Maximum 200% height (for very tall images)
     aspectRatioPadding = `${Math.min(Math.max(calculatedPadding, minPadding), maxPadding)}%`;
-  } else if (isActuallyVideo) {
-    // For videos without dimensions, use a common video aspect ratio instead of square
-    // 16:9 is the most common video aspect ratio
-    aspectRatioPadding = '56.25%'; // 9/16 * 100% = 56.25% for 16:9 aspect ratio
   } else if (projectAspectRatio) {
     // Use project aspect ratio as fallback instead of square
     const ratio = parseRatio(projectAspectRatio);
@@ -568,7 +564,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                     playsInline
                     loop
                     muted
-                    className="absolute inset-0 w-full h-full object-contain group-hover:opacity-80 transition-opacity duration-300 bg-black"
+                    className="absolute inset-0 w-full h-full object-cover group-hover:opacity-80 transition-opacity duration-300 bg-black"
                     onDoubleClick={isMobile ? undefined : () => onOpenLightbox(image)}
                     onTouchEnd={isMobile ? (e) => {
                       console.log('[MobileDebug] Video onTouchEnd fired', {
@@ -712,7 +708,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
       {image.id && ( // Ensure image has ID for actions
       <>
           {/* Add to Shot UI - Top Left */}
-          {simplifiedShotOptions.length > 0 && onAddToLastShot && (
+          {simplifiedShotOptions.length > 0 && onAddToLastShot && !isActuallyVideo && (
           <div className="absolute top-2 left-2 flex flex-col items-start gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
               <ShotSelector
                   value={selectedShotIdLocal}

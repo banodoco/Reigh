@@ -1113,7 +1113,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex items-center space-x-2 z-10">
                         <div className="bg-black/80 backdrop-blur-sm rounded-lg p-2 flex items-center space-x-2">
                           {/* Shot Selection and Add to Shot */}
-                          {onAddToShot && allShots.length > 0 && (
+                          {onAddToShot && allShots.length > 0 && !isVideo && (
                             <>
                               <ShotSelector
                                 value={selectedShotId || ''}
@@ -1169,7 +1169,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           )}
 
                           {/* Delete */}
-                          {onDelete && (
+                          {onDelete && !isVideo && (
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <Button
@@ -1565,7 +1565,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   <div className="absolute bottom-2 sm:bottom-4 left-1/2 transform -translate-x-1/2 flex items-center space-x-1 sm:space-x-2 z-10">
                     <div className="bg-black/80 backdrop-blur-sm rounded-lg p-1 sm:p-2 flex items-center space-x-1 sm:space-x-2">
                       {/* Shot Selection and Add to Shot */}
-                      {onAddToShot && allShots.length > 0 && (
+                      {onAddToShot && allShots.length > 0 && !isVideo && (
                         <>
                           <ShotSelector
                             value={selectedShotId || ''}
@@ -1621,7 +1621,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       )}
 
                       {/* Delete */}
-                      {onDelete && (
+                      {onDelete && !isVideo && (
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button
