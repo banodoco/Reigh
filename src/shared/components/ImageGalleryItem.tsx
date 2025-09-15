@@ -793,16 +793,20 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
           {isVideoContent ? (
               // If we have a thumbnail image, show it and swap to video on hover
               hasThumbnailImage ? (
-                isHovering && videoReady ? (
+                <>
+                  {/* Always keep video element mounted to avoid play() interruptions */}
                 <video
-                    ref={visibleVideoRef}
-                    src={videoUrl || actualSrc || ''}
+                      ref={visibleVideoRef}
+                      src={videoUrl || actualSrc || ''}
                     playsInline
                     loop
                     muted
-                    preload="auto"
-                    poster={displayUrl || undefined}
-                    className="absolute inset-0 w-full h-full object-cover group-hover:opacity-80 transition-opacity duration-300 bg-black"
+                      preload="auto"
+                      poster={displayUrl || undefined}
+                      className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-200 ${
+                        isHovering && videoReady ? 'opacity-100 z-10' : 'opacity-0 z-0'
+                      }`}
+                      style={{ backgroundColor: 'transparent' }}
                     onDoubleClick={isMobile ? undefined : () => onOpenLightbox(image)}
                     onTouchEnd={isMobile ? (e) => {
                       console.log('[MobileDebug] Video onTouchEnd fired', {
@@ -825,14 +829,14 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                       setImageLoading(false);
                     }}
                 />
-                ) : (
-                <>
-                  {/* Always show the thumbnail image when not hovering */}
+                  {/* Thumbnail image - always rendered, hidden when video is visible */}
                   {displayUrl && (
                     <img
                       src={displayUrl}
                       alt={image.prompt || `Generated image ${index + 1}`}
-                      className="absolute inset-0 w-full h-full object-cover group-hover:opacity-80 transition-opacity duration-300"
+                        className={`absolute inset-0 w-full h-full object-cover group-hover:opacity-80 transition-opacity duration-200 ${
+                          isHovering && videoReady ? 'opacity-0 z-0' : 'opacity-100 z-5'
+                        }`}
                       draggable={false}
                       style={{ cursor: 'pointer' }}
                       onMouseEnter={() => setIsHovering(true)}
@@ -903,7 +907,6 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                     />
                   )}
                 </>
-                )
               ) : (
                 // No thumbnail available: preload with metadata and show spinner until ready, then hover to play
                 <>
@@ -966,9 +969,9 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                     />
                   ) : (
                     !videoReady ? (
-                      <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-gray-200 animate-pulse">
-                        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-gray-400"></div>
-                      </div>
+                    <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-gray-200 animate-pulse">
+                      <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-gray-400"></div>
+                    </div>
                     ) : null
                   )}
                 </>
@@ -1062,8 +1065,22 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
       {image.id && ( // Ensure image has ID for actions
       <>
           {/* Add to Shot UI - Top Left */}
-          {simplifiedShotOptions.length > 0 && onAddToLastShot && !isVideoContent && (
-          <div className="absolute top-2 left-2 flex flex-col items-start gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+          {simplifiedShotOptions.length > 0 && onAddToLastShot && (
+          <div className="absolute top-2 left-2 flex flex-col items-start gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+              {isVideoContent && image.shot_id ? (
+                  /* Show clickable shot name for videos */
+                  <button 
+                      className="px-2 py-1 rounded-md bg-black/50 hover:bg-black/70 text-white text-xs transition-colors"
+                      onClick={() => {
+                          const targetShot = simplifiedShotOptions.find(s => s.id === image.shot_id);
+                          if (targetShot) {
+                              navigateToShot(targetShot as any, { scrollToTop: true });
+                          }
+                      }}
+                  >
+                      {simplifiedShotOptions.find(s => s.id === image.shot_id)?.name || 'Unknown Shot'}
+                  </button>
+              ) : (
               <ShotSelector
                   value={selectedShotIdLocal}
                   onValueChange={(value) => {
@@ -1083,7 +1100,9 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                   align="start"
                   sideOffset={4}
               />
+              )}
 
+              {!isVideoContent && (
               <div className="relative">
                 <Tooltip delayDuration={0} disableHoverableContent>
                     <TooltipTrigger asChild>
@@ -1373,6 +1392,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                         </Tooltip>
                     )}
                 </div>
+              )}
           </div>
           )}
 
@@ -1380,7 +1400,8 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
           <TimeStamp 
             createdAt={image.createdAt} 
             position="top-right"
-            showOnHover={!isMobile} // Always show on mobile, hover on desktop
+            showOnHover={false} // Always show for all devices
+            className="z-30"
           />
 
           {/* Optimistic delete overlay */}
@@ -1394,7 +1415,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
           )}
 
           {/* Action buttons - Top Right (Info & Apply) */}
-          <div className="absolute top-2 right-2 flex flex-col items-end gap-1.5 mt-8">
+          <div className="absolute top-2 right-2 flex flex-col items-end gap-1.5 mt-8 z-20">
               {/* Info tooltip (shown on hover) */}
               {image.metadata && (
                 isMobile ? (
@@ -1484,7 +1505,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
 
           {/* Delete button - Bottom Right */}
               {onDelete && (
-              <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
                       <Button 
                           variant="destructive" 
                           size="icon" 
@@ -1502,7 +1523,9 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
           )}
 
           {/* Star button - Bottom Left */}
-          <div className="absolute bottom-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className={`absolute bottom-2 left-2 transition-opacity z-20 ${
+            image.starred ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+          }`}>
               <Button
                   variant="secondary"
                   size="icon"

@@ -565,15 +565,15 @@ const VideoTravelToolPage: React.FC = () => {
       // Show header when in shot list or videos view
       const headerContent = (
         <div className="flex items-center justify-between mb-2 sm:mb-4 mt-4 sm:mt-6 px-3 sm:px-4">
-          <div className="flex items-center gap-4">
+          <div className="flex items-end gap-4">
             <h1 className="text-3xl font-light tracking-tight text-foreground sm:text-4xl">
-              {showVideosView ? 'Videos:' : 'Shots:'}
+              {showVideosView ? 'Videos' : 'Shots'}
             </h1>
             <button
               onClick={() => setShowVideosView(!showVideosView)}
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors underline"
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors underline mb-1"
             >
-              {showVideosView ? 'See all shots' : 'See all generated videos'}
+              {showVideosView ? 'See all shots' : 'See all videos'}
             </button>
           </div>
           {/* Only show New Shot button when in shots view and there are shots */}
