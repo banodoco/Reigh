@@ -14,6 +14,7 @@ import { PromptInputRowProps } from "../types";
 
 export const PromptInputRow: React.FC<PromptInputRowProps> = React.memo(({
   promptEntry, onUpdate, onRemove, canRemove, isGenerating, hasApiKey, index,
+  totalPrompts,
   onEditWithAI,
   aiEditButtonIcon,
   onSetActiveForFullView,
@@ -252,7 +253,7 @@ export const PromptInputRow: React.FC<PromptInputRowProps> = React.memo(({
       <div className="flex justify-between items-center mb-2">
         {!isMobile || !mobileInlineEditing ? (
           <Label htmlFor={`fullPrompt-${promptEntry.id}`} className="text-xs font-medium text-muted-foreground">
-            Prompt #{index + 1}
+            {totalPrompts === 1 ? 'Prompt' : `Prompt #${index + 1}`}
           </Label>
         ) : (
           <div className="h-5" />
@@ -324,7 +325,12 @@ export const PromptInputRow: React.FC<PromptInputRowProps> = React.memo(({
                 : `overflow-hidden ${isMobile ? 'h-[56px]' : 'h-[32px]'} cursor-pointer`
             }`}
             disabled={!hasApiKey || isGenerating}
-            rows={isMobile ? 2 : 1} 
+            rows={isMobile ? 2 : 1}
+            clearable
+            onClear={() => {
+              setLocalFullPrompt('');
+              onUpdate(promptEntry.id, 'fullPrompt', '');
+            }}
           />
         ) : (
           // Mobile not in edit mode: use div that looks like textarea

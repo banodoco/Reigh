@@ -62,6 +62,7 @@ export interface PromptInputRowProps {
   isGenerating?: boolean;
   hasApiKey?: boolean;
   index: number;
+  totalPrompts?: number;
   onEditWithAI?: () => void;
   aiEditButtonIcon?: React.ReactNode;
   onSetActiveForFullView: (id: string | null) => void;

@@ -964,6 +964,14 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
               afterEachPromptText={afterEachPromptText}
               onBeforeEachPromptTextChange={handleTextChange(setBeforeEachPromptText)}
               onAfterEachPromptTextChange={handleTextChange(setAfterEachPromptText)}
+              onClearBeforeEachPromptText={() => {
+                markAsInteracted();
+                setBeforeEachPromptText('');
+              }}
+              onClearAfterEachPromptText={() => {
+                markAsInteracted();
+                setAfterEachPromptText('');
+              }}
             />
 
             <ShotSelector

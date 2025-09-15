@@ -29,6 +29,8 @@ interface PromptsSectionProps {
   afterEachPromptText: string;
   onBeforeEachPromptTextChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
   onAfterEachPromptTextChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
+  onClearBeforeEachPromptText?: () => void;
+  onClearAfterEachPromptText?: () => void;
 }
 
 export const PromptsSection: React.FC<PromptsSectionProps> = ({
@@ -48,6 +50,8 @@ export const PromptsSection: React.FC<PromptsSectionProps> = ({
   afterEachPromptText,
   onBeforeEachPromptTextChange,
   onAfterEachPromptTextChange,
+  onClearBeforeEachPromptText,
+  onClearAfterEachPromptText,
 }) => {
   return (
     <div className="space-y-4">
@@ -57,31 +61,21 @@ export const PromptsSection: React.FC<PromptsSectionProps> = ({
           <span className="absolute top-1/2 left-full transform -translate-y-1/2 ml-2.5 w-12 h-2 bg-orange-200/60 rounded-full"></span>
         </Label>
         <div className="flex items-center space-x-2">
-          {/* Manage Prompts button (shown when >1 prompts) or Add Prompt button (shown when 1 prompt) */}
-          {(!ready ? lastKnownPromptCount > 1 : prompts.length > 1) ? (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onOpenPromptModal}
-              disabled={!hasApiKey || isGenerating || !ready}
-              aria-label="Manage Prompts"
-            >
-              <Edit3 className="h-4 w-4 mr-0 sm:mr-2" />
-              <span className="hidden sm:inline">Manage Prompts</span>
-            </Button>
-          ) : ((!ready ? lastKnownPromptCount <= 1 : prompts.length <= 1) && (
+          {/* Add Prompt button - small '+' button (only shown when single prompt) */}
+          {(!ready ? lastKnownPromptCount <= 1 : prompts.length <= 1) && (
             <TooltipProvider delayDuration={300}>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
                     type="button"
                     variant="outline"
+                    size="sm"
                     onClick={onAddPrompt}
                     disabled={!hasApiKey || isGenerating || !ready}
                     aria-label="Add Prompt"
+                    className="px-2"
                   >
-                    <PlusCircle className="h-4 w-4 mr-0 sm:mr-2" />
-                    <span className="hidden sm:inline">Add Prompt</span>
+                    <PlusCircle className="h-4 w-4" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="top">
@@ -89,7 +83,19 @@ export const PromptsSection: React.FC<PromptsSectionProps> = ({
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
-          ))}
+          )}
+
+          {/* Manage Prompts button */}
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onOpenPromptModal}
+            disabled={!hasApiKey || isGenerating || !ready}
+            aria-label="Manage Prompts"
+          >
+            <Edit3 className="h-4 w-4 mr-0 sm:mr-2" />
+            <span className="hidden sm:inline">Manage Prompts</span>
+          </Button>
         </div>
       </div>
 
@@ -114,6 +120,7 @@ export const PromptsSection: React.FC<PromptsSectionProps> = ({
                 isGenerating={isGenerating}
                 hasApiKey={hasApiKey}
                 index={index}
+                totalPrompts={prompts.length}
                 onEditWithAI={() => { /* Placeholder for direct form AI edit */ }}
                 aiEditButtonIcon={null} 
                 onSetActiveForFullView={onSetActive}
@@ -152,6 +159,8 @@ export const PromptsSection: React.FC<PromptsSectionProps> = ({
             disabled={!hasApiKey || isGenerating}
             className="mt-1 h-16 resize-none"
             rows={2}
+            clearable
+            onClear={onClearBeforeEachPromptText}
           />
         </div>
         <div>
@@ -166,6 +175,8 @@ export const PromptsSection: React.FC<PromptsSectionProps> = ({
             disabled={!hasApiKey || isGenerating}
             className="mt-1 h-16 resize-none"
             rows={2}
+            clearable
+            onClear={onClearAfterEachPromptText}
           />
         </div>
       </div>

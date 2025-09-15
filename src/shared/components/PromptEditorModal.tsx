@@ -850,6 +850,8 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
                       placeholder={promptToEdit.originalText.trim() === '' ? 'Describe what you want' : 'Edit instructions'}
                       className={`h-7 ${isMobile ? 'w-48 text-base' : 'w-72 text-sm'} ${isMobile && isAIEditing ? 'opacity-80' : ''}`}
                       disabled={isAIEditing}
+                      clearable
+                      onClear={() => setEditInstructionsValue('', 'clear-button')}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' && getEditInstructionsValue().trim() && !isAIEditing) {
                           e.preventDefault();
@@ -894,6 +896,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
                     <PromptInputRow
                       promptEntry={prompt}
                       index={index}
+                      totalPrompts={internalPrompts.length}
                       onUpdate={handlePromptFieldUpdate}
                       onRemove={() => handleInternalRemovePrompt(prompt.id)}
                       canRemove={internalPrompts.length > 1}
