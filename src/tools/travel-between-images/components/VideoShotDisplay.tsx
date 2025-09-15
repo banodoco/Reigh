@@ -389,7 +389,9 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
         onPointerDown={handleRippleTrigger}
         onClick={onSelectShot}
       >
-        <div className="flex justify-between items-start mb-3">
+        {/* Scalable content wrapper - similar to ToolSelectorPage approach */}
+        <div className="group-hover:scale-105 transition-transform duration-700 h-full flex flex-col">
+          <div className="flex justify-between items-start mb-3">
           {isEditingName ? (
             <div className="flex items-center gap-2 flex-grow" onClick={(e) => e.stopPropagation()}>
               <Input 
@@ -520,6 +522,7 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
               </div>
             );
           })()}
+        </div>
         </div>
       </div>
 
