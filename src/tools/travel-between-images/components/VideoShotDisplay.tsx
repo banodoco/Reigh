@@ -384,7 +384,7 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
     <>
       <div 
         key={shot.id} 
-        className={`click-ripple group min-h-48 p-4 border rounded-lg bg-card/50 hover:bg-card/80 hover:shadow-wes-hover hover:scale-[1.02] transition-all duration-300 relative cursor-pointer flex flex-col ${isRippleActive ? 'ripple-active' : ''}`}
+        className={`click-ripple group min-h-48 p-4 border rounded-lg bg-card/50 hover:bg-card/80 hover:shadow-wes-hover hover:border-primary/30 transition-all duration-300 relative cursor-pointer flex flex-col ${isRippleActive ? 'ripple-active' : ''}`}
         style={rippleStyles}
         onPointerDown={handleRippleTrigger}
         onClick={onSelectShot}
