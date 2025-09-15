@@ -209,7 +209,7 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
       <div className="relative w-full h-full">
         <button
           type="button"
-          className="block wes-corners cursor-pointer w-full text-left h-full"
+          className="block wes-corners cursor-pointer w-full text-left h-full hover:shadow-wes-hover transition-all duration-700"
           onPointerDown={(e) => { e.stopPropagation(); time('NavPerf', `ClickLag:${item.id}`); }}
           onClick={handleComingSoonClick}
         >
@@ -221,7 +221,7 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
 
   return (
     <div
-      className="relative group cursor-pointer w-full h-full"
+      className="relative group cursor-pointer w-full h-full hover:shadow-wes-hover transition-all duration-700"
       role="button"
       tabIndex={0}
       onPointerDown={handlePointerDown}
