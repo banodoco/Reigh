@@ -99,7 +99,26 @@ const StyleReferenceSection: React.FC<{
   onStyleUpload,
   onStyleRemove,
   onStyleStrengthChange,
-}) => (
+}) => {
+  const [imageLoaded, setImageLoaded] = React.useState(false);
+  const [imageError, setImageError] = React.useState(false);
+
+  // Reset loading states when image changes
+  React.useEffect(() => {
+    if (styleReferenceImage) {
+      setImageLoaded(false);
+      setImageError(false);
+    } else {
+      // If no image, reset states
+      setImageLoaded(false);
+      setImageError(false);
+    }
+  }, [styleReferenceImage]);
+
+  // Only show skeleton during upload process, not during normal image loading
+  const showSkeleton = isUploadingStyleReference;
+
+  return (
   <div className="space-y-2">
     <div className="space-y-1">
       <Label className="text-lg font-medium text-slate-700 dark:text-slate-200 border-l-8 border-purple-200/60 pl-3 py-1 relative">
@@ -116,27 +135,45 @@ const StyleReferenceSection: React.FC<{
           <div className="border-2 border-solid border-gray-300 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-800/50 relative">
             <div className="flex flex-col items-center space-y-3">
               <div className="relative w-full">
-                <img
-                  src={styleReferenceImage}
-                  alt="Style Reference"
-                  className="w-full aspect-square object-cover rounded-lg border border-gray-200 dark:border-gray-700"
-                  style={{ objectFit: 'cover' }}
-                />
-                <div className="absolute top-2 left-2 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded px-2 py-1 border border-gray-200 dark:border-gray-600 z-10">
-                  <p className="text-xs font-light text-gray-600 dark:text-gray-400">Style</p>
-                </div>
-                <div className="absolute top-2 right-2 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-full p-0.5 border border-gray-200 dark:border-gray-600 z-10">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={onStyleRemove}
-                    disabled={isGenerating}
-                    className="h-5 w-5 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30 flex items-center justify-center"
-                  >
-                    <Trash2 className="h-2.5 w-2.5" />
-                  </Button>
-                </div>
+                {showSkeleton ? (
+                  /* Skeleton loading state */
+                  <div className="w-full aspect-square rounded-lg border border-gray-200 dark:border-gray-700 bg-gradient-to-br from-gray-200 via-gray-100 to-gray-200 dark:from-gray-700 dark:via-gray-800 dark:to-gray-700 animate-pulse relative overflow-hidden">
+                    {/* Shimmer effect */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 dark:via-gray-600/20 to-transparent animate-shimmer transform -skew-x-12"></div>
+                    <div className="absolute top-2 left-2 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded px-2 py-1 border border-gray-200 dark:border-gray-600 z-10">
+                      <p className="text-xs font-light text-gray-600 dark:text-gray-400">Style</p>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <img
+                      src={styleReferenceImage}
+                      alt="Style Reference"
+                      className="w-full aspect-square object-cover rounded-lg border border-gray-200 dark:border-gray-700"
+                      style={{ objectFit: 'cover' }}
+                      onLoad={() => setImageLoaded(true)}
+                      onError={() => {
+                        setImageError(true);
+                        setImageLoaded(true);
+                      }}
+                    />
+                    <div className="absolute top-2 left-2 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded px-2 py-1 border border-gray-200 dark:border-gray-600 z-10">
+                      <p className="text-xs font-light text-gray-600 dark:text-gray-400">Style</p>
+                    </div>
+                    <div className="absolute top-2 right-2 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-full p-0.5 border border-gray-200 dark:border-gray-600 z-10">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={onStyleRemove}
+                        disabled={isGenerating}
+                        className="h-5 w-5 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30 flex items-center justify-center"
+                      >
+                        <Trash2 className="h-2.5 w-2.5" />
+                      </Button>
+                    </div>
+                  </>
+                )}
               </div>
               <div className="w-full">
                 <SliderWithValue
@@ -146,7 +183,7 @@ const StyleReferenceSection: React.FC<{
                   min={0.1}
                   max={2.0}
                   step={0.1}
-                  disabled={isGenerating}
+                  disabled={isGenerating || isUploadingStyleReference}
                   numberInputClassName="w-10"
                 />
               </div>
@@ -179,7 +216,8 @@ const StyleReferenceSection: React.FC<{
       )}
     </div>
   </div>
-);
+  );
+};
 
 export const ModelSection: React.FC<ModelSectionProps> = ({
   selectedModel,

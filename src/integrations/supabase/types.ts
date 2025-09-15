@@ -385,10 +385,10 @@ export type Database = {
       func_claim_user_task: {
         Args: { p_table_name: string; p_worker_id: string; p_user_id: string }
         Returns: {
-          params_out: Json
           project_id_out: string
           task_id_out: string
           task_type_out: string
+          params_out: Json
         }[]
       }
     }
