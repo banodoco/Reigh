@@ -61,6 +61,10 @@ interface ImageGenerationFormProps {
    * user feedback that their request was accepted.
    */
   justQueued?: boolean;
+  /**
+   * Called when the associated shot selection changes in the form
+   */
+  onShotChange?: (shotId: string | null) => void;
 }
 
 interface LoraDataEntry {
@@ -90,7 +94,15 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   apiKey,
   openaiApiKey,
   justQueued = false,
+  onShotChange,
 }, ref) => {
+  
+  // Debug logging for callback prop
+  console.log('[ShotChangeDebug] 🏗️ ImageGenerationForm rendered with onShotChange:', {
+    hasCallback: !!onShotChange,
+    callbackType: typeof onShotChange,
+    timestamp: Date.now()
+  });
   // Track first-visit for this session using component state to avoid stale module-level cache
   const [hasVisitedImageGeneration, setHasVisitedImageGeneration] = useState<boolean>(() => {
     try {
@@ -888,10 +900,32 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
 
   // Handle shot change with proper prompt initialization
   const handleShotChange = (value: string) => {
-    console.log('[ImageGenerationForm] Changing shot from', associatedShotId, 'to', value);
+    console.log('[ShotChangeDebug] 🔄 handleShotChange called:', {
+      fromShotId: associatedShotId,
+      toValue: value,
+      hasOnShotChangeCallback: !!onShotChange,
+      timestamp: Date.now()
+    });
+    
     markAsInteracted();
     const newShotId = value === "none" ? null : value;
+    
+    console.log('[ShotChangeDebug] 📝 Setting new shot ID:', {
+      newShotId,
+      previousShotId: associatedShotId,
+      valueWasNone: value === "none"
+    });
+    
     setAssociatedShotId(newShotId);
+    
+    // Call the parent callback if provided
+    if (onShotChange) {
+      console.log('[ShotChangeDebug] 📞 Calling parent onShotChange callback with:', newShotId);
+      onShotChange(newShotId);
+      console.log('[ShotChangeDebug] ✅ Parent callback called successfully');
+    } else {
+      console.log('[ShotChangeDebug] ❌ No onShotChange callback provided');
+    }
     
     // Initialize prompts for the new shot if they don't exist
     const newEffectiveShotId = newShotId || 'none';

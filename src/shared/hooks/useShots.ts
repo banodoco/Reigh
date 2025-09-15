@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Shot, ShotImage, GenerationRow } from '@/types/shots'; 
 import { Database } from '@/integrations/supabase/types';
 import { uploadImageToStorage } from '@/shared/lib/imageUploader';
+import { generateClientThumbnail, uploadImageWithThumbnail } from '@/shared/lib/clientThumbnailGenerator';
 import { toast } from 'sonner';
 import { invalidationRouter } from '@/shared/lib/InvalidationRouter';
 import React from 'react';
@@ -504,7 +505,8 @@ const createGenerationForUploadedImage = async (
   fileName: string,
   fileType: string,
   fileSize: number,
-  projectId: string | null
+  projectId: string | null,
+  thumbnailUrl?: string
 ): Promise<Database['public']['Tables']['generations']['Row']> => {
   if (!projectId) {
     throw new Error('Project ID is required to create a generation record.');
@@ -516,6 +518,7 @@ const createGenerationForUploadedImage = async (
     .from('generations')
     .insert({
       location: imageUrl,
+      thumbnail_url: thumbnailUrl || imageUrl, // Use thumbnail URL if provided, fallback to main image
       type: fileType,
       project_id: projectId,
       params: {
@@ -1413,17 +1416,44 @@ export const useHandleExternalImageDrop = () => {
       for (const imageFile of imageFiles) {
         let newGeneration: Database['public']['Tables']['generations']['Row'] | null = null;
         try {
-          // 2a. Upload the image to Supabase Storage
-          const imageUrl = await uploadImageToStorage(imageFile);
+          // 2a. Generate client-side thumbnail and upload both images
+          console.log(`[ThumbnailGenDebug] Starting client-side thumbnail generation for ${imageFile.name} in useHandleExternalImageDrop`);
+          let imageUrl = '';
+          let thumbnailUrl = '';
+          
+          try {
+            // Get current user ID for storage path
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session?.user?.id) {
+              throw new Error('User not authenticated');
+            }
+            const userId = session.user.id;
+
+            // Generate thumbnail client-side
+            const thumbnailResult = await generateClientThumbnail(imageFile, 300, 0.8);
+            console.log(`[ThumbnailGenDebug] Generated thumbnail: ${thumbnailResult.thumbnailWidth}x${thumbnailResult.thumbnailHeight} (original: ${thumbnailResult.originalWidth}x${thumbnailResult.originalHeight})`);
+            
+            // Upload both main image and thumbnail
+            const uploadResult = await uploadImageWithThumbnail(imageFile, thumbnailResult.thumbnailBlob, userId);
+            imageUrl = uploadResult.imageUrl;
+            thumbnailUrl = uploadResult.thumbnailUrl;
+            
+            console.log(`[ThumbnailGenDebug] Upload complete - Image: ${imageUrl}, Thumbnail: ${thumbnailUrl}`);
+          } catch (thumbnailError) {
+            console.warn(`[ThumbnailGenDebug] Client-side thumbnail generation failed for ${imageFile.name}:`, thumbnailError);
+            // Fallback to original upload flow without thumbnail
+            imageUrl = await uploadImageToStorage(imageFile);
+            thumbnailUrl = imageUrl; // Use main image as fallback
+          }
+          
           if (!imageUrl) {
             toast.error(`Failed to upload image ${imageFile.name} to storage.`);
             continue; // Skip to next file
           }
-  
 
           // 2b. Create a generation record for the uploaded image
           try {
-            newGeneration = await createGenerationForUploadedImage(imageUrl, imageFile.name, imageFile.type, imageFile.size, projectIdForOperation);
+            newGeneration = await createGenerationForUploadedImage(imageUrl, imageFile.name, imageFile.type, imageFile.size, projectIdForOperation, thumbnailUrl);
           } catch (generationError) {
             toast.error(`Failed to create generation data for ${imageFile.name}: ${(generationError as Error).message}`);
             continue; // Skip to next file
@@ -1440,7 +1470,7 @@ export const useHandleExternalImageDrop = () => {
             generation_id: newGeneration.id as string,
             project_id: projectIdForOperation,
             imageUrl: newGeneration.location || undefined,
-            thumbUrl: newGeneration.location || undefined,
+            thumbUrl: thumbnailUrl || newGeneration.location || undefined,
           });
           generationIds.push(newGeneration.id as string);
   

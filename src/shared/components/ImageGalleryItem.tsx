@@ -25,6 +25,8 @@ import { useProject } from "@/shared/contexts/ProjectContext";
 import { useShotNavigation } from "@/shared/hooks/useShotNavigation";
 import { useLastAffectedShot } from "@/shared/hooks/useLastAffectedShot";
 import { parseRatio } from "@/shared/lib/aspectRatios";
+import { useProgressiveImage } from "@/shared/hooks/useProgressiveImage";
+import { isProgressiveLoadingEnabled } from "@/shared/settings/progressiveLoading";
 
 interface ImageGalleryItemProps {
   image: GeneratedImageWithMetadata;
@@ -131,8 +133,26 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   const createShotWithImageMutation = useCreateShotWithImage();
   const { navigateToShot } = useShotNavigation();
   const { lastAffectedShotId, setLastAffectedShotId: updateLastAffectedShotId } = useLastAffectedShot();
-  // Memoize displayUrl to prevent unnecessary recalculations
-  const displayUrl = useMemo(() => getDisplayUrl(image.thumbUrl || image.url), [image.thumbUrl, image.url]);
+  // Progressive loading for thumbnail → full image transition
+  const progressiveEnabled = isProgressiveLoadingEnabled();
+  const { src: progressiveSrc, phase, isThumbShowing, isFullLoaded, error: progressiveError, retry: retryProgressive, ref: progressiveRef } = useProgressiveImage(
+    progressiveEnabled ? image.thumbUrl : null,
+    image.url,
+    {
+      priority: isPriority,
+      lazy: !isPriority,
+      enabled: progressiveEnabled && shouldLoad,
+      crossfadeMs: 180
+    }
+  );
+  
+  // Fallback to legacy behavior if progressive loading is disabled
+  const displayUrl = useMemo(() => {
+    if (progressiveEnabled && progressiveSrc) {
+      return progressiveSrc;
+    }
+    return getDisplayUrl(image.thumbUrl || image.url);
+  }, [progressiveEnabled, progressiveSrc, image.thumbUrl, image.url]);
   // Track loading state for this specific image
   const [imageLoadError, setImageLoadError] = useState<boolean>(false);
   const [imageRetryCount, setImageRetryCount] = useState<number>(0);
@@ -629,9 +649,15 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
               {actualSrc && imageLoaded && (() => {
                 return (
                 <img
+                  ref={progressiveRef}
                   src={actualSrc}
                   alt={image.prompt || `Generated image ${index + 1}`}
-                  className="absolute inset-0 w-full h-full object-cover group-hover:opacity-80 transition-opacity duration-300"
+                  className={cn(
+                    "absolute inset-0 w-full h-full object-cover group-hover:opacity-80 transition-all duration-300",
+                    // Add crossfade effect for progressive loading
+                    progressiveEnabled && isThumbShowing && "opacity-90",
+                    progressiveEnabled && isFullLoaded && "opacity-100"
+                  )}
                   onDoubleClick={isMobile ? undefined : () => onOpenLightbox(image)}
                   onTouchEnd={isMobile ? (e) => {
                     console.log('[MobileDebug] Image onTouchEnd fired', {
@@ -676,6 +702,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                   <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-gray-400"></div>
                 </div>
               )}
+              
             </>
           )}
       </div>

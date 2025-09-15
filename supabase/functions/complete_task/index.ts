@@ -3,6 +3,7 @@
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
+import { Image as ImageScript } from "https://deno.land/x/imagescript@1.3.0/mod.ts";
 /**
  * Edge function: complete-task
  * 
@@ -231,6 +232,63 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
       } catch (thumbnailError) {
         console.error("Error processing thumbnail:", thumbnailError);
       // Don't fail the main upload, just log the error
+      }
+    }
+    // 8.2) If no thumbnail provided and this is an image, auto-generate a thumbnail (1/3 size)
+    if (!thumbnailUrl) {
+      try {
+        const contentType = getContentType(filename);
+        console.log(`[ThumbnailGenDebug] Starting thumbnail generation for task ${taskIdString}, filename: ${filename}, contentType: ${contentType}`);
+
+        if (contentType.startsWith("image/")) {
+          console.log(`[ThumbnailGenDebug] Processing image for thumbnail generation with ImageScript`);
+
+          // Decode with ImageScript (Deno-native, no DOM/canvas APIs)
+          console.log(`[ThumbnailGenDebug] Original file buffer size: ${fileBuffer.length} bytes`);
+          const image = await ImageScript.decode(fileBuffer);
+          const originalWidth = image.width;
+          const originalHeight = image.height;
+          console.log(`[ThumbnailGenDebug] Original image dimensions: ${originalWidth}x${originalHeight}`);
+
+          const thumbWidth = Math.max(1, Math.round(originalWidth / 3));
+          const thumbHeight = Math.max(1, Math.round(originalHeight / 3));
+          console.log(`[ThumbnailGenDebug] Calculated thumbnail dimensions: ${thumbWidth}x${thumbHeight} (1/3 of original)`);
+
+          image.resize(thumbWidth, thumbHeight);
+          const jpegQuality = 80;
+          const thumbBytes = await image.encodeJPEG(jpegQuality);
+          console.log(`[ThumbnailGenDebug] Encoded JPEG thumbnail bytes: ${thumbBytes.length} (quality ${jpegQuality})`);
+          console.log(`[ThumbnailGenDebug] Size reduction: ${fileBuffer.length} → ${thumbBytes.length} bytes (${((thumbBytes.length / fileBuffer.length) * 100).toFixed(1)}% of original)`);
+
+          // Upload thumbnail to storage
+          const ts = Date.now();
+          const rand = Math.random().toString(36).substring(2, 8);
+          const thumbFilename = `thumb_${ts}_${rand}.jpg`;
+          const thumbPath = `${userId}/thumbnails/${thumbFilename}`;
+          console.log(`[ThumbnailGenDebug] Uploading thumbnail to: ${thumbPath}`);
+
+          const { error: autoThumbUploadErr } = await supabaseAdmin.storage
+            .from('image_uploads')
+            .upload(thumbPath, thumbBytes, { contentType: 'image/jpeg', upsert: true });
+
+          if (autoThumbUploadErr) {
+            console.error('[ThumbnailGenDebug] Auto-thumbnail upload error:', autoThumbUploadErr);
+          } else {
+            const { data: autoThumbUrlData } = supabaseAdmin.storage.from('image_uploads').getPublicUrl(thumbPath);
+            thumbnailUrl = autoThumbUrlData.publicUrl;
+            console.log(`[ThumbnailGenDebug] ✅ Auto-generated thumbnail uploaded successfully!`);
+            console.log(`[ThumbnailGenDebug] Thumbnail URL: ${thumbnailUrl}`);
+            console.log(`[ThumbnailGenDebug] Final summary - Original: ${originalWidth}x${originalHeight} (${fileBuffer.length} bytes) → Thumbnail: ${thumbWidth}x${thumbHeight} (${thumbBytes.length} bytes)`);
+          }
+        } else {
+          console.log(`[ThumbnailGenDebug] Skipping auto-thumbnail, content type is not image: ${contentType}`);
+        }
+      } catch (autoThumbErr) {
+        console.error('[ThumbnailGenDebug] Auto-thumbnail generation failed:', autoThumbErr);
+        console.error('[ThumbnailGenDebug] Error stack:', autoThumbErr.stack);
+        // Fallback: use main image as thumbnail to keep UI consistent
+        thumbnailUrl = publicUrl;
+        console.log(`[ThumbnailGenDebug] Using fallback - main image URL as thumbnail: ${thumbnailUrl}`);
       }
     }
     // 8.5) Validate shot existence and clean up parameters if necessary

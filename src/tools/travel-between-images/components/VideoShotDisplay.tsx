@@ -10,6 +10,9 @@ import { getDisplayUrl } from '@/shared/lib/utils';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/shared/components/ui/alert-dialog';
 import { useClickRipple } from '@/shared/hooks/useClickRipple';
 import { parseRatio } from '@/shared/lib/aspectRatios';
+import { useProgressiveImage } from '@/shared/hooks/useProgressiveImage';
+import { isProgressiveLoadingEnabled } from '@/shared/settings/progressiveLoading';
+import { cn } from '@/shared/lib/utils';
 
 interface VideoShotDisplayProps {
   shot: Shot;
@@ -39,7 +42,22 @@ const ShotImage: React.FC<ShotImageProps> = ({ image, index, onSelectShot, shotN
   // Handle both old and new field naming conventions
   const imageUrl = image.imageUrl || image.location;
   const thumbUrl = image.thumbUrl || image.location;
-  const displayUrl = getDisplayUrl(thumbUrl || imageUrl);
+  
+  // Progressive loading for video shot display
+  const progressiveEnabled = isProgressiveLoadingEnabled();
+  const { src: progressiveSrc, phase, isThumbShowing, isFullLoaded, ref: progressiveRef } = useProgressiveImage(
+    progressiveEnabled ? thumbUrl : null,
+    imageUrl,
+    {
+      priority: false, // Not high priority in video shot display
+      lazy: true,
+      enabled: progressiveEnabled && shouldLoad,
+      crossfadeMs: 200
+    }
+  );
+
+  // Use progressive src if available, otherwise fallback to display URL
+  const displayUrl = progressiveEnabled && progressiveSrc ? progressiveSrc : getDisplayUrl(thumbUrl || imageUrl);
   
   // Check if image is already cached by browser (similar to ImageGallery approach)
   const checkIfImageCached = (url: string): boolean => {
@@ -136,9 +154,15 @@ const ShotImage: React.FC<ShotImageProps> = ({ image, index, onSelectShot, shotN
           {/* Show image once it's loaded */}
           {imageLoaded && (
             <img
+              ref={progressiveRef}
               src={displayUrl}
               alt={`Shot image ${index + 1} for ${shotName}`}
-              className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+              className={cn(
+                "absolute inset-0 w-full h-full object-cover pointer-events-none transition-opacity duration-200",
+                // Progressive loading visual states
+                progressiveEnabled && isThumbShowing && "opacity-95",
+                progressiveEnabled && isFullLoaded && "opacity-100"
+              )}
             />
           )}
           

@@ -206,6 +206,7 @@ export const useFalImageGeneration = (): UseFalImageGenerationResult => {
             controlnets?: any[]; 
             control_loras?: any[];
             image_size?: string | undefined; 
+            add_in_position?: boolean;
         } = {
           prompts: submittedPrompts,
           imagesPerPrompt,
@@ -227,6 +228,8 @@ export const useFalImageGeneration = (): UseFalImageGenerationResult => {
           originalFrameTimestamp,
           original_image_filename,
           customMetadataFields,
+          // Make new FAL image generations unpositioned by default
+          add_in_position: false,
         };
         
         Object.keys(taskDbParamsForApi).forEach(key => (taskDbParamsForApi as any)[key] === undefined && delete (taskDbParamsForApi as any)[key]);

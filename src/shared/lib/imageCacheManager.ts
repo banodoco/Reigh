@@ -8,6 +8,9 @@
 // Global cache map to store cache status by image ID
 const globalImageCache = new Map<string, boolean>();
 
+// URL-based cache for progressive loading (stores by actual image URL)
+const urlCache = new Map<string, { loadedAt: number; width?: number; height?: number }>();
+
 // Debug logging configuration
 const CACHE_DEBUG_LOG_RATE = 0.05; // 5% of cache checks will be logged
 
@@ -49,9 +52,9 @@ export const setImageCacheStatus = (image: any, isCached: boolean = true): void 
 };
 
 /**
- * Check if an image is cached
+ * Check if an image is cached (legacy function - use the enhanced version below)
  */
-export const isImageCached = (image: any): boolean => {
+const isImageCachedLegacy = (image: any): boolean => {
   const imageId = image.id;
   if (!imageId) {
     return false;
@@ -81,19 +84,7 @@ export const isImageCached = (image: any): boolean => {
  * Batch check if multiple images are cached - more efficient than individual calls
  */
 export const areImagesCached = (images: any[]): boolean[] => {
-  return images.map(image => {
-    const imageId = image?.id;
-    if (!imageId) return false;
-    
-    const isCached = globalImageCache.get(imageId) === true;
-    
-    // Sync object cache if needed (backwards compatibility)
-    if (isCached && (image as any).__memoryCached !== true) {
-      (image as any).__memoryCached = true;
-    }
-    
-    return isCached;
-  });
+  return images.map(image => isImageCachedLegacy(image));
 };
 
 /**
@@ -256,5 +247,98 @@ export const keepOnlyInCache = (imagesToKeep: any[]): number => {
   return removedCount;
 };
 
-// Legacy exports for backwards compatibility
-export const markImageAsCached = setImageCacheStatus;
+/**
+ * URL-based cache functions for progressive loading
+ */
+
+/**
+ * Check if a URL is cached
+ */
+export const isImageCached = (urlOrImage: string | any): boolean => {
+  // Handle both URL strings and image objects
+  if (typeof urlOrImage === 'string') {
+    return urlCache.has(urlOrImage);
+  }
+  
+  // Legacy image object handling
+  const imageId = urlOrImage?.id;
+  if (!imageId) {
+    return false;
+  }
+  
+  // Primary source: global cache
+  const isCached = globalImageCache.get(imageId) === true;
+  
+  // Sync object cache if needed (backwards compatibility)
+  if (isCached && (urlOrImage as any).__memoryCached !== true) {
+    (urlOrImage as any).__memoryCached = true;
+  }
+  
+  // Occasional debug logging (reduced noise)
+  if (Math.random() < CACHE_DEBUG_LOG_RATE) {
+    console.log(`[ImageCacheManager] Cache check:`, {
+      imageId,
+      isCached,
+      cacheSize: globalImageCache.size
+    });
+  }
+  
+  return isCached;
+};
+
+/**
+ * Mark a URL as cached
+ */
+export const markImageAsCached = (urlOrImage: string | any, metadata?: { width?: number; height?: number }): void => {
+  // Handle both URL strings and image objects
+  if (typeof urlOrImage === 'string') {
+    urlCache.set(urlOrImage, {
+      loadedAt: Date.now(),
+      ...metadata
+    });
+    return;
+  }
+  
+  // Legacy image object handling
+  setImageCacheStatus(urlOrImage, true);
+};
+
+/**
+ * Get URL cache metadata
+ */
+export const getUrlCacheMetadata = (url: string): { loadedAt: number; width?: number; height?: number } | null => {
+  return urlCache.get(url) || null;
+};
+
+/**
+ * Clear URL cache
+ */
+export const clearUrlCache = (): number => {
+  const prevSize = urlCache.size;
+  urlCache.clear();
+  console.log(`[ImageCacheManager] Cleared URL cache, removed ${prevSize} entries`);
+  return prevSize;
+};
+
+/**
+ * Remove old URL cache entries (older than maxAge milliseconds)
+ */
+export const cleanupUrlCache = (maxAge: number = 30 * 60 * 1000): number => {
+  const now = Date.now();
+  let removedCount = 0;
+  
+  urlCache.forEach((metadata, url) => {
+    if (now - metadata.loadedAt > maxAge) {
+      urlCache.delete(url);
+      removedCount++;
+    }
+  });
+  
+  if (removedCount > 0) {
+    console.log(`[ImageCacheManager] Cleaned up ${removedCount} old URL cache entries`);
+  }
+  
+  return removedCount;
+};
+
+// Legacy exports for backwards compatibility - removed duplicate export

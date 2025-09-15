@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 
-import ImageGenerationForm, { ImageGenerationFormHandles, PromptEntry } from "../components/ImageGenerationForm";
+import ImageGenerationForm, { PromptEntry } from "../components/ImageGenerationForm";
+import { ImageGenerationFormHandles } from "../components/ImageGenerationForm/types";
 import { createBatchImageGenerationTasks, BatchImageGenerationTaskParams } from "@/shared/lib/tasks/imageGeneration";
 import { ImageGallery, GeneratedImageWithMetadata, DisplayableMetadata, MetadataLora } from "@/shared/components/ImageGallery";
 import SettingsModal from "@/shared/components/SettingsModal";
@@ -222,11 +223,34 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   }, [formStateReady]); // Only depend on formStateReady to run once when ready
 
 
+  const { lastAffectedShotId, setLastAffectedShotId } = useLastAffectedShot();
   const addImageToShotMutation = useAddImageToShot();
   const addImageToShotWithoutPositionMutation = useAddImageToShotWithoutPosition();
   const positionExistingGenerationMutation = usePositionExistingGenerationInShot();
   const createShotMutation = useCreateShot();
-  const { lastAffectedShotId, setLastAffectedShotId } = useLastAffectedShot();
+  
+  // Debug logging for state changes (after hook declarations)
+  useEffect(() => {
+    console.log('[ShotChangeDebug] 📊 formAssociatedShotId state changed:', {
+      newValue: formAssociatedShotId,
+      timestamp: Date.now()
+    });
+  }, [formAssociatedShotId]);
+  
+  useEffect(() => {
+    console.log('[ShotChangeDebug] 📊 selectedShotFilter state changed:', {
+      newValue: selectedShotFilter,
+      timestamp: Date.now()
+    });
+  }, [selectedShotFilter]);
+  
+  useEffect(() => {
+    console.log('[ShotChangeDebug] 📊 lastAffectedShotId state changed:', {
+      newValue: lastAffectedShotId,
+      timestamp: Date.now()
+    });
+  }, [lastAffectedShotId]);
+  
   // Use consistent page sizes with ImageGallery defaults to prevent cache mismatches
   const itemsPerPage = isMobile ? 20 : 20;
   
@@ -355,17 +379,33 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
 
   // Removed delayed enable; query is always enabled to leverage cache on revisit
 
-  // Track the associated shot ID from the form
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (imageGenerationFormRef.current) {
-        const associatedShotId = imageGenerationFormRef.current.getAssociatedShotId();
-        setFormAssociatedShotId(associatedShotId);
-      }
-    }, 500); // Check every 500ms
-
-    return () => clearInterval(interval);
-  }, []); // Remove dependency to prevent unnecessary effect recreation
+  // Handle shot change from the form (one-time update)
+  const handleFormShotChange = useCallback((shotId: string | null) => {
+    console.log('[ShotChangeDebug] 🎯 handleFormShotChange called in ImageGenerationToolPage:', {
+      newShotId: shotId,
+      currentFormAssociatedShotId: formAssociatedShotId,
+      currentSelectedShotFilter: selectedShotFilter,
+      currentLastAffectedShotId: lastAffectedShotId,
+      timestamp: Date.now()
+    });
+    
+    setFormAssociatedShotId(shotId);
+    console.log('[ShotChangeDebug] ✅ setFormAssociatedShotId called with:', shotId);
+    
+    // Update the shot selection in gallery items by setting lastAffectedShotId
+    if (shotId) {
+      console.log('[ShotChangeDebug] 🎯 Setting lastAffectedShotId to update gallery shot selectors:', shotId);
+      setLastAffectedShotId(shotId);
+      console.log('[ShotChangeDebug] ✅ setLastAffectedShotId called with:', shotId);
+      
+      // Also update the gallery filter if desired
+      console.log('[ShotChangeDebug] 🎯 Updating selectedShotFilter to:', shotId);
+      setSelectedShotFilter(shotId);
+      console.log('[ShotChangeDebug] ✅ setSelectedShotFilter called with:', shotId);
+    } else {
+      console.log('[ShotChangeDebug] 🎯 Shot ID is null, not updating gallery shot selectors');
+    }
+  }, [formAssociatedShotId, selectedShotFilter, setLastAffectedShotId]);
 
   // Handle scrolling to gallery when coming from "View All" in GenerationsPane
   useEffect(() => {
@@ -765,7 +805,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   }, [selectedProjectId, queryClient, generationsFilters]);
 
   // Handle creating a new shot
-  const handleCreateShot = useCallback(async (shotName: string, files: File[]) => {
+  const handleCreateShot = useCallback(async (shotName: string, files: File[]): Promise<void> => {
     if (!selectedProjectId) {
       toast.error("No project selected");
       return;
@@ -789,11 +829,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
         // Note: We're NOT changing setSelectedShotFilter here to keep the gallery populated
       }
       
-      // Return the result so MediaLightbox can get the real shot ID
-      return {
-        shotId: result.shot?.id,
-        shotName: result.shot?.name || shotName
-      };
+      toast.success(`Shot "${shotName}" created successfully`);
     } catch (error) {
       console.error('Error creating shot:', error);
       toast.error("Failed to create shot");
@@ -1141,6 +1177,13 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
                     apiKey={falApiKey}
                     openaiApiKey={openaiApiKey}
                     justQueued={combinedJustQueued}
+                    onShotChange={(() => {
+                      console.log('[ShotChangeDebug] 🔗 Passing handleFormShotChange callback to form:', {
+                        callbackExists: !!handleFormShotChange,
+                        callbackType: typeof handleFormShotChange
+                      });
+                      return handleFormShotChange;
+                    })()}
                   />
                 </div>
               </CollapsibleContent>

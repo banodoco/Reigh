@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { GenerationRow, Shot } from "@/types/shots";
 import { useProject } from "@/shared/contexts/ProjectContext";
 import { uploadImageToStorage } from "@/shared/lib/imageUploader";
+import { generateClientThumbnail, uploadImageWithThumbnail } from "@/shared/lib/clientThumbnailGenerator";
 import { 
   useAddImageToShot, 
   useRemoveImageFromShot, 
@@ -134,8 +135,36 @@ export const useGenerationActions = ({
           }
         }
 
-        const imageUrl = await uploadImageToStorage(fileToUpload);
-        const finalImageUrl = croppedImageUrl ? getDisplayUrl(imageUrl) : imageUrl;
+        // Generate client-side thumbnail
+        console.log(`[ThumbnailGenDebug] Starting client-side thumbnail generation for ${file.name}`);
+        let thumbnailUrl = '';
+        let finalImageUrl = '';
+        
+        try {
+          // Get current user ID for storage path
+          const { data: { session } } = await supabase.auth.getSession();
+          if (!session?.user?.id) {
+            throw new Error('User not authenticated');
+          }
+          const userId = session.user.id;
+
+          // Generate thumbnail client-side
+          const thumbnailResult = await generateClientThumbnail(fileToUpload, 300, 0.8);
+          console.log(`[ThumbnailGenDebug] Generated thumbnail: ${thumbnailResult.thumbnailWidth}x${thumbnailResult.thumbnailHeight} (original: ${thumbnailResult.originalWidth}x${thumbnailResult.originalHeight})`);
+          
+          // Upload both main image and thumbnail
+          const uploadResult = await uploadImageWithThumbnail(fileToUpload, thumbnailResult.thumbnailBlob, userId);
+          finalImageUrl = croppedImageUrl ? getDisplayUrl(uploadResult.imageUrl) : uploadResult.imageUrl;
+          thumbnailUrl = uploadResult.thumbnailUrl;
+          
+          console.log(`[ThumbnailGenDebug] Upload complete - Image: ${finalImageUrl}, Thumbnail: ${thumbnailUrl}`);
+        } catch (thumbnailError) {
+          console.warn(`[ThumbnailGenDebug] Client-side thumbnail generation failed for ${file.name}:`, thumbnailError);
+          // Fallback to original upload flow without thumbnail
+          const imageUrl = await uploadImageToStorage(fileToUpload);
+          finalImageUrl = croppedImageUrl ? getDisplayUrl(imageUrl) : imageUrl;
+          thumbnailUrl = finalImageUrl; // Use main image as fallback
+        }
 
         const promptForGeneration = `External image: ${file.name || 'untitled'}`;
 
@@ -149,6 +178,7 @@ export const useGenerationActions = ({
             .from('generations')
             .insert({
               location: finalImageUrl,
+              thumbnail_url: thumbnailUrl, // Add thumbnail URL
               type: file.type || 'image',
               project_id: projectId,
               params: {
@@ -182,7 +212,7 @@ export const useGenerationActions = ({
           generation_id: newGeneration.id,
           project_id: projectId,
           imageUrl: finalImageUrl,
-          thumbUrl: finalImageUrl,
+          thumbUrl: thumbnailUrl, // Use the generated thumbnail URL
         });
 
         const finalImage: GenerationRow = {
@@ -192,7 +222,7 @@ export const useGenerationActions = ({
           id: newGeneration.id,
           isOptimistic: false,
           imageUrl: finalImageUrl, // Ensure final URL is used
-          thumbUrl: finalImageUrl,
+          thumbUrl: thumbnailUrl, // Use the generated thumbnail URL
         };
         
         return { optimisticId: optimisticImage.shotImageEntryId, finalImage, success: true };

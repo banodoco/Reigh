@@ -223,10 +223,14 @@ export async function fetchGenerations(
   }
 
   const items = finalData?.map((item: any) => {
+    // Simple URL handling: location for main, thumbnail_url for thumb (fallback to main)
+    const mainUrl = item.location;
+    const thumbnailUrl = item.thumbnail_url || mainUrl;
+    
     const baseItem = {
       id: item.id,
-      url: item.location,
-      thumbUrl: item.thumbnail_url || item.location, // Use thumbnail_url if available, fallback to main location
+      url: mainUrl,
+      thumbUrl: thumbnailUrl, // Use thumbnail_url if available, fallback to main URL
       prompt: item.params?.originalParams?.orchestrator_details?.prompt || 
               item.params?.prompt || 
               'No prompt',
@@ -307,11 +311,13 @@ async function createGeneration(params: {
   fileSize: number;
   projectId: string;
   prompt: string;
+  thumbnailUrl?: string;
 }): Promise<any> {
   const { data, error } = await supabase
     .from('generations')
     .insert({
       location: params.imageUrl,
+      thumbnail_url: params.thumbnailUrl || params.imageUrl, // Use thumbnail URL if provided, fallback to main image
       type: params.fileType || 'image',
       project_id: params.projectId,
       params: {

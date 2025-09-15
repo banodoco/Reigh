@@ -808,7 +808,13 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
             {internalPrompts.length > 0 && (
               <Button variant="destructive" size="sm" onClick={handleRemoveAllPrompts} className="ml-auto h-auto py-2">
                 <Trash2 className="mr-2 h-4 w-4 self-center" />
-                <span className="leading-tight">Delete<br />Prompts</span>
+                <span className={`leading-tight ${isMobile ? '' : 'whitespace-nowrap'}`}>
+                  {isMobile ? (
+                    <>Delete<br />Prompts</>
+                  ) : (
+                    'Delete Prompts'
+                  )}
+                </span>
               </Button>
             )}
           </div>

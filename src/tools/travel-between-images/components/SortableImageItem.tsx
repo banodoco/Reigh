@@ -20,6 +20,8 @@ import { Label } from '@/shared/components/ui/label';
 import { cn, getDisplayUrl } from '@/shared/lib/utils';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import MagicEditModal from '@/shared/components/MagicEditModal';
+import { useProgressiveImage } from '@/shared/hooks/useProgressiveImage';
+import { isProgressiveLoadingEnabled } from '@/shared/settings/progressiveLoading';
 
 interface SortableImageItemProps {
   image: GenerationRow;
@@ -60,8 +62,21 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
   shouldLoad = true,
   projectAspectRatio,
 }) => {
-  // Simple approach like ShotsPane - just use the image URL directly
-  const displayImageUrl = getDisplayUrl(image.thumbUrl || image.imageUrl);
+  // Progressive loading for sortable image item
+  const progressiveEnabled = isProgressiveLoadingEnabled();
+  const { src: progressiveSrc, phase, isThumbShowing, isFullLoaded, ref: progressiveRef } = useProgressiveImage(
+    progressiveEnabled ? image.thumbUrl : null,
+    image.imageUrl,
+    {
+      priority: false, // Not high priority in travel tool
+      lazy: true,
+      enabled: progressiveEnabled && shouldLoad,
+      crossfadeMs: 200
+    }
+  );
+
+  // Use progressive src if available, otherwise fallback to display URL
+  const displayImageUrl = progressiveEnabled && progressiveSrc ? progressiveSrc : getDisplayUrl(image.thumbUrl || image.imageUrl);
 
   // Calculate aspect ratio for consistent sizing with skeletons
   const getAspectRatioStyle = () => {
@@ -267,11 +282,17 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
       }}
       onDoubleClick={isMobile ? undefined : onDoubleClick}
     >
-      {/* Simple image display like ShotsPane - no complex loading states */}
+      {/* Progressive image display */}
       <img
+        ref={progressiveRef}
         src={shouldLoad ? displayImageUrl : '/placeholder.svg'}
         alt={`Generated image ${(position ?? 0) + 1}`}
-        className="w-full h-full object-cover transition-opacity duration-200"
+        className={cn(
+          "w-full h-full object-cover transition-all duration-200",
+          // Progressive loading visual states
+          progressiveEnabled && isThumbShowing && "opacity-95",
+          progressiveEnabled && isFullLoaded && "opacity-100"
+        )}
         onTouchStart={isMobile ? handleTouchStart : undefined}
         onTouchEnd={isMobile ? handleTouchEnd : undefined}
         loading="lazy"

@@ -15,6 +15,8 @@ import { toast } from 'sonner';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useCreateShotWithImage } from '@/shared/hooks/useShots';
 import { useProject } from '@/shared/contexts/ProjectContext';
+import { useProgressiveImage } from '@/shared/hooks/useProgressiveImage';
+import { isProgressiveLoadingEnabled, getLightboxPrefetchCount } from '@/shared/settings/progressiveLoading';
 
 interface ShotOption {
   id: string;
@@ -337,7 +339,22 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   }
 
   const isVideo = media.type === 'video' || media.type === 'video_travel_output' || media.location?.endsWith('.mp4');
-  const displayUrl = getDisplayUrl(media.location || media.imageUrl);
+  
+  // Progressive loading for lightbox images
+  const progressiveEnabled = isProgressiveLoadingEnabled();
+  const { src: progressiveSrc, phase, isThumbShowing, isFullLoaded, error: progressiveError, retry: retryProgressive, ref: progressiveRef } = useProgressiveImage(
+    progressiveEnabled && !isVideo ? media.thumbUrl : null,
+    media.location || media.imageUrl,
+    {
+      priority: true, // Lightbox images are always high priority
+      lazy: false,
+      enabled: progressiveEnabled && !isVideo,
+      crossfadeMs: 250 // Slightly longer crossfade for lightbox
+    }
+  );
+  
+  // Use progressive src if available, otherwise fallback to display URL
+  const displayUrl = progressiveEnabled && progressiveSrc ? progressiveSrc : getDisplayUrl(media.location || media.imageUrl);
 
 
 
@@ -988,6 +1005,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                             </div>
                           </div>
                         )}
+                        
                         {/* Hidden canvas for image processing */}
                         <canvas 
                           ref={canvasRef}

@@ -198,6 +198,8 @@ export async function createImageGenerationTask(params: ImageGenerationTaskParam
       }),
       // Include shot association
       ...(params.shot_id ? { shot_id: params.shot_id } : {}),
+      // Make new image generations unpositioned by default
+      add_in_position: false,
     };
     
     console.log("[createImageGenerationTask] Sending clean params to backend:", JSON.stringify(taskParamsToSend, null, 2));

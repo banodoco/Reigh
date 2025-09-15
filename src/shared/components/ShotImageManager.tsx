@@ -25,6 +25,8 @@ import { cn, getDisplayUrl } from '@/shared/lib/utils';
 import { MultiImagePreview, SingleImagePreview } from './ImageDragPreview';
 
 import { useIsMobile } from '@/shared/hooks/use-mobile';
+import { useProgressiveImage } from '@/shared/hooks/useProgressiveImage';
+import { isProgressiveLoadingEnabled } from '@/shared/settings/progressiveLoading';
 import { Button } from './ui/button';
 import { ArrowDown, Trash2, Check, Sparkles } from 'lucide-react';
 import { ProgressiveLoadingManager } from '@/shared/components/ProgressiveLoadingManager';
@@ -1364,8 +1366,22 @@ const MobileImageItem: React.FC<MobileImageItemProps> = ({
     conditionalResult: isSelected ? 'ring-4 ring-offset-2 ring-orange-500 border-orange-500 bg-orange-500/15' : 'NO_SELECTION_CLASSES',
     timestamp: Date.now()
   });
+  // Progressive loading for shot image manager
+  const progressiveEnabled = isProgressiveLoadingEnabled();
+  const { src: progressiveSrc, phase, isThumbShowing, isFullLoaded, ref: progressiveRef } = useProgressiveImage(
+    progressiveEnabled ? image.thumbUrl : null,
+    image.imageUrl,
+    {
+      priority: false, // Not high priority in shot manager
+      lazy: true,
+      enabled: progressiveEnabled && shouldLoad,
+      crossfadeMs: 200
+    }
+  );
+
+  // Use progressive src if available, otherwise fallback to display URL
   const imageUrl = image.thumbUrl || image.imageUrl;
-  const displayUrl = getDisplayUrl(imageUrl);
+  const displayUrl = progressiveEnabled && progressiveSrc ? progressiveSrc : getDisplayUrl(imageUrl);
   const [isMagicEditOpen, setIsMagicEditOpen] = useState(false);
 
   // Image loading state management
@@ -1475,9 +1491,15 @@ const MobileImageItem: React.FC<MobileImageItemProps> = ({
           });
           return (
             <img
+              ref={progressiveRef}
               src={displayUrl}
               alt={`Image ${image.id}`}
-              className="w-full h-full object-cover rounded-sm"
+              className={cn(
+                "w-full h-full object-cover rounded-sm transition-opacity duration-200",
+                // Progressive loading visual states
+                progressiveEnabled && isThumbShowing && "opacity-95",
+                progressiveEnabled && isFullLoaded && "opacity-100"
+              )}
               onTouchStart={handleTouchStart}
               onTouchEnd={handleTouchEnd}
               draggable={false}

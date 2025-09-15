@@ -101,7 +101,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, 
         
         <div className={`flex-shrink-0 ${modal.isMobile ? 'px-4' : 'px-6'}`}>
           <div className="grid gap-4 py-3">
-            <div className={`${modal.isMobile ? 'space-y-2' : 'grid grid-cols-3 items-center gap-6'}`}>
+            <div className="grid grid-cols-3 items-center gap-6">
               <Label htmlFor="project-name" className="text-left">
                 Name
               </Label>
@@ -109,24 +109,23 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, 
                 id="project-name"
                 value={projectName}
                 onChange={(e) => setProjectName(e.target.value)}
-                className={modal.isMobile ? 'w-full' : 'col-span-2'}
+                className="col-span-2"
                 disabled={isCreatingProject}
                 maxLength={30}
                 placeholder="Enter project name..."
               />
             </div>
-            <div className={`${modal.isMobile ? 'space-y-2' : 'grid grid-cols-3 items-center gap-6'}`}>
+            <div className="grid grid-cols-3 items-center gap-6">
               <Label htmlFor="aspect-ratio" className="text-left">
                 Aspect Ratio
               </Label>
-              <div className={modal.isMobile ? 'w-full' : 'col-span-2'}>
+              <div className="col-span-2">
                 <AspectRatioSelector
                   value={aspectRatio}
                   onValueChange={setAspectRatio}
                   disabled={isCreatingProject}
                   id="aspect-ratio"
-                  showVisualizer={!modal.isMobile}
-                  className={modal.isMobile ? 'w-full' : ''}
+                  showVisualizer={true}
                 />
               </div>
             </div>
