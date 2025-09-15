@@ -13,6 +13,7 @@ import { parseRatio } from '@/shared/lib/aspectRatios';
 import { useProgressiveImage } from '@/shared/hooks/useProgressiveImage';
 import { isProgressiveLoadingEnabled } from '@/shared/settings/progressiveLoading';
 import { cn } from '@/shared/lib/utils';
+import { isImageCached, setImageCacheStatus } from '@/shared/lib/imageCacheManager';
 
 interface VideoShotDisplayProps {
   shot: Shot;
@@ -57,24 +58,11 @@ const ShotImage: React.FC<ShotImageProps> = ({ image, index, onSelectShot, shotN
   );
 
   // Use progressive src if available, otherwise fallback to display URL
-  const displayUrl = progressiveEnabled && progressiveSrc ? progressiveSrc : getDisplayUrl(thumbUrl || imageUrl);
+  // Normalize progressive src through getDisplayUrl to prevent format inconsistency
+  const displayUrl = progressiveEnabled && progressiveSrc ? getDisplayUrl(progressiveSrc) : getDisplayUrl(thumbUrl || imageUrl);
   
-  // Check if image is already cached by browser (similar to ImageGallery approach)
-  const checkIfImageCached = (url: string): boolean => {
-    if (!url) return false;
-    
-    try {
-      const testImg = new Image();
-      testImg.src = url;
-      // If image is cached, complete will be true immediately
-      return testImg.complete && testImg.naturalWidth > 0;
-    } catch {
-      return false;
-    }
-  };
-  
-  const isImageCached = checkIfImageCached(displayUrl);
-  const [imageLoaded, setImageLoaded] = useState(isImageCached);
+  // Use centralized cache to check if image is already loaded
+  const [imageLoaded, setImageLoaded] = useState(isImageCached(image));
   const [imageLoadError, setImageLoadError] = useState(false);
 
   // [Performance] Disabled excessive logging
@@ -88,6 +76,8 @@ const ShotImage: React.FC<ShotImageProps> = ({ image, index, onSelectShot, shotN
     // [Performance] Only log errors, not successful loads
     // console.log(`[ShotImage-${index}] Image loaded successfully`);
     setImageLoaded(true);
+    // Mark image as cached in centralized cache to prevent future skeletons
+    setImageCacheStatus(image, true);
   };
 
   const handleImageError = () => {
@@ -167,7 +157,7 @@ const ShotImage: React.FC<ShotImageProps> = ({ image, index, onSelectShot, shotN
           )}
           
           {/* Hidden image for background loading - only start loading when shouldLoad is true OR image is cached */}
-          {!imageLoaded && (shouldLoad || isImageCached) && (
+          {!imageLoaded && (shouldLoad || isImageCached(image)) && (
             <img
               src={displayUrl}
               alt={`Shot image ${index + 1} for ${shotName}`}
