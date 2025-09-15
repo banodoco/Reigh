@@ -301,6 +301,7 @@ const VideoTravelToolPage: React.FC = () => {
 
   // Stabilize initial deep-link loading to avoid flicker when project resolves after mount
   const [initializingFromHash, setInitializingFromHash] = useState<boolean>(false);
+  const initializingFromHashRef = useRef<boolean>(false);
 
   useEffect(() => {
     // When deep-linking to a shot, consider the page "initializing" until:
@@ -308,13 +309,16 @@ const VideoTravelToolPage: React.FC = () => {
     // - shots have begun and finished loading
     if (hashShotId) {
       const stillInitializing = !selectedProjectId || shotsLoadingRaw || !shots;
-      if (initializingFromHash !== stillInitializing) {
+      // Only update state if the initializing status actually changed
+      if (initializingFromHashRef.current !== stillInitializing) {
+        initializingFromHashRef.current = stillInitializing;
         setInitializingFromHash(stillInitializing);
       }
-    } else if (initializingFromHash) {
+    } else if (initializingFromHashRef.current) {
+      initializingFromHashRef.current = false;
       setInitializingFromHash(false);
     }
-  }, [hashShotId, selectedProjectId, shotsLoadingRaw, shots, initializingFromHash]);
+  }, [hashShotId, selectedProjectId, shotsLoadingRaw, shots]);
 
   // If deep-linked to a shot, set current shot id immediately to prevent list-clearing logic
   useEffect(() => {
@@ -361,13 +365,16 @@ const VideoTravelToolPage: React.FC = () => {
 
   // Data fetching is now handled by the useVideoTravelData hook above
   
-  // Final loading flag used by the page
-  const isLoading = shotsLoadingRaw || initializingFromHash;
-  
-  console.log(`${VIDEO_DEBUG_TAG} Final loading decision:`, {
-    isLoading,
-    shotsLoadingRaw
-  });
+  // Final loading flag used by the page - memoized to prevent rapid changes
+  const isLoading = useMemo(() => {
+    const loading = shotsLoadingRaw || initializingFromHash;
+    console.log(`${VIDEO_DEBUG_TAG} Final loading decision:`, {
+      loading,
+      shotsLoadingRaw,
+      initializingFromHash
+    });
+    return loading;
+  }, [shotsLoadingRaw, initializingFromHash]);
 
   // Add state for video generation settings - wait for settings to load before initializing
   const [videoControlMode, setVideoControlMode] = useState<'individual' | 'batch'>('batch');
@@ -601,34 +608,36 @@ const VideoTravelToolPage: React.FC = () => {
 
 
 
+  // Memoize the selected shot update logic to prevent unnecessary re-renders
+  const selectedShotRef = useRef(selectedShot);
+  selectedShotRef.current = selectedShot;
+  
   useEffect(() => {
     if (!selectedProjectId) {
-      if (selectedShot) {
+      if (selectedShotRef.current) {
         setSelectedShot(null);
         setVideoPairConfigs([]);
         setCurrentShotId(null);
       }
       return;
     }
-    if (shots) {
-      if (selectedShot) {
-        const updatedShotFromList = shots.find(s => s.id === selectedShot.id && s.project_id === selectedProjectId);
-        if (updatedShotFromList) {
-          if (!deepEqual(selectedShot, updatedShotFromList)) {
-            setSelectedShot(updatedShotFromList);
-          }
-        } else {
-          setSelectedShot(null);
-          setVideoPairConfigs([]);
-          setCurrentShotId(null);
+    if (shots && selectedShotRef.current) {
+      const updatedShotFromList = shots.find(s => s.id === selectedShotRef.current!.id && s.project_id === selectedProjectId);
+      if (updatedShotFromList) {
+        if (!deepEqual(selectedShotRef.current, updatedShotFromList)) {
+          setSelectedShot(updatedShotFromList);
         }
+      } else {
+        setSelectedShot(null);
+        setVideoPairConfigs([]);
+        setCurrentShotId(null);
       }
-    } else if (!isLoading && selectedShot) {
+    } else if (!isLoading && shots !== undefined && selectedShotRef.current) {
       setSelectedShot(null);
       setVideoPairConfigs([]);
       setCurrentShotId(null);
     }
-  }, [shots, selectedShot, selectedProjectId, isLoading, setCurrentShotId]);
+  }, [shots, selectedProjectId, isLoading, setCurrentShotId]);
 
   // Get full image data when editing a shot to avoid thumbnail limitation
   const contextImages = selectedShot?.images || [];
@@ -668,12 +677,15 @@ const VideoTravelToolPage: React.FC = () => {
   }, [shotImagesForCalculation]);
 
   // Update videoPairConfigs when computed configs change
+  const videoPairConfigsRef = useRef(videoPairConfigs);
+  videoPairConfigsRef.current = videoPairConfigs;
+  
   useEffect(() => {
     // Only update if the configs have actually changed to prevent infinite loops
-    if (!deepEqual(videoPairConfigs, computedVideoPairConfigs)) {
+    if (!deepEqual(videoPairConfigsRef.current, computedVideoPairConfigs)) {
       setVideoPairConfigs(computedVideoPairConfigs);
     }
-  }, [computedVideoPairConfigs, videoPairConfigs]);
+  }, [computedVideoPairConfigs]);
 
   // Clear any previously selected shot unless this navigation explicitly came from a shot click
   // OR if there's a hash in the URL (direct navigation to a specific shot)
@@ -985,21 +997,29 @@ const VideoTravelToolPage: React.FC = () => {
   // Stabilized skeleton visibility to avoid rapid flicker when multiple queries resolve at different times.
   const [showStableSkeleton, setShowStableSkeleton] = useState<boolean>(false);
   const hideTimeoutRef = useRef<number | null>(null);
+  const lastLoadingStateRef = useRef<boolean>(false);
+  
   useEffect(() => {
-    if (isLoading) {
-      // Immediately show the skeleton when entering loading
-      if (hideTimeoutRef.current) {
-        window.clearTimeout(hideTimeoutRef.current);
-        hideTimeoutRef.current = null;
+    // Only update skeleton state if loading state actually changed
+    if (isLoading !== lastLoadingStateRef.current) {
+      lastLoadingStateRef.current = isLoading;
+      
+      if (isLoading) {
+        // Immediately show the skeleton when entering loading
+        if (hideTimeoutRef.current) {
+          window.clearTimeout(hideTimeoutRef.current);
+          hideTimeoutRef.current = null;
+        }
+        setShowStableSkeleton(true);
+      } else {
+        // Delay hiding slightly to prevent rapid toggle flicker
+        hideTimeoutRef.current = window.setTimeout(() => {
+          setShowStableSkeleton(false);
+          hideTimeoutRef.current = null;
+        }, 120);
       }
-      setShowStableSkeleton(true);
-    } else {
-      // Delay hiding slightly to prevent rapid toggle flicker
-      hideTimeoutRef.current = window.setTimeout(() => {
-        setShowStableSkeleton(false);
-        hideTimeoutRef.current = null;
-      }, 120);
     }
+    
     return () => {
       if (hideTimeoutRef.current) {
         window.clearTimeout(hideTimeoutRef.current);
