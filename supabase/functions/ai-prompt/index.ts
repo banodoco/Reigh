@@ -49,7 +49,9 @@ serve(async (req) => {
 
         let systemMsg = `You are a helpful assistant that generates image prompts based on user input.
 
-IMPORTANT: Each prompt you generate should be specifically designed for AI image generation. The prompts should follow the user's instruction. Unless the user requests otherwise, the prompts should be detailed, descriptive, and focus on visual elements like composition, lighting, style, colors, and atmosphere.
+IMPORTANT: Each prompt you generate should be specifically designed for AI image generation. The prompts should follow the user's instruction. Unless the user requests otherwise, the prompts should be detailed, descriptive, and focus on visual elements like composition, lighting, colors, and atmosphere.
+
+STYLE GUIDANCE: Do not mention specific artistic styles (like 'photography', 'anime', 'oil painting', 'digital art', etc.) in the prompts unless the user specifically asks for a particular style. Focus on describing the subject, scene, composition, lighting, and visual details instead.
 
 CRITICAL FORMATTING REQUIREMENTS:
 - Output EXACTLY ${numberToGenerate} prompts
@@ -123,6 +125,8 @@ IMPORTANT: Only respond with the ${numberToGenerate} prompts, nothing else. Do n
         const systemMsg = `You are an AI assistant that helps refine user prompts for image generation.
 
 Your task is to edit the provided image prompt based on the user's instructions.
+
+STYLE GUIDANCE: Do not add specific artistic styles (like 'photography', 'anime', 'oil painting', 'digital art', etc.) to the prompts unless the user specifically requests a particular style in their edit instructions. Focus on describing the subject, scene, composition, lighting, and visual details instead.
 
 CRITICAL FORMATTING REQUIREMENTS:
 - Output ONLY the revised prompt text
