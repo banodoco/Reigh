@@ -152,7 +152,6 @@ BEGIN
             type,
             project_id,
             thumbnail_url,
-            thumbnail_status,
             created_at
         ) VALUES (
             new_generation_id,
@@ -162,11 +161,6 @@ BEGIN
             generation_type,
             NEW.project_id,
             thumbnail_url,  -- Save extracted thumbnail_url directly to column
-            CASE 
-                WHEN thumbnail_url IS NOT NULL THEN 'completed'
-                WHEN generation_type = 'image' THEN 'pending'
-                ELSE 'not_applicable'
-            END,
             NOW()
         );
 
@@ -182,14 +176,9 @@ BEGIN
         -- Mark the task as having created a generation
         NEW.generation_created := TRUE;
 
-        RAISE LOG '[ProcessTask] Created generation % for % task % with category: %, tool_type: %, thumbnail_url: %, thumbnail_status: %, add_in_position: %', 
+        RAISE LOG '[ProcessTask] Created generation % for % task % with category: %, tool_type: %, thumbnail_url: %, add_in_position: %', 
             new_generation_id, NEW.task_type, NEW.id, task_category, task_tool_type, 
             COALESCE(thumbnail_url, 'none'),
-            CASE 
-                WHEN thumbnail_url IS NOT NULL THEN 'completed'
-                WHEN generation_type = 'image' THEN 'pending'
-                ELSE 'not_applicable'
-            END,
             add_in_position;
     ELSE
         -- Log why task was skipped for debugging
