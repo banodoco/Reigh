@@ -225,7 +225,59 @@ export async function fetchGenerations(
   const items = finalData?.map((item: any) => {
     // Simple URL handling: location for main, thumbnail_url for thumb (fallback to main)
     const mainUrl = item.location;
-    const thumbnailUrl = item.thumbnail_url || mainUrl;
+    
+    // Enhanced thumbnail URL extraction - check database field first, then params
+    let thumbnailUrl = item.thumbnail_url;
+    
+    // If no thumbnail in database, check params for travel-between-images videos
+    if (!thumbnailUrl && item.params?.tool_type === 'travel-between-images') {
+      thumbnailUrl = 
+        item.params?.thumbnailUrl ||
+        item.params?.originalParams?.orchestrator_details?.thumbnail_url ||
+        item.params?.full_orchestrator_payload?.thumbnail_url ||
+        item.params?.originalParams?.full_orchestrator_payload?.thumbnail_url;
+    }
+    
+    // Final fallback to main URL
+    thumbnailUrl = thumbnailUrl || mainUrl;
+    
+    // [VideoThumbnailIssue] Log thumbnail data for travel-between-images videos
+    if (item.params?.tool_type === 'travel-between-images' && item.type?.includes('video')) {
+      // Log first few items in detail, then summary for the rest
+      const shouldLogDetail = finalData.indexOf(item) < 3;
+      
+      if (shouldLogDetail) {
+        console.log('[VideoThumbnailFirst3] DETAILED - Processing travel video:', {
+          id: item.id?.substring(0, 8),
+          type: item.type,
+          mainUrl: mainUrl?.substring(0, 50) + '...',
+          thumbnail_url_raw: item.thumbnail_url,
+          thumbnail_url_type: typeof item.thumbnail_url,
+          thumbnail_url_preview: item.thumbnail_url ? item.thumbnail_url.substring(0, 50) + '...' : 'NULL',
+          finalThumbnailUrl: thumbnailUrl?.substring(0, 50) + '...',
+          extractedFromDB: !!item.thumbnail_url,
+          extractedFromParams: !item.thumbnail_url && thumbnailUrl !== mainUrl,
+          isUsingVideoFallback: thumbnailUrl === mainUrl,
+          // Check if thumbnail might be in params
+          paramsHasThumbnail: !!(item.params?.thumbnailUrl || item.params?.originalParams?.orchestrator_details?.thumbnail_url || item.params?.full_orchestrator_payload?.thumbnail_url),
+          paramsThumbnailUrl: item.params?.thumbnailUrl?.substring(0, 50) + '...' || 'none',
+          orchestratorThumbnailUrl: item.params?.originalParams?.orchestrator_details?.thumbnail_url?.substring(0, 50) + '...' || 'none',
+          fullOrchestratorThumbnailUrl: item.params?.full_orchestrator_payload?.thumbnail_url?.substring(0, 50) + '...' || 'none',
+          // Show full params structure for first item
+          fullParams: finalData.indexOf(item) === 0 ? item.params : 'hidden',
+          timestamp: Date.now()
+        });
+      } else {
+        console.log('[VideoThumbnailIssue] SUMMARY - Travel video:', {
+          id: item.id?.substring(0, 8),
+          thumbnail_url_raw: item.thumbnail_url,
+          extractedFromDB: !!item.thumbnail_url,
+          extractedFromParams: !item.thumbnail_url && thumbnailUrl !== mainUrl,
+          isUsingVideoFallback: thumbnailUrl === mainUrl,
+          finalThumbnailUrl: thumbnailUrl?.substring(0, 50) + '...',
+        });
+      }
+    }
     
     const baseItem = {
       id: item.id,

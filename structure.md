@@ -47,7 +47,7 @@
 | **Realtime Architecture** | [realtime_system.md](docs/structure_detail/realtime_system.md) | Implemented unified realtime system and usage guide |
 | **Component Modularity** | [component_modularization.md](docs/structure_detail/component_modularization.md) | Reusable UI component patterns and shared details |
 | **Tool: Image Gen** | [tool_image_generation.md](docs/structure_detail/tool_image_generation.md) | Multi-model image generation (Wan 2.2, Qwen.Image), LoRA support, style reference system, inline AI prompt editing |
-| **Tool: Video Travel** | [tool_video_travel.md](docs/structure_detail/tool_video_travel.md) | Frame-accurate video generation workflow, shot reordering, mobile video preloading |
+| **Tool: Video Travel** | [tool_video_travel.md](docs/structure_detail/tool_video_travel.md) | Frame-accurate video generation workflow, shot reordering, mobile video preloading, video gallery with hover-to-play |
 | **Tool: Edit Travel** | [tool_edit_travel.md](docs/structure_detail/tool_edit_travel.md) | Text-guided image transformations |
 | **Tool: Training Data** | [tool_training_data_helper.md](docs/structure_detail/tool_training_data_helper.md) | Training video upload & segmentation |
 | **Auto-Top-Up System** | [auto_topup_system.md](docs/structure_detail/auto_topup_system.md) | Credit purchases, auto-top-up setup, Stripe integration, database triggers |

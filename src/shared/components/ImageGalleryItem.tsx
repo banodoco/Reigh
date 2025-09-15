@@ -116,6 +116,19 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   currentViewingShotId,
   projectAspectRatio,
 }) => {
+  // [VideoThumbnailRender] Debug if this component is rendering for videos
+  React.useEffect(() => {
+    if (image.isVideo && index < 3) {
+      console.log('[VideoThumbnailRender] ImageGalleryItem mounting for video:', {
+        imageId: image.id?.substring(0, 8),
+        index,
+        isVideo: image.isVideo,
+        shouldLoad,
+        timestamp: Date.now()
+      });
+    }
+  }, []); // Only log on mount
+  
   // Debug mobile state for first few items (reduced frequency)
   React.useEffect(() => {
     if (index < 3) {
@@ -134,7 +147,8 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   const { navigateToShot } = useShotNavigation();
   const { lastAffectedShotId, setLastAffectedShotId: updateLastAffectedShotId } = useLastAffectedShot();
   // Progressive loading for thumbnail → full image transition
-  const progressiveEnabled = isProgressiveLoadingEnabled();
+  // DISABLE progressive loading for videos - we want to show thumbnails, not load the full video file
+  const progressiveEnabled = isProgressiveLoadingEnabled() && !image.isVideo;
   const { src: progressiveSrc, phase, isThumbShowing, isFullLoaded, error: progressiveError, retry: retryProgressive, ref: progressiveRef } = useProgressiveImage(
     progressiveEnabled ? image.thumbUrl : null,
     image.url,
@@ -148,11 +162,34 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   
   // Fallback to legacy behavior if progressive loading is disabled
   const displayUrl = useMemo(() => {
+    // For videos, ALWAYS use the thumbnail, never the video file
+    if (image.isVideo) {
+      const videoDisplayUrl = getDisplayUrl(image.thumbUrl || image.url);
+      
+      if (index === 0) { // Only log the first video item in detail
+        console.log('[VideoThumbnailFIXED] ImageGalleryItem video URL selection:', {
+          imageId: image.id?.substring(0, 8),
+          index,
+          progressiveEnabled,
+          usingThumbnail: !!image.thumbUrl,
+          usingVideoFallback: !image.thumbUrl,
+          // Show full URLs for verification
+          fullThumbUrl: image.thumbUrl,
+          fullVideoUrl: image.url,
+          fullDisplayUrl: videoDisplayUrl,
+          timestamp: Date.now()
+        });
+      }
+      
+      return videoDisplayUrl;
+    }
+    
+    // For images, use progressive loading if enabled
     if (progressiveEnabled && progressiveSrc) {
       return progressiveSrc;
     }
     return getDisplayUrl(image.thumbUrl || image.url);
-  }, [progressiveEnabled, progressiveSrc, image.thumbUrl, image.url]);
+  }, [progressiveEnabled, progressiveSrc, image.thumbUrl, image.url, image.isVideo, image.id, index]);
   // Track loading state for this specific image
   const [imageLoadError, setImageLoadError] = useState<boolean>(false);
   const [imageRetryCount, setImageRetryCount] = useState<number>(0);
@@ -322,6 +359,18 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
       });
     }
     
+    // [VideoThumbnailLoop] Debug what's causing the reset loop
+    if (image.isVideo && index === 0) {
+      console.log('[VideoThumbnailLoop] imageIdentifier changed, causing reset:', {
+        imageId: image.id?.substring(0, 8),
+        prevIdentifier: prevImageIdentifierRef.current,
+        newIdentifier: imageIdentifier,
+        url: image.url?.substring(0, 50) + '...',
+        thumbUrl: image.thumbUrl?.substring(0, 50) + '...',
+        timestamp: Date.now()
+      });
+    }
+    
     // Update the ref AFTER logging
     prevImageIdentifierRef.current = imageIdentifier;
     
@@ -340,6 +389,34 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
 
   // Progressive loading: only set src when shouldLoad is true
   const [actualSrc, setActualSrc] = useState<string | null>(null);
+  
+  // [VideoThumbnailActualSrc] Debug actualSrc changes for videos
+  React.useEffect(() => {
+    if (image.isVideo && index === 0) {
+      console.log('[VideoThumbnailActualSrc] actualSrc changed:', {
+        imageId: image.id?.substring(0, 8),
+        actualSrc: actualSrc?.substring(0, 50) + '...' || 'NULL',
+        actualSrcExists: !!actualSrc,
+        timestamp: Date.now(),
+        stack: new Error().stack?.split('\n')[1] // Show where this was called from
+      });
+    }
+  }, [actualSrc, image.isVideo, image.id, index]);
+  
+  // [VideoThumbnailIssue] Debug shouldLoad for videos
+  React.useEffect(() => {
+    if (image.isVideo && index === 0) {
+      console.log('[VideoThumbnailLoad] shouldLoad state for first video:', {
+        imageId: image.id?.substring(0, 8),
+        shouldLoad,
+        actualSrc: !!actualSrc,
+        displayUrl: displayUrl?.substring(0, 50) + '...',
+        imageLoading,
+        imageLoadError,
+        timestamp: Date.now()
+      });
+    }
+  }, [shouldLoad, actualSrc, image.isVideo, image.id, index, displayUrl, imageLoading, imageLoadError]);
 
   // Generate display URL with retry cache busting
   const actualDisplayUrl = useMemo(() => {
@@ -396,9 +473,132 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   const isCurrentDeleting = isDeleting;
   const imageKey = image.id || `image-${actualDisplayUrl}-${index}`;
 
-  // Determine if it's a video by checking the URL extension if isVideo prop is not explicitly set
-  const urlIsVideo = actualDisplayUrl && (actualDisplayUrl.toLowerCase().endsWith('.webm') || actualDisplayUrl.toLowerCase().endsWith('.mp4') || actualDisplayUrl.toLowerCase().endsWith('.mov'));
-  const isActuallyVideo = typeof image.isVideo === 'boolean' ? image.isVideo : urlIsVideo;
+  // Determine if it's a video ONLY if the display URL points to a video file
+  // Thumbnails for videos are images (png/jpg) and must be treated as images here
+  const urlIsVideo = Boolean(
+    actualDisplayUrl && (
+      actualDisplayUrl.toLowerCase().endsWith('.webm') ||
+      actualDisplayUrl.toLowerCase().endsWith('.mp4') ||
+      actualDisplayUrl.toLowerCase().endsWith('.mov')
+    )
+  );
+  // If the display URL is not a video file, force image rendering even if image.isVideo is true
+  const isActuallyVideo = urlIsVideo;
+  // Content type: whether this item represents a video generation at all
+  const isVideoContent = useMemo(() => {
+    if (typeof image.isVideo === 'boolean') return image.isVideo;
+    const url = image.url || '';
+    const lower = url.toLowerCase();
+    return lower.endsWith('.webm') || lower.endsWith('.mp4') || lower.endsWith('.mov');
+  }, [image.isVideo, image.url]);
+
+  // Check if we have a real image thumbnail (not a video file)
+  const hasThumbnailImage = useMemo(() => {
+    const thumb = image.thumbUrl || '';
+    if (!thumb) return false;
+    const lower = thumb.toLowerCase();
+    // Treat as image only if not a video extension
+    const isVideoExt = lower.endsWith('.webm') || lower.endsWith('.mp4') || lower.endsWith('.mov');
+    return !isVideoExt;
+  }, [image.thumbUrl]);
+
+  // Hover-to-play support for videos that show a thumbnail first
+  const [isHovering, setIsHovering] = useState(false);
+  const hoverVideoRef = useRef<HTMLVideoElement | null>(null);
+  const videoUrl = useMemo(() => (isVideoContent ? (image.url || null) : null), [isVideoContent, image.url]);
+  const [videoReady, setVideoReady] = useState(false);
+  useEffect(() => {
+    setVideoReady(false);
+    if (index < 3 && isVideoContent) {
+      console.log(`[VideoHover] Video URL changed for item ${index}:`, {
+        imageId: image.id?.substring(0, 8),
+        videoUrl: videoUrl?.substring(0, 50) + '...',
+        isVideoContent,
+        hasThumbnailImage,
+        timestamp: Date.now()
+      });
+    }
+  }, [videoUrl, index, isVideoContent, hasThumbnailImage, image.id]);
+  const visibleVideoRef = useRef<HTMLVideoElement | null>(null);
+  const safePause = useCallback((videoEl: HTMLVideoElement | null, label: string) => {
+    if (!videoEl) return;
+    try {
+      videoEl.pause();
+      videoEl.currentTime = 0;
+      if (index < 3 && isVideoContent) {
+        console.log(`[VideoHover] Paused ${label} for item ${index}`);
+      }
+    } catch (error) {
+      if (index < 3 && isVideoContent) {
+        console.warn(`[VideoHover] Failed to pause ${label} for item ${index}:`, error);
+      }
+    }
+  }, [index, isVideoContent]);
+  useEffect(() => {
+    const videoEl = visibleVideoRef.current;
+    if (!videoEl) return;
+    
+    if (index < 3 && isVideoContent) {
+      console.log(`[VideoHover] Hover state changed for item ${index}:`, {
+        imageId: image.id?.substring(0, 8),
+        isHovering,
+        videoReady,
+        hasThumbnailImage,
+        videoElExists: !!videoEl,
+        videoSrc: videoEl.src?.substring(0, 50) + '...' || 'none',
+        timestamp: Date.now()
+      });
+    }
+    
+    if (isHovering && videoReady) {
+      if (index < 3 && isVideoContent) {
+        console.log(`[VideoHover] Starting play for item ${index}:`, {
+          imageId: image.id?.substring(0, 8),
+          videoSrc: videoEl.src?.substring(0, 50) + '...',
+          timestamp: Date.now()
+        });
+      }
+      videoEl.play().catch((error) => {
+        if (index < 3 && isVideoContent) {
+          console.warn(`[VideoHover] Play failed for item ${index}:`, {
+            imageId: image.id?.substring(0, 8),
+            error: error.message,
+            timestamp: Date.now()
+          });
+        }
+      });
+    } else {
+      if (index < 3 && isVideoContent) {
+        console.log(`[VideoHover] Stopping play for item ${index}:`, {
+          imageId: image.id?.substring(0, 8),
+          reason: !isHovering ? 'not hovering' : 'not ready',
+          timestamp: Date.now()
+        });
+      }
+      safePause(videoEl, 'visible video (effect)');
+    }
+  }, [isHovering, videoReady, index, isVideoContent, image.id, safePause]);
+
+  // Pause videos on visibility change (tab change or route transitions causing hidden state)
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState !== 'visible') {
+        safePause(visibleVideoRef.current, 'visible video (visibility)');
+        safePause(hoverVideoRef.current, 'hidden video (visibility)');
+        if (isHovering) setIsHovering(false);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, [safePause, isHovering]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      safePause(visibleVideoRef.current, 'visible video (unmount)');
+      safePause(hoverVideoRef.current, 'hidden video (unmount)');
+    };
+  }, [safePause]);
 
   // Placeholder check
   const isPlaceholder = !image.id && actualDisplayUrl === "/placeholder.svg";
@@ -547,6 +747,40 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
           isOptimisticallyDeleted ? 'opacity-50 scale-95 pointer-events-none' : ''
         }`}
         draggable={false}
+        onMouseEnter={() => { 
+          if (!isMobile && isVideoContent) {
+            if (index < 3) {
+              console.log(`[VideoHover] Mouse enter on item ${index}:`, {
+                imageId: image.id?.substring(0, 8),
+                hasThumbnailImage,
+                videoReady,
+                timestamp: Date.now()
+              });
+            }
+            setIsHovering(true);
+          }
+        }}
+        onMouseLeave={() => { 
+          if (!isMobile && isVideoContent) {
+            if (index < 3) {
+              console.log(`[VideoHover] Mouse leave on item ${index}:`, {
+                imageId: image.id?.substring(0, 8),
+                hasThumbnailImage,
+                videoReady,
+                timestamp: Date.now()
+              });
+            }
+            // Explicitly pause immediately while element is still in DOM
+            if (visibleVideoRef.current) {
+              try {
+                visibleVideoRef.current.pause();
+                visibleVideoRef.current.currentTime = 0;
+                if (index < 3) console.log(`[VideoHover] Immediate pause on mouseleave for item ${index}`);
+              } catch {}
+            }
+            setIsHovering(false);
+          }
+        }}
     >
       <div className="relative w-full">
       <div 
@@ -556,14 +790,18 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
         }} 
         className="relative bg-gray-200"
       >
-          {isActuallyVideo ? (
-              // Show video once it's loaded, regardless of shouldLoad state
-              actualSrc && imageLoaded ? (
+          {isVideoContent ? (
+              // If we have a thumbnail image, show it and swap to video on hover
+              hasThumbnailImage ? (
+                isHovering && videoReady ? (
                 <video
-                    src={actualSrc}
+                    ref={visibleVideoRef}
+                    src={videoUrl || actualSrc || ''}
                     playsInline
                     loop
                     muted
+                    preload="auto"
+                    poster={displayUrl || undefined}
                     className="absolute inset-0 w-full h-full object-cover group-hover:opacity-80 transition-opacity duration-300 bg-black"
                     onDoubleClick={isMobile ? undefined : () => onOpenLightbox(image)}
                     onTouchEnd={isMobile ? (e) => {
@@ -575,19 +813,8 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                       e.preventDefault();
                       onMobileTap(image);
                     } : undefined}
-                    onMouseEnter={(e) => {
-                      if (!isMobile) {
-                        (e.target as HTMLVideoElement).play().catch(() => {
-                          // Ignore autoplay errors (e.g., if browser blocks autoplay)
-                        });
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!isMobile) {
-                        (e.target as HTMLVideoElement).pause();
-                        (e.target as HTMLVideoElement).currentTime = 0; // Reset to beginning
-                      }
-                    }}
+                    onMouseEnter={() => setIsHovering(true)}
+                    onMouseLeave={() => setIsHovering(false)}
                     draggable={false}
                     style={{ cursor: 'pointer' }}
                     onError={handleImageError}
@@ -598,24 +825,151 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                       setImageLoading(false);
                     }}
                 />
-              ) : (
+                ) : (
                 <>
-                  {/* Hidden video for background loading - always render to ensure loading happens */}
-                  {actualSrc && !imageLoaded && (
+                  {/* Always show the thumbnail image when not hovering */}
+                  {displayUrl && (
+                    <img
+                      src={displayUrl}
+                      alt={image.prompt || `Generated image ${index + 1}`}
+                      className="absolute inset-0 w-full h-full object-cover group-hover:opacity-80 transition-opacity duration-300"
+                      draggable={false}
+                      style={{ cursor: 'pointer' }}
+                      onMouseEnter={() => setIsHovering(true)}
+                      onMouseLeave={() => setIsHovering(false)}
+                    />
+                  )}
+                  {/* Keep a hidden video element mounted to preload and be ready to play */}
+                  {videoUrl && (isHovering || index < 8) && (
                     <video
-                      src={actualSrc}
+                      ref={hoverVideoRef}
+                      src={videoUrl}
                       style={{ display: 'none' }}
+                      muted
+                      playsInline
+                      preload="metadata"
                       onLoadStart={() => setImageLoading(true)}
-                      onLoadedData={handleImageLoad}
+                      onLoadedMetadata={() => {
+                        if (index < 3 && isVideoContent) {
+                          console.log(`[VideoHover] Hidden video loadedmetadata for item ${index}:`, {
+                            imageId: image.id?.substring(0, 8),
+                            hasThumbnailImage,
+                            videoSrc: hoverVideoRef.current?.src?.substring(0, 50) + '...' || 'none',
+                            timestamp: Date.now()
+                          });
+                        }
+                        setVideoReady(true);
+                      }}
+                      onLoadedData={() => {
+                        if (index < 3 && isVideoContent) {
+                          console.log(`[VideoHover] Hidden video loadeddata for item ${index}:`, {
+                            imageId: image.id?.substring(0, 8),
+                            hasThumbnailImage,
+                            videoSrc: hoverVideoRef.current?.src?.substring(0, 50) + '...' || 'none',
+                            timestamp: Date.now()
+                          });
+                        }
+                        setVideoReady(true);
+                        handleImageLoad();
+                      }}
+                      onCanPlay={() => {
+                        if (index < 3 && isVideoContent) {
+                          console.log(`[VideoHover] Hidden video canplay for item ${index}:`, {
+                            imageId: image.id?.substring(0, 8),
+                            hasThumbnailImage,
+                            videoSrc: hoverVideoRef.current?.src?.substring(0, 50) + '...' || 'none',
+                            timestamp: Date.now()
+                          });
+                        }
+                        setVideoReady(true);
+                      }}
+                      onWaiting={() => {
+                        if (index < 3 && isVideoContent) {
+                          console.log(`[VideoHover] Hidden video waiting (buffering) for item ${index}`);
+                        }
+                      }}
+                      onStalled={() => {
+                        if (index < 3 && isVideoContent) {
+                          console.log(`[VideoHover] Hidden video stalled for item ${index}`);
+                        }
+                      }}
+                      onSuspend={() => {
+                        if (index < 3 && isVideoContent) {
+                          console.log(`[VideoHover] Hidden video suspend for item ${index}`);
+                        }
+                      }}
                       onError={handleImageError}
                       onAbort={() => setImageLoading(false)}
                     />
                   )}
-                  {/* Video loading skeleton - only show if video hasn't loaded yet */}
-                  {!imageLoaded && (
-                    <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-gray-200 animate-pulse">
-                      <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-gray-400"></div>
-                    </div>
+                </>
+                )
+              ) : (
+                // No thumbnail available: preload with metadata and show spinner until ready, then hover to play
+                <>
+                  {videoUrl && (isHovering || index < 8) && (
+                    <video
+                      ref={hoverVideoRef}
+                      src={videoUrl}
+                      style={{ display: 'none' }}
+                      muted
+                      playsInline
+                      preload="metadata"
+                      onLoadStart={() => setImageLoading(true)}
+                      onCanPlay={() => {
+                        if (index < 3 && isVideoContent) {
+                          console.log(`[VideoHover] No-thumbnail video ready (canPlay) for item ${index}:`, {
+                            imageId: image.id?.substring(0, 8),
+                            hasThumbnailImage,
+                            videoSrc: hoverVideoRef.current?.src?.substring(0, 50) + '...' || 'none',
+                            timestamp: Date.now()
+                          });
+                        }
+                        setVideoReady(true);
+                        handleImageLoad();
+                      }}
+                      onError={handleImageError}
+                      onAbort={() => setImageLoading(false)}
+                    />
+                  )}
+                  {isHovering && videoReady ? (
+                    <video
+                        ref={visibleVideoRef}
+                        src={videoUrl || ''}
+                        playsInline
+                        loop
+                        muted
+                        preload="auto"
+                        className="absolute inset-0 w-full h-full object-cover group-hover:opacity-80 transition-opacity duration-300 bg-black"
+                        onDoubleClick={isMobile ? undefined : () => onOpenLightbox(image)}
+                        draggable={false}
+                        style={{ cursor: 'pointer' }}
+                        onPlay={() => {
+                          if (index < 3 && isVideoContent) {
+                            console.log(`[VideoHover] Visible video playing for item ${index}`);
+                          }
+                        }}
+                        onPause={() => {
+                          if (index < 3 && isVideoContent) {
+                            console.log(`[VideoHover] Visible video paused for item ${index}`);
+                          }
+                        }}
+                        onWaiting={() => {
+                          if (index < 3 && isVideoContent) {
+                            console.log(`[VideoHover] Visible video buffering (waiting) for item ${index}`);
+                          }
+                        }}
+                        onError={handleImageError}
+                        onLoadStart={() => setImageLoading(true)}
+                        onLoadedData={handleImageLoad}
+                        onAbort={() => setImageLoading(false)}
+                    />
+                  ) : (
+                    !videoReady ? (
+                      <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-gray-200 animate-pulse">
+                        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-gray-400"></div>
+                      </div>
+                    ) : null
                   )}
                 </>
               )
@@ -708,7 +1062,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
       {image.id && ( // Ensure image has ID for actions
       <>
           {/* Add to Shot UI - Top Left */}
-          {simplifiedShotOptions.length > 0 && onAddToLastShot && !isActuallyVideo && (
+          {simplifiedShotOptions.length > 0 && onAddToLastShot && !isVideoContent && (
           <div className="absolute top-2 left-2 flex flex-col items-start gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
               <ShotSelector
                   value={selectedShotIdLocal}

@@ -412,6 +412,24 @@ const VideoTravelToolPage: React.FC = () => {
       mediaType: 'video'
     }
   );
+
+  // [VideoThumbnailIssue] Log what data we're passing to ImageGallery
+  React.useEffect(() => {
+    if (showVideosView && videosData?.items) {
+      console.log('[VideoThumbnailIssue] VideoTravelToolPage passing to ImageGallery:', {
+        itemsCount: videosData.items.length,
+        sampleItems: videosData.items.slice(0, 3).map(item => ({
+          id: item.id?.substring(0, 8),
+          url: item.url?.substring(0, 50) + '...',
+          thumbUrl: item.thumbUrl?.substring(0, 50) + '...',
+          isVideo: item.isVideo,
+          hasThumbnail: !!item.thumbUrl,
+          urlEqualsThumbUrl: item.url === item.thumbUrl
+        })),
+        timestamp: Date.now()
+      });
+    }
+  }, [showVideosView, videosData?.items]);
   
   // Memoize expensive computations
   const shouldShowShotEditor = useMemo(() => {
