@@ -148,7 +148,7 @@ const ShotImage: React.FC<ShotImageProps> = ({ image, index, onSelectShot, shotN
               src={displayUrl}
               alt={`Shot image ${index + 1} for ${shotName}`}
               className={cn(
-                "absolute inset-0 w-full h-full object-cover pointer-events-none transition-opacity duration-200",
+                "absolute inset-0 w-full h-full object-cover pointer-events-none transition-all duration-700 group-hover:scale-110",
                 // Progressive loading visual states
                 progressiveEnabled && isThumbShowing && "opacity-95",
                 progressiveEnabled && isFullLoaded && "opacity-100"
