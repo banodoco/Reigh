@@ -126,7 +126,7 @@ const ShotImage: React.FC<ShotImageProps> = ({ image, index, onSelectShot, shotN
 
   return (
     <div
-      className="flex-shrink-0 w-32 rounded overflow-hidden border relative bg-gray-200"
+      className="flex-shrink-0 w-32 rounded overflow-hidden border relative bg-gray-200 group-hover:scale-105 transition-transform duration-700"
       style={{
         animationDelay: `${index * 0.1}s`,
         height: `${finalHeight}px`,
@@ -148,7 +148,7 @@ const ShotImage: React.FC<ShotImageProps> = ({ image, index, onSelectShot, shotN
               src={displayUrl}
               alt={`Shot image ${index + 1} for ${shotName}`}
               className={cn(
-                "absolute inset-0 w-full h-full object-cover pointer-events-none transition-all duration-700 group-hover:scale-110",
+                "absolute inset-0 w-full h-full object-cover pointer-events-none transition-opacity duration-200",
                 // Progressive loading visual states
                 progressiveEnabled && isThumbShowing && "opacity-95",
                 progressiveEnabled && isFullLoaded && "opacity-100"
@@ -203,7 +203,7 @@ const PlaceholderBlock: React.FC<PlaceholderBlockProps> = ({ index, projectAspec
 
   return (
     <div
-      className="flex-shrink-0 w-32 rounded overflow-hidden border relative bg-gray-100 opacity-30"
+      className="flex-shrink-0 w-32 rounded overflow-hidden border relative bg-gray-100 opacity-30 group-hover:scale-105 transition-transform duration-700"
       style={{
         animationDelay: `${index * 0.1}s`,
         height: `${finalHeight}px`,
@@ -508,7 +508,7 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
             
             return (
               <div 
-                className="flex-shrink-0 w-32 rounded border bg-muted animate-in fade-in-up relative"
+                className="flex-shrink-0 w-32 rounded border bg-muted animate-in fade-in-up relative group-hover:scale-105 transition-transform duration-700"
                 style={{
                   animationDelay: `${imagesToShow.length * 0.1}s`,
                   height: `${finalHeight}px`,
