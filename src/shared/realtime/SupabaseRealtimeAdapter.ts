@@ -1,7 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 
 // CRITICAL: Verify this file is loaded
-console.error('[ReconnectionIssue] 🔥 SUPABASE ADAPTER FILE LOADED AT:', new Date().toISOString());
+console.info('[ReconnectionIssue] 🔥 SUPABASE ADAPTER FILE LOADED AT:', new Date().toISOString());
 
 export type ChannelRef = ReturnType<typeof supabase.channel>;
 
@@ -21,7 +21,7 @@ export class SupabaseRealtimeAdapter {
       const realtime = (supabase as any)?.realtime;
       const conn = realtime?.conn;
       
-      console.error('[WebSocketCloseMonitor] 🔍 CURRENT CONNECTION STATE:', {
+      console.debug('[WebSocketCloseMonitor] 🔍 CURRENT CONNECTION STATE:', {
         hasRealtime: !!realtime,
         hasConn: !!conn,
         hasTransport: !!(conn?.transport),
@@ -71,13 +71,13 @@ export class SupabaseRealtimeAdapter {
           }
         };
 
-        console.error('[WebSocketCloseMonitor] 📡 WEBSOCKET MONITORING ENABLED:', {
+        console.debug('[WebSocketCloseMonitor] 📡 WEBSOCKET MONITORING ENABLED:', {
           url: conn.transport?.url,
           readyState: conn.transport?.readyState,
           timestamp: Date.now()
         });
       } else {
-        console.error('[WebSocketCloseMonitor] ⚠️ MONITORING NOT SET UP:', {
+        console.debug('[WebSocketCloseMonitor] ⚠️ MONITORING NOT SET UP:', {
           hasConn: !!conn,
           hasTransport: !!(conn?.transport),
           alreadyMonitored: !!(conn?.transport?.__CLOSE_MONITORED__),
@@ -139,7 +139,7 @@ export class SupabaseRealtimeAdapter {
     this.setupWebSocketCloseMonitoring();
     
     console.error('[ReconnectionIssue] 🚨🚨🚨 ADAPTER CONNECT CALLED - TRANSPORT FIX STARTING 🚨🚨🚨');
-    console.error('[DeepDebug] 🔍 ADAPTER CONNECT ENTRY POINT:', {
+    console.debug('[DeepDebug] 🔍 ADAPTER CONNECT ENTRY POINT:', {
       hasToken: !!token,
       tokenPrefix: (typeof token === 'string' ? token.slice(0, 20) + '...' : 'null'),
       hasSupabase: !!(supabase),
@@ -155,7 +155,7 @@ export class SupabaseRealtimeAdapter {
       timestamp: Date.now(),
       stack: new Error().stack?.split('\n').slice(1, 4)
     });
-    console.error('[ReconnectionIssue] 🔥 ADAPTER CONNECT CALLED:', {
+    console.info('[ReconnectionIssue] 🔥 ADAPTER CONNECT CALLED:', {
       hasToken: !!token,
       socketExistsBefore: !!(supabase as any)?.realtime?.socket,
       socketStateBefore: (supabase as any)?.realtime?.socket?.readyState,
@@ -187,15 +187,15 @@ export class SupabaseRealtimeAdapter {
         timestamp: Date.now()
       });
       
-      console.error('[DeepDebug] 🔍 CALLING REALTIME.SETAUTH');
+      console.debug('[DeepDebug] 🔍 CALLING REALTIME.SETAUTH');
       (supabase as any)?.realtime?.setAuth?.(token ?? null); 
-      console.error('[DeepDebug] ✅ REALTIME.SETAUTH COMPLETED');
+      console.debug('[DeepDebug] ✅ REALTIME.SETAUTH COMPLETED');
     } catch (e) {
       console.error('[DeepDebug] ❌ REALTIME.SETAUTH FAILED:', e);
     }
     
     try { 
-      console.error('[DeepDebug] 🔍 CALLING REALTIME.CONNECT');
+      console.debug('[DeepDebug] 🔍 CALLING REALTIME.CONNECT');
       
       // CRITICAL: Ensure transport is set before calling connect
       const realtime = (supabase as any)?.realtime;
@@ -211,7 +211,7 @@ export class SupabaseRealtimeAdapter {
       });
       
       if (realtime && realtime.transport !== window.WebSocket) {
-        console.error('[DeepDebug] 🔧 FIXING TRANSPORT BEFORE CONNECT CALL');
+        console.debug('[DeepDebug] 🔧 FIXING TRANSPORT BEFORE CONNECT CALL');
         
         // Create a proper Phoenix WebSocket transport factory
         const phoenixWebSocketTransport = function(endpoint: string) {
@@ -364,11 +364,11 @@ export class SupabaseRealtimeAdapter {
         phoenixWebSocketTransport.transportName = 'websocket';
         
         realtime.transport = phoenixWebSocketTransport;
-        console.error('[DeepDebug] 🔧 SET PHOENIX TRANSPORT FACTORY');
+        console.debug('[DeepDebug] 🔧 SET PHOENIX TRANSPORT FACTORY');
       }
       
       (supabase as any)?.realtime?.connect?.(); 
-      console.error('[DeepDebug] ✅ REALTIME.CONNECT COMPLETED');
+      console.debug('[DeepDebug] ✅ REALTIME.CONNECT COMPLETED');
       
       // VERIFY transport is still correct after connect
       if (realtime) {
@@ -515,7 +515,7 @@ export class SupabaseRealtimeAdapter {
     // CRITICAL FIX: Fix Phoenix Socket transport configuration
     try {
       const realtime = (supabase as any)?.realtime;
-      console.error('[ReconnectionIssue] 🔥 PHOENIX TRANSPORT DIAGNOSIS:', {
+      console.info('[ReconnectionIssue] 🔥 PHOENIX TRANSPORT DIAGNOSIS:', {
         realtimeExists: !!realtime,
         hasConn: !!realtime?.conn,
         transportName: realtime?.conn?.transport?.name || realtime?.conn?.transport?.constructor?.name,
@@ -527,10 +527,10 @@ export class SupabaseRealtimeAdapter {
       // DISABLED: Complex Phoenix transport fix was causing WebSocket to be broken
       // The transport fix was creating a raw WebSocket instead of proper Phoenix transport
       if (false && realtime?.conn && !realtime.conn.transport) {
-        console.error('[ReconnectionIssue] 🔥 FIXING MISSING PHOENIX TRANSPORT');
+        console.info('[ReconnectionIssue] 🔥 FIXING MISSING PHOENIX TRANSPORT');
         
         // Debug the actual Phoenix Socket structure
-        console.error('[ReconnectionIssue] 🔥 PHOENIX CONN STRUCTURE:', {
+        console.info('[ReconnectionIssue] 🔥 PHOENIX CONN STRUCTURE:', {
           connKeys: Object.keys(realtime.conn),
           connType: realtime.conn.constructor?.name,
           transportProperty: 'transport' in realtime.conn,
@@ -539,11 +539,11 @@ export class SupabaseRealtimeAdapter {
         });
         
         // Create a WebSocket transport directly using native WebSocket
-        console.error('[ReconnectionIssue] 🔥 CREATING NATIVE WEBSOCKET TRANSPORT');
+        console.info('[ReconnectionIssue] 🔥 CREATING NATIVE WEBSOCKET TRANSPORT');
         
         // Create a transport that mimics Phoenix's WebSocket transport
         const WebSocketTransport = function(endpoint: string) {
-          console.error('[ReconnectionIssue] 🔥 TRANSPORT CREATING WEBSOCKET:', endpoint);
+          console.info('[ReconnectionIssue] 🔥 TRANSPORT CREATING WEBSOCKET:', endpoint);
           return new WebSocket(endpoint);
         };
         
@@ -552,12 +552,12 @@ export class SupabaseRealtimeAdapter {
         WebSocketTransport.prototype.name = 'websocket';
         
         // Try multiple ways to set the transport
-        console.error('[ReconnectionIssue] 🔥 ATTEMPTING TRANSPORT ASSIGNMENT...');
+        console.info('[ReconnectionIssue] 🔥 ATTEMPTING TRANSPORT ASSIGNMENT...');
         
         try {
           // Method 1: Direct assignment
           realtime.conn.transport = WebSocketTransport;
-          console.error('[ReconnectionIssue] 🔥 METHOD 1 - Direct assignment:', !!realtime.conn.transport);
+          console.info('[ReconnectionIssue] 🔥 METHOD 1 - Direct assignment:', !!realtime.conn.transport);
         } catch (e) {
           console.error('[ReconnectionIssue] 🔥 METHOD 1 FAILED:', e);
         }
@@ -569,7 +569,7 @@ export class SupabaseRealtimeAdapter {
             writable: true,
             configurable: true
           });
-          console.error('[ReconnectionIssue] 🔥 METHOD 2 - defineProperty:', !!realtime.conn.transport);
+          console.info('[ReconnectionIssue] 🔥 METHOD 2 - defineProperty:', !!realtime.conn.transport);
         } catch (e) {
           console.error('[ReconnectionIssue] 🔥 METHOD 2 FAILED:', e);
         }
@@ -577,12 +577,12 @@ export class SupabaseRealtimeAdapter {
         try {
           // Method 3: Try on realtime object directly
           realtime.transport = WebSocketTransport;
-          console.error('[ReconnectionIssue] 🔥 METHOD 3 - realtime.transport:', !!realtime.transport);
+          console.info('[ReconnectionIssue] 🔥 METHOD 3 - realtime.transport:', !!realtime.transport);
         } catch (e) {
           console.error('[ReconnectionIssue] 🔥 METHOD 3 FAILED:', e);
         }
         
-        console.error('[ReconnectionIssue] 🔥 PHOENIX TRANSPORT FIX RESULT:', {
+        console.info('[ReconnectionIssue] 🔥 PHOENIX TRANSPORT FIX RESULT:', {
           connTransportSet: !!realtime.conn.transport,
           realtimeTransportSet: !!realtime.transport,
           transportName: realtime.conn.transport?.name || realtime.conn.transport?.transportName,
@@ -749,7 +749,7 @@ export class SupabaseRealtimeAdapter {
     
     // Check if WebSocket was created after connect()
     setTimeout(() => {
-      console.error('[ReconnectionIssue] 🔥 ADAPTER CONNECT RESULT:', {
+      console.info('[ReconnectionIssue] 🔥 ADAPTER CONNECT RESULT:', {
         socketExistsAfter: !!(supabase as any)?.realtime?.socket,
         socketStateAfter: (supabase as any)?.realtime?.socket?.readyState,
         timestamp: Date.now()

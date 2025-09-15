@@ -5,7 +5,7 @@ import type { QueryClient } from '@tanstack/react-query';
 import { routeEvent } from '@/shared/lib/InvalidationRouter';
 
 // CRITICAL: Verify this file is loaded
-console.error('[ReconnectionIssue] 🔥 PROJECT CHANNEL MANAGER FILE LOADED AT:', new Date().toISOString());
+console.info('[ReconnectionIssue] 🔥 PROJECT CHANNEL MANAGER FILE LOADED AT:', new Date().toISOString());
 // Removed ensureWebSocketReady import - it was causing infinite loops
 
 export type ChannelState = 'closed' | 'joining' | 'joined' | 'leaving' | 'errored' | 'unknown';

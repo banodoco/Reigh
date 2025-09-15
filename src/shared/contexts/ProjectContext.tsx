@@ -78,14 +78,14 @@ const mapDbProjectToProject = (row: any): Project => ({
 export const ProjectProvider = ({ children }: { children: ReactNode }) => {
   // CRITICAL: Log component mount/unmount to detect tab suspension issues
   React.useEffect(() => {
-    console.error('[ProjectContext:FastResume] 🚨 ProjectProvider MOUNTED', {
+    console.info('[ProjectContext:FastResume] 🚨 ProjectProvider MOUNTED', {
       timestamp: Date.now(),
       visibilityState: document.visibilityState,
       stack: new Error().stack?.split('\n').slice(1, 3)
     });
     
     return () => {
-      console.error('[ProjectContext:FastResume] 🚨 ProjectProvider UNMOUNTING', {
+      console.info('[ProjectContext:FastResume] 🚨 ProjectProvider UNMOUNTING', {
         timestamp: Date.now(),
         visibilityState: document.visibilityState,
         stack: new Error().stack?.split('\n').slice(1, 3)
@@ -678,7 +678,7 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
   }, [userId, isLoadingPreferences, fetchProjects, isLoadingProjects]); // Refetch when user changes or preferences finish loading
 
   const handleSetSelectedProjectId = useCallback((projectId: string | null) => {
-    console.error('[TabReactivation] 🔥 SELECTED PROJECT ID CHANGING', {
+    console.info('[TabReactivation] 🔥 SELECTED PROJECT ID CHANGING', {
       from: selectedProjectId,
       to: projectId,
       visibilityState: document.visibilityState,

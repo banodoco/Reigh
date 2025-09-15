@@ -27,7 +27,7 @@ function matchesPrefix(queryKey: readonly unknown[], prefix: readonly string[]):
 async function forceObserverReconnection(queryClient: any, selectedProjectId: string | null) {
   if (!selectedProjectId) return;
 
-  console.error('[TabReactivation] 💣💣💣 NUCLEAR BOMB VERSION 3.0 - ABSOLUTE DESTRUCTION 💣💣💣', { 
+  console.warn('[TabReactivation] 💣💣💣 NUCLEAR BOMB VERSION 3.0 - ABSOLUTE DESTRUCTION 💣💣💣', { 
     timestamp: Date.now(), 
     version: '3.0-FORCE-RELOAD',
     selectedProjectId 
@@ -173,7 +173,7 @@ type RealtimeState = {
 const RealtimeContext = React.createContext<RealtimeState | null>(null);
 
 export function RealtimeProvider({ children }: { children: React.ReactNode }) {
-  console.error('[SilentRejoinDebug] 🚀 REALTIME PROVIDER CONSTRUCTOR', {
+  console.debug('[SilentRejoinDebug] 🚀 REALTIME PROVIDER CONSTRUCTOR', {
     timestamp: Date.now(),
     location: 'RealtimeProvider function start'
   });
@@ -181,7 +181,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
   const { selectedProjectId } = useProject();
   
-  console.error('[SilentRejoinDebug] 🎯 HOOKS CALLED', {
+  console.debug('[SilentRejoinDebug] 🎯 HOOKS CALLED', {
     hasQueryClient: !!queryClient,
     selectedProjectId,
     timestamp: Date.now()
@@ -231,7 +231,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   const lastHealAtRef = React.useRef<number>(0);
   const mountTimeRef = React.useRef<number>(Date.now());
   
-  console.error('[SilentRejoinDebug] 🔧 REFS CREATED', {
+  console.debug('[SilentRejoinDebug] 🔧 REFS CREATED', {
     hasAdapterRef: !!adapterRef,
     hasManagerRef: !!managerRef,
     hasDiagnosticsRef: !!diagnosticsRef,
@@ -240,7 +240,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   });
   
 
-  console.error('[SilentRejoinDebug] 🏭 INITIALIZING COMPONENTS', {
+  console.debug('[SilentRejoinDebug] 🏭 INITIALIZING COMPONENTS', {
     hasAdapterCurrent: !!adapterRef.current,
     hasDiagnosticsCurrent: !!diagnosticsRef.current,
     hasLoggerCurrent: !!loggerRef.current,
@@ -250,21 +250,21 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   
   try {
     if (!adapterRef.current) {
-      console.error('[SilentRejoinDebug] 🔌 CREATING ADAPTER');
+      console.debug('[SilentRejoinDebug] 🔌 CREATING ADAPTER');
       adapterRef.current = new SupabaseRealtimeAdapter(loggerRef.current);
-      console.error('[SilentRejoinDebug] ✅ ADAPTER CREATED', { adapter: !!adapterRef.current });
+      console.debug('[SilentRejoinDebug] ✅ ADAPTER CREATED', { adapter: !!adapterRef.current });
     }
     
     if (!diagnosticsRef.current) {
-      console.error('[SilentRejoinDebug] 📊 CREATING DIAGNOSTICS');
+      console.debug('[SilentRejoinDebug] 📊 CREATING DIAGNOSTICS');
       diagnosticsRef.current = new DiagnosticsStore();
-      console.error('[SilentRejoinDebug] ✅ DIAGNOSTICS CREATED', { diagnostics: !!diagnosticsRef.current });
+      console.debug('[SilentRejoinDebug] ✅ DIAGNOSTICS CREATED', { diagnostics: !!diagnosticsRef.current });
     }
     
     if (!loggerRef.current) {
-      console.error('[SilentRejoinDebug] 📝 CREATING LOGGER');
+      console.debug('[SilentRejoinDebug] 📝 CREATING LOGGER');
       loggerRef.current = new DiagnosticsLogger('RealtimeCore', runtimeConfig.RECONNECTION_LOGS_ENABLED);
-      console.error('[SilentRejoinDebug] ✅ LOGGER CREATED', { logger: !!loggerRef.current });
+      console.debug('[SilentRejoinDebug] ✅ LOGGER CREATED', { logger: !!loggerRef.current });
     }
     
     if (!managerRef.current) {
@@ -287,7 +287,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       console.error('[RealtimeProvider] ✅ MANAGER CREATED AND STORED GLOBALLY');
     }
     
-    console.error('[SilentRejoinDebug] 🎉 ALL COMPONENTS INITIALIZED', {
+    console.debug('[SilentRejoinDebug] 🎉 ALL COMPONENTS INITIALIZED', {
       adapter: !!adapterRef.current,
       diagnostics: !!diagnosticsRef.current,
       logger: !!loggerRef.current,
@@ -524,7 +524,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
 
   // Reflect diagnostics to provider state
   React.useEffect(() => {
-    console.error('[SilentRejoinDebug] 🏗️ REALTIME PROVIDER MOUNTING', {
+    console.debug('[SilentRejoinDebug] 🏗️ REALTIME PROVIDER MOUNTING', {
       selectedProjectId,
       hasAdapter: !!adapterRef.current,
       hasManager: !!managerRef.current,

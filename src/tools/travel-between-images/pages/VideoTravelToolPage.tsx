@@ -30,6 +30,8 @@ import { useAllShotGenerations } from '@/shared/hooks/useShotGenerations';
 import { useProjectVideoCountsCache } from '@/shared/hooks/useProjectVideoCountsCache';
 
 import { useVideoGalleryPreloader } from '@/shared/hooks/useVideoGalleryPreloader';
+import { useGenerations } from '@/shared/hooks/useGenerations';
+import { ImageGallery } from '@/shared/components/ImageGallery';
 
 // Custom hook to parallelize data fetching for better performance
 const useVideoTravelData = (selectedShotId?: string, projectId?: string) => {
@@ -76,7 +78,7 @@ const useVideoTravelData = (selectedShotId?: string, projectId?: string) => {
     refetchShots,
     
     // LoRAs data
-    availableLoras: (publicLorasQuery.data?.map(resource => resource.metadata) || []) as LoraModel[],
+    availableLoras: ((publicLorasQuery.data || []) as any[]).map(resource => resource.metadata || {}) as LoraModel[],
     lorasLoading: publicLorasQuery.isLoading,
     
     // Settings data
@@ -392,6 +394,25 @@ const VideoTravelToolPage: React.FC = () => {
   const [selectedModel, setSelectedModel] = useState<'wan-2.1' | 'wan-2.2'>('wan-2.1');
   // const [afterEachPromptText, setAfterEachPromptText] = useState<string>(''); // Removed - not used in ShotEditor
   
+  // Add state for toggling between shots and videos view
+  const [showVideosView, setShowVideosView] = useState<boolean>(false);
+  
+  // Fetch all videos generated with travel-between-images tool type
+  const { 
+    data: videosData, 
+    isLoading: videosLoading, 
+    error: videosError 
+  } = useGenerations(
+    selectedProjectId, 
+    1, // page
+    100, // limit
+    showVideosView, // only enable when showing videos view
+    {
+      toolType: 'travel-between-images',
+      mediaType: 'video'
+    }
+  );
+  
   // Memoize expensive computations
   const shouldShowShotEditor = useMemo(() => {
     // Only show editor if we actually have a valid shot to edit
@@ -523,14 +544,22 @@ const VideoTravelToolPage: React.FC = () => {
       // Clear header when viewing a specific shot
       clearHeader();
     } else {
-      // Show header when in shot list view
+      // Show header when in shot list or videos view
       const headerContent = (
         <div className="flex items-center justify-between mb-2 sm:mb-4 mt-4 sm:mt-6 px-3 sm:px-4">
-          <h1 className="text-3xl font-light tracking-tight text-foreground sm:text-4xl">
-            Shots:
-          </h1>
-          {/* Only show header button when there are shots */}
-          {(!isLoading && shots && shots.length > 0) && (
+          <div className="flex items-center gap-4">
+            <h1 className="text-3xl font-light tracking-tight text-foreground sm:text-4xl">
+              {showVideosView ? 'Videos:' : 'Shots:'}
+            </h1>
+            <button
+              onClick={() => setShowVideosView(!showVideosView)}
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors underline"
+            >
+              {showVideosView ? 'See all shots' : 'See all generated videos'}
+            </button>
+          </div>
+          {/* Only show New Shot button when in shots view and there are shots */}
+          {(!showVideosView && !isLoading && shots && shots.length > 0) && (
             <Button onClick={() => setIsCreateShotModalOpen(true)}>New Shot</Button>
           )}
         </div>
@@ -538,7 +567,7 @@ const VideoTravelToolPage: React.FC = () => {
       setHeader(headerContent);
     }
     // Only clear header on component unmount, not on every effect re-run
-  }, [setHeader, clearHeader, isLoading, shots, setIsCreateShotModalOpen, shouldShowShotEditor, hashShotId]);
+  }, [setHeader, clearHeader, isLoading, shots, setIsCreateShotModalOpen, shouldShowShotEditor, hashShotId, showVideosView]);
 
   // Clean up header on component unmount
   useLayoutEffect(() => {
@@ -751,6 +780,8 @@ const VideoTravelToolPage: React.FC = () => {
   }, [viaShotClick, currentShotId, shots, selectedShot]);
 
   const handleShotSelect = (shot: Shot) => {
+    // Reset videos view when selecting a shot
+    setShowVideosView(false);
     navigateToShot(shot);
   };
 
@@ -766,6 +797,8 @@ const VideoTravelToolPage: React.FC = () => {
     setSelectedShot(null);
     setVideoPairConfigs([]);
     setCurrentShotId(null);
+    // Reset videos view when going back to shot list
+    setShowVideosView(false);
     // By replacing the current entry in the history stack, we effectively reset 
     // the 'fromShotClick' state without adding a new entry to the browser history.
     // This ensures that subsequent interactions with the shot list behave as if 
@@ -1130,11 +1163,28 @@ const VideoTravelToolPage: React.FC = () => {
     <div ref={mainContainerRef} className="w-full">
       {!shouldShowShotEditor ? (
         <>
-          <ShotListDisplay
-            onSelectShot={handleShotSelect}
-            onCreateNewShot={() => setIsCreateShotModalOpen(true)}
-            shots={shots}
-          />
+          {showVideosView ? (
+            <ImageGallery
+              images={videosData?.items || []}
+              allShots={shots || []}
+              onAddToLastShot={async () => false} // No-op for video gallery
+              onAddToLastShotWithoutPosition={async () => false} // No-op for video gallery
+              currentToolType="travel-between-images"
+              initialMediaTypeFilter="video"
+              initialToolTypeFilter={true}
+              currentToolTypeName="Travel Between Images"
+              showShotFilter={true}
+              initialShotFilter="all"
+              columnsPerRow={4}
+              itemsPerPage={20}
+            />
+          ) : (
+            <ShotListDisplay
+              onSelectShot={handleShotSelect}
+              onCreateNewShot={() => setIsCreateShotModalOpen(true)}
+              shots={shots}
+            />
+          )}
         </>
       ) : (
         // Show a loading state while settings or component are being fetched
