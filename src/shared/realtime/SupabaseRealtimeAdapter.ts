@@ -9,6 +9,8 @@ export type SocketState = 'idle' | 'connecting' | 'connected' | 'reconnecting' |
 
 export class SupabaseRealtimeAdapter {
   private logger?: any;
+  private lastConnectAttemptAt: number = 0;
+  private readonly connectCooldownMs: number = 2000; // 2 seconds cooldown between connect attempts
 
   constructor(logger?: any) {
     this.logger = logger;
@@ -88,11 +90,49 @@ export class SupabaseRealtimeAdapter {
   }
 
   async connect(token?: string | null) {
+    const now = Date.now();
+    const elapsedSinceLastConnect = now - this.lastConnectAttemptAt;
+    const isAlreadyConnected = !!(supabase as any)?.realtime?.isConnected?.();
+    
     console.error('[SilentRejoinDebug] 🔌 ADAPTER.CONNECT() CALLED', {
       hasToken: !!token,
       tokenPrefix: (typeof token === 'string' ? token.slice(0, 20) + '...' : 'null'),
-      timestamp: Date.now(),
+      isAlreadyConnected,
+      elapsedSinceLastConnect,
+      cooldownMs: this.connectCooldownMs,
+      timestamp: now,
       callStack: new Error().stack?.split('\n').slice(1, 4)
+    });
+    
+    // CRITICAL FIX: Skip connect if already connected or in cooldown
+    if (isAlreadyConnected && elapsedSinceLastConnect < this.connectCooldownMs) {
+      console.error('[ConnectGuard] ✅ SKIPPED - already connected and in cooldown', {
+        reason: 'already-connected-cooldown',
+        isAlreadyConnected,
+        elapsedMs: elapsedSinceLastConnect,
+        cooldownMs: this.connectCooldownMs,
+        timestamp: now
+      });
+      return;
+    }
+    
+    if (isAlreadyConnected) {
+      console.error('[ConnectGuard] ✅ SKIPPED - already connected', {
+        reason: 'already-connected',
+        isAlreadyConnected,
+        timestamp: now
+      });
+      return;
+    }
+    
+    // Update last connect attempt timestamp
+    this.lastConnectAttemptAt = now;
+    
+    console.error('[ConnectGuard] 🚀 PROCEEDING with connect', {
+      reason: 'not-connected-or-past-cooldown',
+      isAlreadyConnected,
+      elapsedMs: elapsedSinceLastConnect,
+      timestamp: now
     });
 
     // CRITICAL: Add WebSocket close event monitoring
@@ -873,20 +913,55 @@ export class SupabaseRealtimeAdapter {
   }
 
   async channel(topic: string) {
+    const now = Date.now();
+    
     console.error('[WebSocketDiagnostic] 🚨 CHANNEL METHOD CALLED:', {
       topic,
-      timestamp: Date.now(),
+      timestamp: now,
       hasSupabase: !!(supabase as any)?.realtime
     });
     
     // CRITICAL: Set up WebSocket monitoring before channel operations
     this.setupWebSocketCloseMonitoring();
     
-    // CRITICAL: Log channel creation to understand reuse
+    // CRITICAL FIX: Check for existing channel and reuse if healthy
     const existingChannels = (supabase as any)?.realtime?.channels || [];
     const existingChannel = existingChannels.find((c: any) => 
       c.topic === topic || c.topic === `realtime:${topic}` || c.topic.endsWith(`:${topic}`)
     );
+    
+    if (existingChannel) {
+      const channelState = existingChannel.state;
+      const isHealthyState = channelState === 'joined' || channelState === 'joining';
+      
+      console.error('[ChannelReuse] 🔍 EXISTING CHANNEL FOUND', {
+        requestedTopic: topic,
+        existingTopic: existingChannel.topic,
+        channelState,
+        isHealthyState,
+        decision: isHealthyState ? 'reuse' : 'recreate',
+        bindings: existingChannel.bindings ? Object.keys(existingChannel.bindings).length : 0,
+        timestamp: now
+      });
+      
+      if (isHealthyState) {
+        console.error('[ChannelReuse] ♾️ REUSING HEALTHY CHANNEL', {
+          reason: 'healthy-existing-channel',
+          topic: existingChannel.topic,
+          state: channelState,
+          timestamp: now
+        });
+        return existingChannel;
+      } else {
+        console.error('[ChannelReuse] 🔄 RECREATING UNHEALTHY CHANNEL', {
+          reason: 'unhealthy-existing-channel',
+          topic: existingChannel.topic,
+          state: channelState,
+          timestamp: now
+        });
+        // Continue to create new channel
+      }
+    }
     
     console.warn('[ReconnectionIssue][CHANNEL_ADAPTER_CREATE]', {
       requestedTopic: topic,
@@ -897,7 +972,8 @@ export class SupabaseRealtimeAdapter {
         state: existingChannel.state,
         bindings: existingChannel.bindings ? Object.keys(existingChannel.bindings).length : 0
       } : null,
-      timestamp: Date.now()
+      willCreateNew: true,
+      timestamp: now
     });
     
     console.error('[ReconnectionIssue] 🔥 BEFORE CHANNEL CREATION - WEBSOCKET STATE:', {
@@ -1305,12 +1381,13 @@ export class SupabaseRealtimeAdapter {
     
     const channel = supabase.channel(topic, { config: { broadcast: { self: false, ack: true } } });
     
-    console.error('[ChannelCreationDebug] 🔍 CHANNEL CREATED - IMMEDIATE STATE:', {
+    console.error('[ChannelCreationDebug] 🏭 CHANNEL CREATED - IMMEDIATE STATE:', {
       channelExists: !!channel,
       channelState: channel?.state,
       channelTopic: channel?.topic,
       channelBindings: channel?.bindings ? Object.keys(channel.bindings).length : 0,
-      timestamp: Date.now()
+      wasReused: false,
+      timestamp: now
     });
     
     console.error('[ReconnectionIssue] 🔥 AFTER CHANNEL CREATION - WEBSOCKET STATE:', {
@@ -1327,8 +1404,8 @@ export class SupabaseRealtimeAdapter {
       resultTopic: channel?.topic,
       resultState: (channel as any)?.state,
       resultBindings: (channel as any)?.bindings ? Object.keys((channel as any).bindings).length : 0,
-      isReused: existingChannel && channel === existingChannel,
-      timestamp: Date.now()
+      isReused: false, // New channel created
+      timestamp: now
     });
     
     return channel;

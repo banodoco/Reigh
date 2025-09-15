@@ -384,13 +384,11 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
     <>
       <div 
         key={shot.id} 
-        className={`click-ripple group min-h-48 p-4 border rounded-lg bg-card/50 hover:bg-card/80 hover:shadow-wes-hover hover:border-primary/30 transition-all duration-300 relative cursor-pointer flex flex-col ${isRippleActive ? 'ripple-active' : ''}`}
+        className={`click-ripple group min-h-48 p-4 border rounded-lg bg-card/50 hover:bg-card/80 hover:shadow-wes-hover hover:border-primary/30 hover:scale-105 transition-all duration-700 relative cursor-pointer flex flex-col ${isRippleActive ? 'ripple-active' : ''}`}
         style={rippleStyles}
         onPointerDown={handleRippleTrigger}
         onClick={onSelectShot}
       >
-        {/* Scalable content wrapper - similar to ToolSelectorPage approach */}
-        <div className="group-hover:scale-105 transition-transform duration-700 h-full flex flex-col">
           <div className="flex justify-between items-start mb-3">
           {isEditingName ? (
             <div className="flex items-center gap-2 flex-grow" onClick={(e) => e.stopPropagation()}>
@@ -522,7 +520,6 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
               </div>
             );
           })()}
-        </div>
         </div>
       </div>
 

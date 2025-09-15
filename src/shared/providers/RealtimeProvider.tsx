@@ -371,9 +371,10 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
   // Unified join routine: mirrors initial join (setAuth -> connect -> join)
-  const rejoinLikeInitial = React.useCallback(async () => {
+  const rejoinLikeInitial = React.useCallback(async (forceRejoin: boolean = false) => {
     console.warn('[SilentRejoinDebug] 🚀 REJOIN ATTEMPT STARTED', {
       selectedProjectId,
+      forceRejoin,
       timestamp: Date.now(),
       callStack: new Error().stack?.split('\n').slice(1, 4)
     });
@@ -441,13 +442,28 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       adapterRef.current?.connect(session?.access_token ?? null);
       console.warn('[SilentRejoinDebug] ✅ STEP 3 COMPLETE: Adapter connected', { timestamp: Date.now() });
       
+      // CRITICAL FIX: Only force rejoin if channel is actually stale or unhealthy
+      const currentChannelState = managerRef.current?.getChannelState?.() || 'unknown';
+      const lastEventAt = managerRef.current?.getLastEventReceivedAt?.() || 0;
+      const timeSinceLastEvent = lastEventAt ? Date.now() - lastEventAt : Number.POSITIVE_INFINITY;
+      const isChannelStale = timeSinceLastEvent > 30000 || currentChannelState !== 'joined';
+      const shouldForceRejoin = forceRejoin || isChannelStale;
+      
       console.warn('[SilentRejoinDebug] 📞 STEP 4: Joining channel...', { 
         selectedProjectId, 
-        forceRejoin: true,
+        currentChannelState,
+        timeSinceLastEvent,
+        isChannelStale,
+        shouldForceRejoin,
+        requestedForce: forceRejoin,
         timestamp: Date.now() 
       });
-      await managerRef.current?.join(selectedProjectId, true); // Force rejoin on visibility recovery
-      console.warn('[SilentRejoinDebug] ✅ STEP 4 COMPLETE: Channel joined', { timestamp: Date.now() });
+      
+      await managerRef.current?.join(selectedProjectId, shouldForceRejoin);
+      console.warn('[SilentRejoinDebug] ✅ STEP 4 COMPLETE: Channel joined', { 
+        forcedRejoin: shouldForceRejoin,
+        timestamp: Date.now() 
+      });
       
       // Clear healing-in-progress flag on successful completion
       if (typeof window !== 'undefined') {
@@ -731,7 +747,8 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
           
           if (shouldRejoin) {
             console.warn('[TabReactivation] 🚀 TRIGGERING REJOIN - Channel needs healing');
-            await rejoinLikeInitial();
+            // Pass true to force rejoin on visibility recovery (tab resume scenario)
+            await rejoinLikeInitial(true);
           } else {
             console.warn('[TabReactivation] ✅ SKIPPING REJOIN - Channel already healthy');
           }
@@ -889,7 +906,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       const now = Date.now();
       if (now - lastHealAtRef.current < 3000) return; // minimal debounce
       lastHealAtRef.current = now;
-      await rejoinLikeInitial();
+      await rejoinLikeInitial(false);
     };
 
     // Subscribe to VisibilityManager for unified event handling
@@ -957,7 +974,8 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
           
           console.warn('[SilentRejoinDebug] 🚀 WATCHDOG TRIGGERING REJOIN', { timestamp: now });
           try {
-            await rejoinLikeInitial();
+            // Watchdog rejoin - let the manager decide if force is needed based on staleness
+            await rejoinLikeInitial(false);
             console.warn('[SilentRejoinDebug] ✅ WATCHDOG REJOIN COMPLETED', { timestamp: Date.now() });
           } catch (watchdogError) {
             console.error('[SilentRejoinDebug] 💥 WATCHDOG REJOIN FAILED', { 

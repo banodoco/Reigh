@@ -30,6 +30,9 @@ export class ProjectChannelManager {
   private joinInProgress: boolean = false;
   private lastJoinAttemptAt: number = 0;
   private readonly joinThrottleMs: number = 1000;
+  
+  // Health window for determining if channel is healthy based on recent events
+  private readonly HEALTHY_EVENT_WINDOW_MS = 30_000; // 30 seconds
 
   // COMPREHENSIVE HEALTH CHECK
   getDetailedHealthCheck(): any {
@@ -120,66 +123,76 @@ export class ProjectChannelManager {
   getLastEventReceivedAt(): number { return this.lastEventReceivedAt || 0; }
 
   async join(projectId: string, forceRejoin: boolean = false) {
-    // Join concurrency guard - use existing now variable declared below
-    const elapsedSinceLastJoin = Date.now() - this.lastJoinAttemptAt;
+    const now = Date.now();
+    const topic = buildTaskUpdatesTopic(projectId);
+    const sameProject = this.projectId === projectId;
+    const state = (this.channel as any)?.state;
+    const timeSinceLastEvent = this.lastEventReceivedAt ? now - this.lastEventReceivedAt : Number.POSITIVE_INFINITY;
     
     console.error('[JoinGuard] 🔍 JOIN ATTEMPT:', {
       projectId,
       forceRejoin,
+      sameProject,
+      currentState: state,
+      timeSinceLastEvent,
       joinInProgress: this.joinInProgress,
-      lastJoinAttemptAt: this.lastJoinAttemptAt,
-      elapsedSinceLastJoin,
-      throttleMs: this.joinThrottleMs,
-      willProceed: forceRejoin || !this.joinInProgress || elapsedSinceLastJoin > this.joinThrottleMs,
-      timestamp: Date.now()
-    });
-    
-    if (!forceRejoin && this.joinInProgress && elapsedSinceLastJoin < this.joinThrottleMs) {
-      console.error('[JoinGuard] ⏸️ JOIN THROTTLED - ignoring concurrent join attempt');
-      return;
-    }
-    
-    this.joinInProgress = true;
-    this.lastJoinAttemptAt = Date.now();
-    
-    this.logger.error('[SilentRejoinDebug] 🔗 MANAGER.JOIN() CALLED', {
-      projectId,
-      forceRejoin,
-      timestamp: Date.now(),
-      callStack: new Error().stack?.split('\n').slice(1, 4)
+      timestamp: now
     });
     
     if (!projectId) {
-      this.logger.error('[SilentRejoinDebug] ❌ MANAGER.JOIN() ABORTED - No projectId', { projectId });
+      this.logger.error('[JoinGuard] ❌ ABORTED - No projectId', { projectId });
       return;
     }
     
-    const topic = buildTaskUpdatesTopic(projectId);
-    const now = Date.now();
-
-    // Throttle repeated join attempts in a short window to avoid churn
-    if (!forceRejoin && now - this.lastJoinAttemptAt < this.joinThrottleMs) {
-      this.logger.warn('[ReconnectionIssue][JOIN_THROTTLED]', {
+    // CRITICAL FIX: Early dedupe based on health (joined + recent events)
+    if (sameProject && this.channel && state === 'joined' && timeSinceLastEvent < this.HEALTHY_EVENT_WINDOW_MS) {
+      console.error('[JoinDedupe] ✅ HEALTHY CHANNEL - skipping rejoin', {
+        reason: 'healthy',
+        state,
+        timeSinceLastEvent,
+        healthyThreshold: this.HEALTHY_EVENT_WINDOW_MS,
         topic,
-        sinceLastMs: now - this.lastJoinAttemptAt,
+        timestamp: now
+      });
+      return;
+    }
+    
+    // CRITICAL FIX: Skip if already joined/joining unless explicitly stale or forced
+    if (!forceRejoin && sameProject && this.channel && (state === 'joined' || state === 'joining')) {
+      console.error('[JoinDedupe] ⏭️ ALREADY JOINED/JOINING - skipping', {
+        reason: 'already-active',
+        state,
+        timeSinceLastEvent,
+        topic,
+        timestamp: now
+      });
+      return;
+    }
+    
+    // CRITICAL FIX: Check throttle and lock BEFORE setting any state
+    const elapsedSinceLastJoin = now - this.lastJoinAttemptAt;
+    if (!forceRejoin && (this.joinInProgress || elapsedSinceLastJoin < this.joinThrottleMs)) {
+      console.error('[JoinGuard] ⏸️ THROTTLED OR IN PROGRESS - skipping', {
+        reason: this.joinInProgress ? 'in-progress' : 'throttled',
+        elapsedMs: elapsedSinceLastJoin,
         throttleMs: this.joinThrottleMs,
+        joinInProgress: this.joinInProgress,
         timestamp: now
       });
       return;
     }
-
-    // Prevent concurrent joins; allow explicit forceRejoin to override
-    if (this.joinInProgress && !forceRejoin) {
-      this.logger.warn('[ReconnectionIssue][JOIN_SUPPRESSED_INFLIGHT]', {
-        topic,
-        reason: 'Join already in progress',
-        timestamp: now
-      });
-      return;
-    }
-
+    
+    // CRITICAL FIX: Only NOW acquire lock and set timestamp
     this.joinInProgress = true;
     this.lastJoinAttemptAt = now;
+    
+    console.error('[JoinGuard] 🔒 LOCK ACQUIRED - proceeding with join', {
+      topic,
+      forceRejoin,
+      previousState: state,
+      timestamp: now
+    });
+    
     try {
     
     // CRITICAL: Ensure WebSocket is ready before attempting channel operations
@@ -244,55 +257,52 @@ export class ProjectChannelManager {
         const state = (this.channel as any).state;
         const bindingsCount = this.getBindingsCount();
         
-        // CRITICAL FIX: Don't recreate healthy channels even on forceRejoin
+        // CRITICAL FIX: Use event freshness instead of bindings for health check
         const isJoined = state === 'joined';
-        const hasBindings = bindingsCount > 0;
-        const isHealthy = isJoined && hasBindings;
+        const hasRecentEvents = timeSinceLastEvent < this.HEALTHY_EVENT_WINDOW_MS;
+        const isHealthy = isJoined && hasRecentEvents;
         
-        this.logger.warn('[ReconnectionIssue][HEALTH_CHECK]', {
+        console.error('[StalenessCheck] 🔍 CHANNEL HEALTH EVALUATION:', {
           state,
-          bindingsCount,
+          timeSinceLastEvent,
+          healthyThreshold: this.HEALTHY_EVENT_WINDOW_MS,
           isJoined,
-          hasBindings,
+          hasRecentEvents,
           isHealthy,
           forceRejoin,
-          willSkip: isHealthy,
-          lastEventAt: this.lastEventReceivedAt,
-          timeSinceLastEvent: this.lastEventReceivedAt ? Date.now() - this.lastEventReceivedAt : 'never',
+          decision: isHealthy && !forceRejoin ? 'skip-recreation' : 'proceed-recreation',
           channelTopic: (this.channel as any)?.topic,
-          timestamp: Date.now()
+          timestamp: now
         });
         
-        if (state === 'joined' && bindingsCount > 0) {
-          // CRITICAL FIX: After tab resume, always recreate even if channel appears healthy
-          // The channel might be stale from the previous connection
-          const isReconnection = forceRejoin === true;
-          const timeSinceLastEvent = this.lastEventReceivedAt ? Date.now() - this.lastEventReceivedAt : null;
-          const hasRecentEvents = timeSinceLastEvent && timeSinceLastEvent < 30000; // 30 seconds
-          
-          if (isReconnection && !hasRecentEvents) {
-            this.logger.error('[ReconnectionIssue][FORCE_RECREATION_AFTER_TAB_RESUME]', {
-              reason: 'Channel appears healthy but is likely stale after tab resume - forcing recreation',
-              state,
-              bindingsCount,
-              timeSinceLastEvent,
-              hasRecentEvents,
-              isReconnection,
-              timestamp: Date.now()
-            });
-            // Continue to recreation instead of returning
-          } else {
-            this.logger.warn('[ReconnectionIssue][SKIP_HEALTHY_RECREATION]', {
-              reason: 'Channel is healthy and has recent events - avoiding unnecessary recreation',
-              state,
-              bindingsCount,
-              timeSinceLastEvent,
-              hasRecentEvents,
-              forceRejoin,
-              timestamp: Date.now()
-            });
-            return;
-          }
+        // Skip recreation if healthy and not forced
+        if (isHealthy && !forceRejoin) {
+          console.error('[JoinDedupe] ✅ CHANNEL HEALTHY - skipping recreation', {
+            reason: 'healthy-with-recent-events',
+            state,
+            timeSinceLastEvent,
+            hasRecentEvents,
+            timestamp: now
+          });
+          return;
+        }
+        
+        // Log why we're proceeding with recreation
+        if (forceRejoin) {
+          console.error('[JoinDedupe] 🔄 FORCE REJOIN - recreating channel', {
+            reason: 'force-requested',
+            state,
+            timeSinceLastEvent,
+            timestamp: now
+          });
+        } else if (!hasRecentEvents) {
+          console.error('[JoinDedupe] 🔄 STALE CHANNEL - recreating', {
+            reason: 'stale-events',
+            state,
+            timeSinceLastEvent,
+            healthyThreshold: this.HEALTHY_EVENT_WINDOW_MS,
+            timestamp: now
+          });
         }
         
         if (!forceRejoin && (state === 'joined' || state === 'joining')) {
@@ -927,9 +937,9 @@ export class ProjectChannelManager {
       // Don't immediately recreate - let the provider watchdog handle this if no events arrive
     }
   } finally {
-      // Ensure we always release the join lock
+      // CRITICAL FIX: Always release the join lock
       this.joinInProgress = false;
-      this.logger.warn('[ReconnectionIssue][JOIN_LOCK_RELEASED]', {
+      console.error('[JoinGuard] 🔓 LOCK RELEASED', {
         topic: buildTaskUpdatesTopic(projectId),
         timestamp: Date.now()
       });
