@@ -23,7 +23,6 @@ import { GenerationTaskProvider } from '@/shared/contexts/GenerationTaskContext'
 // [MobileStallFix] Import debug utilities for console debugging
 import '@/shared/lib/mobileProjectDebug';
 import { getNetworkStatusManager } from '@/shared/lib/NetworkStatusManager';
-import { RealtimeStatus } from '@/shared/components/RealtimeStatus';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -232,7 +231,6 @@ const AppInternalContent = () => {
           ) : null}
         </DragOverlay>
         <Sonner />
-        <RealtimeStatus />
       </DndContext>
     </TooltipProvider>
   );

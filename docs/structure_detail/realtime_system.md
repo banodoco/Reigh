@@ -67,12 +67,6 @@ UI Components ◀──────── React Query cache (data)
     - Access connection state in React components
     - Optional: consume last received event metadata for UI feedback
 
-- RealtimeStatus Component (optional)
-  - Path: `src/shared/components/RealtimeStatus.tsx`
-  - Responsibilities:
-    - Visual indicator of realtime connection status and last event timestamps
-    - Useful for debugging and user feedback
-
 ## Event Handling
 
 ### Supabase Channel Events (current coverage)
@@ -182,7 +176,7 @@ useEffect(() => {
 3. Excess polling: check DataFreshness diagnostics and realtime connection state
 
 ## Notes & Limitations
-- The system currently subscribes to `tasks` changes only; generation-only updates are reflected through task-driven events and mutation-driven invalidations.
+- The system currently subscribes to `tasks` changes only. Generation-related UI updates are primarily driven by task events and by explicit mutation invalidations. Pure generation-only backend changes that are not accompanied by a task event (e.g., background thumbnail writes) are picked up by the smart polling fallback.
 - Invalidation uses broad key families to ensure all relevant variants refetch without bespoke wiring per consumer.
 
 Result: **Fast, reliable updates via direct invalidation, with intelligent polling as a resilient fallback.**
