@@ -456,7 +456,7 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
           </div>
         </div>
         
-        <div className="flex space-x-2 overflow-x-hidden flex-1 items-start">
+        <div className="flex space-x-2 overflow-hidden flex-1 items-start">
           {imagesToShow.length > 0 ? (
             <>
               {imagesToShow.map((image, index) => (

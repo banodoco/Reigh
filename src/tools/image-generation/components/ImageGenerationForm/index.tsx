@@ -127,6 +127,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   const [promptsByShot, setPromptsByShot] = useState<Record<string, PromptEntry[]>>({});
   const promptIdCounter = useRef(1);
   const [isPromptModalOpen, setIsPromptModalOpen] = useState(false);
+  const [openPromptModalWithAIExpanded, setOpenPromptModalWithAIExpanded] = useState(false);
   const [imagesPerPrompt, setImagesPerPrompt] = useState(1);
   const defaultsApplied = useRef(false);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
@@ -706,6 +707,11 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     setPrompts(prev => [...prev, newPrompt]);
   };
 
+  const handleOpenMagicPrompt = useCallback(() => {
+    setOpenPromptModalWithAIExpanded(true);
+    setIsPromptModalOpen(true);
+  }, []);
+
   const handleUpdatePrompt = (id: string, field: 'fullPrompt' | 'shortPrompt', value: string) => {
     markAsInteracted();
     setPrompts(prev => prev.map(p => {
@@ -960,6 +966,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
               onUpdatePrompt={handleUpdatePrompt}
               onRemovePrompt={handleRemovePrompt}
               onOpenPromptModal={() => setIsPromptModalOpen(true)}
+              onOpenMagicPrompt={handleOpenMagicPrompt}
               beforeEachPromptText={beforeEachPromptText}
               afterEachPromptText={afterEachPromptText}
               onBeforeEachPromptTextChange={handleTextChange(setBeforeEachPromptText)}
@@ -1052,11 +1059,15 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         >
           <LazyPromptEditorModal
             isOpen={isPromptModalOpen}
-            onClose={() => setIsPromptModalOpen(false)}
+            onClose={() => {
+              setIsPromptModalOpen(false);
+              setOpenPromptModalWithAIExpanded(false);
+            }}
             prompts={prompts}
             onSave={handleSavePromptsFromModal}
             generatePromptId={generatePromptId}
             apiKey={openaiApiKey}
+            openWithAIExpanded={openPromptModalWithAIExpanded}
           />
         </DynamicImportErrorBoundary>
       </Suspense>

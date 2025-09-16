@@ -195,67 +195,67 @@ const VideoTravelToolPage: React.FC = () => {
   const noOpCallback = useCallback(() => {}, []);
   
   const handleVideoControlModeChange = useCallback((mode: 'individual' | 'batch') => {
-    if (isLoadingSettingsRef.current) return;
+    if (!hasLoadedInitialSettings.current) return;
     userHasInteracted.current = true;
     setVideoControlMode(mode);
   }, []);
 
   const handlePairConfigChange = useCallback((pairId: string, field: 'prompt' | 'frames' | 'context', value: string | number) => {
-    if (isLoadingSettingsRef.current) return;
+    if (!hasLoadedInitialSettings.current) return;
     userHasInteracted.current = true;
     setVideoPairConfigs(prev => prev.map(p => p.id === pairId ? { ...p, [field]: value } : p));
   }, []);
 
   const handleBatchVideoPromptChange = useCallback((prompt: string) => {
-    if (isLoadingSettingsRef.current) return;
+    if (!hasLoadedInitialSettings.current) return;
     userHasInteracted.current = true;
     setBatchVideoPrompt(prompt);
   }, []);
 
   const handleBatchVideoFramesChange = useCallback((frames: number) => {
-    if (isLoadingSettingsRef.current) return;
+    if (!hasLoadedInitialSettings.current) return;
     userHasInteracted.current = true;
     setBatchVideoFrames(frames);
   }, []);
 
   const handleBatchVideoContextChange = useCallback((context: number) => {
-    if (isLoadingSettingsRef.current) return;
+    if (!hasLoadedInitialSettings.current) return;
     userHasInteracted.current = true;
     setBatchVideoContext(context);
   }, []);
 
   const handleBatchVideoStepsChange = useCallback((steps: number) => {
-    if (isLoadingSettingsRef.current) return;
+    if (!hasLoadedInitialSettings.current) return;
     userHasInteracted.current = true;
     setBatchVideoSteps(steps);
   }, []);
 
   const handleDimensionSourceChange = useCallback((source: 'project' | 'firstImage' | 'custom') => {
-    if (isLoadingSettingsRef.current) return;
+    if (!hasLoadedInitialSettings.current) return;
     userHasInteracted.current = true;
     setDimensionSource(source);
   }, []);
 
   const handleCustomWidthChange = useCallback((width?: number) => {
-    if (isLoadingSettingsRef.current) return;
+    if (!hasLoadedInitialSettings.current) return;
     userHasInteracted.current = true;
     setCustomWidth(width);
   }, []);
 
   const handleCustomHeightChange = useCallback((height?: number) => {
-    if (isLoadingSettingsRef.current) return;
+    if (!hasLoadedInitialSettings.current) return;
     userHasInteracted.current = true;
     setCustomHeight(height);
   }, []);
 
   const handleEnhancePromptChange = useCallback((enhance: boolean) => {
-    if (isLoadingSettingsRef.current) return;
+    if (!hasLoadedInitialSettings.current) return;
     userHasInteracted.current = true;
     setEnhancePrompt(enhance);
   }, []);
 
   const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
-    if (isLoadingSettingsRef.current) return;
+    if (!hasLoadedInitialSettings.current) return;
     userHasInteracted.current = true;
     setGenerationMode(mode);
   }, []);
@@ -1243,10 +1243,10 @@ const VideoTravelToolPage: React.FC = () => {
                 selectedShotId={shotToEdit.id}
                 projectId={selectedProjectId}
               videoPairConfigs={videoPairConfigs}
-              videoControlMode={isLoadingSettings ? 'batch' : videoControlMode}
-              batchVideoPrompt={isLoadingSettings ? '' : batchVideoPrompt}
-              batchVideoFrames={isLoadingSettings ? 60 : batchVideoFrames}
-              batchVideoContext={isLoadingSettings ? 10 : batchVideoContext}
+              videoControlMode={videoControlMode}
+              batchVideoPrompt={batchVideoPrompt}
+              batchVideoFrames={batchVideoFrames}
+              batchVideoContext={batchVideoContext}
               onShotImagesUpdate={handleShotImagesUpdate}
               onBack={handleBackToShotList}
               onVideoControlModeChange={handleVideoControlModeChange}
@@ -1254,24 +1254,24 @@ const VideoTravelToolPage: React.FC = () => {
               onBatchVideoPromptChange={handleBatchVideoPromptChange}
               onBatchVideoFramesChange={handleBatchVideoFramesChange}
               onBatchVideoContextChange={handleBatchVideoContextChange}
-              batchVideoSteps={isLoadingSettings ? 4 : batchVideoSteps}
+              batchVideoSteps={batchVideoSteps}
               onBatchVideoStepsChange={handleBatchVideoStepsChange}
-              dimensionSource={isLoadingSettings ? 'firstImage' : dimensionSource}
+              dimensionSource={dimensionSource}
               onDimensionSourceChange={handleDimensionSourceChange}
-              customWidth={isLoadingSettings ? undefined : customWidth}
+              customWidth={customWidth}
               onCustomWidthChange={handleCustomWidthChange}
-              customHeight={isLoadingSettings ? undefined : customHeight}
+              customHeight={customHeight}
               onCustomHeightChange={handleCustomHeightChange}
-              steerableMotionSettings={isLoadingSettings ? DEFAULT_STEERABLE_MOTION_SETTINGS : steerableMotionSettings}
+              steerableMotionSettings={steerableMotionSettings}
               onSteerableMotionSettingsChange={handleSteerableMotionSettingsChange}
               onGenerateAllSegments={noOpCallback}
               // LoRA props removed - now managed internally by ShotEditor
               availableLoras={availableLoras}
-              enhancePrompt={isLoadingSettings ? false : enhancePrompt}
+              enhancePrompt={enhancePrompt}
               onEnhancePromptChange={handleEnhancePromptChange}
-              generationMode={isLoadingSettings ? 'batch' : generationMode}
+              generationMode={generationMode}
               onGenerationModeChange={handleGenerationModeChange}
-              selectedModel={isLoadingSettings ? 'wan-2.1' : selectedModel}
+              selectedModel={selectedModel}
               onModelChange={handleModelChange}
 
               onPreviousShot={handlePreviousShot}

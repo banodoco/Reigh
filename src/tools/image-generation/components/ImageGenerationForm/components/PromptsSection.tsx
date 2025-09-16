@@ -2,7 +2,7 @@ import React from "react";
 import { Button } from "@/shared/components/ui/button";
 import { Label } from "@/shared/components/ui/label";
 import { Textarea } from "@/shared/components/ui/textarea";
-import { PlusCircle, Edit3 } from "lucide-react";
+import { PlusCircle, Edit3, Sparkles } from "lucide-react";
 import { 
   Tooltip, 
   TooltipContent, 
@@ -25,6 +25,7 @@ interface PromptsSectionProps {
   onUpdatePrompt: (id: string, field: 'fullPrompt' | 'shortPrompt', value: string) => void;
   onRemovePrompt: (id: string) => void;
   onOpenPromptModal: () => void;
+  onOpenMagicPrompt: () => void;
   beforeEachPromptText: string;
   afterEachPromptText: string;
   onBeforeEachPromptTextChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
@@ -46,6 +47,7 @@ export const PromptsSection: React.FC<PromptsSectionProps> = ({
   onUpdatePrompt,
   onRemovePrompt,
   onOpenPromptModal,
+  onOpenMagicPrompt,
   beforeEachPromptText,
   afterEachPromptText,
   onBeforeEachPromptTextChange,
@@ -61,29 +63,28 @@ export const PromptsSection: React.FC<PromptsSectionProps> = ({
           <span className="absolute top-1/2 left-full transform -translate-y-1/2 ml-2.5 w-12 h-2 bg-orange-200/60 rounded-full"></span>
         </Label>
         <div className="flex items-center space-x-2">
-          {/* Add Prompt button - small '+' button (only shown when single prompt) */}
-          {(!ready ? lastKnownPromptCount <= 1 : prompts.length <= 1) && (
-            <TooltipProvider delayDuration={300}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={onAddPrompt}
-                    disabled={!hasApiKey || isGenerating || !ready}
-                    aria-label="Add Prompt"
-                    className="px-2"
-                  >
-                    <PlusCircle className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="top">
-                  Add Prompt
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          )}
+          {/* Magic Prompt button - always visible */}
+          <TooltipProvider delayDuration={300}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={onOpenMagicPrompt}
+                  disabled={!hasApiKey || isGenerating || !ready}
+                  aria-label="Magic Prompt"
+                  className="px-2"
+                >
+                  <Sparkles className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                Magic Prompt (AI Tools)
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
 
           {/* Manage Prompts button */}
           <Button

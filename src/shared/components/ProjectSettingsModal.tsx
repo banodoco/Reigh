@@ -218,7 +218,7 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({ isOp
             </Collapsible>
           </div>
         </div>
-        <DialogFooter className={`${modal.isMobile ? 'px-4 pt-4 pb-1 flex-row justify-between' : 'px-6 pt-5 pb-2'} border-t`}>
+        <DialogFooter className={`${modal.isMobile ? 'px-4 pt-4 pb-0 flex-row justify-between' : 'px-6 pt-5 pb-0'} border-t`}>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isUpdatingProject} className={modal.isMobile ? '' : 'mr-auto'}>
             Cancel
           </Button>

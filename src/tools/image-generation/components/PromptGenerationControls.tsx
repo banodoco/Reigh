@@ -123,10 +123,7 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
   };
 
   return (
-    <div className="space-y-4 p-4 border-b mb-4">
-      <h3 className="text-lg font-light flex items-center">
-        <Wand2 className="mr-2 h-5 w-5" /> Generate Prompts
-      </h3>
+    <div className="space-y-2 p-4">
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <div className="md:col-span-3">
           <Label htmlFor="gen_overallPromptText">What prompts would you like to generate?</Label>
@@ -150,12 +147,12 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
             value={rulesToRememberText}
             onChange={(e) => {
               const next = e.target.value;
-              // Add bullet points for all lines (including empty ones)
+              // Add bullet points for lines that have content (not empty lines)
               const lines = next.split('\n');
               const formattedLines = lines.map((line) => {
                 const trimmedLine = line.trim();
-                // Add bullet to any line that doesn't already have one
-                if (!line.startsWith('•') && !line.startsWith('-') && !line.startsWith('*')) {
+                // Only add bullet to lines that have content and don't already have a bullet
+                if (trimmedLine !== '' && !line.startsWith('•') && !line.startsWith('-') && !line.startsWith('*')) {
                   return `• ${line}`;
                 }
                 return line;
@@ -183,6 +180,61 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
                 setTimeout(() => {
                   textarea.setSelectionRange(cursorPos + 3, cursorPos + 3);
                 }, 0);
+              } else if (e.key === 'Backspace') {
+                const textarea = e.target as HTMLTextAreaElement;
+                const cursorPos = textarea.selectionStart;
+                const cursorEnd = textarea.selectionEnd;
+                const currentValue = textarea.value;
+                
+                // Only handle if no text is selected (cursor position)
+                if (cursorPos === cursorEnd && cursorPos > 0) {
+                  const beforeCursor = currentValue.slice(0, cursorPos);
+                  const lines = currentValue.split('\n');
+                  
+                  // Find which line the cursor is on
+                  let currentLineStart = 0;
+                  let currentLineIndex = 0;
+                  for (let i = 0; i < lines.length; i++) {
+                    const lineLength = lines[i].length + (i < lines.length - 1 ? 1 : 0); // +1 for \n
+                    if (currentLineStart + lineLength > cursorPos) {
+                      currentLineIndex = i;
+                      break;
+                    }
+                    currentLineStart += lineLength;
+                  }
+                  
+                  const currentLine = lines[currentLineIndex];
+                  const positionInLine = cursorPos - currentLineStart;
+                  
+                  // Simple logic: If we're on a line that only contains a bullet (and it's not the first line),
+                  // and we press backspace anywhere on that line, delete it and jump back
+                  const isEmptyBulletLine = currentLine === '• ' || currentLine === '- ' || currentLine === '* ' ||
+                                           currentLine === '•' || currentLine === '-' || currentLine === '*';
+                  
+                  const shouldDeleteEmptyBulletLine = currentLineIndex > 0 && isEmptyBulletLine;
+                  
+                  // Also handle the original case: backspace at beginning of any bulleted line (not first line)
+                  const shouldDeleteAtBeginning = currentLineIndex > 0 && positionInLine === 0 && 
+                                                 (currentLine.startsWith('• ') || currentLine.startsWith('- ') || currentLine.startsWith('* '));
+                  
+                  if (shouldDeleteEmptyBulletLine || shouldDeleteAtBeginning) {
+                    e.preventDefault();
+                    
+                    // Remove the current line and move cursor to end of previous line
+                    const newLines = [...lines];
+                    newLines.splice(currentLineIndex, 1);
+                    const newValue = newLines.join('\n');
+                    
+                    setRulesToRememberText(newValue);
+                    emitChange({ rulesToRememberText: newValue });
+                    
+                    // Position cursor at end of previous line
+                    const previousLineEnd = currentLineStart - 1; // -1 to account for removed \n
+                    setTimeout(() => {
+                      textarea.setSelectionRange(previousLineEnd, previousLineEnd);
+                    }, 0);
+                  }
+                }
               }
             }}
             onFocus={(e) => {
@@ -227,9 +279,6 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
               <span className="font-light text-sm">
                 Level of creativity
               </span>
-              <span className="block text-xs text-muted-foreground">
-                {selectedTemperatureOption?.description || 'Good balance of creativity'}
-              </span>
             </div>
             <div className="relative mb-0">
               <Slider
@@ -247,9 +296,9 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
                 <span>5</span>
               </div>
             </div>
-            <div className="text-center">
-              <span className="font-light text-sm">
-                {selectedTemperatureOption?.label || 'Balanced'}
+            <div className="text-center -mt-1">
+              <span className="text-xs text-muted-foreground">
+                {selectedTemperatureOption?.description || 'Good balance of creativity'}
               </span>
             </div>
           </div>

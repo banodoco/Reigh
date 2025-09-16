@@ -1151,7 +1151,7 @@ python worker.py --db-type supabase \\
             </div>
           )}
           
-          <DialogFooter className={`${modal.isMobile ? 'px-2 pt-6 pb-2' : 'px-2 pt-7 pb-2'} border-t relative z-20`}>
+          <DialogFooter className={`${modal.isMobile ? 'px-2 pt-6 pb-0' : 'px-2 pt-7 pb-0'} border-t relative z-20`}>
             <Button variant="outline" onClick={() => onOpenChange(false)} className="w-full">
               Close
             </Button>

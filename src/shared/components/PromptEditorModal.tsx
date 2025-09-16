@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
 import { PromptEntry, PromptInputRow, PromptInputRowProps } from '@/tools/image-generation/components/ImageGenerationForm';
-import { PlusCircle, AlertTriangle, Wand2Icon, Edit, PackagePlus, ArrowUp, Trash2, ChevronDown, ChevronRight, Sparkles, X, Loader2 } from 'lucide-react';
+import { PlusCircle, AlertTriangle, Wand2Icon, Edit, PackagePlus, ArrowUp, Trash2, ChevronDown, ChevronLeft, ChevronRight, Sparkles, X, Loader2 } from 'lucide-react';
 import { PromptGenerationControls, GenerationControlValues as PGC_GenerationControlValues } from '@/tools/image-generation/components/PromptGenerationControls';
 import { BulkEditControls, BulkEditParams as BEC_BulkEditParams, BulkEditControlValues as BEC_BulkEditControlValues } from '@/tools/image-generation/components/BulkEditControls';
 import { useAIInteractionService } from '@/shared/hooks/useAIInteractionService';
@@ -41,6 +41,7 @@ export interface PromptEditorModalProps {
   onSave: (updatedPrompts: PromptEntry[]) => void;
   generatePromptId: () => string;
   apiKey?: string;
+  openWithAIExpanded?: boolean;
 }
 
 type EditorMode = 'generate' | 'bulk-edit';
@@ -49,6 +50,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
   isOpen, onClose, prompts: initialPrompts, onSave,
   generatePromptId,
   apiKey,
+  openWithAIExpanded = false,
 }) => {
   // Debug: Log when component is called with detailed prop info
   console.log(`[EDIT_DEBUG:RENDER] PromptEditorModal rendered.`, {
@@ -263,11 +265,11 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
       clearEditInstructions('modal-open'); // Reset edit instructions text
       setInternalPrompts(initialPrompts.map(p => ({ ...p })));
       setActivePromptIdForFullView(null);
-      setIsAIPromptSectionExpanded(false); // Always start with AI section closed
+      setIsAIPromptSectionExpanded(openWithAIExpanded); // Use prop to control AI section initial state
       // Initialize last-saved signature to current to avoid immediate auto-save
       lastSavedSignatureRef.current = JSON.stringify(initialPrompts);
     }
-  }, [isOpen]); // Only reinitialize when modal opens, not when initialPrompts change
+  }, [isOpen, openWithAIExpanded]); // Only reinitialize when modal opens or AI expanded state changes
 
   // Auto-save while open: every 3s if changes detected
   useEffect(() => {
@@ -728,7 +730,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
           <input ref={tempFocusInputRef} type="text" className="sr-only" aria-hidden="true" />
         )}
         <div className={modal.headerClass}>
-          <DialogHeader className={`${modal.isMobile ? 'px-4 pt-6 pb-2' : 'px-6 pt-8 pb-2'} flex-shrink-0`}>
+          <DialogHeader className={`${modal.isMobile ? 'px-2 pt-6 pb-2' : 'px-6 pt-8 pb-2'} flex-shrink-0`}>
             <DialogTitle>Prompt Editor</DialogTitle>
           </DialogHeader>
         </div>
@@ -743,12 +745,12 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
           <Collapsible 
             open={isAIPromptSectionExpanded} 
             onOpenChange={setIsAIPromptSectionExpanded}
-            className={`${modal.isMobile ? 'px-4' : 'px-6'}`}
+            className={`${modal.isMobile ? 'px-2' : 'px-6'}`}
           >
             <CollapsibleTrigger asChild>
               <Button
                 variant="ghost"
-                className={`${isAIPromptSectionExpanded ? 'w-full justify-between p-4 mb-4 hover:bg-accent/50' : 'w-full justify-between p-4 mb-4 bg-gradient-to-r from-purple-500/20 via-pink-500/20 to-red-500/20 border border-pink-400/40 hover:from-purple-500/30 hover:to-red-500/30'} transition-colors duration-300`}
+                className={`${isAIPromptSectionExpanded ? 'w-full justify-between p-4 hover:bg-accent/50 border border-accent-foreground/10 rounded-lg' : 'w-full justify-between p-4 bg-gradient-to-r from-purple-500/20 via-pink-500/20 to-red-500/20 border border-pink-400/40 hover:from-purple-500/30 hover:to-red-500/30'} transition-colors duration-300`}
                 onTouchStart={handleTouchStart}
                 onClick={handleToggleAIPromptSection}
               >
@@ -763,14 +765,14 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
                 {isAIPromptSectionExpanded ? (
                   <ChevronDown className="h-4 w-4" />
                 ) : (
-                  <ChevronRight className="h-4 w-4" />
+                  <ChevronLeft className="h-4 w-4" />
                 )}
               </Button>
             </CollapsibleTrigger>
             <CollapsibleContent>
-              <div className="bg-accent/30 border border-accent-foreground/10 rounded-lg p-4 mb-4">
+              <div className="bg-accent/30 border border-accent-foreground/10 rounded-lg p-4">
                 <Tabs value={activeTab} onValueChange={(value) => { markAsInteracted(); setActiveTab(value as EditorMode); }}>
-                  <TabsList className="grid w-full grid-cols-2 mb-4">
+                  <TabsList className="grid w-full grid-cols-2">
                     <TabsTrigger value="generate"><Wand2Icon className="mr-2 h-4 w-4" />Generate New</TabsTrigger>
                     <TabsTrigger value="bulk-edit"><Edit className="mr-2 h-4 w-4" />Bulk Edit</TabsTrigger>
                   </TabsList>
@@ -803,23 +805,8 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
             </CollapsibleContent>
           </Collapsible>
           
-                      <div className={`${modal.isMobile ? 'px-4' : 'px-6'} text-sm text-muted-foreground mb-6 flex justify-between items-center`}>
-            <span>Editing {internalPrompts.length} prompt(s). Changes are auto-saved.</span>
-            {internalPrompts.length > 0 && (
-              <Button variant="destructive" size="sm" onClick={handleRemoveAllPrompts} className="ml-auto h-auto py-2">
-                <Trash2 className="mr-2 h-4 w-4 self-center" />
-                <span className={`leading-tight ${isMobile ? '' : 'whitespace-nowrap'}`}>
-                  {isMobile ? (
-                    <>Delete<br />Prompts</>
-                  ) : (
-                    'Delete Prompts'
-                  )}
-                </span>
-              </Button>
-            )}
-          </div>
-          <div className="border-t">
-            <div className={`${modal.isMobile ? 'p-4 pb-1' : 'p-6 pb-2'}`}>
+          <div>
+            <div className={`${modal.isMobile ? 'px-2 py-4 pb-1' : 'p-6 pb-2'}`}>
               {internalPrompts.length === 0 && (
                 <div className="text-center text-muted-foreground py-8">
                   No prompts yet. Add one manually or use AI generation.
@@ -848,7 +835,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
                       onFocus={() => console.log(`[EDIT_DEBUG:FOCUS] Input focused, value: "${editInstructionsRef.current?.value}"`)}
                       onBlur={() => console.log(`[EDIT_DEBUG:BLUR] Input blurred, value: "${editInstructionsRef.current?.value}"`)}
                       placeholder={promptToEdit.originalText.trim() === '' ? 'Describe what you want' : 'Edit instructions'}
-                      className={`h-7 ${isMobile ? 'w-48 text-base' : 'w-72 text-sm'} ${isMobile && isAIEditing ? 'opacity-80' : ''}`}
+                      className={`h-7 ${isMobile ? 'w-48' : 'w-72'} ${isMobile && isAIEditing ? 'opacity-80' : ''}`}
                       disabled={isAIEditing}
                       clearable
                       onClear={() => setEditInstructionsValue('', 'clear-button')}
@@ -931,11 +918,22 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
             </div>
           )}
           
-          <DialogFooter className={`${modal.isMobile ? 'p-4 pt-4 pb-4 flex-row justify-between' : 'p-6 pt-6'} border-t relative z-20`}>
-           <Button variant="outline" onClick={handleInternalAddBlankPrompt} className={modal.isMobile ? '' : 'mr-auto'}>
-            <PackagePlus className="mr-2 h-4 w-4" /> Blank Prompt
-          </Button>
-                      <Button onClick={handleFinalSaveAndClose}>Close</Button>
+          <DialogFooter className={`${modal.isMobile ? 'p-4 pt-4 pb-1 flex-row justify-between' : 'p-6 pt-6 pb-2'} border-t relative z-20`}>
+            <div className={`flex gap-2 ${modal.isMobile ? '' : 'mr-auto'}`}>
+              <Button variant="outline" onClick={handleInternalAddBlankPrompt}>
+                <PackagePlus className={`h-4 w-4 ${modal.isMobile ? '' : 'mr-2'}`} />
+                <span className={modal.isMobile ? 'hidden' : ''}>Blank Prompt</span>
+                {modal.isMobile && <span className="sr-only">Blank Prompt</span>}
+              </Button>
+              {internalPrompts.length > 0 && (
+                <Button variant="destructive" onClick={handleRemoveAllPrompts}>
+                  <Trash2 className={`h-4 w-4 ${modal.isMobile ? '' : 'mr-2'}`} />
+                  <span className={modal.isMobile ? 'hidden' : ''}>Delete Prompts</span>
+                  {modal.isMobile && <span className="sr-only">Delete Prompts</span>}
+                </Button>
+              )}
+            </div>
+            <Button onClick={handleFinalSaveAndClose}>Close</Button>
           </DialogFooter>
         </div>
       </DialogContent>

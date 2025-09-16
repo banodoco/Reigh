@@ -31,18 +31,18 @@ export const BulkEditControls: React.FC<BulkEditControlsProps> = ({
   onValuesChange,
 }) => {
   const [editInstructions, setEditInstructions] = useState(initialValues?.editInstructions || '');
-  const [modelType, setModelType] = useState<AIModelType>(initialValues?.modelType || 'standard');
+  const [modelType, setModelType] = useState<AIModelType>('smart');
 
   const hasHydratedRef = useRef(false);
   useEffect(() => {
     if (!hasHydratedRef.current && initialValues) {
       setEditInstructions(initialValues.editInstructions || '');
-      setModelType(initialValues.modelType || 'standard');
+      setModelType('smart');
       hasHydratedRef.current = true;
       // Emit once after hydration so parent has a consistent snapshot (same as Generate view)
       onValuesChange?.({
         editInstructions: initialValues.editInstructions || '',
-        modelType: initialValues.modelType || 'standard',
+        modelType: 'smart',
       });
     }
   }, [initialValues, onValuesChange]);
@@ -85,10 +85,7 @@ export const BulkEditControls: React.FC<BulkEditControlsProps> = ({
   }
 
   return (
-    <div className="space-y-4 p-4 border-b mb-4">
-      <h3 className="text-lg font-light flex items-center">
-        <Edit className="mr-2 h-5 w-5" /> Manage Prompts {numberOfPromptsToEdit > 0 ? `(${numberOfPromptsToEdit})` : ''}
-      </h3>
+    <div className="space-y-2 p-4">
       <div>
         <Label htmlFor="bulkEditInstructions_field">Edit Instructions</Label>
         <Textarea
@@ -102,40 +99,18 @@ export const BulkEditControls: React.FC<BulkEditControlsProps> = ({
           placeholder="e.g., Make all prompts more concise and add a call to action..."
           rows={3}
           disabled={!hasApiKey || isEditing || numberOfPromptsToEdit === 0}
-          className="mt-1"
+          className="mt-1 mb-4"
         />
       </div>
       
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
-        <div>
-            <Label htmlFor="bulkEditModelType_field">AI Model for Editing</Label>
-            <Select 
-                value={modelType}
-                onValueChange={(value: string) => {
-                  const next = value as AIModelType;
-                  setModelType(next);
-                  emitChange({ modelType: next });
-                }}
-                disabled={!hasApiKey || isEditing || numberOfPromptsToEdit === 0}
-            >
-                <SelectTrigger id="bulkEditModelType_trigger" className="mt-1 w-full sm:w-[200px]">
-                    <SelectValue placeholder="Select AI model" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="standard">Standard</SelectItem>
-                    <SelectItem value="smart">Smart (Potentially slower/costlier)</SelectItem>
-                </SelectContent>
-            </Select>
-        </div>
-        <Button 
-            type="button"
-            onClick={handleBulkEditClick}
-            disabled={!hasApiKey || isEditing || !editInstructions.trim() || numberOfPromptsToEdit === 0} 
-            className="w-full sm:w-auto"
-        >
-          {isEditing ? 'Editing All...' : `Apply to All ${numberOfPromptsToEdit > 0 ? numberOfPromptsToEdit : ''} Prompts`}
-        </Button>
-      </div>
+      <Button 
+          type="button"
+          onClick={handleBulkEditClick}
+          disabled={!hasApiKey || isEditing || !editInstructions.trim() || numberOfPromptsToEdit === 0} 
+          className="w-full sm:w-auto"
+      >
+        {isEditing ? 'Editing All...' : `Apply to All ${numberOfPromptsToEdit > 0 ? numberOfPromptsToEdit : ''} Prompts`}
+      </Button>
     </div>
   );
 }; 
