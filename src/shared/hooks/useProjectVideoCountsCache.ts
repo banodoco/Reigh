@@ -1,7 +1,7 @@
 import React, { useCallback, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useStandardizedPolling } from '@/shared/hooks/useResurrectionPolling';
+import { useSmartPollingConfig } from '@/shared/hooks/useSmartPolling';
 
 /**
  * Project-wide video counts cache
@@ -86,27 +86,19 @@ async function fetchProjectVideoCountsFromDB(projectId: string): Promise<Map<str
 export function useProjectVideoCountsCache(projectId: string | null) {
   const cacheRef = useRef(globalProjectVideoCountsCache);
   
-  // 🎯 STANDARDIZED POLLING: Use standardized polling for video counts cache
-  const { refetchInterval, refetchIntervalInBackground } = useStandardizedPolling(
-    'ProjectVideoCountsCache',
-    { projectId },
-    {
-      staticInterval: 60 * 1000, // 1 minute - cache refresh polling
-      disableBackgroundPolling: true // Only poll when tab is active for cache data
-    }
-  );
+  // 🎯 SMART POLLING: Use DataFreshnessManager for intelligent polling decisions
+  const smartPollingConfig = useSmartPollingConfig(['project-video-counts', projectId]);
   
   // Query to fetch all shot video counts for the project
   const { data: projectCounts, isLoading, error, refetch } = useQuery<Map<string, number>>({
     queryKey: ['project-video-counts', projectId],
     queryFn: () => fetchProjectVideoCountsFromDB(projectId!),
     enabled: !!projectId,
-    staleTime: 5 * 60 * 1000, // 5 minutes - very aggressive caching for instant loads
     gcTime: 10 * 60 * 1000, // 10 minutes
-    // 🎯 STANDARDIZED POLLING: Network-aware, jittered, healing-window-aware polling
-    refetchInterval,
-    refetchIntervalInBackground,
     placeholderData: (previousData) => previousData, // Keep showing previous data while refetching
+    // 🎯 SMART POLLING: Intelligent polling based on realtime health
+    ...smartPollingConfig,
+    refetchIntervalInBackground: true, // Enable background polling
   });
   
   // Update cache when data changes

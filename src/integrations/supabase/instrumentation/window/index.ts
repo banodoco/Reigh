@@ -1,14 +1,10 @@
 import { __WS_INSTRUMENTATION_ENABLED__, __CORRUPTION_TRACE_ENABLED__ } from '@/integrations/supabase/config/env';
 import { captureRealtimeSnapshot } from '@/integrations/supabase/utils/snapshot';
 import { __CORRUPTION_TIMELINE__, addCorruptionEvent } from '@/integrations/supabase/utils/timeline';
-import { InstrumentationManager } from '../InstrumentationManager';
 
 export function installWindowOnlyInstrumentation() {
-  // Use InstrumentationManager for centralized control
-  InstrumentationManager.install('window');
-  InstrumentationManager.install('localStorage');
-  InstrumentationManager.install('fetch');
-  InstrumentationManager.install('errorCapture');
+  // InstrumentationManager removed - calling legacy function directly
+  installWindowOnlyInstrumentationLegacy();
   return;
 }
 
@@ -25,21 +21,24 @@ export function installWindowOnlyInstrumentationLegacy() {
       const originalClear = localStorage.clear;
       localStorage.setItem = function(key, value) {
         if (key === 'lastSelectedProjectId') {
-          console.error(`[ProjectContext:FastResume] 🔍 localStorage.setItem('${key}', '${value}')`, new Error().stack?.split('\n').slice(1, 4));
+          // Reduced frequency of localStorage logging to avoid spam
+          if (Math.random() < 0.1) { // Only log 10% of the time
+            console.log(`[ProjectContext:FastResume] 🔍 localStorage.setItem('${key}', '${value}')`, new Error().stack?.split('\n').slice(1, 4));
+          }
         }
         return originalSetItem.call(this, key, value);
       } as any;
       localStorage.removeItem = function(key) {
         if (key === 'lastSelectedProjectId') {
-          console.error(`[ProjectContext:FastResume] 🔍 localStorage.removeItem('${key}')`, new Error().stack?.split('\n').slice(1, 4));
+          console.log(`[ProjectContext:FastResume] 🔍 localStorage.removeItem('${key}')`, new Error().stack?.split('\n').slice(1, 4));
         }
         return originalRemoveItem.call(this, key);
       } as any;
       localStorage.clear = function() {
-        console.error(`[ProjectContext:FastResume] 🚨 localStorage.clear() called!`, new Error().stack?.split('\n').slice(1, 4));
+        console.warn(`[ProjectContext:FastResume] 🚨 localStorage.clear() called!`, new Error().stack?.split('\n').slice(1, 4));
         return originalClear.call(this);
       } as any;
-      console.error('[ProjectContext:FastResume] 🔍 localStorage monitoring installed');
+      console.info('[ProjectContext:FastResume] 🔍 localStorage monitoring installed');
     }
   } catch {}
 
@@ -90,7 +89,7 @@ export function installWindowOnlyInstrumentationLegacy() {
       if (originalOnUnhandledRejection) return originalOnUnhandledRejection.call(this, event);
     };
 
-    console.error('[RealtimeCorruptionTrace] 🔧 Global error capture installed');
+    console.info('[RealtimeCorruptionTrace] 🔧 Global error capture installed');
   }
 
   if (!__WS_INSTRUMENTATION_ENABLED__) {
@@ -98,14 +97,14 @@ export function installWindowOnlyInstrumentationLegacy() {
     return;
   }
 
-  console.error('[ReconnectionIssue] 🚨 WEBSOCKET INSTRUMENTATION SETUP:', {
+  console.info('[ReconnectionIssue] 🚨 WEBSOCKET INSTRUMENTATION SETUP:', {
     windowExists: typeof window !== 'undefined',
     WebSocketExists: !!window.WebSocket,
     timestamp: Date.now()
   });
 
   const key = '__WS_PROBE_INSTALLED__';
-  console.error('[WebSocketInstrumentation] 🔧 INSTRUMENTATION CHECK:', {
+  console.info('[WebSocketInstrumentation] 🔧 INSTRUMENTATION CHECK:', {
     alreadyInstalled: !!(window as any)[key],
     originalWebSocket: typeof window.WebSocket,
     webSocketToString: window.WebSocket?.toString?.(),
@@ -116,14 +115,14 @@ export function installWindowOnlyInstrumentationLegacy() {
 
   (window as any)[key] = true;
   const OriginalWS = window.WebSocket;
-  console.error('[ReconnectionIssue] 🚨 WEBSOCKET INSTRUMENTATION INSTALLED');
+  console.info('[ReconnectionIssue] 🚨 WEBSOCKET INSTRUMENTATION INSTALLED');
 
   try {
     const performanceEntries = performance.getEntriesByType('resource');
     const wsEntries = performanceEntries.filter(entry =>
       (entry as any).name.includes('websocket') || (entry as any).name.includes('wss://') || (entry as any).name.includes('ws://')
     );
-    console.error('[WebSocketInstrumentation] 🔍 EXISTING WEBSOCKET CHECK:', {
+    console.info('[WebSocketInstrumentation] 🔍 EXISTING WEBSOCKET CHECK:', {
       existingWebSocketResources: wsEntries.length,
       resources: wsEntries.map(e => ({ name: (e as any).name, startTime: (e as any).startTime })),
       timestamp: Date.now()
@@ -142,7 +141,7 @@ export function installWindowOnlyInstrumentationLegacy() {
     const isSupabaseRealtime = url.includes('supabase.co/realtime');
     const isSupabaseWebSocket = url.includes('supabase.co') && url.includes('websocket');
 
-    console.error('[WebSocketCreation] 🚨 WEBSOCKET CONSTRUCTOR CALLED!', {
+    console.info('[WebSocketCreation] 🚨 WEBSOCKET CONSTRUCTOR CALLED!', {
       wsId,
       url,
       protocols,
@@ -170,7 +169,7 @@ export function installWindowOnlyInstrumentationLegacy() {
       ws = protocols ? new OriginalWS(url, protocols) : new OriginalWS(url);
 
       if (isSupabaseRealtime || isSupabaseWebSocket) {
-        console.error('[WebSocketCreation] 🎯 SUPABASE WEBSOCKET DETECTED:', {
+        console.info('[WebSocketCreation] 🎯 SUPABASE WEBSOCKET DETECTED:', {
           wsId,
           url,
           protocols,
@@ -190,7 +189,7 @@ export function installWindowOnlyInstrumentationLegacy() {
       const createdAt = Date.now();
       let stability = { opens: 0, errors: 0, closes: 0, messages: 0 } as any;
 
-      console.error('[WebSocketCreation] ✅ WEBSOCKET INSTANCE CREATED SUCCESSFULLY', {
+      console.info('[WebSocketCreation] ✅ WEBSOCKET INSTANCE CREATED SUCCESSFULLY', {
         wsId,
         url,
         readyState: ws.readyState,
@@ -203,7 +202,7 @@ export function installWindowOnlyInstrumentationLegacy() {
           clearInterval(stabilityMonitor);
           return;
         }
-        console.error('[WebSocketStability] 📊 WS HEALTH CHECK:', {
+        console.log('[WebSocketStability] 📊 WS HEALTH CHECK:', {
           wsId,
           url,
           readyState: ws.readyState,
@@ -218,7 +217,7 @@ export function installWindowOnlyInstrumentationLegacy() {
 
       ws.addEventListener('open', () => {
         stability.opens++;
-        console.error('[WebSocketStability] ✅ WS OPENED:', { wsId, url, openTime: Date.now() - createdAt, stability, timestamp: Date.now() });
+        console.info('[WebSocketStability] ✅ WS OPENED:', { wsId, url, openTime: Date.now() - createdAt, stability, timestamp: Date.now() });
       });
 
       ws.addEventListener('message', (event: MessageEvent) => {
@@ -227,7 +226,7 @@ export function installWindowOnlyInstrumentationLegacy() {
           try {
             const messageData = typeof event.data === 'string' ? event.data : '[BINARY_DATA]';
             const messagePreview = typeof messageData === 'string' ? messageData.slice(0, 100) : '[BINARY]';
-            console.error('[SupabaseWebSocketDiag] 📨 WEBSOCKET MESSAGE RECEIVED:', {
+            console.log('[SupabaseWebSocketDiag] 📨 WEBSOCKET MESSAGE RECEIVED:', {
               url: ws.url,
               readyState: ws.readyState,
               timestamp: Date.now(),
@@ -281,7 +280,7 @@ export function installWindowOnlyInstrumentationLegacy() {
       throw error;
     }
 
-    console.error('[WebSocketCreation] 🔍 WEBSOCKET CREATED - CALLER ANALYSIS:', {
+    console.log('[WebSocketCreation] 🔍 WEBSOCKET CREATED - CALLER ANALYSIS:', {
       url: url.slice(0, 100),
       isSupabaseRealtime: url.includes('supabase.co/realtime'),
       isTestWebSocket: url.includes('echo.websocket.org'),
@@ -292,21 +291,15 @@ export function installWindowOnlyInstrumentationLegacy() {
       timestamp: Date.now()
     });
 
-    (ws as any).addEventListener('open', () => console.error('[ReconnectionIssue] 🔥 [DeadModeInvestigation] WS open', { url, timestamp: Date.now() }));
+    (ws as any).addEventListener('open', () => console.log('[ReconnectionIssue] 🔥 [DeadModeInvestigation] WS open', { url, timestamp: Date.now() }));
     (ws as any).addEventListener('error', (e: any) => {
       console.error('[WebSocketDebug] 🔥 WS ERROR EVENT:', { url, error: e, readyState: (ws as any).readyState, timestamp: Date.now() });
-      try {
-        const { trackWebSocketFailure } = require('@/shared/lib/webSocketFailureTracker');
-        trackWebSocketFailure(url, `WebSocket error event: ${e}`, (ws as any).readyState);
-      } catch {}
+      // webSocketFailureTracker removed - error already logged above
     });
     (ws as any).addEventListener('close', (e: CloseEvent) => {
       console.error('[WebSocketDebug] 🔥 WS CLOSE EVENT:', { url, code: e?.code, reason: e?.reason, wasClean: e?.wasClean, readyState: (ws as any).readyState, timestamp: Date.now() });
       if ((e as any)?.code !== 1000) {
-        try {
-          const { trackWebSocketFailure } = require('@/shared/lib/webSocketFailureTracker');
-          trackWebSocketFailure(url, `WebSocket closed abnormally: code=${(e as any)?.code}, reason=${(e as any)?.reason}`, (ws as any).readyState);
-        } catch {}
+        // webSocketFailureTracker removed - abnormal close already logged above
       }
     });
 
@@ -324,11 +317,17 @@ export function installWindowOnlyInstrumentationLegacy() {
         const url = typeof input === 'string' ? input : (input?.url || 'unknown');
         const isSupabase = typeof url === 'string' && url.includes('.supabase.co');
         const traceId = Math.random().toString(36).slice(2, 10);
-        console.error('[ResumeTrace][Fetch] ▶️ START', { traceId, url, isSupabase, timestamp: Date.now() });
+        // Disabled excessive fetch logging - was causing spam
+        // console.error('[ResumeTrace][Fetch] ▶️ START', { traceId, url, isSupabase, timestamp: Date.now() });
         try {
           const res = await originalFetch(...(args as any));
           const ms = Math.round(performance.now() - start);
-          console.error('[ResumeTrace][Fetch] ✅ END', { traceId, url, status: (res as any).status, ok: (res as any).ok, ms, timestamp: Date.now() });
+          // Log actual errors as errors, slow requests as warnings
+          if (!res.ok) {
+            console.error('[ResumeTrace][Fetch] ❌ ERROR', { traceId, url, status: (res as any).status, ok: (res as any).ok, ms, timestamp: Date.now() });
+          } else if (ms > 1000) {
+            console.warn('[ResumeTrace][Fetch] 🐌 SLOW REQUEST', { traceId, url, status: (res as any).status, ok: (res as any).ok, ms, timestamp: Date.now() });
+          }
           return res;
         } catch (e: any) {
           const ms = Math.round(performance.now() - start);

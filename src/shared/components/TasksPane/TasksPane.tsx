@@ -15,6 +15,7 @@ import { TasksPaneProcessingWarning } from '../ProcessingWarnings';
 import { TASK_STATUS, TaskStatus } from '@/types/database';
 import { useBottomOffset } from '@/shared/hooks/useBottomOffset';
 import { filterVisibleTasks, isTaskVisible } from '@/shared/lib/taskConfig';
+import { useSimpleRealtime } from '@/shared/providers/SimpleRealtimeProvider';
 
 const ITEMS_PER_PAGE = 50;
 
@@ -164,12 +165,19 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
   const { selectedProjectId } = useProject();
   const shouldLoadTasks = !!selectedProjectId;
   
-  // [TasksPaneCountMismatch] Track task loading conditions
-  console.log('[TasksPaneCountMismatch]', {
+  // Realtime connection status
+  const { isConnected: realtimeConnected, isConnecting: realtimeConnecting, error: realtimeError } = useSimpleRealtime();
+  
+  // [TasksPaneRealtimeDebug] Track realtime connection and task loading conditions
+  console.log('[TasksPaneRealtimeDebug]', {
+    context: 'connection-and-loading-state',
     selectedProjectId,
     shouldLoadTasks,
     selectedFilter,
     currentPage,
+    realtimeConnected,
+    realtimeConnecting,
+    realtimeError: realtimeError?.message || null,
     timestamp: Date.now()
   });
   
@@ -184,9 +192,35 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
   // NOTE: Task invalidation is now handled by the centralized TaskInvalidationSubscriber
   // which provides better read-after-write consistency with exponential backoff retry
   
-  // [TasksPaneCountMismatch] Track paginated tasks hook results
-  console.log('[TasksPaneCountMismatch]', {
-    context: 'TasksPane:paginated-hook-params-and-results',
+  // [TasksPaneRealtimeDebug] Track React Query state and detect polling fallback
+  const queryState = queryClient.getQueryState(['tasks', 'paginated', selectedProjectId, STATUS_GROUPS[selectedFilter], ITEMS_PER_PAGE, (currentPage - 1) * ITEMS_PER_PAGE]);
+  const queryData = queryClient.getQueryData(['tasks', 'paginated', selectedProjectId, STATUS_GROUPS[selectedFilter], ITEMS_PER_PAGE, (currentPage - 1) * ITEMS_PER_PAGE]);
+  
+  console.log('[TasksPaneRealtimeDebug]', {
+    context: 'react-query-state-analysis',
+    queryKey: ['tasks', 'paginated', selectedProjectId, STATUS_GROUPS[selectedFilter], ITEMS_PER_PAGE, (currentPage - 1) * ITEMS_PER_PAGE],
+    queryState: {
+      status: queryState?.status,
+      fetchStatus: queryState?.fetchStatus,
+      isStale: queryState?.isStale,
+      dataUpdatedAt: queryState?.dataUpdatedAt ? new Date(queryState.dataUpdatedAt).toISOString() : null,
+      dataUpdatedAtAge: queryState?.dataUpdatedAt ? Date.now() - queryState.dataUpdatedAt : null,
+      errorUpdatedAt: queryState?.errorUpdatedAt ? new Date(queryState.errorUpdatedAt).toISOString() : null,
+      isInvalidated: queryState?.isInvalidated,
+    },
+    hasQueryData: !!queryData,
+    realtimeStatus: {
+      connected: realtimeConnected,
+      connecting: realtimeConnecting,
+      error: realtimeError?.message || null
+    },
+    possiblePollingFallback: !realtimeConnected && queryState?.fetchStatus === 'fetching',
+    timestamp: Date.now()
+  });
+
+  // [TasksPaneRealtimeDebug] Track paginated tasks hook results
+  console.log('[TasksPaneRealtimeDebug]', {
+    context: 'paginated-hook-params-and-results',
     hookParams: {
       projectId: shouldLoadTasks ? selectedProjectId : null,
       status: STATUS_GROUPS[selectedFilter],
@@ -211,6 +245,42 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
   // Store previous pagination data to avoid flickering during loading
   const [displayPaginatedData, setDisplayPaginatedData] = useState<typeof paginatedData>(paginatedData);
   
+  // [TasksPaneRealtimeDebug] Track data freshness and invalidation events
+  useEffect(() => {
+    const handleTaskUpdate = (event: CustomEvent) => {
+      console.log('[TasksPaneRealtimeDebug]', {
+        context: 'realtime-task-update-event-received',
+        eventType: 'realtime:task-update',
+        eventDetail: event.detail,
+        currentFilter: selectedFilter,
+        currentPage,
+        realtimeConnected,
+        timestamp: Date.now()
+      });
+    };
+
+    const handleTaskNew = (event: CustomEvent) => {
+      console.log('[TasksPaneRealtimeDebug]', {
+        context: 'realtime-task-new-event-received',
+        eventType: 'realtime:task-new',
+        eventDetail: event.detail,
+        currentFilter: selectedFilter,
+        currentPage,
+        realtimeConnected,
+        timestamp: Date.now()
+      });
+    };
+
+    // Listen for realtime events
+    window.addEventListener('realtime:task-update', handleTaskUpdate as EventListener);
+    window.addEventListener('realtime:task-new', handleTaskNew as EventListener);
+
+    return () => {
+      window.removeEventListener('realtime:task-update', handleTaskUpdate as EventListener);
+      window.removeEventListener('realtime:task-new', handleTaskNew as EventListener);
+    };
+  }, [selectedFilter, currentPage, realtimeConnected]);
+  
   // Update display data more aggressively - update when tasks are added OR removed
   useEffect(() => {
     const shouldUpdate = (!isPaginatedLoading && paginatedData) || 
@@ -220,8 +290,8 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
                          (paginatedData as any).tasks.length !== (displayPaginatedData as any).tasks.length);
     
     if (shouldUpdate) {
-      console.log('[TasksPane] Updating display data', {
-        context: 'TasksPane:update-display-paginated-data',
+      console.log('[TasksPaneRealtimeDebug]', {
+        context: 'data-update-triggered',
         reason: !displayPaginatedData ? 'initial' : 'task_count_changed',
         previousTasksCount: (displayPaginatedData as any)?.tasks?.length || 0,
         newTasksCount: (paginatedData as any)?.tasks?.length || 0,
@@ -229,6 +299,13 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
         isLoading: isPaginatedLoading,
         selectedFilter,
         currentPage,
+        realtimeConnected,
+        dataFreshness: {
+          queryDataUpdatedAt: queryState?.dataUpdatedAt ? new Date(queryState.dataUpdatedAt).toISOString() : null,
+          ageInMs: queryState?.dataUpdatedAt ? Date.now() - queryState.dataUpdatedAt : null,
+          isStale: queryState?.isStale,
+          wasRecentlyInvalidated: queryState?.isInvalidated
+        },
         timestamp: Date.now()
       });
       
@@ -290,9 +367,11 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
   // Get status counts for indicators
   const { data: statusCounts, isLoading: isStatusCountsLoading, error: statusCountsError } = useTaskStatusCounts(shouldLoadTasks ? selectedProjectId : null);
   
-  // [TasksPaneCountMismatch] Track status counts hook results
-  console.log('[TasksPaneCountMismatch]', {
-    context: 'TasksPane:status-counts-hook-results',
+  // [TasksPaneRealtimeDebug] Track status counts hook results and freshness
+  const statusCountsQueryState = queryClient.getQueryState(['task-status-counts', selectedProjectId]);
+  
+  console.log('[TasksPaneRealtimeDebug]', {
+    context: 'status-counts-hook-results-and-freshness',
     hookParams: {
       projectId: shouldLoadTasks ? selectedProjectId : null,
     },
@@ -302,6 +381,15 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
       statusCounts,
       error: statusCountsError,
     },
+    queryFreshness: {
+      status: statusCountsQueryState?.status,
+      fetchStatus: statusCountsQueryState?.fetchStatus,
+      dataUpdatedAt: statusCountsQueryState?.dataUpdatedAt ? new Date(statusCountsQueryState.dataUpdatedAt).toISOString() : null,
+      ageInMs: statusCountsQueryState?.dataUpdatedAt ? Date.now() - statusCountsQueryState.dataUpdatedAt : null,
+      isStale: statusCountsQueryState?.isStale,
+      isInvalidated: statusCountsQueryState?.isInvalidated
+    },
+    realtimeConnected,
     timestamp: Date.now()
   });
   
@@ -331,6 +419,48 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
   // Badge now uses status counts total, pagination uses database total - both should match
   const hasMismatch = false;
   
+  // [TasksPaneRealtimeDebug] Comprehensive realtime behavior summary
+  const paginatedQueryAge = queryState?.dataUpdatedAt ? Date.now() - queryState.dataUpdatedAt : null;
+  const statusCountsQueryAge = statusCountsQueryState?.dataUpdatedAt ? Date.now() - statusCountsQueryState.dataUpdatedAt : null;
+  
+  console.log('[TasksPaneRealtimeDebug]', {
+    context: 'comprehensive-realtime-behavior-summary',
+    realtimeStatus: {
+      connected: realtimeConnected,
+      connecting: realtimeConnecting,
+      error: realtimeError?.message || null
+    },
+    dataFreshness: {
+      paginatedQuery: {
+        ageInMs: paginatedQueryAge,
+        ageInSeconds: paginatedQueryAge ? Math.round(paginatedQueryAge / 1000) : null,
+        isStale: queryState?.isStale,
+        status: queryState?.status,
+        fetchStatus: queryState?.fetchStatus
+      },
+      statusCountsQuery: {
+        ageInMs: statusCountsQueryAge,
+        ageInSeconds: statusCountsQueryAge ? Math.round(statusCountsQueryAge / 1000) : null,
+        isStale: statusCountsQueryState?.isStale,
+        status: statusCountsQueryState?.status,
+        fetchStatus: statusCountsQueryState?.fetchStatus
+      }
+    },
+    possibleIssues: {
+      realtimeDisconnected: !realtimeConnected,
+      dataVeryStale: (paginatedQueryAge && paginatedQueryAge > 30000) || (statusCountsQueryAge && statusCountsQueryAge > 30000),
+      queriesStillFetching: queryState?.fetchStatus === 'fetching' || statusCountsQueryState?.fetchStatus === 'fetching',
+      likelyUsingPolling: !realtimeConnected && (queryState?.fetchStatus === 'fetching' || statusCountsQueryState?.fetchStatus === 'fetching')
+    },
+    currentState: {
+      selectedFilter,
+      currentPage,
+      tasksDisplayed: (displayPaginatedData as any)?.tasks?.length || 0,
+      badgeCount: cancellableTaskCount
+    },
+    timestamp: Date.now()
+  });
+
   console.log('[TasksPane] Badge count calculation', {
     selectedFilter,
     statusCountsProcessing: displayStatusCounts?.processing || 0,

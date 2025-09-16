@@ -13,7 +13,7 @@ import { NEW_GROUP_DROPPABLE_ID } from '@/shared/components/ShotsPane/NewGroupDr
 import { LastAffectedShotProvider, LastAffectedShotContext } from '@/shared/contexts/LastAffectedShotContext';
 import { AppRoutes } from "./routes";
 import { ProjectProvider, useProject } from "@/shared/contexts/ProjectContext";
-import { RealtimeProvider } from '@/shared/providers/RealtimeProvider';
+import { SimpleRealtimeProvider } from '@/shared/providers/SimpleRealtimeProvider';
 // Removed RealtimeBoundary - using surgical observer restoration instead
 import { PanesProvider } from '@/shared/contexts/PanesContext';
 import { CurrentShotProvider } from '@/shared/contexts/CurrentShotContext';
@@ -22,13 +22,8 @@ import { ShotsProvider } from '@/shared/contexts/ShotsContext';
 import { GenerationTaskProvider } from '@/shared/contexts/GenerationTaskContext';
 // [MobileStallFix] Import debug utilities for console debugging
 import '@/shared/lib/mobileProjectDebug';
-import { initPollingDebugHelpers } from '@/shared/lib/pollingDebugHelpers';
-import { initTabReactivationTesting } from '@/shared/lib/tabReactivationTesting';
-import { initTabResumeDebugger } from '@/shared/lib/tabResumeDebugger';
-import { initWebSocketFailureTracker } from '@/shared/lib/webSocketFailureTracker';
-import { InstrumentationManager } from '@/integrations/supabase/instrumentation/InstrumentationManager';
 import { getNetworkStatusManager } from '@/shared/lib/NetworkStatusManager';
-import { invalidationRouter } from '@/shared/lib/InvalidationRouter';
+import { RealtimeStatus } from '@/shared/components/RealtimeStatus';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -66,8 +61,7 @@ const queryClient = new QueryClient({
   },
 });
 
-// Initialize InvalidationRouter with QueryClient
-invalidationRouter.setQueryClient(queryClient);
+// InvalidationRouter removed - DataFreshnessManager handles all invalidation logic now
 
 // New inner component that uses the context
 const AppInternalContent = () => {
@@ -238,34 +232,27 @@ const AppInternalContent = () => {
           ) : null}
         </DragOverlay>
         <Sonner />
+        <RealtimeStatus />
       </DndContext>
     </TooltipProvider>
   );
 };
 
 function App() {
-  // Initialize debug helpers using InstrumentationManager for centralized control
+  // Simplified initialization - removed legacy debug instrumentations
   React.useEffect(() => {
-    try { 
-      // Install debug instrumentations through manager
-      InstrumentationManager.install('tabResume');
-      InstrumentationManager.install('webSocketFailure');
-      InstrumentationManager.install('cacheValidation');
-      InstrumentationManager.install('pollingDebug');
-      
-      // Legacy direct initializations (will be phased out)
-      initPollingDebugHelpers(queryClient); 
-      initTabReactivationTesting(); 
-    } catch {}
-    
     // Initialize NetworkStatusManager for centralized network status handling
-    try { getNetworkStatusManager(); } catch {}
+    try { 
+      getNetworkStatusManager(); 
+    } catch (error) {
+      console.warn('[App] Failed to initialize NetworkStatusManager:', error);
+    }
   }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
       <ProjectProvider>
-        <RealtimeProvider>
+        <SimpleRealtimeProvider>
           <ShotsProvider>
             <GenerationTaskProvider>
               <PanesProvider>
@@ -279,7 +266,7 @@ function App() {
               </PanesProvider>
             </GenerationTaskProvider>
           </ShotsProvider>
-        </RealtimeProvider>
+        </SimpleRealtimeProvider>
       </ProjectProvider>
     </QueryClientProvider>
   );

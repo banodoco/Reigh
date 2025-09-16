@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { GeneratedImageWithMetadata } from '@/shared/components/ImageGallery';
 import { GenerationRow } from '@/types/shots';
 import { supabase } from '@/integrations/supabase/client';
-import { useResurrectionPollingConfig, RecentActivityDetectors } from './useResurrectionPolling';
+import { useSmartPollingConfig } from './useSmartPolling';
 import { useQueryDebugLogging, QueryDebugConfigs } from './useQueryDebugLogging';
 
 // Extended interface that includes task data
@@ -427,23 +427,8 @@ export function useUnifiedGenerations(options: UseUnifiedGenerationsOptions) {
     }
   }
 
-  // 🎯 MODULAR POLLING: Configure resurrection polling with UnifiedGenerations-specific settings
-  const { refetchInterval } = useResurrectionPollingConfig(
-    'UnifiedGenerations', // Debug tag matches original logs
-    { 
-      mode: options.mode,
-      projectId: options.projectId,
-      shotId: options.shotId,
-      page: options.page
-    }, // Context for logging
-    {
-      hasRecentActivity: RecentActivityDetectors.unifiedGenerations,
-      fastInterval: 15000,        // 15s when recent generations exist
-      resurrectionInterval: 45000, // 45s for stale data recovery  
-      initialInterval: 30000,     // 30s when no data
-      staleThreshold: 60000       // 1 minute = stale
-    }
-  );
+  // 🎯 SMART POLLING: Use DataFreshnessManager for intelligent polling decisions
+  const smartPollingConfig = useSmartPollingConfig(['unified-generations', effectiveProjectId, options.mode]);
   
   const query = useQuery({
     queryKey: cacheKey,
@@ -474,13 +459,12 @@ export function useUnifiedGenerations(options: UseUnifiedGenerationsOptions) {
       return fetchUnifiedGenerations({ ...options, projectId: effectiveProjectId });
     },
     enabled: enabled && !!effectiveProjectId,
-    staleTime: 10 * 1000, // 10 seconds - match task polling for consistency
     gcTime,
     // Do NOT carry over previous data across key changes (e.g., shot switches)
     // This prevents cross-shot contamination in consumers like VideoOutputsGallery
     // placeholderData: (previousData) => previousData,
-    // 🎯 MODULAR POLLING: Use configured resurrection polling
-    refetchInterval,
+    // 🎯 SMART POLLING: Intelligent polling based on realtime health
+    ...smartPollingConfig,
     refetchIntervalInBackground: true, // CRITICAL: Continue polling when tab is not visible
     refetchOnWindowFocus: false, // Prevent double-fetches
     refetchOnReconnect: false, // Prevent double-fetches

@@ -199,17 +199,9 @@ export async function createTask(taskParams: BaseTaskParams): Promise<any> {
       throw new Error(error.message || 'Failed to create task');
     }
 
-    // Use InvalidationRouter for centralized cache invalidation
-    try {
-      if (typeof window !== 'undefined') {
-        const { invalidationRouter } = await import('@/shared/lib/InvalidationRouter');
-        invalidationRouter.taskCreated({
-          projectId: taskParams.project_id,
-          taskId: data?.task_id
-        });
-        console.log('[PollingBreakageIssue] [createTask] Emitted TASK_CREATED domain event');
-      }
-    } catch {}
+    // Task creation events are now handled by DataFreshnessManager via realtime events
+    // No manual invalidation needed - the smart polling system handles cache updates automatically
+    console.log('[PollingBreakageIssue] [createTask] Task created - DataFreshnessManager will handle cache updates via realtime events');
 
     return data;
   } catch (err: any) {

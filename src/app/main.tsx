@@ -25,7 +25,6 @@ if (import.meta.env.NODE_ENV === 'development') {
 
 // Import cache validator for debugging (only in development)
 if (import.meta.env.DEV) {
-  import('../shared/lib/cacheValidationDebugger');
   import('../shared/lib/simpleCacheValidator');
 }
 

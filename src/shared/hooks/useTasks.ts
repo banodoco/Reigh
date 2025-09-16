@@ -5,8 +5,8 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useProject } from '../contexts/ProjectContext';
 import { filterVisibleTasks, isTaskVisible } from '@/shared/lib/taskConfig';
-import { invalidationRouter } from '@/shared/lib/InvalidationRouter';
-import { useStandardizedPolling, RecentActivityDetectors } from '@/shared/hooks/useResurrectionPolling';
+// Removed invalidationRouter - DataFreshnessManager handles all invalidation logic
+import { useSmartPollingConfig } from '@/shared/hooks/useSmartPolling';
 
 const TASKS_QUERY_KEY = 'tasks';
 
@@ -124,19 +124,14 @@ export const useCreateTask = (options?: { showToast?: boolean }) => {
           timestamp: Date.now()
         });
         
-        // Emit domain event - InvalidationRouter handles all canonical invalidations
-        invalidationRouter.taskCreated({ 
-          projectId: selectedProjectId,
-          taskId: data?.task_id 
-        });
+        // Task creation event is now handled by DataFreshnessManager via realtime events
         
         console.log('[TasksPaneCountMismatch] [useCreateTask] Domain event emitted - InvalidationRouter will handle all invalidations');
         
         // Do NOT invalidate other pages - they'll update via realtime/polling
       } else {
-        // Fallback: emit event without project context
-        console.log('[useCreateTask] Emitting task created event for unknown project');
-        invalidationRouter.taskCreated({ projectId: 'unknown' });
+        // Fallback: no manual invalidation needed - DataFreshnessManager handles it
+        console.log('[useCreateTask] Task created without project context - DataFreshnessManager will handle updates');
       }
     },
     onError: (error: Error, variables) => {
@@ -167,14 +162,7 @@ export const useUpdateTaskStatus = () => {
       return data;
     },
     onSuccess: (data, variables) => {
-      // Emit domain event for task status change
-      if (data?.project_id) {
-        invalidationRouter.taskStatusChanged({ 
-          projectId: data.project_id, 
-          taskId: variables.taskId,
-          status: variables.status
-        });
-      }
+      // Task status change event is now handled by DataFreshnessManager via realtime events
     },
     onError: (error: Error) => {
       console.error('Error updating task status:', error);
@@ -275,18 +263,8 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
   const { projectId, status, limit = 50, offset = 0 } = params;
   const page = Math.floor(offset / limit) + 1;
   
-  // 🎯 LIVE POLLING: Use gallery-style polling for more responsive task updates
-  const { refetchInterval, refetchIntervalInBackground } = useStandardizedPolling(
-    'Tasks',
-    { projectId, page, status },
-    {
-      hasRecentActivity: RecentActivityDetectors.paginatedTasks,
-      fastInterval: 5000,         // 5s for active tasks (faster than gallery's 15s)
-      resurrectionInterval: 30000, // 30s for inactive state (faster than gallery's 45s) 
-      initialInterval: 3000,      // 3s initial (faster than gallery's 30s)
-      staleThreshold: 15000       // 15 seconds = stale (faster than gallery's 60s)
-    }
-  );
+  // 🎯 SMART POLLING: Use DataFreshnessManager for intelligent polling decisions
+  const smartPollingConfig = useSmartPollingConfig([TASKS_QUERY_KEY, 'paginated', projectId]);
   
   // [TasksPaneCountMismatch] Debug unexpected limit values
   if (limit < 10) {
@@ -589,13 +567,12 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
     // CRITICAL: Gallery cache settings - prevent background refetches
     // Keep previous page's data visible during refetches to avoid UI blanks
     placeholderData: (previousData) => previousData,
-    staleTime: 10 * 1000, // 10 seconds - allow standardized polling to work properly
     gcTime: 5 * 60 * 1000, // 5 minutes  
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
-    // 🎯 LIVE POLLING: Network-aware, jittered, healing-window-aware polling with background updates
-    refetchInterval,
-    refetchIntervalInBackground: true // Enable background polling like the gallery
+    // 🎯 SMART POLLING: Intelligent polling based on realtime health
+    ...smartPollingConfig,
+    refetchIntervalInBackground: true // Enable background polling
   });
   
   // [TasksPaneCountMismatch] CRITICAL DEBUG: Log the actual query state to catch cache/stale issues
@@ -641,7 +618,7 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
   const meetsStaleThreshold = dataAge > hiddenStaleThresholdMs;
 
   if (isProcessingFilter && hasStaleEmptyData && query.status === 'success' && meetsStaleThreshold && timeSinceLastRefetch > minBackoffMs) {
-    console.error('[TasksPaneCountMismatch] NUCLEAR REFETCH: Processing query has empty data but is marked success!', {
+    console.warn('[TasksPaneCountMismatch] NUCLEAR REFETCH: Processing query has empty data but is marked success!', {
       queryDebugInfo,
       forcingRefetch: true,
       reason: 'Processing filter with empty data should refetch',
@@ -801,13 +778,7 @@ export const useCancelTask = (projectId: string | null) => {
     mutationFn: cancelTask,
     onSuccess: (_, taskId) => {
       console.log(`[${Date.now()}] [useCancelTask] Task cancelled, emitting domain event for projectId:`, projectId);
-      // Emit domain event for task cancellation
-      if (projectId) {
-        invalidationRouter.emit({ 
-          type: 'TASK_CANCELLED', 
-          payload: { projectId, taskId } 
-        });
-      }
+      // Task cancellation event is now handled by DataFreshnessManager via realtime events
     },
     onError: (error: Error) => {
       console.error('Error cancelling task:', error);
@@ -824,13 +795,7 @@ export const useCancelPendingTasks = () => {
     mutationFn: cancelPendingTasks,
     onSuccess: (data, projectId) => {
       console.log(`[${Date.now()}] [useCancelPendingTasks] Tasks cancelled, emitting batch domain event for projectId:`, projectId);
-      // Emit batch domain event for multiple task cancellations
-      if (projectId) {
-        invalidationRouter.emit({ 
-          type: 'TASKS_BATCH_UPDATE', 
-          payload: { projectId, taskIds: [] } 
-        });
-      }
+      // Task batch cancellation event is now handled by DataFreshnessManager via realtime events
     },
     onError: (error: Error) => {
       console.error('Error cancelling pending tasks:', error);
@@ -844,15 +809,8 @@ export const useCancelAllPendingTasks = useCancelPendingTasks;
 
 // Hook to get status counts for indicators
 export const useTaskStatusCounts = (projectId: string | null) => {
-  // 🎯 LIVE POLLING: Use faster polling for status counts to keep badges current
-  const { refetchInterval, refetchIntervalInBackground } = useStandardizedPolling(
-    'TaskStatusCounts',
-    { projectId },
-    {
-      staticInterval: 3000, // 3 seconds - faster status updates
-      disableBackgroundPolling: false // Keep polling in background
-    }
-  );
+  // 🎯 SMART POLLING: Use DataFreshnessManager for intelligent polling decisions
+  const smartPollingConfig = useSmartPollingConfig(['task-status-counts', projectId]);
 
   return useQuery({
     queryKey: ['task-status-counts', projectId],
@@ -1014,9 +972,8 @@ export const useTaskStatusCounts = (projectId: string | null) => {
       return result;
     },
     enabled: !!projectId,
-    staleTime: 3 * 1000, // 3 seconds - faster refresh for live updates
-    // 🎯 LIVE POLLING: Network-aware, jittered, healing-window-aware polling with background updates
-    refetchInterval,
+    // 🎯 SMART POLLING: Intelligent polling based on realtime health
+    ...smartPollingConfig,
     refetchIntervalInBackground: true, // Enable background polling like the gallery
   });
 }; 

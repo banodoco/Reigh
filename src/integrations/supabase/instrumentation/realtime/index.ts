@@ -1,14 +1,13 @@
 import { __CORRUPTION_TRACE_ENABLED__, __REALTIME_DOWN_FIX_ENABLED__ } from '@/integrations/supabase/config/env';
 import { captureRealtimeSnapshot, getEffectiveRealtimeSocket } from '@/integrations/supabase/utils/snapshot';
 import { __CORRUPTION_TIMELINE__, addCorruptionEvent } from '@/integrations/supabase/utils/timeline';
-import { InstrumentationManager } from '../InstrumentationManager';
 
 export function installRealtimeInstrumentation(supabase: any) {
-  // Use InstrumentationManager for centralized control
-  return InstrumentationManager.installRealtimeWithClient(supabase);
+  // InstrumentationManager removed - calling legacy function directly
+  return installRealtimeInstrumentationLegacy(supabase);
 }
 
-// Legacy function for backward compatibility - now delegates to InstrumentationManager
+// Legacy function for backward compatibility - direct implementation
 export function installRealtimeInstrumentationLegacy(supabase: any) {
   if (typeof window === 'undefined' || !supabase?.realtime) return;
   const realtime: any = supabase.realtime;

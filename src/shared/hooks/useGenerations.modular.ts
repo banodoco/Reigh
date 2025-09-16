@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tansta
 import { GeneratedImageWithMetadata } from '@/shared/components/ImageGallery';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { useResurrectionPollingConfig, RecentActivityDetectors } from './useResurrectionPolling';
+import { useSmartPollingConfig } from './useSmartPolling';
 import { useQueryDebugLogging, QueryDebugConfigs } from './useQueryDebugLogging';
 
 /**
@@ -45,18 +45,8 @@ export function useGenerationsModular(
   const queryClient = useQueryClient();
   const queryKey = ['unified-generations', 'project', projectId, page, limit, filters];
 
-  // 🎯 MODULAR POLLING: Configure resurrection polling with specific settings for generations
-  const { refetchInterval } = useResurrectionPollingConfig(
-    'ImageGallery', // Debug tag
-    { projectId, page, filters }, // Context for logging
-    {
-      // Custom config for generations
-      hasRecentActivity: RecentActivityDetectors.generations,
-      fastInterval: 15000,        // 15s when recent generations exist
-      resurrectionInterval: 45000, // 45s for stale data recovery
-      initialInterval: 30000      // 30s when no data
-    }
-  );
+  // 🎯 SMART POLLING: Use DataFreshnessManager for intelligent polling decisions
+  const smartPollingConfig = useSmartPollingConfig(['unified-generations', 'project', projectId]);
 
   const result = useQuery<GenerationsPaginatedResponse, Error>({
     queryKey,
@@ -69,8 +59,8 @@ export function useGenerationsModular(
     staleTime: 10 * 1000,
     gcTime: 10 * 60 * 1000,
     
-    // 🎯 MODULAR POLLING: Use the configured resurrection polling
-    refetchInterval,
+    // 🎯 SMART POLLING: Intelligent polling based on realtime health
+    ...smartPollingConfig,
     refetchIntervalInBackground: true, // Continue polling when tab inactive
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,

@@ -1,203 +1,188 @@
 # Realtime System
 
-This document describes the implemented unified realtime and polling system used to keep the UI instantly in sync with backend changes, while remaining resilient during connectivity issues ("dead mode"). It complements the migration blueprint in `structure_detail/realtime_simplification_plan.md` by documenting the final architecture and how to work with it.
+This document describes the current realtime system used to keep the UI in sync with backend changes. The design favors the official Supabase Realtime patterns, immediate React Query invalidation for fast UI updates, and a smart polling fallback that adapts when realtime is degraded.
 
 ## Goals
-- Instant, predictable updates for galleries, tasks, and shots
-- Simple, centralized ownership of realtime channels
-- Safe fallback when realtime is degraded or offline
-- Consistent, canonical React Query keys for cache invalidation
-- Clear debugability with minimal performance overhead
+- Simple, reliable realtime updates using standard Supabase patterns
+- Immediate UI updates via React Query invalidation
+- Smart polling fallback driven by data freshness when realtime is degraded
+- Clear separation between transport (Supabase), coordination (provider/manager), and presentation (components)
+- Easy debugging and observability
 
 ## High-Level Architecture
-- AuthStateManager centralizes all authentication state changes (eliminates race conditions)
-- ReconnectScheduler centralizes all reconnection intents (prevents reconnect races)
-- RealtimeProvider owns all Supabase channels and emits events
-- InvalidationRouter translates events into React Query invalidations
-- Unified Query Keys provide a canonical way to address caches
-- Resurrection Polling guarantees freshness when realtime is down
+- SimpleRealtimeManager handles all Supabase channel operations
+- SimpleRealtimeProvider bridges realtime events to React and invalidates React Query
+- DataFreshnessManager tracks freshness to drive smart polling for queries
 
 ```text
-UI ↔ React Query cache ← InvalidationRouter ← RealtimeProvider ← Supabase
-                                    ↑                    ↑
-                         useResurrectionPolling    AuthStateManager
-                              (fallback)               ↓
-                                            ReconnectScheduler
-                                         (reconnect coordination)
+Supabase ──▶ SimpleRealtimeManager ──▶ (window) Custom Events
+                                │
+                                ▼
+                     SimpleRealtimeProvider ──▶ React Query (invalidate)
+                                │
+                                ▼
+                      DataFreshnessManager ──▶ Smart polling (fallback)
+
+UI Components ◀──────── React Query cache (data)
 ```
 
 ## Components & Files
 
-- AuthStateManager
-  - Path: `src/integrations/supabase/auth/AuthStateManager.ts` (initialized in `client.ts`)
+- SimpleRealtimeManager
+  - Path: `src/shared/realtime/SimpleRealtimeManager.ts`
   - Responsibilities:
-    - Single source of truth for all `onAuthStateChange` events
-    - Processes core auth logic FIRST (realtime auth sync, healing)
-    - Notifies component subscribers in predictable order
-    - Eliminates race conditions between multiple auth listeners
-    - Components subscribe via: `authManager.subscribe('ComponentName', callback)`
-
-- ReconnectScheduler
-  - Path: `src/integrations/supabase/reconnect/ReconnectScheduler.ts` (initialized in `client.ts`)
-  - Responsibilities:
-    - Centralizes all reconnection intents from multiple sources
-    - Coalesces and debounces reconnect requests (1s debounce, 5s minimum interval)
-    - Prevents race conditions between AuthManager, console warn interceptor, and other triggers
-    - Dispatches single `realtime:auth-heal` event with coalesced metadata
-    - Priority-based processing (high > medium > low)
-
-- RealtimeProvider
-  - Path: `src/shared/providers/RealtimeProvider.tsx`
-  - Responsibilities:
-    - Creates a project-scoped Supabase channel: `task-updates:${projectId}`
+    - Creates and manages a single Supabase channel per project: `task-updates:${projectId}`
+    - Follows official pattern: `channel.on(...).on(...).subscribe(cb)`
     - Subscribes to:
       - Broadcast: `task-update`
-      - Postgres changes: `tasks` (INSERT/UPDATE), `generations` (INSERT), `shot_generations` (*)
-    - Converts payloads into domain events and forwards them to `InvalidationRouter`
-    - Exposes minimal connection state via `useRealtime()` for diagnostics
+      - Postgres changes: `tasks` table (INSERT/UPDATE) filtered by `project_id`
+    - Emits DOM events for React consumption: `realtime:task-update`, `realtime:task-new`
+    - Reports events and connection status to `DataFreshnessManager`
 
-- InvalidationRouter
-  - Path: `src/shared/lib/InvalidationRouter.ts`
+- SimpleRealtimeProvider
+  - Path: `src/shared/providers/SimpleRealtimeProvider.tsx`
   - Responsibilities:
-    - Accepts domain events and performs targeted, canonical invalidations
-    - Coalesces frequent invalidations with a 500ms flush to reduce thrash
+    - Manages connection lifecycle based on selected project
+    - Listens to custom DOM events and performs React Query invalidation
+    - Exposes connection state via `useSimpleRealtime()`
+    - Invalidates the following query key families on relevant events:
+      - `['tasks']`
+      - `['task-status-counts']`
+      - `['unified-generations']`
+      - `['shots']`
+      - `['unpositioned-count']`
+      - `['project-video-counts']`
 
-- Unified Query Keys
-  - Path: `src/shared/lib/queryKeys.ts`
-  - Builders:
-    - `unifiedGenerationsProjectKey(projectId, page?, limit?, filtersKey?, includeTaskData?)`
-    - `unifiedGenerationsShotKey(shotId, page?, limit?, filtersKey?, includeTaskData?)`
-  - Use these builders (or the raw array forms they produce) everywhere you query or invalidate unified generations.
-
-- Resurrection Polling
-  - Path: `src/shared/hooks/useResurrectionPolling.ts`
+- DataFreshnessManager
+  - Path: `src/shared/realtime/DataFreshnessManager.ts`
   - Responsibilities:
-    - Returns a `refetchInterval` that adapts to data staleness and visibility
-    - When realtime is disabled or down, guarantees a minimum polling interval
-    - Adds jitter and clamps to avoid synchronized bursts and long stalls
+    - Tracks last event times per query key family
+    - Tracks realtime connection status (connected/disconnected/error)
+    - Provides polling intervals and freshness diagnostics
+    - Integrated via `useSmartPolling` / `useSmartPollingConfig`
 
-- Legacy hook (temporary fallback)
-  - Path: `src/shared/hooks/useWebSocket.ts`
-  - Notes:
-    - The app no longer calls this by default. It remains available behind a kill-switch for safety during rollout.
+- useSimpleRealtime hook
+  - Path: `src/shared/hooks/useSimpleRealtime.ts`
+  - Responsibilities:
+    - Access connection state in React components
+    - Optional: consume last received event metadata for UI feedback
 
-## Runtime Configuration
-- Path: `src/shared/lib/config.ts`
-- Flags:
-  - `VITE_REALTIME_ENABLED` (default: true)
-    - Set to `false` to disable realtime and force polling-only mode.
-  - `VITE_LEGACY_LISTENERS_ENABLED` (default: false)
-    - Reserved to conditionally enable legacy listeners during debugging.
-  - `VITE_DEADMODE_FORCE_POLLING_MS` (optional)
-    - Base interval for forced polling when realtime is down. Jitter and visibility clamps apply.
+- RealtimeStatus Component (optional)
+  - Path: `src/shared/components/RealtimeStatus.tsx`
+  - Responsibilities:
+    - Visual indicator of realtime connection status and last event timestamps
+    - Useful for debugging and user feedback
 
-## Event → Invalidation Map (Canonical)
+## Event Handling
 
-- GENERATION_INSERT / GENERATION_UPDATE / GENERATION_DELETE
-  - Payload: `{ projectId, shotId? }`
-  - Invalidations:
-    - `['unified-generations', 'project', projectId]`
-    - If `shotId`: `['unified-generations', 'shot', shotId]` and `['unpositioned-count', shotId]`
-    - Also nudges `['shots', projectId]` when relevant to lists
+### Supabase Channel Events (current coverage)
+- Broadcast: `task-update`
+- Postgres changes: `tasks` (INSERT, UPDATE), filtered by `project_id`
 
-- SHOT_GENERATION_CHANGE (any change in `shot_generations`)
-  - Payload: `{ projectId, shotId }`
-  - Invalidations:
-    - `['unified-generations', 'project', projectId]`
-    - `['unified-generations', 'shot', shotId]`
-    - `['unpositioned-count', shotId]` (for position changes affecting unpositioned generation count)
+Note: There is no direct subscription to the `generations` table. Generation-related UI stays in sync via task-driven events and React Query invalidation.
 
-- TASK_STATUS_CHANGE (INSERT/UPDATE in `tasks`)
-  - Payload: `{ projectId }`
-  - Invalidations:
-    - `['task-status-counts', projectId]`
-    - `['tasks', 'paginated', projectId, 1]`
+### Custom DOM Events
+- `realtime:task-update` — fired when task updates are received
+- `realtime:task-new` — fired when new tasks are created
 
-- GENERATIONS_UPDATED (broadcast convenience)
-  - Payload: `{ projectId, shotId? }`
-  - Invalidations:
-    - `['unified-generations', 'project', projectId]`
-    - If `shotId`: `['unified-generations', 'shot', shotId]`
+### React Query Invalidation (primary mechanism)
+On realtime events, the provider invalidates these query key families:
+- `['tasks']` — paginated tasks, single task queries, etc.
+- `['task-status-counts']` — counts used by task panes and badges
+- `['unified-generations']` — all variants (project/shot/paginated)
+- `['shots']` — shot lists and shot details influenced by task outcomes
+- `['unpositioned-count']` — per-shot generation counts
+- `['project-video-counts']` — aggregated video counts by project
 
-Note: InvalidationRouter batches invalidations within a 500ms window to reduce redundant refetches under bursty updates.
+React Query invalidation uses prefix matching, so the families above cover concrete keys such as:
+- `['tasks', 'paginated', projectId, page, limit, status]`
+- `['task-status-counts', projectId]`
+- `['unified-generations', 'project', projectId, page, limit, filters]`
+- `['unified-generations', 'shot', shotId]`
+- `['shots', projectId]`
+- `['unpositioned-count', shotId]`
+- `['project-video-counts', projectId]`
 
-## Polling in Dead Mode
-- When realtime is down or disabled, `useResurrectionPolling` guarantees fresh data by:
-  - Returning a minimum interval (default 5s in visible, min 15s when hidden)
-  - Applying jitter (~±1s) to avoid herding
-  - Clamping overly long intervals (ensuring periodic refresh)
-- Visibility recovery:
-  - On `visibilitychange` → when becoming visible, the app immediately invalidates critical caches and nudges realtime to reconnect.
+## Smart Polling Fallback
 
-## Using Unified Keys in New Code
+When realtime is degraded or temporarily unavailable, queries that opt in to smart polling use:
+- `useSmartPolling` / `useSmartPollingConfig` (path: `src/shared/hooks/useSmartPolling.ts`)
+- Polling intervals are derived from `DataFreshnessManager` and typically behave as:
+  - Realtime connected with recent events (<30s): ~30s polling
+  - Realtime connected but events aging: ~10–15s polling
+  - Realtime disconnected/error: ~5s aggressive polling
 
-- Querying project-wide unified generations:
-```ts
-import { unifiedGenerationsProjectKey } from '@/shared/lib/queryKeys';
+This fallback complements (but does not replace) direct invalidation. With a healthy realtime connection, UI updates are immediate due to invalidation; smart polling ensures resilience.
 
-const key = unifiedGenerationsProjectKey(projectId, page, limit, filtersKey, includeTaskData);
-const { data } = useQuery({ queryKey: key, queryFn: fetchUnifiedProjectGenerations });
-```
+## Usage Examples
 
-- Invalidating after a mutation:
-```ts
-queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', projectId] });
-if (shotId) {
-  queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shotId] });
+### Basic Setup (already configured in `App.tsx`)
+```tsx
+import { SimpleRealtimeProvider } from '@/shared/providers/SimpleRealtimeProvider';
+
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <ProjectProvider>
+        <SimpleRealtimeProvider>
+          {/* Your app components */}
+        </SimpleRealtimeProvider>
+      </ProjectProvider>
+    </QueryClientProvider>
+  );
 }
 ```
 
-- Do not use legacy keys like `['generations', projectId]` or `['all-shot-generations', shotId]`.
+### Using Connection Status
+```tsx
+import { useSimpleRealtime } from '@/shared/providers/SimpleRealtimeProvider';
 
-## Realtime Flows
+function MyComponent() {
+  const { isConnected, isConnecting, error } = useSimpleRealtime();
+  
+  return (
+    <div>
+      Status: {isConnected ? 'Connected' : isConnecting ? 'Connecting...' : 'Disconnected'}
+      {error && <div>Error: {error}</div>}
+    </div>
+  );
+}
+```
 
-1) Task completion → Gallery refresh
-- Postgres `tasks` UPDATE status → RealtimeProvider → TASK_STATUS_CHANGE → invalidate tasks counts + paginated tasks
-- If completed, also emit GENERATIONS_UPDATED → invalidate unified project (and shot if available)
+### Listening to Custom Events
+```tsx
+useEffect(() => {
+  const onUpdate = (event: any) => console.log('Task update event', event.detail);
+  const onNew = (event: any) => console.log('New task event', event.detail);
+  window.addEventListener('realtime:task-update', onUpdate as EventListener);
+  window.addEventListener('realtime:task-new', onNew as EventListener);
+  return () => {
+    window.removeEventListener('realtime:task-update', onUpdate as EventListener);
+    window.removeEventListener('realtime:task-new', onNew as EventListener);
+  };
+}, []);
+```
 
-2) New generation persisted
-- Postgres `generations` INSERT → GENERATION_INSERT → invalidate unified project + shot (if known)
+## Observability & Debugging
 
-3) Shot association changes
-- Postgres `shot_generations` any change → SHOT_GENERATION_CHANGE → invalidate unified project + shot
+### Console Logs (key prefixes)
+- `[SimpleRealtime]` — channel join/leave, event delivery, status
+- `[SimpleRealtimeProvider]` — provider lifecycle
+- `[TasksPaneRealtimeDebug]` — end-to-end invalidation + query freshness
+- `[DataFreshness]` — freshness state, intervals, subscribers
+- `[SmartPolling]` — polling updates per query key
 
-## Resilience & Backoff
-- The provider does not loop aggressively; reconnects are handled by Supabase + visibility nudges
-- The legacy hook (if enabled) implements exponential backoff and channel re-subscription
-- Polling guarantees liveness when realtime is degraded
+### Runtime Diagnostics
+- `window.__REALTIME_SNAPSHOT__` — last channel state and event time
+- `window.__DATA_FRESHNESS_MANAGER__` — freshness manager instance (diagnostics available)
 
-## Multi-Tab Considerations
-- Each tab owns its own RealtimeProvider and channel
-- InvalidationRouter’s batching reduces pressure during bursts
-- React Query de-duplicates concurrent fetches at the key level
+### Common Checks
+1. Not receiving updates: verify channel status logs and project id
+2. UI not updating: ensure invalidated query key families match active queries
+3. Excess polling: check DataFreshness diagnostics and realtime connection state
 
-## Service Worker & Caching
-- If a service worker is added in the future, ensure network-first for API routes in dead mode to avoid stale data
-- This system expects fresh reads when invalidations occur
+## Notes & Limitations
+- The system currently subscribes to `tasks` changes only; generation-only updates are reflected through task-driven events and mutation-driven invalidations.
+- Invalidation uses broad key families to ensure all relevant variants refetch without bespoke wiring per consumer.
 
-## Debugging & Troubleshooting
-- Look for logs tagged `[DeadModeInvestigation]` and `[DeadModeRecovery]`
-- Look for logs tagged `[AuthManager]` for centralized auth state processing
-- `useRealtime()` (from RealtimeProvider) exposes connection state for UI/dev tools
-- Visibility changes log diagnostic context and trigger invalidations on focus
-
-Checklist when "Gallery not updating": 
-- Confirm invalidations target `['unified-generations', 'project', projectId]` and/or `['unified-generations', 'shot', shotId]`
-- Ensure relevant UI queries use unified keys
-- Check `VITE_REALTIME_ENABLED` and polling intervals
-- Check for auth race conditions: all components should use `authManager.subscribe()` not direct `onAuthStateChange`
-
-## Adding New Event Types
-1. Emit a domain event from RealtimeProvider based on broadcast/DB change
-2. Map it in `InvalidationRouter` to the minimal set of canonical keys
-3. Keep event payloads small: prefer `{ projectId, shotId }`
-
-## References
-- AuthManager: `src/integrations/supabase/auth/AuthStateManager.ts` (initialized in `client.ts`)
-- ReconnectScheduler: `src/integrations/supabase/reconnect/ReconnectScheduler.ts` (initialized in `client.ts`)
-- Provider: `src/shared/providers/RealtimeProvider.tsx`
-- Router: `src/shared/lib/InvalidationRouter.ts`
-- Keys: `src/shared/lib/queryKeys.ts`
-- Polling: `src/shared/hooks/useResurrectionPolling.ts`
-- Config: `src/integrations/supabase/config/env.ts`
-- Legacy (fallback only): `src/shared/hooks/useWebSocket.ts`
+Result: **Fast, reliable updates via direct invalidation, with intelligent polling as a resilient fallback.**

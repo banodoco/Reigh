@@ -5,7 +5,7 @@ import { Database } from '@/integrations/supabase/types';
 import { uploadImageToStorage } from '@/shared/lib/imageUploader';
 import { generateClientThumbnail, uploadImageWithThumbnail } from '@/shared/lib/clientThumbnailGenerator';
 import { toast } from 'sonner';
-import { invalidationRouter } from '@/shared/lib/InvalidationRouter';
+// Removed invalidationRouter - DataFreshnessManager handles all invalidation logic
 import React from 'react';
 import { log } from '@/shared/lib/logger';
 
@@ -85,11 +85,7 @@ export const useCreateShot = () => {
       return { shot: newShot, shouldSelectAfterCreation };
     },
     onSuccess: (result) => {
-      // Emit domain event for shot creation
-      invalidationRouter.shotCreated({
-        projectId: result.shot.project_id,
-        shotId: result.shot.id
-      });
+      // Shot creation events are now handled by DataFreshnessManager via realtime events
     },
     onError: (error: Error) => {
       console.error('Error creating shot:', error);
@@ -273,8 +269,7 @@ export const useDuplicateShot = () => {
     onSettled: (data, error, { projectId }) => {
       // Only invalidate on error - success case is handled in onSuccess
       if (error && projectId) {
-        // Emit domain event for shot update on error (to refresh)
-        invalidationRouter.shotUpdated({ projectId });
+        // Shot update events are now handled by DataFreshnessManager via realtime events
       }
     },
   });
@@ -450,10 +445,7 @@ export const useReorderShots = () => {
       // Invalidate queries to refresh from database and confirm the actual order
       if (projectId) {
         // Emit domain event for shot reordering
-        invalidationRouter.emit({
-          type: 'SHOT_REORDER',
-          payload: { projectId }
-        });
+        // Shot reorder events are now handled by DataFreshnessManager via realtime events
         console.log(`${REORDER_DEBUG_TAG} Emitted SHOT_REORDER event for project: ${projectId}`);
       }
     },
@@ -690,10 +682,7 @@ export const useAddImageToShot = () => {
       const { project_id, shot_id } = variables;
       
       if (project_id) {
-        invalidationRouter.shotGenerationChanged({
-          projectId: project_id,
-          shotId: shot_id
-        });
+        // Shot generation change events are now handled by DataFreshnessManager via realtime events
         // Also directly invalidate unpositioned-count for immediate UI update
         try {
           const qc = (window as any).__REACT_QUERY_CLIENT__;
@@ -777,10 +766,7 @@ export const useAddImageToShotWithoutPosition = () => {
       
       // Emit domain event for shot-generation change
       if (project_id) {
-        invalidationRouter.shotGenerationChanged({
-          projectId: project_id,
-          shotId: shot_id
-        });
+        // Shot generation change events are now handled by DataFreshnessManager via realtime events
         // Also directly invalidate unpositioned-count for immediate UI update
         try {
           const qc = (window as any).__REACT_QUERY_CLIENT__;
@@ -919,10 +905,7 @@ export const usePositionExistingGenerationInShot = () => {
       
       // Emit domain event for shot-generation change
       if (project_id) {
-        invalidationRouter.shotGenerationChanged({
-          projectId: project_id,
-          shotId: shot_id
-        });
+        // Shot generation change events are now handled by DataFreshnessManager via realtime events
       }
     },
     onError: (error: Error) => {
@@ -1168,10 +1151,7 @@ export const useDeleteShot = () => {
     },
     onSuccess: (_, { projectId, shotId }) => {
       // Emit domain event for shot deletion
-      invalidationRouter.emit({
-        type: 'SHOT_DELETED',
-        payload: { projectId, shotId }
-      });
+      // Shot deletion events are now handled by DataFreshnessManager via realtime events
 
     },
     onError: (error: Error) => {

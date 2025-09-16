@@ -4,7 +4,7 @@
 console.info('[ReconnectionIssue] 🔥 CLIENT.TS FILE LOADED AT:', new Date().toISOString());
 
 // EMERGENCY: Check if app is in infinite loop state
-console.error('[EMERGENCY] 🚨 CLIENT.TS STARTUP CHECK:', {
+console.info('[EMERGENCY] 🚨 CLIENT.TS STARTUP CHECK:', {
   timestamp: Date.now(),
   hasWindow: typeof window !== 'undefined',
   visibilityState: typeof document !== 'undefined' ? document.visibilityState : 'unknown',
@@ -16,15 +16,14 @@ import type { Database } from './types';
 import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, __IS_DEV_ENV__, __WS_INSTRUMENTATION_ENABLED__, __REALTIME_DOWN_FIX_ENABLED__, __CORRUPTION_TRACE_ENABLED__ } from '@/integrations/supabase/config/env';
 import { installWindowOnlyInstrumentation } from '@/integrations/supabase/instrumentation/window';
 import { installRealtimeInstrumentation } from '@/integrations/supabase/instrumentation/realtime';
-import { InstrumentationManager } from '@/integrations/supabase/instrumentation/InstrumentationManager';
+// Removed InstrumentationManager - system simplified
 import { captureRealtimeSnapshot } from '@/integrations/supabase/utils/snapshot';
 import { __CORRUPTION_TIMELINE__ } from '@/integrations/supabase/utils/timeline';
 import { initAuthStateManager } from '@/integrations/supabase/auth/AuthStateManager';
 import { getReconnectScheduler } from '@/integrations/supabase/reconnect/ReconnectScheduler';
 import { maybeAutoLogin } from '@/integrations/supabase/dev/autoLogin';
 
-// Initialize InstrumentationManager and install window-only instrumentation BEFORE any client creation
-InstrumentationManager.initialize();
+// Install window-only instrumentation BEFORE any client creation
 installWindowOnlyInstrumentation();
 
 // Log environment detection

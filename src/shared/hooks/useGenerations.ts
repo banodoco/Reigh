@@ -3,8 +3,9 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tansta
 import { GeneratedImageWithMetadata } from '@/shared/components/ImageGallery';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { useResurrectionPollingConfig, RecentActivityDetectors } from './useResurrectionPolling';
-import { invalidationRouter } from '@/shared/lib/InvalidationRouter';
+// Removed useResurrectionPolling - replaced by useSmartPolling
+// Removed invalidationRouter - DataFreshnessManager handles all invalidation logic
+import { useSmartPollingConfig } from './useSmartPolling';
 import { useQueryDebugLogging, QueryDebugConfigs } from './useQueryDebugLogging';
 
 /**
@@ -430,18 +431,8 @@ export function useGenerations(
   const queryKey = ['unified-generations', 'project', effectiveProjectId, page, limit, filters];
 
 
-  // 🎯 MODULAR POLLING: Configure resurrection polling with ImageGallery-specific settings
-  const { refetchInterval } = useResurrectionPollingConfig(
-    'ImageGallery', // Debug tag matches original logs
-    { projectId, page, filters }, // Context for logging
-    {
-      hasRecentActivity: RecentActivityDetectors.generations,
-      fastInterval: 15000,        // 15s when recent generations exist
-      resurrectionInterval: 45000, // 45s for stale data recovery  
-      initialInterval: 30000,     // 30s when no data
-      staleThreshold: 60000       // 1 minute = stale
-    }
-  );
+  // 🎯 SMART POLLING: Use DataFreshnessManager for intelligent polling decisions
+  const smartPollingConfig = useSmartPollingConfig(['generations', projectId]);
 
   const result = useQuery<GenerationsPaginatedResponse, Error>({
     queryKey: queryKey,
@@ -452,13 +443,12 @@ export function useGenerations(
     // Synchronously grab initial data from the cache on mount to prevent skeletons on revisit
     initialData: () => queryClient.getQueryData(queryKey),
     // Cache management to prevent memory leaks as pagination grows
-    staleTime: 10 * 1000, // 10 seconds - match task polling for consistency
     gcTime: 10 * 60 * 1000, // 10 minutes, slightly longer gcTime
-    
-    // 🎯 MODULAR POLLING: Use the configured resurrection polling function
-    refetchInterval,
-    refetchIntervalInBackground: true, // CRITICAL: Continue polling when tab is not visible
     refetchOnWindowFocus: false, // Prevent double-fetches
+    
+    // 🎯 SMART POLLING: Intelligent polling based on realtime health
+    ...smartPollingConfig,
+    refetchIntervalInBackground: true, // CRITICAL: Continue polling when tab is not visible
     refetchOnReconnect: false, // Prevent double-fetches
   });
 
@@ -491,14 +481,7 @@ export function useDeleteGeneration() {
       }
     },
     onSuccess: (data, variables) => {
-      // Emit domain event for generation location update
-      invalidationRouter.emit({
-        type: 'GENERATION_LOCATION_UPDATE',
-        payload: { 
-          projectId: data?.project_id,
-          generationId: variables.id 
-        }
-      });
+      // Generation location update events are now handled by DataFreshnessManager via realtime events
     },
     onError: (error: Error) => {
       console.error('Error deleting generation:', error);
@@ -515,14 +498,7 @@ export function useUpdateGenerationLocation() {
       return updateGenerationLocation(id, location);
     },
     onSuccess: (data, variables) => {
-      // Emit domain event for generation location update
-      invalidationRouter.emit({
-        type: 'GENERATION_LOCATION_UPDATE',
-        payload: {
-          projectId: variables.projectId, // Use projectId from variables since updateGenerationLocation returns void
-          generationId: variables.id
-        }
-      });
+      // Generation location update events are now handled by DataFreshnessManager via realtime events
     },
     onError: (error: Error) => {
       console.error('Error updating generation location:', error);
@@ -541,10 +517,7 @@ export function useCreateGeneration() {
         mutationFn: createGeneration,
         onSuccess: (data, variables) => {
       // Emit domain event for generation creation
-            invalidationRouter.generationInserted({
-              projectId: variables.projectId,
-              generationId: data?.id
-            });
+            // Generation insertion events are now handled by DataFreshnessManager via realtime events
         },
         onError: (error: Error) => {
       console.error('Error creating generation:', error);
@@ -643,13 +616,7 @@ export function useToggleGenerationStar() {
     onSuccess: (data, variables) => {
       console.log('[StarDebug:useToggleGenerationStar] onSuccess called', { variables, data });
       // Emit domain event for generation star toggle
-      invalidationRouter.emit({
-        type: 'GENERATION_STAR_TOGGLE',
-        payload: {
-          projectId: data?.project_id,
-          generationId: variables.id
-        }
-      });
+      // Generation star toggle events are now handled by DataFreshnessManager via realtime events
     },
     onSettled: () => {
       console.log('[StarDebug:useToggleGenerationStar] onSettled called - invalidating caches');
