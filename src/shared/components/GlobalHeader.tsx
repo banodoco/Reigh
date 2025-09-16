@@ -197,7 +197,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
     }
 
     // Default text when no stats
-    return "You've referred 0 visitors :(";
+    return "You've referred 0 visitors :(";p
   };
 
   const selectedProject = projects.find(p => p.id === selectedProjectId);
@@ -233,7 +233,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
           }}
         >
           {/* Left side - Brand + Project Selector */}
-          <div className="flex items-center space-x-6 pl-4 relative z-30">
+          <div className="flex items-center space-x-6 pl-2 relative z-30">
             {/* Brand */}
             <div 
               role="link"
@@ -253,14 +253,6 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                 </div>
               </div>
               
-              <div className="wes-symmetry relative">
-                <span className="hidden sm:inline font-theme text-3xl font-theme-bold tracking-wide text-primary text-shadow-vintage group-hover:animate-vintage-glow transition-all duration-300">
-                  Reigh
-                </span>
-                <div className="absolute -top-1 -right-2 pointer-events-none">
-                  <Star className="w-3 h-3 text-wes-vintage-gold animate-rotate-slow opacity-50" />
-                </div>
-              </div>
             </div>
 
             {/* Project Management */}

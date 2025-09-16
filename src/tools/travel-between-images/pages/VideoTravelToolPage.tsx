@@ -570,8 +570,11 @@ const VideoTravelToolPage: React.FC = () => {
               {showVideosView ? 'Videos' : 'Shots'}
             </h1>
             <button
-              onClick={() => setShowVideosView(!showVideosView)}
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors underline mb-1"
+              onClick={(e) => {
+                setShowVideosView(!showVideosView);
+                e.currentTarget.blur(); // Remove focus immediately after click
+              }}
+              className="text-sm text-muted-foreground hover:text-foreground focus:text-foreground transition-colors underline mb-1.5 focus:outline-none"
             >
               {showVideosView ? 'See all shots' : 'See all videos'}
             </button>
