@@ -68,7 +68,16 @@ export const useLoraSync = ({
   }, [selectedShot?.id, hasInitializedShot]);
 
   // Load shot-specific LoRAs when shot changes (only depend on data, not loraManager)
+  const lastEffectRunRef = useRef<string>('');
   useEffect(() => {
+    // Create a unique key for this effect run to prevent duplicate processing
+    const effectKey = `${selectedShot?.id}-${isShotLoraSettingsLoading}-${hasInitializedShot}-${availableLoras.length}`;
+    
+    // Skip if this exact combination has already been processed
+    if (effectKey === lastEffectRunRef.current) {
+      return;
+    }
+    
     const effectId = `${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
     console.log(`[LoRA:${effectId}] Effect triggered for shot: ${selectedShot?.id}`);
     
@@ -83,6 +92,9 @@ export const useLoraSync = ({
       });
       return;
     }
+    
+    // Mark this effect run as processed
+    lastEffectRunRef.current = effectKey;
     
     // Also ensure availableLoras are loaded
     if (!availableLoras || availableLoras.length === 0) {

@@ -741,9 +741,45 @@ export class ProjectChannelManager {
       timestamp: Date.now()
     });
 
+    // Enhanced state tracking before subscribe
+    const preSubscribeState = {
+      channelState: (this.channel as any)?.state,
+      socketState: (this.channel as any)?.socket?.readyState,
+      socketConnected: (this.channel as any)?.socket?.readyState === 1,
+      phoenixConnected: (this.channel as any)?.socket?.isConnected?.(),
+      timestamp: subscribeStartedAt
+    };
+    
+    console.error('[ChannelStateDebug] 📊 PRE-SUBSCRIBE STATE:', preSubscribeState);
+    
     const ref = await (this.channel as any).subscribe((status: any, response?: any) => {
       try {
         const elapsed = Date.now() - subscribeStartedAt;
+        
+        // Enhanced state tracking in callback
+        const postCallbackState = {
+          status,
+          response,
+          elapsed,
+          channelState: (this.channel as any)?.state,
+          socketState: (this.channel as any)?.socket?.readyState,
+          socketConnected: (this.channel as any)?.socket?.readyState === 1,
+          phoenixConnected: (this.channel as any)?.socket?.isConnected?.(),
+          timestamp: Date.now()
+        };
+        
+        console.error('[ChannelStateDebug] 📞 SUBSCRIBE CALLBACK - STATE CHANGE:', postCallbackState);
+        
+        // Log state transitions
+        if (status !== preSubscribeState.channelState) {
+          console.error('[ChannelStateDebug] 🔄 STATE TRANSITION DETECTED:', {
+            from: preSubscribeState.channelState,
+            to: status,
+            elapsed,
+            reason: response ? 'with-response' : 'no-response',
+            response
+          });
+        }
         
         // SUBSCRIPTION TIMEOUT DEBUG: Log every callback invocation
         this.logger.error('[SubscriptionTimeoutDebug] 📞 SUBSCRIBE CALLBACK INVOKED:', {
@@ -1018,6 +1054,14 @@ export class ProjectChannelManager {
         try {
           const now = Date.now();
           this.lastEventReceivedAt = now;
+          
+          console.error('[EventReceipt] 📨 TASK-UPDATE EVENT:', {
+            eventType: 'task-update',
+            topic: (this.channel as any)?.topic,
+            bumpLastEventAt: true,
+            timestamp: now
+          });
+          
           this.diagnostics.update({ lastEventAt: this.lastEventReceivedAt });
           const message = payload?.payload || {};
           this.diagnostics.bumpEvent(String(message?.type || 'broadcast'));
@@ -1389,15 +1433,73 @@ export class ProjectChannelManager {
 
     this.handlersAttached = true;
     
-    // IMMEDIATE binding check after attachment
-    const bindingsAfterAttach = this.getBindingsCount();
+    // IMMEDIATE binding check after attachment with both wrapper and inner inspection
+    const wrapperBindings = (this.channel as any).bindings || {};
+    const innerBindings = (this.channel as any)?.channel?.bindings || {};
+    
+    console.error('[BindingsDebug] 🔍 BINDING INSPECTION AFTER ATTACH:', {
+      topic: (this.channel as any)?.topic,
+      handlersAttached: true,
+      wrapperBindings: Object.keys(wrapperBindings).length,
+      innerBindings: Object.keys(innerBindings).length,
+      wrapperKeys: Object.keys(wrapperBindings),
+      innerKeys: Object.keys(innerBindings),
+      channelState: (this.channel as any)?.state,
+      timestamp: Date.now()
+    });
+    
     this.logger.warn('[ReconnectionIssue][HANDLER_ATTACH_COMPLETE]', {
       topic: (this.channel as any)?.topic,
       channelState: (this.channel as any)?.state,
-      bindingsAfterAttach,
+      bindingsAfterAttach: Object.keys(wrapperBindings).length,
       handlersAttached: this.handlersAttached,
       timestamp: Date.now()
     });
+
+    // Add channel lifecycle monitoring
+    if (this.channel && !(this.channel as any).__LIFECYCLE_HOOKED__) {
+      (this.channel as any).__LIFECYCLE_HOOKED__ = true;
+      
+      // Monitor channel close events
+      (this.channel as any).on('phx_close', (payload: any) => {
+        console.error('[ChannelLifecycle] 🚪 CHANNEL CLOSED BY SERVER:', {
+          topic: (this.channel as any)?.topic,
+          payload,
+          initiator: 'server',
+          sinceJoinMs: Date.now() - this.channelCreatedAt,
+          wrapperBindings: this.getBindingsCount(),
+          innerBindings: (this.channel as any)?.channel?.bindings ? Object.keys((this.channel as any).channel.bindings).length : 0,
+          channelState: (this.channel as any)?.state,
+          socketState: (this.channel as any)?.socket?.readyState,
+          timestamp: Date.now()
+        });
+      });
+
+      // Monitor channel error events
+      (this.channel as any).on('phx_error', (payload: any) => {
+        console.error('[ChannelLifecycle] ❌ CHANNEL ERROR:', {
+          topic: (this.channel as any)?.topic,
+          payload,
+          sinceJoinMs: Date.now() - this.channelCreatedAt,
+          wrapperBindings: this.getBindingsCount(),
+          innerBindings: (this.channel as any)?.channel?.bindings ? Object.keys((this.channel as any).channel.bindings).length : 0,
+          timestamp: Date.now()
+        });
+      });
+
+      // Monitor successful join replies
+      (this.channel as any).on('phx_reply', (payload: any) => {
+        console.error('[PhoenixJoinFlow] 📨 JOIN REPLY:', {
+          topic: (this.channel as any)?.topic,
+          event: 'phx_reply',
+          status: payload?.status,
+          payload,
+          elapsedSinceJoinPush: Date.now() - this.channelCreatedAt,
+          channelState: (this.channel as any)?.state,
+          timestamp: Date.now()
+        });
+      });
+    }
     
     // CRITICAL: Log channel subscription status after handlers are set up
     setTimeout(() => {

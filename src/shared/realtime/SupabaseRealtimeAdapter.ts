@@ -1276,12 +1276,47 @@ export class SupabaseRealtimeAdapter {
           const startTime = Date.now();
           await new Promise((resolve) => {
             const checkConnection = () => {
+              const currentTime = Date.now();
+              const elapsed = currentTime - startTime;
               const isNowConnected = conn?.transport?.readyState === 1 && conn?.isConnected?.();
+              
+        // Enhanced connection monitoring with transport shape analysis
+        const transportProps = conn?.transport ? Object.keys(conn.transport) : [];
+        const transportType = typeof conn?.transport;
+        
+        console.error('[ConnectionMonitorDebug] 🔄 CHECK #' + Math.floor(elapsed/100) + ':', {
+          elapsed,
+          isNowConnected,
+          transportReadyState: conn?.transport?.readyState,
+          transportReadyStateText: ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'][conn?.transport?.readyState] || 'UNKNOWN',
+          phoenixConnected: conn?.isConnected?.(),
+          willTimeout: elapsed > 2900,
+          nextCheckIn: elapsed < 3000 ? '100ms' : 'none',
+          timestamp: currentTime
+        });
+        
+        // Log transport shape details for calibration
+        if (Math.floor(elapsed/100) === 1) { // Only on second check
+          console.error('[TransportShapeDebug] 🔬 TRANSPORT ANALYSIS:', {
+            haveConn: !!conn,
+            haveTransport: !!conn?.transport,
+            transportType,
+            transportProps,
+            knownMethods: {
+              readyState: typeof conn?.transport?.readyState,
+              isConnected: typeof conn?.isConnected,
+              connect: typeof conn?.connect,
+              disconnect: typeof conn?.disconnect
+            },
+            timestamp: currentTime
+          });
+        }
+              
               if (isNowConnected) {
-                console.error('[PhoenixConnectionFix] ✅ PHOENIX SOCKET CONNECTED');
+                console.error('[PhoenixConnectionFix] ✅ PHOENIX SOCKET CONNECTED after', elapsed + 'ms');
                 resolve(true);
-              } else if (Date.now() - startTime > 3000) {
-                console.error('[PhoenixConnectionFix] ⏰ PHOENIX CONNECTION TIMEOUT');
+              } else if (elapsed > 3000) {
+                console.error('[PhoenixConnectionFix] ⏰ PHOENIX CONNECTION TIMEOUT after', elapsed + 'ms');
                 resolve(false);
               } else {
                 setTimeout(checkConnection, 100);

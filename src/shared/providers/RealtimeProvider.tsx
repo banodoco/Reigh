@@ -567,7 +567,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       }));
       // Expose minimal realtime snapshot for polling heuristics
       try {
-        (window as any).__REALTIME_SNAPSHOT__ = {
+        const newSnapshot = {
           channelState: diagnostics.snapshot.channelState,
           lastEventAt: diagnostics.snapshot.lastEventAt,
           channelRecreatedCount: diagnostics.snapshot.channelRecreatedCount,
@@ -575,7 +575,38 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
           channels,
           ts: Date.now(),
         };
-      } catch {}
+        
+        const oldSnapshot = (window as any).__REALTIME_SNAPSHOT__;
+        const snapshotChanged = !oldSnapshot || 
+          oldSnapshot.channelState !== newSnapshot.channelState ||
+          oldSnapshot.lastEventAt !== newSnapshot.lastEventAt ||
+          oldSnapshot.channels?.length !== newSnapshot.channels.length;
+        
+        if (snapshotChanged) {
+          console.error('[RealtimeSnapshotDebug] 📊 SNAPSHOT UPDATE:', {
+            changed: snapshotChanged,
+            oldChannelState: oldSnapshot?.channelState,
+            newChannelState: newSnapshot.channelState,
+            oldLastEventAt: oldSnapshot?.lastEventAt,
+            newLastEventAt: newSnapshot.lastEventAt,
+            oldLastEventDate: oldSnapshot?.lastEventAt ? new Date(oldSnapshot.lastEventAt).toISOString() : null,
+            newLastEventDate: newSnapshot.lastEventAt ? new Date(newSnapshot.lastEventAt).toISOString() : null,
+            timeSinceLastEvent: newSnapshot.lastEventAt ? Date.now() - newSnapshot.lastEventAt : null,
+            oldChannels: oldSnapshot?.channels?.length || 0,
+            newChannels: newSnapshot.channels.length,
+            diagnosticsSnapshot: diagnostics.snapshot,
+            timestamp: Date.now()
+          });
+        }
+        
+        (window as any).__REALTIME_SNAPSHOT__ = newSnapshot;
+      } catch (snapshotError) {
+        console.error('[RealtimeSnapshotDebug] ❌ Error updating snapshot:', {
+          error: snapshotError,
+          errorMessage: snapshotError?.message,
+          timestamp: Date.now()
+        });
+      }
     };
     sync();
     const unsub = diagnostics.subscribe(sync);

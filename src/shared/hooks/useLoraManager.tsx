@@ -355,19 +355,29 @@ export const useLoraManager = (
   // Auto-load saved LoRAs by default when they exist and no LoRAs are currently selected
   // BUT only if the user hasn't manually interacted (to prevent re-adding after manual removal)
   // Also skip entirely if disableAutoLoad flag is true
+  const autoLoadStateRef = useRef<string>('');
   useEffect(() => {
-    console.log(`[LoRAAutoLoad] Effect triggered - disableAutoLoad: ${disableAutoLoad}, enableProjectPersistence: ${enableProjectPersistence}, hasSavedLoras: ${hasSavedLoras}, selectedLorasLength: ${selectedLoras.length}, userHasManuallyInteracted: ${userHasManuallyInteracted}`);
-    
+    // Early exit if auto-load is disabled to prevent unnecessary logging
     if (disableAutoLoad) {
-      console.log(`[LoRAAutoLoad] Skipping - auto-load disabled`);
       return;
     }
+    
+    // Create state key to prevent duplicate processing
+    const stateKey = `${enableProjectPersistence}-${hasSavedLoras}-${selectedLoras.length}-${userHasManuallyInteracted}`;
+    if (stateKey === autoLoadStateRef.current) {
+      return; // Skip if state hasn't changed
+    }
+    
+    console.log(`[LoRAAutoLoad] Effect triggered - enableProjectPersistence: ${enableProjectPersistence}, hasSavedLoras: ${hasSavedLoras}, selectedLorasLength: ${selectedLoras.length}, userHasManuallyInteracted: ${userHasManuallyInteracted}`);
+    
     if (enableProjectPersistence && hasSavedLoras && selectedLoras.length === 0 && !userHasManuallyInteracted) {
       console.log(`[LoRAAutoLoad] Loading project LoRAs automatically`);
       handleLoadProjectLoras();
     } else {
       console.log(`[LoRAAutoLoad] Skipping - conditions not met`);
     }
+    
+    autoLoadStateRef.current = stateKey;
   }, [enableProjectPersistence, hasSavedLoras, selectedLoras.length, handleLoadProjectLoras, userHasManuallyInteracted, disableAutoLoad]);
 
   // No longer needed - using proper JSX with Tooltip components

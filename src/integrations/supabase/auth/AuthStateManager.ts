@@ -27,20 +27,25 @@ export class AuthStateManager {
       this.supabase?.realtime?.setAuth?.(session?.access_token ?? null);
       
       if (event === 'SIGNED_IN' && typeof window !== 'undefined') {
-        setTimeout(() => {
+        setTimeout(async () => {
           try {
             const now = Date.now();
             if (now - this.__LAST_AUTH_HEAL_AT__ > 5000) {
               this.__LAST_AUTH_HEAL_AT__ = now;
               
               // Use ReconnectScheduler instead of direct event dispatch
-              const { getReconnectScheduler } = require('@/integrations/supabase/reconnect/ReconnectScheduler');
-              const scheduler = getReconnectScheduler();
-              scheduler.requestReconnect({
-                source: 'AuthManager',
-                reason: `SIGNED_IN event (${event})`,
-                priority: 'high'
-              });
+              try {
+                const module = await import('@/integrations/supabase/reconnect/ReconnectScheduler');
+                const { getReconnectScheduler } = module;
+                const scheduler = getReconnectScheduler();
+                scheduler.requestReconnect({
+                  source: 'AuthManager',
+                  reason: `SIGNED_IN event (${event})`,
+                  priority: 'high'
+                });
+              } catch (importError) {
+                console.error('[AuthManager] ❌ Failed to import ReconnectScheduler:', importError);
+              }
             }
           } catch (healError) {
             console.error('[AuthManager] ❌ RECONNECT REQUEST FAILED:', healError);

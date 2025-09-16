@@ -439,35 +439,10 @@ python worker.py --db-type supabase \\
         style={modal.style}
         {...modal.props}
       >
-        {/* Top button container - positioned relative to DialogContent */}
-        {isMobile && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleSignOut}
-            className="absolute left-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-            style={{ top: isIpad ? 14 : undefined }}
-          >
-            <LogOut className="h-4 w-4" />
-            <span className="sr-only">Sign out</span>
-          </Button>
-        )}
         
         <div className={modal.headerClass}>
-          <DialogHeader className={`${modal.isMobile ? 'px-2 pt-2 pb-1' : 'px-2 pt-2 pb-1'} flex-shrink-0 relative`}>
+          <DialogHeader className={`${modal.isMobile ? 'px-2 pt-1 pb-1' : 'px-2 pt-1 pb-1'} flex-shrink-0 relative`}>
             <DialogTitle className="text-2xl md:mt-[11px]">App Settings</DialogTitle>
-            {!isMobile && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleSignOut}
-                className="absolute top-0 right-0 flex items-center gap-2 text-muted-foreground hover:text-foreground"
-                style={{ top: isIpad ? -2 : undefined }}
-              >
-                <LogOut className="h-4 w-4" />
-                Sign out
-              </Button>
-            )}
           </DialogHeader>
         </div>
         
@@ -477,7 +452,7 @@ python worker.py --db-type supabase \\
           className={`${modal.scrollClass} ${modal.isMobile ? 'px-2' : 'px-2'} overflow-x-visible [scrollbar-gutter:stable_both-edges] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] sm:[&::-webkit-scrollbar]:block sm:[-ms-overflow-style:auto] sm:[scrollbar-width:auto] sm:pr-4`}
         >
           {/* Generation Method Selection */}
-          <div className="mb-5">
+          <div className={`${isMobile ? 'mb-3' : 'mb-5'}`}>
           {/* Mobile header */}
           {isMobile && (
             <div className="mb-4">
@@ -591,7 +566,7 @@ python worker.py --db-type supabase \\
                   {/* Installation section */}
                   <div className="space-y-4">
                     {/* Computer Type Selection and API Token Display */}
-                    <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 items-start`}>
+                    <div className={`grid ${isMobile ? 'grid-cols-2 gap-3' : 'grid-cols-1 md:grid-cols-2 gap-4 md:gap-6'} items-start`}>
                       {/* Left: Computer Type Selection */}
                       <div className="space-y-2 sm:space-y-3">
                         <p className="text-sm font-light">What kind of computer do you have?</p>
@@ -698,7 +673,7 @@ python worker.py --db-type supabase \\
 
                     {computerType !== "mac" && (
                       <Tabs value={activeInstallTab} onValueChange={setActiveInstallTab} className="w-full">
-                        <TabsList className="grid w-full grid-cols-2 bg-gray-100 border border-gray-200 mb-6">
+                        <TabsList className="grid w-full grid-cols-2 bg-gray-100 border border-gray-200 mb-4">
                           <TabsTrigger 
                             value="need-install"
                             className="data-[state=active]:bg-white data-[state=active]:shadow-sm"
@@ -1151,8 +1126,14 @@ python worker.py --db-type supabase \\
             </div>
           )}
           
-          <DialogFooter className={`${modal.isMobile ? 'px-2 pt-6 pb-0' : 'px-2 pt-7 pb-0'} border-t relative z-20`}>
-            <Button variant="outline" onClick={() => onOpenChange(false)} className="w-full">
+          <DialogFooter className={`${modal.isMobile ? 'px-2 pt-6 pb-3 flex-row justify-between' : 'px-2 pt-7 pb-3'} border-t relative z-20`}>
+            <div className={`flex gap-2 ${modal.isMobile ? '' : 'mr-auto'}`}>
+              <Button variant="secondary" onClick={handleSignOut}>
+                <LogOut className="h-4 w-4 mr-2" />
+                Sign out
+              </Button>
+            </div>
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
               Close
             </Button>
           </DialogFooter>

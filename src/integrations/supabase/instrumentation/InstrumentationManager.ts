@@ -597,17 +597,49 @@ class InstrumentationManagerImpl {
       console.warn = function(...args: any[]) {
         const message = args.join(' ');
         if (message.includes('realtime=down') || message.includes('Polling boosted due to realtime=down')) {
-          try {
-            const { getReconnectScheduler } = require('@/integrations/supabase/reconnect/ReconnectScheduler');
-            const scheduler = getReconnectScheduler();
-            scheduler.requestReconnect({
-              source: 'ConsoleWarnInterceptor',
-              reason: 'realtime=down detected in console output',
-              priority: 'medium'
-            });
-          } catch (error) {
-            InstrumentationManager.getDiagnosticsChannel().error('RealtimeDownFix', 'RECONNECT REQUEST FAILED', { error });
-          }
+          console.log('[RealtimeDownFix] 🔍 DETECTED realtime=down, attempting reconnect...', { 
+            message: message.slice(0, 100) + '...',
+            timestamp: Date.now()
+          });
+          
+          // Use async IIFE to handle dynamic import
+          (async () => {
+            try {
+              console.log('[RealtimeDownFix] 📦 Attempting to import ReconnectScheduler...');
+              const module = await import('@/integrations/supabase/reconnect/ReconnectScheduler');
+              const { getReconnectScheduler } = module;
+              console.log('[RealtimeDownFix] ✅ ReconnectScheduler module loaded successfully');
+              
+              console.log('[RealtimeDownFix] 🏭 Getting scheduler instance...');
+              const scheduler = getReconnectScheduler();
+              console.log('[RealtimeDownFix] ✅ Scheduler instance obtained:', { 
+                schedulerExists: !!scheduler,
+                schedulerType: typeof scheduler,
+                hasRequestReconnect: typeof scheduler?.requestReconnect
+              });
+              
+              console.log('[RealtimeDownFix] 📞 Calling requestReconnect...');
+              scheduler.requestReconnect({
+                source: 'ConsoleWarnInterceptor',
+                reason: 'realtime=down detected in console output',
+                priority: 'medium'
+              });
+              console.log('[RealtimeDownFix] ✅ requestReconnect called successfully');
+              
+            } catch (error) {
+              console.error('[RealtimeDownFix] ❌ DETAILED ERROR ANALYSIS:', {
+                error,
+                errorMessage: error?.message,
+                errorStack: error?.stack,
+                errorName: error?.name,
+                errorConstructor: error?.constructor?.name,
+                errorKeys: error ? Object.keys(error) : [],
+                errorStringified: JSON.stringify(error, null, 2),
+                timestamp: Date.now()
+              });
+              InstrumentationManager.getDiagnosticsChannel().error('RealtimeDownFix', 'RECONNECT REQUEST FAILED', { error });
+            }
+          })();
         }
         return originalConsoleWarn.apply(this, args as any);
       } as any;

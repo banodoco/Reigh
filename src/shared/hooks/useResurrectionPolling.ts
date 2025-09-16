@@ -267,6 +267,30 @@ export function createResurrectionPollingFunction(config: ResurrectionPollingCon
         const sinceLastEvent = snap?.lastEventAt ? (now - snap.lastEventAt) : null;
         const channelState = snap?.channelState;
         const degraded = channelState !== 'joined' || (sinceLastEvent != null && sinceLastEvent > 15000);
+        
+        // Enhanced degradation analysis
+        const degradationReasons = [];
+        if (channelState !== 'joined') {
+          degradationReasons.push(`channel_not_joined:${channelState}`);
+        }
+        if (sinceLastEvent != null && sinceLastEvent > 15000) {
+          degradationReasons.push(`no_events_for:${Math.round(sinceLastEvent/1000)}s`);
+        }
+        
+        console.error('[RealtimePollingDebug] 🔍 DEGRADATION CHECK:', {
+          debugTag,
+          degraded,
+          degradationReasons,
+          channelState,
+          sinceLastEventMs: sinceLastEvent,
+          sinceLastEventSec: sinceLastEvent ? Math.round(sinceLastEvent/1000) : null,
+          lastEventAt: snap?.lastEventAt,
+          lastEventDate: snap?.lastEventAt ? new Date(snap.lastEventAt).toISOString() : null,
+          snapshotKeys: snap ? Object.keys(snap) : null,
+          fullSnapshot: snap,
+          timestamp: now
+        });
+        
         if (degraded) {
           const interval = addJitter(8000, 1000);
           if (runtimeConfig.RECONNECTION_LOGS_ENABLED) {
@@ -275,12 +299,20 @@ export function createResurrectionPollingFunction(config: ResurrectionPollingCon
               intervalMs: interval,
               channelState,
               sinceLastEventMs: sinceLastEvent,
+              degradationReasons,
               snapshot: snap,
             });
           }
           return interval;
         }
-      } catch {}
+      } catch (snapshotError) {
+        console.error('[RealtimePollingDebug] ❌ Error checking realtime snapshot:', {
+          error: snapshotError,
+          errorMessage: snapshotError?.message,
+          debugTag,
+          timestamp: Date.now()
+        });
+      }
       if (runtimeConfig.RECONNECTION_LOGS_ENABLED) {
         console.log(`[Polling:${debugTag}] Fresh; rely on realtime`, {
           ...baseLogContext,
