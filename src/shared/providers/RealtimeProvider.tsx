@@ -417,9 +417,30 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     try {
       console.warn('[SilentRejoinDebug] 📞 STEP 1: Getting session...', { timestamp: Date.now() });
       const { data: { session } } = await supabase.auth.getSession();
+      
+      // Enhanced auth validation logging
+      const now = Date.now();
+      const tokenExpiresAt = session?.expires_at;
+      const isTokenExpired = tokenExpiresAt ? (now / 1000) > tokenExpiresAt : null;
+      const timeToExpiry = tokenExpiresAt ? tokenExpiresAt - (now / 1000) : null;
+      
+      console.warn('[AuthDebug] Session validation:', {
+        hasSession: !!session,
+        hasToken: !!session?.access_token,
+        tokenLength: session?.access_token?.length,
+        tokenPrefix: session?.access_token ? session.access_token.slice(0, 20) + '...' : null,
+        expiresAt: tokenExpiresAt,
+        isTokenExpired,
+        timeToExpirySeconds: timeToExpiry,
+        sessionKeys: session ? Object.keys(session) : null,
+        timestamp: now
+      });
+      
       console.warn('[SilentRejoinDebug] ✅ STEP 1 COMPLETE: Got session', { 
         hasSession: !!session, 
         hasToken: !!session?.access_token,
+        isTokenExpired,
+        timeToExpirySeconds: timeToExpiry,
         timestamp: Date.now() 
       });
       
@@ -925,6 +946,42 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   }, [selectedProjectId, rejoinLikeInitial, queryClient]);
 
   // Watchdog: if not joined, perform the same join routine
+  // Add listener for realtime:auth-heal events to debug reconnection attempts
+  React.useEffect(() => {
+    const handleReconnectEvent = (event: CustomEvent) => {
+      console.warn('[ReconnectDebug] 🔄 RECONNECT EVENT RECEIVED:', {
+        source: event.detail?.source,
+        reason: event.detail?.reason,
+        priority: event.detail?.priority,
+        coalescedSources: event.detail?.coalescedSources,
+        coalescedReasons: event.detail?.coalescedReasons,
+        timestamp: event.detail?.timestamp,
+        currentTime: Date.now(),
+        eventDelay: Date.now() - (event.detail?.timestamp || 0)
+      });
+      
+      // Trigger rejoin when we receive the event
+      rejoinLikeInitial(false).then(() => {
+        console.warn('[ReconnectDebug] ✅ RECONNECT COMPLETED from event');
+      }).catch(error => {
+        console.error('[ReconnectDebug] ❌ RECONNECT FAILED from event:', {
+          error,
+          errorMessage: error?.message,
+          source: event.detail?.source,
+          reason: event.detail?.reason
+        });
+      });
+    };
+    
+    window.addEventListener('realtime:auth-heal', handleReconnectEvent as EventListener);
+    console.log('[ReconnectDebug] 👂 Listening for realtime:auth-heal events');
+    
+    return () => {
+      window.removeEventListener('realtime:auth-heal', handleReconnectEvent as EventListener);
+      console.log('[ReconnectDebug] 👋 Stopped listening for realtime:auth-heal events');
+    };
+  }, [rejoinLikeInitial]);
+
   React.useEffect(() => {
     const diagnostics = diagnosticsRef.current!;
     const tick = async () => {

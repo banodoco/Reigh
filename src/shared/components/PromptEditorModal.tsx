@@ -730,7 +730,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
           <input ref={tempFocusInputRef} type="text" className="sr-only" aria-hidden="true" />
         )}
         <div className={modal.headerClass}>
-          <DialogHeader className={`${modal.isMobile ? 'px-2 pt-6 pb-2' : 'px-6 pt-8 pb-2'} flex-shrink-0`}>
+          <DialogHeader className={`${modal.isMobile ? 'px-2 pt-2 pb-2' : 'px-6 pt-4 pb-2'} flex-shrink-0`}>
             <DialogTitle>Prompt Editor</DialogTitle>
           </DialogHeader>
         </div>

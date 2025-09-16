@@ -112,7 +112,7 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({ isOpen, onOpenChan
         {...{...modal.props}}
       >
         <div className={modal.headerClass}>
-          <DialogHeader className={`${modal.isMobile ? 'px-4 pt-4 pb-2' : 'px-6 pt-4 pb-2'} flex-shrink-0`}>
+          <DialogHeader className={`${modal.isMobile ? 'px-4 pt-2 pb-2' : 'px-6 pt-2 pb-2'} flex-shrink-0`}>
             <DialogTitle className="text-xl font-cocogoose text-primary">
               Refer artists to create with Reigh
             </DialogTitle>

@@ -168,7 +168,7 @@ export const MagicEditModal: React.FC<MagicEditModalProps> = ({
           {...{...modal.props}}
         >
           <div className={modal.headerClass}>
-            <DialogHeader className={`${modal.isMobile ? 'px-4 pt-3 pb-1' : 'px-6 pt-3 pb-1'} flex-shrink-0`}>
+            <DialogHeader className={`${modal.isMobile ? 'px-4 pt-2 pb-1' : 'px-6 pt-2 pb-1'} flex-shrink-0`}>
               <DialogTitle>Magic Edit</DialogTitle>
             </DialogHeader>
           </div>

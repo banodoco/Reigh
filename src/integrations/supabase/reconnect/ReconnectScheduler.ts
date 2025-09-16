@@ -38,22 +38,47 @@ export class ReconnectScheduler {
       timestamp: Date.now()
     };
 
+    console.log('[ReconnectScheduler] Request received:', {
+      source: fullIntent.source,
+      reason: fullIntent.reason,
+      priority: fullIntent.priority,
+      pendingIntentsCount: this.pendingIntents.length,
+      isProcessing: this.isProcessing,
+      timeSinceLastReconnect: Date.now() - this.lastReconnectAt,
+      schedulerState: this.getState()
+    });
+
     // Add to pending intents
     this.pendingIntents.push(fullIntent);
 
     // Clear existing debounce timer
     if (this.debounceTimeout) {
       clearTimeout(this.debounceTimeout);
+      console.log('[ReconnectScheduler] Cleared existing debounce timer');
     }
 
     // Set new debounce timer
     this.debounceTimeout = setTimeout(() => {
       this.processReconnectIntents();
     }, this.DEBOUNCE_MS);
+    
+    console.log('[ReconnectScheduler] Debounce timer set:', {
+      debounceMs: this.DEBOUNCE_MS,
+      willProcessAt: Date.now() + this.DEBOUNCE_MS
+    });
   }
 
   private processReconnectIntents() {
+    console.log('[ReconnectScheduler] Processing intents:', {
+      isProcessing: this.isProcessing,
+      pendingIntentsCount: this.pendingIntents.length,
+      pendingIntents: this.pendingIntents.map(i => ({ source: i.source, reason: i.reason, priority: i.priority }))
+    });
+
     if (this.isProcessing || this.pendingIntents.length === 0) {
+      console.log('[ReconnectScheduler] Skipping processing:', {
+        reason: this.isProcessing ? 'already processing' : 'no pending intents'
+      });
       return;
     }
 
@@ -63,6 +88,13 @@ export class ReconnectScheduler {
     // Enforce minimum interval
     if (timeSinceLastReconnect < this.MIN_INTERVAL_MS) {
       const remainingWait = this.MIN_INTERVAL_MS - timeSinceLastReconnect;
+      
+      console.log('[ReconnectScheduler] Enforcing minimum interval:', {
+        timeSinceLastReconnect,
+        minIntervalMs: this.MIN_INTERVAL_MS,
+        remainingWait,
+        willRetryAt: now + remainingWait
+      });
       
       // Reschedule after the remaining wait time
       this.debounceTimeout = setTimeout(() => {
@@ -85,6 +117,19 @@ export class ReconnectScheduler {
     const allSources = sortedIntents.map(i => i.source);
     const allReasons = [...new Set(sortedIntents.map(i => i.reason))];
 
+    console.log('[ReconnectScheduler] Coalescing intents:', {
+      totalIntents: sortedIntents.length,
+      primaryIntent: {
+        source: primaryIntent.source,
+        reason: primaryIntent.reason,
+        priority: primaryIntent.priority,
+        timestamp: primaryIntent.timestamp
+      },
+      allSources,
+      allReasons,
+      eventWillDispatch: true
+    });
+
     // Clear pending intents
     this.pendingIntents = [];
 
@@ -92,6 +137,8 @@ export class ReconnectScheduler {
     this.lastReconnectAt = now;
 
     try {
+      console.log('[ReconnectScheduler] Dispatching realtime:auth-heal event...');
+      
       // Dispatch the single, coalesced reconnect event
       window.dispatchEvent(new CustomEvent('realtime:auth-heal', {
         detail: {
@@ -103,10 +150,25 @@ export class ReconnectScheduler {
           timestamp: now
         }
       }));
+      
+      console.log('[ReconnectScheduler] ✅ Event dispatched successfully');
     } catch (error) {
-      console.error('[ReconnectScheduler] ❌ FAILED TO DISPATCH RECONNECT:', error);
+      console.error('[ReconnectScheduler] ❌ FAILED TO DISPATCH RECONNECT:', {
+        error,
+        errorMessage: error?.message,
+        errorStack: error?.stack,
+        eventDetails: {
+          source: primaryIntent.source,
+          reason: primaryIntent.reason,
+          priority: primaryIntent.priority,
+          coalescedSources: allSources,
+          coalescedReasons: allReasons,
+          timestamp: now
+        }
+      });
     } finally {
       this.isProcessing = false;
+      console.log('[ReconnectScheduler] Processing complete, isProcessing set to false');
     }
   }
 

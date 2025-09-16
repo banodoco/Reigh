@@ -1191,11 +1191,29 @@ export class SupabaseRealtimeAdapter {
     const conn = realtime?.conn;
     const isPhoenixConnected = conn?.transport?.readyState === 1 && conn?.isConnected?.();
     
+    // Enhanced WebSocket state logging
+    const wsState = conn?.transport?.readyState;
+    const wsStateText = ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'][wsState] || 'UNKNOWN';
+    const wsUrl = conn?.transport?.url;
+    
+    console.log('[WebSocketDebug] Current connection state:', {
+      wsState,
+      wsStateText,
+      wsUrl,
+      isPhoenixConnected,
+      connExists: !!conn,
+      transportExists: !!conn?.transport,
+      isConnectedMethod: conn?.isConnected?.(),
+      timestamp: Date.now()
+    });
+    
     if (!isPhoenixConnected) {
       console.error('[PhoenixConnectionFix] 🚨 PHOENIX SOCKET NOT CONNECTED - FORCING CONNECTION:', {
         connExists: !!conn,
         transportExists: !!conn?.transport,
         transportReadyState: conn?.transport?.readyState,
+        transportReadyStateText: wsStateText,
+        transportUrl: wsUrl,
         isConnected: conn?.isConnected?.(),
         timestamp: Date.now()
       });

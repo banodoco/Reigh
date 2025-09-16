@@ -16,6 +16,7 @@ import { VideoTravelSettings } from '../settings';
 import { deepEqual, sanitizeSettings } from '@/shared/lib/deepEqual';
 import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/shared/components/ui/skeleton';
+import { SkeletonGallery } from '@/shared/components/ui/skeleton-gallery';
 import { PageFadeIn } from '@/shared/components/transitions';
 import { useListPublicResources } from '@/shared/hooks/useResources';
 import { ToolPageHeader } from '@/shared/components/ToolPageHeader';
@@ -112,7 +113,12 @@ const VideoTravelToolPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const viaShotClick = location.state?.fromShotClick === true;
-  const { selectedProjectId, setSelectedProjectId } = useProject();
+  const { selectedProjectId, setSelectedProjectId, projects } = useProject();
+  
+  // Get current project's aspect ratio
+  const currentProject = projects.find(p => p.id === selectedProjectId);
+  const projectAspectRatio = currentProject?.aspectRatio;
+  
   const [selectedShot, setSelectedShot] = useState<Shot | null>(null);
   const { currentShotId, setCurrentShotId } = useCurrentShot();
   
@@ -1185,20 +1191,30 @@ const VideoTravelToolPage: React.FC = () => {
       {!shouldShowShotEditor ? (
         <>
           {showVideosView ? (
-            <ImageGallery
-              images={videosData?.items || []}
-              allShots={shots || []}
-              onAddToLastShot={async () => false} // No-op for video gallery
-              onAddToLastShotWithoutPosition={async () => false} // No-op for video gallery
-              currentToolType="travel-between-images"
-              initialMediaTypeFilter="video"
-              initialToolTypeFilter={true}
-              currentToolTypeName="Travel Between Images"
-              showShotFilter={true}
-              initialShotFilter="all"
-              columnsPerRow={4}
-              itemsPerPage={20}
-            />
+            // Show SkeletonGallery when loading videos or when no data yet
+            (!selectedProjectId || (videosLoading && (!videosData?.items || videosData.items.length === 0))) ? (
+              <SkeletonGallery
+                count={20}
+                columns={{ base: 2, sm: 3, md: 4, lg: 4, xl: 4, '2xl': 4 }}
+                showControls={true}
+                projectAspectRatio={projectAspectRatio}
+              />
+            ) : (
+              <ImageGallery
+                images={videosData?.items || []}
+                allShots={shots || []}
+                onAddToLastShot={async () => false} // No-op for video gallery
+                onAddToLastShotWithoutPosition={async () => false} // No-op for video gallery
+                currentToolType="travel-between-images"
+                initialMediaTypeFilter="video"
+                initialToolTypeFilter={true}
+                currentToolTypeName="Travel Between Images"
+                showShotFilter={true}
+                initialShotFilter="all"
+                columnsPerRow={4}
+                itemsPerPage={20}
+              />
+            )
           ) : (
             <ShotListDisplay
               onSelectShot={handleShotSelect}

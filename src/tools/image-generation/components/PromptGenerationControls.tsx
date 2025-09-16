@@ -126,7 +126,7 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
     <div className="space-y-2 p-4">
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <div className="md:col-span-3">
-          <Label htmlFor="gen_overallPromptText">What prompts would you like to generate?</Label>
+          <Label htmlFor="gen_overallPromptText" className="mb-2 block">What prompts would you like to generate?</Label>
           <Textarea
             id="gen_overallPromptText"
             value={overallPromptText}
@@ -141,7 +141,7 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
           />
         </div>
         <div className="md:col-span-2">
-          <Label htmlFor="gen_rulesToRememberText">Rules/Constraints</Label>
+          <Label htmlFor="gen_rulesToRememberText" className="mb-2 block">Rules/Constraints</Label>
           <Textarea
             id="gen_rulesToRememberText"
             value={rulesToRememberText}
@@ -303,7 +303,7 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
             </div>
           </div>
         </div>
-        <div className="space-y-2 pt-6 sm:pt-4">
+        <div className="space-y-2 pt-2 sm:pt-4">
             <div className="flex items-center space-x-2">
                 <Checkbox 
                     id="gen_includeExistingContext" 
@@ -347,14 +347,16 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
             </div>
         </div>
       </div>
-      <Button 
-        type="button"
-        onClick={handleGenerateClick}
-        disabled={!hasApiKey || isGenerating} 
-        className="w-full sm:w-auto"
-      >
-        {isGenerating ? 'Generating...' : 'Generate Prompts'}
-      </Button>
+      <div className="-mt-2 pt-6 sm:mt-0 sm:pt-2">
+        <Button 
+          type="button"
+          onClick={handleGenerateClick}
+          disabled={!hasApiKey || isGenerating} 
+          className="w-full sm:w-auto"
+        >
+          {isGenerating ? 'Generating...' : 'Generate Prompts'}
+        </Button>
+      </div>
     </div>
   );
 }; 
